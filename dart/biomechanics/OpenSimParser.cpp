@@ -919,6 +919,32 @@ OpenSimFile OpenSimParser::readOsim40(
 
   OpenSimFile file;
   file.skeleton = skel;
+
+  tinyxml2::XMLElement* markerSet
+      = modelElement->FirstChildElement("MarkerSet");
+  if (markerSet != nullptr)
+  {
+    tinyxml2::XMLElement* markerList = markerSet->FirstChildElement("objects");
+    if (markerList != nullptr)
+    {
+      tinyxml2::XMLElement* markerCursor
+          = markerList->FirstChildElement("Marker");
+      while (markerCursor)
+      {
+        std::string name(markerCursor->Attribute("name"));
+        Eigen::Vector3s offset
+            = readVec3(markerCursor->FirstChildElement("location"));
+        std::string bodyName
+            = markerCursor->FirstChildElement("body")->GetText();
+
+        file.markersMap[name]
+            = std::make_pair(skel->getBodyNode(bodyName), offset);
+
+        markerCursor = markerCursor->NextSiblingElement();
+      }
+    }
+  }
+
   return file;
 }
 
@@ -1151,6 +1177,33 @@ OpenSimFile OpenSimParser::readOsim30(
 
   OpenSimFile file;
   file.skeleton = skel;
+
+  tinyxml2::XMLElement* markerSet
+      = modelElement->FirstChildElement("MarkerSet");
+  if (markerSet != nullptr)
+  {
+    tinyxml2::XMLElement* markerList = markerSet->FirstChildElement("objects");
+    if (markerList != nullptr)
+    {
+      tinyxml2::XMLElement* markerCursor
+          = markerList->FirstChildElement("Marker");
+      while (markerCursor)
+      {
+        std::string name(markerCursor->Attribute("name"));
+        Eigen::Vector3s offset
+            = readVec3(markerCursor->FirstChildElement("location"));
+        std::string socketName
+            = markerCursor->FirstChildElement("socket_parent_frame")->GetText();
+        std::string bodyName = bodyLookupMap[socketName].name;
+
+        file.markersMap[name]
+            = std::make_pair(skel->getBodyNode(bodyName), offset);
+
+        markerCursor = markerCursor->NextSiblingElement();
+      }
+    }
+  }
+
   return file;
 }
 

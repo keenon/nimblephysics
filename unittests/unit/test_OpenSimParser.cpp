@@ -21,11 +21,16 @@ TEST(OpenSimParser, RAJAGOPAL_v3)
   OpenSimFile file = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
   std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
-  (void)skel;
   EXPECT_TRUE(skel->getNumDofs() > 0);
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
   verifyFeatherstoneJacobians(world);
+
+  EXPECT_TRUE(file.markersMap.size() > 0);
+  for (auto pair : file.markersMap)
+  {
+    EXPECT_TRUE(pair.second.first != nullptr);
+  }
 
   /*
   // Uncomment this for local testing
@@ -63,6 +68,12 @@ TEST(OpenSimParser, RAJAGOPAL_v4)
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
   verifyFeatherstoneJacobians(world);
+
+  EXPECT_TRUE(file.markersMap.size() > 0);
+  for (auto pair : file.markersMap)
+  {
+    EXPECT_TRUE(pair.second.first != nullptr);
+  }
 
   /*
   // Uncomment this for local testing
