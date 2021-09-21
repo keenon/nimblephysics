@@ -3445,7 +3445,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForce(
   Eigen::VectorXs tmp;
   tmp.resize(static_cast<int>(skel->getNumDofs()));
 
-  s_t eps = useRidders ? 1e-3 : 1e-6;
+  s_t eps = useRidders ? 1e-2 : 1e-4;
   math::finiteDifference(
     [&](/* in*/ s_t eps,
         /* in*/ int dof,
