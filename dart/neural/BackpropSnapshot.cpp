@@ -2307,7 +2307,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosVelJacobian(
 #ifdef DART_USE_ARBITRARY_PRECISION
   s_t eps = useRidders ? 5e-6 : 1e-7;
 #else
-  s_t eps = useRidders ? 5e-3 : 1e-7;
+  s_t eps = useRidders ? 1e-4 : 1e-7;
 #endif
   try
   {
