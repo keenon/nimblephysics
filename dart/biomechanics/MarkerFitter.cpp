@@ -14,9 +14,9 @@ MarkerFitResult::MarkerFitResult() : success(false){};
 
 MarkerFitter::MarkerFitter(
     std::shared_ptr<dynamics::Skeleton> skeleton,
-    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers)
+    std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+        markers)
   : mSkeleton(skeleton),
-    mMarkers(markers),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(15),
@@ -26,12 +26,131 @@ MarkerFitter::MarkerFitter(
     mDisableLinesearch(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
+  int offset = 0;
   for (auto pair : markers)
   {
+    mMarkerIndices[pair.first] = offset;
+    mMarkerNames.push_back(pair.first);
+    offset++;
+    mMarkers.push_back(pair.second);
     mMarkersBallJoints.emplace_back(
-        mSkeletonBallJoints->getBodyNode(pair.first->getName()),
-        Eigen::Vector3s(pair.second));
+        mSkeletonBallJoints->getBodyNode(pair.second.first->getName()),
+        Eigen::Vector3s(pair.second.second));
   }
+}
+
+//==============================================================================
+/// This solves an optimization problem, trying to get the Skeleton to match
+/// the markers as closely as possible.
+std::shared_ptr<MarkerFitResult> MarkerFitter::optimize(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  // Create an instance of the IpoptApplication
+  //
+  // We are using the factory, since this allows us to compile this
+  // example with an Ipopt Windows DLL
+  SmartPtr<Ipopt::IpoptApplication> app = IpoptApplicationFactory();
+
+  // Change some options
+  // Note: The following choices are only examples, they might not be
+  //       suitable for your optimization problem.
+  app->Options()->SetNumericValue("tol", static_cast<double>(mTolerance));
+  app->Options()->SetStringValue(
+      "linear_solver",
+      "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
+
+  app->Options()->SetStringValue(
+      "hessian_approximation", "limited-memory"); // limited-memory, exacty
+
+  /*
+  app->Options()->SetStringValue(
+      "scaling_method", "none"); // none, gradient-based
+  */
+
+  app->Options()->SetIntegerValue("max_iter", mIterationLimit);
+
+  // Disable LBFGS history
+  app->Options()->SetIntegerValue(
+      "limited_memory_max_history", mLBFGSHistoryLength);
+
+  // Just for debugging
+  if (mCheckDerivatives)
+  {
+    app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
+    app->Options()->SetStringValue("derivative_test", "first-order");
+    app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
+  }
+
+  if (mPrintFrequency > 0)
+  {
+    app->Options()->SetIntegerValue("print_frequency_iter", mPrintFrequency);
+  }
+  else
+  {
+    app->Options()->SetIntegerValue(
+        "print_frequency_iter", std::numeric_limits<int>::infinity());
+  }
+  if (mSilenceOutput)
+  {
+    app->Options()->SetIntegerValue("print_level", 0);
+  }
+  if (mDisableLinesearch)
+  {
+    app->Options()->SetIntegerValue("max_soc", 0);
+    app->Options()->SetStringValue("accept_every_trial_step", "yes");
+  }
+  app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
+
+  std::shared_ptr<MarkerFitResult> result = std::make_shared<MarkerFitResult>();
+
+  // Initialize the IpoptApplication and process the options
+  Ipopt::ApplicationReturnStatus status;
+  status = app->Initialize();
+  if (status != Solve_Succeeded)
+  {
+    std::cout << std::endl
+              << std::endl
+              << "*** Error during initialization!" << std::endl;
+    return result;
+  }
+
+  // This will automatically free the problem object when finished,
+  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
+  // If you try to leave `problem` on the stack, you'll get invalid free
+  // exceptions when IPOpt attempts to free it.
+  BilevelFitProblem* problem
+      = new BilevelFitProblem(this, markerObservations, result);
+  SmartPtr<BilevelFitProblem> problemPtr(problem);
+  status = app->OptimizeTNLP(problemPtr);
+
+  if (status == Solve_Succeeded)
+  {
+    // Retrieve some statistics about the solve
+    Index iter_count = app->Statistics()->IterationCount();
+    std::cout << std::endl
+              << std::endl
+              << "*** The problem solved in " << iter_count << " iterations!"
+              << std::endl;
+
+    Number final_obj = app->Statistics()->FinalObjective();
+    std::cout << std::endl
+              << std::endl
+              << "*** The final value of the objective function is "
+              << final_obj << '.' << std::endl;
+  }
+
+  result->success = (status == Ipopt::Solve_Succeeded);
+
+  return result;
+}
+
+//==============================================================================
+/// Internally all the markers are concatenated together, so each index has a
+/// name.
+std::string MarkerFitter::getMarkerNameAtIndex(int index)
+{
+  return mMarkerNames[index];
 }
 
 //==============================================================================
@@ -708,110 +827,6 @@ MarkerFitter::finiteDifferenceLossGradientWrtJointsJacobianWrtMarkerOffsets(
   return jac;
 }
 
-//==============================================================================
-std::shared_ptr<MarkerFitResult> MarkerFitter::optimize(
-    const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
-        markerObservations)
-{
-  // Create an instance of the IpoptApplication
-  //
-  // We are using the factory, since this allows us to compile this
-  // example with an Ipopt Windows DLL
-  SmartPtr<Ipopt::IpoptApplication> app = IpoptApplicationFactory();
-
-  // Change some options
-  // Note: The following choices are only examples, they might not be
-  //       suitable for your optimization problem.
-  app->Options()->SetNumericValue("tol", static_cast<double>(mTolerance));
-  app->Options()->SetStringValue(
-      "linear_solver",
-      "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
-
-  app->Options()->SetStringValue(
-      "hessian_approximation", "limited-memory"); // limited-memory, exacty
-
-  /*
-  app->Options()->SetStringValue(
-      "scaling_method", "none"); // none, gradient-based
-  */
-
-  app->Options()->SetIntegerValue("max_iter", mIterationLimit);
-
-  // Disable LBFGS history
-  app->Options()->SetIntegerValue(
-      "limited_memory_max_history", mLBFGSHistoryLength);
-
-  // Just for debugging
-  if (mCheckDerivatives)
-  {
-    app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
-    app->Options()->SetStringValue("derivative_test", "first-order");
-    app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
-  }
-
-  if (mPrintFrequency > 0)
-  {
-    app->Options()->SetIntegerValue("print_frequency_iter", mPrintFrequency);
-  }
-  else
-  {
-    app->Options()->SetIntegerValue(
-        "print_frequency_iter", std::numeric_limits<int>::infinity());
-  }
-  if (mSilenceOutput)
-  {
-    app->Options()->SetIntegerValue("print_level", 0);
-  }
-  if (mDisableLinesearch)
-  {
-    app->Options()->SetIntegerValue("max_soc", 0);
-    app->Options()->SetStringValue("accept_every_trial_step", "yes");
-  }
-  app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
-
-  std::shared_ptr<MarkerFitResult> result = std::make_shared<MarkerFitResult>();
-
-  // Initialize the IpoptApplication and process the options
-  Ipopt::ApplicationReturnStatus status;
-  status = app->Initialize();
-  if (status != Solve_Succeeded)
-  {
-    std::cout << std::endl
-              << std::endl
-              << "*** Error during initialization!" << std::endl;
-    return result;
-  }
-
-  // This will automatically free the problem object when finished,
-  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
-  // If you try to leave `problem` on the stack, you'll get invalid free
-  // exceptions when IPOpt attempts to free it.
-  BilevelFitProblem* problem
-      = new BilevelFitProblem(this, markerObservations, result);
-  SmartPtr<BilevelFitProblem> problemPtr(problem);
-  status = app->OptimizeTNLP(problemPtr);
-
-  if (status == Solve_Succeeded)
-  {
-    // Retrieve some statistics about the solve
-    Index iter_count = app->Statistics()->IterationCount();
-    std::cout << std::endl
-              << std::endl
-              << "*** The problem solved in " << iter_count << " iterations!"
-              << std::endl;
-
-    Number final_obj = app->Statistics()->FinalObjective();
-    std::cout << std::endl
-              << std::endl
-              << "*** The final value of the objective function is "
-              << final_obj << '.' << std::endl;
-  }
-
-  result->success = (status == Ipopt::Solve_Succeeded);
-
-  return result;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // The BilevelFitProblem, which maps the problem onto a format that IPOpt can
 // work with.
@@ -826,14 +841,22 @@ std::shared_ptr<MarkerFitResult> MarkerFitter::optimize(
 /// observes some subset of the markers at some points in 3D space.
 BilevelFitProblem::BilevelFitProblem(
     MarkerFitter* fitter,
-    const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
     std::shared_ptr<MarkerFitResult>& outResult)
-  : mFitter(fitter),
-    mMarkerObservations(markerObservations),
-    mOutResult(outResult),
-    mInitializationCached(false)
+  : mFitter(fitter), mOutResult(outResult), mInitializationCached(false)
 {
+  // Translate the markers into the format expected by the problem
+  for (auto observation : markerObservations)
+  {
+    std::vector<std::pair<int, Eigen::Vector3s>> translated;
+    for (auto pair : observation)
+    {
+      translated.emplace_back(
+          mFitter->mMarkerIndices[pair.first], Eigen::Vector3s(pair.second));
+    }
+    mMarkerObservations.push_back(translated);
+  }
 }
 
 //==============================================================================
@@ -1643,7 +1666,12 @@ void BilevelFitProblem::finalize_solution(
   int dofs = mFitter->mSkeleton->getNumDofs();
 
   mOutResult->groupScales = x.segment(0, groupScaleDim);
-  mOutResult->markerOffsets = x.segment(groupScaleDim, markerOffsetDim);
+  mOutResult->rawMarkerOffsets = x.segment(groupScaleDim, markerOffsetDim);
+  for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+  {
+    mOutResult->markerErrors[mFitter->mMarkerNames[i]]
+        = mOutResult->rawMarkerOffsets.segment<3>(i * 3);
+  }
   for (int i = 0; i < mMarkerObservations.size(); i++)
   {
     mOutResult->poses.push_back(

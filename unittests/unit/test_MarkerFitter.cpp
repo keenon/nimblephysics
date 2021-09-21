@@ -25,11 +25,26 @@ using namespace realtime;
 bool testFitterGradients(
     MarkerFitter& fitter,
     std::shared_ptr<dynamics::Skeleton>& skel,
-    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-        markers,
-    const std::vector<std::pair<int, Eigen::Vector3s>>& observedMarkers)
+    const std::map<
+        std::string,
+        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markersMap,
+    const std::map<std::string, Eigen::Vector3s>& observedMarkersMap)
 {
   const s_t THRESHOLD = 2e-7;
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<int, Eigen::Vector3s>> observedMarkers;
+  int offset = 0;
+  std::map<std::string, int> markerOffsets;
+  for (auto pair : markersMap)
+  {
+    markerOffsets[pair.first] = offset;
+    offset++;
+    markers.push_back(pair.second);
+  }
+  for (auto pair : observedMarkersMap)
+  {
+    observedMarkers.emplace_back(markerOffsets[pair.first], pair.second);
+  }
 
   Eigen::VectorXs gradWrtJoints = fitter.getLossGradientWrtJoints(
       skel, markers, fitter.getMarkerError(skel, markers, observedMarkers));
@@ -243,10 +258,17 @@ bool testBilevelFitProblemGradients(
     int numPoses,
     double markerDropProb,
     std::shared_ptr<dynamics::Skeleton>& skel,
-    const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-        markers)
+    const std::map<
+        std::string,
+        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markersMap)
 {
   const s_t THRESHOLD = 5e-8;
+
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  for (auto pair : markersMap)
+  {
+    markers.push_back(pair.second);
+  }
 
   Eigen::VectorXs originalGroupScales = skel->getGroupScales();
 
@@ -260,7 +282,7 @@ bool testBilevelFitProblemGradients(
   Eigen::VectorXs goldMarkerOffsets
       = Eigen::VectorXs::Random(markers.size() * 3) * 0.05;
   std::vector<Eigen::VectorXs> goldPoses;
-  std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> observations;
+  std::vector<std::map<std::string, Eigen::Vector3s>> observations;
 
   for (int i = 0; i < numPoses; i++)
   {
@@ -270,13 +292,13 @@ bool testBilevelFitProblemGradients(
             skel, goldPose, goldGroupScales, goldMarkerOffsets);
     Eigen::VectorXs markerWorldPoses = skel->getMarkerWorldPositions(markers);
     // Take an observation
-    std::vector<std::pair<int, Eigen::Vector3s>> obs;
+    std::map<std::string, Eigen::Vector3s> obs;
     for (int j = 0; j < markers.size(); j++)
     {
       if (((double)rand() / RAND_MAX) > markerDropProb)
       {
-        obs.emplace_back(
-            j, Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3)));
+        obs[fitter.getMarkerNameAtIndex(j)]
+            = Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3));
       }
     }
     observations.push_back(obs);
@@ -382,12 +404,16 @@ bool testSolveBilevelFitProblem(
 
   // Provide three markers per body, to give enough data to make things
   // unambiguos
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markers;
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitX() * 0.05);
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitY() * 0.05);
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitZ() * 0.05);
+    markers[std::to_string(i) + "_0"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitX() * 0.05);
+    markers[std::to_string(i) + "_1"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitY() * 0.05);
+    markers[std::to_string(i) + "_2"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitZ() * 0.05);
   }
 
   MarkerFitter fitter(skel, markers);
@@ -402,7 +428,7 @@ bool testSolveBilevelFitProblem(
   Eigen::VectorXs goldMarkerOffsets
       = Eigen::VectorXs::Random(markers.size() * 3) * markerErrorBounds;
   std::vector<Eigen::VectorXs> goldPoses;
-  std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> observations;
+  std::vector<std::map<std::string, Eigen::Vector3s>> observations;
 
   Eigen::VectorXs goldX = Eigen::VectorXs::Zero(
       goldGroupScales.size() + goldMarkerOffsets.size()
@@ -432,13 +458,13 @@ bool testSolveBilevelFitProblem(
             skel, goldPose, goldGroupScales, goldMarkerOffsets);
     Eigen::VectorXs markerWorldPoses = skel->getMarkerWorldPositions(markers);
     // Take an observation
-    std::vector<std::pair<int, Eigen::Vector3s>> obs;
+    std::map<std::string, Eigen::Vector3s> obs;
     for (int j = 0; j < markers.size(); j++)
     {
       if (((double)rand() / RAND_MAX) > markerDropProb)
       {
-        obs.emplace_back(
-            j, Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3)));
+        obs[fitter.getMarkerNameAtIndex(j)]
+            = Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3));
       }
     }
     observations.push_back(obs);
@@ -484,11 +510,12 @@ bool testSolveBilevelFitProblem(
   groupScaleCols.col(1) = result->groupScales;
   groupScaleCols.col(2) = groupScaleError;
 
-  Eigen::VectorXs markerOffsetError = result->markerOffsets - goldMarkerOffsets;
+  Eigen::VectorXs markerOffsetError
+      = result->rawMarkerOffsets - goldMarkerOffsets;
   Eigen::MatrixXs markerOffsetCols
       = Eigen::MatrixXs(markerOffsetError.size(), 3);
   markerOffsetCols.col(0) = goldMarkerOffsets;
-  markerOffsetCols.col(1) = result->markerOffsets;
+  markerOffsetCols.col(1) = result->rawMarkerOffsets;
   markerOffsetCols.col(2) = markerOffsetError;
 
   std::cout << "Gold group scales - Recovered - Error: " << std::endl
@@ -513,12 +540,16 @@ bool debugIKInitializationToGUI(
 
   // Provide three markers per body, to give enough data to make things
   // unambiguos
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markers;
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitX() * 0.05);
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitY() * 0.05);
-    markers.emplace_back(skel->getBodyNode(i), Eigen::Vector3s::UnitZ() * 0.05);
+    markers[std::to_string(i) + "_0"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitX() * 0.05);
+    markers[std::to_string(i) + "_1"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitY() * 0.05);
+    markers[std::to_string(i) + "_2"]
+        = std::make_pair(skel->getBodyNode(i), Eigen::Vector3s::UnitZ() * 0.05);
   }
 
   MarkerFitter fitter(skel, markers);
@@ -571,12 +602,13 @@ bool debugIKInitializationToGUI(
   Eigen::VectorXs markerWorldPoses
       = skelBallJoints->getMarkerWorldPositions(adjustedMarkers);
   // Take an observation
-  std::vector<std::pair<int, Eigen::Vector3s>> obs;
-  for (int j = 0; j < adjustedMarkers.size(); j++)
+  std::map<std::string, Eigen::Vector3s> obs;
+  for (int j = 0; j < markers.size(); j++)
   {
     if (((double)rand() / RAND_MAX) > markerDropProb)
     {
-      obs.emplace_back(j, Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3)));
+      obs[fitter.getMarkerNameAtIndex(j)]
+          = Eigen::Vector3s(markerWorldPoses.segment<3>(j * 3));
     }
   }
 
@@ -992,34 +1024,30 @@ TEST(MarkerFitter, DERIVATIVES)
 
   osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("radius_r"), Eigen::Vector3s::Random()));
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random()));
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("tibia_r"), Eigen::Vector3s::Random()));
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("ulna_l"), Eigen::Vector3s::Random()));
-  markers.push_back(
-      std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
+  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markers;
+  markers["0"] = std::make_pair(
+      osim->getBodyNode("radius_l"), Eigen::Vector3s::Random());
+  markers["1"] = std::make_pair(
+      osim->getBodyNode("radius_r"), Eigen::Vector3s::Random());
+  markers["2"]
+      = std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
+  markers["3"]
+      = std::make_pair(osim->getBodyNode("tibia_r"), Eigen::Vector3s::Random());
+  markers["4"]
+      = std::make_pair(osim->getBodyNode("ulna_l"), Eigen::Vector3s::Random());
+  markers["5"]
+      = std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random());
 
   MarkerFitter fitter(osim, markers);
 
-  std::vector<std::pair<int, Eigen::Vector3s>> observedMarkers;
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(0, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(1, Eigen::Vector3s::Random()));
+  std::map<std::string, Eigen::Vector3s> observedMarkers;
+  observedMarkers["0"] = Eigen::Vector3s::Random();
+  observedMarkers["1"] = Eigen::Vector3s::Random();
   // Skip 2
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(3, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(4, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(5, Eigen::Vector3s::Random()));
+  observedMarkers["3"] = Eigen::Vector3s::Random();
+  observedMarkers["4"] = Eigen::Vector3s::Random();
+  observedMarkers["5"] = Eigen::Vector3s::Random();
 
   /*
   Eigen::VectorXs pose = Eigen::VectorXs(37);
@@ -1054,34 +1082,30 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("radius_r"), Eigen::Vector3s::Random()));
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("tibia_l"), Eigen::Vector3s::Random()));
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("tibia_r"), Eigen::Vector3s::Random()));
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("ulna_l"), Eigen::Vector3s::Random()));
-  markers.push_back(std::make_pair(
-      osimBallJoints->getBodyNode("ulna_r"), Eigen::Vector3s::Random()));
+  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      markers;
+  markers["0"] = std::make_pair(
+      osimBallJoints->getBodyNode("radius_l"), Eigen::Vector3s::Random());
+  markers["1"] = std::make_pair(
+      osimBallJoints->getBodyNode("radius_r"), Eigen::Vector3s::Random());
+  markers["2"] = std::make_pair(
+      osimBallJoints->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
+  markers["3"] = std::make_pair(
+      osimBallJoints->getBodyNode("tibia_r"), Eigen::Vector3s::Random());
+  markers["4"] = std::make_pair(
+      osimBallJoints->getBodyNode("ulna_l"), Eigen::Vector3s::Random());
+  markers["5"] = std::make_pair(
+      osimBallJoints->getBodyNode("ulna_r"), Eigen::Vector3s::Random());
 
   MarkerFitter fitter(osimBallJoints, markers);
 
-  std::vector<std::pair<int, Eigen::Vector3s>> observedMarkers;
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(0, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(1, Eigen::Vector3s::Random()));
+  std::map<std::string, Eigen::Vector3s> observedMarkers;
+  observedMarkers["0"] = Eigen::Vector3s::Random();
+  observedMarkers["1"] = Eigen::Vector3s::Random();
   // Skip 2
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(3, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(4, Eigen::Vector3s::Random()));
-  observedMarkers.push_back(
-      std::make_pair<int, Eigen::Vector3s>(5, Eigen::Vector3s::Random()));
+  observedMarkers["3"] = Eigen::Vector3s::Random();
+  observedMarkers["4"] = Eigen::Vector3s::Random();
+  observedMarkers["5"] = Eigen::Vector3s::Random();
 
   EXPECT_TRUE(
       testFitterGradients(fitter, osimBallJoints, markers, observedMarkers));

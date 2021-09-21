@@ -33,10 +33,13 @@
 #include <memory>
 
 #include <dart/biomechanics/OpenSimParser.hpp>
+#include <dart/dynamics/BodyNode.hpp>
 #include <dart/dynamics/MeshShape.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/simulation/World.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -45,6 +48,11 @@ namespace python {
 
 void OpenSimParser(py::module& m)
 {
+  ::py::class_<dart::biomechanics::OpenSimFile>(m, "OpenSimFile")
+      .def_readwrite("skeleton", &dart::biomechanics::OpenSimFile::skeleton)
+      .def_readwrite(
+          "markersMap", &dart::biomechanics::OpenSimFile::markersMap);
+
   auto sm = m.def_submodule("OpenSimParser");
   sm.def(
       "parseOsim",

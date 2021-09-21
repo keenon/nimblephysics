@@ -25,11 +25,10 @@ struct MarkerFitResult
   bool success;
 
   Eigen::VectorXs groupScales;
-  Eigen::VectorXs markerOffsets;
   std::vector<Eigen::VectorXs> poses;
+  std::map<std::string, Eigen::Vector3s> markerErrors;
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-      adjustedMarkers;
+  Eigen::VectorXs rawMarkerOffsets;
 
   MarkerFitResult();
 };
@@ -47,8 +46,19 @@ class MarkerFitter
 public:
   MarkerFitter(
       std::shared_ptr<dynamics::Skeleton> skeleton,
-      std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-          markers);
+      std::map<
+          std::string,
+          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers);
+
+  /// This solves an optimization problem, trying to get the Skeleton to match
+  /// the markers as closely as possible.
+  std::shared_ptr<MarkerFitResult> optimize(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// Internally all the markers are concatenated together, so each index has a
+  /// name.
+  std::string getMarkerNameAtIndex(int index);
 
   /// This method will set `skeleton` to the configuration given by the vectors
   /// of jointPositions and groupScales. It will also compute and return the
@@ -234,13 +244,12 @@ public:
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
-  std::shared_ptr<MarkerFitResult> optimize(
-      const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
-          markerObservations);
-
   friend class BilevelFitProblem;
 
 protected:
+  std::map<std::string, int> mMarkerIndices;
+  std::vector<std::string> mMarkerNames;
+
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
 
@@ -274,7 +283,7 @@ public:
   /// observes some subset of the markers at some points in 3D space.
   BilevelFitProblem(
       MarkerFitter* fitter,
-      const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
       std::shared_ptr<MarkerFitResult>& outResult);
 
@@ -430,8 +439,7 @@ public:
 
 protected:
   MarkerFitter* mFitter;
-  const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
-      mMarkerObservations;
+  std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
   std::shared_ptr<MarkerFitResult>& mOutResult;
   bool mInitializationCached;
   Eigen::VectorXs mCachedInitialization;

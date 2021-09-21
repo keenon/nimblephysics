@@ -994,6 +994,13 @@ public:
 
   /// These are a set of bodies, and offsets in local body space where markers
   /// are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getMarkerMapWorldPositions(
+      const std::map<
+          std::string,
+          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers);
+
+  /// These are a set of bodies, and offsets in local body space where markers
+  /// are mounted on the body
   Eigen::VectorXs getMarkerWorldPositions(
       const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
           markers);

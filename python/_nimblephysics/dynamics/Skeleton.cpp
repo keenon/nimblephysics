@@ -702,6 +702,7 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self, std::size_t treeIndex)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
+      .def("getRandomPose", &dart::dynamics::Skeleton::getRandomPose)
       .def(
           "getControlForceUpperLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
@@ -812,6 +813,14 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::
               getJointWorldPositionsJacobianWrtBodyScales,
           ::py::arg("joints"))
+      .def(
+          "getMarkerWorldPositions",
+          &dart::dynamics::Skeleton::getMarkerWorldPositions,
+          ::py::arg("markers"))
+      .def(
+          "getMarkerMapWorldPositions",
+          &dart::dynamics::Skeleton::getMarkerMapWorldPositions,
+          ::py::arg("markers"))
       .def(
           "fitJointsToWorldPositions",
           +[](dart::dynamics::Skeleton* self,

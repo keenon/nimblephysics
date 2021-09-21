@@ -53,11 +53,11 @@ void MarkerFitter(py::module& m)
       .def_readwrite(
           "groupScales", &dart::biomechanics::MarkerFitResult::groupScales)
       .def_readwrite(
-          "markerOffsets", &dart::biomechanics::MarkerFitResult::markerOffsets)
+          "markerErrors", &dart::biomechanics::MarkerFitResult::markerErrors)
       .def_readwrite("poses", &dart::biomechanics::MarkerFitResult::poses)
       .def_readwrite(
-          "adjustedMarkers",
-          &dart::biomechanics::MarkerFitResult::adjustedMarkers);
+          "rawMarkerOffsets",
+          &dart::biomechanics::MarkerFitResult::rawMarkerOffsets);
 
   ::py::class_<
       dart::biomechanics::MarkerFitter,
@@ -65,7 +65,8 @@ void MarkerFitter(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dynamics::Skeleton>,
-              std::vector<
+              std::map<
+                  std::string,
                   std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>(),
           ::py::arg("skeleton"),
           ::py::arg("markers"))

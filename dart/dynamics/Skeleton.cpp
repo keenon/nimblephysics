@@ -4123,6 +4123,25 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
 //==============================================================================
 /// These are a set of bodies, and offsets in local body space where markers
 /// are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getMarkerMapWorldPositions(
+    const std::map<
+        std::string,
+        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers)
+{
+  std::map<std::string, Eigen::Vector3s> returnMap;
+  for (auto markerPair : markers)
+  {
+    returnMap[markerPair.first]
+        = markerPair.second.first->getWorldTransform()
+          * markerPair.second.first->getScale().cwiseProduct(
+              markerPair.second.second);
+  }
+  return returnMap;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where markers
+/// are mounted on the body
 Eigen::VectorXs Skeleton::getMarkerWorldPositions(
     const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
         markers)
