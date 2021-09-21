@@ -2667,6 +2667,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosVelJacobian(
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       if ((!areResultsStandardized() || ptr->areResultsStandardized())
+          && ptr->getNumContacts() == getNumContacts()
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -2697,6 +2698,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosVelJacobian(
 
       BackpropSnapshotPtr ptr = neural::forwardPass(world, true);
       if ((!areResultsStandardized() || ptr->areResultsStandardized())
+          && ptr->getNumContacts() == getNumContacts()
           && ptr->getNumClamping() == getNumClamping()
           && ptr->getNumUpperBound() == getNumUpperBound())
       {
@@ -2848,6 +2850,7 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceRiddersPosVelJacobian(
       velMinus = snapshotMinus->getPostStepVelocity();
       if (!((!areResultsStandardized()
              || snapshotMinus->areResultsStandardized())
+            && snapshotMinus->getNumContacts() == getNumContacts()
             && snapshotMinus->getNumClamping() == getNumClamping()
             && snapshotMinus->getNumUpperBound() == getNumUpperBound()))
       {
