@@ -27,6 +27,7 @@
  * -------------------------------------------------------------------------- */
 
 #include "dart/math/SimmSpline.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include <array>
 
 using namespace dart;
@@ -438,69 +439,20 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
     return 0.0;
 }
 
-s_t SimmSpline::finiteDifferenceFirstDerivative(s_t x, bool useRiddders)
+s_t SimmSpline::finiteDifferenceFirstDerivative(s_t x, bool useRidders)
 {
-  if (useRiddders)
-  {
-    return finiteDifferenceRiddersFirstDerivative(x);
-  }
-
-  const s_t EPS = 1e-7;
-  return (calcValue(x + EPS) - calcValue(x - EPS)) / (2 * EPS);
-}
-
-s_t SimmSpline::finiteDifferenceRiddersFirstDerivative(s_t x)
-{
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<s_t, tabSize>, tabSize> tab;
-
-  tab[0][0]
-      = (calcValue(x + stepSize) - calcValue(x - stepSize)) / (2 * stepSize);
-  s_t dx = tab[0][0];
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    tab[0][iTab]
-        = (calcValue(x + stepSize) - calcValue(x - stepSize)) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = max(
-          std::abs(tab[jTab][iTab] - tab[jTab - 1][iTab]),
-          std::abs(tab[jTab][iTab] - tab[jTab - 1][iTab - 1]));
-      if (currError < bestError)
-      {
-        bestError = currError;
-        dx = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if (std::abs(tab[iTab][iTab] - tab[iTab - 1][iTab - 1])
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-
-  return dx;
+  s_t result = 0.;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /*out*/ s_t& perturbed) {
+      perturbed = calcValue(x + eps);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  return result;
 }
 
 int SimmSpline::getArgumentSize() const

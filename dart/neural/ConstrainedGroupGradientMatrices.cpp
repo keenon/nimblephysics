@@ -11,6 +11,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
@@ -2391,128 +2392,27 @@ ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfMinv(
     WithRespectTo* wrt,
     bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMinv(world, tau, wrt);
-
-  std::size_t innerDim = getWrtDim(world, wrt);
-
-  // These are predicted contact forces at the clamping contacts
   Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(world, tau);
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  Eigen::VectorXs before = getWrt(world, wrt);
-
-  const s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs newVPlus = implicitMultiplyByInvMassMatrix(world, tau);
-    perturbed = before;
-    perturbed(i) -= EPS;
-    setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs newVMinus = implicitMultiplyByInvMassMatrix(world, tau);
-    Eigen::VectorXs diff = newVPlus - newVMinus;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  setWrt(world, wrt, before);
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
-/// finite differences. This is SUPER SLOW, and is only here for testing.
-Eigen::MatrixXs
-ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
-    simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt)
-{
-  std::size_t innerDim = getWrtDim(world, wrt);
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = implicitMultiplyByInvMassMatrix(world, tau);
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
   Eigen::VectorXs originalWrt = getWrt(world, wrt);
+  Eigen::MatrixXs result(original.size(), getWrtDim(world, wrt));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    setWrt(world, wrt, perturbedPlus);
-    Eigen::MatrixXs MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    setWrt(world, wrt, perturbedMinus);
-    Eigen::MatrixXs MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-
-    tab[0][0] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      setWrt(world, wrt, perturbedPlus);
-      MinvTauPlus = implicitMultiplyByInvMassMatrix(world, tau);
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      setWrt(world, wrt, perturbedMinus);
-      MinvTauMinus = implicitMultiplyByInvMassMatrix(world, tau);
-
-      tab[0][iTab] = (MinvTauPlus - MinvTauMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      setWrt(world, wrt, tweakedWrt);
+      perturbed = implicitMultiplyByInvMassMatrix(world, tau);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
   setWrt(world, wrt, originalWrt);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -2521,128 +2421,27 @@ ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfMinv(
 Eigen::MatrixXs ConstrainedGroupGradientMatrices::finiteDifferenceJacobianOfC(
     simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfC(world, wrt);
-
-  std::size_t innerDim = getWrtDim(world, wrt);
-
-  // These are predicted contact forces at the clamping contacts
   Eigen::VectorXs original = getCoriolisAndGravityAndExternalForces(world);
-
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
-  Eigen::VectorXs before = getWrt(world, wrt);
-
-  const s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    Eigen::VectorXs perturbed = before;
-    perturbed(i) += EPS;
-    setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs tauPos = getCoriolisAndGravityAndExternalForces(world);
-    perturbed = before;
-    perturbed(i) -= EPS;
-    setWrt(world, wrt, perturbed);
-    Eigen::MatrixXs tauNeg = getCoriolisAndGravityAndExternalForces(world);
-    Eigen::VectorXs diff = tauPos - tauNeg;
-    result.col(i) = diff / (2 * EPS);
-  }
-
-  setWrt(world, wrt, before);
-
-  return result;
-}
-
-//==============================================================================
-/// This computes and returns the jacobian of C(pos, inertia, vel) by finite
-/// differences.
-Eigen::MatrixXs
-ConstrainedGroupGradientMatrices::finiteDifferenceRiddersJacobianOfC(
-    simulation::WorldPtr world, WithRespectTo* wrt)
-{
-  std::size_t innerDim = getWrtDim(world, wrt);
-
-  // These are predicted contact forces at the clamping contacts
-  Eigen::VectorXs original = getCoriolisAndGravityAndExternalForces(world);
-
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(original.size(), innerDim);
-
   Eigen::VectorXs originalWrt = getWrt(world, wrt);
+  Eigen::MatrixXs result(original.size(), getWrtDim(world, wrt));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < innerDim; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    setWrt(world, wrt, perturbedPlus);
-    Eigen::MatrixXs tauPlus = getCoriolisAndGravityAndExternalForces(world);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    setWrt(world, wrt, perturbedMinus);
-    Eigen::MatrixXs tauMinus = getCoriolisAndGravityAndExternalForces(world);
-
-    tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      setWrt(world, wrt, perturbedPlus);
-      tauPlus = getCoriolisAndGravityAndExternalForces(world);
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      setWrt(world, wrt, perturbedMinus);
-      tauMinus = getCoriolisAndGravityAndExternalForces(world);
-
-      tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      setWrt(world, wrt, tweakedWrt);
+      perturbed = getCoriolisAndGravityAndExternalForces(world);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
   setWrt(world, wrt, originalWrt);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
