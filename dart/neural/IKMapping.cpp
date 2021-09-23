@@ -107,7 +107,7 @@ void IKMapping::setPositions(
         diff = positions - getPositions(world);
         J = getPosJacobian(world);
       },
-      [this](Eigen::VectorXs& pos) {
+      [](Eigen::VectorXs& pos) {
         // Don't random restart here
         (void)pos;
         assert(false);
