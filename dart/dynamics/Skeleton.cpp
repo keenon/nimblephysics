@@ -2998,7 +2998,7 @@ Eigen::MatrixXs
 Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
-  Eigen::MatrixXs result(joints.size() * 3, getNumScaleGroups());
+  Eigen::MatrixXs result(joints.size() * 3, getNumScaleGroups() * 3);
   Eigen::VectorXs original = getGroupScales();
 
   s_t eps = 1e-7;
@@ -3560,9 +3560,9 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
         Eigen::Vector3s originalScale = getBodyNode(body)->getScale();
         Eigen::Vector3s perturbedScale = originalScale;
         perturbedScale(axis) += eps;
-        getBodyNode(dof)->setScale(perturbedScale);
+        getBodyNode(body)->setScale(perturbedScale);
         perturbed = getJointWorldPositions(joints);
-        getBodyNode(dof)->setScale(originalScale);
+        getBodyNode(body)->setScale(originalScale);
         return true;
       },
       result,
