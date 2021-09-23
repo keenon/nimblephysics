@@ -763,10 +763,6 @@ public:
   Eigen::MatrixXs finiteDifferenceRelativeJacobianInPositionSpace(
       bool useRidders = true);
 
-  /// This uses finite differencing to compute the relative Jacobian in position
-  /// space
-  Eigen::MatrixXs finiteDifferenceRiddersRelativeJacobianInPositionSpace();
-
   /// This checks the intermediate analytical results of
   /// getRelativeJacobianInPositionSpace() against the finite differencing
   /// equivalents.

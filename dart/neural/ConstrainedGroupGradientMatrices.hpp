@@ -433,20 +433,10 @@ public:
       WithRespectTo* wrt,
       bool useRidders = false);
 
-  /// This computes and returns the jacobian of M^{-1}(pos, inertia) * tau by
-  /// finite differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
-      simulation::WorldPtr world, Eigen::VectorXs tau, WithRespectTo* wrt);
-
   /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
   /// differences. This is SUPER SLOW, and is only here for testing.
   Eigen::MatrixXs finiteDifferenceJacobianOfC(
       simulation::WorldPtr world, WithRespectTo* wrt, bool useRidders = true);
-
-  /// This computes and returns the jacobian of C(pos, inertia, vel) by finite
-  /// differences. This is SUPER SLOW, and is only here for testing.
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
-      simulation::WorldPtr world, WithRespectTo* wrt);
 
 private:
   std::size_t getWrtDim(simulation::WorldPtr world, WithRespectTo* wrt);

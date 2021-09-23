@@ -691,11 +691,6 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M(pos) for finite changes
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfM(
-      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXs finiteDifferenceJacobianOfC(
       neural::WithRespectTo* wrt, bool useRidders = true);
@@ -708,16 +703,6 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M*f + C(pos, vel) for finite changes
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfID(
-      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in C(pos, vel) for finite changes, using Ridders
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
-      neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXs finiteDifferenceJacobianOfMinv(
       const Eigen::VectorXs& f,
@@ -725,23 +710,11 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M^{-1}f for finite changes, using Ridders
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
-      Eigen::VectorXs f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXs finiteDifferenceVelCJacobian(bool useRidders = true);
 
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXs finiteDifferenceRiddersVelCJacobian();
-
   Eigen::MatrixXs finiteDifferenceJacobianOfFD(
       neural::WithRespectTo* wrt, bool useRidders = true);
-
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfFD(
-      neural::WithRespectTo* wrt);
 
   Eigen::VectorXs getDynamicsForces();
 
@@ -1535,10 +1508,6 @@ public:
       const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       bool useRidders = true);
-
-  // Documentation inherited
-  math::Jacobian finiteDifferenceRiddersWorldPositionJacobian(
-      const JacobianNode* _node, const Eigen::Vector3s& _localOffset);
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;

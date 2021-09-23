@@ -39,6 +39,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/FiniteDifference.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -400,130 +401,48 @@ const Eigen::Vector6s& Joint::getRelativePrimaryAcceleration() const
 //==============================================================================
 Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
 {
-  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXs::Zero(6, getNumDofs());
-  const s_t EPS = 1e-5;
+  Eigen::MatrixXs result(6, getNumDofs());
 
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    s_t original = getVelocity(i);
-    setVelocity(i, original + EPS);
-    Eigen::Vector6s Vplus = getRelativeSpatialVelocity();
-    setVelocity(i, original - EPS);
-    Eigen::Vector6s Vminus = getRelativeSpatialVelocity();
-    setVelocity(i, original);
-
-    J.col(i) = (Vplus - Vminus) / (2 * EPS);
-  }
-
-  return J;
+  bool useRidders = false;
+  s_t eps = 1e-5;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      s_t original = getVelocity(dof);
+      setVelocity(dof, original + eps);
+      perturbed = getRelativeSpatialVelocity();
+      setVelocity(dof, original);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianInPositionSpace(
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersRelativeJacobianInPositionSpace();
-  }
-  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXs::Zero(6, getNumDofs());
-  const s_t EPS = 1e-5;
-
   Eigen::Isometry3s T = getRelativeTransform();
+  Eigen::MatrixXs result(6, getNumDofs());
 
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    s_t original = getPosition(i);
-    setPosition(i, original + EPS);
-    Eigen::Vector6s Tplus = math::logMap(T.inverse() * getRelativeTransform());
-    setPosition(i, original - EPS);
-    Eigen::Vector6s Tminus = math::logMap(T.inverse() * getRelativeTransform());
-    setPosition(i, original);
-
-    J.col(i) = (Tplus - Tminus) / (2 * EPS);
-  }
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Joint::finiteDifferenceRiddersRelativeJacobianInPositionSpace()
-{
-  Eigen::Matrix<s_t, 6, Eigen::Dynamic> J
-      = Eigen::MatrixXs::Zero(6, getNumDofs());
-
-  Eigen::Isometry3s T = getRelativeTransform();
-
-  s_t originalStepSize = 1e-2;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 14;
-
-  for (std::size_t i = 0; i < getNumDofs(); i++)
-  {
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    s_t original = getPosition(i);
-    setPosition(i, original + originalStepSize);
-    Eigen::Vector6s Tplus = math::logMap(T.inverse() * getRelativeTransform());
-    setPosition(i, original - originalStepSize);
-    Eigen::Vector6s Tminus = math::logMap(T.inverse() * getRelativeTransform());
-    setPosition(i, original);
-
-    tab[0][0] = (Tplus - Tminus) / (2 * originalStepSize);
-
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      setPosition(i, original + stepSize);
-      Eigen::Vector6s Tplus
-          = math::logMap(T.inverse() * getRelativeTransform());
-      setPosition(i, original - stepSize);
-      Eigen::Vector6s Tminus
-          = math::logMap(T.inverse() * getRelativeTransform());
-      setPosition(i, original);
-
-      tab[0][iTab] = (Tplus - Tminus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  return J;
+  s_t eps = useRidders ? 1e-2 : 1e-5;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      s_t original = getPosition(dof);
+      setPosition(dof, original + eps);
+      perturbed = math::logMap(T.inverse() * getRelativeTransform());
+      setPosition(dof, original);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  return result;
 }
 
 //==============================================================================

@@ -117,18 +117,10 @@ public:
       const Eigen::Vector2s& velocities,
       bool useRidders = true) const;
 
-  Eigen::Matrix<s_t, 6, 2>
-  finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
-      const Eigen::Vector2s& positions,
-      const Eigen::Vector2s& velocities) const;
-
   Eigen::Matrix<s_t, 6, 2> finiteDifferenceRelativeJacobianDerivWrtPos(
       const Eigen::Vector2s& positions,
       int index,
       bool useRidders = true) const;
-
-  Eigen::Matrix<s_t, 6, 2> finiteDifferenceRiddersRelativeJacobianDerivWrtPos(
-      const Eigen::Vector2s& positions, int index) const;
 
   Eigen::Matrix<s_t, 6, 2>
   finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
@@ -138,23 +130,11 @@ public:
       bool useRidders = true) const;
 
   Eigen::Matrix<s_t, 6, 2>
-  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPosition(
-      const Eigen::Vector2s& positions,
-      const Eigen::Vector2s& velocities,
-      int index) const;
-
-  Eigen::Matrix<s_t, 6, 2>
   finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
       const Eigen::Vector2s& positions,
       const Eigen::Vector2s& velocities,
       int index,
       bool useRidders = true) const;
-
-  Eigen::Matrix<s_t, 6, 2>
-  finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVelocity(
-      const Eigen::Vector2s& positions,
-      const Eigen::Vector2s& velocities,
-      int index) const;
 
 protected:
   /// Constructor called by Skeleton class

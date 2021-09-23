@@ -54,6 +54,7 @@
 #include "dart/dynamics/PointMass.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/math/IKSolver.hpp"
@@ -2145,508 +2146,128 @@ void Skeleton::DiffC::print()
 Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfM(
     const Eigen::VectorXs& x, neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfM(x, wrt);
-
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
-
-  // Get baseline C(pos, vel)
-  Eigen::VectorXs baseline = getMassMatrix() * x;
-
-  s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += EPS;
-    wrt->set(this, tweaked);
-    mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::VectorXs plus = getMassMatrix() * x;
-    tweaked = start;
-    tweaked(i) -= EPS;
-    wrt->set(this, tweaked);
-    mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::VectorXs minus = getMassMatrix() * x;
-
-    J.col(i) = (plus - minus) / (2 * EPS);
-  }
-
-  // Reset everything how we left it
-  wrt->set(this, start);
-  mSkelCache.mDirty.mMassMatrix = true;
-  getMassMatrix();
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfM(
-    const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
-{
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::MatrixXs result(n, m);
   Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(this, tweakedWrt);
+        mSkelCache.mDirty.mMassMatrix = true;
+        perturbed = getMassMatrix() * x;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
-  for (std::size_t i = 0; i < m; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(this, perturbedPlus);
-    mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::MatrixXs plus = getMassMatrix() * x;
-
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(this, perturbedMinus);
-    mSkelCache.mDirty.mMassMatrix = true;
-    Eigen::MatrixXs minus = getMassMatrix() * x;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(this, perturbedPlus);
-      mSkelCache.mDirty.mMassMatrix = true;
-      plus = getMassMatrix() * x;
-
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(this, perturbedMinus);
-      mSkelCache.mDirty.mMassMatrix = true;
-      minus = getMassMatrix() * x;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
+  // Reset everything how we left it
   wrt->set(this, originalWrt);
   mSkelCache.mDirty.mMassMatrix = true;
   getMassMatrix();
 
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfC(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfC(wrt);
-
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
+  Eigen::MatrixXs result(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  // Get baseline C(pos, vel)
-  Eigen::VectorXs baseline
-      = getCoriolisAndGravityForces() - getExternalForces();
-
-  s_t EPS = 1e-7;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += EPS;
-    wrt->set(this, tweaked);
-    Eigen::VectorXs perturbedPos
-        = getCoriolisAndGravityForces() - getExternalForces();
-    tweaked = start;
-    tweaked(i) -= EPS;
-    wrt->set(this, tweaked);
-    Eigen::VectorXs perturbedNeg
-        = getCoriolisAndGravityForces() - getExternalForces();
-
-    J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
-  }
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(this, tweakedWrt);
+        perturbed = getCoriolisAndGravityForces() - getExternalForces();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   // Reset everything how we left it
-  wrt->set(this, start);
+  wrt->set(this, originalWrt);
 
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfID(
     const Eigen::VectorXs& f, neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfID(f, wrt);
-
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
+  Eigen::MatrixXs result(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
   const Eigen::VectorXs old_ddq = getAccelerations();
   setAccelerations(f);
 
-  s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += EPS;
-    wrt->set(this, tweaked);
-    computeInverseDynamics();
-    const Eigen::VectorXs plus = getControlForces();
-    tweaked = start;
-    tweaked(i) -= EPS;
-    wrt->set(this, tweaked);
-    computeInverseDynamics();
-    const Eigen::VectorXs minus = getControlForces();
-
-    J.col(i) = (plus - minus) / (2 * EPS);
-  }
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(this, tweakedWrt);
+        computeInverseDynamics();
+        perturbed = getControlForces();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   // Reset everything how we left it
-  wrt->set(this, start);
-
+  wrt->set(this, originalWrt);
   setAccelerations(old_ddq);
 
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfID(
-    const Eigen::VectorXs& f, neural::WithRespectTo* wrt)
-{
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs originalWrt = wrt->get(this);
-
-  const Eigen::VectorXs old_ddq = getAccelerations();
-  setAccelerations(f);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(this, perturbedPlus);
-    computeInverseDynamics();
-    Eigen::VectorXs plus = getControlForces();
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(this, perturbedMinus);
-    computeInverseDynamics();
-    Eigen::VectorXs minus = getControlForces();
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(this, perturbedPlus);
-      computeInverseDynamics();
-      plus = getControlForces();
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(this, perturbedMinus);
-      computeInverseDynamics();
-      minus = getControlForces();
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(this, originalWrt);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfC(
-    neural::WithRespectTo* wrt)
-{
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs originalWrt = wrt->get(this);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(this, perturbedPlus);
-    Eigen::MatrixXs tauPlus
-        = getCoriolisAndGravityForces() - getExternalForces();
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(this, perturbedMinus);
-    Eigen::MatrixXs tauMinus
-        = getCoriolisAndGravityForces() - getExternalForces();
-
-    tab[0][0] = (tauPlus - tauMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(this, perturbedPlus);
-      tauPlus = getCoriolisAndGravityForces() - getExternalForces();
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(this, perturbedMinus);
-      tauMinus = getCoriolisAndGravityForces() - getExternalForces();
-
-      tab[0][iTab] = (tauPlus - tauMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(this, originalWrt);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfMinv(
     const Eigen::VectorXs& f, neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMinv(f, wrt);
-
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
-
-  // Get baseline C(pos, vel)
-  Eigen::VectorXs baseline = multiplyByImplicitInvMassMatrix(f);
-
-  s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += EPS;
-    wrt->set(this, tweaked);
-    Eigen::VectorXs plus = multiplyByImplicitInvMassMatrix(f);
-    tweaked = start;
-    tweaked(i) -= EPS;
-    wrt->set(this, tweaked);
-    Eigen::VectorXs minus = multiplyByImplicitInvMassMatrix(f);
-
-    J.col(i) = (plus - minus) / (2 * EPS);
-  }
-
-  // Reset everything how we left it
-  wrt->set(this, start);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfMinv(
-    Eigen::VectorXs f, neural::WithRespectTo* wrt)
-{
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
+  Eigen::MatrixXs result(n, m);
   Eigen::VectorXs originalWrt = wrt->get(this);
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(this, tweakedWrt);
+        perturbed = multiplyByImplicitInvMassMatrix(f);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
-  for (std::size_t i = 0; i < m; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbedPlus = Eigen::VectorXs(originalWrt);
-    perturbedPlus(i) += stepSize;
-    wrt->set(this, perturbedPlus);
-    Eigen::MatrixXs MinvFPlus = multiplyByImplicitInvMassMatrix(f);
-    Eigen::VectorXs perturbedMinus = Eigen::VectorXs(originalWrt);
-    perturbedMinus(i) -= stepSize;
-    wrt->set(this, perturbedMinus);
-    Eigen::MatrixXs MinvFMinus = multiplyByImplicitInvMassMatrix(f);
-
-    tab[0][0] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbedPlus = Eigen::VectorXs(originalWrt);
-      perturbedPlus(i) += stepSize;
-      wrt->set(this, perturbedPlus);
-      MinvFPlus = multiplyByImplicitInvMassMatrix(f);
-      perturbedMinus = Eigen::VectorXs(originalWrt);
-      perturbedMinus(i) -= stepSize;
-      wrt->set(this, perturbedMinus);
-      MinvFMinus = multiplyByImplicitInvMassMatrix(f);
-
-      tab[0][iTab] = (MinvFPlus - MinvFMinus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
+  // Reset everything how we left it
   wrt->set(this, originalWrt);
 
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -2721,30 +2342,45 @@ Eigen::VectorXs Skeleton::getRandomPose()
 //==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersVelCJacobian();
-
   std::size_t n = getNumDofs();
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, n);
-  Eigen::VectorXs vel = getVelocities();
+  Eigen::MatrixXs result(n, n);
+  Eigen::VectorXs originalVel = getVelocities();
 
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedVel = originalVel;
+        tweakedVel(dof) += eps;
+        setVelocities(tweakedVel);
+        perturbed = getCoriolisAndGravityForces();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  setVelocities(originalVel);
+
+  // DEBUGGING
+  // TODO: delete?
+#ifndef NDEBUG
   // Get baseline C(pos, vel)
   Eigen::VectorXs baseline = getCoriolisAndGravityForces();
-
   s_t EPS = 1e-6;
-
   for (std::size_t i = 0; i < n; i++)
   {
-    Eigen::VectorXs tweakedVel = vel;
+    Eigen::VectorXs tweakedVel = originalVel;
     tweakedVel(i) += EPS;
     setVelocities(tweakedVel);
     Eigen::VectorXs perturbedPos = getCoriolisAndGravityForces();
-    tweakedVel = vel;
+    tweakedVel = originalVel;
     tweakedVel(i) -= EPS;
     setVelocities(tweakedVel);
     Eigen::VectorXs perturbedNeg = getCoriolisAndGravityForces();
 
-#ifndef NDEBUG
     if (perturbedPos == perturbedNeg && perturbedPos != baseline)
     {
       // std::cout << "Got a mysteriously broken coriolis force result" <<
@@ -2752,7 +2388,7 @@ Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 
       // Set positive vel change
 
-      tweakedVel = vel;
+      tweakedVel = originalVel;
       tweakedVel(i) += EPS;
       setVelocities(tweakedVel);
 
@@ -2786,7 +2422,7 @@ Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
 
       // Set negative vel change
 
-      tweakedVel = vel;
+      tweakedVel = originalVel;
       tweakedVel(i) -= EPS;
       setVelocities(tweakedVel);
 
@@ -2820,224 +2456,44 @@ Eigen::MatrixXs Skeleton::finiteDifferenceVelCJacobian(bool useRidders)
       // idempotent in V std::cout << "mCg pos: " << std::endl << mCg <<
       // std::endl; std::cout << "mCg neg: " << std::endl << mCg2 << std::endl;
     }
+  }
+  // Reset everything how we left it
+  setVelocities(originalVel);
 #endif
 
-    J.col(i) = (perturbedPos - perturbedNeg) / (2 * EPS);
-  }
-
-  // Reset everything how we left it
-  setVelocities(vel);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersVelCJacobian()
-{
-  std::size_t n = getNumDofs();
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, n);
-  Eigen::VectorXs vel = getVelocities();
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < n; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs tweakedVel = vel;
-    tweakedVel(i) += stepSize;
-    setVelocities(tweakedVel);
-    Eigen::VectorXs perturbedPos = getCoriolisAndGravityForces();
-    tweakedVel = vel;
-    tweakedVel(i) -= stepSize;
-    setVelocities(tweakedVel);
-    Eigen::VectorXs perturbedNeg = getCoriolisAndGravityForces();
-
-    tab[0][0] = (perturbedPos - perturbedNeg) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      tweakedVel = vel;
-      tweakedVel(i) += stepSize;
-      setVelocities(tweakedVel);
-      perturbedPos = getCoriolisAndGravityForces();
-      tweakedVel = vel;
-      tweakedVel(i) -= stepSize;
-      setVelocities(tweakedVel);
-      perturbedNeg = getCoriolisAndGravityForces();
-
-      tab[0][iTab] = (perturbedPos - perturbedNeg) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i) = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  // Reset everything how we left it
-  setVelocities(vel);
-
-  return J;
+  return result;
 }
 
 //==============================================================================
 Eigen::MatrixXs Skeleton::finiteDifferenceJacobianOfFD(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfFD(wrt);
-
   std::size_t n = getNumDofs();
   std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
+  Eigen::MatrixXs result(n, m);
+  Eigen::VectorXs originalWrt = wrt->get(this);
 
-  s_t EPS = 5e-7;
-
-  for (std::size_t i = 0; i < m; i++)
-  {
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += EPS;
-    wrt->set(this, tweaked);
-    computeForwardDynamics();
-    Eigen::VectorXs plus = getAccelerations();
-    tweaked = start;
-    tweaked(i) -= EPS;
-    wrt->set(this, tweaked);
-    computeForwardDynamics();
-    Eigen::VectorXs minus = getAccelerations();
-
-    J.col(i) = (plus - minus) / (2 * EPS);
-  }
+  s_t eps = useRidders ? 1e-3 : 5e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(this, tweakedWrt);
+        computeForwardDynamics();
+        perturbed = getAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   // Reset everything how we left it
-  wrt->set(this, start);
-
-  return J;
-}
-
-//==============================================================================
-Eigen::MatrixXs Skeleton::finiteDifferenceRiddersJacobianOfFD(
-    neural::WithRespectTo* wrt)
-{
-  std::size_t n = getNumDofs();
-  std::size_t m = wrt->dim(this);
-  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(n, m);
-  Eigen::VectorXs start = wrt->get(this);
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < n; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs tweaked = start;
-    tweaked(i) += stepSize;
-    wrt->set(this, tweaked);
-    computeForwardDynamics();
-    Eigen::VectorXs plus = getAccelerations();
-    tweaked = start;
-    tweaked(i) -= stepSize;
-    wrt->set(this, tweaked);
-    computeForwardDynamics();
-    Eigen::VectorXs minus = getAccelerations();
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      tweaked = start;
-      tweaked(i) += stepSize;
-      wrt->set(this, tweaked);
-      computeForwardDynamics();
-      plus = getAccelerations();
-      tweaked = start;
-      tweaked(i) -= stepSize;
-      wrt->set(this, tweaked);
-      computeForwardDynamics();
-      minus = getAccelerations();
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i) = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  // Reset everything how we left it
-  wrt->set(this, start);
+  wrt->set(this, originalWrt);
   computeForwardDynamics();
 
-  return J;
+  return result;
 }
 
 //==============================================================================
@@ -3542,30 +2998,28 @@ Eigen::MatrixXs
 Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
-  Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumScaleGroups() * 3);
-
+  Eigen::MatrixXs result(joints.size() * 3, getNumScaleGroups());
   Eigen::VectorXs original = getGroupScales();
 
-  const double EPS = 1e-7;
-  for (int i = 0; i < getNumScaleGroups() * 3; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    setGroupScales(perturbed);
-    Eigen::VectorXs plus = getJointWorldPositions(joints);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        setGroupScales(tweaked);
+        perturbed = getJointWorldPositions(joints);
+        return true;
+      },
+      result,
+      eps,
+      false);
 
-    perturbed = original;
-    perturbed(i) -= EPS;
-    setGroupScales(perturbed);
-    Eigen::VectorXs minus = getJointWorldPositions(joints);
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-
+  // Reset everything how we left it
   setGroupScales(original);
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -3957,27 +3411,28 @@ Eigen::MatrixXs
 Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
     const std::vector<const dynamics::Joint*>& joints)
 {
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size() * 3, getNumDofs());
-
+  Eigen::MatrixXs result(joints.size() * 3, getNumDofs());
   Eigen::VectorXs originalPos = getPositions();
-  const double EPS = 1e-7;
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    Eigen::VectorXs perturbed = originalPos;
-    perturbed(i) += EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs plus = getJointWorldPositions(joints);
 
-    perturbed = originalPos;
-    perturbed(i) -= EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs minus = getJointWorldPositions(joints);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPos;
+        tweakedPos(dof) += eps;
+        setPositions(tweakedPos);
+        perturbed = getJointWorldPositions(joints);
+        return true;
+      },
+      result,
+      eps,
+      false);
 
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
+  // Reset everything how we left it
   setPositions(originalPos);
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4006,27 +3461,28 @@ Eigen::MatrixXs
 Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
     const std::vector<const dynamics::Joint*>& joints)
 {
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size() * 3, getNumDofs());
-
+  Eigen::MatrixXs result(joints.size() * 3, getNumDofs());
   Eigen::VectorXs originalPos = getPositions();
-  const double EPS = 1e-7;
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    Eigen::VectorXs perturbed = originalPos;
-    perturbed(i) += EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs plus = getJointWorldAngles(joints);
 
-    perturbed = originalPos;
-    perturbed(i) -= EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs minus = getJointWorldAngles(joints);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPos;
+        tweakedPos(dof) += eps;
+        setPositions(tweakedPos);
+        perturbed = getJointWorldAngles(joints);
+        return true;
+      },
+      result,
+      eps,
+      false);
 
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
+  // Reset everything how we left it
   setPositions(originalPos);
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4092,32 +3548,24 @@ Eigen::MatrixXs
 Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
     const std::vector<const dynamics::Joint*>& joints)
 {
-  Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes() * 3);
+  Eigen::MatrixXs result(joints.size() * 3, getNumBodyNodes());
 
-  const double EPS = 1e-7;
-  for (int i = 0; i < getNumBodyNodes(); i++)
-  {
-    Eigen::Vector3s originalScale = getBodyNode(i)->getScale();
-    for (int axis = 0; axis < 3; axis++)
-    {
-      Eigen::Vector3s perturbed = originalScale;
-      perturbed(axis) += EPS;
-      getBodyNode(i)->setScale(perturbed);
-      Eigen::VectorXs plus = getJointWorldPositions(joints);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t originalScale = getBodyNode(dof)->getScale();
+        getBodyNode(dof)->setScale(originalScale + eps);
+        perturbed = getJointWorldPositions(joints);
+        getBodyNode(dof)->setScale(originalScale);
+        return true;
+      },
+      result,
+      eps,
+      false);
 
-      perturbed = originalScale;
-      perturbed(axis) -= EPS;
-      getBodyNode(i)->setScale(perturbed);
-      Eigen::VectorXs minus = getJointWorldPositions(joints);
-
-      getBodyNode(i)->setScale(originalScale);
-
-      jac.col(i * 3 + axis) = (plus - minus) / (2 * EPS);
-    }
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4185,27 +3633,28 @@ Skeleton::finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
     const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
         markers)
 {
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
-
+  Eigen::MatrixXs result(markers.size() * 3, getNumDofs());
   Eigen::VectorXs originalPos = getPositions();
-  const double EPS = 1e-7;
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    Eigen::VectorXs perturbed = originalPos;
-    perturbed(i) += EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs plus = getMarkerWorldPositions(markers);
 
-    perturbed = originalPos;
-    perturbed(i) -= EPS;
-    setPositions(perturbed);
-    Eigen::VectorXs minus = getMarkerWorldPositions(markers);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPos;
+        tweakedPos(dof) += eps;
+        setPositions(tweakedPos);
+        perturbed = getMarkerWorldPositions(markers);
+        return true;
+      },
+      result,
+      eps,
+      false);
 
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
+  // Reset everything how we left it
   setPositions(originalPos);
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -6101,117 +5550,26 @@ math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
     const Eigen::Vector3s& _localOffset,
     bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersWorldPositionJacobian(_node, _localOffset);
-  }
-  math::Jacobian J = math::Jacobian::Zero(6, getNumDofs());
-  s_t EPS = 1e-5;
-  for (int i = 0; i < getNumDofs(); i++)
-  {
-    s_t original = getPosition(i);
-    setPosition(i, original + EPS);
-    Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-    plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-    plus.tail<3>() = _node->getWorldTransform() * _localOffset;
-    setPosition(i, original - EPS);
-    Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-    minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-    minus.tail<3>() = _node->getWorldTransform() * _localOffset;
-    J.col(i) = (plus - minus) / (2 * EPS);
-    setPosition(i, original);
-  }
-  return J;
-}
+  Eigen::MatrixXs result(6, getNumDofs());
 
-//==============================================================================
-math::Jacobian Skeleton::finiteDifferenceRiddersWorldPositionJacobian(
-    const JacobianNode* _node, const Eigen::Vector3s& _localOffset)
-{
-  std::size_t n = getNumDofs();
-  Eigen::MatrixXs J = math::Jacobian::Zero(6, n);
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t original = getPosition(dof);
+        setPosition(dof, original + eps);
+        perturbed = Eigen::Vector6s::Zero();
+        perturbed.head<3>() = math::logMap(_node->getWorldTransform().linear());
+        perturbed.tail<3>() = _node->getWorldTransform() * _localOffset;
+        setPosition(dof, original);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  for (std::size_t i = 0; i < n; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::Vector6s, tabSize>, tabSize> tab;
-
-    s_t original = getPosition(i);
-
-    setPosition(i, original + stepSize);
-    Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-    plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-    plus.tail<3>() = _node->getWorldTransform() * _localOffset;
-
-    setPosition(i, original - stepSize);
-    Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-    minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-    minus.tail<3>() = _node->getWorldTransform() * _localOffset;
-
-    setPosition(i, original);
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      s_t original = getPosition(i);
-
-      setPosition(i, original + stepSize);
-      Eigen::Vector6s plus = Eigen::Vector6s::Zero();
-      plus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-      plus.tail<3>() = _node->getWorldTransform() * _localOffset;
-
-      setPosition(i, original - stepSize);
-      Eigen::Vector6s minus = Eigen::Vector6s::Zero();
-      minus.head<3>() = math::logMap(_node->getWorldTransform().linear());
-      minus.tail<3>() = _node->getWorldTransform() * _localOffset;
-
-      setPosition(i, original);
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = std::max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          J.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-
-  return J;
+  return math::Jacobian(result);
 }
 
 //==============================================================================
