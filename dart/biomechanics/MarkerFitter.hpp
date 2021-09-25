@@ -46,15 +46,20 @@ class MarkerFitter
 public:
   MarkerFitter(
       std::shared_ptr<dynamics::Skeleton> skeleton,
-      std::map<
-          std::string,
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers);
+      dynamics::MarkerMap markers);
 
   /// This solves an optimization problem, trying to get the Skeleton to match
   /// the markers as closely as possible.
   std::shared_ptr<MarkerFitResult> optimize(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
+
+  /// This lets us pick a subset of the marker observations, to cap the size of
+  /// the optimization problem.
+  static std::vector<std::map<std::string, Eigen::Vector3s>> pickSubset(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      int maxSize);
 
   /// Internally all the markers are concatenated together, so each index has a
   /// name.

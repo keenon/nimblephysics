@@ -2755,7 +2755,7 @@ void Skeleton::setLinkMasses(Eigen::VectorXs masses)
 //==============================================================================
 // This returns a vector of all the link scales for all the links in the
 // skeleton concatenated into a flat vector
-Eigen::VectorXs Skeleton::getLinkScales()
+Eigen::VectorXs Skeleton::getBodyScales()
 {
   Eigen::VectorXs scales = Eigen::VectorXs::Zero(getNumBodyNodes() * 3);
   for (int i = 0; i < getNumBodyNodes(); i++)
@@ -2767,7 +2767,7 @@ Eigen::VectorXs Skeleton::getLinkScales()
 
 //==============================================================================
 // Sets all the link scales for the skeleton, from a flat vector
-void Skeleton::setLinkScales(Eigen::VectorXs scales)
+void Skeleton::setBodyScales(Eigen::VectorXs scales)
 {
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
@@ -3576,9 +3576,7 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
 /// These are a set of bodies, and offsets in local body space where markers
 /// are mounted on the body
 std::map<std::string, Eigen::Vector3s> Skeleton::getMarkerMapWorldPositions(
-    const std::map<
-        std::string,
-        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers)
+    const MarkerMap& markers)
 {
   std::map<std::string, Eigen::Vector3s> returnMap;
   for (auto markerPair : markers)
@@ -3589,6 +3587,39 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getMarkerMapWorldPositions(
               markerPair.second.second);
   }
   return returnMap;
+}
+
+//==============================================================================
+/// This converts markers from a source skeleton to the current, doing a
+/// simple mapping based on body node names. Any markers that don't find a
+/// body node in the current skeleton with the same name are dropped.
+std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+Skeleton::convertMarkerMap(
+    const std::map<
+        std::string,
+        std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markerMap,
+    bool warnOnDrop)
+{
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>> result;
+  for (auto pair : markerMap)
+  {
+    dynamics::BodyNode* node = getBodyNode(pair.second.first->getName());
+    if (node != nullptr)
+    {
+      result[pair.first]
+          = std::make_pair(node, Eigen::Vector3s(pair.second.second));
+    }
+    else if (warnOnDrop)
+    {
+      std::cout
+          << "WARNING: marker \"" << pair.first
+          << "\" attaches to a node named \"" << pair.second.first->getName()
+          << "\", for which there is no equivalent in the current skeleton. "
+             "This marker will be dropped in the converted markers map."
+          << std::endl;
+    }
+  }
+  return result;
 }
 
 //==============================================================================

@@ -217,6 +217,157 @@ OpenSimFile OpenSimParser::parseOsim(
 }
 
 //==============================================================================
+/// This grabs the marker trajectories from a TRC file
+OpenSimTRC OpenSimParser::loadTRC(
+    const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  OpenSimTRC result;
+  const std::string content = retriever->readAll(uri);
+
+  std::vector<std::string> markerNames;
+  Eigen::Vector3s markerSwapSpace = Eigen::Vector3s::Zero();
+
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    std::map<std::string, Eigen::Vector3s> markerPositions;
+
+    int tokenNumber = 0;
+    std::string whitespace = " \t";
+    auto tokenStart = line.find_first_not_of(whitespace);
+    while (tokenStart != std::string::npos)
+    {
+      auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+      std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+      /////////////////////////////////////////////////////////
+      // Process the token, given tokenNumber and lineNumber
+
+      if (lineNumber == 2)
+      {
+        if (tokenNumber == 0)
+        { // DataRate
+          result.timestep = 1.0 / atof(token.c_str());
+        }
+        if (tokenNumber == 4)
+        { // Units
+          result.units = token;
+        }
+      }
+      else if (lineNumber == 3 && tokenNumber > 1)
+      {
+        markerNames.push_back(token);
+      }
+      else if (lineNumber > 4 && tokenNumber > 1)
+      {
+        int offset = tokenNumber - 2; // first two cols are "frame #" and "time"
+        int markerNumber = (int)floor((double)offset / 3);
+        int axisNumber = offset - (markerNumber * 3);
+        markerSwapSpace(axisNumber) = atof(token.c_str());
+        if (axisNumber == 2)
+        {
+          if (!markerSwapSpace.hasNaN())
+          {
+            markerPositions[markerNames[markerNumber]]
+                = Eigen::Vector3s(markerSwapSpace);
+          }
+        }
+      }
+
+      /////////////////////////////////////////////////////////
+
+      tokenNumber++;
+      if (tokenEnd == std::string::npos)
+      {
+        break;
+      }
+      tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+    lineNumber++;
+
+    result.markerTimesteps.push_back(markerPositions);
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// When people finish preparing their model in OpenSim, they save a *.osim
+/// file with all the scales and offsets baked in. This is a utility to go
+/// through and get out the scales and offsets in terms of a standard
+/// skeleton, so that we can include their values in standard datasets.
+OpenSimScaleAndMarkerOffsets OpenSimParser::getScaleAndMarkerOffsets(
+    const OpenSimFile& standardSkeleton, const OpenSimFile& scaledSkeleton)
+{
+  OpenSimScaleAndMarkerOffsets config;
+
+  // Check that the two skeletons are compatible
+  for (int i = 0; i < standardSkeleton.skeleton->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* bodyNode = standardSkeleton.skeleton->getBodyNode(i);
+    if (!scaledSkeleton.skeleton->getBodyNode(bodyNode->getName()))
+    {
+      std::cout << "OpenSimParser::getConfiguration() failed because the "
+                   "skeletons were too different! The standard skeleton has a "
+                   "body named \""
+                << bodyNode->getName() << "\", but the scaled skeleton doesn't."
+                << std::endl;
+      config.success = false;
+      return config;
+    }
+  }
+
+  // Now go through both skeletons and try to work out what the body scales are
+
+  config.bodyScales
+      = Eigen::VectorXs::Ones(standardSkeleton.skeleton->getNumBodyNodes() * 3);
+  for (int i = 0; i < standardSkeleton.skeleton->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* scaledNode = scaledSkeleton.skeleton->getBodyNode(
+        standardSkeleton.skeleton->getBodyNode(i)->getName());
+    dynamics::Shape* shape = scaledNode->getShapeNode(0)->getShape().get();
+    if (shape->getType() == dynamics::MeshShape::getStaticType())
+    {
+      dynamics::MeshShape* mesh = static_cast<dynamics::MeshShape*>(shape);
+      Eigen::Vector3s scale = mesh->getScale();
+      config.bodyScales.segment<3>(i * 3) = scale;
+    }
+  }
+
+  // Try to convert the markers into the standard skeleton
+
+  for (auto pair : scaledSkeleton.markersMap)
+  {
+    std::string markerName = pair.first;
+    dynamics::BodyNode* standardBody
+        = standardSkeleton.skeleton->getBodyNode(pair.second.first->getName());
+    if (standardBody != nullptr)
+    {
+      Eigen::Vector3s bodyScale = config.bodyScales.segment<3>(
+          standardBody->getIndexInSkeleton() * 3);
+      Eigen::Vector3s goldOffset = pair.second.second.cwiseQuotient(bodyScale);
+      config.markers[markerName] = std::make_pair(standardBody, goldOffset);
+      config.markerOffsets[markerName] = goldOffset - pair.second.second;
+    }
+  }
+
+  // Return
+
+  config.success = true;
+  return config;
+}
+
+//==============================================================================
 std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,

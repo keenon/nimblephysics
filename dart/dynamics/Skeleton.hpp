@@ -60,6 +60,9 @@ class ConstrainedGroupGradientMatrices;
 
 namespace dynamics {
 
+typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+    MarkerMap;
+
 /// class Skeleton
 class Skeleton : public virtual common::VersionCounter,
                  public MetaSkeleton,
@@ -806,10 +809,10 @@ public:
 
   // This returns a vector of all the link scales for all the links in the
   // skeleton concatenated into a flat vector
-  Eigen::VectorXs getLinkScales();
+  Eigen::VectorXs getBodyScales();
 
   // Sets all the link scales for the skeleton, from a flat vector
-  void setLinkScales(Eigen::VectorXs scales);
+  void setBodyScales(Eigen::VectorXs scales);
 
   // This sets all the positions of the joints to within their limit range, if
   // they're currently outside it.
@@ -968,9 +971,13 @@ public:
   /// These are a set of bodies, and offsets in local body space where markers
   /// are mounted on the body
   std::map<std::string, Eigen::Vector3s> getMarkerMapWorldPositions(
-      const std::map<
-          std::string,
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers);
+      const MarkerMap& markers);
+
+  /// This converts markers from a source skeleton to the current, doing a
+  /// simple mapping based on body node names. Any markers that don't find a
+  /// body node in the current skeleton with the same name are dropped.
+  MarkerMap convertMarkerMap(
+      const MarkerMap& markerMap, bool warnOnDrop = true);
 
   /// These are a set of bodies, and offsets in local body space where markers
   /// are mounted on the body

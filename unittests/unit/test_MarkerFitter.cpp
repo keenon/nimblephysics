@@ -15,7 +15,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -404,8 +404,7 @@ bool testSolveBilevelFitProblem(
 
   // Provide three markers per body, to give enough data to make things
   // unambiguos
-  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-      markers;
+  dynamics::MarkerMap markers;
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     markers[std::to_string(i) + "_0"]
@@ -540,8 +539,7 @@ bool debugIKInitializationToGUI(
 
   // Provide three markers per body, to give enough data to make things
   // unambiguos
-  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-      markers;
+  dynamics::MarkerMap markers;
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     markers[std::to_string(i) + "_0"]
@@ -698,6 +696,213 @@ bool debugIKInitializationToGUI(
               }
             }
           }
+          skel->setGroupScales(newScales);
+          skelBallJoints->setGroupScales(newScales);
+
+          // Return the clamped position
+          Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
+          clampedPos.segment(0, skelBallJoints->getNumDofs())
+              = skelBallJoints->getPositions();
+          clampedPos.segment(
+              skelBallJoints->getNumDofs(),
+              skelBallJoints->getNumScaleGroups() * 3)
+              = newScales;
+
+          // Debug to a GUI
+          server.renderSkeleton(skel);
+          Eigen::VectorXs currentMarkerPoses
+              = skel->getMarkerWorldPositions(adjustedMarkersSkel);
+          for (int i = 0; i < adjustedMarkersSkel.size(); i++)
+          {
+            Eigen::Vector3s source = currentMarkerPoses.segment<3>(i * 3);
+            Eigen::Vector3s goal = markerWorldPoses.segment<3>(i * 3);
+            std::vector<Eigen::Vector3s> line;
+            line.push_back(source);
+            line.push_back(goal);
+
+            server.createLine(
+                "marker_error_" + std::to_string(i),
+                line,
+                Eigen::Vector3s::UnitX());
+          }
+          server.flush();
+
+          return clampedPos;
+        },
+        [skelBallJoints, markerWorldPoses, adjustedMarkers](
+            /*out*/ Eigen::VectorXs& diff,
+            /*out*/ Eigen::MatrixXs& jac) {
+          diff = markerWorldPoses
+                 - skelBallJoints->getMarkerWorldPositions(adjustedMarkers);
+          assert(
+              jac.cols()
+              == skelBallJoints->getNumDofs()
+                     + skelBallJoints->getNumScaleGroups() * 3);
+          assert(jac.rows() == adjustedMarkers.size() * 3);
+          jac.setZero();
+          jac.block(
+              0, 0, adjustedMarkers.size() * 3, skelBallJoints->getNumDofs())
+              = skelBallJoints
+                    ->getMarkerWorldPositionsJacobianWrtJointPositions(
+                        adjustedMarkers);
+          jac.block(
+              0,
+              skelBallJoints->getNumDofs(),
+              adjustedMarkers.size() * 3,
+              skelBallJoints->getNumScaleGroups() * 3)
+              = skelBallJoints->getMarkerWorldPositionsJacobianWrtGroupScales(
+                  adjustedMarkers);
+        },
+        [skel, skelBallJoints](Eigen::VectorXs& val) {
+          val.segment(0, skelBallJoints->getNumDofs())
+              = skel->convertPositionsToBallSpace(skel->getRandomPose());
+          val.segment(
+                 skelBallJoints->getNumDofs(),
+                 skelBallJoints->getNumScaleGroups() * 3)
+              .setConstant(1.0);
+
+          std::cout << "Eigen::VectorXs initialGuess = Eigen::VectorXs("
+                    << val.size() << ");" << std::endl;
+          std::cout << "initialGuess << ";
+          for (int j = 0; j < val.size(); j++)
+          {
+            if (j > 0)
+              std::cout << ", ";
+            std::cout << val(j);
+          }
+          std::cout << std::endl;
+        },
+        math::IKConfig().setLogOutput(true).setMaxRestarts(1));
+
+    Eigen::VectorXs finalMarkers
+        = skel->getMarkerWorldPositions(adjustedMarkers);
+    Eigen::VectorXs diff = markerWorldPoses - finalMarkers;
+    for (int i = 0; i < adjustedMarkers.size(); i++)
+    {
+      auto pair = adjustedMarkers[i];
+      Eigen::Vector3s markerDiff = diff.segment<3>(i * 3);
+      s_t markerError = markerDiff.squaredNorm();
+      std::cout << "Error on marker (" << pair.first->getName() << ", ["
+                << pair.second(0) << "," << pair.second(1) << ","
+                << pair.second(2) << "]): " << markerError << std::endl;
+    }
+  }
+
+  server.blockWhileServing();
+
+  return true;
+}
+
+bool debugFitToGUI(
+    std::shared_ptr<dynamics::Skeleton>& skel,
+    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+        adjustedMarkersSkel,
+    Eigen::VectorXs markerWorldPoses)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderSkeleton(skel);
+  server.setAutoflush(false);
+
+  Eigen::VectorXs originalGroupScales = skel->getGroupScales();
+
+  // std::shared_ptr<dynamics::Skeleton> goldTarget = skel->clone();
+  // goldTarget->setPositions(goldPose);
+  server.renderSkeleton(skel, "goldSkel");
+
+  std::shared_ptr<dynamics::Skeleton> skelBallJoints
+      = skel->convertSkeletonToBallJoints();
+  skelBallJoints->setPositions(
+      skel->convertPositionsToBallSpace(skel->getPositions()));
+
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+      adjustedMarkers;
+  for (auto pair : adjustedMarkersSkel)
+  {
+    adjustedMarkers.emplace_back(
+        skelBallJoints->getBodyNode(pair.first->getName()),
+        Eigen::Vector3s(pair.second));
+  }
+
+  while (true)
+  {
+    // 2. Reset the skeleton configuration
+    skel->setPositions(skel->getRandomPose());
+    skelBallJoints->setPositions(
+        skel->convertPositionsToBallSpace(skel->getPositions()));
+    skel->setGroupScales(originalGroupScales);
+    skelBallJoints->setGroupScales(originalGroupScales);
+    // skel->setPositions(goldPose);
+    // skel->setGroupScales(goldGroupScales);
+
+    Eigen::VectorXs initialPos = Eigen::VectorXs::Zero(
+        skelBallJoints->getNumDofs() + skelBallJoints->getNumScaleGroups() * 3);
+    initialPos.segment(0, skelBallJoints->getNumDofs())
+        = skelBallJoints->getPositions();
+    initialPos.segment(
+        skelBallJoints->getNumDofs(), skelBallJoints->getNumScaleGroups() * 3)
+        = skelBallJoints->getGroupScales();
+    Eigen::VectorXs initialGuess = Eigen::VectorXs(97);
+
+    math::solveIK(
+        initialPos,
+        adjustedMarkers.size() * 3,
+        [skel,
+         skelBallJoints,
+         adjustedMarkers,
+         adjustedMarkersSkel,
+         markerWorldPoses,
+         &server](
+            /* in*/ const Eigen::VectorXs pos, bool clamp) {
+          // Set positions
+          skelBallJoints->setPositions(
+              pos.segment(0, skelBallJoints->getNumDofs()));
+          skel->setPositions(skel->convertPositionsFromBallSpace(
+              pos.segment(0, skelBallJoints->getNumDofs())));
+          if (clamp)
+          {
+            std::cout << "Eigen::VectorXs val = Eigen::VectorXs("
+                      << pos.segment(0, skelBallJoints->getNumDofs()).size()
+                      << ");" << std::endl;
+            std::cout << "ballJointsPos << ";
+            for (int j = 0; j < skelBallJoints->getNumDofs(); j++)
+            {
+              if (j > 0)
+                std::cout << ", ";
+              std::cout << skelBallJoints->getPositions()(j);
+            }
+            std::cout << std::endl;
+
+            skel->clampPositionsToLimits();
+            skelBallJoints->setPositions(
+                skel->convertPositionsToBallSpace(skel->getPositions()));
+          }
+
+          // Set scales
+          Eigen::VectorXs newScales = pos.segment(
+              skelBallJoints->getNumDofs(),
+              skelBallJoints->getNumScaleGroups() * 3);
+          for (int i = 0; i < skelBallJoints->getNumScaleGroups(); i++)
+          {
+            for (int axis = 0; axis < 3; axis++)
+            {
+              if (newScales(i * 3 + axis)
+                  > skelBallJoints->getScaleGroupUpperBound(i)(axis))
+              {
+                newScales(i * 3 + axis)
+                    = skelBallJoints->getScaleGroupUpperBound(i)(axis);
+              }
+              if (newScales(i * 3 + axis)
+                  < skelBallJoints->getScaleGroupLowerBound(i)(axis))
+              {
+                newScales(i * 3 + axis)
+                    = skelBallJoints->getScaleGroupLowerBound(i)(axis);
+              }
+            }
+          }
+          // This effectively disables scaling
+          newScales.setConstant(1.0);
+
           skel->setGroupScales(newScales);
           skelBallJoints->setGroupScales(newScales);
 
@@ -1113,3 +1318,117 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
       testBilevelFitProblemGradients(fitter, 3, 0.02, osimBallJoints, markers));
 }
 #endif
+
+// #ifdef ALL_TESTS
+TEST(MarkerFitter, EVAL_PERFORMANCE)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  // Get the gold data scales in `config`
+  OpenSimFile moddedBase = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
+  standard.markersMap = convertedMarkers;
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimScaleAndMarkerOffsets config
+      = OpenSimParser::getScaleAndMarkerOffsets(standard, scaled);
+  EXPECT_TRUE(config.success);
+
+  // Check our marker maps
+
+  std::vector<std::pair<
+      std::string,
+      std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>
+      moddedMarkerOffsets;
+  for (auto pair : moddedBase.markersMap)
+  {
+    moddedMarkerOffsets.push_back(pair);
+  }
+  for (int i = 0; i < moddedMarkerOffsets.size(); i++)
+  {
+    for (int j = 0; j < moddedMarkerOffsets.size(); j++)
+    {
+      if (i == j)
+        continue;
+      // Just don't have duplicate markers
+      if (moddedMarkerOffsets[i].second.first
+              == moddedMarkerOffsets[j].second.first
+          && moddedMarkerOffsets[i].second.second
+                 == moddedMarkerOffsets[j].second.second)
+      {
+        std::cout << "Found duplicate markers, " << i << " and " << j << ": "
+                  << moddedMarkerOffsets[i].first << " and "
+                  << moddedMarkerOffsets[j].first << " on "
+                  << moddedMarkerOffsets[i].second.first->getName()
+                  << std::endl;
+      }
+    }
+  }
+
+  std::vector<Eigen::Vector3s> convertedMarkerOffsets;
+  for (auto pair : standard.markersMap)
+  {
+    convertedMarkerOffsets.push_back(pair.second.second);
+  }
+  for (int i = 0; i < convertedMarkerOffsets.size(); i++)
+  {
+    for (int j = 0; j < convertedMarkerOffsets.size(); j++)
+    {
+      if (i == j)
+        continue;
+      assert(convertedMarkerOffsets[i] != convertedMarkerOffsets[j]);
+    }
+  }
+
+  // Get a random subset of the data
+
+  srand(15);
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
+      = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 20);
+
+  // Try to fit the skeleton to
+
+  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  Eigen::VectorXs targetPoses
+      = Eigen::VectorXs::Zero(markerObservations[0].size() * 3);
+  for (auto pair : markerObservations[0])
+  {
+    targetPoses.segment<3>(markers.size() * 3) = pair.second / 1000;
+    markers.push_back(standard.markersMap[pair.first]);
+  }
+  Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
+  debugFitToGUI(standard.skeleton, markers, targetPoses);
+  /*
+  standard.skeleton->fitMarkersToWorldPositions(
+      markers,
+      targetPoses,
+      markerWeights,
+      true,
+      math::IKConfig().setLogOutput(true));
+      */
+  return;
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  std::shared_ptr<MarkerFitResult> result = fitter.optimize(markerObservations);
+
+  Eigen::VectorXs groupScaleError = result->groupScales - config.bodyScales;
+  Eigen::MatrixXs groupScaleCols = Eigen::MatrixXs(groupScaleError.size(), 4);
+  groupScaleCols.col(0) = config.bodyScales;
+  groupScaleCols.col(1) = result->groupScales;
+  groupScaleCols.col(2) = groupScaleError;
+  groupScaleCols.col(3) = groupScaleError.cwiseQuotient(config.bodyScales);
+  std::cout << "gold scales - result scales - error - error %" << std::endl
+            << groupScaleCols << std::endl;
+}
+// #endif

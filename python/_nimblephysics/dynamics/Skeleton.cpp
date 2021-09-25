@@ -753,10 +753,10 @@ void Skeleton(py::module& m)
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
             self->setPositionLowerLimits(limits);
           })
-      .def("getLinkScales", &dart::dynamics::Skeleton::getLinkScales)
+      .def("getBodyScales", &dart::dynamics::Skeleton::getBodyScales)
       .def(
-          "setLinkScales",
-          &dart::dynamics::Skeleton::setLinkScales,
+          "setBodyScales",
+          &dart::dynamics::Skeleton::setBodyScales,
           ::py::arg("scales"))
       .def(
           "clampPositionsToLimits",

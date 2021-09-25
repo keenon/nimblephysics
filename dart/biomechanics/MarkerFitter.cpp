@@ -13,9 +13,7 @@ using namespace Ipopt;
 MarkerFitResult::MarkerFitResult() : success(false){};
 
 MarkerFitter::MarkerFitter(
-    std::shared_ptr<dynamics::Skeleton> skeleton,
-    std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-        markers)
+    std::shared_ptr<dynamics::Skeleton> skeleton, dynamics::MarkerMap markers)
   : mSkeleton(skeleton),
     mTolerance(1e-8),
     mIterationLimit(500),
@@ -141,6 +139,34 @@ std::shared_ptr<MarkerFitResult> MarkerFitter::optimize(
   }
 
   result->success = (status == Ipopt::Solve_Succeeded);
+
+  return result;
+}
+
+//==============================================================================
+/// This lets us pick a subset of the marker observations, to cap the size of
+/// the optimization problem.
+std::vector<std::map<std::string, Eigen::Vector3s>> MarkerFitter::pickSubset(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    int maxSize)
+{
+  if (maxSize >= markerObservations.size())
+  {
+    return markerObservations;
+  }
+
+  // Create a vector of indices, random shuffle them, then use them to select
+  // the elements we want
+  std::vector<unsigned int> indices(markerObservations.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::random_shuffle(indices.begin(), indices.end());
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> result;
+  for (int i = 0; i < maxSize; i++)
+  {
+    result.push_back(markerObservations[indices[i]]);
+  }
 
   return result;
 }
