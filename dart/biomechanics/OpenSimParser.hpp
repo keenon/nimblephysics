@@ -34,9 +34,14 @@ struct OpenSimScaleAndMarkerOffsets
 /// This holds marker trajectory information from an OpenSim TRC file
 struct OpenSimTRC
 {
-  double timestep;
-  std::string units;
+  std::vector<double> timestamps;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+};
+
+struct OpenSimMot
+{
+  std::vector<double> timestamps;
+  Eigen::MatrixXs poses;
 };
 
 class OpenSimParser
@@ -50,6 +55,13 @@ public:
   /// This grabs the marker trajectories from a TRC file
   static OpenSimTRC loadTRC(
       const common::Uri& uri,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// This grabs the joint angles from a *.mot file
+  static OpenSimMot loadMot(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const common::Uri& uri,
+      int downsampleByFactor = 1,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim

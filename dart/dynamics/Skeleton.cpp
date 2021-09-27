@@ -3606,8 +3606,10 @@ Skeleton::convertMarkerMap(
     dynamics::BodyNode* node = getBodyNode(pair.second.first->getName());
     if (node != nullptr)
     {
-      result[pair.first]
-          = std::make_pair(node, Eigen::Vector3s(pair.second.second));
+      result[pair.first] = std::make_pair(
+          node,
+          Eigen::Vector3s(pair.second.second)
+              .cwiseQuotient(pair.second.first->getScale()));
     }
     else if (warnOnDrop)
     {

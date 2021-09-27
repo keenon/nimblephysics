@@ -797,7 +797,9 @@ bool debugFitToGUI(
     std::shared_ptr<dynamics::Skeleton>& skel,
     std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
         adjustedMarkersSkel,
-    Eigen::VectorXs markerWorldPoses)
+    Eigen::VectorXs markerWorldPoses,
+    std::shared_ptr<dynamics::Skeleton>& goldSkel,
+    Eigen::VectorXs goldTarget)
 {
   server::GUIWebsocketServer server;
   server.serve(8070);
@@ -808,7 +810,8 @@ bool debugFitToGUI(
 
   // std::shared_ptr<dynamics::Skeleton> goldTarget = skel->clone();
   // goldTarget->setPositions(goldPose);
-  server.renderSkeleton(skel, "goldSkel");
+  goldSkel->setPositions(goldTarget);
+  server.renderSkeleton(goldSkel, "gold");
 
   std::shared_ptr<dynamics::Skeleton> skelBallJoints
       = skel->convertSkeletonToBallJoints();
@@ -828,6 +831,7 @@ bool debugFitToGUI(
   {
     // 2. Reset the skeleton configuration
     skel->setPositions(skel->getRandomPose());
+    // skel->setPositions(goldTarget);
     skelBallJoints->setPositions(
         skel->convertPositionsToBallSpace(skel->getPositions()));
     skel->setGroupScales(originalGroupScales);
@@ -901,7 +905,7 @@ bool debugFitToGUI(
             }
           }
           // This effectively disables scaling
-          newScales.setConstant(1.0);
+          // newScales.setConstant(1.0);
 
           skel->setGroupScales(newScales);
           skelBallJoints->setGroupScales(newScales);
@@ -998,6 +1002,52 @@ bool debugFitToGUI(
   server.blockWhileServing();
 
   return true;
+}
+
+void debugTrajectoryAndMarkersToGUI(
+    std::shared_ptr<dynamics::Skeleton>& skel,
+    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+        markers,
+    Eigen::MatrixXs poses,
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderSkeleton(skel);
+  server.setAutoflush(false);
+
+  int timestep = 0;
+  Ticker ticker(1.0 / 50);
+  ticker.registerTickListener([&](long) {
+    skel->setPositions(poses.col(timestep));
+    server.renderSkeleton(skel);
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPositions
+        = markerTrajectories[timestep];
+    for (auto pair : markerWorldPositions)
+    {
+      Eigen::Vector3s worldObserved = pair.second;
+      Eigen::Vector3s worldInferred
+          = markers[pair.first].first->getWorldTransform()
+            * (markers[pair.first].second.cwiseProduct(
+                markers[pair.first].first->getScale()));
+      std::vector<Eigen::Vector3s> points;
+      points.push_back(worldObserved);
+      points.push_back(worldInferred);
+      server.createLine(
+          "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
+    }
+
+    server.flush();
+
+    timestep++;
+    if (timestep >= poses.cols())
+    {
+      timestep = 0;
+    }
+  });
+  server.registerConnectionListener([&]() { ticker.start(); });
+  server.blockWhileServing();
 }
 
 #ifdef ALL_TESTS
@@ -1334,14 +1384,21 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   OpenSimFile moddedBase = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/"
       "Rajagopal2015_passiveCal_hipAbdMoved.osim");
-  dynamics::MarkerMap convertedMarkers
-      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
-  standard.markersMap = convertedMarkers;
   OpenSimFile scaled = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(scaled.markersMap);
+  standard.markersMap = convertedMarkers;
   OpenSimScaleAndMarkerOffsets config
       = OpenSimParser::getScaleAndMarkerOffsets(standard, scaled);
   EXPECT_TRUE(config.success);
+
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+  Eigen::MatrixXs poses = mot.poses;
+  (void)poses;
 
   // Check our marker maps
 
@@ -1349,7 +1406,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       std::string,
       std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>
       moddedMarkerOffsets;
-  for (auto pair : moddedBase.markersMap)
+  for (auto pair : standard.markersMap)
   {
     moddedMarkerOffsets.push_back(pair);
   }
@@ -1374,39 +1431,65 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
     }
   }
 
-  std::vector<Eigen::Vector3s> convertedMarkerOffsets;
-  for (auto pair : standard.markersMap)
+  // Check that timestamps match up
+  if (mot.timestamps.size() != markerTrajectories.timestamps.size())
   {
-    convertedMarkerOffsets.push_back(pair.second.second);
-  }
-  for (int i = 0; i < convertedMarkerOffsets.size(); i++)
-  {
-    for (int j = 0; j < convertedMarkerOffsets.size(); j++)
+    std::cout << "Got a different number of timestamps. Mot: "
+              << mot.timestamps.size()
+              << " != Trc: " << markerTrajectories.timestamps.size()
+              << std::endl;
+    EXPECT_EQ(mot.timestamps.size(), markerTrajectories.timestamps.size());
+    std::cout << "First 10 timesteps:" << std::endl;
+    for (int k = 0; k < 10; k++)
     {
-      if (i == j)
-        continue;
-      assert(convertedMarkerOffsets[i] != convertedMarkerOffsets[j]);
+      std::cout << k << ": Mot=" << mot.timestamps[k]
+                << " != Trc=" << markerTrajectories.timestamps[k] << std::endl;
+    }
+  }
+  else
+  {
+    for (int i = 0; i < mot.timestamps.size(); i++)
+    {
+      if (abs(mot.timestamps[i] - markerTrajectories.timestamps[i]) > 1e-10)
+      {
+        std::cout << "Different timestamps at step " << i
+                  << ": Mot: " << mot.timestamps[i]
+                  << " != Trc: " << markerTrajectories.timestamps[i]
+                  << std::endl;
+        EXPECT_NEAR(mot.timestamps[i], markerTrajectories.timestamps[i], 1e-10);
+        break;
+      }
     }
   }
 
-  // Get a random subset of the data
+  /*
+  // Target markers
+  debugTrajectoryAndMarkersToGUI(
+      scaled.skeleton,
+      scaled.markersMap,
+      poses,
+      markerTrajectories.markerTimesteps);
+  */
 
-  srand(15);
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
-      = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 20);
+  int timestep = 50;
+
+  std::map<std::string, Eigen::Vector3s> goldMarkers
+      = markerTrajectories.markerTimesteps[timestep];
+  Eigen::VectorXs goldPose = poses.col(timestep);
 
   // Try to fit the skeleton to
 
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
-  Eigen::VectorXs targetPoses
-      = Eigen::VectorXs::Zero(markerObservations[0].size() * 3);
-  for (auto pair : markerObservations[0])
+  Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
+  for (auto pair : goldMarkers)
   {
-    targetPoses.segment<3>(markers.size() * 3) = pair.second / 1000;
+    std::cout << "Marker: " << pair.first << std::endl;
+    targetPoses.segment<3>(markers.size() * 3) = pair.second;
     markers.push_back(standard.markersMap[pair.first]);
   }
   Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
-  debugFitToGUI(standard.skeleton, markers, targetPoses);
+  debugFitToGUI(
+      standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
   /*
   standard.skeleton->fitMarkersToWorldPositions(
       markers,
@@ -1416,6 +1499,12 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       math::IKConfig().setLogOutput(true));
       */
   return;
+
+  // Get a random subset of the data
+
+  srand(25);
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
+      = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 20);
 
   // Create a marker fitter
 
