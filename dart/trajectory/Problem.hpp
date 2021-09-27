@@ -156,6 +156,8 @@ public:
       /* OUT */ Eigen::Ref<Eigen::VectorXs> constraints,
       PerformanceLog* log = nullptr);
 
+  virtual void resetDirty();
+
   /// This computes the Jacobian that relates the flat problem to the end state.
   /// This returns a matrix that's (getConstraintDim(), getFlatProblemDim()).
   void backpropJacobian(

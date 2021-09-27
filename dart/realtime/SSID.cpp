@@ -20,17 +20,26 @@ SSID::SSID(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<trajectory::LossFn> loss,
     int planningHistoryMillis,
-    int sensorDim)
+    Eigen::VectorXs sensorDims,
+    int steps)
   : mRunning(false),
     mWorld(world),
     mLoss(loss),
     mPlanningHistoryMillis(planningHistoryMillis),
-    mSensorDim(sensorDim),
-    mSensorLog(VectorLog(sensorDim)),
-    mControlLog(VectorLog(world->getNumDofs()))
+    mSensorDims(sensorDims),
+    mControlLog(VectorLog(world->getNumDofs())),
+    mPlanningSteps(steps)
 {
+  for(int i=0;i<mSensorDims.size();i++)
+  {
+    mSensorLogs.push_back(VectorLog(mSensorDims(i)));
+  }
   int dofs = world->getNumDofs();
   mInitialPosEstimator
+      = [dofs](Eigen::MatrixXs /* sensors */, long /* time */) {
+          return Eigen::VectorXs::Zero(dofs);
+        };
+  mInitialVelEstimator
       = [dofs](Eigen::MatrixXs /* sensors */, long /* time */) {
           return Eigen::VectorXs::Zero(dofs);
         };
@@ -39,8 +48,8 @@ SSID::SSID(
       = std::make_shared<IPOptOptimizer>();
   ipoptOptimizer->setCheckDerivatives(false);
   ipoptOptimizer->setSuppressOutput(true);
-  ipoptOptimizer->setTolerance(1e-9);
-  ipoptOptimizer->setIterationLimit(20);
+  ipoptOptimizer->setTolerance(1e-30);
+  ipoptOptimizer->setIterationLimit(100);
   ipoptOptimizer->setRecordFullDebugInfo(false);
   ipoptOptimizer->setRecordIterations(false);
   ipoptOptimizer->setLBFGSHistoryLength(5);
@@ -85,6 +94,12 @@ void SSID::setInitialPosEstimator(
   mInitialPosEstimator = initialPosEstimator;
 }
 
+void SSID::setInitialVelEstimator(
+    std::function<Eigen::VectorXs(Eigen::MatrixXs, long)> initialVelEstimator)
+{
+  mInitialVelEstimator = initialVelEstimator;
+}
+
 /// This returns the current problem definition that MPC is using
 std::shared_ptr<trajectory::Problem> SSID::getProblem()
 {
@@ -92,9 +107,9 @@ std::shared_ptr<trajectory::Problem> SSID::getProblem()
 }
 
 /// This logs that the sensor output is a specific vector now
-void SSID::registerSensorsNow(Eigen::VectorXs sensors)
+void SSID::registerSensorsNow(Eigen::VectorXs sensors,int sensor_id)
 {
-  return registerSensors(timeSinceEpochMillis(), sensors);
+  return registerSensors(timeSinceEpochMillis(), sensors, sensor_id);
 }
 
 /// This logs that the controls are a specific vector now
@@ -105,9 +120,9 @@ void SSID::registerControlsNow(Eigen::VectorXs controls)
 
 /// This logs that the sensor output was a specific vector at a specific
 /// moment
-void SSID::registerSensors(long now, Eigen::VectorXs sensors)
+void SSID::registerSensors(long now, Eigen::VectorXs sensors, int sensor_id)
 {
-  mSensorLog.record(now, sensors);
+  mSensorLogs[sensor_id].record(now, sensors);
 }
 
 /// This logs that our controls were this value at this time
@@ -137,6 +152,7 @@ void SSID::stop()
 /// This runs inference to find mutable values, starting at `startTime`
 void SSID::runInference(long startTime)
 {
+  // registerLock();
   long startComputeWallTime = timeSinceEpochMillis();
 
   int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
@@ -145,33 +161,44 @@ void SSID::runInference(long startTime)
 
   if (!mProblem)
   {
-    std::shared_ptr<MultiShot> multishot
-        = std::make_shared<MultiShot>(mWorld, *mLoss.get(), steps, 10, true);
-    multishot->setParallelOperationsEnabled(true);
-    mProblem = multishot;
+    std::shared_ptr<SingleShot> singleshot
+        = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
+    //multishot->setParallelOperationsEnabled(true);
+    mProblem = singleshot;
   }
-
+  //std::cout<<"Problem Created"<<std::endl;
   // Every turn, we need to pin all the forces
-
-  Eigen::MatrixXs forceHistory = mControlLog.getValues(
-      startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  registerLock();
+  //Eigen::MatrixXs forceHistory = mControlLog.getValues(
+  //    startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
+    startTime, steps+1);
   for (int i = 0; i < steps; i++)
   {
     mProblem->pinForce(i, forceHistory.col(i));
   }
-
+  //std::cout<<"ForcePinned"<<std::endl;
   // We also need to set all the sensor history into metadata
 
-  Eigen::MatrixXs sensorHistory = mSensorLog.getValues(
-      startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  //Eigen::MatrixXs poseHistory = mSensorLogs[0].getValues(
+  //    startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  //Eigen::MatrixXs velHistory = mSensorLogs[1].getValues(
+  //  startTime - mPlanningHistoryMillis, steps, millisPerStep
+  // );
+  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
+  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
+  registerUnlock();
+  //std::cout<<"In SSID Force Hist: \n"<<forceHistory<<"\nPos Hist: \n"<<poseHistory<<"\nVel Hist: \n"<<velHistory<<std::endl;
   mProblem->setMetadata("forces", forceHistory);
-  mProblem->setMetadata("sensors", sensorHistory);
-
-  mProblem->setStartPos(mInitialPosEstimator(sensorHistory, startTime));
-
+  mProblem->setMetadata("sensors", poseHistory);
+  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
+  // TODO: Set initial velocity
+  mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
   // Then actually run the optimization
-
+  //std::cout<<"Ready to Optimize"<<std::endl;
   mSolution = mOptimizer->optimize(mProblem.get());
+  //std::cout<<"Optimization End"<<std::endl;
 
   long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
 
@@ -186,6 +213,64 @@ void SSID::runInference(long startTime)
   {
     listener(startTime, pos, vel, mass, computeDurationWallTime);
   }
+}
+
+Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int samples)
+{
+  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int steps = static_cast<int>(
+      ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
+
+  if (!mProblem)
+  {
+    std::shared_ptr<SingleShot> singleshot
+        = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
+    mProblem = singleshot;
+  }
+  
+  registerLock();
+  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
+    startTime, steps+1);
+  for (int i = 0; i < steps; i++)
+  {
+    mProblem->pinForce(i, forceHistory.col(i));
+  }
+  
+  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
+  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
+  //std::cout<<"In SSID Force Hist: \n"<<forceHistory<<"\nPos Hist: \n"<<poseHistory<<"\nVel Hist: \n"<<velHistory<<std::endl;
+  registerUnlock();
+  mProblem->setMetadata("forces", forceHistory);
+  mProblem->setMetadata("sensors", poseHistory);
+  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
+  mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
+
+  Eigen::VectorXs losses;
+  if(upper != lower)
+  {
+    losses = Eigen::VectorXs::Zero(samples);
+    s_t epsilon = (upper-lower)/samples;
+    s_t probe = lower;
+    for(int i=0;i<samples;i++)
+    {
+      mWorld->setMasses(Eigen::Vector1s(probe));
+      mProblem->resetDirty();
+      s_t loss = mProblem->getLoss(mWorld);
+      losses(i) = loss;
+      probe += epsilon;
+    }
+  }
+  else
+  {
+    losses = Eigen::VectorXs::Zero(1);
+    mWorld->setMasses(Eigen::Vector1s(lower));
+    mProblem->resetDirty();
+    s_t loss = mProblem->getLoss(mWorld);
+    losses(0) = loss;
+  }
+  
+  return losses;
 }
 
 /// This registers a listener to get called when we finish replanning
@@ -207,16 +292,46 @@ void SSID::optimizationThreadLoop()
   sigaddset(&sigset, SIGINT);
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-
+  /*
   while (mRunning)
   {
     long startTime = timeSinceEpochMillis();
     if (mControlLog.availableHistoryBefore(startTime) > mPlanningHistoryMillis)
     {
-      std::cout << "Running inference" << std::endl;
       runInference(startTime);
+      std::cout<<"Gap Time:"<<startTime - init_time<<std::endl;
     }
-    // long endTime = timeSinceEpochMillis();
+  }
+  */
+ while(mRunning)
+ {
+   long startTime = timeSinceEpochMillis();
+   if(mControlLog.availableStepsBefore(startTime)>mPlanningSteps+1)
+   {
+     runInference(startTime);
+   }
+ }
+}
+
+void SSID::attachMutex(std::mutex &mutex_lock)
+{
+  mRegisterMutex = &mutex_lock;
+  mLockRegistered = true;
+}
+
+void SSID::registerLock()
+{
+  if(mLockRegistered)
+  {
+    mRegisterMutex->lock();
+  }
+}
+
+void SSID::registerUnlock()
+{
+  if(mLockRegistered)
+  {
+    mRegisterMutex->unlock();
   }
 }
 

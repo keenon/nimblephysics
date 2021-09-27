@@ -3,7 +3,6 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/math/IKSolver.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
 #include "dart/simulation/World.hpp"
@@ -90,21 +89,74 @@ void IKMapping::setPositions(
   // Reset to 0, so that solutions are always deterministic even if IK is
   // under/over specified
   world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  // Run simple IK to try to get as close as possible. Completely possible that
+  // the requested positions are infeasible, in which case we'll just do a best
+  // guess.
+  s_t error = std::numeric_limits<s_t>::infinity();
+  s_t lr = 0.05;
+  bool useTranspose = false;
+  for (int i = 0; i < mIKIterationLimit; i++)
+  {
+    Eigen::VectorXs diff = positions - getPositions(world);
+    s_t newError = diff.squaredNorm();
+    s_t errorChange = newError - error;
+    error = newError;
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+    std::cout << "IK iteration " << i << " lr: " << lr << " loss: " << error
+              << " change: " << errorChange << std::endl;
+#endif
+    if (error < 1e-21)
+    {
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+      std::cout << "Terminating IK search after " << i
+                << " iterations with loss: " << error << std::endl;
+#endif
+      break;
+    }
+    if (errorChange > 0)
+    {
+      lr *= 0.5;
+    }
+    else if (errorChange > -1e-22)
+    {
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+      std::cout << "Terminating IK search after " << i
+                << " iterations with optimal loss: " << error << std::endl;
+#endif
+      break;
+    }
+    else
+    {
+      // Slowly grow LR while we're safely decreasing loss
+      lr *= 1.1;
+    }
+    if (lr < 1e-4)
+    {
+      useTranspose = true;
+    }
 
-  math::solveIK(
-      Eigen::VectorXs::Zero(world->getNumDofs()),
-      positions.size(),
-      [world](Eigen::VectorXs pos) {
-        world->setPositions(pos);
-        world->clampPositionsToLimits();
-        return world->getPositions();
-      },
-      [this, world, positions](Eigen::VectorXs& diff, Eigen::MatrixXs& J) {
-        diff = positions - getPositions(world);
-        J = getPosJacobian(world);
-      },
-      1e-12,
-      1000);
+    Eigen::MatrixXs J = getPosJacobian(world);
+    Eigen::VectorXs delta;
+
+    if (useTranspose)
+    {
+      delta = J.transpose() * diff;
+    }
+    else
+    {
+      delta = J.completeOrthogonalDecomposition().solve(diff);
+    }
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+    // std::cout << "IK Diff: " << std::endl << diff << std::endl;
+    // std::cout << "IK J: " << std::endl << J << std::endl;
+    // std::cout << "IK Delta: " << std::endl << delta << std::endl;
+    // std::cout << "J * IK Delta: " << std::endl << J * delta << std::endl;
+#endif
+    world->setPositions(world->getPositions() + (lr * delta));
+  }
+#ifdef DART_NEURAL_LOG_IK_OUTPUT
+  std::cout << "Finished IK search with loss: " << error << std::endl;
+#endif
 }
 
 //==============================================================================

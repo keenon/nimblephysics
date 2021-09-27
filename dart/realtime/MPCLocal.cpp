@@ -232,8 +232,9 @@ void MPCLocal::optimizePlan(long startTime)
     }
 
     PerformanceLog* optimizeTrack = log->startRun("Optimize");
-
+    //std::cout<<"MPC Optimization Start"<<std::endl;
     mSolution = mOptimizer->optimize(mProblem.get());
+    //std::cout<<"MPC Optimization end"<<std::endl;
     optimizeTrack->end();
 
     mLastOptimizedTime = startTime;

@@ -265,6 +265,8 @@ void WithRespectToMass::set(simulation::World* world, Eigen::VectorXs value)
   {
     dynamics::Skeleton* skel = world->getSkeleton(i).get();
     int skel_dim = dim(skel);
+    //std::cout<<"skel_dim: "<<skel_dim<<std::endl;
+    //std::cout<<"value_dim: "<<value<<std::endl;
     set(skel, value.segment(cursor, skel_dim));
     cursor += skel_dim;
   }

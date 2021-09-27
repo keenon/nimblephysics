@@ -172,19 +172,6 @@ public:
   /// \param[in] _isCollidable True to enable collisions
   void setCollidable(bool _isCollidable);
 
-  /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
-  /// it's created/loaded from a file. Subsequent scalings can change that
-  /// value.
-  void setScale(s_t newScale);
-
-  /// Returns the scale of the body node.
-  s_t getScale();
-
-  void setScaleLowerBound(s_t lowerBound);
-  s_t getScaleLowerBound();
-  void setScaleUpperBound(s_t upperBound);
-  s_t getScaleUpperBound();
-
   /// Set the mass of the bodynode
   void setMass(s_t mass);
 
@@ -1270,13 +1257,6 @@ public:
 
   /// Same as mDependentDofs, but holds const pointers
   std::vector<const DegreeOfFreedom*> mConstDependentDofs;
-
-  /// This holds on to the relative scaling of this body node. This defaults
-  /// to 1.0 when a body is created, but can be updated by calls to setScale().
-  s_t mScale;
-
-  s_t mScaleLowerBound;
-  s_t mScaleUpperBound;
 
   //--------------------------------------------------------------------------
   // Dynamical Properties

@@ -162,7 +162,9 @@ public:
   std::size_t getNumSkeletons() const;
 
   /// Add a skeleton to this world
-  std::string addSkeleton(const dynamics::SkeletonPtr& _skeleton);
+  std::string addSkeleton(
+      const dynamics::SkeletonPtr& _skeleton
+    );
 
   /// Remove a skeleton from this world
   void removeSkeleton(const dynamics::SkeletonPtr& _skeleton);
@@ -339,10 +341,6 @@ public:
   /// This constructs an inverse mass matrix for the whole world, by creating a
   /// block-diagonal concatenation of each skeleton's inverse mass matrix.
   Eigen::MatrixXs getInvMassMatrix();
-
-  // This sets all the positions of the joints to within their limit range, if
-  // they're currently outside it.
-  void clampPositionsToLimits();
 
   //--------------------------------------------------------------------------
   // High Level ("Reinforcement Learning style") API
@@ -570,6 +568,8 @@ public:
   void setSlowDebugResultsAgainstFD(bool slowDebug);
 
   bool getSlowDebugResultsAgainstFD();
+
+  void DisableWrtMass();
 
 protected:
   /// If this is true, we use finite-differencing to compute all of the

@@ -70,10 +70,6 @@ JointProperties::JointProperties(
   : mName(_name),
     mT_ParentBodyToJoint(_T_ParentBodyToJoint),
     mT_ChildBodyToJoint(_T_ChildBodyToJoint),
-    mParentScale(1.0),
-    mChildScale(1.0),
-    mOriginalParentTranslation(_T_ParentBodyToJoint.translation()),
-    mOriginalChildTranslation(_T_ChildBodyToJoint.translation()),
     mIsPositionLimitEnforced(_isPositionLimitEnforced),
     mActuatorType(_actuatorType),
     mMimicJoint(_mimicJoint),
@@ -120,13 +116,7 @@ void Joint::setAspectProperties(const AspectProperties& properties)
 {
   setName(properties.mName);
   setTransformFromParentBodyNode(properties.mT_ParentBodyToJoint);
-  mAspectProperties.mParentScale = properties.mParentScale;
-  mAspectProperties.mOriginalParentTranslation
-      = properties.mOriginalParentTranslation;
   setTransformFromChildBodyNode(properties.mT_ChildBodyToJoint);
-  mAspectProperties.mChildScale = properties.mChildScale;
-  mAspectProperties.mOriginalChildTranslation
-      = properties.mOriginalChildTranslation;
   setPositionLimitEnforced(properties.mIsPositionLimitEnforced);
   setActuatorType(properties.mActuatorType);
   setMimicJoint(
@@ -535,14 +525,11 @@ void Joint::debugRelativeJacobianInPositionSpace()
   const s_t threshold = 1e-9;
   if (((bruteForce - analytical).cwiseAbs().array() > threshold).any())
   {
-    std::cout << "Relative Jacobian (in position space) disagrees on joint \""
-              << getName() << "\" of type \"" << getType() << "\"!"
-              << std::endl;
+    std::cout << "Relative Jacobian (in position space) disagrees on joint \"" << getName()
+              << "\" of type \"" << getType() << "\"!" << std::endl;
     std::cout << "Analytical:" << std::endl << analytical << std::endl;
     std::cout << "Brute Force:" << std::endl << bruteForce << std::endl;
-    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << ","
-              << (analytical - bruteForce).maxCoeff() << "):" << std::endl
-              << analytical - bruteForce << std::endl;
+    std::cout << "Diff (" << (analytical - bruteForce).minCoeff() << "," << (analytical - bruteForce).maxCoeff() << "):" << std::endl << analytical - bruteForce << std::endl;
   }
 }
 
@@ -654,8 +641,6 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
-  mAspectProperties.mParentScale = 1.0;
-  mAspectProperties.mOriginalParentTranslation = _T.translation();
   notifyPositionUpdated();
 }
 
@@ -664,8 +649,6 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
-  mAspectProperties.mChildScale = 1.0;
-  mAspectProperties.mOriginalChildTranslation = _T.translation();
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -680,58 +663,6 @@ const Eigen::Isometry3s& Joint::getTransformFromParentBodyNode() const
 const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 {
   return mAspectProperties.mT_ChildBodyToJoint;
-}
-
-//==============================================================================
-/// Copy the transfromFromParentNode and transfromFromChildNode, and their
-/// scales, from another joint
-void Joint::copyTransformsFrom(const dynamics::Joint* other)
-{
-  mAspectProperties.mChildScale = other->mAspectProperties.mChildScale;
-  mAspectProperties.mT_ChildBodyToJoint
-      = other->mAspectProperties.mT_ChildBodyToJoint;
-  mAspectProperties.mOriginalChildTranslation
-      = other->mAspectProperties.mOriginalChildTranslation;
-  mAspectProperties.mParentScale = other->mAspectProperties.mParentScale;
-  mAspectProperties.mT_ParentBodyToJoint
-      = other->mAspectProperties.mT_ParentBodyToJoint;
-  mAspectProperties.mOriginalParentTranslation
-      = other->mAspectProperties.mOriginalParentTranslation;
-}
-
-//==============================================================================
-/// Set the scale of the child body
-void Joint::setChildScale(s_t scale)
-{
-  mAspectProperties.mChildScale = scale;
-  mAspectProperties.mT_ChildBodyToJoint.translation()
-      = mAspectProperties.mOriginalChildTranslation * scale;
-  updateRelativeJacobian();
-  notifyPositionUpdated();
-}
-
-//==============================================================================
-/// Set the scale of the parent body
-void Joint::setParentScale(s_t scale)
-{
-  mAspectProperties.mParentScale = scale;
-  mAspectProperties.mT_ParentBodyToJoint.translation()
-      = mAspectProperties.mOriginalParentTranslation * scale;
-  notifyPositionUpdated();
-}
-
-//==============================================================================
-/// Get the scale of the child body
-s_t Joint::getChildScale() const
-{
-  return mAspectProperties.mChildScale;
-}
-
-//==============================================================================
-/// Get the scale of the parent body
-s_t Joint::getParentScale() const
-{
-  return mAspectProperties.mParentScale;
 }
 
 //==============================================================================

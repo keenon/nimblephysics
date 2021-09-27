@@ -191,22 +191,6 @@ public:
   /// Get transformation from child body node to this joint
   const Eigen::Isometry3s& getTransformFromChildBodyNode() const;
 
-  /// Copy the transfromFromParentNode and transfromFromChildNode, and their
-  /// scales, from another joint
-  void copyTransformsFrom(const dynamics::Joint* other);
-
-  /// Set the scale of the child body
-  void setChildScale(s_t scale);
-
-  /// Set the scale of the parent body
-  void setParentScale(s_t scale);
-
-  /// Get the scale of the child body
-  s_t getChildScale() const;
-
-  /// Get the scale of the parent body
-  s_t getParentScale() const;
-
   /// Set to enforce joint position limit
   ///
   /// The joint position limit is valid when the actutor type is one of

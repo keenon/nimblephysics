@@ -823,184 +823,6 @@ public:
   // skeleton concatenated into a flat vector.
   void setLinkMasses(Eigen::VectorXs masses);
 
-  // This returns a vector of all the link scales for all the links in the
-  // skeleton concatenated into a flat vector
-  Eigen::VectorXs getLinkScales();
-
-  // Sets all the link scales for the skeleton, from a flat vector
-  void setLinkScales(Eigen::VectorXs scales);
-
-  // This sets all the positions of the joints to within their limit range, if
-  // they're currently outside it.
-  void clampPositionsToLimits();
-
-  //----------------------------------------------------------------------------
-  // Constraining links to have the same scale
-  //----------------------------------------------------------------------------
-
-  const std::vector<std::vector<dynamics::BodyNode*>>& getBodyScaleGroups()
-      const;
-
-  const std::vector<dynamics::BodyNode*>& getBodyScaleGroup(int index) const;
-
-  /// This creates scale groups for any body nodes that may've been added since
-  /// we last interacted with the body scale group APIs
-  void ensureBodyScaleGroups();
-
-  /// This returns the index of the group that this body node corresponds to
-  int getScaleGroupIndex(dynamics::BodyNode* bodyNode);
-
-  /// This takes two scale groups and merges their contents into a single group.
-  /// After this operation, there is one fewer scale group.
-  void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
-
-  /// This gets the scale upper bound for the first body in a group, by index
-  s_t getScaleGroupUpperBound(int groupIndex);
-
-  /// This gets the scale lower bound for the first body in a group, by index
-  s_t getScaleGroupLowerBound(int groupIndex);
-
-  /// This takes two scale groups and merges their contents into a single group.
-  /// After this operation, there is one fewer scale group.
-  void mergeScaleGroupsByIndex(int a, int b);
-
-  /// This returns the number of scaling groups (groups with an equal-scale
-  /// constraint) that there are in the model.
-  int getNumScaleGroups();
-
-  /// This sets the scales of all the body nodes according to their group
-  /// membership. The `scale` vector is expected to be the same size as the
-  /// number of groups.
-  void setGroupScales(Eigen::VectorXs scale);
-
-  /// This gets the scales of the first body in each scale group.
-  Eigen::VectorXs getGroupScales();
-
-  /// This returns the Jacobian of the joint positions wrt the scales of the
-  /// groups
-  Eigen::MatrixXs getJointWorldPositionsJacobianWrtGroupScales(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  /// This returns the Jacobian of the joint positions wrt the scales of the
-  /// groups
-  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  //----------------------------------------------------------------------------
-  // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
-  //
-  // This allows us to do computations like IK in a gimbal-lock-free space.
-  //----------------------------------------------------------------------------
-
-  // This creates a fresh skeleton, which is a copy of this one EXCEPT that
-  // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
-  // the configuration spaces are different, so you need to use
-  // `convertPositionsToBallSpace()` and `convertPositionsFromBallSpace()` to
-  // transform positions to and from the new skeleton's configuration.
-  std::shared_ptr<dynamics::Skeleton> convertSkeletonToBallJoints();
-
-  // This converts the position vector from Euler space to Ball space for any
-  // joints that need to be converted. This needs to be called on a skeleton
-  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
-  // in vector unchanged.
-  Eigen::VectorXs convertPositionsToBallSpace(Eigen::VectorXs pos);
-
-  // This converts the position vector from Ball space to Euler space for any
-  // joints that need to be converted. This needs to be called on a skeleton
-  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
-  // in vector unchanged.
-  Eigen::VectorXs convertPositionsFromBallSpace(Eigen::VectorXs pos);
-
-  //----------------------------------------------------------------------------
-  // IK for retargetting (especially between similar but not identical human
-  // skeletons)
-  //----------------------------------------------------------------------------
-
-  /// This returns the concatenated 3-vectors for world positions of each joint
-  /// in 3D world space, for the registered joints.
-  Eigen::VectorXs getJointWorldPositions(
-      const std::vector<const dynamics::Joint*>& joints) const;
-
-  /// This returns the concatenated 3-vectors for world angle of each joint's
-  /// child space in 3D world space, for the registered joints.
-  Eigen::VectorXs getJointWorldAngles(
-      const std::vector<const dynamics::Joint*>& joints) const;
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointPositions(
-      const std::vector<const dynamics::Joint*>& joints) const;
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointChildAngles(
-      const std::vector<const dynamics::Joint*>& joints) const;
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs
-  finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  /// This returns the Jacobian relating changes in source skeleton body scales
-  /// to changes in source joint world positions.
-  Eigen::MatrixXs getJointWorldPositionsJacobianWrtBodyScales(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  /// This returns the Jacobian relating changes in source skeleton body scales
-  /// to changes in source joint world positions.
-  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
-      const std::vector<const dynamics::Joint*>& joints);
-
-  /// These are a set of bodies, and offsets in local body space where markers
-  /// are mounted on the body
-  Eigen::VectorXs getMarkerWorldPositions(
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-          markers);
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtJointPositions(
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-          markers) const;
-
-  /// This returns the Jacobian relating changes in source skeleton joint
-  /// positions to changes in source joint world positions.
-  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-          markers);
-
-  /// This runs IK, attempting to fit the world positions of the passed in
-  /// joints to the vector of (concatenated) target positions. This can
-  /// optionally also rescale the skeleton.
-  s_t fitJointsToWorldPositions(
-      const std::vector<const dynamics::Joint*>& positionJoints,
-      Eigen::VectorXs targetPositions,
-      bool scaleBodies = false,
-      s_t convergenceThreshold = 1e-7,
-      int maxStepCount = 100,
-      s_t leastSquaresDamping = 0.01,
-      bool lineSearch = true,
-      bool logOutput = false);
-
-  /// This runs IK, attempting to fit the world positions of the passed in
-  /// markers to the vector of (concatenated) target positions.
-  s_t fitMarkersToWorldPositions(
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-          markers,
-      Eigen::VectorXs targetPositions,
-      Eigen::VectorXs markerWeights,
-      s_t convergenceThreshold = 1e-7,
-      int maxStepCount = 100,
-      s_t leastSquaresDamping = 0.01,
-      bool lineSearch = true,
-      bool logOutput = false);
-
   //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
@@ -1041,10 +863,6 @@ public:
   //----------------------------------------------------------------------------
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
-
-  /// This solves a simple inverse dynamics problem to get forces we need to
-  /// apply to arrive at "nextVel" at the next timestep.
-  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
 
   struct ContactInverseDynamicsResult
   {
@@ -1348,18 +1166,13 @@ public:
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
-  math::Jacobian getWorldPositionJacobian(
-      const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const;
-
   // Documentation inherited
   math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node,
-      const Eigen::Vector3s& _localOffset,
-      bool useRidders = true);
+      const JacobianNode* _node, bool useRidders = true);
 
   // Documentation inherited
   math::Jacobian finiteDifferenceRiddersWorldPositionJacobian(
-      const JacobianNode* _node, const Eigen::Vector3s& _localOffset);
+      const JacobianNode* _node);
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;
@@ -1503,21 +1316,21 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
-
+  
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
-
+  
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
-  // Get spring coefficients
+  //Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
 
-  // Get rest positions
+  //Get rest positions
   Eigen::VectorXs getRestPositions();
 
-  // Get Spring Forces
-  Eigen::VectorXs getSpringForce();
+  //Get Spring Forces
+  Eigen::VectorXs getSpringForce(); 
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;
@@ -1825,9 +1638,6 @@ protected:
 
   /// NameManager for tracking SoftBodyNodes
   dart::common::NameManager<SoftBodyNode*> mNameMgrForSoftBodyNodes;
-
-  /// The groups that constrain the scales of body nodes to be equal
-  std::vector<std::vector<dynamics::BodyNode*>> mBodyScaleGroups;
 
   struct DirtyFlags
   {

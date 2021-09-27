@@ -579,6 +579,11 @@ bool World::getSlowDebugResultsAgainstFD()
   return mSlowDebugResultsAgainstFD;
 }
 
+void World::DisableWrtMass()
+{
+  mWrtMass = nullptr;
+}
+
 //==============================================================================
 int World::getSimFrames() const
 {
@@ -684,7 +689,9 @@ std::size_t World::getNumSkeletons() const
 }
 
 //==============================================================================
-std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
+std::string World::addSkeleton(
+    const dynamics::SkeletonPtr& _skeleton
+    )
 {
   if (nullptr == _skeleton)
   {
@@ -1334,17 +1341,6 @@ Eigen::MatrixXs World::getInvMassMatrix()
     cursor += dofs;
   }
   return invMassMatrix;
-}
-
-//==============================================================================
-// This sets all the positions of the joints to within their limit range, if
-// they're currently outside it.
-void World::clampPositionsToLimits()
-{
-  for (std::size_t i = 0; i < mSkeletons.size(); i++)
-  {
-    mSkeletons[i]->clampPositionsToLimits();
-  }
 }
 
 //==============================================================================

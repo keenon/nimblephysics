@@ -38,8 +38,6 @@
 
 #include "dart/common/Console.hpp"
 #include "dart/common/StlHelpers.hpp"
-#include "dart/dynamics/BoxShape.hpp"
-#include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/Chain.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
@@ -49,7 +47,6 @@
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
-#include "dart/dynamics/SphereShape.hpp"
 #include "dart/math/Helpers.hpp"
 
 namespace dart {
@@ -475,114 +472,6 @@ bool BodyNode::isCollidable() const
 void BodyNode::setCollidable(bool _isCollidable)
 {
   mAspectProperties.mIsCollidable = _isCollidable;
-}
-
-//==============================================================================
-/// Re-scales the body node. The original scale of the BodyNode is 1.0, when
-/// it's created/loaded from a file. Subsequent scalings can change that
-/// value.
-void BodyNode::setScale(s_t newScale)
-{
-  if (newScale < mScaleLowerBound)
-  {
-    std::cout << "BodyNode refusing to setScale(" << newScale << ") because "
-              << newScale << " is less than the scale lower bound ("
-              << mScaleLowerBound << "). Clamping to lower bound." << std::endl;
-    newScale = mScaleLowerBound;
-  }
-  if (newScale > mScaleUpperBound)
-  {
-    std::cout << "BodyNode refusing to setScale(" << newScale << ") because "
-              << newScale << " is greater than the scale upper bound ("
-              << mScaleUpperBound << "). Clamping to upper bound." << std::endl;
-    newScale = mScaleUpperBound;
-  }
-
-  s_t ratio = newScale / mScale;
-
-  // Rescale inertia, COM, mass
-  Inertia inertia = getInertia();
-  inertia.setMass(inertia.getMass() * ratio);
-  inertia.setLocalCOM(inertia.getLocalCOM() * ratio);
-  Eigen::Matrix3s scaledMoment
-      = inertia.getMoment() * ratio
-        * ratio; // The MOI is an integral of m*r*r, so needs to be scaled twice
-  inertia.setMoment(scaledMoment);
-  setInertia(inertia);
-
-  // Rescale distance to parent joint
-  Joint* parentJoint = getParentJoint();
-  parentJoint->setChildScale(newScale);
-
-  // Rescale distance to child joints
-  for (int i = 0; i < getNumChildJoints(); i++)
-  {
-    Joint* childJoint = getChildJoint(i);
-    childJoint->setParentScale(newScale);
-  }
-
-  // Rescale all visible shapes and colliders
-  for (int i = 0; i < getNumShapeNodes(); i++)
-  {
-    ShapeNode* shapeNode = getShapeNode(i);
-    shapeNode->setOffset(shapeNode->getOffset() * ratio);
-
-    ShapePtr shapePtr = shapeNode->getShape();
-    if (shapePtr->getType() == MeshShape::getStaticType())
-    {
-      MeshShape* mesh = static_cast<MeshShape*>(shapePtr.get());
-      mesh->setScale(mesh->getScale() * ratio);
-    }
-    else if (shapePtr->getType() == BoxShape::getStaticType())
-    {
-      BoxShape* box = static_cast<BoxShape*>(shapePtr.get());
-      box->setSize(box->getSize() * ratio);
-    }
-    else if (shapePtr->getType() == SphereShape::getStaticType())
-    {
-      SphereShape* sphere = static_cast<SphereShape*>(shapePtr.get());
-      sphere->setRadius(sphere->getRadius() * ratio);
-    }
-    else if (shapePtr->getType() == CapsuleShape::getStaticType())
-    {
-      CapsuleShape* capsule = static_cast<CapsuleShape*>(shapePtr.get());
-      capsule->setRadius(capsule->getRadius() * ratio);
-      capsule->setHeight(capsule->getHeight() * ratio);
-    }
-  }
-
-  mScale = newScale;
-}
-
-//==============================================================================
-/// Returns the scale of the body node.
-s_t BodyNode::getScale()
-{
-  return mScale;
-}
-
-//==============================================================================
-void BodyNode::setScaleLowerBound(s_t lowerBound)
-{
-  mScaleLowerBound = lowerBound;
-}
-
-//==============================================================================
-s_t BodyNode::getScaleLowerBound()
-{
-  return mScaleLowerBound;
-}
-
-//==============================================================================
-void BodyNode::setScaleUpperBound(s_t upperBound)
-{
-  mScaleUpperBound = upperBound;
-}
-
-//==============================================================================
-s_t BodyNode::getScaleUpperBound()
-{
-  return mScaleUpperBound;
 }
 
 //==============================================================================
@@ -1431,9 +1320,6 @@ BodyNode::BodyNode(
     mIsColliding(false),
     mParentJoint(_parentJoint),
     mParentBodyNode(nullptr),
-    mScale(1.0),
-    mScaleLowerBound(0.5),
-    mScaleUpperBound(1.5),
     mPartialAcceleration(Eigen::Vector6s::Zero()),
     mIsPartialAccelerationDirty(true),
     mF(Eigen::Vector6s::Zero()),
@@ -1488,9 +1374,6 @@ BodyNode* BodyNode::clone(
 {
   BodyNode* clonedBn
       = new BodyNode(_parentBodyNode, _parentJoint, getBodyNodeProperties());
-  clonedBn->mScale = mScale;
-  clonedBn->mScaleLowerBound = mScaleLowerBound;
-  clonedBn->mScaleUpperBound = mScaleUpperBound;
 
   clonedBn->matchAspects(this);
 

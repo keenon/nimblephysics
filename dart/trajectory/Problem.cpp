@@ -443,6 +443,12 @@ int Problem::getConstraintDim() const
   return mConstraints.size();
 }
 
+void Problem::resetDirty()
+{
+  mRolloutCacheDirty = true;
+  std::cout<<"Reach Here"<<std::endl;
+}
+
 //==============================================================================
 /// This computes the values of the constraints, assuming that the constraint
 /// vector being passed in is only the size of mConstraints

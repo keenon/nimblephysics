@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <thread>
+#include <mutex>
 
 #include <Eigen/Dense>
 
@@ -31,7 +32,8 @@ public:
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<trajectory::LossFn> loss,
       int planningHistoryMillis,
-      int sensorDim);
+      Eigen::VectorXs sensorDims,
+      int steps);
 
   /// This updates the loss function that we're going to move in real time to
   /// minimize. This can happen quite frequently, for example if our loss
@@ -56,18 +58,22 @@ public:
       std::function<Eigen::VectorXs(Eigen::MatrixXs, long)>
           initialPosEstimator);
 
+  void setInitialVelEstimator(
+    std::function<Eigen::VectorXs(Eigen::MatrixXs, long)>
+    initialVelEstimator);
+
   /// This returns the current problem definition that MPC is using
   std::shared_ptr<trajectory::Problem> getProblem();
 
   /// This logs that the sensor output is a specific vector now
-  void registerSensorsNow(Eigen::VectorXs sensors);
+  void registerSensorsNow(Eigen::VectorXs sensors, int sensor_id);
 
   /// This logs that the controls are a specific vector now
   void registerControlsNow(Eigen::VectorXs sensors);
 
   /// This logs that the sensor output was a specific vector at a specific
   /// moment
-  void registerSensors(long now, Eigen::VectorXs sensors);
+  void registerSensors(long now, Eigen::VectorXs sensors, int sensor_id);
 
   /// This logs that our controls were this value at this time
   void registerControls(long now, Eigen::VectorXs controls);
@@ -81,11 +87,18 @@ public:
   /// This runs inference to find mutable values, starting at `startTime`
   void runInference(long startTime);
 
+  Eigen::VectorXs runPlotting(long startTime, s_t upper, s_t lower, int samples);
+
   /// This registers a listener to get called when we finish replanning
   void registerInferListener(
       std::function<
           void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)>
           inferListener);
+
+  // wrapper for locking the buffer
+  void attachMutex(std::mutex &mutex_lock);
+  void registerLock();
+  void registerUnlock();
 
 protected:
   /// This is the function for the optimization thread to run when we're live
@@ -95,14 +108,18 @@ protected:
   std::shared_ptr<simulation::World> mWorld;
   std::shared_ptr<trajectory::LossFn> mLoss;
   int mPlanningHistoryMillis;
-  int mSensorDim;
-  VectorLog mSensorLog;
+  int mPlanningSteps;
+  Eigen::VectorXs mSensorDims;
+  std::vector<VectorLog> mSensorLogs;
   VectorLog mControlLog;
 
   std::shared_ptr<trajectory::Optimizer> mOptimizer;
   std::shared_ptr<trajectory::Problem> mProblem;
   std::shared_ptr<trajectory::Solution> mSolution;
   std::thread mOptimizationThread;
+  std::mutex* mRegisterMutex;
+  bool mLockRegistered = false;
+  Eigen::VectorXs mParameters;
 
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(
@@ -112,6 +129,7 @@ protected:
   // This is the function that estimates our initial state before launching
   // learning
   std::function<Eigen::VectorXs(Eigen::MatrixXs, long)> mInitialPosEstimator;
+  std::function<Eigen::VectorXs(Eigen::MatrixXs, long)> mInitialVelEstimator;
 };
 
 } // namespace realtime

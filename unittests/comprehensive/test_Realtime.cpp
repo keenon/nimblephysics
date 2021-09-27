@@ -35,6 +35,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <mutex>
 
 #include <gtest/gtest.h>
 
@@ -53,7 +54,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -71,7 +72,6 @@ std::shared_ptr<LossFn> getMPCLoss()
     s_t sum = 0.0;
     for (int i = 0; i < steps; i++)
     {
-      // rollout->getVelsConst().col(i).squaredNorm()
       sum += rollout->getPosesConst().col(i).squaredNorm();
     }
     return sum;
@@ -87,20 +87,10 @@ std::shared_ptr<LossFn> getMPCLoss()
     for (int i = 0; i < steps; i++)
     {
       gradWrtRollout->getPoses().col(i) = 2 * rollout->getPosesConst().col(i);
-      // gradWrtRollout->getVels().col(i) = 2 *
-      // rollout->getVelsConst().col(i);
     }
-    /*
-    for (int i = 0; i < steps; i++)
-    {
-      gradWrtRollout->getControlForces("identity").col(i)
-          = 2 * rollout->getControlForcesConst("identity").col(i);
-    }
-    */
     s_t sum = 0.0;
     for (int i = 0; i < steps; i++)
     {
-      // rollout->getVelsConst().col(i).squaredNorm()
       sum += rollout->getPosesConst().col(i).squaredNorm();
     }
     return sum;
@@ -109,15 +99,17 @@ std::shared_ptr<LossFn> getMPCLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-std::shared_ptr<LossFn> getSSIDLoss()
+std::shared_ptr<LossFn> getSSIDPosLoss()
 {
   TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
-    Eigen::MatrixXs sensorPositions = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
     int steps = rollout->getPosesConst().cols();
 
     Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
 
-    // std::cout << "Pos Error: " << std::endl << posError << std::endl;
+    //std::cout << "Pos In Buffer: " << std::endl << sensorPositions << std::endl;
+    //std::cout << "Pos In Traj  : " << std::endl << rollout->getPosesConst() << std::endl;
 
     s_t sum = 0.0;
     for (int i = 0; i < steps; i++)
@@ -135,7 +127,8 @@ std::shared_ptr<LossFn> getSSIDLoss()
     gradWrtRollout->getControlForces().setZero();
     int steps = rollout->getPosesConst().cols();
 
-    Eigen::MatrixXs sensorPositions = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
 
     Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
 
@@ -150,6 +143,105 @@ std::shared_ptr<LossFn> getSSIDLoss()
 
   return std::make_shared<LossFn>(loss, lossGrad);
 }
+
+std::shared_ptr<LossFn> getSSIDVelPosLoss()
+{
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+    int steps = rollout->getPosesConst().cols();
+
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    // std::cout << "Pos Error: " << std::endl << posError << std::endl;
+
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += posError.col(i).squaredNorm();
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getControlForces().setZero();
+    int steps = rollout->getPosesConst().cols();
+
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    gradWrtRollout->getPoses() = 2 * posError;
+    gradWrtRollout->getVels() = 2 * velError;
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += posError.col(i).squaredNorm();
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  return std::make_shared<LossFn>(loss, lossGrad);
+}
+
+std::shared_ptr<LossFn> getSSIDVelLoss()
+{
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+    int steps = rollout->getVelsConst().cols();
+
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    // std::cout << "Pos Error: " << std::endl << posError << std::endl;
+
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getControlForces().setZero();
+    int steps = rollout->getVelsConst().cols();
+
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    gradWrtRollout->getVels() = 2 * velError;
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  return std::make_shared<LossFn>(loss, lossGrad);
+}
+
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_MPC)
@@ -206,8 +298,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   cartpole->setPosition(1, 15.0 / 180.0 * 3.1415);
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
-  // cartpole->getDof(1)->setCoulombFriction(0.1);
-
+  
   ////////////////////////////////////////////////////////////
   // Set up a realtime world and controller
   ////////////////////////////////////////////////////////////
@@ -218,7 +309,6 @@ TEST(REALTIME, CARTPOLE_MPC)
   // 300 timesteps
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = 300 * millisPerTimestep;
-  // int advanceSteps = 70;
 
   s_t goalX = 1.0;
 
@@ -270,15 +360,42 @@ TEST(REALTIME, CARTPOLE_MPC)
         return sum;
       };
 
+  int inferenceSteps = 5;
+  int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
+  std::shared_ptr<simulation::World> ssidWorld = world->clone();
+  
+  
+  ssidWorld->tuneMass(
+    armPair.second, // Also feasible since only name is used
+    WrtMassBodyNodeEntryType::INERTIA_MASS,
+    Eigen::VectorXs::Ones(1) * 5.0,
+    Eigen::VectorXs::Ones(1) * 0.2);
+  
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(
+      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
+  
+  std::mutex lock;
+  ssid.attachMutex(lock);
+  
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long){
+      return sensors.col(0);
+    });
+
+  //world->DisableWrtMass();
+  world->clearTunableMassThisInstance();
   MPCLocal mpcLocal = MPCLocal(
       world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
   mpcLocal.setSilent(true);
-
-  int inferenceHistoryMillis = 10 * millisPerTimestep;
-  std::shared_ptr<simulation::World> ssidWorld = world->clone();
-  SSID ssid = SSID(
-      ssidWorld, getSSIDLoss(), inferenceHistoryMillis, world->getNumDofs());
-
+  
   mpcLocal.setMaxIterations(7);
 
   mpcLocal.setEnableLineSearch(false);
@@ -287,6 +404,16 @@ TEST(REALTIME, CARTPOLE_MPC)
   // This should fork off mpcLocal to another process
   // MPCRemote mpcRemote = MPCRemote(mpcLocal);
   MPCLocal& mpcRemote = mpcLocal;
+  
+  ssid.registerInferListener([&](long time,
+                                 Eigen::VectorXs pos,
+                                 Eigen::VectorXs vel,
+                                 Eigen::VectorXs mass,
+                                 long) {
+    mpcRemote.recordGroundTruthState(time, pos, vel, mass);
+    armPair.second->setMass(mass(0));
+    //armPair.second->setMass(1);
+  });
 
   std::function<Eigen::VectorXs()> getControlForces = [&]() {
     Eigen::VectorXs forces = mpcRemote.getControlForceNow();
@@ -299,15 +426,8 @@ TEST(REALTIME, CARTPOLE_MPC)
           mpcRemote.recordGroundTruthStateNow(pos, vel, mass);
           // ssid.registerSensorsNow(pos);
         };
-  ssid.registerInferListener([&](long time,
-                                 Eigen::VectorXs pos,
-                                 Eigen::VectorXs vel,
-                                 Eigen::VectorXs mass,
-                                 long /* duration */) {
-    mpcRemote.recordGroundTruthState(time, pos, vel, mass);
-    world->setMasses(mass);
-  });
-
+  // The infer listener will be called at the end of the inference
+  
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
   GUIWebsocketServer server;
 
@@ -322,6 +442,8 @@ TEST(REALTIME, CARTPOLE_MPC)
     dragTo(2) = 0.0;
     server.setObjectPosition("goal", dragTo);
   });
+  std::string key = "mass";
+  //server.createText(key,"Current Mass",Eigen::Vector2i(40,40),Eigen::Vector2i(10,10));
 
   Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
 
@@ -330,9 +452,23 @@ TEST(REALTIME, CARTPOLE_MPC)
                             ->getShapeNodesWith<VisualAspect>()[0]
                             ->getVisualAspect();
   Eigen::Vector3s originalColor = sledBodyVisual->getColor();
-
+  float mass = 2.0;
+  float id_mass = 1.0;
+  //long t_i = 0;
+  realtimeUnderlyingWorld->getSkeleton("cartpole")->getBodyNode(1)->setMass(mass);
+  ssidWorld->getSkeleton("cartpole")->getBodyNode(1)->setMass(id_mass);
+  world->getSkeleton("cartpole")->getBodyNode(1)->setMass(id_mass);
+  std::cout<<"World Mass: "<<world->getMasses()<<std::endl;
+  std::cout<<"RWorld Mass: "<<realtimeUnderlyingWorld->getMasses()<<std::endl;
+  std::cout<<"SWorld Mass: "<<ssidWorld->getMasses()<<std::endl;
+  int total_steps = 0;
+  //long time_tag = 0;
   ticker.registerTickListener([&](long now) {
-    realtimeUnderlyingWorld->setControlForces(mpcRemote.getControlForce(now));
+    //now = millisPerTimestep*total_steps;
+    //Eigen::VectorXs forces = Eigen::VectorXs::Ones(world->getNumDofs());
+    Eigen::VectorXs mpcforces = mpcRemote.getControlForce(now);
+    realtimeUnderlyingWorld->setControlForces(mpcforces);
+    //realtimeUnderlyingWorld->setControlForces(forces);
 
     if (server.getKeysDown().count("a"))
     {
@@ -354,22 +490,36 @@ TEST(REALTIME, CARTPOLE_MPC)
     {
       sledBodyVisual->setColor(originalColor);
     }
-
     if (server.getKeysDown().count(","))
     {
       // Increase mass
+      mass = 3.0;
+      realtimeUnderlyingWorld->getSkeleton("cartpole")->getBodyNode(1)->setMass(mass);
     }
     else if (server.getKeysDown().count("o"))
     {
       // Decrease mass
+      mass = 1.0;
+      realtimeUnderlyingWorld->getSkeleton("cartpole")->getBodyNode(1)->setMass(mass);
     }
+    
 
-    /*
-    realtimeWorld.registerTiming(
-        "buffer", mpcRemote.getRemainingPlanBufferMillis(), "ms");
-        */
-
+    ssid.registerLock();
+    ssid.registerControls(now, mpcforces);
+    ssid.registerSensors(now, realtimeUnderlyingWorld->getPositions(),0);
+    ssid.registerSensors(now, realtimeUnderlyingWorld->getVelocities(),1);
+    ssid.registerUnlock();
     realtimeUnderlyingWorld->step();
+    if(total_steps%50==0 && total_steps != 0)
+    {
+      //ssid.runInference(now);
+      id_mass = world->getSkeleton("cartpole")->getBodyNode(1)->getMass();
+      std::cout<<"Now In Step: "<<total_steps<<" Mass: "<<id_mass<<" Realmass: "<<mass<<std::endl;
+    }
+    
+    
+    
+    total_steps ++;
     mpcRemote.recordGroundTruthState(
         now,
         realtimeUnderlyingWorld->getPositions(),
@@ -377,6 +527,7 @@ TEST(REALTIME, CARTPOLE_MPC)
         realtimeUnderlyingWorld->getMasses());
 
     server.renderWorld(realtimeUnderlyingWorld);
+    //server.setTextContents(key,"Current Masses: "+std::to_string(id_mass));
   });
 
   mpcRemote.registerReplanningListener(
@@ -398,7 +549,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     //
     // https://github.com/coin-or/Ipopt/issues/298
 
-    // ssid.start();
+    ssid.start();
   });
 
   server.registerShutdownListener([&]() { mpcRemote.stop(); });
@@ -473,17 +624,138 @@ TEST(REALTIME, CARTPOLE_SSID)
   cartpole->setPosition(1, 15.0 / 180.0 * 3.1415);
   cartpole->computeForwardDynamics();
   cartpole->integrateVelocities(world->getTimeStep());
-  // cartpole->getDof(1)->setCoulombFriction(0.1);
 
   world->tuneMass(
-      armPair.second,
+      sledPair.second,
       WrtMassBodyNodeEntryType::INERTIA_MASS,
-      Eigen::VectorXs::Ones(1) * 3.0,
+      Eigen::VectorXs::Ones(1) * 5.0,
       Eigen::VectorXs::Ones(1) * 0.2);
 
-  std::shared_ptr<LossFn> lossFn = getSSIDLoss();
-
+  std::shared_ptr<LossFn> lossFn = getSSIDPosLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelPosLoss();
+  ////////////////////////////////
+  // Set up a realtime world and controller
   ////////////////////////////////////////////////////////////
+
+  // 100 fps
+  world->setTimeStep(1.0 / 100);
+
+  // 300 timesteps
+  int steps = 5;
+  int millisPerTimestep = world->getTimeStep() * 1000;
+  int inferenceHistoryMillis = steps * millisPerTimestep;
+  //int advanceSteps = 70;
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long /* timestamp */) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    }
+  );
+  
+  sledPair.second->setMass(2.0);
+  float init_mass = 1.0;
+  for (int i = 0; i < 1500; i++)
+  {
+    long time = i * millisPerTimestep;
+    Eigen::VectorXs forces = Eigen::VectorXs::Zero(world->getNumDofs());
+    world->setControlForces(forces);
+    world->step();
+    ssid.registerControls(time, forces);
+    ssid.registerSensors(time, world->getPositions(),0);
+    ssid.registerSensors(time, world->getVelocities(),1);
+    
+    if(i%50==0 && i!=0 && i!=50)
+    {
+      sledPair.second->setMass(init_mass);
+      for(int j=0;j<1;j++)
+      {
+        ssid.runInference(time);
+      }
+      init_mass = sledPair.second->getMass();
+      std::cout << "Recovered mass after iteration "<<i<<": "
+                << init_mass << std::endl;
+      sledPair.second->setMass(2.0);
+    }
+  }
+}
+#endif
+
+TEST(REALTIME, CARTPOLE_PLOT)
+{
+  ////////////////////////////////////////////////////////////
+  // Create a cartpole example
+  ////////////////////////////////////////////////////////////
+
+  // World
+  WorldPtr world = World::create();
+  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  SkeletonPtr cartpole = Skeleton::create("cartpole");
+
+  std::pair<PrismaticJoint*, BodyNode*> sledPair
+      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
+  std::shared_ptr<BoxShape> sledShapeBox(
+      new BoxShape(Eigen::Vector3s(0.5, 0.1, 0.1)));
+  ShapeNode* sledShape
+      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+  sledShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
+
+  std::pair<RevoluteJoint*, BodyNode*> armPair
+      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
+  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
+  std::shared_ptr<BoxShape> armShapeBox(
+      new BoxShape(Eigen::Vector3s(0.1, 1.0, 0.1)));
+  ShapeNode* armShape
+      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+  armShape->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
+
+  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
+  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
+  armPair.first->setTransformFromChildBodyNode(armOffset);
+
+  world->addSkeleton(cartpole);
+
+  cartpole->setControlForceUpperLimit(0, 15);
+  cartpole->setControlForceLowerLimit(0, -15);
+  cartpole->setVelocityUpperLimit(0, 1000);
+  cartpole->setVelocityLowerLimit(0, -1000);
+  cartpole->setPositionUpperLimit(0, 10);
+  cartpole->setPositionLowerLimit(0, -10);
+
+  cartpole->setControlForceUpperLimit(1, 0);
+  cartpole->setControlForceLowerLimit(1, 0);
+  cartpole->setVelocityUpperLimit(1, 1000);
+  cartpole->setVelocityLowerLimit(1, -1000);
+  cartpole->setPositionUpperLimit(1, 10);
+  cartpole->setPositionLowerLimit(1, -10);
+
+  cartpole->setPosition(0, 0);
+  cartpole->setPosition(1, 15.0 / 180.0 * 3.1415);
+  cartpole->computeForwardDynamics();
+  cartpole->integrateVelocities(world->getTimeStep());
+
+  world->tuneMass(
+      //sledPair.second,
+      armPair.second,
+      WrtMassBodyNodeEntryType::INERTIA_MASS,
+      Eigen::VectorXs::Ones(1) * 5.0,
+      Eigen::VectorXs::Ones(1) * 0.2);
+
+  std::shared_ptr<LossFn> lossFn = getSSIDPosLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelPosLoss();
+  ////////////////////////////////
   // Set up a realtime world and controller
   ////////////////////////////////////////////////////////////
 
@@ -492,37 +764,79 @@ TEST(REALTIME, CARTPOLE_SSID)
 
   // 300 timesteps
   int millisPerTimestep = world->getTimeStep() * 1000;
-  int inferenceHistoryMillis = 5 * millisPerTimestep;
+  int steps = 5;
+  int inferenceHistoryMillis = steps * millisPerTimestep;
   // int advanceSteps = 70;
-
-  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, world->getNumDofs());
-
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long /* timestamp */) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    }
+  );
+  
+  //sledPair.second->setMass(2.0);
   armPair.second->setMass(2.0);
-  for (int i = 0; i < 50; i++)
+  float init_mass = 1.0;
+  std::vector<Eigen::VectorXs> multi_loss;
+  //std::vector<Eigen::VectorXs> multi_loss2;
+  std::vector<s_t> solutions;
+  for (int i = 0; i < 200; i++)
   {
     long time = i * millisPerTimestep;
     Eigen::VectorXs forces = Eigen::VectorXs::Ones(world->getNumDofs());
     world->setControlForces(forces);
     world->step();
     ssid.registerControls(time, forces);
-    ssid.registerSensors(time, world->getPositions());
+    ssid.registerSensors(time, world->getPositions(),0);
+    ssid.registerSensors(time, world->getVelocities(),1);
+    //std::cout<<"Registered Pos: \n"<<world->getPositions()<<"\nVel: \n"<<world->getVelocities()<<"\nMass: "<<armPair.second->getMass()<<std::endl;
+    
+    if(i%5==0 && i!=0)
+    {
+      multi_loss.push_back(ssid.runPlotting(time,5.0,0.2,200));
+      //multi_loss2.push_back(ssid.runPlotting(time,5.0,0.2,200));
+      //sledPair.second->setMass(init_mass);
+      armPair.second->setMass(init_mass);
+      ssid.runInference(time);
+      //init_mass = sledPair.second->getMass();
+      init_mass = armPair.second->getMass();
+      std::cout << "Recovered mass after iteration "<<i<<": "
+                << init_mass << std::endl;
+      solutions.push_back(init_mass);
+      //sledPair.second->setMass(2.0); 
+      armPair.second->setMass(2.0);
+    }
   }
-  armPair.second->setMass(1.0);
-
-  ssid.setInitialPosEstimator(
-      [](Eigen::MatrixXs sensors, long /* timestamp */) {
-        // Use the first column of sensor data as an approximate starting point
-        return sensors.col(0);
-      });
-
-  ssid.runInference(30 * millisPerTimestep);
-
-  std::cout << "Recovered mass after 1st iteration: "
-            << armPair.second->getMass() << std::endl;
-
-  ssid.runInference(50 * millisPerTimestep);
-
-  std::cout << "Recovered mass after 2nd iteration: "
-            << armPair.second->getMass() << std::endl;
+  Eigen::MatrixXs lossMatrix = Eigen::MatrixXs::Zero(200,multi_loss.size());
+  //Eigen::MatrixXs lossMatrix2 = Eigen::MatrixXs::Zero(200,multi_loss.size());
+  Eigen::VectorXs solutionVec = Eigen::VectorXs::Zero(solutions.size());
+  for(int i=0;i<multi_loss.size();i++)
+  {
+    lossMatrix.col(i) = multi_loss[i];
+    //lossMatrix2.col(i) = multi_loss2[i];
+    solutionVec(i) = solutions[i];
+  }
+  std::ofstream file;
+  file.open("/workspaces/nimblephysics/saved_data/raw_data/Losses.txt");
+  file<<lossMatrix.transpose();
+  file.close();
+  /*
+  std::ofstream file2;
+  file2.open("/workspaces/nimblephysics/saved_data/raw_data/Losses2.txt");
+  file2<<lossMatrix2.transpose();
+  file2.close();
+  */
+  std::ofstream sfile;
+  sfile.open("/workspaces/nimblephysics/saved_data/raw_data/Solutions.txt");
+  sfile<<solutionVec;
+  sfile.close();
 }
-#endif
