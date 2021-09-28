@@ -1277,9 +1277,20 @@ OpenSimFile OpenSimParser::readOsim40(
             = readVec3(markerCursor->FirstChildElement("location"));
         std::string bodyName
             = markerCursor->FirstChildElement("body")->GetText();
+        bool fixed
+            = std::string(markerCursor->FirstChildElement("fixed")->GetText())
+              == "true";
 
         file.markersMap[name]
             = std::make_pair(skel->getBodyNode(bodyName), offset);
+        if (fixed)
+        {
+          file.anatomicalMarkers.push_back(name);
+        }
+        else
+        {
+          file.trackingMarkers.push_back(name);
+        }
 
         markerCursor = markerCursor->NextSiblingElement();
       }

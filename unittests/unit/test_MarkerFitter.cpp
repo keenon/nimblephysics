@@ -1236,6 +1236,337 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, CLAMP_WEIRDNESS_2)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
+  std::shared_ptr<dynamics::Skeleton> osimBallJoints
+      = osim->convertSkeletonToBallJoints();
+
+  Eigen::VectorXs goldPos = Eigen::VectorXs::Zero(37);
+  goldPos << -0.0476159, 0.42647, 1.56991, 0.555199, 1.00915, -0.977329,
+      -0.399547, -0.00193299, 0.2908, 0.225648, 0.403207, 0, 0, -0.51773,
+      0.0772674, -0.320767, 0.00382977, 0.165412, 0, 0, -0.599194, -0.13623,
+      0.508717, 0.110365, -0.23571, 0.144373, 0.61493, 1.55246, 0, 0, 0.103503,
+      -0.020086, -0.166672, 0.634983, 1.54352, 0, 0;
+
+  /*
+  Eigen::VectorXs standardBodyScales = Eigen::VectorXs::Zero(60);
+  standardBodyScales << 1.07452, 1.04143, 1.46617, 1.18352, 0.969945, 1.18352,
+      0.943467, 1.20593, 0.943467, 0.970271, 1, 0.943467, 0.970271, 1, 0.943467,
+      0.970271, 1, 0.943467, 1.06301, 0.955219, 1.06301, 0.973821, 1.20515,
+      0.973821, 0.971309, 1, 0.973821, 0.971309, 1, 0.973821, 0.971309, 1,
+      0.973821, 1.31629, 1.04819, 1.2481, 1.47983, 1.03373, 1.47983, 0.809716,
+      1.1894, 0.809716, 0.809716, 1.1894, 0.809716, 0.85, 0.85, 0.85, 1.41502,
+      0.997312, 1.41502, 0.804157, 1.19371, 0.804157, 0.804157, 1.19371,
+      0.804157, 0.85, 0.85, 0.85;
+  */
+
+  Eigen::VectorXs ballJointsPos = Eigen::VectorXs(37);
+  ballJointsPos << 0.385497, 1.92537, 0.173129, 0.526872, 1.00141, -0.991841,
+      -1.79229, -3.7335, -5.46329, 0.0399868, 0.15965, 0.145338, 0.509427,
+      -0.0132649, 0.0595007, -0.436285, -0.0382189, 0.0938329, 0.5266,
+      -0.122631, -0.0870851, 0.171899, -0.498203, -5.24101, -3.02705, 2.37908,
+      6.95225, 3.34415, 0.469331, 0.0271157, 0.247161, 0.0453717, 0.0429319,
+      0.850612, 2.96457, -0.337401, -0.117685;
+
+  osimBallJoints->setPositions(ballJointsPos);
+  osim->setPositions(osim->convertPositionsFromBallSpace(ballJointsPos));
+  Eigen::VectorXs unclamped
+      = osim->convertPositionsToBallSpace(osim->getPositions());
+
+  Eigen::VectorXs recovered = osim->getPositions();
+
+  // acromial_r is the trouble spot
+  /*
+  dynamics::EulerJoint* acromial_r
+      = static_cast<dynamics::EulerJoint*>(osim->getJoint("acromial_r"));
+  Eigen::Matrix3s R = math::expMapRot(
+      ballJointsPos.segment<3>(acromial_r->getDof(0)->getIndexInSkeleton()));
+  if (acromial_r->getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+  {
+    std::cout << "R: " << std::endl << R << std::endl;
+    std::cout << "Axis order ZXY" << std::endl;
+    std::cout << "Recovered axis: " << math::matrixToEulerZXY(R) << std::endl;
+  }
+  */
+
+  if (!equals(unclamped, ballJointsPos, 1e-12))
+  {
+    std::cout << "Unclamped doesn't match original" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclamped.size(), 3);
+    compare.col(0) = ballJointsPos;
+    compare.col(1) = unclamped;
+    compare.col(2) = unclamped - ballJointsPos;
+    std::cout << "Original - Balls(Euler(Original)) - Diff:" << std::endl
+              << compare << std::endl;
+
+    for (int i = 0; i < osim->getNumBodyNodes(); i++)
+    {
+      Eigen::Matrix4s osimBallJointsBodyPos
+          = osimBallJoints->getBodyNode(i)->getWorldTransform().matrix();
+      Eigen::Matrix4s osimBodyPos
+          = osim->getBodyNode(i)->getWorldTransform().matrix();
+      if (!equals(osimBallJointsBodyPos, osimBodyPos, 1e-12))
+      {
+        std::cout << "Body node " << osim->getBodyNode(i)->getName()
+                  << " doesn't match:" << std::endl;
+        std::cout << "Ball joints:" << std::endl
+                  << osimBallJointsBodyPos << std::endl;
+        std::cout << "Euler joints:" << std::endl << osimBodyPos << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << osimBodyPos - osimBallJointsBodyPos << std::endl;
+      }
+    }
+  }
+
+  Eigen::VectorXs unclampedEuler = osim->getPositions();
+  osim->clampPositionsToLimits();
+  Eigen::VectorXs clampedEuler = osim->getPositions();
+  if (!equals(clampedEuler, unclampedEuler, 1e-12))
+  {
+    std::cout << "Clamped doesn't match original in Euler space!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclampedEuler.size(), 5);
+    compare.col(0) = unclampedEuler;
+    compare.col(1) = osim->getPositionLowerLimits();
+    compare.col(2) = osim->getPositionUpperLimits();
+    compare.col(3) = clampedEuler;
+    compare.col(4) = clampedEuler - unclampedEuler;
+    std::cout
+        << "Unclamped Euler - Lower Limit - Upper Limit - Clamped Euler - Diff:"
+        << std::endl
+        << compare << std::endl;
+
+    Eigen::VectorXs diff = clampedEuler - unclampedEuler;
+    int cursor = 0;
+    for (int i = 0; i < osim->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = osim->getJoint(i);
+      int dofs = joint->getNumDofs();
+      Eigen::VectorXs diffSubset = diff.segment(cursor, dofs);
+      if (diffSubset.squaredNorm() > 1e-8)
+      {
+        std::cout << "Euler diff at joint " << joint->getName() << std::endl
+                  << diffSubset << std::endl;
+      }
+      cursor += dofs;
+    }
+  }
+
+  Eigen::VectorXs clamped
+      = osim->convertPositionsToBallSpace(osim->getPositions());
+  if (!equals(clamped, unclamped, 1e-12))
+  {
+    std::cout << "Clamped doesn't match original" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclamped.size(), 3);
+    compare.col(0) = unclamped;
+    compare.col(1) = clamped;
+    compare.col(2) = clamped - unclamped;
+    std::cout << "Unclamped - Clamped - Diff:" << std::endl
+              << compare << std::endl;
+
+    Eigen::VectorXs diff = clamped - unclamped;
+    int cursor = 0;
+    for (int i = 0; i < osimBallJoints->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = osimBallJoints->getJoint(i);
+      int dofs = joint->getNumDofs();
+      Eigen::VectorXs diffSubset = diff.segment(cursor, dofs);
+      if (diffSubset.squaredNorm() > 1e-8)
+      {
+        std::cout << "Diff at joint " << joint->getName() << std::endl
+                  << diffSubset << std::endl;
+      }
+      cursor += dofs;
+    }
+
+    /*
+    for (int i = 0; i < osim->getNumBodyNodes(); i++)
+    {
+      Eigen::Matrix4s osimBallJointsBodyPos
+          = osimBallJoints->getBodyNode(i)->getWorldTransform().matrix();
+      Eigen::Matrix4s osimBodyPos
+          = osim->getBodyNode(i)->getWorldTransform().matrix();
+      if (!equals(osimBallJointsBodyPos, osimBodyPos, 1e-12))
+      {
+        std::cout << "Body node " << osim->getBodyNode(i)->getName()
+                  << " doesn't match:" << std::endl;
+        std::cout << "Ball joints:" << std::endl
+                  << osimBallJointsBodyPos << std::endl;
+        std::cout << "Euler joints:" << std::endl << osimBodyPos << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << osimBodyPos - osimBallJointsBodyPos << std::endl;
+      }
+    }
+    */
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
+  std::shared_ptr<dynamics::Skeleton> osimBallJoints
+      = osim->convertSkeletonToBallJoints();
+
+  Eigen::VectorXs goldPos = Eigen::VectorXs::Zero(37);
+  goldPos << 0.0749049, -0.00491559, 1.32853, 0.467201, 0.98761, -0.990219, -0.521694, -0.330605, -0.0701683, 0.555501, 0.337712, 0, 0, -0.076734, 0.0938467, -0.210891, 0.00541465, 0.298908, 0, 0, -0.143646, -0.00811661, 0.335166, -0.0826361, -0.141152, -0.36731, 1.07779, 1.54974, 0, 0, -0.190997, -0.0918618, -0.131114, 1.33685, 1.54543, 0, 0;
+
+  /*
+  Eigen::VectorXs standardBodyScales = Eigen::VectorXs::Zero(60);
+  standardBodyScales << 1.07452, 1.04143, 1.46617, 1.18352, 0.969945, 1.18352,
+      0.943467, 1.20593, 0.943467, 0.970271, 1, 0.943467, 0.970271, 1, 0.943467,
+      0.970271, 1, 0.943467, 1.06301, 0.955219, 1.06301, 0.973821, 1.20515,
+      0.973821, 0.971309, 1, 0.973821, 0.971309, 1, 0.973821, 0.971309, 1,
+      0.973821, 1.31629, 1.04819, 1.2481, 1.47983, 1.03373, 1.47983, 0.809716,
+      1.1894, 0.809716, 0.809716, 1.1894, 0.809716, 0.85, 0.85, 0.85, 1.41502,
+      0.997312, 1.41502, 0.804157, 1.19371, 0.804157, 0.804157, 1.19371,
+      0.804157, 0.85, 0.85, 0.85;
+  */
+
+  Eigen::VectorXs ballJointsPos = Eigen::VectorXs(37);
+  ballJointsPos << 0.0152175, 1.3869, 0.0771069, 0.471897, 0.996231, -0.997029, -0.391901, -0.0459652, -0.759009, 0.21759, 0.0853194, 0.315544, 0.369044, -0.066452, 0.168316, -0.194789, -0.0744426, 0.101366, 0.136293, -0.255278, -0.0411979, 0.241774, -0.17405, -0.283901, -0.202385, -0.0557436, 1.22807, 2.9512, -0.381279, -0.0594017, 0.333266, 0.139513, -0.231853, 1.67011, 3.27791, 0.508881, 0.422523;
+
+  osimBallJoints->setPositions(ballJointsPos);
+  osim->setPositions(osim->convertPositionsFromBallSpace(ballJointsPos));
+  Eigen::VectorXs unclamped
+      = osim->convertPositionsToBallSpace(osim->getPositions());
+
+  Eigen::VectorXs recovered = osim->getPositions();
+
+  // acromial_r is the trouble spot
+  /*
+  dynamics::EulerJoint* acromial_r
+      = static_cast<dynamics::EulerJoint*>(osim->getJoint("acromial_r"));
+  Eigen::Matrix3s R = math::expMapRot(
+      ballJointsPos.segment<3>(acromial_r->getDof(0)->getIndexInSkeleton()));
+  if (acromial_r->getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+  {
+    std::cout << "R: " << std::endl << R << std::endl;
+    std::cout << "Axis order ZXY" << std::endl;
+    std::cout << "Recovered axis: " << math::matrixToEulerZXY(R) << std::endl;
+  }
+  */
+
+  if (!equals(unclamped, ballJointsPos, 1e-12))
+  {
+    std::cout << "Unclamped doesn't match original" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclamped.size(), 3);
+    compare.col(0) = ballJointsPos;
+    compare.col(1) = unclamped;
+    compare.col(2) = unclamped - ballJointsPos;
+    std::cout << "Original - Balls(Euler(Original)) - Diff:" << std::endl
+              << compare << std::endl;
+
+    for (int i = 0; i < osim->getNumBodyNodes(); i++)
+    {
+      Eigen::Matrix4s osimBallJointsBodyPos
+          = osimBallJoints->getBodyNode(i)->getWorldTransform().matrix();
+      Eigen::Matrix4s osimBodyPos
+          = osim->getBodyNode(i)->getWorldTransform().matrix();
+      if (!equals(osimBallJointsBodyPos, osimBodyPos, 1e-12))
+      {
+        std::cout << "Body node " << osim->getBodyNode(i)->getName()
+                  << " doesn't match:" << std::endl;
+        std::cout << "Ball joints:" << std::endl
+                  << osimBallJointsBodyPos << std::endl;
+        std::cout << "Euler joints:" << std::endl << osimBodyPos << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << osimBodyPos - osimBallJointsBodyPos << std::endl;
+      }
+    }
+  }
+
+  Eigen::VectorXs unclampedEuler = osim->getPositions();
+  osim->clampPositionsToLimits();
+  Eigen::VectorXs clampedEuler = osim->getPositions();
+  if (!equals(clampedEuler, unclampedEuler, 1e-12))
+  {
+    std::cout << "Clamped doesn't match original in Euler space!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclampedEuler.size(), 5);
+    compare.col(0) = unclampedEuler;
+    compare.col(1) = osim->getPositionLowerLimits();
+    compare.col(2) = osim->getPositionUpperLimits();
+    compare.col(3) = clampedEuler;
+    compare.col(4) = clampedEuler - unclampedEuler;
+    std::cout
+        << "Unclamped Euler - Lower Limit - Upper Limit - Clamped Euler - Diff:"
+        << std::endl
+        << compare << std::endl;
+
+    Eigen::VectorXs diff = clampedEuler - unclampedEuler;
+    int cursor = 0;
+    for (int i = 0; i < osim->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = osim->getJoint(i);
+      int dofs = joint->getNumDofs();
+      Eigen::VectorXs diffSubset = diff.segment(cursor, dofs);
+      if (diffSubset.squaredNorm() > 1e-8)
+      {
+        std::cout << "Euler diff at joint " << joint->getName() << std::endl
+                  << diffSubset << std::endl;
+      }
+      cursor += dofs;
+    }
+  }
+
+  Eigen::VectorXs clamped
+      = osim->convertPositionsToBallSpace(osim->getPositions());
+  if (!equals(clamped, unclamped, 1e-12))
+  {
+    std::cout << "Clamped doesn't match original" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(unclamped.size(), 3);
+    compare.col(0) = unclamped;
+    compare.col(1) = clamped;
+    compare.col(2) = clamped - unclamped;
+    std::cout << "Unclamped - Clamped - Diff:" << std::endl
+              << compare << std::endl;
+
+    Eigen::VectorXs diff = clamped - unclamped;
+    int cursor = 0;
+    for (int i = 0; i < osimBallJoints->getNumJoints(); i++)
+    {
+      dynamics::Joint* joint = osimBallJoints->getJoint(i);
+      int dofs = joint->getNumDofs();
+      Eigen::VectorXs diffSubset = diff.segment(cursor, dofs);
+      if (diffSubset.squaredNorm() > 1e-8)
+      {
+        std::cout << "Diff at joint " << joint->getName() << std::endl
+                  << diffSubset << std::endl;
+      }
+      cursor += dofs;
+    }
+
+    /*
+    for (int i = 0; i < osim->getNumBodyNodes(); i++)
+    {
+      Eigen::Matrix4s osimBallJointsBodyPos
+          = osimBallJoints->getBodyNode(i)->getWorldTransform().matrix();
+      Eigen::Matrix4s osimBodyPos
+          = osim->getBodyNode(i)->getWorldTransform().matrix();
+      if (!equals(osimBallJointsBodyPos, osimBodyPos, 1e-12))
+      {
+        std::cout << "Body node " << osim->getBodyNode(i)->getName()
+                  << " doesn't match:" << std::endl;
+        std::cout << "Ball joints:" << std::endl
+                  << osimBallJointsBodyPos << std::endl;
+        std::cout << "Euler joints:" << std::endl << osimBodyPos << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << osimBodyPos - osimBallJointsBodyPos << std::endl;
+      }
+    }
+    */
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1446,15 +1777,52 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       markerTrajectories.markerTimesteps);
   */
 
-  int timestep = 50;
+  int timestep = 1377;
 
   std::map<std::string, Eigen::Vector3s> goldMarkers
       = markerTrajectories.markerTimesteps[timestep];
   Eigen::VectorXs goldPose = poses.col(timestep);
 
+  /*
+  // Try to convert the goldPose to the standard skeleton
+
+  Eigen::VectorXs standardGoldPose
+      = Eigen::VectorXs::Zero(standard.skeleton->getNumDofs());
+  for (int i = 0; i < standard.skeleton->getNumDofs(); i++)
+  {
+    standardGoldPose(i) = goldPose(
+        scaled.skeleton->getDof(standard.skeleton->getDof(i)->getName())
+            ->getIndexInSkeleton());
+  }
+  std::cout << "Eigen::VectorXs standardGoldPose = Eigen::VectorXs::Zero("
+            << standardGoldPose.size() << ");" << std::endl;
+  std::cout << "standardGoldPose << ";
+  for (int i = 0; i < standardGoldPose.size(); i++)
+  {
+    if (i > 0)
+    {
+      std::cout << ", ";
+    }
+    std::cout << standardGoldPose(i);
+  }
+  std::cout << ";" << std::endl;
+
+  Eigen::VectorXs standardBodyScales = config.bodyScales;
+  std::cout << "Eigen::VectorXs standardBodyScales = Eigen::VectorXs::Zero("
+            << standardBodyScales.size() << ");" << std::endl;
+  std::cout << "standardBodyScales << ";
+  for (int i = 0; i < standardBodyScales.size(); i++)
+  {
+    if (i > 0)
+    {
+      std::cout << ", ";
+    }
+    std::cout << standardBodyScales(i);
+  }
+  std::cout << ";" << std::endl;
+
   // Try to fit the skeleton to
 
-  /*
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
   Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
   for (auto pair : goldMarkers)
@@ -1467,20 +1835,26 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   debugFitToGUI(
       standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
   */
-  /*
-  standard.skeleton->fitMarkersToWorldPositions(
-      markers,
-      targetPoses,
-      markerWeights,
-      true,
-      math::IKConfig().setLogOutput(true));
-      */
 
   // Get a random subset of the data
 
   srand(25);
+  /*
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
       = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 40);
+  */
+
+  std::vector<unsigned int> indices(markerTrajectories.markerTimesteps.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::random_shuffle(indices.begin(), indices.end());
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  for (int i = 0; i < 40; i++)
+  {
+    std::cout << "Shuffled " << i << "->" << indices[i] << std::endl;
+    markerObservations.push_back(
+        markerTrajectories.markerTimesteps[indices[i]]);
+  }
 
   // Create a marker fitter
 

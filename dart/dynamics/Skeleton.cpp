@@ -52,6 +52,7 @@
 #include "dart/dynamics/Marker.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PointMass.hpp"
+#include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
 #include "dart/math/FiniteDifference.hpp"
@@ -2783,6 +2784,37 @@ void Skeleton::clampPositionsToLimits()
   for (int i = 0; i < getNumDofs(); i++)
   {
     auto* dof = getDof(i);
+    // Special case for rotational joints and euler joints, we're interested in
+    // wrapping by 2*PI
+    bool wrapByTwoPi = false;
+    if (dof->getJoint()->getType() == RevoluteJoint::getStaticType()
+        || dof->getJoint()->getType() == EulerJoint::getStaticType())
+    {
+      wrapByTwoPi = true;
+    }
+    if (dof->getJoint()->getType() == EulerFreeJoint::getStaticType()
+        && dof->getIndexInJoint() < 3)
+    {
+      wrapByTwoPi = true;
+    }
+
+    if (wrapByTwoPi)
+    {
+      double clampedPos = dof->getPosition();
+      while (clampedPos > dof->getPositionUpperLimit())
+      {
+        clampedPos -= 2 * M_PI;
+      }
+      while (clampedPos < dof->getPositionLowerLimit())
+      {
+        clampedPos += 2 * M_PI;
+      }
+      // Only set the value if we ended up in bounds
+      if (clampedPos >= dof->getPositionLowerLimit() && clampedPos <= dof->getPositionUpperLimit()) {
+        dof->setPosition(clampedPos);
+      }
+    }
+
     if (dof->getPosition() > dof->getPositionUpperLimit())
     {
       dof->setPosition(dof->getPositionUpperLimit());
