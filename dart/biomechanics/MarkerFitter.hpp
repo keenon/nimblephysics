@@ -90,6 +90,20 @@ public:
   /// minimize this term.
   s_t computeLoss(Eigen::VectorXs markerError);
 
+  /// During random-restarts on IK, when we find solutions below this loss we'll
+  /// stop doing restarts early, to speed up the process.
+  void setInitialIKSatisfactoryLoss(s_t loss);
+
+  /// This sets the maximum number of restarts allowed for the initial IK solver
+  void setInitialIKMaxRestarts(int restarts);
+
+  /// Sets the maximum that we'll allow markers to move from their original
+  /// position, in meters
+  void setMaxMarkerOffset(s_t offset);
+
+  /// Sets the maximum number of iterations for IPOPT
+  void setIterationLimit(int limit);
+
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
   //////////////////////////////////////////////////////////////////////////
@@ -261,6 +275,10 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
       mMarkersBallJoints;
+
+  s_t mInitialIKSatisfactoryLoss;
+  int mInitialIKMaxRestarts;
+  s_t mMaxMarkerOffset;
 
   // These are IPOPT settings
   double mTolerance;
@@ -445,6 +463,7 @@ public:
 protected:
   MarkerFitter* mFitter;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
+  Eigen::VectorXs mObservationWeights;
   std::shared_ptr<MarkerFitResult>& mOutResult;
   bool mInitializationCached;
   Eigen::VectorXs mCachedInitialization;

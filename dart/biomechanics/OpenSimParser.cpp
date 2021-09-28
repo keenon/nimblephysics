@@ -358,7 +358,6 @@ OpenSimMot OpenSimParser::loadMot(
 
     if (inHeader)
     {
-      std::cout << "\"" << line << "\"" << std::endl;
       if (line == "endheader")
       {
         inHeader = false;
@@ -659,7 +658,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         Eigen::Vector2s coeffs
             = readVec2(linearFunction->FirstChildElement("coefficients"));
         // Bake coeff flips into the axis
-        if (coeffs(0) == -1) {
+        if (coeffs(0) == -1)
+        {
           axis *= coeffs(0);
           coeffs(0) = 1.0;
         }

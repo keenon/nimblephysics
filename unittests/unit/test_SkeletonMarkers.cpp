@@ -37,6 +37,10 @@ TEST(SkeletonConverter, IK_JACOBIANS)
 
   osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
 
+  osim->mergeScaleGroups(
+      osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
+  osim->setScaleGroupUniformScaling(osim->getBodyNode("tibia_r"));
+
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.push_back(
       std::make_pair(osim->getBodyNode("radius_l"), Eigen::Vector3s::Random()));

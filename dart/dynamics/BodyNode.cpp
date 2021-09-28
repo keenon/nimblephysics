@@ -50,8 +50,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
 #include "dart/dynamics/SphereShape.hpp"
-#include "dart/math/Helpers.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -1450,8 +1450,8 @@ BodyNode::BodyNode(
     mParentJoint(_parentJoint),
     mParentBodyNode(nullptr),
     mScale(Eigen::Vector3s::Ones()),
-    mScaleLowerBound(Eigen::Vector3s::Ones() * 0.5),
-    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.5),
+    mScaleLowerBound(Eigen::Vector3s::Ones() * 0.75),
+    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.25),
     mPartialAcceleration(Eigen::Vector6s::Zero()),
     mIsPartialAccelerationDirty(true),
     mF(Eigen::Vector6s::Zero()),
@@ -3145,20 +3145,20 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfSpatialVelocity(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      perturbed = getSpatialVelocity();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        perturbed = getSpatialVelocity();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3186,24 +3186,24 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      perturbed = mCg_dV;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateCombinedVector();
+        }
+        perturbed = mCg_dV;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3422,20 +3422,20 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfGravityForce(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      perturbed = mFgravity;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        perturbed = mFgravity;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3464,28 +3464,29 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForce(
 
   s_t eps = useRidders ? 1e-2 : 1e-4;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-      }
-      perturbed = mCg_F;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateCombinedVector();
+        }
+        for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+        {
+          skel->getBodyNode(j)->aggregateCombinedVector(
+              tmp, skel->getGravity());
+        }
+        perturbed = mCg_F;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3512,26 +3513,27 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForceAdVIV(
 
   s_t eps = useRidders ? 1e-3 : 1e-4;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-      const Eigen::Vector6s& V = getSpatialVelocity();
-      perturbed = math::dad(V, mI * V);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateCombinedVector();
+        }
+        const Eigen::Matrix6s& mI
+            = mAspectProperties.mInertia.getSpatialTensor();
+        const Eigen::Vector6s& V = getSpatialVelocity();
+        perturbed = math::dad(V, mI * V);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3554,25 +3556,26 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForceIdV(
 
   s_t eps = useRidders ? 1e-3 : 1e-4;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-      perturbed = mI * mCg_dV;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateCombinedVector();
+        }
+        const Eigen::Matrix6s& mI
+            = mAspectProperties.mInertia.getSpatialTensor();
+        perturbed = mI * mCg_dV;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
@@ -3634,23 +3637,23 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassSpatialAcceleration(
 
   s_t eps = useRidders ? 1e-3 : 1e-4;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      perturbed = mM_dV;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateMassMatrix();
+        }
+        perturbed = mM_dV;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   // This isn't strictly necessary, because mM_dV is an intermediate variable
   // not used elsewhere without being recomputed first, but just to keep things
@@ -3777,27 +3780,27 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassBodyForce(
 
   s_t eps = useRidders ? 1e-3 : 1e-4;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-      }
-      perturbed = mM_F;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        for (int j = 0; j < skel->getNumBodyNodes(); j++)
+        {
+          skel->getBodyNode(j)->updateMassMatrix();
+        }
+        for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+        {
+          skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
+        }
+        perturbed = mM_F;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
   wrt->set(skel, originalWrt);
   // This isn't strictly necessary, because mM_F is an intermediate variable
   // not used elsewhere without being recomputed first, but just to keep things
@@ -4079,20 +4082,20 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfInvMassArtBias(
 
   s_t eps = 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(skel, tweakedWrt);
-      skel->computeForwardDynamics();
-      perturbed = getBiasForce();
-      return true;
-    },
-    result,
-    eps,
-    false);
-  
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(skel, tweakedWrt);
+        skel->computeForwardDynamics();
+        perturbed = getBiasForce();
+        return true;
+      },
+      result,
+      eps,
+      false);
+
   wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
 

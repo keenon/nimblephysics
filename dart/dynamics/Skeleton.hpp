@@ -63,6 +63,12 @@ namespace dynamics {
 typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
     MarkerMap;
 
+struct BodyScaleGroup
+{
+  std::vector<dynamics::BodyNode*> nodes;
+  bool uniformScaling;
+};
+
 /// class Skeleton
 class Skeleton : public virtual common::VersionCounter,
                  public MetaSkeleton,
@@ -822,10 +828,9 @@ public:
   // Constraining links to have the same scale
   //----------------------------------------------------------------------------
 
-  const std::vector<std::vector<dynamics::BodyNode*>>& getBodyScaleGroups()
-      const;
+  const std::vector<BodyScaleGroup>& getBodyScaleGroups() const;
 
-  const std::vector<dynamics::BodyNode*>& getBodyScaleGroup(int index) const;
+  const BodyScaleGroup& getBodyScaleGroup(int index) const;
 
   /// This creates scale groups for any body nodes that may've been added since
   /// we last interacted with the body scale group APIs
@@ -838,19 +843,31 @@ public:
   /// After this operation, there is one fewer scale group.
   void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
 
+  /// This finds all the pairs of bodies that share the same prefix, and
+  /// different suffixes (for example "a_body_l" and "a_body_r", sharing "_l"
+  /// and "_r")
+  void autogroupSymmetricSuffixes(
+      std::string leftSuffix = "_l", std::string rightSuffix = "_r");
+
+  /// This means that we'll scale a group along all three axis equally. This
+  /// constrains scaling.
+  void setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform = true);
+
+  /// This returns the dimension of the scale group
+  int getScaleGroupDim(int groupIndex);
+
   /// This gets the scale upper bound for the first body in a group, by index
-  Eigen::Vector3s getScaleGroupUpperBound(int groupIndex);
+  Eigen::VectorXs getScaleGroupUpperBound(int groupIndex);
 
   /// This gets the scale lower bound for the first body in a group, by index
-  Eigen::Vector3s getScaleGroupLowerBound(int groupIndex);
+  Eigen::VectorXs getScaleGroupLowerBound(int groupIndex);
 
   /// This takes two scale groups and merges their contents into a single group.
   /// After this operation, there is one fewer scale group.
   void mergeScaleGroupsByIndex(int a, int b);
 
-  /// This returns the number of scaling groups (groups with an equal-scale
-  /// constraint) that there are in the model.
-  int getNumScaleGroups();
+  /// This returns the dimensions of the grouped scale vector.
+  int getGroupScaleDim();
 
   /// This sets the scales of all the body nodes according to their group
   /// membership. The `scale` vector is expected to be the same size as the
@@ -859,6 +876,19 @@ public:
 
   /// This gets the scales of the first body in each scale group.
   Eigen::VectorXs getGroupScales();
+
+  /// This returns the upper bound values for each index in the group scales
+  /// vector
+  Eigen::VectorXs getGroupScalesUpperBound();
+
+  /// This returns the upper bound values for each index in the group scales
+  /// vector
+  Eigen::VectorXs getGroupScalesLowerBound();
+
+  /// This is a general purpose utility to convert a Jacobian wrt Body scales to
+  /// one wrt Group scales
+  Eigen::MatrixXs convertBodyScalesJacobianToGroupScales(
+      Eigen::MatrixXs bodyScalesJac);
 
   /// This returns the Jacobian of the joint positions wrt the scales of the
   /// groups
@@ -1982,7 +2012,7 @@ protected:
   dart::common::NameManager<SoftBodyNode*> mNameMgrForSoftBodyNodes;
 
   /// The groups that constrain the scales of body nodes to be equal
-  std::vector<std::vector<dynamics::BodyNode*>> mBodyScaleGroups;
+  std::vector<BodyScaleGroup> mBodyScaleGroups;
 
   struct DirtyFlags
   {

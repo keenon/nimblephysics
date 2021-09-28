@@ -336,9 +336,9 @@ bool testBilevelFitProblemGradients(
   if (!equals(jac, jac_fd, THRESHOLD))
   {
     Eigen::MatrixXs jacScales
-        = jac.block(0, 0, jac.rows(), skel->getNumScaleGroups() * 3);
+        = jac.block(0, 0, jac.rows(), skel->getGroupScaleDim());
     Eigen::MatrixXs jacScales_fd
-        = jac_fd.block(0, 0, jac.rows(), skel->getNumScaleGroups() * 3);
+        = jac_fd.block(0, 0, jac.rows(), skel->getGroupScaleDim());
     if (!equals(jacScales, jacScales_fd, THRESHOLD))
     {
       std::cout << "Error on BilevelFitProblem constraint jac, scales block"
@@ -352,9 +352,9 @@ bool testBilevelFitProblemGradients(
     }
 
     Eigen::MatrixXs jacMarkers = jac.block(
-        0, skel->getNumScaleGroups() * 3, jac.rows(), markers.size() * 3);
+        0, skel->getGroupScaleDim(), jac.rows(), markers.size() * 3);
     Eigen::MatrixXs jacMarkers_fd = jac_fd.block(
-        0, skel->getNumScaleGroups() * 3, jac.rows(), markers.size() * 3);
+        0, skel->getGroupScaleDim(), jac.rows(), markers.size() * 3);
     if (!equals(jacMarkers, jacMarkers_fd, THRESHOLD))
     {
       std::cout << "Error on BilevelFitProblem constraint jac, markers block"
@@ -367,7 +367,7 @@ bool testBilevelFitProblemGradients(
                 << jacMarkers - jacMarkers_fd << std::endl;
     }
 
-    int offset = (skel->getNumScaleGroups() * 3) + (markers.size() * 3);
+    int offset = (skel->getGroupScaleDim()) + (markers.size() * 3);
     for (int i = 0; i < numPoses; i++)
     {
       Eigen::MatrixXs jacPos = jac.block(
@@ -622,12 +622,12 @@ bool debugIKInitializationToGUI(
     // skel->setGroupScales(goldGroupScales);
 
     Eigen::VectorXs initialPos = Eigen::VectorXs::Zero(
-        skelBallJoints->getNumDofs() + skelBallJoints->getNumScaleGroups() * 3);
+        skelBallJoints->getNumDofs() + skelBallJoints->getGroupScaleDim());
     /*
     initialPos.segment(0, skelBallJoints->getNumDofs())
         = skelBallJoints->getPositions();
     initialPos.segment(
-        skelBallJoints->getNumDofs(), skelBallJoints->getNumScaleGroups() * 3)
+        skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim())
         = skelBallJoints->getGroupScales();
         Eigen::VectorXs initialGuess = Eigen::VectorXs(97);
     */
@@ -676,26 +676,13 @@ bool debugIKInitializationToGUI(
 
           // Set scales
           Eigen::VectorXs newScales = pos.segment(
-              skelBallJoints->getNumDofs(),
-              skelBallJoints->getNumScaleGroups() * 3);
-          for (int i = 0; i < skelBallJoints->getNumScaleGroups(); i++)
-          {
-            for (int axis = 0; axis < 3; axis++)
-            {
-              if (newScales(i * 3 + axis)
-                  > skelBallJoints->getScaleGroupUpperBound(i)(axis))
-              {
-                newScales(i * 3 + axis)
-                    = skelBallJoints->getScaleGroupUpperBound(i)(axis);
-              }
-              if (newScales(i * 3 + axis)
-                  < skelBallJoints->getScaleGroupLowerBound(i)(axis))
-              {
-                newScales(i * 3 + axis)
-                    = skelBallJoints->getScaleGroupLowerBound(i)(axis);
-              }
-            }
-          }
+              skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim());
+          Eigen::VectorXs scalesUpperBound
+              = skelBallJoints->getGroupScalesUpperBound();
+          Eigen::VectorXs scalesLowerBound
+              = skelBallJoints->getGroupScalesLowerBound();
+          newScales = newScales.cwiseMax(scalesLowerBound);
+          newScales = newScales.cwiseMin(scalesUpperBound);
           skel->setGroupScales(newScales);
           skelBallJoints->setGroupScales(newScales);
 
@@ -704,8 +691,7 @@ bool debugIKInitializationToGUI(
           clampedPos.segment(0, skelBallJoints->getNumDofs())
               = skelBallJoints->getPositions();
           clampedPos.segment(
-              skelBallJoints->getNumDofs(),
-              skelBallJoints->getNumScaleGroups() * 3)
+              skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim())
               = newScales;
 
           // Debug to a GUI
@@ -737,7 +723,7 @@ bool debugIKInitializationToGUI(
           assert(
               jac.cols()
               == skelBallJoints->getNumDofs()
-                     + skelBallJoints->getNumScaleGroups() * 3);
+                     + skelBallJoints->getGroupScaleDim());
           assert(jac.rows() == adjustedMarkers.size() * 3);
           jac.setZero();
           jac.block(
@@ -749,7 +735,7 @@ bool debugIKInitializationToGUI(
               0,
               skelBallJoints->getNumDofs(),
               adjustedMarkers.size() * 3,
-              skelBallJoints->getNumScaleGroups() * 3)
+              skelBallJoints->getGroupScaleDim())
               = skelBallJoints->getMarkerWorldPositionsJacobianWrtGroupScales(
                   adjustedMarkers);
         },
@@ -758,7 +744,7 @@ bool debugIKInitializationToGUI(
               = skel->convertPositionsToBallSpace(skel->getRandomPose());
           val.segment(
                  skelBallJoints->getNumDofs(),
-                 skelBallJoints->getNumScaleGroups() * 3)
+                 skelBallJoints->getGroupScaleDim())
               .setConstant(1.0);
 
           std::cout << "Eigen::VectorXs initialGuess = Eigen::VectorXs("
@@ -840,11 +826,11 @@ bool debugFitToGUI(
     // skel->setGroupScales(goldGroupScales);
 
     Eigen::VectorXs initialPos = Eigen::VectorXs::Zero(
-        skelBallJoints->getNumDofs() + skelBallJoints->getNumScaleGroups() * 3);
+        skelBallJoints->getNumDofs() + skelBallJoints->getGroupScaleDim());
     initialPos.segment(0, skelBallJoints->getNumDofs())
         = skelBallJoints->getPositions();
     initialPos.segment(
-        skelBallJoints->getNumDofs(), skelBallJoints->getNumScaleGroups() * 3)
+        skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim())
         = skelBallJoints->getGroupScales();
     Eigen::VectorXs initialGuess = Eigen::VectorXs(97);
 
@@ -884,26 +870,13 @@ bool debugFitToGUI(
 
           // Set scales
           Eigen::VectorXs newScales = pos.segment(
-              skelBallJoints->getNumDofs(),
-              skelBallJoints->getNumScaleGroups() * 3);
-          for (int i = 0; i < skelBallJoints->getNumScaleGroups(); i++)
-          {
-            for (int axis = 0; axis < 3; axis++)
-            {
-              if (newScales(i * 3 + axis)
-                  > skelBallJoints->getScaleGroupUpperBound(i)(axis))
-              {
-                newScales(i * 3 + axis)
-                    = skelBallJoints->getScaleGroupUpperBound(i)(axis);
-              }
-              if (newScales(i * 3 + axis)
-                  < skelBallJoints->getScaleGroupLowerBound(i)(axis))
-              {
-                newScales(i * 3 + axis)
-                    = skelBallJoints->getScaleGroupLowerBound(i)(axis);
-              }
-            }
-          }
+              skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim());
+          Eigen::VectorXs scalesUpperBound
+              = skelBallJoints->getGroupScalesUpperBound();
+          Eigen::VectorXs scalesLowerBound
+              = skelBallJoints->getGroupScalesLowerBound();
+          newScales = newScales.cwiseMax(scalesLowerBound);
+          newScales = newScales.cwiseMin(scalesUpperBound);
           // This effectively disables scaling
           // newScales.setConstant(1.0);
 
@@ -915,8 +888,7 @@ bool debugFitToGUI(
           clampedPos.segment(0, skelBallJoints->getNumDofs())
               = skelBallJoints->getPositions();
           clampedPos.segment(
-              skelBallJoints->getNumDofs(),
-              skelBallJoints->getNumScaleGroups() * 3)
+              skelBallJoints->getNumDofs(), skelBallJoints->getGroupScaleDim())
               = newScales;
 
           // Debug to a GUI
@@ -948,7 +920,7 @@ bool debugFitToGUI(
           assert(
               jac.cols()
               == skelBallJoints->getNumDofs()
-                     + skelBallJoints->getNumScaleGroups() * 3);
+                     + skelBallJoints->getGroupScaleDim());
           assert(jac.rows() == adjustedMarkers.size() * 3);
           jac.setZero();
           jac.block(
@@ -960,7 +932,7 @@ bool debugFitToGUI(
               0,
               skelBallJoints->getNumDofs(),
               adjustedMarkers.size() * 3,
-              skelBallJoints->getNumScaleGroups() * 3)
+              skelBallJoints->getGroupScaleDim())
               = skelBallJoints->getMarkerWorldPositionsJacobianWrtGroupScales(
                   adjustedMarkers);
         },
@@ -969,7 +941,7 @@ bool debugFitToGUI(
               = skel->convertPositionsToBallSpace(skel->getRandomPose());
           val.segment(
                  skelBallJoints->getNumDofs(),
-                 skelBallJoints->getNumScaleGroups() * 3)
+                 skelBallJoints->getGroupScaleDim())
               .setConstant(1.0);
 
           std::cout << "Eigen::VectorXs initialGuess = Eigen::VectorXs("
@@ -1374,6 +1346,9 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
 
   // Get the raw marker trajectory data
   OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
@@ -1479,6 +1454,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 
   // Try to fit the skeleton to
 
+  /*
   std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
   Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
   for (auto pair : goldMarkers)
@@ -1490,6 +1466,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
   debugFitToGUI(
       standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
+  */
   /*
   standard.skeleton->fitMarkersToWorldPositions(
       markers,
@@ -1498,23 +1475,29 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       true,
       math::IKConfig().setLogOutput(true));
       */
-  return;
 
   // Get a random subset of the data
 
   srand(25);
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
-      = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 20);
+      = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 40);
 
   // Create a marker fitter
 
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
   std::shared_ptr<MarkerFitResult> result = fitter.optimize(markerObservations);
+  standard.skeleton->setGroupScales(result->groupScales);
+  Eigen::VectorXs bodyScales = standard.skeleton->getBodyScales();
 
-  Eigen::VectorXs groupScaleError = result->groupScales - config.bodyScales;
+  std::cout << "Result scales: " << bodyScales << std::endl;
+
+  Eigen::VectorXs groupScaleError = bodyScales - config.bodyScales;
   Eigen::MatrixXs groupScaleCols = Eigen::MatrixXs(groupScaleError.size(), 4);
   groupScaleCols.col(0) = config.bodyScales;
-  groupScaleCols.col(1) = result->groupScales;
+  groupScaleCols.col(1) = bodyScales;
   groupScaleCols.col(2) = groupScaleError;
   groupScaleCols.col(3) = groupScaleError.cwiseQuotient(config.bodyScales);
   std::cout << "gold scales - result scales - error - error %" << std::endl

@@ -21,7 +21,10 @@ MarkerFitter::MarkerFitter(
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
-    mDisableLinesearch(false)
+    mDisableLinesearch(false),
+    mInitialIKSatisfactoryLoss(0.003),
+    mInitialIKMaxRestarts(100),
+    mMaxMarkerOffset(0.1)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
   int offset = 0;
@@ -236,6 +239,36 @@ Eigen::VectorXs MarkerFitter::getMarkerError(
 s_t MarkerFitter::computeLoss(Eigen::VectorXs markerError)
 {
   return markerError.squaredNorm();
+}
+
+//==============================================================================
+/// During random-restarts on IK, when we find solutions below this loss we'll
+/// stop doing restarts early, to speed up the process.
+void MarkerFitter::setInitialIKSatisfactoryLoss(s_t loss)
+{
+  mInitialIKSatisfactoryLoss = loss;
+}
+
+//==============================================================================
+/// This sets the maximum number of restarts allowed for the initial IK solver
+void MarkerFitter::setInitialIKMaxRestarts(int restarts)
+{
+  mInitialIKMaxRestarts = restarts;
+}
+
+//==============================================================================
+/// Sets the maximum that we'll allow markers to move from their original
+/// position, in meters
+void MarkerFitter::setMaxMarkerOffset(s_t offset)
+{
+  mMaxMarkerOffset = offset;
+}
+
+//==============================================================================
+/// Sets the maximum number of iterations for IPOPT
+void MarkerFitter::setIterationLimit(int limit)
+{
+  mIterationLimit = limit;
 }
 
 //==============================================================================
@@ -593,8 +626,8 @@ Eigen::MatrixXs MarkerFitter::finiteDifferenceMarkerErrorJacobianWrtGroupScales(
         markers,
     const std::vector<std::pair<int, Eigen::Vector3s>>& visibleMarkerWorldPoses)
 {
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(
-      markers.size() * 3, skeleton->getNumScaleGroups() * 3);
+  Eigen::MatrixXs jac
+      = Eigen::MatrixXs::Zero(markers.size() * 3, skeleton->getGroupScaleDim());
 
   Eigen::VectorXs originalGroupScales = skeleton->getGroupScales();
 
@@ -668,7 +701,7 @@ MarkerFitter::finiteDifferenceLossGradientWrtJointsJacobianWrtGroupScales(
     const std::vector<std::pair<int, Eigen::Vector3s>>& visibleMarkerWorldPoses)
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(
-      skeleton->getNumDofs(), skeleton->getNumScaleGroups() * 3);
+      skeleton->getNumDofs(), skeleton->getGroupScaleDim());
 
   Eigen::VectorXs originalGroupScales = skeleton->getGroupScales();
 
@@ -883,6 +916,8 @@ BilevelFitProblem::BilevelFitProblem(
     }
     mMarkerObservations.push_back(translated);
   }
+
+  mObservationWeights = Eigen::VectorXs::Ones(mMarkerObservations.size());
 }
 
 //==============================================================================
@@ -893,7 +928,7 @@ BilevelFitProblem::~BilevelFitProblem()
 //==============================================================================
 int BilevelFitProblem::getProblemSize()
 {
-  int scaleGroupDims = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   int poseDims = mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size();
   return scaleGroupDims + markerOffsetDims + poseDims;
@@ -911,7 +946,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
   {
     return mCachedInitialization;
   }
-  int groupScaleDim = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int groupScaleDim = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDim = mFitter->mMarkers.size() * 3;
   int dofs = mFitter->mSkeleton->getNumDofs();
 
@@ -921,8 +956,8 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
   // Initialize with a zero marker offset
   init.segment(groupScaleDim, markerOffsetDim).setZero();
 
-  Eigen::VectorXs scalesAvg = Eigen::VectorXs::Zero(
-      mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3);
+  Eigen::VectorXs scalesAvg
+      = Eigen::VectorXs::Zero(mFitter->mSkeletonBallJoints->getGroupScaleDim());
   s_t individualLossSum = 0.0;
   for (int i = 0; i < mMarkerObservations.size(); i++)
   {
@@ -946,7 +981,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
     // requires a bit of careful book-keeping.
 
     int problemDim = mFitter->mSkeletonBallJoints->getNumDofs()
-                     + mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3;
+                     + mFitter->mSkeletonBallJoints->getGroupScaleDim();
     Eigen::VectorXs initialPos = Eigen::VectorXs::Ones(problemDim);
 
     // Set our initial guess for IK to whatever the current pose of the skeleton
@@ -957,7 +992,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
             mFitter->mSkeleton->getPositions());
     initialPos.segment(
         mFitter->mSkeletonBallJoints->getNumDofs(),
-        mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3)
+        mFitter->mSkeletonBallJoints->getGroupScaleDim())
         = mFitter->mSkeletonBallJoints->getGroupScales();
 
     s_t loss = math::solveIK(
@@ -986,30 +1021,13 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
           // Set scales
           Eigen::VectorXs newScales = pos.segment(
               mFitter->mSkeletonBallJoints->getNumDofs(),
-              mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3);
-          for (int i = 0; i < mFitter->mSkeletonBallJoints->getNumScaleGroups();
-               i++)
-          {
-            for (int axis = 0; axis < 3; axis++)
-            {
-              if (newScales(i * 3 + axis)
-                  > mFitter->mSkeletonBallJoints->getScaleGroupUpperBound(i)(
-                      axis))
-              {
-                newScales(i * 3 + axis)
-                    = mFitter->mSkeletonBallJoints->getScaleGroupUpperBound(i)(
-                        axis);
-              }
-              if (newScales(i * 3 + axis)
-                  < mFitter->mSkeletonBallJoints->getScaleGroupLowerBound(i)(
-                      axis))
-              {
-                newScales(i * 3 + axis)
-                    = mFitter->mSkeletonBallJoints->getScaleGroupLowerBound(i)(
-                        axis);
-              }
-            }
-          }
+              mFitter->mSkeletonBallJoints->getGroupScaleDim());
+          Eigen::VectorXs scalesUpperBound
+              = mFitter->mSkeletonBallJoints->getGroupScalesUpperBound();
+          Eigen::VectorXs scalesLowerBound
+              = mFitter->mSkeletonBallJoints->getGroupScalesLowerBound();
+          newScales = newScales.cwiseMax(scalesLowerBound);
+          newScales = newScales.cwiseMin(scalesUpperBound);
           mFitter->mSkeleton->setGroupScales(newScales);
           mFitter->mSkeletonBallJoints->setGroupScales(newScales);
 
@@ -1019,7 +1037,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
               = mFitter->mSkeletonBallJoints->getPositions();
           clampedPos.segment(
               mFitter->mSkeletonBallJoints->getNumDofs(),
-              mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3)
+              mFitter->mSkeletonBallJoints->getGroupScaleDim())
               = newScales;
           return clampedPos;
         },
@@ -1032,7 +1050,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
           assert(
               jac.cols()
               == mFitter->mSkeletonBallJoints->getNumDofs()
-                     + mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3);
+                     + mFitter->mSkeletonBallJoints->getGroupScaleDim());
           assert(jac.rows() == observedMarkers.size() * 3);
           jac.setZero();
           jac.block(
@@ -1047,7 +1065,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
               0,
               mFitter->mSkeletonBallJoints->getNumDofs(),
               observedMarkers.size() * 3,
-              mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3)
+              mFitter->mSkeletonBallJoints->getGroupScaleDim())
               = mFitter->mSkeletonBallJoints
                     ->getMarkerWorldPositionsJacobianWrtGroupScales(
                         observedMarkers);
@@ -1058,18 +1076,30 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
                   mFitter->mSkeleton->getRandomPose());
           val.segment(
                  mFitter->mSkeletonBallJoints->getNumDofs(),
-                 mFitter->mSkeletonBallJoints->getNumScaleGroups() * 3)
+                 mFitter->mSkeletonBallJoints->getGroupScaleDim())
               .setConstant(1.0);
         },
         math::IKConfig()
             .setMaxStepCount(150)
             .setConvergenceThreshold(1e-10)
             // .setLossLowerBound(1e-8)
-            .setLossLowerBound(0.003)
-            .setMaxRestarts(100)
+            .setLossLowerBound(mFitter->mInitialIKSatisfactoryLoss)
+            .setMaxRestarts(mFitter->mInitialIKMaxRestarts)
             .setLogOutput(false));
-    std::cout << "Loss (with scaling): " << loss << std::endl;
-    individualLossSum += loss;
+
+    if (loss > mFitter->mInitialIKSatisfactoryLoss)
+    {
+      mObservationWeights(i) = 0.0;
+      std::cout << "Observation Loss [" << i
+                << "] (with scaling) TOO HIGH, will be excluded from fit: "
+                << loss << std::endl;
+    }
+    else
+    {
+      std::cout << "Observation Loss [" << i << "] (with scaling): " << loss
+                << std::endl;
+      individualLossSum += loss;
+    }
 
     init.segment(groupScaleDim + markerOffsetDim + (i * dofs), dofs)
         = mFitter->mSkeleton->convertPositionsFromBallSpace(
@@ -1153,7 +1183,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
             .setMaxRestarts(1)
             .setStartClamped(true)
             .setLogOutput(false));
-    noScaleLossSum += loss;
+    noScaleLossSum += loss * mObservationWeights(i);
 
     init.segment(groupScaleDim + markerOffsetDim + (i * dofs), dofs)
         = mFitter->mSkeleton->convertPositionsFromBallSpace(
@@ -1187,7 +1217,8 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         init.segment(groupScaleDim + markerOffsetDim + (i * dofs), dofs));
     Eigen::VectorXs markerWorldPoses
         = mFitter->mSkeleton->getMarkerWorldPositions(observedMarkers);
-    manualError += (markerPoses - markerWorldPoses).squaredNorm();
+    manualError += (markerPoses - markerWorldPoses).squaredNorm()
+                   * mObservationWeights(i);
   }
   std::cout << "Manually calculated total loss: " << manualError << std::endl;
 
@@ -1207,7 +1238,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
 /// problem state: [groupSizes, markerOffsets, q_0, ..., q_N]
 s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 {
-  int scaleGroupDims = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   Eigen::VectorXs groupScales = x.segment(0, scaleGroupDims);
   Eigen::VectorXs markerOffsets = x.segment(scaleGroupDims, markerOffsetDims);
@@ -1227,7 +1258,8 @@ s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
         mFitter->mSkeleton->getNumDofs());
     mFitter->mSkeleton->setPositions(pose);
     lossSum += mFitter->computeLoss(mFitter->getMarkerError(
-        mFitter->mSkeleton, markers, mMarkerObservations[i]));
+                   mFitter->mSkeleton, markers, mMarkerObservations[i]))
+               * mObservationWeights(i);
   }
   return lossSum;
 }
@@ -1237,7 +1269,7 @@ s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 /// the problem state: [groupSizes, markerOffsets, q_0, ..., q_N]
 Eigen::VectorXs BilevelFitProblem::getGradient(Eigen::VectorXs x)
 {
-  int scaleGroupDims = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   Eigen::VectorXs groupScales = x.segment(0, scaleGroupDims);
   Eigen::VectorXs markerOffsets = x.segment(scaleGroupDims, markerOffsetDims);
@@ -1261,15 +1293,19 @@ Eigen::VectorXs BilevelFitProblem::getGradient(Eigen::VectorXs x)
     // Get loss wrt joint positions
     grad.segment(offset, mFitter->mSkeleton->getNumDofs())
         = mFitter->getLossGradientWrtJoints(
-            mFitter->mSkeleton, markers, markerError);
+              mFitter->mSkeleton, markers, markerError)
+          * mObservationWeights(i);
 
     // Acculumulate loss wrt the global scale groups
-    grad.segment(0, scaleGroupDims) += mFitter->getLossGradientWrtGroupScales(
-        mFitter->mSkeleton, markers, markerError);
+    grad.segment(0, scaleGroupDims)
+        += mFitter->getLossGradientWrtGroupScales(
+               mFitter->mSkeleton, markers, markerError)
+           * mObservationWeights(i);
     // Acculumulate loss wrt the global marker offsets
     grad.segment(scaleGroupDims, markerOffsetDims)
         += mFitter->getLossGradientWrtMarkerOffsets(
-            mFitter->mSkeleton, markers, markerError);
+               mFitter->mSkeleton, markers, markerError)
+           * mObservationWeights(i);
   }
   return grad;
 }
@@ -1300,7 +1336,7 @@ Eigen::VectorXs BilevelFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
 /// the problem state: [groupSizes, markerOffsets, q_0, ..., q_N]
 Eigen::VectorXs BilevelFitProblem::getConstraints(Eigen::VectorXs x)
 {
-  int scaleGroupDims = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   Eigen::VectorXs groupScales = x.segment(0, scaleGroupDims);
   Eigen::VectorXs markerOffsets = x.segment(scaleGroupDims, markerOffsetDims);
@@ -1322,10 +1358,11 @@ Eigen::VectorXs BilevelFitProblem::getConstraints(Eigen::VectorXs x)
 
     // Get loss wrt joint positions
     ikGrad += mFitter->getLossGradientWrtJoints(
-        mFitter->mSkeleton,
-        markers,
-        mFitter->getMarkerError(
-            mFitter->mSkeleton, markers, mMarkerObservations[i]));
+                  mFitter->mSkeleton,
+                  markers,
+                  mFitter->getMarkerError(
+                      mFitter->mSkeleton, markers, mMarkerObservations[i]))
+              * mObservationWeights(i);
   }
 
   return ikGrad;
@@ -1340,7 +1377,7 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
   Eigen::MatrixXs jac
       = Eigen::MatrixXs::Zero(mFitter->mSkeleton->getNumDofs(), x.size());
 
-  int scaleGroupDims = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   Eigen::VectorXs groupScales = x.segment(0, scaleGroupDims);
   Eigen::VectorXs markerOffsets = x.segment(scaleGroupDims, markerOffsetDims);
@@ -1370,17 +1407,20 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
         mFitter->mSkeleton->getNumDofs(),
         mFitter->mSkeleton->getNumDofs())
         = mFitter->getLossGradientWrtJointsJacobianWrtJoints(
-            mFitter->mSkeleton, markers, markerError, sparsityMap);
+              mFitter->mSkeleton, markers, markerError, sparsityMap)
+          * mObservationWeights(i);
 
     // Acculumulate loss wrt the global scale groups
     jac.block(0, 0, mFitter->mSkeleton->getNumDofs(), scaleGroupDims)
         += mFitter->getLossGradientWrtJointsJacobianWrtGroupScales(
-            mFitter->mSkeleton, markers, markerError, sparsityMap);
+               mFitter->mSkeleton, markers, markerError, sparsityMap)
+           * mObservationWeights(i);
     // Acculumulate loss wrt the global marker offsets
     jac.block(
         0, scaleGroupDims, mFitter->mSkeleton->getNumDofs(), markerOffsetDims)
         += mFitter->getLossGradientWrtJointsJacobianWrtMarkerOffsets(
-            mFitter->mSkeleton, markers, markerError, sparsityMap);
+               mFitter->mSkeleton, markers, markerError, sparsityMap)
+           * mObservationWeights(i);
   }
 
   return jac;
@@ -1424,7 +1464,7 @@ bool BilevelFitProblem::get_nlp_info(
     Ipopt::TNLP::IndexStyleEnum& index_style)
 {
   // Set the number of decision variables
-  n = mFitter->mSkeleton->getNumScaleGroups() * 3 + mFitter->mMarkers.size() * 3
+  n = mFitter->mSkeleton->getGroupScaleDim() + mFitter->mMarkers.size() * 3
       + (mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size());
 
   // Set the total number of constraints
@@ -1457,7 +1497,7 @@ bool BilevelFitProblem::get_bounds_info(
   Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
   lowerBounds.setConstant(-1 * std::numeric_limits<double>::infinity());
 
-  int scaleGroupDim = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int scaleGroupDim = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDim = mFitter->mMarkers.size() * 3;
   int dofs = mFitter->mSkeleton->getNumDofs();
 
@@ -1465,10 +1505,14 @@ bool BilevelFitProblem::get_bounds_info(
       n
       == scaleGroupDim + markerOffsetDim + (mMarkerObservations.size() * dofs));
 
-  upperBounds.segment(0, scaleGroupDim).setConstant(1.4);
-  lowerBounds.segment(0, scaleGroupDim).setConstant(0.6);
-  upperBounds.segment(scaleGroupDim, markerOffsetDim).setConstant(0.1);
-  lowerBounds.segment(scaleGroupDim, markerOffsetDim).setConstant(-0.1);
+  upperBounds.segment(0, scaleGroupDim)
+      = mFitter->mSkeleton->getGroupScalesUpperBound();
+  lowerBounds.segment(0, scaleGroupDim)
+      = mFitter->mSkeleton->getGroupScalesLowerBound();
+  upperBounds.segment(scaleGroupDim, markerOffsetDim)
+      .setConstant(mFitter->mMaxMarkerOffset);
+  lowerBounds.segment(scaleGroupDim, markerOffsetDim)
+      .setConstant(-mFitter->mMaxMarkerOffset);
   for (int i = 0; i < mMarkerObservations.size(); i++)
   {
     upperBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
@@ -1687,7 +1731,7 @@ void BilevelFitProblem::finalize_solution(
   (void)_ip_cq;
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
 
-  int groupScaleDim = mFitter->mSkeleton->getNumScaleGroups() * 3;
+  int groupScaleDim = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDim = mFitter->mMarkers.size() * 3;
   int dofs = mFitter->mSkeleton->getNumDofs();
 
