@@ -10,6 +10,7 @@
 namespace dart {
 
 std::string escapeJson(const std::string& str);
+std::string numberToJson(s_t number);
 void vec2iToJson(std::stringstream& json, const Eigen::Vector2i& vec);
 void vec2dToJson(std::stringstream& json, const Eigen::Vector2s& vec);
 void vec3ToJson(std::stringstream& json, const Eigen::Vector3s& vec);
