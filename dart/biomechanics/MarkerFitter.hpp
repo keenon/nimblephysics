@@ -20,6 +20,9 @@ namespace dart {
 
 namespace biomechanics {
 
+class MarkerFitter;
+class MarkerFitterState;
+
 struct MarkerFitResult
 {
   bool success;
@@ -31,6 +34,65 @@ struct MarkerFitResult
   Eigen::VectorXs rawMarkerOffsets;
 
   MarkerFitResult();
+};
+
+/**
+ * This gives us a legible version of what's going on inside the optimization
+ * problem, so it's easier to unpack specific parts of the loss in useful ways.
+ */
+struct MarkerFitterState
+{
+  // The current state
+  std::map<std::string, Eigen::Vector3s> bodyScales;
+  std::map<std::string, Eigen::Vector3s> markerOffsets;
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerErrorsAtTimesteps;
+  std::vector<Eigen::VectorXs> posesAtTimesteps;
+
+  // The gradient of the current state, which is not always used, but can help
+  // shuttling information back and forth from friendly PyTorch APIs.
+  std::map<std::string, Eigen::Vector3s> bodyScalesGrad;
+  std::map<std::string, Eigen::Vector3s> markerOffsetsGrad;
+  std::vector<std::map<std::string, Eigen::Vector3s>>
+      markerErrorsAtTimestepsGrad;
+  std::vector<Eigen::VectorXs> posesAtTimestepsGrad;
+
+  /// This unflattens an input vector, given some information about the problm
+  MarkerFitterState(
+      const Eigen::VectorXs& flat,
+      std::shared_ptr<dynamics::Skeleton> skeleton,
+      dynamics::MarkerMap markers,
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      std::vector<std::string> markerOrder,
+      int numTimesteps,
+      MarkerFitter* fitter);
+
+  /// This returns a single flat vector representing this whole problem state
+  Eigen::VectorXs flattenState();
+
+  /// This returns a single flat vector representing the gradient of this whole
+  /// problem state
+  Eigen::VectorXs flattenGradient();
+
+protected:
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::shared_ptr<dynamics::Skeleton> skeleton;
+  std::vector<std::string> markerOrder;
+  MarkerFitter* fitter;
+};
+
+/**
+ * This allows us to specify an arbitrary loss function for the bilevel
+ * optimization problem.
+ */
+class MarkerFitterLoss
+{
+public:
+  // Marker errors, positions, body scales, marker offsets
+  MarkerFitterLoss(std::function<s_t(const MarkerFitterState&)> loss);
+
+  MarkerFitterLoss(
+      std::function<s_t(const MarkerFitterState&, MarkerFitterState&)>
+          lossAndGrad);
 };
 
 /**
@@ -68,7 +130,7 @@ public:
   /// This method will set `skeleton` to the configuration given by the vectors
   /// of jointPositions and groupScales. It will also compute and return the
   /// list of markers given by markerDiffs.
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
   setConfiguration(
       std::shared_ptr<dynamics::Skeleton>& skeleton,
       Eigen::VectorXs jointPositions,
@@ -80,7 +142,7 @@ public:
   /// have a difference of zero.
   Eigen::VectorXs getMarkerError(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -88,7 +150,10 @@ public:
   /// This gets the overall objective term for the MarkerFitter for a single
   /// timestep. The MarkerFitter is trying to do a bilevel optimization to
   /// minimize this term.
-  s_t computeLoss(Eigen::VectorXs markerError);
+  s_t computeIKLoss(Eigen::VectorXs markerError);
+
+  /// This returns the gradient for the simple IK loss term
+  Eigen::VectorXs getIKLossGradWrtMarkerError(Eigen::VectorXs markerError);
 
   /// During random-restarts on IK, when we find solutions below this loss we'll
   /// stop doing restarts early, to speed up the process.
@@ -109,46 +174,46 @@ public:
   //////////////////////////////////////////////////////////////////////////
 
   /// This gets the gradient of the objective wrt the joint positions
-  Eigen::VectorXs getLossGradientWrtJoints(
+  Eigen::VectorXs getMarkerLossGradientWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
-      Eigen::VectorXs markerError);
+      Eigen::VectorXs lossGradWrtMarkerError);
 
   /// This gets the gradient of the objective wrt the joint positions
-  Eigen::VectorXs finiteDifferenceLossGradientWrtJoints(
+  Eigen::VectorXs finiteDifferenceSquaredMarkerLossGradientWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
   /// This gets the gradient of the objective wrt the group scales
-  Eigen::VectorXs getLossGradientWrtGroupScales(
+  Eigen::VectorXs getMarkerLossGradientWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
-      Eigen::VectorXs markerError);
+      Eigen::VectorXs lossGradWrtMarkerError);
 
   /// This gets the gradient of the objective wrt the group scales
-  Eigen::VectorXs finiteDifferenceLossGradientWrtGroupScales(
+  Eigen::VectorXs finiteDifferenceSquaredMarkerLossGradientWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
   /// This gets the gradient of the objective wrt the marker offsets
-  Eigen::VectorXs getLossGradientWrtMarkerOffsets(
+  Eigen::VectorXs getMarkerLossGradientWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
-      Eigen::VectorXs markerError);
+      Eigen::VectorXs lossGradWrtMarkerError);
 
   /// This gets the gradient of the objective wrt the marker offsets
-  Eigen::VectorXs finiteDifferenceLossGradientWrtMarkerOffsets(
+  Eigen::VectorXs finiteDifferenceSquaredMarkerLossGradientWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -159,7 +224,7 @@ public:
 
   /// Get the marker indices that are not visible
   std::vector<int> getSparsityMap(
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -167,32 +232,32 @@ public:
   /// This gets the jacobian of the marker error wrt the joints
   Eigen::MatrixXs getMarkerErrorJacobianWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of the marker error wrt the joints
   Eigen::MatrixXs finiteDifferenceMarkerErrorJacobianWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the joint positions
-  Eigen::MatrixXs getLossGradientWrtJointsJacobianWrtJoints(
+  Eigen::MatrixXs getIKLossGradientWrtJointsJacobianWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const Eigen::VectorXs& markerError,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the joint positions
-  Eigen::MatrixXs finiteDifferenceLossGradientWrtJointsJacobianWrtJoints(
+  Eigen::MatrixXs finiteDifferenceIKLossGradientWrtJointsJacobianWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -200,32 +265,32 @@ public:
   /// This gets the jacobian of the marker error wrt the group scales
   Eigen::MatrixXs getMarkerErrorJacobianWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of the marker error wrt the group scales
   Eigen::MatrixXs finiteDifferenceMarkerErrorJacobianWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the group scales
-  Eigen::MatrixXs getLossGradientWrtJointsJacobianWrtGroupScales(
+  Eigen::MatrixXs getIKLossGradientWrtJointsJacobianWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const Eigen::VectorXs& markerError,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the group scales
-  Eigen::MatrixXs finiteDifferenceLossGradientWrtJointsJacobianWrtGroupScales(
+  Eigen::MatrixXs finiteDifferenceIKLossGradientWrtJointsJacobianWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -233,32 +298,33 @@ public:
   /// This gets the jacobian of the marker error wrt the marker offsets
   Eigen::MatrixXs getMarkerErrorJacobianWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of the marker error wrt the marker offsets
   Eigen::MatrixXs finiteDifferenceMarkerErrorJacobianWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the marker offsets
-  Eigen::MatrixXs getLossGradientWrtJointsJacobianWrtMarkerOffsets(
+  Eigen::MatrixXs getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const Eigen::VectorXs& markerError,
       const std::vector<int>& sparsityMap);
 
   /// This gets the jacobian of (the gradient of the objective wrt the joint
   /// positions) wrt the marker offsets
-  Eigen::MatrixXs finiteDifferenceLossGradientWrtJointsJacobianWrtMarkerOffsets(
+  Eigen::MatrixXs
+  finiteDifferenceIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
-      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
@@ -270,10 +336,10 @@ protected:
   std::vector<std::string> mMarkerNames;
 
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       mMarkersBallJoints;
 
   s_t mInitialIKSatisfactoryLoss;

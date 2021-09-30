@@ -877,6 +877,11 @@ public:
   /// This gets the scales of the first body in each scale group.
   Eigen::VectorXs getGroupScales();
 
+  /// This converts a map of body scales back into group scales, interpreting
+  /// everything as gradients.
+  Eigen::VectorXs getGroupScaleGradientsFromMap(
+      std::map<std::string, Eigen::Vector3s> bodyScales);
+
   /// This returns the upper bound values for each index in the group scales
   /// vector
   Eigen::VectorXs getGroupScalesUpperBound();

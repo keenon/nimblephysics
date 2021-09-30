@@ -27,11 +27,11 @@ bool testFitterGradients(
     std::shared_ptr<dynamics::Skeleton>& skel,
     const std::map<
         std::string,
-        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markersMap,
+        std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markersMap,
     const std::map<std::string, Eigen::Vector3s>& observedMarkersMap)
 {
   const s_t THRESHOLD = 2e-7;
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   std::vector<std::pair<int, Eigen::Vector3s>> observedMarkers;
   int offset = 0;
   std::map<std::string, int> markerOffsets;
@@ -46,10 +46,10 @@ bool testFitterGradients(
     observedMarkers.emplace_back(markerOffsets[pair.first], pair.second);
   }
 
-  Eigen::VectorXs gradWrtJoints = fitter.getLossGradientWrtJoints(
+  Eigen::VectorXs gradWrtJoints = fitter.getMarkerLossGradientWrtJoints(
       skel, markers, fitter.getMarkerError(skel, markers, observedMarkers));
   Eigen::VectorXs gradWrtJoints_fd
-      = fitter.finiteDifferenceLossGradientWrtJoints(
+      = fitter.finiteDifferenceSquaredMarkerLossGradientWrtJoints(
           skel, markers, observedMarkers);
 
   if (!equals(gradWrtJoints, gradWrtJoints_fd, THRESHOLD))
@@ -64,10 +64,10 @@ bool testFitterGradients(
     return false;
   }
 
-  Eigen::VectorXs gradWrtScales = fitter.getLossGradientWrtGroupScales(
+  Eigen::VectorXs gradWrtScales = fitter.getMarkerLossGradientWrtGroupScales(
       skel, markers, fitter.getMarkerError(skel, markers, observedMarkers));
   Eigen::VectorXs gradWrtScales_fd
-      = fitter.finiteDifferenceLossGradientWrtGroupScales(
+      = fitter.finiteDifferenceSquaredMarkerLossGradientWrtGroupScales(
           skel, markers, observedMarkers);
 
   if (!equals(gradWrtScales, gradWrtScales_fd, THRESHOLD))
@@ -82,10 +82,11 @@ bool testFitterGradients(
     return false;
   }
 
-  Eigen::VectorXs gradWrtMarkerOffsets = fitter.getLossGradientWrtMarkerOffsets(
-      skel, markers, fitter.getMarkerError(skel, markers, observedMarkers));
+  Eigen::VectorXs gradWrtMarkerOffsets
+      = fitter.getMarkerLossGradientWrtMarkerOffsets(
+          skel, markers, fitter.getMarkerError(skel, markers, observedMarkers));
   Eigen::VectorXs gradWrtMarkerOffsets_fd
-      = fitter.finiteDifferenceLossGradientWrtMarkerOffsets(
+      = fitter.finiteDifferenceSquaredMarkerLossGradientWrtMarkerOffsets(
           skel, markers, observedMarkers);
 
   if (!equals(gradWrtMarkerOffsets, gradWrtMarkerOffsets_fd, THRESHOLD))
@@ -127,13 +128,13 @@ bool testFitterGradients(
   }
 
   Eigen::MatrixXs gradWrtJointsJacWrtJoints
-      = fitter.getLossGradientWrtJointsJacobianWrtJoints(
+      = fitter.getIKLossGradientWrtJointsJacobianWrtJoints(
           skel,
           markers,
           fitter.getMarkerError(skel, markers, observedMarkers),
           sparsityMap);
   Eigen::MatrixXs gradWrtJointsJacWrtJoints_fd
-      = fitter.finiteDifferenceLossGradientWrtJointsJacobianWrtJoints(
+      = fitter.finiteDifferenceIKLossGradientWrtJointsJacobianWrtJoints(
           skel, markers, observedMarkers);
 
   if (!equals(
@@ -173,13 +174,13 @@ bool testFitterGradients(
   }
 
   Eigen::MatrixXs gradWrtJointsJacWrtGroupScales
-      = fitter.getLossGradientWrtJointsJacobianWrtGroupScales(
+      = fitter.getIKLossGradientWrtJointsJacobianWrtGroupScales(
           skel,
           markers,
           fitter.getMarkerError(skel, markers, observedMarkers),
           sparsityMap);
   Eigen::MatrixXs gradWrtJointsJacWrtGroupScales_fd
-      = fitter.finiteDifferenceLossGradientWrtJointsJacobianWrtGroupScales(
+      = fitter.finiteDifferenceIKLossGradientWrtJointsJacobianWrtGroupScales(
           skel, markers, observedMarkers);
 
   if (!equals(
@@ -224,13 +225,13 @@ bool testFitterGradients(
   }
 
   Eigen::MatrixXs gradWrtJointsJacWrtMarkerOffsets
-      = fitter.getLossGradientWrtJointsJacobianWrtMarkerOffsets(
+      = fitter.getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
           skel,
           markers,
           fitter.getMarkerError(skel, markers, observedMarkers),
           sparsityMap);
   Eigen::MatrixXs gradWrtJointsJacWrtMarkerOffsets_fd
-      = fitter.finiteDifferenceLossGradientWrtJointsJacobianWrtMarkerOffsets(
+      = fitter.finiteDifferenceIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
           skel, markers, observedMarkers);
 
   if (!equals(
@@ -260,11 +261,11 @@ bool testBilevelFitProblemGradients(
     std::shared_ptr<dynamics::Skeleton>& skel,
     const std::map<
         std::string,
-        std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markersMap)
+        std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markersMap)
 {
   const s_t THRESHOLD = 5e-8;
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   for (auto pair : markersMap)
   {
     markers.push_back(pair.second);
@@ -287,7 +288,7 @@ bool testBilevelFitProblemGradients(
   for (int i = 0; i < numPoses; i++)
   {
     Eigen::VectorXs goldPose = Eigen::VectorXs::Random(skel->getNumDofs());
-    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers
         = fitter.setConfiguration(
             skel, goldPose, goldGroupScales, goldMarkerOffsets);
     Eigen::VectorXs markerWorldPoses = skel->getMarkerWorldPositions(markers);
@@ -452,7 +453,7 @@ bool testSolveBilevelFitProblem(
     }
     std::cout << std::endl;
 
-    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers
         = fitter.setConfiguration(
             skel, goldPose, goldGroupScales, goldMarkerOffsets);
     Eigen::VectorXs markerWorldPoses = skel->getMarkerWorldPositions(markers);
@@ -575,7 +576,7 @@ bool debugIKInitializationToGUI(
   goldPose(skel->getJoint("ankle_l")->getDof(0)->getIndexInSkeleton()) = 0.0;
   */
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       adjustedMarkersSkel = fitter.setConfiguration(
           skel, goldPose, goldGroupScales, goldMarkerOffsets);
 
@@ -588,7 +589,7 @@ bool debugIKInitializationToGUI(
   skelBallJoints->setPositions(
       skel->convertPositionsToBallSpace(skel->getPositions()));
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       adjustedMarkers;
   for (auto pair : adjustedMarkersSkel)
   {
@@ -781,7 +782,7 @@ bool debugIKInitializationToGUI(
 
 bool debugFitToGUI(
     std::shared_ptr<dynamics::Skeleton>& skel,
-    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         adjustedMarkersSkel,
     Eigen::VectorXs markerWorldPoses,
     std::shared_ptr<dynamics::Skeleton>& goldSkel,
@@ -804,7 +805,7 @@ bool debugFitToGUI(
   skelBallJoints->setPositions(
       skel->convertPositionsToBallSpace(skel->getPositions()));
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       adjustedMarkers;
   for (auto pair : adjustedMarkersSkel)
   {
@@ -1416,7 +1417,11 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
       = osim->convertSkeletonToBallJoints();
 
   Eigen::VectorXs goldPos = Eigen::VectorXs::Zero(37);
-  goldPos << 0.0749049, -0.00491559, 1.32853, 0.467201, 0.98761, -0.990219, -0.521694, -0.330605, -0.0701683, 0.555501, 0.337712, 0, 0, -0.076734, 0.0938467, -0.210891, 0.00541465, 0.298908, 0, 0, -0.143646, -0.00811661, 0.335166, -0.0826361, -0.141152, -0.36731, 1.07779, 1.54974, 0, 0, -0.190997, -0.0918618, -0.131114, 1.33685, 1.54543, 0, 0;
+  goldPos << 0.0749049, -0.00491559, 1.32853, 0.467201, 0.98761, -0.990219,
+      -0.521694, -0.330605, -0.0701683, 0.555501, 0.337712, 0, 0, -0.076734,
+      0.0938467, -0.210891, 0.00541465, 0.298908, 0, 0, -0.143646, -0.00811661,
+      0.335166, -0.0826361, -0.141152, -0.36731, 1.07779, 1.54974, 0, 0,
+      -0.190997, -0.0918618, -0.131114, 1.33685, 1.54543, 0, 0;
 
   /*
   Eigen::VectorXs standardBodyScales = Eigen::VectorXs::Zero(60);
@@ -1431,7 +1436,12 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
   */
 
   Eigen::VectorXs ballJointsPos = Eigen::VectorXs(37);
-  ballJointsPos << 0.0152175, 1.3869, 0.0771069, 0.471897, 0.996231, -0.997029, -0.391901, -0.0459652, -0.759009, 0.21759, 0.0853194, 0.315544, 0.369044, -0.066452, 0.168316, -0.194789, -0.0744426, 0.101366, 0.136293, -0.255278, -0.0411979, 0.241774, -0.17405, -0.283901, -0.202385, -0.0557436, 1.22807, 2.9512, -0.381279, -0.0594017, 0.333266, 0.139513, -0.231853, 1.67011, 3.27791, 0.508881, 0.422523;
+  ballJointsPos << 0.0152175, 1.3869, 0.0771069, 0.471897, 0.996231, -0.997029,
+      -0.391901, -0.0459652, -0.759009, 0.21759, 0.0853194, 0.315544, 0.369044,
+      -0.066452, 0.168316, -0.194789, -0.0744426, 0.101366, 0.136293, -0.255278,
+      -0.0411979, 0.241774, -0.17405, -0.283901, -0.202385, -0.0557436, 1.22807,
+      2.9512, -0.381279, -0.0594017, 0.333266, 0.139513, -0.231853, 1.67011,
+      3.27791, 0.508881, 0.422523;
 
   osimBallJoints->setPositions(ballJointsPos);
   osim->setPositions(osim->convertPositionsFromBallSpace(ballJointsPos));
@@ -1566,7 +1576,7 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1582,7 +1592,7 @@ TEST(MarkerFitter, DERIVATIVES)
 
   osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
 
-  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
       osim->getBodyNode("radius_l"), Eigen::Vector3s::Random());
@@ -1624,9 +1634,9 @@ TEST(MarkerFitter, DERIVATIVES)
 
   // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
 }
-#endif
+// #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1640,7 +1650,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
-  std::map<std::string, std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
       osimBallJoints->getBodyNode("radius_l"), Eigen::Vector3s::Random());
@@ -1670,9 +1680,9 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   EXPECT_TRUE(
       testBilevelFitProblemGradients(fitter, 3, 0.02, osimBallJoints, markers));
 }
-#endif
+// #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1710,7 +1720,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 
   std::vector<std::pair<
       std::string,
-      std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>
       moddedMarkerOffsets;
   for (auto pair : standard.markersMap)
   {
@@ -1823,7 +1833,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 
   // Try to fit the skeleton to
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
   for (auto pair : goldMarkers)
   {
@@ -1877,4 +1887,4 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   std::cout << "gold scales - result scales - error - error %" << std::endl
             << groupScaleCols << std::endl;
 }
-// #endif
+#endif

@@ -2810,7 +2810,9 @@ void Skeleton::clampPositionsToLimits()
         clampedPos += 2 * M_PI;
       }
       // Only set the value if we ended up in bounds
-      if (clampedPos >= dof->getPositionLowerLimit() && clampedPos <= dof->getPositionUpperLimit()) {
+      if (clampedPos >= dof->getPositionLowerLimit()
+          && clampedPos <= dof->getPositionUpperLimit())
+      {
         dof->setPosition(clampedPos);
       }
     }
@@ -3105,6 +3107,39 @@ Eigen::VectorXs Skeleton::getGroupScales()
     else
     {
       groups.segment<3>(cursor) = mBodyScaleGroups[i].nodes[0]->getScale();
+      cursor += 3;
+    }
+  }
+  assert(cursor == groups.size());
+  return groups;
+}
+
+//==============================================================================
+/// This converts a map of body scales back into group scales, interpreting
+/// everything as gradients.
+Eigen::VectorXs Skeleton::getGroupScaleGradientsFromMap(
+    std::map<std::string, Eigen::Vector3s> bodyScales)
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getGroupScaleDim());
+  int cursor = 0;
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      for (auto node : mBodyScaleGroups[i].nodes)
+      {
+        groups(cursor) += bodyScales[node->getName()].sum();
+      }
+      cursor++;
+    }
+    else
+    {
+      for (auto node : mBodyScaleGroups[i].nodes)
+      {
+        groups.segment<3>(cursor) += bodyScales[node->getName()];
+      }
       cursor += 3;
     }
   }
