@@ -41,6 +41,18 @@ using namespace utils;
 namespace biomechanics {
 
 //==============================================================================
+OpenSimFile::OpenSimFile(
+    dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
+  : skeleton(skeleton), markersMap(markersMap)
+{
+}
+
+//==============================================================================
+OpenSimFile::OpenSimFile()
+{
+}
+
+//==============================================================================
 common::ResourceRetrieverPtr ensureRetriever(
     const common::ResourceRetrieverPtr& _retriever)
 {

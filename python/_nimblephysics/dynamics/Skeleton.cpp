@@ -788,9 +788,17 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::mergeScaleGroupsByIndex,
           ::py::arg("groupA"),
           ::py::arg("groupB"))
-      .def("autogroupSymmetricSuffixes", &dart::dynamics::Skeleton::autogroupSymmetricSuffixes, ::py::arg("leftSuffix") = "_l", ::py::arg("rightSuffix") = "_r")
+      .def(
+          "autogroupSymmetricSuffixes",
+          &dart::dynamics::Skeleton::autogroupSymmetricSuffixes,
+          ::py::arg("leftSuffix") = "_l",
+          ::py::arg("rightSuffix") = "_r")
       .def("getGroupScaleDim", &dart::dynamics::Skeleton::getGroupScaleDim)
-      .def("setScaleGroupUniformScaling", &dart::dynamics::Skeleton::setScaleGroupUniformScaling, ::py::arg("bodyNode"), ::py::arg("uniform") = true)
+      .def(
+          "setScaleGroupUniformScaling",
+          &dart::dynamics::Skeleton::setScaleGroupUniformScaling,
+          ::py::arg("bodyNode"),
+          ::py::arg("uniform") = true)
       .def(
           "setGroupScales",
           &dart::dynamics::Skeleton::setGroupScales,
@@ -822,7 +830,12 @@ void Skeleton(py::module& m)
       .def(
           "getMarkerMapWorldPositions",
           &dart::dynamics::Skeleton::getMarkerMapWorldPositions,
-          ::py::arg("markers"))
+          ::py::arg("markerMap"))
+      .def(
+          "convertMarkerMap",
+          &dart::dynamics::Skeleton::convertMarkerMap,
+          ::py::arg("markerMap"),
+          ::py::arg("warnOnDrop") = true)
       .def(
           "fitJointsToWorldPositions",
           +[](dart::dynamics::Skeleton* self,
@@ -857,8 +870,7 @@ void Skeleton(py::module& m)
           "fitMarkersToWorldPositions",
           +[](dart::dynamics::Skeleton* self,
               const std::vector<
-                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
-                  markers,
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
               Eigen::VectorXs targetPositions,
               Eigen::VectorXs markerWeights,
               bool scaleBodies,

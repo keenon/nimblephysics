@@ -24,6 +24,9 @@ struct OpenSimFile
   std::vector<std::string> anatomicalMarkers;
   std::vector<std::string> trackingMarkers;
   // TODO: eventually we'll want to record muscles here
+
+  OpenSimFile();
+  OpenSimFile(dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap);
 };
 
 struct OpenSimScaleAndMarkerOffsets
