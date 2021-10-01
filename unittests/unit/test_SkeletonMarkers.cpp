@@ -41,7 +41,7 @@ TEST(SkeletonConverter, IK_JACOBIANS)
       osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
   osim->setScaleGroupUniformScaling(osim->getBodyNode("tibia_r"));
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.push_back(
       std::make_pair(osim->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
   markers.push_back(
@@ -80,7 +80,7 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.push_back(std::make_pair(
       osimBallJoints->getBodyNode("radius_l"), Eigen::Vector3s::Random()));
   markers.push_back(std::make_pair(
