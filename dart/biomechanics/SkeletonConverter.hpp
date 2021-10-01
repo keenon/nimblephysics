@@ -22,8 +22,7 @@ public:
   /// joint on both skeletons. These joints may be of different types (like a
   /// BallJoint vs a CustomJoint) and we'll do our best to match it up so the
   /// rotations are as close as possible.
-  void linkJoints(
-      const dynamics::Joint* sourceJoint, const dynamics::Joint* targetJoint);
+  void linkJoints(dynamics::Joint* sourceJoint, dynamics::Joint* targetJoint);
 
   /// This will do its best to map the target onto the source skeleton
   void rescaleAndPrepTarget(
@@ -88,14 +87,14 @@ public:
   /// the provided GUI.
   void debugToGUI(std::shared_ptr<server::GUIWebsocketServer> server);
 
-  const std::vector<const dynamics::Joint*>& getSourceJoints() const;
+  const std::vector<dynamics::Joint*>& getSourceJoints() const;
 
-  const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+  const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
   getSourceMarkers() const;
 
-  const std::vector<const dynamics::Joint*>& getTargetJoints() const;
+  const std::vector<dynamics::Joint*>& getTargetJoints() const;
 
-  const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+  const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
   getTargetMarkers() const;
 
 protected:
@@ -103,16 +102,14 @@ protected:
   dynamics::SkeletonPtr mSourceSkeletonBallJoints;
   dynamics::SkeletonPtr mTargetSkeleton;
 
-  std::vector<const dynamics::Joint*> mSourceJoints;
-  std::vector<const dynamics::Joint*> mSourceJointsWithBalls;
-  std::vector<const dynamics::Joint*> mTargetJoints;
+  std::vector<dynamics::Joint*> mSourceJoints;
+  std::vector<dynamics::Joint*> mSourceJointsWithBalls;
+  std::vector<dynamics::Joint*> mTargetJoints;
 
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-      mSourceMarkers;
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mSourceMarkers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       mSourceMarkersBallJoints;
-  std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>
-      mTargetMarkers;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mTargetMarkers;
   Eigen::VectorXs mMarkerWeights;
 }; // namespace OpenSimParser
 

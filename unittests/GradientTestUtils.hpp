@@ -4073,7 +4073,7 @@ bool verifyIdentityMapping(WorldPtr world)
 
 bool verifySkeletonMarkerJacobians(
     SkeletonPtr skel,
-    std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>> markers)
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers)
 {
   const s_t THRESHOLD = 1e-7;
 
@@ -4354,10 +4354,9 @@ bool verifySkeletonMarkerJacobians(
             {
               const Eigen::MatrixXi& parentMap = skel->getParentMap();
               int rootJointDof = j;
-              const dynamics::Joint* sourceJoint
-                  = markers[k].first->getParentJoint();
+              dynamics::Joint* sourceJoint = markers[k].first->getParentJoint();
               int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
-              const dynamics::Joint* parentJoint = joint;
+              dynamics::Joint* parentJoint = joint;
               int parentJointDof = parentJoint->getDof(0)->getIndexInSkeleton();
 
               std::cout << "{ Joint \"" << joint->getName()
@@ -4437,11 +4436,11 @@ bool verifySkeletonMarkerJacobians(
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
-                const dynamics::Joint* sourceJoint
+                dynamics::Joint* sourceJoint
                     = markers[k].first->getParentJoint();
                 int sourceJointDof
                     = sourceJoint->getDof(0)->getIndexInSkeleton();
-                const dynamics::Joint* parentJoint = joint;
+                dynamics::Joint* parentJoint = joint;
                 int parentJointDof
                     = parentJoint->getDof(0)->getIndexInSkeleton();
                 bool isScalingBodyParentOfMarker
@@ -4531,11 +4530,11 @@ bool verifySkeletonMarkerJacobians(
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
-                const dynamics::Joint* sourceJoint
+                dynamics::Joint* sourceJoint
                     = markers[k].first->getParentJoint();
                 int sourceJointDof
                     = sourceJoint->getDof(0)->getIndexInSkeleton();
-                const dynamics::Joint* parentJoint = joint;
+                dynamics::Joint* parentJoint = joint;
                 int parentJointDof
                     = parentJoint->getDof(0)->getIndexInSkeleton();
                 bool isScalingBodyParentOfMarker

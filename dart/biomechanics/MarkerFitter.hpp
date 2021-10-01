@@ -59,11 +59,7 @@ struct MarkerFitterState
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
       const Eigen::VectorXs& flat,
-      std::shared_ptr<dynamics::Skeleton> skeleton,
-      dynamics::MarkerMap markers,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-      std::vector<std::string> markerOrder,
-      int numTimesteps,
       MarkerFitter* fitter);
 
   /// This returns a single flat vector representing this whole problem state
@@ -78,21 +74,6 @@ protected:
   std::shared_ptr<dynamics::Skeleton> skeleton;
   std::vector<std::string> markerOrder;
   MarkerFitter* fitter;
-};
-
-/**
- * This allows us to specify an arbitrary loss function for the bilevel
- * optimization problem.
- */
-class MarkerFitterLoss
-{
-public:
-  // Marker errors, positions, body scales, marker offsets
-  MarkerFitterLoss(std::function<s_t(const MarkerFitterState&)> loss);
-
-  MarkerFitterLoss(
-      std::function<s_t(const MarkerFitterState&, MarkerFitterState&)>
-          lossAndGrad);
 };
 
 /**
@@ -130,8 +111,7 @@ public:
   /// This method will set `skeleton` to the configuration given by the vectors
   /// of jointPositions and groupScales. It will also compute and return the
   /// list of markers given by markerDiffs.
-  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-  setConfiguration(
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> setConfiguration(
       std::shared_ptr<dynamics::Skeleton>& skeleton,
       Eigen::VectorXs jointPositions,
       Eigen::VectorXs groupScales,
@@ -168,6 +148,10 @@ public:
 
   /// Sets the maximum number of iterations for IPOPT
   void setIterationLimit(int limit);
+
+  /// Sets the loss and gradient function
+  void setCustomLossAndGrad(
+      std::function<s_t(MarkerFitterState&)> customLossAndGrad);
 
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
@@ -330,6 +314,7 @@ public:
           visibleMarkerWorldPoses);
 
   friend class BilevelFitProblem;
+  friend class MarkerFitterState;
 
 protected:
   std::map<std::string, int> mMarkerIndices;
@@ -337,10 +322,13 @@ protected:
 
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
+  dynamics::MarkerMap mMarkerMap;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       mMarkersBallJoints;
+
+  std::function<s_t(MarkerFitterState&)> mLossAndGrad;
 
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;
@@ -528,6 +516,7 @@ public:
 
 protected:
   MarkerFitter* mFitter;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerMapObservations;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
   Eigen::VectorXs mObservationWeights;
   std::shared_ptr<MarkerFitResult>& mOutResult;

@@ -488,20 +488,28 @@ void BodyNode::setScale(Eigen::Vector3s newScale)
   {
     if (newScale(i) < mScaleLowerBound(i))
     {
-      std::cout << "BodyNode refusing to setScale(" << newScale(i)
-                << ", axis=" << i << ") because " << newScale(i)
-                << " is less than the scale lower bound ("
-                << mScaleLowerBound(i) << "). Clamping to lower bound."
-                << std::endl;
+      // Don't warn if it's close
+      if (newScale(i) < mScaleLowerBound(i) - 0.001)
+      {
+        std::cout << "BodyNode refusing to setScale(" << newScale(i)
+                  << ", axis=" << i << ") because " << newScale(i)
+                  << " is less than the scale lower bound ("
+                  << mScaleLowerBound(i) << "). Clamping to lower bound."
+                  << std::endl;
+      }
       newScale(i) = mScaleLowerBound(i);
     }
     if (newScale(i) > mScaleUpperBound(i))
     {
-      std::cout << "BodyNode refusing to setScale(" << newScale
-                << ", axis=" << i << ") because " << newScale
-                << " is greater than the scale upper bound ("
-                << mScaleUpperBound << "). Clamping to upper bound."
-                << std::endl;
+      // Don't warn if it's close
+      if (newScale(i) > mScaleUpperBound(i) + 0.001)
+      {
+        std::cout << "BodyNode refusing to setScale(" << newScale
+                  << ", axis=" << i << ") because " << newScale
+                  << " is greater than the scale upper bound ("
+                  << mScaleUpperBound << "). Clamping to upper bound."
+                  << std::endl;
+      }
       newScale(i) = mScaleUpperBound(i);
     }
   }
