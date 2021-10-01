@@ -294,14 +294,14 @@ MarkerFitter::MarkerFitter(
   }
 
   // Default to a least-squares loss over just the marker errors
-  mLossAndGrad = [](MarkerFitterState& state) {
+  mLossAndGrad = [](MarkerFitterState* state) {
     s_t loss = 0.0;
-    for (int t = 0; t < state.markerErrorsAtTimesteps.size(); t++)
+    for (int t = 0; t < state->markerErrorsAtTimesteps.size(); t++)
     {
-      for (auto pair : state.markerErrorsAtTimesteps[t])
+      for (auto pair : state->markerErrorsAtTimesteps[t])
       {
         loss += pair.second.squaredNorm();
-        state.markerErrorsAtTimestepsGrad[t][pair.first] = 2 * pair.second;
+        state->markerErrorsAtTimestepsGrad[t][pair.first] = 2 * pair.second;
       }
     }
     return loss;
@@ -548,7 +548,7 @@ void MarkerFitter::setIterationLimit(int limit)
 //==============================================================================
 /// Sets the loss and gradient function
 void MarkerFitter::setCustomLossAndGrad(
-    std::function<s_t(MarkerFitterState&)> customLossAndGrad)
+    std::function<s_t(MarkerFitterState*)> customLossAndGrad)
 {
   mLossAndGrad = customLossAndGrad;
 }
@@ -1506,7 +1506,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
 s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 {
   MarkerFitterState state(x, mMarkerMapObservations, mFitter);
-  return mFitter->mLossAndGrad(state);
+  return mFitter->mLossAndGrad(&state);
 }
 
 //==============================================================================
@@ -1515,7 +1515,7 @@ s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 Eigen::VectorXs BilevelFitProblem::getGradient(Eigen::VectorXs x)
 {
   MarkerFitterState state(x, mMarkerMapObservations, mFitter);
-  mFitter->mLossAndGrad(state);
+  mFitter->mLossAndGrad(&state);
   return state.flattenGradient();
 }
 

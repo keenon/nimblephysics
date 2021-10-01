@@ -20,7 +20,7 @@ gold_scales = original_scales + ((np.random.rand(original_scales.shape[0]) - 0.5
 skel.setGroupScales(gold_scales)
 gold_poses: List[np.ndarray] = []
 gold_markers: List[np.ndarray] = []
-for i in range(10):
+for i in range(3):
   pose = skel.getRandomPose()
   skel.setPositions(pose)
   markers = skel.getMarkerMapWorldPositions(osim.markersMap)
@@ -31,8 +31,24 @@ for i in range(10):
 skel.setPositions(np.zeros(skel.getNumDofs()))
 skel.setGroupScales(original_scales)
 
+def lossAndGrad(state: nimble.biomechanics.MarkerFitterState):
+  loss = 0.0
+  try:
+    markerErrorsAtTimestepsGrad = []
+    for t in range(len(state.markerErrorsAtTimesteps)):
+      grad = {}
+      for marker in state.markerErrorsAtTimesteps[t]:
+        error = state.markerErrorsAtTimesteps[t][marker]
+        loss += np.dot(error,error)
+        grad[marker] = 2 * error
+      markerErrorsAtTimestepsGrad.append(grad)
+    state.markerErrorsAtTimestepsGrad = markerErrorsAtTimestepsGrad
+  except Exception as e: print(e)
+  return loss
+
 fitter: nimble.biomechanics.MarkerFitter = nimble.biomechanics.MarkerFitter(
     skel, osim.markersMap)
+fitter.setCustomLossAndGrad(lossAndGrad)
 result: nimble.biomechanics.MarkerFitResult = fitter.optimize(gold_markers)
 
 print('Gold group scales:')

@@ -21,7 +21,7 @@ namespace dart {
 namespace biomechanics {
 
 class MarkerFitter;
-class MarkerFitterState;
+struct MarkerFitterState;
 
 struct MarkerFitResult
 {
@@ -151,7 +151,7 @@ public:
 
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
-      std::function<s_t(MarkerFitterState&)> customLossAndGrad);
+      std::function<s_t(MarkerFitterState*)> customLossAndGrad);
 
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
@@ -314,7 +314,7 @@ public:
           visibleMarkerWorldPoses);
 
   friend class BilevelFitProblem;
-  friend class MarkerFitterState;
+  friend struct MarkerFitterState;
 
 protected:
   std::map<std::string, int> mMarkerIndices;
@@ -328,7 +328,7 @@ protected:
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       mMarkersBallJoints;
 
-  std::function<s_t(MarkerFitterState&)> mLossAndGrad;
+  std::function<s_t(MarkerFitterState*)> mLossAndGrad;
 
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;

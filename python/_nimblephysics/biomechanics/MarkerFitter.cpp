@@ -37,6 +37,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/functional.h>
 
 namespace py = pybind11;
 
@@ -45,6 +46,19 @@ namespace python {
 
 void MarkerFitter(py::module& m)
 {
+  ::py::class_<
+      dart::biomechanics::MarkerFitterState>(
+      m, "MarkerFitterState")
+      .def_readwrite("bodyScales", &dart::biomechanics::MarkerFitterState::bodyScales)
+      .def_readwrite("markerOffsets", &dart::biomechanics::MarkerFitterState::markerOffsets)
+      .def_readwrite("markerErrorsAtTimesteps", &dart::biomechanics::MarkerFitterState::markerErrorsAtTimesteps)
+      .def_readwrite("posesAtTimesteps", &dart::biomechanics::MarkerFitterState::posesAtTimesteps)
+      // Gradient of current state
+      .def_readwrite("bodyScalesGrad", &dart::biomechanics::MarkerFitterState::bodyScalesGrad)
+      .def_readwrite("markerOffsetsGrad", &dart::biomechanics::MarkerFitterState::markerOffsetsGrad)
+      .def_readwrite("markerErrorsAtTimestepsGrad", &dart::biomechanics::MarkerFitterState::markerErrorsAtTimestepsGrad)
+      .def_readwrite("posesAtTimestepsGrad", &dart::biomechanics::MarkerFitterState::posesAtTimestepsGrad);
+
   ::py::class_<
       dart::biomechanics::MarkerFitResult,
       std::shared_ptr<dart::biomechanics::MarkerFitResult>>(
@@ -67,9 +81,14 @@ void MarkerFitter(py::module& m)
               std::shared_ptr<dynamics::Skeleton>,
               std::map<
                   std::string,
-                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>(),
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
           ::py::arg("skeleton"),
           ::py::arg("markers"))
+      .def("setInitialIKSatisfactoryLoss", &dart::biomechanics::MarkerFitter::setInitialIKSatisfactoryLoss, ::py::arg("loss"))
+      .def("setInitialIKMaxRestarts", &dart::biomechanics::MarkerFitter::setInitialIKMaxRestarts, ::py::arg("starts"))
+      .def("setMaxMarkerOffset", &dart::biomechanics::MarkerFitter::setMaxMarkerOffset, ::py::arg("offset"))
+      .def("setIterationLimit", &dart::biomechanics::MarkerFitter::setIterationLimit, ::py::arg("iters"))
+      .def("setCustomLossAndGrad", &dart::biomechanics::MarkerFitter::setCustomLossAndGrad, ::py::arg("loss"))
       .def(
           "optimize",
           &dart::biomechanics::MarkerFitter::optimize,
