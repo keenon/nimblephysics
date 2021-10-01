@@ -63,7 +63,7 @@ We'll do the following steps over and over again until we're happy with the resu
 
 1. Run a simulation for 100 timesteps
 2. Calculate loss (the difference between the box's final position and our goal)
-3. Backpropagate the loss through time (using PyTorch's :code:`loss.backwards()`)
+3. Backpropagate the loss through time (using PyTorch's :code:`loss.backward()`)
 4. Update our initial conditions by taking a step in the direction of the gradient
 
 To run a forward simulation, we'll just call :code`nimble.timestep()` over and over again. Remember from :ref:`Worlds` that "state" is just "position" and "velocity" concatenated together::
