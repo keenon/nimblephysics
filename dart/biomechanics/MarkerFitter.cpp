@@ -410,6 +410,12 @@ std::shared_ptr<MarkerFitResult> MarkerFitter::optimize(
   }
 
   result->success = (status == Ipopt::Solve_Succeeded);
+  result->posesMatrix
+      = Eigen::MatrixXs::Zero(result->poses[0].size(), result->poses.size());
+  for (int i = 0; i < result->poses.size(); i++)
+  {
+    result->posesMatrix.col(i) = result->poses[i];
+  }
 
   return result;
 }

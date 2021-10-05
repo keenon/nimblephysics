@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "dart/dynamics/EulerJoint.hpp"
-#include "dart/math/LinearFunction.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/LinearFunction.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -79,6 +79,8 @@ dart::dynamics::Joint* EulerFreeJoint::clone() const
   EulerFreeJoint* joint = new EulerFreeJoint(this->getJointProperties());
   joint->setName(getName());
   joint->copyTransformsFrom(this);
+  joint->setFlipAxisMap(mFlipAxisMap);
+  joint->setAxisOrder(mAxisOrder);
   return joint;
 }
 
@@ -300,17 +302,17 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      Eigen::Vector6s tweaked
-          = positions + (eps * Eigen::Vector6s::Unit(index));
-      perturbed = computeRelativeJacobianStatic(
-          tweaked, axisOrder, flipAxisMap, childBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::Vector6s tweaked
+            = positions + (eps * Eigen::Vector6s::Unit(index));
+        perturbed = computeRelativeJacobianStatic(
+            tweaked, axisOrder, flipAxisMap, childBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -391,16 +393,16 @@ Eigen::Matrix6s EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      Eigen::Vector6s tweaked = positions + (eps * velocities);
-      perturbed = computeRelativeJacobianStatic(
-          tweaked, axisOrder, flipAxisMap, childBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::Vector6s tweaked = positions + (eps * velocities);
+        perturbed = computeRelativeJacobianStatic(
+            tweaked, axisOrder, flipAxisMap, childBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -496,17 +498,17 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPos(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      Eigen::Vector6s tweaked = 
-          positions + (eps * Eigen::Vector6s::Unit(index));
-      perturbed = computeRelativeJacobianTimeDerivStatic(
-          tweaked, velocities, axisOrder, flipAxisMap, childBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::Vector6s tweaked
+            = positions + (eps * Eigen::Vector6s::Unit(index));
+        perturbed = computeRelativeJacobianTimeDerivStatic(
+            tweaked, velocities, axisOrder, flipAxisMap, childBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -583,17 +585,17 @@ EulerFreeJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVel(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      Eigen::Vector6s tweaked = 
-          velocities + (eps * Eigen::Vector6s::Unit(index));
-      perturbed = computeRelativeJacobianTimeDerivStatic(
-          positions, tweaked, axisOrder, flipAxisMap, childBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::Vector6s tweaked
+            = velocities + (eps * Eigen::Vector6s::Unit(index));
+        perturbed = computeRelativeJacobianTimeDerivStatic(
+            positions, tweaked, axisOrder, flipAxisMap, childBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }

@@ -3,6 +3,8 @@ import nimblephysics_libs._nimblephysics as nimble
 from typing import List, Dict, Callable, Tuple
 import numpy as np
 from .loader import absPath
+from .gui_server import NimbleGUI
+import random
 
 
 class MarkerMocapOptimizationState:
@@ -85,11 +87,13 @@ class MarkerMocap:
   """
   fitter: nimble.biomechanics.MarkerFitter
   skel: nimble.dynamics.Skeleton
+  skelOriginalPose: np.ndarray
   markersMap: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]]
 
   def __init__(self, skel: nimble.dynamics.Skeleton,
                markersMap: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]]) -> None:
     self.skel = skel
+    self.skelOriginalPose = skel.getPositions()
     self.markersMap = markersMap
     self.fitter = nimble.biomechanics.MarkerFitter(
         skel, markersMap)
@@ -108,10 +112,10 @@ class MarkerMocap:
         print(e)
     self.fitter.setCustomLossAndGrad(wrappedLoss)
 
-  def evaluatePerformance(self,
-                          markerTrcPath: str,
-                          handScaledGoldBodyOsim: str,
-                          handScaledGoldIKMot: str):
+  def debugMotionToGUI(self,
+                       markerTrcPath: str,
+                       handScaledGoldBodyOsim: str,
+                       handScaledGoldIKMot: str):
     """
     This compares the performance of the MarkerMocap system to a manual fit process, and prints a number of stats
     """
@@ -134,17 +138,101 @@ class MarkerMocap:
     config: nimble.biomechanics.OpenSimScaleAndMarkerOffsets = nimble.biomechanics.OpenSimParser.getScaleAndMarkerOffsets(
         standardOsim, scaledOsim)
 
-    """
     handScaledGoldIKMotAbs: str = absPath(handScaledGoldIKMot)
     print("Loading "+handScaledGoldIKMotAbs)
     mot: nimble.biomechanics.OpenSimMot = nimble.biomechanics.OpenSimParser.loadMot(
         scaledOsim.skeleton,
         handScaledGoldIKMotAbs)
-    """
 
+    print('Num bodies: '+str(scaledOsim.skeleton.getNumBodyNodes()))
+    for i in range(scaledOsim.skeleton.getNumBodyNodes()):
+      print('BodyNode '+str(i)+': '+scaledOsim.skeleton.getBodyNode(i).getName())
+
+    print('Num joints: '+str(scaledOsim.skeleton.getNumJoints()))
+    for i in range(scaledOsim.skeleton.getNumJoints()):
+      print('Joint '+str(i)+': '+scaledOsim.skeleton.getJoint(i).getName()+' - '+scaledOsim.skeleton.getJoint(i).getType())
+
+    scaledOsim.skeleton.setPositions(mot.poses[:, 0])
+    print('Root joint offset:')
+    print(scaledOsim.skeleton.getJoint(0).getRelativeTransform().matrix())
+
+    markerObservations: List[Dict[str, np.ndarray]] = []
+    markerObservations.append(markerTrajectories.markerTimesteps[0])
+    print("Marker observations:")
+    print(markerObservations[0])
+
+    print("Original markers:")
+    print(convertedMarkers)
+
+    world: nimble.simulation.World = nimble.simulation.World()
+    world.addSkeleton(scaledOsim.skeleton)
+    gui: NimbleGUI = NimbleGUI(world)
+    for markerName in markerTrajectories.markerLines:
+      gui.nativeAPI().createLine(markerName, markerTrajectories.markerLines[markerName], [1, 0, 0])
+    gui.loopPosMatrix(mot.poses)
+    gui.serve(8080)
+    gui.blockWhileServing()
+
+  def evaluatePerformance(self,
+                          markerTrcPath: str,
+                          handScaledGoldBodyOsim: str,
+                          handScaledGoldIKMot: str,
+                          numStepsToFit: int = 3,
+                          debugToGUI: bool = True) -> nimble.biomechanics.MarkerFitResult:
+    """
+    This compares the performance of the MarkerMocap system to a manual fit process, and prints a number of stats
+    """
+    markerTrcPathAbs: str = absPath(markerTrcPath)
+    print("Loading "+markerTrcPathAbs)
+    markerTrajectories: nimble.biomechanics.OpenSimTRC = nimble.biomechanics.OpenSimParser.loadTRC(
+        markerTrcPathAbs)
+
+    handScaledGoldBodyOsimAbs: str = absPath(handScaledGoldBodyOsim)
+    print("Loading "+handScaledGoldBodyOsimAbs)
+    scaledOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
+        handScaledGoldBodyOsimAbs)
+    print("Converting markers")
+    convertedMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]
+                           ] = self.skel.convertMarkerMap(scaledOsim.markersMap)
+    print("Creating OpenSimFile")
+    standardOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimFile(
+        self.skel, convertedMarkers)
+    print("Computing scale and marker offsets")
+    config: nimble.biomechanics.OpenSimScaleAndMarkerOffsets = nimble.biomechanics.OpenSimParser.getScaleAndMarkerOffsets(
+        standardOsim, scaledOsim)
+
+    handScaledGoldIKMotAbs: str = absPath(handScaledGoldIKMot)
+    print("Loading "+handScaledGoldIKMotAbs)
+    mot: nimble.biomechanics.OpenSimMot = nimble.biomechanics.OpenSimParser.loadMot(
+        scaledOsim.skeleton,
+        handScaledGoldIKMotAbs)
+
+    activeMarkers = []
+    trimmedConvertedMarkers = {}
+    for markerName in scaledOsim.markersMap:
+      if '_' not in markerName and markerName.isupper():
+        activeMarkers.append(markerName)
+        trimmedConvertedMarkers[markerName] = convertedMarkers[markerName]
+
+    originalIK: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
+        scaledOsim.skeleton, scaledOsim.markersMap, mot.poses, markerTrajectories.markerTimesteps, activeMarkers)
+    print('Original IK:')
+    originalIK.printReport(limitTimesteps=10)
+
+    randomIndices = [i for i in range(len(markerTrajectories.markerTimesteps))]
+    random.shuffle(randomIndices)
+    chosenIndices = randomIndices[:numStepsToFit]
+
+    goldPoses = mot.poses[:, chosenIndices]
     print("Picking a random subset of the marker data")
-    markerObservations: List[Dict[str, np.ndarray]] = nimble.biomechanics.MarkerFitter.pickSubset(
-        markerTrajectories.markerTimesteps, 2)
+    markerObservations: List[Dict[str, np.ndarray]
+                             ] = [markerTrajectories.markerTimesteps[i] for i in chosenIndices]
+
+    self.fitter = nimble.biomechanics.MarkerFitter(
+        self.skel, trimmedConvertedMarkers)
+    self.fitter.setInitialIKSatisfactoryLoss(0.05)
+    self.fitter.setInitialIKMaxRestarts(50)
+    self.fitter.setIterationLimit(100)
 
     print("Optimize the fit")
     result: nimble.biomechanics.MarkerFitResult = self.fitter.optimize(markerObservations)
@@ -154,7 +242,7 @@ class MarkerMocap:
     print("Result scales: " + str(bodyScales))
 
     groupScaleError: np.ndarray = bodyScales - config.bodyScales
-    groupScaleCols: np.ndarray = np.zeros(groupScaleError.shape[0], 4)
+    groupScaleCols: np.ndarray = np.zeros((groupScaleError.shape[0], 4))
     groupScaleCols[:, 0] = config.bodyScales
     groupScaleCols[:, 1] = bodyScales
     groupScaleCols[:, 2] = groupScaleError
@@ -162,4 +250,73 @@ class MarkerMocap:
     print("gold scales - result scales - error - error %")
     print(groupScaleCols)
 
-    pass
+    resultIK: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
+        self.skel, trimmedConvertedMarkers, result.posesMatrix, markerObservations, activeMarkers)
+    print('Fine tuned IK:')
+    resultIK.printReport(limitTimesteps=10)
+
+    if debugToGUI:
+      world: nimble.simulation.World = nimble.simulation.World()
+      gui: NimbleGUI = NimbleGUI(world)
+
+      def renderTimestep(timestep):
+        gui.nativeAPI().setAutoflush(False)
+        # Render our guessed position
+        self.skel.setPositions(result.poses[timestep])
+        gui.nativeAPI().renderSkeleton(self.skel, 'result')
+
+        # Calculate where we think markers are
+        observedMarkers: Dict[str, np.ndarray] = {}
+        for markerName in trimmedConvertedMarkers:
+          markerBody = trimmedConvertedMarkers[markerName][0]
+          originalMarkerOffset = trimmedConvertedMarkers[markerName][1]
+          markerError = result.markerErrors[markerName]
+          observedMarkers[markerName] = nimble.math.transformBy(
+              markerBody.getWorldTransform(), originalMarkerOffset + markerError)
+
+        # Render the gold position
+        scaledOsim.skeleton.setPositions(goldPoses[:, timestep])
+        gui.nativeAPI().renderSkeleton(scaledOsim.skeleton, 'gold', [0, 1, 0])
+
+        # Render compared marker positions
+        goldMarkers: Dict[str, np.ndarray] = scaledOsim.skeleton.getMarkerMapWorldPositions(
+            scaledOsim.markersMap)
+        realMarkers: Dict[str, np.ndarray] = markerTrajectories.markerTimesteps[timestep]
+        for markerName in activeMarkers:
+          points = [observedMarkers[markerName], goldMarkers[markerName]]
+          gui.nativeAPI().createLine(markerName, points, [1, 0, 0])
+          gui.nativeAPI().createBox(
+              markerName + "_found", [0.005, 0.005, 0.005],
+              observedMarkers[markerName],
+              [0, 0, 0],
+              [1, 0, 0])
+          gui.nativeAPI().createBox(
+              markerName + "_gold", [0.01, 0.01, 0.01],
+              goldMarkers[markerName],
+              [0, 0, 0],
+              [0, 1, 0])
+          gui.nativeAPI().createBox(
+              markerName + "_real", [0.01, 0.01, 0.01],
+              observedMarkers[markerName],
+              [0, 0, 0],
+              [1, 1, 0])
+        gui.nativeAPI().setAutoflush(True)
+        gui.nativeAPI().flush()
+
+      cursor = 0
+      renderTimestep(cursor)
+
+      def keyListener(key: str):
+        nonlocal cursor
+        if key == " ":
+          cursor += 1
+          if cursor >= len(result.poses):
+            cursor = 0
+          renderTimestep(cursor)
+
+      gui.nativeAPI().registerKeydownListener(keyListener)
+
+      gui.serve(8080)
+      gui.blockWhileServing()
+
+    return result

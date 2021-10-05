@@ -15,7 +15,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -1722,8 +1722,8 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 }
 #endif
 
-#ifdef FULL_EVAL
-#ifdef ALL_TESTS
+// #ifdef FULL_EVAL
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1819,6 +1819,14 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   }
 
   /*
+  scaled.skeleton->setPositions(poses.col(0));
+  std::cout << scaled.skeleton->getJoint(0)->getRelativeTransform().matrix()
+            << std::endl;
+
+  std::shared_ptr<dynamics::Skeleton> clone = scaled.skeleton->clone();
+  clone->setPositions(poses.col(0));
+  std::cout << clone->getJoint(0)->getRelativeTransform().matrix() << std::endl;
+
   // Target markers
   debugTrajectoryAndMarkersToGUI(
       scaled.skeleton,
@@ -1894,16 +1902,39 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       = MarkerFitter::pickSubset(markerTrajectories.markerTimesteps, 40);
   */
 
+  /*
   std::vector<unsigned int> indices(markerTrajectories.markerTimesteps.size());
   std::iota(indices.begin(), indices.end(), 0);
   std::random_shuffle(indices.begin(), indices.end());
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
-  for (int i = 0; i < 40; i++)
+  for (int i = 0; i < 2; i++)
   {
     std::cout << "Shuffled " << i << "->" << indices[i] << std::endl;
     markerObservations.push_back(
         markerTrajectories.markerTimesteps[indices[i]]);
+    for (auto pair : markerTrajectories.markerTimesteps[indices[i]])
+    {
+      std::cout << pair.first << ": " << pair.second << std::endl;
+    }
+  }
+  */
+
+  std::cout << "Original skel pos: " << standard.skeleton->getPositions()
+            << std::endl;
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  markerObservations.push_back(markerTrajectories.markerTimesteps[0]);
+  for (auto pair : markerObservations[0])
+  {
+    std::cout << pair.first << ": " << pair.second << std::endl;
+  }
+
+  std::cout << "Marker map:" << std::endl;
+  for (auto pair : standard.markersMap)
+  {
+    std::cout << pair.first << ": (" << pair.second.first->getName() << ", "
+              << pair.second.second << ")" << std::endl;
   }
 
   // Create a marker fitter
@@ -1927,5 +1958,5 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   std::cout << "gold scales - result scales - error - error %" << std::endl
             << groupScaleCols << std::endl;
 }
-#endif
-#endif
+// #endif
+// #endif

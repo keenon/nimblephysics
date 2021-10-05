@@ -581,9 +581,13 @@ GUIWebsocketServer& GUIWebsocketServer::renderBasis(
 /// This is a high-level command that creates/updates all the shapes in a
 /// world by calling the lower-level commands
 GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
-    const std::shared_ptr<dynamics::Skeleton>& skel, const std::string& prefix)
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::string& prefix,
+    Eigen::Vector3s overrideColor)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  bool useOriginalColor = overrideColor == -1 * Eigen::Vector3s::Ones();
 
   bool oldAutoflush = mAutoflush;
   mAutoflush = false;
@@ -643,7 +647,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 boxShape->getSize(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                visual->getColor(),
+                useOriginalColor ? visual->getColor() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -658,7 +662,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 meshShape->getScale(),
-                visual->getColor(),
+                useOriginalColor ? visual->getColor() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -670,7 +674,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 shapeName,
                 sphereShape->getRadius(),
                 shapeNode->getWorldTransform().translation(),
-                visual->getColor(),
+                useOriginalColor ? visual->getColor() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -684,7 +688,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 capsuleShape->getHeight(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                visual->getColor(),
+                useOriginalColor ? visual->getColor() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -698,7 +702,7 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
                 shapeName,
                 sphereShape->getRadii()[0],
                 shapeNode->getWorldTransform().translation(),
-                visual->getColor(),
+                useOriginalColor ? visual->getColor() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }

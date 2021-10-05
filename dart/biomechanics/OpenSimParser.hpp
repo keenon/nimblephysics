@@ -42,6 +42,7 @@ struct OpenSimTRC
 {
   std::vector<double> timestamps;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+  std::map<std::string, std::vector<Eigen::Vector3s>> markerLines;
 };
 
 struct OpenSimMot

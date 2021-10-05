@@ -1459,7 +1459,7 @@ BodyNode::BodyNode(
     mParentBodyNode(nullptr),
     mScale(Eigen::Vector3s::Ones()),
     mScaleLowerBound(Eigen::Vector3s::Ones() * 0.75),
-    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.25),
+    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.5),
     mPartialAcceleration(Eigen::Vector6s::Zero()),
     mIsPartialAccelerationDirty(true),
     mF(Eigen::Vector6s::Zero()),

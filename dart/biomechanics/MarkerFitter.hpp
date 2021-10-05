@@ -29,6 +29,7 @@ struct MarkerFitResult
 
   Eigen::VectorXs groupScales;
   std::vector<Eigen::VectorXs> poses;
+  Eigen::MatrixXs posesMatrix;
   std::map<std::string, Eigen::Vector3s> markerErrors;
 
   Eigen::VectorXs rawMarkerOffsets;

@@ -68,6 +68,8 @@ void OpenSimParser(py::module& m)
   ::py::class_<dart::biomechanics::OpenSimTRC>(m, "OpenSimTRC")
       .def_readwrite(
           "markerTimesteps", &dart::biomechanics::OpenSimTRC::markerTimesteps)
+      .def_readwrite(
+          "markerLines", &dart::biomechanics::OpenSimTRC::markerLines)
       .def_readwrite("timestamps", &dart::biomechanics::OpenSimTRC::timestamps);
 
   ::py::class_<dart::biomechanics::OpenSimScaleAndMarkerOffsets>(

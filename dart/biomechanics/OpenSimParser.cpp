@@ -335,6 +335,17 @@ OpenSimTRC OpenSimParser::loadTRC(
     lineNumber++;
   }
 
+  // Translate into a "lines" format, where each marker gets a full trajectory
+  for (int i = 0; i < result.markerTimesteps.size(); i++)
+  {
+    // TODO: this will result in a bug if some timesteps are missing marker
+    // observations
+    for (auto pair : result.markerTimesteps[i])
+    {
+      result.markerLines[pair.first].push_back(pair.second);
+    }
+  }
+
   return result;
 }
 

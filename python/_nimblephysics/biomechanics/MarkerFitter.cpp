@@ -83,6 +83,8 @@ void MarkerFitter(py::module& m)
           "markerErrors", &dart::biomechanics::MarkerFitResult::markerErrors)
       .def_readwrite("poses", &dart::biomechanics::MarkerFitResult::poses)
       .def_readwrite(
+          "posesMatrix", &dart::biomechanics::MarkerFitResult::posesMatrix)
+      .def_readwrite(
           "rawMarkerOffsets",
           &dart::biomechanics::MarkerFitResult::rawMarkerOffsets);
 

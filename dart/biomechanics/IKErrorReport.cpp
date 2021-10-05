@@ -1,0 +1,86 @@
+#include "dart/biomechanics/IKErrorReport.hpp"
+
+namespace dart {
+namespace biomechanics {
+
+IKErrorReport::IKErrorReport(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    dynamics::MarkerMap markers,
+    Eigen::MatrixXs poses,
+    std::vector<std::map<std::string, Eigen::Vector3s>> observations,
+    std::vector<std::string> activeMarkers)
+  : averageRootMeanSquaredError(0.0),
+    averageSumSquaredError(0.0),
+    averageMaxError(0.0)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+
+  // If no active markers are specified, assume they all are
+  if (activeMarkers.size() == 0)
+  {
+    for (auto pair : markers)
+      activeMarkers.push_back(pair.first);
+  }
+
+  for (int i = 0; i < observations.size(); i++)
+  {
+    skel->setPositions(poses.col(i));
+    std::map<std::string, Eigen::Vector3s> worldMarkers
+        = skel->getMarkerMapWorldPositions(markers);
+
+    s_t thisTotalSquaredError = 0.0;
+    s_t thisMaxError = 0.0;
+    for (std::string markerName : activeMarkers)
+    {
+      Eigen::Vector3s diff
+          = observations[i][markerName] - worldMarkers[markerName];
+      s_t squaredError = diff.squaredNorm();
+      thisTotalSquaredError = squaredError;
+      thisMaxError = std::max(thisMaxError, diff.norm());
+    }
+    s_t thisRootMeanSquaredError
+        = sqrt(thisTotalSquaredError / activeMarkers.size());
+    this->rootMeanSquaredError.push_back(thisRootMeanSquaredError);
+    this->maxError.push_back(thisMaxError);
+    this->sumSquaredError.push_back(thisTotalSquaredError);
+
+    if (std::isfinite(thisRootMeanSquaredError)
+        && std::isfinite(thisTotalSquaredError) && std::isfinite(thisMaxError))
+    {
+      this->averageRootMeanSquaredError += thisRootMeanSquaredError;
+      this->averageSumSquaredError += thisTotalSquaredError;
+      this->averageMaxError += thisMaxError;
+    }
+  }
+  this->averageRootMeanSquaredError /= observations.size();
+  this->averageSumSquaredError /= observations.size();
+  this->averageMaxError /= observations.size();
+
+  skel->setPositions(originalPos);
+}
+
+void IKErrorReport::printReport(int limitTimesteps)
+{
+  std::cout << "IK Error Report:" << std::endl;
+  std::cout << "sum_squared (" << this->averageSumSquaredError
+            << " avg) -- RMSE (" << this->averageRootMeanSquaredError
+            << " avg) -- Max (" << this->averageMaxError
+            << " avg):" << std::endl;
+
+  int printTimesteps = this->rootMeanSquaredError.size();
+  if (limitTimesteps > 0 && limitTimesteps < printTimesteps)
+  {
+    printTimesteps = limitTimesteps;
+  }
+  Eigen::MatrixXs together = Eigen::MatrixXs::Zero(printTimesteps, 3);
+  for (int i = 0; i < printTimesteps; i++)
+  {
+    together(i, 0) = this->sumSquaredError[i];
+    together(i, 1) = this->rootMeanSquaredError[i];
+    together(i, 2) = this->maxError[i];
+  }
+  std::cout << together << std::endl;
+}
+
+} // namespace biomechanics
+} // namespace dart
