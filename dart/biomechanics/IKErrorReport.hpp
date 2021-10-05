@@ -33,6 +33,8 @@ public:
 
   std::vector<std::string> worstMarkers;
   std::vector<Eigen::Vector3s> worstMarkerErrors;
+  std::vector<Eigen::Vector3s> worstMarkerReals;
+  std::vector<Eigen::Vector3s> worstMarkerPredicteds;
   std::vector<s_t> sumSquaredError;
   std::vector<s_t> rootMeanSquaredError;
   std::vector<s_t> maxError;

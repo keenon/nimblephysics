@@ -18,8 +18,13 @@ def customLoss(mocapState: nimble.MarkerMocapOptimizationState):
     for markerName in mocapState.markerErrorsAtTimesteps[t]:
       sum += mocapState.markerErrorsAtTimesteps[t][markerName].dot(
           mocapState.markerErrorsAtTimesteps[t][markerName])
-  # for markerName in mocapState.markerOffsets:
-  # sum += 0.05 * mocapState.markerOffsets[markerName].dot(mocapState.markerOffsets[markerName])
+  """
+  for bodyName in mocapState.bodyScales:
+    for i in range(3):
+      sum += 0.05 * torch.square(mocapState.bodyScales[bodyName][i] - 1.0)
+  for markerName in mocapState.markerOffsets:
+    sum += 0.05 * mocapState.markerOffsets[markerName].dot(mocapState.markerOffsets[markerName])
+  """
   return sum
 
 

@@ -32,8 +32,23 @@ IKErrorReport::IKErrorReport(
     s_t thisMaxError = 0.0;
     std::string worstMarker = "[NONE]";
     Eigen::Vector3s worstMarkerError = Eigen::Vector3s::Zero();
+    Eigen::Vector3s worstMarkerReal = Eigen::Vector3s::Zero();
+    Eigen::Vector3s worstMarkerPredicted = Eigen::Vector3s::Zero();
+
     for (std::string markerName : activeMarkers)
     {
+      if (observations[i].count(markerName) == 0)
+      {
+        std::cout << "Could not find active marker \"" << markerName
+                  << "\" in timestep " << i << "!!" << std::endl
+                  << "Existing markers at timestep: [";
+        for (auto pair : observations[i])
+        {
+          std::cout << pair.first << ", ";
+        }
+        std::cout << "]" << std::endl;
+        continue;
+      }
       Eigen::Vector3s diff
           = observations[i][markerName] - worldMarkers[markerName];
       s_t squaredError = diff.squaredNorm();
@@ -43,10 +58,14 @@ IKErrorReport::IKErrorReport(
       {
         worstMarker = markerName;
         worstMarkerError = diff;
+        worstMarkerReal = observations[i][markerName];
+        worstMarkerPredicted = worldMarkers[markerName];
       }
     }
     worstMarkers.push_back(worstMarker);
     worstMarkerErrors.push_back(worstMarkerError);
+    worstMarkerReals.push_back(worstMarkerReal);
+    worstMarkerPredicteds.push_back(worstMarkerPredicted);
 
     s_t thisRootMeanSquaredError
         = sqrt(thisTotalSquaredError / activeMarkers.size());
@@ -92,9 +111,17 @@ void IKErrorReport::printReport(int limitTimesteps)
   std::cout << together << std::endl;
   for (int i = 0; i < printTimesteps; i++)
   {
-    std::cout << "Worst Marker at " << i << ": " << worstMarkers[i] << " -> ["
-              << worstMarkerErrors[i](0) << ", " << worstMarkerErrors[i](1)
-              << ", " << worstMarkerErrors[i](2) << "]" << std::endl;
+    std::cout << "Worst Marker at " << i << ": " << worstMarkers[i] << " -> ";
+    std::cout << "real[" << worstMarkerReals[i](0) << ", "
+              << worstMarkerReals[i](1) << ", " << worstMarkerReals[i](2)
+              << "]";
+    std::cout << " - predicted[" << worstMarkerPredicteds[i](0) << ", "
+              << worstMarkerPredicteds[i](1) << ", "
+              << worstMarkerPredicteds[i](2) << "]";
+    std::cout << " = error[" << worstMarkerErrors[i](0) << ", "
+              << worstMarkerErrors[i](1) << ", " << worstMarkerErrors[i](2)
+              << "]";
+    std::cout << std::endl;
   }
 }
 
