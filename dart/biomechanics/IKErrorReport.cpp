@@ -30,14 +30,24 @@ IKErrorReport::IKErrorReport(
 
     s_t thisTotalSquaredError = 0.0;
     s_t thisMaxError = 0.0;
+    std::string worstMarker = "[NONE]";
+    Eigen::Vector3s worstMarkerError = Eigen::Vector3s::Zero();
     for (std::string markerName : activeMarkers)
     {
       Eigen::Vector3s diff
           = observations[i][markerName] - worldMarkers[markerName];
       s_t squaredError = diff.squaredNorm();
-      thisTotalSquaredError = squaredError;
+      thisTotalSquaredError += squaredError;
       thisMaxError = std::max(thisMaxError, diff.norm());
+      if (diff.squaredNorm() > worstMarkerError.squaredNorm())
+      {
+        worstMarker = markerName;
+        worstMarkerError = diff;
+      }
     }
+    worstMarkers.push_back(worstMarker);
+    worstMarkerErrors.push_back(worstMarkerError);
+
     s_t thisRootMeanSquaredError
         = sqrt(thisTotalSquaredError / activeMarkers.size());
     this->rootMeanSquaredError.push_back(thisRootMeanSquaredError);
@@ -80,6 +90,12 @@ void IKErrorReport::printReport(int limitTimesteps)
     together(i, 2) = this->maxError[i];
   }
   std::cout << together << std::endl;
+  for (int i = 0; i < printTimesteps; i++)
+  {
+    std::cout << "Worst Marker at " << i << ": " << worstMarkers[i] << " -> ["
+              << worstMarkerErrors[i](0) << ", " << worstMarkerErrors[i](1)
+              << ", " << worstMarkerErrors[i](2) << "]" << std::endl;
+  }
 }
 
 } // namespace biomechanics
