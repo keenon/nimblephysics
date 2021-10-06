@@ -64,6 +64,8 @@ if(TARGET dart-utils)
   dart_add_test("comprehensive" test_SoftDynamics)
   target_link_libraries(test_SoftDynamics dart-utils)
 
+  dart_add_test("comprehensive" test_Cartpole)
+
   dart_add_test("comprehensive" test_World)
   target_link_libraries(test_World dart-utils)
   if(TARGET dart-collision-bullet)
@@ -80,6 +82,8 @@ if(TARGET dart-utils)
     target_link_libraries(test_HalfCheetahTrajectory dart-utils-urdf)
     target_link_libraries(test_KR5Trajectory dart-utils)
     target_link_libraries(test_KR5Trajectory dart-utils-urdf)
+    target_link_libraries(test_Cartpole dart-utils)
+    target_link_libraries(test_Cartpole dart-utils-urdf)
 
     dart_add_test("comprehensive" test_Gradients)
     target_link_libraries(test_Gradients dart-utils-urdf)
