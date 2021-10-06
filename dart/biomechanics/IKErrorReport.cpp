@@ -7,20 +7,12 @@ IKErrorReport::IKErrorReport(
     std::shared_ptr<dynamics::Skeleton> skel,
     dynamics::MarkerMap markers,
     Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> observations,
-    std::vector<std::string> activeMarkers)
+    std::vector<std::map<std::string, Eigen::Vector3s>> observations)
   : averageRootMeanSquaredError(0.0),
     averageSumSquaredError(0.0),
     averageMaxError(0.0)
 {
   Eigen::VectorXs originalPos = skel->getPositions();
-
-  // If no active markers are specified, assume they all are
-  if (activeMarkers.size() == 0)
-  {
-    for (auto pair : markers)
-      activeMarkers.push_back(pair.first);
-  }
 
   for (int i = 0; i < observations.size(); i++)
   {
@@ -35,20 +27,9 @@ IKErrorReport::IKErrorReport(
     Eigen::Vector3s worstMarkerReal = Eigen::Vector3s::Zero();
     Eigen::Vector3s worstMarkerPredicted = Eigen::Vector3s::Zero();
 
-    for (std::string markerName : activeMarkers)
+    for (auto pair : observations[i])
     {
-      if (observations[i].count(markerName) == 0)
-      {
-        std::cout << "Could not find active marker \"" << markerName
-                  << "\" in timestep " << i << "!!" << std::endl
-                  << "Existing markers at timestep: [";
-        for (auto pair : observations[i])
-        {
-          std::cout << pair.first << ", ";
-        }
-        std::cout << "]" << std::endl;
-        continue;
-      }
+      std::string markerName = pair.first;
       Eigen::Vector3s diff
           = observations[i][markerName] - worldMarkers[markerName];
       s_t squaredError = diff.squaredNorm();
@@ -68,7 +49,7 @@ IKErrorReport::IKErrorReport(
     worstMarkerPredicteds.push_back(worstMarkerPredicted);
 
     s_t thisRootMeanSquaredError
-        = sqrt(thisTotalSquaredError / activeMarkers.size());
+        = sqrt(thisTotalSquaredError / observations[i].size());
     this->rootMeanSquaredError.push_back(thisRootMeanSquaredError);
     this->maxError.push_back(thisMaxError);
     this->sumSquaredError.push_back(thisTotalSquaredError);

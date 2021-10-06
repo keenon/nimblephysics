@@ -728,11 +728,32 @@ public:
   Eigen::VectorXs getDynamicsForces();
 
   //----------------------------------------------------------------------------
+  // Anthropometrics
+  //----------------------------------------------------------------------------
+
+  /// This computes the distance (along the `up` vector) from the highest vertex
+  /// to the lowest vertex on the model, when positioned at `pose`
+  s_t getHeight(
+      Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the height
+  Eigen::VectorXs getGradientOfHeightWrtBodyScales(
+      Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the height
+  Eigen::VectorXs finiteDifferenceGradientOfHeightWrtBodyScales(
+      Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  //----------------------------------------------------------------------------
   // Randomness
   //----------------------------------------------------------------------------
 
   /// This gets a random pose that's valid within joint limits
   Eigen::VectorXs getRandomPose();
+
+  /// This gets a random pose that's valid within joint limits, but only changes
+  /// the specified joints. All unspecified joints are left as 0.
+  Eigen::VectorXs getRandomPoseForJoints(std::vector<dynamics::Joint*> joints);
 
   //----------------------------------------------------------------------------
   // Trajectory optimization

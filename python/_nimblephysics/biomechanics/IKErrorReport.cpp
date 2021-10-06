@@ -67,13 +67,11 @@ void IKErrorReport(py::module& m)
               std::shared_ptr<dynamics::Skeleton>,
               dynamics::MarkerMap,
               Eigen::MatrixXs,
-              std::vector<std::map<std::string, Eigen::Vector3s>>,
-              std::vector<std::string>>(),
+              std::vector<std::map<std::string, Eigen::Vector3s>>>(),
           ::py::arg("skeleton"),
           ::py::arg("markers"),
           ::py::arg("poses"),
-          ::py::arg("observations"),
-          ::py::arg("activeMarkers") = std::vector<std::string>())
+          ::py::arg("observations"))
       .def(
           "printReport",
           &dart::biomechanics::IKErrorReport::printReport,

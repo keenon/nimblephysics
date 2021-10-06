@@ -26,8 +26,7 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel,
       dynamics::MarkerMap markers,
       Eigen::MatrixXs poses,
-      std::vector<std::map<std::string, Eigen::Vector3s>> observations,
-      std::vector<std::string> activeMarkers);
+      std::vector<std::map<std::string, Eigen::Vector3s>> observations);
 
   void printReport(int limitTimesteps = -1);
 

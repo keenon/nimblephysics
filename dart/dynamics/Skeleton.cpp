@@ -2292,6 +2292,182 @@ Eigen::VectorXs Skeleton::getDynamicsForces()
 }
 
 //==============================================================================
+/// This computes the distance (along the `up` vector) from the highest vertex
+/// to the lowest vertex on the model, when positioned at `pose`
+s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
+{
+  Eigen::VectorXs originalPose = getPositions();
+  setPositions(pose);
+
+  s_t maxUp = -1 * std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s maxVertex = Eigen::Vector3s::Zero();
+  dynamics::BodyNode* maxBodyNode = nullptr;
+  s_t minUp = std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s minVertex = Eigen::Vector3s::Zero();
+  dynamics::BodyNode* minBodyNode = nullptr;
+
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* node = getBodyNode(i);
+    for (int j = 0; j < node->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapeNode* shapeNode = node->getShapeNode(j);
+      std::shared_ptr<dynamics::Shape> shape = shapeNode->getShape();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh
+            = static_cast<dynamics::MeshShape*>(shape.get());
+        for (Eigen::Vector3s rawVertex : mesh->getVertices())
+        {
+          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
+          s_t upDist = up.dot(worldVertex);
+          if (upDist > maxUp)
+          {
+            maxUp = upDist;
+            maxBodyNode = node;
+            maxVertex = worldVertex;
+          }
+          if (upDist < minUp)
+          {
+            minUp = upDist;
+            minBodyNode = node;
+            minVertex = worldVertex;
+          }
+        }
+      }
+      else
+      {
+        std::cout << "WARNING: getHeight() currently only supports Skeletons "
+                     "with Mesh shapes. Instead we got a shape of type \""
+                  << shape->getType()
+                  << "\". This shape will be ignored in computing height."
+                  << std::endl;
+      }
+    }
+  }
+
+  (void)maxVertex;
+  (void)maxBodyNode;
+  (void)minVertex;
+  (void)minBodyNode;
+
+  setPositions(originalPose);
+
+  if (std::isfinite(maxUp) && std::isfinite(minUp))
+  {
+    return maxUp - minUp;
+  }
+  // Fallback
+  return 0.0;
+}
+
+//==============================================================================
+/// This computes the gradient of the height
+Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
+    Eigen::VectorXs pose, Eigen::Vector3s up)
+{
+  Eigen::VectorXs originalPose = getPositions();
+  setPositions(pose);
+
+  s_t maxUp = -1 * std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s maxVertex = Eigen::Vector3s::Zero();
+  dynamics::BodyNode* maxBodyNode = nullptr;
+  s_t minUp = std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s minVertex = Eigen::Vector3s::Zero();
+  dynamics::BodyNode* minBodyNode = nullptr;
+
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* node = getBodyNode(i);
+    for (int j = 0; j < node->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapeNode* shapeNode = node->getShapeNode(j);
+      std::shared_ptr<dynamics::Shape> shape = shapeNode->getShape();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh
+            = static_cast<dynamics::MeshShape*>(shape.get());
+        for (Eigen::Vector3s vertex : mesh->getVertices())
+        {
+          Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
+          s_t upDist = up.dot(worldVertex);
+          if (upDist > maxUp)
+          {
+            maxUp = upDist;
+            maxBodyNode = node;
+            maxVertex = node->getWorldTransform().inverse() * worldVertex;
+          }
+          if (upDist < minUp)
+          {
+            minUp = upDist;
+            minBodyNode = node;
+            minVertex = node->getWorldTransform().inverse() * worldVertex;
+          }
+        }
+      }
+      else
+      {
+        std::cout << "WARNING: getGradientOfHeightWrtBodyScales() currently "
+                     "only supports Skeletons "
+                     "with Mesh shapes. Instead we got a shape of type \""
+                  << shape->getType()
+                  << "\". This shape will be ignored in computing the gradient."
+                  << std::endl;
+      }
+    }
+  }
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  markers.emplace_back(minBodyNode, minVertex);
+  markers.emplace_back(maxBodyNode, maxVertex);
+  Eigen::Vector6s markerToHeight = Eigen::Vector6s::Zero();
+  markerToHeight.head<3>() = -up;
+  markerToHeight.tail<3>() = up;
+
+  Eigen::VectorXs grad
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers).transpose()
+        * markerToHeight;
+
+  setPositions(originalPose);
+  return grad;
+}
+
+//==============================================================================
+/// This computes the gradient of the height
+Eigen::VectorXs Skeleton::finiteDifferenceGradientOfHeightWrtBodyScales(
+    Eigen::VectorXs pose, Eigen::Vector3s up)
+{
+  Eigen::VectorXs originalPose = getPositions();
+  setPositions(pose);
+
+  std::size_t n = getNumBodyNodes() * 3;
+  Eigen::VectorXs result(n);
+  Eigen::VectorXs originalScales = getBodyScales();
+
+  s_t eps = 1e-6;
+
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& height) {
+        Eigen::VectorXs tweaked = originalScales;
+        tweaked(i) += eps;
+        setBodyScales(tweaked);
+        height = getHeight(pose, up);
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  setBodyScales(originalScales);
+  setPositions(originalPose);
+
+  return result;
+}
+
+//==============================================================================
 /// This gets a random pose that's valid within joint limits
 Eigen::VectorXs Skeleton::getRandomPose()
 {
@@ -2312,21 +2488,6 @@ Eigen::VectorXs Skeleton::getRandomPose()
         = (((pose(i) + 1.0) / 2.0) * (upperLimit - lowerLimit)) + lowerLimit;
     pose(i) = withinBounds;
   }
-  /*
-  for (int i = 0; i < getNumJoints(); i++)
-  {
-    if (getJoint(i)->getType() == FreeJoint::getStaticType())
-    {
-      // TODO: random generate a decent SO3 rotation
-      pose.segment<3>(getJoint(i)->getDof(0)->getIndexInSkeleton()).setZero();
-    }
-    if (getJoint(i)->getType() == BallJoint::getStaticType())
-    {
-      // TODO: random generate a decent SO3 rotation
-      pose.segment<3>(getJoint(i)->getDof(0)->getIndexInSkeleton()).setZero();
-    }
-  }
-  */
 
 #ifndef NDEBUG
   Eigen::VectorXs oldPose = getPositions();
@@ -2336,6 +2497,25 @@ Eigen::VectorXs Skeleton::getRandomPose()
   assert(clampedPos == pose);
   setPositions(oldPose);
 #endif
+
+  return pose;
+}
+
+//==============================================================================
+/// This gets a random pose that's valid within joint limits, but only changes
+/// the specified joints. All unspecified joints are left as 0.
+Eigen::VectorXs Skeleton::getRandomPoseForJoints(
+    std::vector<dynamics::Joint*> joints)
+{
+  Eigen::VectorXs randomPose = getRandomPose();
+  Eigen::VectorXs pose = Eigen::VectorXs::Zero(getNumDofs());
+
+  for (auto joint : joints)
+  {
+    pose.segment(joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+        = randomPose.segment(
+            joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs());
+  }
 
   return pose;
 }

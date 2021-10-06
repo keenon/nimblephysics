@@ -1835,7 +1835,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       markerTrajectories.markerTimesteps);
   */
 
-  int timestep = 1377;
+  int timestep = 1264; // 103, 1851
 
   std::map<std::string, Eigen::Vector3s> goldMarkers
       = markerTrajectories.markerTimesteps[timestep];
@@ -1878,6 +1878,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
     std::cout << standardBodyScales(i);
   }
   std::cout << ";" << std::endl;
+  */
 
   // Try to fit the skeleton to
 
@@ -1892,7 +1893,6 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
   debugFitToGUI(
       standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
-  */
 
   // Get a random subset of the data
 

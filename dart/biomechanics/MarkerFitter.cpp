@@ -291,6 +291,21 @@ MarkerFitter::MarkerFitter(
     mMarkersBallJoints.emplace_back(
         mSkeletonBallJoints->getBodyNode(pair.second.first->getName()),
         Eigen::Vector3s(pair.second.second));
+
+    // Traverse up the parent list looking for all the joints that effect this
+    // node
+    dynamics::BodyNode* cursor = pair.second.first;
+    while (cursor != nullptr)
+    {
+      dynamics::Joint* parentJoint = cursor->getParentJoint();
+      assert(parentJoint != nullptr);
+      if (std::find(mObservedJoints.begin(), mObservedJoints.end(), parentJoint)
+          == mObservedJoints.end())
+      {
+        mObservedJoints.push_back(parentJoint);
+      }
+      cursor = parentJoint->getParentBodyNode();
+    }
   }
 
   // Default to a least-squares loss over just the marker errors
@@ -1346,7 +1361,8 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         [this](Eigen::VectorXs& val) {
           val.segment(0, mFitter->mSkeletonBallJoints->getNumDofs())
               = mFitter->mSkeleton->convertPositionsToBallSpace(
-                  mFitter->mSkeleton->getRandomPose());
+                  mFitter->mSkeleton->getRandomPoseForJoints(
+                      mFitter->mObservedJoints));
           val.segment(
                  mFitter->mSkeletonBallJoints->getNumDofs(),
                  mFitter->mSkeletonBallJoints->getGroupScaleDim())
@@ -1446,7 +1462,8 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         },
         [this](Eigen::VectorXs& val) {
           val = mFitter->mSkeleton->convertPositionsToBallSpace(
-              mFitter->mSkeleton->getRandomPose());
+              mFitter->mSkeleton->getRandomPoseForJoints(
+                  mFitter->mObservedJoints));
         },
         math::IKConfig()
             .setMaxStepCount(500)

@@ -323,6 +323,7 @@ protected:
 
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
+  std::vector<dynamics::Joint*> mObservedJoints;
   dynamics::MarkerMap mMarkerMap;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;

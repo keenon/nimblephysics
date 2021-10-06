@@ -702,7 +702,21 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self, std::size_t treeIndex)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
+      .def(
+          "getHeight",
+          &dart::dynamics::Skeleton::getHeight,
+          ::py::arg("pos"),
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfHeightWrtBodyScales",
+          &dart::dynamics::Skeleton::getGradientOfHeightWrtBodyScales,
+          ::py::arg("pos"),
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
       .def("getRandomPose", &dart::dynamics::Skeleton::getRandomPose)
+      .def(
+          "getRandomPoseForJoints",
+          &dart::dynamics::Skeleton::getRandomPoseForJoints,
+          ::py::arg("joints"))
       .def(
           "getControlForceUpperLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
