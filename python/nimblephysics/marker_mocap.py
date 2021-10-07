@@ -100,8 +100,27 @@ class MarkerMocap:
     self.fitter.setInitialIKSatisfactoryLoss(0.05)
     self.fitter.setInitialIKMaxRestarts(50)
     self.fitter.setIterationLimit(100)
+    self.zeroConstraints: Dict[str,
+                               Callable
+                               [[nimble.biomechanics.MarkerFitterState],
+                                float]] = {}
 
   def setCustomLoss(self, lossFn: Callable[[MarkerMocapOptimizationState], torch.Tensor]) -> None:
+    def wrappedLoss(rawState: nimble.biomechanics.MarkerFitterState) -> float:
+      try:
+        wrappedState = MarkerMocapOptimizationState(rawState)
+        loss: torch.Tensor = lossFn(wrappedState)
+        wrappedState.fillGradients(loss)
+        return loss.item()
+      except Exception as e:
+        print(e)
+        return 0
+    self.wrappedLoss = wrappedLoss
+    self.fitter.setCustomLossAndGrad(self.wrappedLoss)
+
+  def addZeroConstraint(
+          self, name: str, lossFn: Callable[[MarkerMocapOptimizationState],
+                                            torch.Tensor]) -> None:
     def wrappedLoss(rawState: nimble.biomechanics.MarkerFitterState):
       try:
         wrappedState = MarkerMocapOptimizationState(rawState)
@@ -110,8 +129,12 @@ class MarkerMocap:
         return loss.item()
       except Exception as e:
         print(e)
-    self.wrappedLoss = wrappedLoss
-    self.fitter.setCustomLossAndGrad(self.wrappedLoss)
+    self.zeroConstraints[name] = wrappedLoss
+    self.fitter.addZeroConstraint(name, wrappedLoss)
+
+  def removeZeroConstraint(self, name: str) -> None:
+    self.zeroConstraints.pop(name, None)
+    self.fitter.removeZeroConstraint(name)
 
   def debugMotionToGUI(self,
                        markerTrcPath: str,
@@ -226,6 +249,8 @@ class MarkerMocap:
     self.fitter.setInitialIKMaxRestarts(50)
     self.fitter.setIterationLimit(100)
     self.fitter.setCustomLossAndGrad(self.wrappedLoss)
+    for key in self.zeroConstraints:
+      self.fitter.addZeroConstraint(key, self.zeroConstraints[key])
 
     print("Optimize the fit")
     result: nimble.biomechanics.MarkerFitResult = self.fitter.optimize(markerObservations)

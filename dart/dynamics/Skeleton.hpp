@@ -728,7 +728,7 @@ public:
   Eigen::VectorXs getDynamicsForces();
 
   //----------------------------------------------------------------------------
-  // Anthropometrics
+  // Differentiable Sensors
   //----------------------------------------------------------------------------
 
   /// This computes the distance (along the `up` vector) from the highest vertex
@@ -743,6 +743,35 @@ public:
   /// This computes the gradient of the height
   Eigen::VectorXs finiteDifferenceGradientOfHeightWrtBodyScales(
       Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This returns a marker set with at least one marker in it, that each
+  /// represents the lowest point on the body, measure by the `up` vector, in
+  /// the specified position. If there are no ties, this will be of length 1. If
+  /// there are more than one tied lowest point, then this is of length > 1.
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+  getLowestPointMarkers(Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the lowest point on the colliders, as measured by the `up`
+  /// vector. This is useful in order to apply constraints that a model can't
+  /// penetrate the ground.
+  s_t getLowestPoint(
+      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the lowest point wrt body scales
+  Eigen::VectorXs getGradientOfLowestPointWrtBodyScales(
+      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the lowest point wrt body scales
+  Eigen::VectorXs finiteDifferenceGradientOfLowestPointWrtBodyScales(
+      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the lowest point wrt body scales
+  Eigen::VectorXs getGradientOfLowestPointWrtJoints(
+      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
+  /// This computes the gradient of the lowest point wrt body scales
+  Eigen::VectorXs finiteDifferenceGradientOfLowestPointWrtJoints(
+      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
 
   //----------------------------------------------------------------------------
   // Randomness

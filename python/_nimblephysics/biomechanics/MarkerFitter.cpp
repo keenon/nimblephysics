@@ -120,6 +120,15 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))
       .def(
+          "addZeroConstraint",
+          &dart::biomechanics::MarkerFitter::addZeroConstraint,
+          ::py::arg("name"),
+          ::py::arg("loss"))
+      .def(
+          "removeZeroConstraint",
+          &dart::biomechanics::MarkerFitter::removeZeroConstraint,
+          ::py::arg("name"))
+      .def(
           "optimize",
           &dart::biomechanics::MarkerFitter::optimize,
           ::py::arg("markerObservations"))

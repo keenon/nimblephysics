@@ -712,6 +712,18 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::getGradientOfHeightWrtBodyScales,
           ::py::arg("pos"),
           ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getLowestPoint",
+          &dart::dynamics::Skeleton::getLowestPoint,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfLowestPointWrtBodyScales",
+          &dart::dynamics::Skeleton::getGradientOfLowestPointWrtBodyScales,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfLowestPointWrtJoints",
+          &dart::dynamics::Skeleton::getGradientOfLowestPointWrtJoints,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
       .def("getRandomPose", &dart::dynamics::Skeleton::getRandomPose)
       .def(
           "getRandomPoseForJoints",

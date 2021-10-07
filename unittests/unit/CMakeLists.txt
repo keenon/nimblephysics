@@ -112,9 +112,9 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_IKErrorReport dart-utils)
   target_link_libraries(test_IKErrorReport dart-utils-urdf)
 
-  dart_add_test("unit" test_Anthropometrics)
-  target_link_libraries(test_Anthropometrics dart-utils)
-  target_link_libraries(test_Anthropometrics dart-utils-urdf)
+  dart_add_test("unit" test_Sensors)
+  target_link_libraries(test_Sensors dart-utils)
+  target_link_libraries(test_Sensors dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)

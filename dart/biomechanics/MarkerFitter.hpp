@@ -154,6 +154,15 @@ public:
   void setCustomLossAndGrad(
       std::function<s_t(MarkerFitterState*)> customLossAndGrad);
 
+  /// This adds a custom function as an equality constraint to the problem. The
+  /// constraint has to equal 0.
+  void addZeroConstraint(
+      std::string name,
+      std::function<s_t(MarkerFitterState*)> customConstraintAndGrad);
+
+  /// This removes an equality constraint by name
+  void removeZeroConstraint(std::string name);
+
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
   //////////////////////////////////////////////////////////////////////////
@@ -331,6 +340,8 @@ protected:
       mMarkersBallJoints;
 
   std::function<s_t(MarkerFitterState*)> mLossAndGrad;
+  std::map<std::string, std::function<s_t(MarkerFitterState*)>>
+      mZeroConstraints;
 
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;

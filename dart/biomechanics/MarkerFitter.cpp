@@ -575,6 +575,23 @@ void MarkerFitter::setCustomLossAndGrad(
 }
 
 //==============================================================================
+/// This adds a custom function as an equality constraint to the problem. The
+/// constraint has to equal 0.
+void MarkerFitter::addZeroConstraint(
+    std::string name,
+    std::function<s_t(MarkerFitterState*)> customConstraintAndGrad)
+{
+  mZeroConstraints[name] = customConstraintAndGrad;
+}
+
+//==============================================================================
+/// This removes an equality constraint by name
+void MarkerFitter::removeZeroConstraint(std::string name)
+{
+  mZeroConstraints.erase(name);
+}
+
+//==============================================================================
 /// This gets the gradient of the objective wrt the joint positions
 Eigen::VectorXs MarkerFitter::getMarkerLossGradientWrtJoints(
     const std::shared_ptr<dynamics::Skeleton>& skeleton,
@@ -1597,7 +1614,25 @@ Eigen::VectorXs BilevelFitProblem::getConstraints(Eigen::VectorXs x)
               * mObservationWeights(i);
   }
 
-  return ikGrad;
+  if (mFitter->mZeroConstraints.size() > 0)
+  {
+    MarkerFitterState state(x, mMarkerMapObservations, mFitter);
+
+    Eigen::VectorXs concatenatedConstraints = Eigen::VectorXs::Zero(
+        ikGrad.size() + mFitter->mZeroConstraints.size());
+    concatenatedConstraints.segment(0, ikGrad.size()) = ikGrad;
+    int cursor = ikGrad.size();
+    for (auto pair : mFitter->mZeroConstraints)
+    {
+      concatenatedConstraints(cursor) = pair.second(&state);
+      cursor++;
+    }
+    return concatenatedConstraints;
+  }
+  else
+  {
+    return ikGrad;
+  }
 }
 
 //==============================================================================
@@ -1655,7 +1690,26 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
            * mObservationWeights(i);
   }
 
-  return jac;
+  if (mFitter->mZeroConstraints.size() > 0)
+  {
+    MarkerFitterState state(x, mMarkerMapObservations, mFitter);
+
+    Eigen::MatrixXs concatenatedJac = Eigen::MatrixXs::Zero(
+        jac.rows() + mFitter->mZeroConstraints.size(), jac.cols());
+    concatenatedJac.block(0, 0, jac.rows(), jac.cols()) = jac;
+    int cursor = jac.rows();
+    for (auto pair : mFitter->mZeroConstraints)
+    {
+      pair.second(&state);
+      concatenatedJac.row(cursor) = state.flattenGradient();
+      cursor++;
+    }
+    return concatenatedJac;
+  }
+  else
+  {
+    return jac;
+  }
 }
 
 //==============================================================================
@@ -1665,8 +1719,9 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
 Eigen::MatrixXs BilevelFitProblem::finiteDifferenceConstraintsJacobian(
     Eigen::VectorXs x)
 {
-  Eigen::MatrixXs jac
-      = Eigen::MatrixXs::Zero(mFitter->mSkeleton->getNumDofs(), x.size());
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(
+      mFitter->mSkeleton->getNumDofs() + mFitter->mZeroConstraints.size(),
+      x.size());
   const s_t EPS = 1e-7;
   for (int i = 0; i < x.size(); i++)
   {
@@ -1700,7 +1755,7 @@ bool BilevelFitProblem::get_nlp_info(
       + (mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size());
 
   // Set the total number of constraints
-  m = mFitter->mSkeleton->getNumDofs();
+  m = mFitter->mSkeleton->getNumDofs() + mFitter->mZeroConstraints.size();
 
   // Set the number of entries in the constraint Jacobian
   nnz_jac_g = m * n;

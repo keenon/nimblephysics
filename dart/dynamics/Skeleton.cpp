@@ -2468,6 +2468,179 @@ Eigen::VectorXs Skeleton::finiteDifferenceGradientOfHeightWrtBodyScales(
 }
 
 //==============================================================================
+/// This returns a marker set with at least one marker in it, that each
+/// represents the lowest point on the body, measure by the `up` vector, in
+/// the specified position. If there are no ties, this will be of length 1. If
+/// there are more than one tied lowest point, then this is of length > 1.
+std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+Skeleton::getLowestPointMarkers(Eigen::Vector3s up)
+{
+  s_t minUp = std::numeric_limits<s_t>::infinity();
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> minMarkers;
+
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* node = getBodyNode(i);
+    for (int j = 0; j < node->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapeNode* shapeNode = node->getShapeNode(j);
+      std::shared_ptr<dynamics::Shape> shape = shapeNode->getShape();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh
+            = static_cast<dynamics::MeshShape*>(shape.get());
+        for (Eigen::Vector3s rawVertex : mesh->getVertices())
+        {
+          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
+          s_t upDist = up.dot(worldVertex);
+          if (upDist < minUp)
+          {
+            minUp = upDist;
+            minMarkers.clear();
+          }
+          if (upDist <= minUp)
+          {
+            minMarkers.emplace_back(
+                node, node->getWorldTransform().inverse() * worldVertex);
+          }
+        }
+      }
+      else
+      {
+        std::cout << "WARNING: getGradientOfHeightWrtBodyScales() currently "
+                     "only supports Skeletons "
+                     "with Mesh shapes. Instead we got a shape of type \""
+                  << shape->getType()
+                  << "\". This shape will be ignored in computing the gradient."
+                  << std::endl;
+      }
+    }
+  }
+
+  return minMarkers;
+}
+
+//==============================================================================
+/// This computes the lowest point on the colliders, as measured by the `up`
+/// vector. This is useful in order to apply constraints that a model can't
+/// penetrate the ground.
+s_t Skeleton::getLowestPoint(Eigen::Vector3s up)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> minMarkers
+      = getLowestPointMarkers(up);
+
+  s_t lowestPoint
+      = up.dot(minMarkers[0].first->getWorldTransform() * minMarkers[0].second);
+
+  return lowestPoint;
+}
+
+//==============================================================================
+/// This computes the gradient of the lowest point wrt body scales
+Eigen::VectorXs Skeleton::getGradientOfLowestPointWrtBodyScales(
+    Eigen::Vector3s up)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> minMarkers
+      = getLowestPointMarkers(up);
+
+  Eigen::VectorXs markersToLowestPoint
+      = Eigen::VectorXs::Zero(minMarkers.size() * 3);
+  for (int i = 0; i < minMarkers.size(); i++)
+  {
+    markersToLowestPoint.segment<3>(i * 3) = up;
+  }
+
+  Eigen::VectorXs grad
+      = getMarkerWorldPositionsJacobianWrtBodyScales(minMarkers).transpose()
+        * markersToLowestPoint;
+
+  return grad;
+}
+
+//==============================================================================
+/// This computes the gradient of the lowest point wrt body scales
+Eigen::VectorXs Skeleton::finiteDifferenceGradientOfLowestPointWrtBodyScales(
+    Eigen::Vector3s up)
+{
+  std::size_t n = getNumBodyNodes() * 3;
+  Eigen::VectorXs result(n);
+  Eigen::VectorXs originalScales = getBodyScales();
+
+  s_t eps = 1e-6;
+
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs tweaked = originalScales;
+        tweaked(i) += eps;
+        setBodyScales(tweaked);
+        out = getLowestPoint(up);
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  setBodyScales(originalScales);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the gradient of the lowest point wrt body scales
+Eigen::VectorXs Skeleton::getGradientOfLowestPointWrtJoints(Eigen::Vector3s up)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> minMarkers
+      = getLowestPointMarkers(up);
+
+  Eigen::VectorXs markersToLowestPoint
+      = Eigen::VectorXs::Zero(minMarkers.size() * 3);
+  for (int i = 0; i < minMarkers.size(); i++)
+  {
+    markersToLowestPoint.segment<3>(i * 3) = up;
+  }
+
+  Eigen::VectorXs grad
+      = getMarkerWorldPositionsJacobianWrtJointPositions(minMarkers).transpose()
+        * markersToLowestPoint;
+
+  return grad;
+}
+
+//==============================================================================
+/// This computes the gradient of the lowest point wrt body scales
+Eigen::VectorXs Skeleton::finiteDifferenceGradientOfLowestPointWrtJoints(
+    Eigen::Vector3s up)
+{
+  Eigen::VectorXs originalPose = getPositions();
+
+  std::size_t n = getNumDofs();
+  Eigen::VectorXs result(n);
+
+  s_t eps = 1e-6;
+
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs tweaked = originalPose;
+        tweaked(i) += eps;
+        setPositions(tweaked);
+        out = getLowestPoint(up);
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  setPositions(originalPose);
+
+  return result;
+}
+
+//==============================================================================
 /// This gets a random pose that's valid within joint limits
 Eigen::VectorXs Skeleton::getRandomPose()
 {

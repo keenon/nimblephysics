@@ -1614,7 +1614,7 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1647,6 +1647,14 @@ TEST(MarkerFitter, DERIVATIVES)
       = std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random());
 
   MarkerFitter fitter(osim, markers);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(2);
+  fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
+    (void)state;
+    return 0.0;
+  });
+
+  srand(42);
 
   std::map<std::string, Eigen::Vector3s> observedMarkers;
   observedMarkers["0"] = Eigen::Vector3s::Random();
@@ -1673,9 +1681,9 @@ TEST(MarkerFitter, DERIVATIVES)
 
   // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
 }
-#endif
+// #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1705,6 +1713,14 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
       osimBallJoints->getBodyNode("ulna_r"), Eigen::Vector3s::Random());
 
   MarkerFitter fitter(osimBallJoints, markers);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(2);
+  fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
+    (void)state;
+    return 0.0;
+  });
+
+  srand(42);
 
   std::map<std::string, Eigen::Vector3s> observedMarkers;
   observedMarkers["0"] = Eigen::Vector3s::Random();
@@ -1720,10 +1736,10 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   EXPECT_TRUE(
       testBilevelFitProblemGradients(fitter, 3, 0.02, osimBallJoints, markers));
 }
-#endif
+// #endif
 
 // #ifdef FULL_EVAL
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1958,5 +1974,5 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   std::cout << "gold scales - result scales - error - error %" << std::endl
             << groupScaleCols << std::endl;
 }
-// #endif
+#endif
 // #endif
