@@ -246,6 +246,10 @@ public:
   /// single vector
   Eigen::VectorXs getMasses();
 
+  //Eigen::VectorXs getLinkMasses();
+
+  size_t getLinkMassesDims();
+
   // This gives the vector of force upper limits for all the DOFs in this
   // world
   Eigen::VectorXs getControlForceUpperLimits();
@@ -282,13 +286,19 @@ public:
   // in the world mapped into a flat vector.
   Eigen::VectorXs getLinkCOMs();
 
+  Eigen::Vector3s getLinkCOMIndex(size_t index);
+
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // all the skeletons in this world concatenated together
   Eigen::VectorXs getLinkMOIs();
 
+  Eigen::Vector6s getLinkMOIIndex(size_t index);
+
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
+
+  s_t getLinkMassIndex(size_t index);
 
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
@@ -326,6 +336,14 @@ public:
 
   // This sets all the masses for all the registered bodies in the world
   void setMasses(Eigen::VectorXs masses);
+
+  void setLinkMasses(Eigen::VectorXs masses);
+
+  void setLinkMassIndex(s_t mass, size_t index);
+
+  void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
+
+  void setLinkMOIIndex(Eigen::Vector6s com, size_t index);
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces

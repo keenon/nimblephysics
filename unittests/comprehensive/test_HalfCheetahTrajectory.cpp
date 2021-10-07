@@ -296,7 +296,7 @@ TEST(HALF_CHEETAH, POS_VEL_ERRORS_2)
 }
 #endif
 
-#ifdef ALL_TESTS
+//#ifdef ALL_TESTS
 TEST(HALF_CHEETAH, FULL_TEST)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -575,4 +575,4 @@ TEST(HALF_CHEETAH, FULL_TEST)
   }
   */
 }
-#endif
+//#endif

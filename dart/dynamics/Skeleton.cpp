@@ -3097,6 +3097,16 @@ Eigen::VectorXs Skeleton::getLinkCOMs()
   return inertias;
 }
 
+Eigen::Vector3s Skeleton::getLinkCOMIndex(size_t index)
+{
+  Eigen::Vector3s mass_center = Eigen::Vector3s::Zero();
+  const Inertia& node_inertia = getBodyNode(index)->getInertia();
+  mass_center(0) = node_inertia.COM_X;
+  mass_center(1) = node_inertia.COM_Y;
+  mass_center(2) = node_inertia.COM_Z;
+  return mass_center;
+}
+
 //==============================================================================
 Eigen::VectorXs Skeleton::getLinkMOIs()
 {
@@ -3113,6 +3123,19 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
     inertias(cursor++) = inertia.I_YZ;
   }
   return inertias;
+}
+
+Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
+{
+  Eigen::Vector6s inertia = Eigen::Vector6s::Zero();
+  const Inertia& node_inertia = getBodyNode(index)->getInertia();
+  inertia(0) = node_inertia.I_XX;
+  inertia(1) = node_inertia.I_YY;
+  inertia(2) = node_inertia.I_ZZ;
+  inertia(3) = node_inertia.I_XY;
+  inertia(4) = node_inertia.I_XZ;
+  inertia(5) = node_inertia.I_YZ;
+  return inertia;
 }
 
 //==============================================================================
@@ -3205,6 +3228,26 @@ void Skeleton::setLinkCOMs(Eigen::VectorXs coms)
   }
 }
 
+void Skeleton::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
+{
+  const Inertia& inertia = getBodyNode(index)->getInertia();
+    s_t COM_X = com(0);
+    s_t COM_Y = com(1);
+    s_t COM_Z = com(2);
+    Inertia newInertia(
+        inertia.MASS,
+        COM_X,
+        COM_Y,
+        COM_Z,
+        inertia.I_XX,
+        inertia.I_YY,
+        inertia.I_ZZ,
+        inertia.I_XY,
+        inertia.I_XZ,
+        inertia.I_YZ);
+    getBodyNode(index)->setInertia(newInertia);
+}
+
 //==============================================================================
 void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
 {
@@ -3231,6 +3274,29 @@ void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
         I_YZ);
     getBodyNode(i)->setInertia(newInertia);
   }
+}
+
+void Skeleton::setLinkMOIIndex(Eigen::Vector6s moi, size_t index)
+{
+  const Inertia& inertia = getBodyNode(index)->getInertia();
+  s_t I_XX = moi(0);
+  s_t I_YY = moi(1);
+  s_t I_ZZ = moi(2);
+  s_t I_XY = moi(3);
+  s_t I_XZ = moi(4);
+  s_t I_YZ = moi(5);
+  Inertia newInertia(
+        inertia.MASS,
+        inertia.COM_X,
+        inertia.COM_Y,
+        inertia.COM_Z,
+        I_XX,
+        I_YY,
+        I_ZZ,
+        I_XY,
+        I_XZ,
+        I_YZ);
+    getBodyNode(index)->setInertia(newInertia);
 }
 
 //==============================================================================

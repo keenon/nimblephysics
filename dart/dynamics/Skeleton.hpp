@@ -785,9 +785,15 @@ public:
   // skeleton concatenated together
   Eigen::VectorXs getLinkCOMs();
 
+  // This gets particular center-of-mass vectors of a body node
+  Eigen::Vector3s getLinkCOMIndex(size_t index);
+
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   Eigen::VectorXs getLinkMOIs();
+
+  // This get particular moment of inertia of a body node
+  Eigen::Vector6s getLinkMOIIndex(size_t index);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
@@ -815,9 +821,13 @@ public:
   // skeleton concatenated together
   void setLinkCOMs(Eigen::VectorXs coms);
 
+  void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
+
   // This sets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   void setLinkMOIs(Eigen::VectorXs mois);
+
+  void setLinkMOIIndex(Eigen::Vector6s moi, size_t index);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.

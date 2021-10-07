@@ -137,6 +137,12 @@ public:
   /// indefinitely, until the program is killed with Ctrl+C
   void serve(int port);
 
+  bool variableChange();
+
+  void setMasschange(s_t mass);
+
+  void setCOMchange(Eigen::Vector3s com);
+
 protected:
   /// This is the function for the optimization thread to run when we're live
   void optimizationThreadLoop();
@@ -161,6 +167,9 @@ protected:
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
   bool mSilent;
+  s_t pre_mass;
+  Eigen::Vector3s pre_com;
+  bool mVarchange = true;
 
   std::shared_ptr<trajectory::Optimizer> mOptimizer;
   std::shared_ptr<trajectory::Solution> mSolution;

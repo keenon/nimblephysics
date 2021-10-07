@@ -997,6 +997,69 @@ Eigen::VectorXs World::getMasses()
   return mWrtMass->get(this);
 }
 
+size_t World::getLinkMassesDims()
+{
+  size_t mass_dim = 0;
+  for (int i=0;i< mSkeletons.size();i++)
+  {
+    mass_dim += mSkeletons[i]->getLinkMassesDims();
+  }
+  return mass_dim;
+}
+
+Eigen::VectorXs World::getLinkMasses()
+{
+  Eigen::VectorXs masses = Eigen::VectorXs::Zero(getLinkMassesDims());
+  size_t cur = 0;
+  for(size_t i = 0;i < mSkeletons.size();i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    masses.segment(cur,mdim) = mSkeletons[i]->getLinkMasses();
+    cur += mdim;
+  }
+  return masses;
+}
+
+s_t World::getLinkMassIndex(size_t index)
+{
+  Eigen::VectorXs masses = getLinkMasses();
+  return masses(index);
+}
+
+Eigen::Vector3s World::getLinkCOMIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkCOMIndex(index-probe);
+}
+
+Eigen::Vector6s World::getLinkMOIIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkMOIIndex(index-probe);
+}
+
 //==============================================================================
 Eigen::VectorXs World::getPositions()
 {
@@ -1278,6 +1341,59 @@ void World::setVelocityLowerLimits(Eigen::VectorXs limits)
 void World::setMasses(Eigen::VectorXs masses)
 {
   mWrtMass->set(this, masses);
+}
+
+void World::setLinkMasses(Eigen::VectorXs masses)
+{
+  assert(masses.size()==getLinkMassesDims());
+  size_t cur = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    mSkeletons[i]->setLinkMasses(masses.segment(cur,mdim));
+    cur += mdim;
+  }
+}
+
+void World::setLinkMassIndex(s_t mass, size_t index)
+{
+  Eigen::VectorXs masses = getLinkMasses();
+  masses(index) = mass;
+  setLinkMasses(masses);
+}
+
+void World::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  mSkeletons[skeleton_id]->setLinkCOMIndex(com,index-probe);
+}
+
+void World::setLinkMOIIndex(Eigen::Vector6s moi, size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  mSkeletons[skeleton_id]->setLinkMOIIndex(moi,index-probe);
 }
 
 //==============================================================================

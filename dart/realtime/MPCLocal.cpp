@@ -189,7 +189,7 @@ void MPCLocal::optimizePlan(long startTime)
     startTime = mLastOptimizedTime;
   }
 
-  if (mSolution == nullptr)
+  if (mSolution == nullptr || variableChange())
   {
     PerformanceLog::initialize();
     PerformanceLog* log = PerformanceLog::startRoot("MPCLocal loop");
@@ -199,7 +199,7 @@ void MPCLocal::optimizePlan(long startTime)
 
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
-
+    //std::cout<<"Mass current: \n"<<worldClone->getLinkMasses()<<std::endl;
     if (!mOptimizer)
     {
       PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
@@ -209,7 +209,7 @@ void MPCLocal::optimizePlan(long startTime)
       ipoptOptimizer->setCheckDerivatives(false);
       ipoptOptimizer->setSuppressOutput(true);
       ipoptOptimizer->setRecoverBest(mEnableOptimizationGuards);
-      ipoptOptimizer->setTolerance(1e-3);
+      ipoptOptimizer->setTolerance(1e-3); //1e-3
       ipoptOptimizer->setIterationLimit(mMaxIterations);
       ipoptOptimizer->setDisableLinesearch(!mEnableLinesearch);
       ipoptOptimizer->setRecordFullDebugInfo(false);
@@ -223,12 +223,13 @@ void MPCLocal::optimizePlan(long startTime)
       createOpt->end();
     }
 
-    if (!mProblem)
+    if (!mProblem || variableChange())
     {
       std::shared_ptr<MultiShot> multishot = std::make_shared<MultiShot>(
           worldClone, *mLoss.get(), mSteps, mShotLength, false);
       multishot->setParallelOperationsEnabled(true);
       mProblem = multishot;
+      mVarchange = false;
     }
 
     PerformanceLog* optimizeTrack = log->startRun("Optimize");
@@ -252,7 +253,7 @@ void MPCLocal::optimizePlan(long startTime)
   else
   {
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
-
+    //std::cout<<"Mass current: \n"<<worldClone->getLinkMasses()<<std::endl;
     int diff = startTime - mLastOptimizedTime;
     int steps
         = static_cast<int>(floor(static_cast<s_t>(diff) / mMillisPerStep));
@@ -508,6 +509,29 @@ void MPCLocal::optimizationThreadLoop()
     long endTime = timeSinceEpochMillis();
     adjustPerformance(endTime - startTime);
   }
+}
+
+bool MPCLocal::variableChange()
+{
+  return mVarchange;
+}
+
+void MPCLocal::setMasschange(s_t mass)
+{
+  if(abs(mass-pre_mass)>0.001)
+  {
+    mVarchange = true;
+  }
+  pre_mass = mass;
+}
+
+void MPCLocal::setCOMchange(Eigen::Vector3s com)
+{
+  if((com-pre_com).norm()>0.001)
+  {
+    mVarchange = true;
+  }
+  pre_com = com;
 }
 
 } // namespace realtime
