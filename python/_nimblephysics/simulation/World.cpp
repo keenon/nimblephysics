@@ -113,6 +113,13 @@ void World(py::module& m)
           },
           ::py::arg("name"))
       .def(
+          "getSkeletonDofOffset",
+          +[](const dart::simulation::World* self,
+              const dart::dynamics::SkeletonPtr& _skeleton) -> std::size_t {
+            return self->getSkeletonDofOffset(_skeleton);
+          },
+          ::py::arg("skeleton"))
+      .def(
           "getNumSkeletons",
           +[](const dart::simulation::World* self) -> std::size_t {
             return self->getNumSkeletons();

@@ -718,6 +718,19 @@ public:
 
   Eigen::VectorXs getDynamicsForces();
 
+  /// This computes the gradient of unconstrained q-space Jacobian * v0
+  /// with respect to joint positions
+  Eigen::MatrixXs getJacobianDerivativeWrtJoints(
+    const BodyNode* node,
+    Eigen::VectorXs v0);
+
+  /// VERY SLOW: Only for testing. This computes the gradient of 
+  /// unconstrained q-space Jacobian * v0 with respect to joint positions
+  Eigen::MatrixXs finiteDifferenceJacobianDerivativeWrtJoints(
+    const BodyNode* node,
+    Eigen::VectorXs v0,
+    bool useRidders = true);
+
   //----------------------------------------------------------------------------
   // Randomness
   //----------------------------------------------------------------------------

@@ -3353,6 +3353,169 @@ Eigen::VectorXs Skeleton::convertPositionsFromBallSpace(Eigen::VectorXs pos)
 }
 
 //==============================================================================
+/// This computes the gradient of unconstrained q-space Jacobian * v0
+/// with respect to joint positions
+Eigen::MatrixXs Skeleton::getJacobianDerivativeWrtJoints(
+    const BodyNode* node,
+    Eigen::VectorXs v0)
+{
+  return finiteDifferenceJacobianDerivativeWrtJoints(node, v0);
+
+  // Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, getNumDofs());
+
+  // const Eigen::MatrixXi& parentMap = getParentMap();
+
+  // // Differentiating the whole mess wrt this joint
+  // dynamics::Joint* rootJoint = getDof(index)->getJoint();
+  // Eigen::Vector6s rootScrew = rootJoint->getRelativeJacobianInPositionSpace()
+  //     .col(getDof(index)->getIndexInJoint());
+  // int rootJointDof = index;
+
+  // for (int j = 0; j < getNumDofs(); j++)
+  // {
+  //   std::cout << "dof " << j << std::endl;
+  //   dynamics::Joint* parentJoint = getDof(j)->getJoint();
+  //   Eigen::Vector6s screw = parentJoint->getRelativeJacobianInPositionSpace()
+  //     .col(getDof(j)->getIndexInJoint());
+  //   int parentJointDof = j;
+    
+  //   const dynamics::Joint* sourceJoint = node->getParentJoint();
+  //   int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+
+  //   /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+  //   /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+  //   if (parentMap(parentJointDof, sourceJointDof) == 1
+  //       || sourceJoint == parentJoint)
+  //   {
+  //     // The original value in this cell is the following
+
+  //     /*
+  //     jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
+  //         screw, worldMarkers.segment<3>(i * 3), 0.0);
+  //     */
+  //     int axisIndex = getDof(j)->getIndexInJoint();
+  //     int rotateIndex = getDof(index)->getIndexInJoint();
+  //     Eigen::Vector6s screwGrad = parentJoint->getScrewAxisGradientForPosition(
+  //             axisIndex, rotateIndex);
+      
+  //     std::cout << screwGrad << std::endl;
+  //     std::cout << "and world " << std::endl;
+  //     std::cout << math::AdInvT(
+  //       parentJoint->getChildBodyNode()->getWorldTransform(),
+  //       screwGrad) << std::endl;
+
+  //     // There's a special case if the root is the parent of both the DOF for
+  //     // this column of the Jac, _and_ of the marker. That means that all
+  //     // we're doing is rotating (and translating, but that's irrelevant) the
+  //     // joint-marker system. So all we need is the gradient of the rotation.
+  //     if (parentMap(rootJointDof, parentJointDof) == 1)
+  //     {
+  //       // Eigen::Vector3s originalJac = math::gradientWrtTheta(
+  //       //     screw, worldMarkers.segment<3>(i * 3), 0.0);
+  //       // jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+  //       //     rootScrew.head<3>(), originalJac, 0);
+
+  //       // ideas:
+  //       // originalJac is recreating part of the actual jacobian
+
+  //       Eigen::Vector3s originalJac = math::gradientWrtTheta(
+  //           screw, node->getWorldTransform().translation(), 0.0);
+  //       jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+  //           rootScrew.head<3>(), originalJac, 0);
+  //     }
+  //     else
+  //     {
+  //       // We'll use the sum-product rule, so we need to individually
+  //       // differentiate both terms (`screw` and `markerPos`) wrt the root
+  //       // joint's theta term.
+
+  //       // Make `screwGrad` hold the gradient of the screw with respect to
+  //       // root
+
+  //       Eigen::Vector6s screwGrad = Eigen::Vector6s::Zero();
+
+  //       if (rootJoint == parentJoint)
+  //       {
+  //         int axisIndex = getDof(j)->getIndexInJoint();
+  //         int rotateIndex = getDof(index)->getIndexInJoint();
+  //         screwGrad = math::AdInvT(
+  //           parentJoint->getChildBodyNode()->getWorldTransform(),parentJoint->getScrewAxisGradientForPosition(
+  //             axisIndex, rotateIndex));
+  //       }
+  //       else
+  //       {
+  //         // Otherwise rotating the root joint doesn't effect parentJoint's
+  //         // screw
+  //         screwGrad.setZero();
+  //       }
+
+  //       // `screwGrad` now holds the gradient of the screw with respect to
+  //       // root.
+
+  //       // Now we need the marker position's gradient wrt the root axis
+
+  //       Eigen::Vector3s markerGradWrtRoot = Eigen::Vector3s::Zero();
+
+  //       if (parentMap(rootJointDof, sourceJointDof) == 1
+  //           || (rootJoint == sourceJoint))
+  //       {
+  //         // markerGradWrtRoot = math::gradientWrtTheta(
+  //         //     rootScrew, worldMarkers.segment<3>(i * 3), 0.0);
+  //       }
+
+  //       // Now we just need to apply the product rule to get the final
+  //       // result
+
+  //       // Eigen::Vector3s partA = math::gradientWrtTheta(
+  //       //     screwGrad, worldMarkers.segment<3>(i * 3), 0.0);
+  //       // Eigen::Vector3s partB = math::gradientWrtThetaPureRotation(
+  //       //     screw.head<3>(), markerGradWrtRoot, 0.0);
+
+  //       // jac.block<3, 1>(i * 3, j) = partA + partB;
+
+  //       DART_UNUSED(markerGradWrtRoot);
+  //       DART_UNUSED(screw);
+  //       DART_UNUSED(rootScrew);
+
+  //     }
+  //   }
+  // }
+
+  // return jac;
+}
+
+//==============================================================================
+/// VERY SLOW: Only for testing. This computes the gradient of 
+/// unconstrained q-space Jacobian * v0 with respect to joint positions
+Eigen::MatrixXs Skeleton::finiteDifferenceJacobianDerivativeWrtJoints(
+    const BodyNode* node,
+    Eigen::VectorXs v0,
+    bool useRidders)
+{
+  useRidders = false;
+  Eigen::VectorXs originalPos = getPositions();
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedPos = originalPos;
+      tweakedPos(dof) += eps;
+      setPositions(tweakedPos);
+      perturbed = getJacobian(node) * v0;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+
+  setPositions(originalPos);
+  return result;
+}
+
+//==============================================================================
 /// This returns the concatenated 3-vectors for world positions of each joint
 /// in 3D world space, for the registered source joints.
 Eigen::VectorXs Skeleton::getJointWorldPositions(
