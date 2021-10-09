@@ -702,6 +702,7 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self, std::size_t treeIndex)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
+      .def("getRandomPose", &dart::dynamics::Skeleton::getRandomPose)
       .def(
           "getControlForceUpperLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
@@ -813,8 +814,35 @@ void Skeleton(py::module& m)
               getJointWorldPositionsJacobianWrtBodyScales,
           ::py::arg("joints"))
       .def(
+          "getMarkerWorldPositions",
+          &dart::dynamics::Skeleton::getMarkerWorldPositions,
+          ::py::arg("markers"))
+      .def(
+          "getMarkerMapWorldPositions",
+          &dart::dynamics::Skeleton::getMarkerMapWorldPositions,
+          ::py::arg("markers"))
+      .def(
           "fitJointsToWorldPositions",
-          &dart::dynamics::Skeleton::fitJointsToWorldPositions,
+          +[](dart::dynamics::Skeleton* self,
+              const std::vector<const dynamics::Joint*>& positionJoints,
+              Eigen::VectorXs targetPositions,
+              bool scaleBodies,
+              double convergenceThreshold,
+              int maxStepCount,
+              double leastSquaresDamping,
+              bool lineSearch,
+              bool logOutput) -> double {
+            return self->fitJointsToWorldPositions(
+                positionJoints,
+                targetPositions,
+                scaleBodies,
+                math::IKConfig()
+                    .setConvergenceThreshold(convergenceThreshold)
+                    .setMaxStepCount(maxStepCount)
+                    .setLeastSquaresDamping(leastSquaresDamping)
+                    .setLineSearch(lineSearch)
+                    .setLogOutput(logOutput));
+          },
           ::py::arg("positionJoints"),
           ::py::arg("targetPositions"),
           ::py::arg("scaleBodies") = false,
@@ -825,10 +853,34 @@ void Skeleton(py::module& m)
           ::py::arg("logOutput") = false)
       .def(
           "fitMarkersToWorldPositions",
-          &dart::dynamics::Skeleton::fitMarkersToWorldPositions,
+          +[](dart::dynamics::Skeleton* self,
+              const std::vector<
+                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+                  markers,
+              Eigen::VectorXs targetPositions,
+              Eigen::VectorXs markerWeights,
+              bool scaleBodies,
+              double convergenceThreshold,
+              int maxStepCount,
+              double leastSquaresDamping,
+              bool lineSearch,
+              bool logOutput) -> double {
+            return self->fitMarkersToWorldPositions(
+                markers,
+                targetPositions,
+                markerWeights,
+                scaleBodies,
+                math::IKConfig()
+                    .setConvergenceThreshold(convergenceThreshold)
+                    .setMaxStepCount(maxStepCount)
+                    .setLeastSquaresDamping(leastSquaresDamping)
+                    .setLineSearch(lineSearch)
+                    .setLogOutput(logOutput));
+          },
           ::py::arg("markers"),
           ::py::arg("targetPositions"),
-          ::py::arg("markeWeights"),
+          ::py::arg("markerWeights"),
+          ::py::arg("scaleBodies") = false,
           ::py::arg("convergenceThreshold") = 1e-7,
           ::py::arg("maxStepCount") = 100,
           ::py::arg("leastSquaresDamping") = 0.01,

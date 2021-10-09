@@ -358,10 +358,10 @@ public:
       int axisDof, int rotateDof, s_t eps);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForPosition(int axisDof, int rotateDof);
+  Eigen::Vector6s getScrewAxisGradientForPosition(int axisDof, int rotateDof) override;
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForForce(int axisDof, int rotateDof);
+  Eigen::Vector6s getScrewAxisGradientForForce(int axisDof, int rotateDof) override;
 
 protected:
   /// Constructor called by Skeleton class

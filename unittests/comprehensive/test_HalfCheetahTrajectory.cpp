@@ -88,6 +88,40 @@ using namespace neural;
 using namespace server;
 using namespace realtime;
 
+TEST(HALF_CHEETAH, FIRST_DEMO)
+{
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
+
+  std::shared_ptr<dynamics::Skeleton> halfCheetah
+      = world->getSkeleton("half_cheetah");
+  std::cout << "Springs: " << halfCheetah->getSpringStiffVector() << std::endl;
+  std::cout << "Damping: " << halfCheetah->getDampingCoeffVector() << std::endl;
+  for (int i = 0; i < halfCheetah->getNumDofs(); i++)
+  {
+    // halfCheetah->getDof(i)->setSpringStiffness(0.0);
+    // halfCheetah->getDof(i)->setDampingCoefficient(0.0);
+  }
+
+  for (int i = 0; i < 300; i++)
+  {
+    world->step();
+    std::cout << i << ":" << std::endl;
+    std::cout << "Pos:" << std::endl << world->getPositions() << std::endl;
+    std::cout << "Vel:" << std::endl << world->getVelocities() << std::endl;
+    if (world->getPositions().hasNaN())
+    {
+      std::cout << "Got a NaN on timestep " << i << "!!" << std::endl;
+      EXPECT_FALSE(world->getPositions().hasNaN());
+      break;
+    }
+  }
+}
+
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, NUMERICAL_INSTABILITY)
 {
@@ -151,7 +185,7 @@ TEST(HALF_CHEETAH, BROKEN_POINT)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
 {
   // Create a world
@@ -194,7 +228,7 @@ TEST(HALF_CHEETAH, CAPSULE_INTER_PENETRATION)
   EXPECT_TRUE(verifyF_c(world));
   EXPECT_TRUE(verifyIdentityMapping(world));
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, POS_VEL_ERRORS)

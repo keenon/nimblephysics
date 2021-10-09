@@ -1467,6 +1467,17 @@ Eigen::MatrixXs World::getInvMassMatrix()
 }
 
 //==============================================================================
+// This sets all the positions of the joints to within their limit range, if
+// they're currently outside it.
+void World::clampPositionsToLimits()
+{
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    mSkeletons[i]->clampPositionsToLimits();
+  }
+}
+
+//==============================================================================
 // The state is [pos, vel] concatenated, so this return 2*getNumDofs()
 int World::getStateSize()
 {

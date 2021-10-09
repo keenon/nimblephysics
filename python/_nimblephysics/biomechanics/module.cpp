@@ -44,6 +44,7 @@ void LilypadSolver(py::module& sm);
 void BatchGaitInverseDynamics(py::module& sm);
 void OpenSimParser(py::module& sm);
 void SkeletonConverter(py::module& sm);
+void MarkerFitter(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -57,6 +58,7 @@ void dart_biomechanics(py::module& m)
   BatchGaitInverseDynamics(sm);
   OpenSimParser(sm);
   SkeletonConverter(sm);
+  MarkerFitter(sm);
 }
 
 } // namespace python

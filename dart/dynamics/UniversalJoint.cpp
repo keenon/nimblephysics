@@ -36,6 +36,7 @@
 
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/FiniteDifference.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -395,85 +396,20 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
     const Eigen::Vector2s& velocities,
     bool useRidders) const
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
-        positions, velocities);
-  }
+  Eigen::Matrix<s_t, 6, 2> result;
 
-  const s_t EPS = 1e-7;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+      perturbed = getRelativeJacobianStatic(positions + eps * velocities);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  Eigen::Matrix<s_t, 6, 2> plus
-      = getRelativeJacobianStatic(positions + EPS * velocities);
-  Eigen::Matrix<s_t, 6, 2> minus
-      = getRelativeJacobianStatic(positions - EPS * velocities);
-
-  return (plus - minus) / (2 * EPS);
-}
-
-//==============================================================================
-Eigen::Matrix<s_t, 6, 2>
-UniversalJoint::finiteDifferenceRiddersRelativeJacobianTimeDerivStatic(
-    const Eigen::Vector2s& positions, const Eigen::Vector2s& velocities) const
-{
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<Eigen::Matrix<s_t, 6, 2>, tabSize>, tabSize> tab;
-
-  Eigen::Matrix<s_t, 6, 2> plus
-      = getRelativeJacobianStatic(positions + stepSize * velocities);
-  Eigen::Matrix<s_t, 6, 2> minus
-      = getRelativeJacobianStatic(positions - stepSize * velocities);
-
-  tab[0][0] = (plus - minus) / (2 * stepSize);
-  Eigen::Matrix<s_t, 6, 2> jac = (plus - minus) / (2 * stepSize);
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    Eigen::Matrix<s_t, 6, 2> plus
-        = getRelativeJacobianStatic(positions + stepSize * velocities);
-    Eigen::Matrix<s_t, 6, 2> minus
-        = getRelativeJacobianStatic(positions - stepSize * velocities);
-
-    tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = max(
-          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
-      if (currError < bestError)
-      {
-        bestError = currError;
-        jac.noalias() = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -481,84 +417,21 @@ Eigen::Matrix<s_t, 6, 2>
 UniversalJoint::finiteDifferenceRelativeJacobianDerivWrtPos(
     const Eigen::Vector2s& positions, int index, bool useRidders) const
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersRelativeJacobianDerivWrtPos(positions, index);
-  }
+  Eigen::Matrix<s_t, 6, 2> result;
 
-  const s_t EPS = 1e-7;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+      perturbed = getRelativeJacobianStatic(
+          positions + eps * Eigen::Vector2s::Unit(index));
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianStatic(
-      positions + EPS * Eigen::Vector2s::Unit(index));
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianStatic(
-      positions - EPS * Eigen::Vector2s::Unit(index));
-
-  return (plus - minus) / (2 * EPS);
-}
-
-//==============================================================================
-Eigen::Matrix<s_t, 6, 2>
-UniversalJoint::finiteDifferenceRiddersRelativeJacobianDerivWrtPos(
-    const Eigen::Vector2s& positions, int index) const
-{
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<Eigen::Matrix<s_t, 6, 2>, tabSize>, tabSize> tab;
-
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianStatic(
-      positions + stepSize * Eigen::Vector2s::Unit(index));
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianStatic(
-      positions - stepSize * Eigen::Vector2s::Unit(index));
-
-  tab[0][0] = (plus - minus) / (2 * stepSize);
-  Eigen::Matrix<s_t, 6, 2> jac = (plus - minus) / (2 * stepSize);
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianStatic(
-        positions + stepSize * Eigen::Vector2s::Unit(index));
-    Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianStatic(
-        positions - stepSize * Eigen::Vector2s::Unit(index));
-
-    tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = max(
-          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
-      if (currError < bestError)
-      {
-        bestError = currError;
-        jac.noalias() = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -569,87 +442,21 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
     int index,
     bool useRidders) const
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPosition(
-        positions, velocities, index);
-  }
+  Eigen::Matrix<s_t, 6, 2> result;
 
-  const s_t EPS = 1e-7;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+      perturbed = getRelativeJacobianTimeDerivStatic(
+          positions + eps * Eigen::Vector2s::Unit(index), velocities);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-      positions + EPS * Eigen::Vector2s::Unit(index), velocities);
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-      positions - EPS * Eigen::Vector2s::Unit(index), velocities);
-
-  return (plus - minus) / (2 * EPS);
-}
-
-//==============================================================================
-Eigen::Matrix<s_t, 6, 2> UniversalJoint::
-    finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtPosition(
-        const Eigen::Vector2s& positions,
-        const Eigen::Vector2s& velocities,
-        int index) const
-{
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<Eigen::Matrix<s_t, 6, 2>, tabSize>, tabSize> tab;
-
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-      positions + stepSize * Eigen::Vector2s::Unit(index), velocities);
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-      positions - stepSize * Eigen::Vector2s::Unit(index), velocities);
-
-  tab[0][0] = (plus - minus) / (2 * stepSize);
-  Eigen::Matrix<s_t, 6, 2> jac = (plus - minus) / (2 * stepSize);
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-        positions + stepSize * Eigen::Vector2s::Unit(index), velocities);
-    Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-        positions - stepSize * Eigen::Vector2s::Unit(index), velocities);
-
-    tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = max(
-          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
-      if (currError < bestError)
-      {
-        bestError = currError;
-        jac.noalias() = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -660,87 +467,21 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
     int index,
     bool useRidders) const
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVelocity(
-        positions, velocities, index);
-  }
+  Eigen::Matrix<s_t, 6, 2> result;
 
-  const s_t EPS = 1e-7;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
+    [&](/* in*/ s_t eps,
+        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+      perturbed = getRelativeJacobianTimeDerivStatic(
+          positions, velocities + eps * Eigen::Vector2s::Unit(index));
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
 
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-      positions, velocities + EPS * Eigen::Vector2s::Unit(index));
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-      positions, velocities - EPS * Eigen::Vector2s::Unit(index));
-
-  return (plus - minus) / (2 * EPS);
-}
-
-//==============================================================================
-Eigen::Matrix<s_t, 6, 2> UniversalJoint::
-    finiteDifferenceRiddersRelativeJacobianTimeDerivDerivWrtVelocity(
-        const Eigen::Vector2s& positions,
-        const Eigen::Vector2s& velocities,
-        int index) const
-{
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  s_t stepSize = originalStepSize;
-  s_t bestError = std::numeric_limits<s_t>::max();
-
-  // Neville tableau of finite difference results
-  std::array<std::array<Eigen::Matrix<s_t, 6, 2>, tabSize>, tabSize> tab;
-
-  Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-      positions, velocities + stepSize * Eigen::Vector2s::Unit(index));
-  Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-      positions, velocities - stepSize * Eigen::Vector2s::Unit(index));
-
-  tab[0][0] = (plus - minus) / (2 * stepSize);
-  Eigen::Matrix<s_t, 6, 2> jac = (plus - minus) / (2 * stepSize);
-
-  // Iterate over smaller and smaller step sizes
-  for (int iTab = 1; iTab < tabSize; iTab++)
-  {
-    stepSize /= con;
-
-    Eigen::Matrix<s_t, 6, 2> plus = getRelativeJacobianTimeDerivStatic(
-        positions, velocities + stepSize * Eigen::Vector2s::Unit(index));
-    Eigen::Matrix<s_t, 6, 2> minus = getRelativeJacobianTimeDerivStatic(
-        positions, velocities - stepSize * Eigen::Vector2s::Unit(index));
-
-    tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-    s_t fac = con2;
-    // Compute extrapolations of increasing orders, requiring no new
-    // evaluations
-    for (int jTab = 1; jTab <= iTab; jTab++)
-    {
-      tab[jTab][iTab]
-          = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1]) / (fac - 1.0);
-      fac = con2 * fac;
-      s_t currError = max(
-          (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-          (tab[jTab][iTab] - tab[jTab - 1][iTab - 1]).array().abs().maxCoeff());
-      if (currError < bestError)
-      {
-        bestError = currError;
-        jac.noalias() = tab[jTab][iTab];
-      }
-    }
-
-    // If higher order is worse by a significant factor, quit early.
-    if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-        >= safeThreshold * bestError)
-    {
-      break;
-    }
-  }
-
-  return jac;
+  return result;
 }
 
 } // namespace dynamics

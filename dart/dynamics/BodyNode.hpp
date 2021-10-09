@@ -172,6 +172,19 @@ public:
   /// \param[in] _isCollidable True to enable collisions
   void setCollidable(bool _isCollidable);
 
+  /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
+  /// it's created/loaded from a file. Subsequent scalings can change that
+  /// value.
+  void setScale(Eigen::Vector3s newScale);
+
+  /// Returns the scale of the body node.
+  Eigen::Vector3s getScale() const;
+
+  void setScaleLowerBound(Eigen::Vector3s lowerBound);
+  Eigen::Vector3s getScaleLowerBound() const;
+  void setScaleUpperBound(Eigen::Vector3s upperBound);
+  Eigen::Vector3s getScaleUpperBound() const;
+
   /// Set the mass of the bodynode
   void setMass(s_t mass);
 
@@ -1119,18 +1132,10 @@ public:
   /// This computes the Jacobian of spatial velocity with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of spatial velocity with respect
-  /// to wrt using Ridders method
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfSpatialVelocity(
-      neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
   /// to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
-  /// to wrt using Ridders method
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
-      neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCBackword() against the finite differencing equivalents.
   void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
@@ -1138,32 +1143,17 @@ public:
   /// wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfGravityForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of gravity force (mFgravity) with respect to
-  /// wrt using Ridders method
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfGravityForce(
-      neural::WithRespectTo* wrt);
   /// This computes the Jacobian of body force (mCg_F) with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfBodyForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of body force (mCg_F) with respect to wrt
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForce(
-      neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
   /// (mCg_F) with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfBodyForceAdVIV(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of the ad(V, I*V) subexpression of body force
-  /// (mCg_F) with respect to wrt
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
-      neural::WithRespectTo* wrt);
   /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
   /// with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfBodyForceIdV(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
-  /// with respect to wrt
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfBodyForceIdV(
-      neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMForward() against the finite differencing equivalents.
   bool debugJacobianOfMForward(neural::WithRespectTo* wrt, Eigen::VectorXs x);
@@ -1171,10 +1161,6 @@ public:
   /// computation
   Eigen::MatrixXs finiteDifferenceJacobianOfMassSpatialAcceleration(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
-  /// computation
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
-      neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMBackward() against the finite differencing equivalents.
   bool debugJacobianOfMBackward(
@@ -1183,10 +1169,6 @@ public:
   /// computation
   Eigen::MatrixXs finiteDifferenceJacobianOfMassBodyForce(
       neural::WithRespectTo* wrt, bool useRidders = true);
-  /// This computes the Jacobian of the F (mM_F) as it's computed in the M
-  /// computation
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMassBodyForce(
-      neural::WithRespectTo* wrt);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfMinvXBackward() against the finite differencing
   /// equivalents.
@@ -1257,6 +1239,13 @@ public:
 
   /// Same as mDependentDofs, but holds const pointers
   std::vector<const DegreeOfFreedom*> mConstDependentDofs;
+
+  /// This holds on to the relative scaling of this body node. This defaults
+  /// to 1.0 when a body is created, but can be updated by calls to setScale().
+  Eigen::Vector3s mScale;
+
+  Eigen::Vector3s mScaleLowerBound;
+  Eigen::Vector3s mScaleUpperBound;
 
   //--------------------------------------------------------------------------
   // Dynamical Properties

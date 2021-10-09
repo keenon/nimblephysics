@@ -801,7 +801,7 @@ Eigen::Matrix6s FreeJoint::getRelativeJacobianInPositionSpaceStatic(
       = math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
 
 #ifndef NDEBUG
-  const s_t threshold = 1e-10;
+  const s_t threshold = 1e-5;
   Eigen::Matrix6s fd = const_cast<FreeJoint*>(this)
                            ->finiteDifferenceRelativeJacobianInPositionSpace();
   if (((fd - result).cwiseAbs().array() > threshold).any())
@@ -1171,12 +1171,19 @@ Eigen::Vector6s FreeJoint::estimatePerturbedScrewAxisForForce(
 Eigen::Vector6s FreeJoint::getScrewAxisGradientForPosition(
     int axisDof, int rotateDof)
 {
-  s_t EPS = 5e-9;
-  Eigen::Vector6s pos
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
-  Eigen::Vector6s neg
-      = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
-  return (pos - neg) / (2 * EPS);
+  if (axisDof < 3)
+  {
+    s_t EPS = 5e-9;
+    Eigen::Vector6s pos
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, EPS);
+    Eigen::Vector6s neg
+        = estimatePerturbedScrewAxisForPosition(axisDof, rotateDof, -EPS);
+    return (pos - neg) / (2 * EPS);
+  }
+  else
+  {
+    return Eigen::Vector6s::Zero();
+  }
 }
 
 //==============================================================================

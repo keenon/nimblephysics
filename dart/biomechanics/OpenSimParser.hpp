@@ -2,6 +2,7 @@
 #define DART_UTILS_OSIMPARSER_HPP_
 
 #include <string>
+#include <map>
 
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
@@ -14,20 +15,28 @@ using namespace utils;
 
 namespace biomechanics {
 
+struct OpenSimFile
+{
+  dynamics::SkeletonPtr skeleton;
+  // Markers map
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markersMap;
+  // TODO: eventually we'll want to record muscles here
+};
+
 class OpenSimParser
 {
 public:
   /// Read Skeleton from osim file
-  static dynamics::SkeletonPtr parseOsim(
+  static OpenSimFile parseOsim(
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
 protected:
-  static dynamics::SkeletonPtr readOsim30(
+  static OpenSimFile readOsim30(
       const common::Uri& uri,
       tinyxml2::XMLElement* docElement,
       const common::ResourceRetrieverPtr& retriever);
-  static dynamics::SkeletonPtr readOsim40(
+  static OpenSimFile readOsim40(
       const common::Uri& uri,
       tinyxml2::XMLElement* docElement,
       const common::ResourceRetrieverPtr& retriever);

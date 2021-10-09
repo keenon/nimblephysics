@@ -362,6 +362,7 @@ public:
   /// block-diagonal concatenation of each skeleton's inverse mass matrix.
   Eigen::MatrixXs getInvMassMatrix();
 
+  void clampPositionsToLimits();
   //--------------------------------------------------------------------------
   // High Level ("Reinforcement Learning style") API
   //

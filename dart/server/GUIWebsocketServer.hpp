@@ -242,6 +242,11 @@ public:
   /// returns Vector3s::Zero().
   Eigen::Vector3s getObjectColor(const std::string& key);
 
+  /// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
+  /// radius] for a sphere, and [radius, radius, height] for a capsule. Returns
+  /// 0 for lines.
+  Eigen::Vector3s getObjectScale(const std::string& key);
+
   /// This moves an object (e.g. box, sphere, line) to a specified position
   GUIWebsocketServer& setObjectPosition(
       const std::string& key, const Eigen::Vector3s& pos);
@@ -254,6 +259,11 @@ public:
   /// This changes an object (e.g. box, sphere, line) color
   GUIWebsocketServer& setObjectColor(
       const std::string& key, const Eigen::Vector3s& color);
+
+  /// This changes an object (e.g. box, sphere, mesh) size. Has no effect on
+  /// lines.
+  GUIWebsocketServer& setObjectScale(
+      const std::string& key, const Eigen::Vector3s& scale);
 
   /// This enables mouse events on an object (if they're not already), and
   /// calls "listener" whenever the object is dragged with the desired drag

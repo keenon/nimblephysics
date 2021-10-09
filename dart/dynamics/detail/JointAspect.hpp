@@ -121,6 +121,28 @@ struct JointProperties
   /// Transformation from child BodyNode to this Joint
   Eigen::Isometry3s mT_ChildBodyToJoint;
 
+  /// This holds the relative scale we're applying to the offsets of the parent
+  /// transform. Do not use directly! Use setParentScale() and getParentScale()
+  /// instead
+  Eigen::Vector3s mParentScale;
+
+  /// This holds the original translation from the parent, so that we can
+  /// reconstruct exactly what the translation is as we change the scale of
+  /// objects. This avoids numerical issues with roundoff during scaling messing
+  /// with finite differencing.
+  Eigen::Vector3s mOriginalParentTranslation;
+
+  /// This holds the relative scale we're applying to the offsets of the child
+  /// transform. Do not use directly! Use setChildScale() and getChildScale()
+  /// instead
+  Eigen::Vector3s mChildScale;
+
+  /// This holds the original translation from the child, so that we can
+  /// reconstruct exactly what the translation is as we change the scale of
+  /// objects. This avoids numerical issues with roundoff during scaling messing
+  /// with finite differencing.
+  Eigen::Vector3s mOriginalChildTranslation;
+
   /// True if the joint limits should be enforced in dynamic simulation
   bool mIsPositionLimitEnforced;
 

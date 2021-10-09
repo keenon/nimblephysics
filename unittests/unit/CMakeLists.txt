@@ -55,11 +55,29 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_OpenSimParser)
   target_link_libraries(test_OpenSimParser dart-utils)
 
+  dart_add_test("unit" test_SkeletonConverter)
+  target_link_libraries(test_SkeletonConverter dart-utils)
+
+  dart_add_test("unit" test_SkeletonToBallJoints)
+  target_link_libraries(test_SkeletonToBallJoints dart-utils)
+
+  dart_add_test("unit" test_SkeletonMarkers)
+  target_link_libraries(test_SkeletonMarkers dart-utils)
+
+  dart_add_test("unit" test_MarkerFitter)
+  target_link_libraries(test_MarkerFitter dart-utils)
+
+  dart_add_test("unit" test_Scaling)
+  target_link_libraries(test_Scaling dart-utils)
+
   dart_add_test("unit" test_VskParser)
   target_link_libraries(test_VskParser dart-utils)
 
   dart_add_test("unit" test_AMCParser)
   target_link_libraries(test_AMCParser dart-utils)
+
+  dart_add_test("unit" test_C3D)
+  target_link_libraries(test_C3D dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)

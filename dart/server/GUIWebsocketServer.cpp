@@ -730,7 +730,45 @@ GUIWebsocketServer& GUIWebsocketServer::renderSkeleton(
               = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
           Eigen::Vector3s color = visual->getColor();
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
+          Eigen::Vector3s scale = Eigen::Vector3s::Zero();
+          if (shape->getType() == "BoxShape")
+          {
+            dynamics::BoxShape* boxShape
+                = dynamic_cast<dynamics::BoxShape*>(shape);
+            scale = boxShape->getSize();
+          }
+          else if (shape->getType() == "MeshShape")
+          {
+            dynamics::MeshShape* meshShape
+                = dynamic_cast<dynamics::MeshShape*>(shape);
+            scale = meshShape->getScale();
+          }
+          else if (shape->getType() == "SphereShape")
+          {
+            dynamics::SphereShape* sphereShape
+                = dynamic_cast<dynamics::SphereShape*>(shape);
+            scale = Eigen::Vector3s::Ones() * sphereShape->getRadius();
+          }
+          else if (shape->getType() == "CapsuleShape")
+          {
+            dynamics::CapsuleShape* capsuleShape
+                = dynamic_cast<dynamics::CapsuleShape*>(shape);
+            scale = Eigen::Vector3s(
+                capsuleShape->getRadius(),
+                capsuleShape->getRadius(),
+                capsuleShape->getHeight());
+          }
+          else if (
+              shape->getType() == "EllipsoidShape"
+              && dynamic_cast<dynamics::EllipsoidShape*>(shape)->isSphere())
+          {
+            dynamics::EllipsoidShape* sphereShape
+                = dynamic_cast<dynamics::EllipsoidShape*>(shape);
+            scale = Eigen::Vector3s::Ones() * sphereShape->getRadii()[0];
+          }
 
+          if (getObjectScale(shapeName) != scale)
+            setObjectScale(shapeName, scale);
           if (getObjectPosition(shapeName) != pos)
             setObjectPosition(shapeName, pos);
           if (getObjectRotation(shapeName) != euler)
@@ -1296,6 +1334,21 @@ Eigen::Vector3s GUIWebsocketServer::getObjectColor(const std::string& key)
   return Eigen::Vector3s::Zero();
 }
 
+/// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
+/// radius] for a sphere, and [radius, radius, height] for a capsule.
+Eigen::Vector3s GUIWebsocketServer::getObjectScale(const std::string& key)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mBoxes.find(key) != mBoxes.end())
+    return mBoxes[key].size;
+  if (mSpheres.find(key) != mSpheres.end())
+    return Eigen::Vector3s::Ones() * mSpheres[key].radius;
+  if (mMeshes.find(key) != mMeshes.end())
+    return mMeshes[key].scale;
+  return Eigen::Vector3s::Zero();
+}
+
 /// This moves an object (e.g. box, sphere, line) to a specified position
 GUIWebsocketServer& GUIWebsocketServer::setObjectPosition(
     const std::string& key, const Eigen::Vector3s& pos)
@@ -1389,6 +1442,36 @@ GUIWebsocketServer& GUIWebsocketServer::setObjectColor(
     json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
          << "\", \"color\": ";
     vec3ToJson(json, color);
+    json << "}";
+  });
+
+  return *this;
+}
+
+/// This changes an object (e.g. box, sphere, mesh) size. Has no effect on
+/// lines.
+GUIWebsocketServer& GUIWebsocketServer::setObjectScale(
+    const std::string& key, const Eigen::Vector3s& scale)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mBoxes.find(key) != mBoxes.end())
+  {
+    mBoxes[key].size = scale;
+  }
+  if (mSpheres.find(key) != mSpheres.end())
+  {
+    mSpheres[key].radius = scale(0);
+  }
+  if (mMeshes.find(key) != mMeshes.end())
+  {
+    mMeshes[key].scale = scale;
+  }
+
+  queueCommand([&](std::stringstream& json) {
+    json << "{ \"type\": \"set_object_scale\", \"key\": \"" << key
+         << "\", \"scale\": ";
+    vec3ToJson(json, scale);
     json << "}";
   });
 
@@ -1682,7 +1765,7 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderValue(
 
     queueCommand([&](std::stringstream& json) {
       json << "{ \"type\": \"set_slider_value\", \"key\": " << key
-           << "\", \"value\": " << value << " }";
+           << "\", \"value\": " << numberToJson(value) << " }";
     });
   }
   else
@@ -1708,7 +1791,7 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderMin(
 
     queueCommand([&](std::stringstream& json) {
       json << "{ \"type\": \"set_slider_min\", \"key\": " << key
-           << "\", \"value\": " << min << " }";
+           << "\", \"value\": " << numberToJson(min) << " }";
     });
   }
   else
@@ -1734,7 +1817,7 @@ GUIWebsocketServer& GUIWebsocketServer::setSliderMax(
 
     queueCommand([&](std::stringstream& json) {
       json << "{ \"type\": \"set_slider_max\", \"key\": " << key
-           << "\", \"value\": " << max << " }";
+           << "\", \"value\": " << numberToJson(max) << " }";
     });
   }
   else
@@ -1809,10 +1892,10 @@ GUIWebsocketServer& GUIWebsocketServer::setPlotData(
       vecToJson(json, xs);
       json << ", \"ys\": ";
       vecToJson(json, ys);
-      json << ", \"min_x\": " << minX;
-      json << ", \"max_x\": " << maxX;
-      json << ", \"min_y\": " << minY;
-      json << ", \"max_y\": " << maxY;
+      json << ", \"min_x\": " << numberToJson(minX);
+      json << ", \"max_x\": " << numberToJson(maxX);
+      json << ", \"min_y\": " << numberToJson(minY);
+      json << ", \"max_y\": " << numberToJson(maxY);
       json << " }";
     });
   }
@@ -1948,7 +2031,7 @@ void GUIWebsocketServer::encodeCreateSphere(
     std::stringstream& json, Sphere& sphere)
 {
   json << "{ \"type\": \"create_sphere\", \"key\": \"" << sphere.key
-       << "\", \"radius\": " << sphere.radius;
+       << "\", \"radius\": " << numberToJson(sphere.radius);
   json << ", \"pos\": ";
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
@@ -1963,8 +2046,8 @@ void GUIWebsocketServer::encodeCreateCapsule(
     std::stringstream& json, Capsule& capsule)
 {
   json << "{ \"type\": \"create_capsule\", \"key\": \"" << capsule.key
-       << "\", \"radius\": " << capsule.radius
-       << ", \"height\": " << capsule.height;
+       << "\", \"radius\": " << numberToJson(capsule.radius)
+       << ", \"height\": " << numberToJson(capsule.height);
   json << ", \"pos\": ";
   vec3ToJson(json, capsule.pos);
   json << ", \"euler\": ";
@@ -2106,9 +2189,9 @@ void GUIWebsocketServer::encodeCreateSlider(
   vec2iToJson(json, slider.fromTopLeft);
   json << ", \"size\": ";
   vec2iToJson(json, slider.size);
-  json << ", \"max\": " << slider.max;
-  json << ", \"min\": " << slider.min;
-  json << ", \"value\": " << slider.value;
+  json << ", \"max\": " << numberToJson(slider.max);
+  json << ", \"min\": " << numberToJson(slider.min);
+  json << ", \"value\": " << numberToJson(slider.value);
   json << ", \"only_ints\": " << (slider.onlyInts ? "true" : "false");
   json << ", \"horizontal\": " << (slider.horizontal ? "true" : "false");
   json << "}";
@@ -2121,10 +2204,10 @@ void GUIWebsocketServer::encodeCreatePlot(std::stringstream& json, Plot& plot)
   vec2iToJson(json, plot.fromTopLeft);
   json << ", \"size\": ";
   vec2iToJson(json, plot.size);
-  json << ", \"max_x\": " << plot.maxX;
-  json << ", \"min_x\": " << plot.minX;
-  json << ", \"max_y\": " << plot.maxY;
-  json << ", \"min_y\": " << plot.minY;
+  json << ", \"max_x\": " << numberToJson(plot.maxX);
+  json << ", \"min_x\": " << numberToJson(plot.minX);
+  json << ", \"max_y\": " << numberToJson(plot.maxY);
+  json << ", \"min_y\": " << numberToJson(plot.minY);
   json << ", \"xs\": ";
   vecToJson(json, plot.xs);
   json << ", \"ys\": ";

@@ -38,6 +38,8 @@
 
 #include "dart/common/Console.hpp"
 #include "dart/common/StlHelpers.hpp"
+#include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/Chain.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
@@ -47,7 +49,9 @@
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
+#include "dart/dynamics/SphereShape.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/FiniteDifference.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -472,6 +476,131 @@ bool BodyNode::isCollidable() const
 void BodyNode::setCollidable(bool _isCollidable)
 {
   mAspectProperties.mIsCollidable = _isCollidable;
+}
+
+//==============================================================================
+/// Re-scales the body node. The original scale of the BodyNode is 1.0, when
+/// it's created/loaded from a file. Subsequent scalings can change that
+/// value.
+void BodyNode::setScale(Eigen::Vector3s newScale)
+{
+  for (int i = 0; i < 3; i++)
+  {
+    if (newScale(i) < mScaleLowerBound(i))
+    {
+      std::cout << "BodyNode refusing to setScale(" << newScale(i)
+                << ", axis=" << i << ") because " << newScale(i)
+                << " is less than the scale lower bound ("
+                << mScaleLowerBound(i) << "). Clamping to lower bound."
+                << std::endl;
+      newScale(i) = mScaleLowerBound(i);
+    }
+    if (newScale(i) > mScaleUpperBound(i))
+    {
+      std::cout << "BodyNode refusing to setScale(" << newScale
+                << ", axis=" << i << ") because " << newScale
+                << " is greater than the scale upper bound ("
+                << mScaleUpperBound << "). Clamping to upper bound."
+                << std::endl;
+      newScale(i) = mScaleUpperBound(i);
+    }
+  }
+
+  Eigen::Vector3s ratio = newScale.cwiseQuotient(mScale);
+
+  // Rescale inertia, COM, mass
+  Inertia inertia = getInertia();
+  inertia.rescale(ratio);
+  setInertia(inertia);
+
+  // Rescale distance to parent joint
+  Joint* parentJoint = getParentJoint();
+  parentJoint->setChildScale(newScale);
+
+  // Rescale distance to child joints
+  for (int i = 0; i < getNumChildJoints(); i++)
+  {
+    Joint* childJoint = getChildJoint(i);
+    childJoint->setParentScale(newScale);
+  }
+
+  // Rescale all visible shapes and colliders
+  for (int i = 0; i < getNumShapeNodes(); i++)
+  {
+    ShapeNode* shapeNode = getShapeNode(i);
+    shapeNode->setOffset(shapeNode->getOffset().cwiseProduct(ratio));
+
+    ShapePtr shapePtr = shapeNode->getShape();
+    if (shapePtr->getType() == MeshShape::getStaticType())
+    {
+      MeshShape* mesh = static_cast<MeshShape*>(shapePtr.get());
+      mesh->setScale(mesh->getScale().cwiseProduct(ratio));
+    }
+    else if (shapePtr->getType() == BoxShape::getStaticType())
+    {
+      BoxShape* box = static_cast<BoxShape*>(shapePtr.get());
+      box->setSize(box->getSize().cwiseProduct(ratio));
+    }
+    else if (shapePtr->getType() == SphereShape::getStaticType())
+    {
+      if (ratio(0) != ratio(1) || ratio(1) != ratio(2))
+      {
+        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+                  << ") but we're scaling an attached sphere shape, which "
+                     "can't skew. Scaling by X-axis, arbitrarily."
+                  << std::endl;
+      }
+      SphereShape* sphere = static_cast<SphereShape*>(shapePtr.get());
+      sphere->setRadius(sphere->getRadius() * ratio(0));
+    }
+    else if (shapePtr->getType() == CapsuleShape::getStaticType())
+    {
+      if (ratio(0) != ratio(2))
+      {
+        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+                  << ") but we're scaling an attached capsule shape, which "
+                     "can't skew by a different X and Z. Scaling radius by "
+                     "X-axis, height by Y-axis."
+                  << std::endl;
+      }
+      CapsuleShape* capsule = static_cast<CapsuleShape*>(shapePtr.get());
+      capsule->setRadius(capsule->getRadius() * ratio(0));
+      capsule->setHeight(capsule->getHeight() * ratio(1));
+    }
+  }
+
+  mScale = newScale;
+}
+
+//==============================================================================
+/// Returns the scale of the body node.
+Eigen::Vector3s BodyNode::getScale() const
+{
+  return mScale;
+}
+
+//==============================================================================
+void BodyNode::setScaleLowerBound(Eigen::Vector3s lowerBound)
+{
+  mScaleLowerBound = lowerBound;
+}
+
+//==============================================================================
+Eigen::Vector3s BodyNode::getScaleLowerBound() const
+{
+  return mScaleLowerBound;
+}
+
+//==============================================================================
+void BodyNode::setScaleUpperBound(Eigen::Vector3s upperBound)
+{
+  mScaleUpperBound = upperBound;
+}
+
+//==============================================================================
+Eigen::Vector3s BodyNode::getScaleUpperBound() const
+{
+  return mScaleUpperBound;
 }
 
 //==============================================================================
@@ -1320,6 +1449,9 @@ BodyNode::BodyNode(
     mIsColliding(false),
     mParentJoint(_parentJoint),
     mParentBodyNode(nullptr),
+    mScale(Eigen::Vector3s::Ones()),
+    mScaleLowerBound(Eigen::Vector3s::Ones() * 0.5),
+    mScaleUpperBound(Eigen::Vector3s::Ones() * 1.5),
     mPartialAcceleration(Eigen::Vector6s::Zero()),
     mIsPartialAccelerationDirty(true),
     mF(Eigen::Vector6s::Zero()),
@@ -1374,6 +1506,9 @@ BodyNode* BodyNode::clone(
 {
   BodyNode* clonedBn
       = new BodyNode(_parentBodyNode, _parentJoint, getBodyNodeProperties());
+  clonedBn->mScale = mScale;
+  clonedBn->mScaleLowerBound = mScaleLowerBound;
+  clonedBn->mScaleUpperBound = mScaleUpperBound;
 
   clonedBn->matchAspects(this);
 
@@ -3001,282 +3136,30 @@ void BodyNode::debugJacobianOfCForward(neural::WithRespectTo* wrt)
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfSpatialVelocity(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfSpatialVelocity(wrt);
-  }
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  const s_t EPS = 1e-6;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s plus = getSpatialVelocity();
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s minus = getSpatialVelocity();
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
-
-  return jac;
-}
-
-//============================================================================
-/// This computes the Jacobian of spatial velocity with respect
-/// to wrt using Ridders method
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfSpatialVelocity(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
   Eigen::VectorXs tmp;
   tmp.resize(static_cast<int>(skel->getNumDofs()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s plus = getSpatialVelocity();
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s minus = getSpatialVelocity();
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
       skel->computeForwardDynamics();
-      Eigen::Vector6s plus = getSpatialVelocity();
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      Eigen::Vector6s minus = getSpatialVelocity();
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
-  skel->computeForwardDynamics();
-
-  return jac;
-}
-
-//============================================================================
-Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
-    neural::WithRespectTo* wrt, bool useRidders)
-{
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(wrt);
-  }
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  const s_t EPS = 1e-6;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    Eigen::Vector6s plus = mCg_dV;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    Eigen::Vector6s minus = mCg_dV;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
-
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of spatial acceleration (mCg_dV) with respect
-/// to wrt using Ridders method
-Eigen::MatrixXs
-BodyNode::finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    Eigen::Vector6s plus = mCg_dV;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    Eigen::Vector6s minus = mCg_dV;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      Eigen::Vector6s plus = mCg_dV;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      Eigen::Vector6s minus = mCg_dV;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
+      perturbed = getSpatialVelocity();
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
@@ -3287,7 +3170,52 @@ BodyNode::finiteDifferenceRiddersJacobianOfSpatialCoriolisAcceleration(
     skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
   }
 
-  return jac;
+  return result;
+}
+
+//============================================================================
+Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfSpatialCoriolisAcceleration(
+    neural::WithRespectTo* wrt, bool useRidders)
+{
+  auto skel = getSkeleton().get();
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
+
+  Eigen::VectorXs tmp;
+  tmp.resize(static_cast<int>(skel->getNumDofs()));
+
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
+      skel->computeForwardDynamics();
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->updateCombinedVector();
+      }
+      perturbed = mCg_dV;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
+  skel->computeForwardDynamics();
+  for (int j = 0; j < skel->getNumBodyNodes(); j++)
+  {
+    skel->getBodyNode(j)->updateCombinedVector();
+  }
+  for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+  {
+    skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -3485,128 +3413,30 @@ void BodyNode::debugJacobianOfCBackward(neural::WithRespectTo* wrt)
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfGravityForce(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfGravityForce(wrt);
-  }
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  const s_t EPS = 1e-6;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s plus = mFgravity;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s minus = mFgravity;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
-  skel->computeForwardDynamics();
-
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of gravity force (mFgravity) with respect to
-/// wrt using Ridders method
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfGravityForce(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
   Eigen::VectorXs tmp;
   tmp.resize(static_cast<int>(skel->getNumDofs()));
 
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s plus = mFgravity;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s minus = mFgravity;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
       skel->computeForwardDynamics();
-      Eigen::Vector6s plus = mFgravity;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      Eigen::Vector6s minus = mFgravity;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
+      perturbed = mFgravity;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
@@ -3617,7 +3447,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfGravityForce(
     skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
   }
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -3625,53 +3455,38 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfGravityForce(
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForce(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-  {
-    return finiteDifferenceRiddersJacobianOfBodyForce(wrt);
-  }
-
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
   Eigen::VectorXs tmp;
   tmp.resize(static_cast<int>(skel->getNumDofs()));
 
-  const s_t EPS = 1e-4;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-    }
-    Eigen::Vector6s plus = mCg_F;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-    }
-    Eigen::Vector6s minus = mCg_F;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
+  s_t eps = useRidders ? 1e-2 : 1e-4;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
+      skel->computeForwardDynamics();
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->updateCombinedVector();
+      }
+      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+      {
+        skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
+      }
+      perturbed = mCg_F;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
@@ -3682,141 +3497,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForce(
     skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
   }
 
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of body force (mCg_F) with respect to wrt
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForce(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-2;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-    }
-    Eigen::Vector6s plus = mCg_F;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-    }
-    Eigen::Vector6s minus = mCg_F;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-      }
-      Eigen::Vector6s plus = mCg_F;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-      }
-      Eigen::Vector6s minus = mCg_F;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
-  skel->computeForwardDynamics();
-  for (int j = 0; j < skel->getNumBodyNodes(); j++)
-  {
-    skel->getBodyNode(j)->updateCombinedVector();
-  }
-  for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-  {
-    skel->getBodyNode(j)->aggregateCombinedVector(tmp, skel->getGravity());
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -3825,122 +3506,18 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForce(
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForceAdVIV(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfBodyForceAdVIV(wrt);
-
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t EPS = 1e-4;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    // mCg_F = mI * mCg_dV;
-    // mCg_F -= mFgravity;
-    // mCg_F -= math::dad(V, mI * V);
-    const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-    const Eigen::Vector6s& V = getSpatialVelocity();
-    Eigen::Vector6s plus = math::dad(V, mI * V);
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI_minus
-        = mAspectProperties.mInertia.getSpatialTensor();
-    const Eigen::Vector6s& V_minus = getSpatialVelocity();
-    Eigen::Vector6s minus = math::dad(V_minus, mI_minus * V_minus);
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
-  skel->computeForwardDynamics();
-  for (int j = 0; j < skel->getNumBodyNodes(); j++)
-  {
-    skel->getBodyNode(j)->updateCombinedVector();
-  }
-
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of the Ad(V,IV) subexpression of body force
-/// (mCg_F) with respect to wrt
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-    const Eigen::Vector6s& V = getSpatialVelocity();
-    Eigen::Vector6s plus = math::dad(V, mI * V);
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI_minus
-        = mAspectProperties.mInertia.getSpatialTensor();
-    const Eigen::Vector6s& V_minus = getSpatialVelocity();
-    Eigen::Vector6s minus = math::dad(V_minus, mI_minus * V_minus);
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
+  s_t eps = useRidders ? 1e-3 : 1e-4;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
       skel->computeForwardDynamics();
       for (int j = 0; j < skel->getNumBodyNodes(); j++)
       {
@@ -3948,60 +3525,21 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
       }
       const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
       const Eigen::Vector6s& V = getSpatialVelocity();
-      plus = math::dad(V, mI * V);
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      const Eigen::Matrix6s& mI_minus
-          = mAspectProperties.mInertia.getSpatialTensor();
-      const Eigen::Vector6s& V_minus = getSpatialVelocity();
-      Eigen::Vector6s minus = math::dad(V_minus, mI_minus * V_minus);
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
+      perturbed = math::dad(V, mI * V);
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
     skel->getBodyNode(j)->updateCombinedVector();
   }
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4010,176 +3548,39 @@ Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForceAdVIV(
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfBodyForceIdV(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfBodyForceIdV(wrt);
-
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t EPS = 1e-4;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    // mCg_F = mI * mCg_dV;
-    // mCg_F -= mFgravity;
-    // mCg_F -= math::dad(V, mI * V);
-    const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-    Eigen::Vector6s plus = mI * mCg_dV;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI_minus
-        = mAspectProperties.mInertia.getSpatialTensor();
-    Eigen::Vector6s minus = mI_minus * mCg_dV;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
-  skel->computeForwardDynamics();
-  for (int j = 0; j < skel->getNumBodyNodes(); j++)
-  {
-    skel->getBodyNode(j)->updateCombinedVector();
-  }
-
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of the I*dV subexpression of body force (mCg_F)
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfBodyForceIdV(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-    Eigen::Vector6s plus = mI * mCg_dV;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateCombinedVector();
-    }
-    const Eigen::Matrix6s& mI_minus
-        = mAspectProperties.mInertia.getSpatialTensor();
-    Eigen::Vector6s minus = mI_minus * mCg_dV;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
+  s_t eps = useRidders ? 1e-3 : 1e-4;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
       skel->computeForwardDynamics();
       for (int j = 0; j < skel->getNumBodyNodes(); j++)
       {
         skel->getBodyNode(j)->updateCombinedVector();
       }
       const Eigen::Matrix6s& mI = mAspectProperties.mInertia.getSpatialTensor();
-      Eigen::Vector6s plus = mI * mCg_dV;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      skel->computeForwardDynamics();
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateCombinedVector();
-      }
-      const Eigen::Matrix6s& mI_minus
-          = mAspectProperties.mInertia.getSpatialTensor();
-      Eigen::Vector6s minus = mI_minus * mCg_dV;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
+      perturbed = mI * mCg_dV;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
     skel->getBodyNode(j)->updateCombinedVector();
   }
 
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4227,41 +3628,30 @@ bool BodyNode::debugJacobianOfMForward(
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassSpatialAcceleration(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(wrt);
-
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t EPS = 1e-4;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    Eigen::Vector6s plus = mM_dV;
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    Eigen::Vector6s minus = mM_dV;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
+  s_t eps = useRidders ? 1e-3 : 1e-4;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->updateMassMatrix();
+      }
+      perturbed = mM_dV;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   // This isn't strictly necessary, because mM_dV is an intermediate variable
   // not used elsewhere without being recomputed first, but just to keep things
   // visually consistent across finite differencing code (and to future proof
@@ -4271,122 +3661,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassSpatialAcceleration(
     skel->getBodyNode(j)->updateMassMatrix();
   }
 
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of the dV (mM_dV) as it's computed in the M
-/// computation
-Eigen::MatrixXs
-BodyNode::finiteDifferenceRiddersJacobianOfMassSpatialAcceleration(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::VectorXs tmp;
-  tmp.resize(static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    Eigen::Vector6s plus = mM_dV;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    Eigen::Vector6s minus = mM_dV;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      Eigen::Vector6s plus = mM_dV;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      Eigen::Vector6s minus = mM_dV;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
-  // This isn't strictly necessary, because mM_dV is an intermediate variable
-  // not used elsewhere without being recomputed first, but just to keep things
-  // visually consistent across finite differencing code (and to future proof
-  // against copy-pasta errors), we recalculate the state after a reset
-  for (int j = 0; j < skel->getNumBodyNodes(); j++)
-  {
-    skel->getBodyNode(j)->updateMassMatrix();
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4436,12 +3711,10 @@ bool BodyNode::debugJacobianOfMBackward(
     /*
     dMddq.block(iStart, jStart, jointNumDofs, 1)
         = S.transpose() * mMddq_F_p.col(i); // m x 1
-
     if (mParentJoint->hasDof(dof))
     {
       const Jacobian DS_Dq
           = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
-
       dMddq.block(iStart, jStart, jointNumDofs, 1)
           += DS_Dq.transpose() * mMddq_F;
     }
@@ -4492,51 +3765,38 @@ bool BodyNode::debugJacobianOfMBackward(
 Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassBodyForce(
     neural::WithRespectTo* wrt, bool useRidders)
 {
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMassBodyForce(wrt);
-  // void BodyNode::updateMassMatrix();
-  // void BodyNode::aggregateMassMatrix(Eigen::MatrixXs& _MCol, std::size_t
-  // _col);
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
-  const s_t EPS = 1e-4;
-  Eigen::VectorXs original = wrt->get(skel);
   Eigen::MatrixXs tmp = Eigen::MatrixXs::Zero(
       static_cast<int>(skel->getNumDofs()),
       static_cast<int>(skel->getNumDofs()));
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-    }
-    Eigen::Vector6s plus = mM_F;
 
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-    }
-    Eigen::Vector6s minus = mM_F;
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
+  s_t eps = useRidders ? 1e-3 : 1e-4;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
+      for (int j = 0; j < skel->getNumBodyNodes(); j++)
+      {
+        skel->getBodyNode(j)->updateMassMatrix();
+      }
+      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
+      {
+        skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
+      }
+      perturbed = mM_F;
+      return true;
+    },
+    result,
+    eps,
+    useRidders);
+  
+  wrt->set(skel, originalWrt);
   // This isn't strictly necessary, because mM_F is an intermediate variable
   // not used elsewhere without being recomputed first, but just to keep things
   // visually consistent across finite differencing code (and to future proof
@@ -4550,142 +3810,7 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfMassBodyForce(
     skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
   }
 
-  return jac;
-}
-
-//==============================================================================
-/// This computes the Jacobian of the F (mM_F) as it's computed in the M
-/// computation
-Eigen::MatrixXs BodyNode::finiteDifferenceRiddersJacobianOfMassBodyForce(
-    neural::WithRespectTo* wrt)
-{
-  auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
-
-  Eigen::MatrixXs tmp = Eigen::MatrixXs::Zero(
-      static_cast<int>(skel->getNumDofs()),
-      static_cast<int>(skel->getNumDofs()));
-
-  const s_t originalStepSize = 1e-3;
-  const s_t con = 1.4, con2 = (con * con);
-  const s_t safeThreshold = 2.0;
-  const int tabSize = 10;
-
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    s_t stepSize = originalStepSize;
-    s_t bestError = std::numeric_limits<s_t>::max();
-
-    // Neville tableau of finite difference results
-    std::array<std::array<Eigen::VectorXs, tabSize>, tabSize> tab;
-
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += stepSize;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-    }
-    Eigen::Vector6s plus = mM_F;
-
-    perturbed = original;
-    perturbed(i) -= stepSize;
-    wrt->set(skel, perturbed);
-    for (int j = 0; j < skel->getNumBodyNodes(); j++)
-    {
-      skel->getBodyNode(j)->updateMassMatrix();
-    }
-    for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-    {
-      skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-    }
-    Eigen::Vector6s minus = mM_F;
-
-    tab[0][0] = (plus - minus) / (2 * stepSize);
-
-    // Iterate over smaller and smaller step sizes
-    for (int iTab = 1; iTab < tabSize; iTab++)
-    {
-      stepSize /= con;
-
-      perturbed = original;
-      perturbed(i) += stepSize;
-      wrt->set(skel, perturbed);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-      }
-      Eigen::Vector6s plus = mM_F;
-
-      perturbed = original;
-      perturbed(i) -= stepSize;
-      wrt->set(skel, perturbed);
-      for (int j = 0; j < skel->getNumBodyNodes(); j++)
-      {
-        skel->getBodyNode(j)->updateMassMatrix();
-      }
-      for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-      {
-        skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-      }
-      Eigen::Vector6s minus = mM_F;
-
-      tab[0][iTab] = (plus - minus) / (2 * stepSize);
-
-      s_t fac = con2;
-      // Compute extrapolations of increasing orders, requiring no new
-      // evaluations
-      for (int jTab = 1; jTab <= iTab; jTab++)
-      {
-        tab[jTab][iTab] = (tab[jTab - 1][iTab] * fac - tab[jTab - 1][iTab - 1])
-                          / (fac - 1.0);
-        fac = con2 * fac;
-        s_t currError = max(
-            (tab[jTab][iTab] - tab[jTab - 1][iTab]).array().abs().maxCoeff(),
-            (tab[jTab][iTab] - tab[jTab - 1][iTab - 1])
-                .array()
-                .abs()
-                .maxCoeff());
-        if (currError < bestError)
-        {
-          bestError = currError;
-          jac.col(i).noalias() = tab[jTab][iTab];
-        }
-      }
-
-      // If higher order is worse by a significant factor, quit early.
-      if ((tab[iTab][iTab] - tab[iTab - 1][iTab - 1]).array().abs().maxCoeff()
-          >= safeThreshold * bestError)
-      {
-        break;
-      }
-    }
-  }
-  wrt->set(skel, original);
-  // This isn't strictly necessary, because mM_F is an intermediate variable
-  // not used elsewhere without being recomputed first, but just to keep things
-  // visually consistent across finite differencing code (and to future proof
-  // against copy-pasta errors), we recalculate the state after a reset
-  for (int j = 0; j < skel->getNumBodyNodes(); j++)
-  {
-    skel->getBodyNode(j)->updateMassMatrix();
-  }
-  for (int j = skel->getNumBodyNodes() - 1; j >= 0; j--)
-  {
-    skel->getBodyNode(j)->aggregateMassMatrix(tmp, 0);
-  }
-
-  return jac;
+  return result;
 }
 
 //==============================================================================
@@ -4909,11 +4034,7 @@ std::vector<Eigen::MatrixXs>
 BodyNode::finiteDifferenceJacobianOfInvMassArtInertia(
     neural::WithRespectTo* wrt, bool /* useRidders */)
 {
-  /*
-  if (useRidders)
-    return finiteDifferenceRiddersJacobianOfMassBodyForce(wrt);
-  */
-
+  // TODO: let FiniteDifference.h code handle larger-dim Tensor i/o
   auto skel = getSkeleton().get();
   int dofs = wrt->dim(skel);
   std::vector<Eigen::MatrixXs> jacs;
@@ -4951,31 +4072,29 @@ Eigen::MatrixXs BodyNode::finiteDifferenceJacobianOfInvMassArtBias(
     neural::WithRespectTo* wrt, bool /* useRidders */)
 {
   auto skel = getSkeleton().get();
-  int dofs = wrt->dim(skel);
-  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(6, dofs);
+  Eigen::MatrixXs result(6, wrt->dim(skel));
+  Eigen::VectorXs originalWrt = wrt->get(skel);
 
-  const s_t EPS = 1e-5;
-  Eigen::VectorXs original = wrt->get(skel);
-  for (int i = 0; i < dofs; i++)
-  {
-    Eigen::VectorXs perturbed = original;
-    perturbed(i) += EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s plus = getBiasForce();
-
-    perturbed = original;
-    perturbed(i) -= EPS;
-    wrt->set(skel, perturbed);
-    skel->computeForwardDynamics();
-    Eigen::Vector6s minus = getBiasForce();
-
-    jac.col(i) = (plus - minus) / (2 * EPS);
-  }
-  wrt->set(skel, original);
+  s_t eps = 1e-5;
+  math::finiteDifference(
+    [&](/* in*/ s_t eps,
+        /* in*/ int dof,
+        /*out*/ Eigen::VectorXs& perturbed) {
+      Eigen::VectorXs tweakedWrt = originalWrt;
+      tweakedWrt(dof) += eps;
+      wrt->set(skel, tweakedWrt);
+      skel->computeForwardDynamics();
+      perturbed = getBiasForce();
+      return true;
+    },
+    result,
+    eps,
+    false);
+  
+  wrt->set(skel, originalWrt);
   skel->computeForwardDynamics();
 
-  return jac;
+  return result;
 }
 
 //==============================================================================

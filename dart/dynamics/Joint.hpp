@@ -191,6 +191,22 @@ public:
   /// Get transformation from child body node to this joint
   const Eigen::Isometry3s& getTransformFromChildBodyNode() const;
 
+  /// Copy the transfromFromParentNode and transfromFromChildNode, and their
+  /// scales, from another joint
+  void copyTransformsFrom(const dynamics::Joint* other);
+
+  /// Set the scale of the child body
+  void setChildScale(Eigen::Vector3s scale);
+
+  /// Set the scale of the parent body
+  void setParentScale(Eigen::Vector3s scale);
+
+  /// Get the scale of the child body
+  Eigen::Vector3s getChildScale() const;
+
+  /// Get the scale of the parent body
+  Eigen::Vector3s getParentScale() const;
+
   /// Set to enforce joint position limit
   ///
   /// The joint position limit is valid when the actutor type is one of
@@ -747,10 +763,6 @@ public:
   Eigen::MatrixXs finiteDifferenceRelativeJacobianInPositionSpace(
       bool useRidders = true);
 
-  /// This uses finite differencing to compute the relative Jacobian in position
-  /// space
-  Eigen::MatrixXs finiteDifferenceRiddersRelativeJacobianInPositionSpace();
-
   /// This checks the intermediate analytical results of
   /// getRelativeJacobianInPositionSpace() against the finite differencing
   /// equivalents.
@@ -765,6 +777,24 @@ public:
   /// That is, if we increment the vel for dof by EPS, that increases all the
   /// child body spatial velocities by the returned screw.
   virtual Eigen::Vector6s getWorldAxisScrewForVelocity(int dof) const;
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  virtual Eigen::Vector6s getScrewAxisGradientForPosition(
+      int axisDof, int rotateDof);
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  virtual Eigen::Vector6s getScrewAxisGradientForForce(
+      int axisDof, int rotateDof);
+
+  /// This uses finite differencing to compute the gradient of the screw axis on
+  /// `axisDof` as we rotate `rotateDof`.
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientForPosition(
+      int axisDof, int rotateDof);
+
+  /// This uses finite differencing to compute the gradient of the screw axis on
+  /// `axisDof` as we rotate `rotateDof`.
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientForForce(
+      int axisDof, int rotateDof);
 
   /// Get constraint wrench expressed in body node frame
   virtual Eigen::Vector6s getBodyConstraintWrench() const = 0;

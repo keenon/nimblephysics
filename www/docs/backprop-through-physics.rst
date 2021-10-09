@@ -63,7 +63,7 @@ We'll do the following steps over and over again until we're happy with the resu
 
 1. Run a simulation for 100 timesteps
 2. Calculate loss (the difference between the box's final position and our goal)
-3. Backpropagate the loss through time (using PyTorch's :code:`loss.backwards()`)
+3. Backpropagate the loss through time (using PyTorch's :code:`loss.backward()`)
 4. Update our initial conditions by taking a step in the direction of the gradient
 
 To run a forward simulation, we'll just call :code`nimble.timestep()` over and over again. Remember from :ref:`Worlds` that "state" is just "position" and "velocity" concatenated together::
@@ -99,9 +99,9 @@ After we've run our simulation, we need to compute the loss from our simulation:
 
 Since our goal position is just the origin, it's sufficient to call :code:`final_position.norm()` to get the distance to the origin for our trajectory.
 
-Now that we've got a PyTorch Tensor holding a single value representing loss, we can use :code:`loss.backwards()` to have PyTorch run backprop for us::
+Now that we've got a PyTorch Tensor holding a single value representing loss, we can use :code:`loss.backward()` to have PyTorch run backprop for us::
 
-  loss.backwards()
+  loss.backward()
 
 The only reason that the above call works is because :code:`nimble.timestep()` is a fully differentiable operator that PyTorch can understand. Very cool stuff.
 

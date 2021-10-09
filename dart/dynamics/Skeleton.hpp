@@ -48,6 +48,7 @@
 #include "dart/dynamics/SpecializedNodeManager.hpp"
 #include "dart/dynamics/detail/BodyNodeAspect.hpp"
 #include "dart/dynamics/detail/SkeletonAspect.hpp"
+#include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/WithRespectTo.hpp"
 
@@ -690,11 +691,6 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M(pos) for finite changes
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfM(
-      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes
   Eigen::MatrixXs finiteDifferenceJacobianOfC(
       neural::WithRespectTo* wrt, bool useRidders = true);
@@ -707,16 +703,6 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M*f + C(pos, vel) for finite changes
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfID(
-      const Eigen::VectorXs& f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in C(pos, vel) for finite changes, using Ridders
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfC(
-      neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in M^{-1}f for finite changes
   Eigen::MatrixXs finiteDifferenceJacobianOfMinv(
       const Eigen::VectorXs& f,
@@ -724,25 +710,20 @@ public:
       bool useRidders = true);
 
   /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in M^{-1}f for finite changes, using Ridders
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfMinv(
-      Eigen::VectorXs f, neural::WithRespectTo* wrt);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
   /// giving the difference in C(pos, vel) for finite changes in vel
   Eigen::MatrixXs finiteDifferenceVelCJacobian(bool useRidders = true);
-
-  /// VERY SLOW: Only for testing. This computes the unconstrained Jacobian
-  /// giving the difference in C(pos, vel) for finite changes in vel
-  Eigen::MatrixXs finiteDifferenceRiddersVelCJacobian();
 
   Eigen::MatrixXs finiteDifferenceJacobianOfFD(
       neural::WithRespectTo* wrt, bool useRidders = true);
 
-  Eigen::MatrixXs finiteDifferenceRiddersJacobianOfFD(
-      neural::WithRespectTo* wrt);
-
   Eigen::VectorXs getDynamicsForces();
+
+  //----------------------------------------------------------------------------
+  // Randomness
+  //----------------------------------------------------------------------------
+
+  /// This gets a random pose that's valid within joint limits
+  Eigen::VectorXs getRandomPose();
 
   //----------------------------------------------------------------------------
   // Trajectory optimization
@@ -832,6 +813,355 @@ public:
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
   void setLinkMasses(Eigen::VectorXs masses);
+
+  // This returns a vector of all the link scales for all the links in the
+  // skeleton concatenated into a flat vector
+  Eigen::VectorXs getLinkScales();
+
+  // Sets all the link scales for the skeleton, from a flat vector
+  void setLinkScales(Eigen::VectorXs scales);
+
+  // This sets all the positions of the joints to within their limit range, if
+  // they're currently outside it.
+  void clampPositionsToLimits();
+
+  //----------------------------------------------------------------------------
+  // Constraining links to have the same scale
+  //----------------------------------------------------------------------------
+
+  const std::vector<std::vector<dynamics::BodyNode*>>& getBodyScaleGroups()
+      const;
+
+  const std::vector<dynamics::BodyNode*>& getBodyScaleGroup(int index) const;
+
+  /// This creates scale groups for any body nodes that may've been added since
+  /// we last interacted with the body scale group APIs
+  void ensureBodyScaleGroups();
+
+  /// This returns the index of the group that this body node corresponds to
+  int getScaleGroupIndex(dynamics::BodyNode* bodyNode);
+
+  /// This takes two scale groups and merges their contents into a single group.
+  /// After this operation, there is one fewer scale group.
+  void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
+
+  /// This gets the scale upper bound for the first body in a group, by index
+  Eigen::Vector3s getScaleGroupUpperBound(int groupIndex);
+
+  /// This gets the scale lower bound for the first body in a group, by index
+  Eigen::Vector3s getScaleGroupLowerBound(int groupIndex);
+
+  /// This takes two scale groups and merges their contents into a single group.
+  /// After this operation, there is one fewer scale group.
+  void mergeScaleGroupsByIndex(int a, int b);
+
+  /// This returns the number of scaling groups (groups with an equal-scale
+  /// constraint) that there are in the model.
+  int getNumScaleGroups();
+
+  /// This sets the scales of all the body nodes according to their group
+  /// membership. The `scale` vector is expected to be the same size as the
+  /// number of groups.
+  void setGroupScales(Eigen::VectorXs scale);
+
+  /// This gets the scales of the first body in each scale group.
+  Eigen::VectorXs getGroupScales();
+
+  /// This returns the Jacobian of the joint positions wrt the scales of the
+  /// groups
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtGroupScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian of the joint positions wrt the scales of the
+  /// groups
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+  /// scales
+  Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to group
+  /// scales
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtGroupScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  //----------------------------------------------------------------------------
+  // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
+  //
+  // This allows us to do computations like IK in a gimbal-lock-free space.
+  //----------------------------------------------------------------------------
+
+  // This creates a fresh skeleton, which is a copy of this one EXCEPT that
+  // EulerJoints are BallJoints, and EulerFreeJoints are FreeJoints. This means
+  // the configuration spaces are different, so you need to use
+  // `convertPositionsToBallSpace()` and `convertPositionsFromBallSpace()` to
+  // transform positions to and from the new skeleton's configuration.
+  std::shared_ptr<dynamics::Skeleton> convertSkeletonToBallJoints();
+
+  // This converts the position vector from Euler space to Ball space for any
+  // joints that need to be converted. This needs to be called on a skeleton
+  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
+  // in vector unchanged.
+  Eigen::VectorXs convertPositionsToBallSpace(Eigen::VectorXs pos);
+
+  // This converts the position vector from Ball space to Euler space for any
+  // joints that need to be converted. This needs to be called on a skeleton
+  // with EulerJoints and/or EulerFreeJoints or it will just return the passed
+  // in vector unchanged.
+  Eigen::VectorXs convertPositionsFromBallSpace(Eigen::VectorXs pos);
+
+  //----------------------------------------------------------------------------
+  // IK for retargetting (especially between similar but not identical human
+  // skeletons)
+  //----------------------------------------------------------------------------
+
+  /// This returns the concatenated 3-vectors for world positions of each joint
+  /// in 3D world space, for the registered joints.
+  Eigen::VectorXs getJointWorldPositions(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the concatenated 3-vectors for world angle of each joint's
+  /// child space in 3D world space, for the registered joints.
+  Eigen::VectorXs getJointWorldAngles(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointPositions(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtJointPositions(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtJointChildAngles(
+      const std::vector<const dynamics::Joint*>& joints) const;
+
+  /// This returns the Jacobian relating changes in source skeleton joint
+  /// positions to changes in source joint world positions.
+  Eigen::MatrixXs
+  finiteDifferenceJointWorldPositionsJacobianWrtJointChildAngles(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton body scales
+  /// to changes in source joint world positions.
+  Eigen::MatrixXs getJointWorldPositionsJacobianWrtBodyScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// This returns the Jacobian relating changes in source skeleton body scales
+  /// to changes in source joint world positions.
+  Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
+      const std::vector<const dynamics::Joint*>& joints);
+
+  /// These are a set of bodies, and offsets in local body space where markers
+  /// are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getMarkerMapWorldPositions(
+      const std::map<
+          std::string,
+          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>& markers);
+
+  /// These are a set of bodies, and offsets in local body space where markers
+  /// are mounted on the body
+  Eigen::VectorXs getMarkerWorldPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers) const;
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtBodyScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in body scales to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtBodyScales(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This returns the Jacobian relating changes in marker offsets to changes in
+  /// marker world positions.
+  Eigen::MatrixXs getMarkerWorldPositionsJacobianWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers) const;
+
+  /// This returns the Jacobian relating changes in marker offsets to changes in
+  /// marker world positions.
+  Eigen::MatrixXs finiteDifferenceMarkerWorldPositionsJacobianWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This gets the gradient of the ||f(q) - x|| function with respect to q
+  Eigen::VectorXs getMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs goal);
+
+  /// This gets the gradient of the ||f(q) - x|| function with respect to q
+  Eigen::VectorXs
+  finiteDifferenceMarkerWorldPositionDiffToGoalGradientWrtJointPos(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs goal);
+
+  /// This should be equivalent to
+  /// `getMarkerWorldPositionsJacobianWrtJointPositions`, just slower. This is
+  /// here so there's a simple non-recursive formula for the Jacobian to take
+  /// derivatives against.
+  Eigen::MatrixXs getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single joint index
+  Eigen::MatrixXs getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single joint index
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to joint
+  /// positions
+  Eigen::MatrixXs
+  getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to joint
+  /// positions
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single body scaling
+  Eigen::MatrixXs
+  getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis,
+      const Eigen::MatrixXs& markerWrtScaleJac);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single body scaling
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to body
+  /// scales
+  Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to body
+  /// scales
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single marker offset
+  Eigen::MatrixXs
+  getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int marker,
+      int axis,
+      const Eigen::MatrixXs& markerWrtMarkerJac);
+
+  /// This gets the derivative of the Jacobian of the markers wrt joint
+  /// positions, with respect to a single marker offset
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int marker,
+      int axis);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to
+  /// marker offsets
+  Eigen::MatrixXs getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This gets the Jacobian of leftMultiply.transpose()*J with respect to
+  /// marker offsets
+  Eigen::MatrixXs
+  finiteDifferenceMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs leftMultiply);
+
+  /// This runs IK, attempting to fit the world positions of the passed in
+  /// joints to the vector of (concatenated) target positions. This can
+  /// optionally also rescale the skeleton.
+  s_t fitJointsToWorldPositions(
+      const std::vector<const dynamics::Joint*>& positionJoints,
+      Eigen::VectorXs targetPositions,
+      bool scaleBodies = false,
+      math::IKConfig config = math::IKConfig());
+
+  /// This runs IK, attempting to fit the world positions of the passed in
+  /// markers to the vector of (concatenated) target positions.
+  s_t fitMarkersToWorldPositions(
+      const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      Eigen::VectorXs targetPositions,
+      Eigen::VectorXs markerWeights,
+      bool scaleBodies = false,
+      math::IKConfig config = math::IKConfig());
 
   //----------------------------------------------------------------------------
   // Integration and finite difference
@@ -1172,17 +1502,18 @@ public:
       const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
-
+  
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
-  // Documentation inherited
-  math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node, bool useRidders = true);
+  math::Jacobian getWorldPositionJacobian(const JacobianNode* _node,
+                                          const Eigen::Vector3s& _localOffset) const;
 
   // Documentation inherited
-  math::Jacobian finiteDifferenceRiddersWorldPositionJacobian(
-      const JacobianNode* _node);
+  math::Jacobian finiteDifferenceWorldPositionJacobian(
+      const JacobianNode* _node, 
+      const Eigen::Vector3s& _localOffset,
+      bool useRidders = true);
 
   // Documentation inherited
   math::Jacobian getWorldJacobian(const JacobianNode* _node) const override;
@@ -1648,6 +1979,9 @@ protected:
 
   /// NameManager for tracking SoftBodyNodes
   dart::common::NameManager<SoftBodyNode*> mNameMgrForSoftBodyNodes;
+
+  /// The groups that constrain the scales of body nodes to be equal
+  std::vector<std::vector<dynamics::BodyNode*>> mBodyScaleGroups;
 
   struct DirtyFlags
   {

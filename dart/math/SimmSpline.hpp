@@ -117,7 +117,6 @@ public:
   int getMaxDerivativeOrder() const;
 
   s_t finiteDifferenceFirstDerivative(s_t x, bool useRidders = true);
-  s_t finiteDifferenceRiddersFirstDerivative(s_t x);
 
 private:
   void calcCoefficients();
