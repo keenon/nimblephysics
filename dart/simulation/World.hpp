@@ -158,6 +158,8 @@ public:
   /// Get all the bodies attached to all the skeletons in this world
   std::vector<dynamics::BodyNode*> getAllBodyNodes();
 
+  dynamics::BodyNode* getBodyNodeIndex(size_t index);
+
   /// Get the number of skeletons
   std::size_t getNumSkeletons() const;
 

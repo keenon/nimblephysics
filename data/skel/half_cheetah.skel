@@ -316,7 +316,7 @@
                     	<upper>1.05</upper>
                     </limit>
                     <dynamics>
-                        <damping>6.0</damping>
+                        <damping>0.6</damping>
                         <spring_stiffness>240.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -335,7 +335,7 @@
                     	<upper>0.785</upper>
                     </limit>
                     <dynamics>
-                        <damping>4.5</damping>
+                        <damping>0.45</damping>
                         <spring_stiffness>180.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -354,7 +354,7 @@
                     	<upper>0.785</upper>
                     </limit>
                     <dynamics>
-                        <damping>3.0</damping>
+                        <damping>0.3</damping>
                         <spring_stiffness>120.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -375,7 +375,7 @@
                     	<upper>0.7</upper>
                     </limit>
                     <dynamics>
-                        <damping>4.5</damping>
+                        <damping>0.45</damping>
                         <spring_stiffness>180.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -394,7 +394,7 @@
                     	<upper>0.87</upper>
                     </limit>
                     <dynamics>
-                        <damping>3.0</damping>
+                        <damping>0.30</damping>
                         <spring_stiffness>120.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -413,7 +413,7 @@
                     	<upper>0.5</upper>
                     </limit>
                     <dynamics>
-                        <damping>1.5</damping>
+                        <damping>0.15</damping>
                         <spring_stiffness>60.0</spring_stiffness>
                     </dynamics>
                 </axis>
@@ -426,4 +426,3 @@
 
     </world>
 </skel>
-
