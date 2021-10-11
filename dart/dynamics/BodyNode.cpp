@@ -814,6 +814,118 @@ s_t BodyNode::getRestitutionCoeff() const
 }
 
 //==============================================================================
+Eigen::Vector3s BodyNode::getClosestVerticesToMarker(Eigen::Vector3s marker)
+{
+  Eigen::Vector3s minDistVertex = Eigen::Vector3s::Zero();
+  s_t minDist = std::numeric_limits<s_t>::infinity();
+
+  for (int i = 0; i < getNumShapeNodes(); i++)
+  {
+    dynamics::ShapeNode* node = getShapeNode(i);
+    std::shared_ptr<dynamics::Shape> shape = node->getShape();
+    if (shape->getType() == dynamics::MeshShape::getStaticType())
+    {
+      dynamics::MeshShape* meshShape
+          = static_cast<dynamics::MeshShape*>(shape.get());
+      std::vector<Eigen::Vector3s> vertices = meshShape->getVertices();
+      for (int j = 0; j < vertices.size(); j++)
+      {
+        Eigen::Vector3s vertex = getScale().cwiseProduct(vertices[j]);
+        Eigen::Vector3s diff = marker - vertex;
+        if (diff.squaredNorm() < minDist)
+        {
+          minDist = diff.squaredNorm();
+          minDistVertex = vertex;
+        }
+      }
+    }
+  }
+
+  return minDistVertex;
+}
+
+//==============================================================================
+s_t BodyNode::getDistToClosestVerticesToMarker(Eigen::Vector3s marker)
+{
+  Eigen::Vector3s closestVertex = getClosestVerticesToMarker(marker);
+  return (closestVertex - marker).squaredNorm();
+}
+
+//==============================================================================
+Eigen::Vector3s BodyNode::getGradientOfDistToClosestVerticesToMarkerWrtMarker(
+    Eigen::Vector3s marker)
+{
+  Eigen::Vector3s closestVertex = getClosestVerticesToMarker(marker);
+  return 2 * (marker - closestVertex);
+}
+
+//==============================================================================
+Eigen::Vector3s
+BodyNode::finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtMarker(
+    Eigen::Vector3s marker)
+{
+  Eigen::VectorXs result = Eigen::Vector3s::Zero();
+
+  s_t eps = 1e-6;
+
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::Vector3s tweaked = marker;
+        tweaked(i) += eps;
+        out = getDistToClosestVerticesToMarker(tweaked);
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::Vector3s
+BodyNode::getGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+    Eigen::Vector3s marker)
+{
+  Eigen::Vector3s closestVertex = getClosestVerticesToMarker(marker);
+  Eigen::Vector3s scale = getScale();
+  return 2
+         * (closestVertex - marker)
+               .cwiseProduct(closestVertex.cwiseQuotient(scale));
+}
+
+//==============================================================================
+Eigen::Vector3s
+BodyNode::finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+    Eigen::Vector3s marker)
+{
+  Eigen::VectorXs result = Eigen::Vector3s::Zero();
+  Eigen::Vector3s originalScale = getScale();
+
+  s_t eps = 1e-6;
+
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::Vector3s tweaked = originalScale;
+        tweaked(i) += eps;
+        setScale(tweaked);
+        out = getDistToClosestVerticesToMarker(marker);
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  setScale(originalScale);
+
+  return result;
+}
+
+//==============================================================================
 std::size_t BodyNode::getIndexInSkeleton() const
 {
   return mIndexInSkeleton;

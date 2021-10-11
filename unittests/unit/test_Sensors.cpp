@@ -20,6 +20,7 @@ using namespace biomechanics;
 
 #define ALL_TESTS
 
+#ifdef ALL_TESTS
 TEST(Sensors, HEIGHT)
 {
   std::shared_ptr<dynamics::Skeleton> standard
@@ -46,7 +47,9 @@ TEST(Sensors, HEIGHT)
     EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
   }
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(Sensors, LOWEST_POINT)
 {
   std::shared_ptr<dynamics::Skeleton> standard
@@ -58,7 +61,7 @@ TEST(Sensors, LOWEST_POINT)
   Eigen::VectorXs pos = standard->getRandomPose();
   standard->setPositions(pos);
 
-  EXPECT_NE(0, standard->getLowestPoint(standard->getPositions()));
+  EXPECT_NE(0, standard->getLowestPoint());
 
   Eigen::VectorXs analytical
       = standard->getGradientOfLowestPointWrtBodyScales();
@@ -91,3 +94,83 @@ TEST(Sensors, LOWEST_POINT)
     EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
   }
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(Sensors, MARKERS_WRT_MARKERS)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::shared_ptr<dynamics::Skeleton> standard = file.skeleton;
+
+  srand(30);
+  Eigen::VectorXs pos = standard->getRandomPose();
+  standard->setPositions(pos);
+
+  for (auto pair : file.markersMap)
+  {
+    Eigen::Vector3s analytical
+        = pair.second.first
+              ->getGradientOfDistToClosestVerticesToMarkerWrtMarker(
+                  pair.second.second);
+    Eigen::Vector3s bruteForce
+        = pair.second.first
+              ->finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtMarker(
+                  pair.second.second);
+    if (!equals(analytical, bruteForce, 1e-8))
+    {
+      std::cout << "Gradient of dist(marker, closest vertex) wrt marker!"
+                << std::endl;
+      Eigen::MatrixXs diff = Eigen::MatrixXs::Zero(analytical.size(), 3);
+      diff.col(0) = analytical;
+      diff.col(1) = bruteForce;
+      diff.col(2) = analytical - bruteForce;
+      std::cout << "Analytical - Brute Force - Diff" << std::endl
+                << diff << std::endl;
+      EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(Sensors, MARKERS_WRT_SCALE)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::shared_ptr<dynamics::Skeleton> standard = file.skeleton;
+
+  srand(30);
+  Eigen::VectorXs pos = standard->getRandomPose();
+  standard->setPositions(pos);
+
+  Eigen::VectorXs bodyScales
+      = Eigen::VectorXs::Ones(standard->getNumBodyNodes() * 3)
+        + 0.1 * Eigen::VectorXs::Random(standard->getNumBodyNodes() * 3);
+  standard->setBodyScales(bodyScales);
+
+  for (auto pair : file.markersMap)
+  {
+    Eigen::Vector3s analytical
+        = pair.second.first
+              ->getGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+                  pair.second.second);
+    Eigen::Vector3s bruteForce
+        = pair.second.first
+              ->finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+                  pair.second.second);
+    if (!equals(analytical, bruteForce, 1e-8))
+    {
+      std::cout << "Gradient of dist(marker, closest vertex) wrt marker!"
+                << std::endl;
+      Eigen::MatrixXs diff = Eigen::MatrixXs::Zero(analytical.size(), 3);
+      diff.col(0) = analytical;
+      diff.col(1) = bruteForce;
+      diff.col(2) = analytical - bruteForce;
+      std::cout << "Analytical - Brute Force - Diff" << std::endl
+                << diff << std::endl;
+      EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+    }
+  }
+}
+#endif

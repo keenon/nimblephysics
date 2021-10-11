@@ -152,9 +152,6 @@ class MarkerMocap:
     print("Loading "+handScaledGoldBodyOsimAbs)
     scaledOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
         handScaledGoldBodyOsimAbs)
-    print("Converting markers")
-    convertedMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]
-                           ] = self.skel.convertMarkerMap(scaledOsim.markersMap)
 
     handScaledGoldIKMotAbs: str = absPath(handScaledGoldIKMot)
     print("Loading "+handScaledGoldIKMotAbs)
@@ -178,9 +175,6 @@ class MarkerMocap:
     markerObservations.append(markerTrajectories.markerTimesteps[0])
     print("Marker observations:")
     print(markerObservations[0])
-
-    print("Original markers:")
-    print(convertedMarkers)
 
     world: nimble.simulation.World = nimble.simulation.World()
     world.addSkeleton(scaledOsim.skeleton)
@@ -209,12 +203,9 @@ class MarkerMocap:
     print("Loading "+handScaledGoldBodyOsimAbs)
     scaledOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
         handScaledGoldBodyOsimAbs)
-    print("Converting markers")
-    convertedMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]
-                           ] = self.skel.convertMarkerMap(scaledOsim.markersMap)
     print("Creating OpenSimFile")
     standardOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimFile(
-        self.skel, convertedMarkers)
+        self.skel, self.markersMap)
     print("Computing scale and marker offsets")
     config: nimble.biomechanics.OpenSimScaleAndMarkerOffsets = nimble.biomechanics.OpenSimParser.getScaleAndMarkerOffsets(
         standardOsim, scaledOsim)
@@ -243,15 +234,6 @@ class MarkerMocap:
     markerObservations: List[Dict[str, np.ndarray]
                              ] = [markerTrajectories.markerTimesteps[i] for i in chosenIndices]
 
-    self.fitter = nimble.biomechanics.MarkerFitter(
-        self.skel, convertedMarkers)
-    self.fitter.setInitialIKSatisfactoryLoss(0.05)
-    self.fitter.setInitialIKMaxRestarts(50)
-    self.fitter.setIterationLimit(100)
-    self.fitter.setCustomLossAndGrad(self.wrappedLoss)
-    for key in self.zeroConstraints:
-      self.fitter.addZeroConstraint(key, self.zeroConstraints[key])
-
     print("Optimize the fit")
     result: nimble.biomechanics.MarkerFitResult = self.fitter.optimize(markerObservations)
     self.skel.setGroupScales(result.groupScales)
@@ -261,10 +243,10 @@ class MarkerMocap:
     print('Final height (meters): '+str(finalHeightM))
 
     fitMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]] = {}
-    for markerName in convertedMarkers:
+    for markerName in self.markersMap:
       fitMarkers[markerName] = (
-          convertedMarkers[markerName][0],
-          convertedMarkers[markerName][1] + result.markerErrors[markerName])
+          self.markersMap[markerName][0],
+          self.markersMap[markerName][1] + result.markerErrors[markerName])
 
     print("Result scales: " + str(bodyScales))
 
@@ -312,7 +294,7 @@ class MarkerMocap:
         goldMarkers: Dict[str, np.ndarray] = scaledOsim.skeleton.getMarkerMapWorldPositions(
             scaledOsim.markersMap)
         realMarkers: Dict[str, np.ndarray] = markerObservations[timestep]
-        for markerName in convertedMarkers:
+        for markerName in self.markersMap:
           # Not all markers are observed at all timesteps
           if markerName in realMarkers:
             # Make a triangle between the 3 points
@@ -337,6 +319,11 @@ class MarkerMocap:
                 realMarkers[markerName],
                 [0, 0, 0],
                 [1, 1, 0])
+          else:
+            gui.nativeAPI().deleteObject(markerName)
+            gui.nativeAPI().deleteObject(markerName+"_found")
+            gui.nativeAPI().deleteObject(markerName+"_gold")
+            gui.nativeAPI().deleteObject(markerName+"_real")
         gui.nativeAPI().setAutoflush(True)
         gui.nativeAPI().flush()
 

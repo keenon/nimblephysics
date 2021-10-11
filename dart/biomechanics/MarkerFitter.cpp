@@ -286,6 +286,7 @@ MarkerFitter::MarkerFitter(
   {
     mMarkerIndices[pair.first] = offset;
     mMarkerNames.push_back(pair.first);
+    mMarkerIsTracking.push_back(false);
     offset++;
     mMarkers.push_back(pair.second);
     mMarkersBallJoints.emplace_back(
@@ -464,11 +465,62 @@ std::vector<std::map<std::string, Eigen::Vector3s>> MarkerFitter::pickSubset(
 }
 
 //==============================================================================
+/// All markers are either "anatomical" or "tracking". Markers are presumed to
+/// be anamotical markers unless otherwise specified. Tracking markers are
+/// treated differently - they're not used in the initial scaling and fitting,
+/// and their initial positions are not trusted at all. Instead, during
+/// initialization, we guess their offset based on where the markers are
+/// observed to be.
+void MarkerFitter::setMarkerIsTracking(std::string marker, bool isTracking)
+{
+  mMarkerIsTracking[mMarkerIndices[marker]] = isTracking;
+}
+
+//==============================================================================
+/// This returns true if the given marker is "tracking", otherwise it's
+/// "anatomical"
+bool MarkerFitter::getMarkerIsTracking(std::string marker)
+{
+  return mMarkerIsTracking[mMarkerIndices[marker]];
+}
+
+//==============================================================================
+/// This auto-labels any markers whose names end with '1', '2', or '3' as
+/// tracking markers, on the assumption that they're tracking triads.
+void MarkerFitter::setTriadsToTracking()
+{
+  for (int i = 0; i < getNumMarkers(); i++)
+  {
+    std::string markerName = getMarkerNameAtIndex(i);
+    char lastChar = markerName[markerName.size() - 1];
+    if (lastChar == '1' || lastChar == '2' || lastChar == '3')
+    {
+      setMarkerIsTracking(markerName);
+    }
+  }
+}
+
+//==============================================================================
+/// Gets the total number of markers we've got in this Fitter
+int MarkerFitter::getNumMarkers()
+{
+  return mMarkerNames.size();
+}
+
+//==============================================================================
 /// Internally all the markers are concatenated together, so each index has a
 /// name.
 std::string MarkerFitter::getMarkerNameAtIndex(int index)
 {
   return mMarkerNames[index];
+}
+
+//==============================================================================
+/// Internally all the markers are concatenated together, so each index has a
+/// name.
+int MarkerFitter::getMarkerIndex(std::string name)
+{
+  return mMarkerIndices[name];
 }
 
 //==============================================================================
@@ -1261,6 +1313,21 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
   // Initialize with a zero marker offset
   init.segment(groupScaleDim, markerOffsetDim).setZero();
 
+  // We're going to keep track of where we see the tracking markers, relative to
+  // their owning body, so we can initialize their offsets correctly
+  std::map<std::string, Eigen::Vector3s> trackingMarkerObservationsSum;
+  std::map<std::string, int> trackingMarkerNumObservations;
+
+  for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+  {
+    if (mFitter->mMarkerIsTracking[i])
+    {
+      std::string name = mFitter->mMarkerNames[i];
+      trackingMarkerObservationsSum[name] = Eigen::Vector3s::Zero();
+      trackingMarkerNumObservations[name] = 0;
+    }
+  }
+
   Eigen::VectorXs scalesAvg
       = Eigen::VectorXs::Zero(mFitter->mSkeletonBallJoints->getGroupScaleDim());
   s_t individualLossSum = 0.0;
@@ -1271,19 +1338,43 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         observedMarkers;
     Eigen::VectorXs markerPoses
         = Eigen::VectorXs::Zero(mMarkerObservations[i].size() * 3);
+    int numAnatomicalMarkers = 0;
     for (int j = 0; j < mMarkerObservations[i].size(); j++)
     {
       auto pair = mMarkerObservations[i][j];
       observedMarkers.push_back(mFitter->mMarkersBallJoints[pair.first]);
       markerPoses.segment<3>(j * 3) = pair.second;
+      if (!mFitter->mMarkerIsTracking[pair.first])
+      {
+        numAnatomicalMarkers++;
+      }
     }
 
-    // Because we have no initialization, we should do the slow thing and try
-    // really hard to fit the IK well
+    // Do the same thing with anatomical markers
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+        anatomicalMarkers;
+    Eigen::VectorXs anatomicalMarkerPoses
+        = Eigen::VectorXs::Zero(numAnatomicalMarkers * 3);
+    int anatomicalMarkersCursor = 0;
+    for (int j = 0; j < mMarkerObservations[i].size(); j++)
+    {
+      auto pair = mMarkerObservations[i][j];
+      if (!mFitter->mMarkerIsTracking[pair.first])
+      {
+        anatomicalMarkers.push_back(mFitter->mMarkersBallJoints[pair.first]);
+        anatomicalMarkerPoses.segment<3>(anatomicalMarkersCursor * 3)
+            = pair.second;
+        anatomicalMarkersCursor++;
+      }
+    }
+    assert(anatomicalMarkersCursor == numAnatomicalMarkers);
+
+    // Because we have no initialization, we should do the slow thing and
+    // try really hard to fit the IK well
 
     // We're going to enforce the joint limits in the Eulerian space, but do
-    // our actual gradient descient in SO3 space so we can avoid gimbal lock.
-    // That requires a bit of careful book-keeping.
+    // our actual gradient descient in SO3 space so we can avoid gimbal
+    // lock. That requires a bit of careful book-keeping.
 
     int problemDim = mFitter->mSkeletonBallJoints->getNumDofs()
                      + mFitter->mSkeletonBallJoints->getGroupScaleDim();
@@ -1302,8 +1393,8 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
 
     s_t loss = math::solveIK(
         initialPos,
-        observedMarkers.size() * 3,
-        [this, observedMarkers](
+        anatomicalMarkers.size() * 3,
+        [this, anatomicalMarkers](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
           mFitter->mSkeletonBallJoints->setPositions(
@@ -1346,34 +1437,34 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
               = newScales;
           return clampedPos;
         },
-        [this, observedMarkers, markerPoses](
+        [this, anatomicalMarkers, anatomicalMarkerPoses](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
-          diff = markerPoses
+          diff = anatomicalMarkerPoses
                  - mFitter->mSkeletonBallJoints->getMarkerWorldPositions(
-                     observedMarkers);
+                     anatomicalMarkers);
           assert(
               jac.cols()
               == mFitter->mSkeletonBallJoints->getNumDofs()
                      + mFitter->mSkeletonBallJoints->getGroupScaleDim());
-          assert(jac.rows() == observedMarkers.size() * 3);
+          assert(jac.rows() == anatomicalMarkers.size() * 3);
           jac.setZero();
           jac.block(
               0,
               0,
-              observedMarkers.size() * 3,
+              anatomicalMarkers.size() * 3,
               mFitter->mSkeletonBallJoints->getNumDofs())
               = mFitter->mSkeletonBallJoints
                     ->getMarkerWorldPositionsJacobianWrtJointPositions(
-                        observedMarkers);
+                        anatomicalMarkers);
           jac.block(
               0,
               mFitter->mSkeletonBallJoints->getNumDofs(),
-              observedMarkers.size() * 3,
+              anatomicalMarkers.size() * 3,
               mFitter->mSkeletonBallJoints->getGroupScaleDim())
               = mFitter->mSkeletonBallJoints
                     ->getMarkerWorldPositionsJacobianWrtGroupScales(
-                        observedMarkers);
+                        anatomicalMarkers);
         },
         [this](Eigen::VectorXs& val) {
           val.segment(0, mFitter->mSkeletonBallJoints->getNumDofs())
@@ -1411,13 +1502,49 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         = mFitter->mSkeleton->convertPositionsFromBallSpace(
             mFitter->mSkeletonBallJoints->getPositions());
     scalesAvg += mFitter->mSkeletonBallJoints->getGroupScales();
+
+    // Accumulate observations for the tracking markers
+    for (int j = 0; j < mMarkerObservations[i].size(); j++)
+    {
+      auto pair = mMarkerObservations[i][j];
+      if (!mFitter->mMarkerIsTracking[pair.first])
+      {
+        std::string name = mFitter->mMarkerNames[pair.first];
+        std::pair<dynamics::BodyNode*, Eigen::Vector3s> trackingMarker
+            = mFitter->mMarkers[pair.first];
+        Eigen::Vector3s worldPosition = pair.second;
+        Eigen::Vector3s localOffset
+            = trackingMarker.first->getWorldTransform().inverse()
+              * worldPosition;
+        Eigen::Vector3s netOffset = localOffset - trackingMarker.second;
+
+        trackingMarkerObservationsSum[name] += netOffset;
+        trackingMarkerNumObservations[name]++;
+      }
+    }
   }
+  // Get the average scales for the body nodes
   scalesAvg /= mMarkerObservations.size();
   mFitter->mSkeletonBallJoints->setGroupScales(scalesAvg);
   mFitter->mSkeleton->setGroupScales(scalesAvg);
 
   // Take the average scale we found, and use that as the initial guess
   init.segment(0, groupScaleDim) = scalesAvg;
+
+  // Collect the initial offset guesses
+  for (int i = 0; i < mFitter->mMarkers.size(); i++)
+  {
+    if (mFitter->mMarkerIsTracking[i])
+    {
+      std::string name = mFitter->mMarkerNames[i];
+      if (trackingMarkerNumObservations[name] > 0)
+      {
+        Eigen::Vector3s avgOffset = trackingMarkerObservationsSum[name]
+                                    / trackingMarkerNumObservations[name];
+        init.segment<3>(groupScaleDim + i * 3) = avgOffset;
+      }
+    }
+  }
 
   s_t noScaleLossSum = 0.0;
   // Go through and fit the markers as best we can, while holding scales
@@ -1432,7 +1559,11 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
     for (int j = 0; j < mMarkerObservations[i].size(); j++)
     {
       auto pair = mMarkerObservations[i][j];
-      observedMarkers.push_back(mFitter->mMarkersBallJoints[pair.first]);
+      // Collect markers while keeping track of initial offset guesses
+      observedMarkers.emplace_back(
+          mFitter->mMarkersBallJoints[pair.first].first,
+          mFitter->mMarkersBallJoints[pair.first].second
+              + init.segment<3>(groupScaleDim + i * 3));
       markerPoses.segment<3>(j * 3) = pair.second;
     }
 

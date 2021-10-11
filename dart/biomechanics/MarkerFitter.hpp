@@ -105,9 +105,32 @@ public:
           markerObservations,
       int maxSize);
 
+  /// All markers are either "anatomical" or "tracking". Markers are presumed to
+  /// be anamotical markers unless otherwise specified. Tracking markers are
+  /// treated differently - they're not used in the initial scaling and fitting,
+  /// and their initial positions are not trusted at all. Instead, during
+  /// initialization, we guess their offset based on where the markers are
+  /// observed to be.
+  void setMarkerIsTracking(std::string marker, bool isTracking = true);
+
+  /// This returns true if the given marker is "tracking", otherwise it's
+  /// "anatomical"
+  bool getMarkerIsTracking(std::string marker);
+
+  /// This auto-labels any markers whose names end with '1', '2', or '3' as
+  /// tracking markers, on the assumption that they're tracking triads.
+  void setTriadsToTracking();
+
+  /// Gets the total number of markers we've got in this Fitter
+  int getNumMarkers();
+
   /// Internally all the markers are concatenated together, so each index has a
   /// name.
   std::string getMarkerNameAtIndex(int index);
+
+  /// Internally all the markers are concatenated together, so each index has a
+  /// name.
+  int getMarkerIndex(std::string name);
 
   /// This method will set `skeleton` to the configuration given by the vectors
   /// of jointPositions and groupScales. It will also compute and return the
@@ -329,6 +352,7 @@ public:
 protected:
   std::map<std::string, int> mMarkerIndices;
   std::vector<std::string> mMarkerNames;
+  std::vector<bool> mMarkerIsTracking;
 
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;

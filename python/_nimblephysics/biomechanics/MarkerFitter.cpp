@@ -136,7 +136,20 @@ void MarkerFitter(py::module& m)
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,
           ::py::arg("markerObservations"),
-          ::py::arg("subsetSize"));
+          ::py::arg("subsetSize"))
+      .def(
+          "setMarkerIsTracking",
+          &dart::biomechanics::MarkerFitter::setMarkerIsTracking,
+          ::py::arg("marker"),
+          ::py::arg("isTracking") = true)
+      .def(
+          "getMarkerIsTracking",
+          &dart::biomechanics::MarkerFitter::getMarkerIsTracking,
+          ::py::arg("marker"))
+      .def(
+          "setTriadsToTracking",
+          &dart::biomechanics::MarkerFitter::setTriadsToTracking)
+      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
 }
 
 } // namespace python

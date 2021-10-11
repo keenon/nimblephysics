@@ -754,8 +754,7 @@ public:
   /// This computes the lowest point on the colliders, as measured by the `up`
   /// vector. This is useful in order to apply constraints that a model can't
   /// penetrate the ground.
-  s_t getLowestPoint(
-      Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+  s_t getLowestPoint(Eigen::Vector3s up = Eigen::Vector3s::UnitY());
 
   /// This computes the gradient of the lowest point wrt body scales
   Eigen::VectorXs getGradientOfLowestPointWrtBodyScales(

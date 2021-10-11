@@ -795,6 +795,24 @@ void BodyNode(py::module& m)
             return self->getRestitutionCoeff();
           })
       .def(
+          "getClosestVerticesToMarker",
+          &dynamics::BodyNode::getClosestVerticesToMarker,
+          ::py::arg("marker"))
+      .def(
+          "getDistToClosestVerticesToMarker",
+          &dynamics::BodyNode::getDistToClosestVerticesToMarker,
+          ::py::arg("marker"))
+      .def(
+          "getGradientOfDistToClosestVerticesToMarkerWrtMarker",
+          &dynamics::BodyNode::
+              getGradientOfDistToClosestVerticesToMarkerWrtMarker,
+          ::py::arg("marker"))
+      .def(
+          "getGradientOfDistToClosestVerticesToMarkerWrtBodyScale",
+          &dynamics::BodyNode::
+              getGradientOfDistToClosestVerticesToMarkerWrtBodyScale,
+          ::py::arg("marker"))
+      .def(
           "getIndexInSkeleton",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
             return self->getIndexInSkeleton();

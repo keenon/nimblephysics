@@ -1614,7 +1614,7 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1681,9 +1681,9 @@ TEST(MarkerFitter, DERIVATIVES)
 
   // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
 }
-// #endif
+#endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1736,10 +1736,10 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   EXPECT_TRUE(
       testBilevelFitProblemGradients(fitter, 3, 0.02, osimBallJoints, markers));
 }
-// #endif
+#endif
 
 // #ifdef FULL_EVAL
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1760,7 +1760,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   OpenSimFile scaled = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
   dynamics::MarkerMap convertedMarkers
-      = standard.skeleton->convertMarkerMap(scaled.markersMap);
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
   standard.markersMap = convertedMarkers;
   OpenSimScaleAndMarkerOffsets config
       = OpenSimParser::getScaleAndMarkerOffsets(standard, scaled);
@@ -1898,6 +1898,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 
   // Try to fit the skeleton to
 
+  /*
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
   for (auto pair : goldMarkers)
@@ -1909,6 +1910,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
   debugFitToGUI(
       standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
+  */
 
   // Get a random subset of the data
 
@@ -1959,6 +1961,10 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(50);
   fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
   std::shared_ptr<MarkerFitResult> result = fitter.optimize(markerObservations);
   standard.skeleton->setGroupScales(result->groupScales);
   Eigen::VectorXs bodyScales = standard.skeleton->getBodyScales();
@@ -1974,5 +1980,5 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   std::cout << "gold scales - result scales - error - error %" << std::endl
             << groupScaleCols << std::endl;
 }
-#endif
+// #endif
 // #endif
