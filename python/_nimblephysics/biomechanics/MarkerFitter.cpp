@@ -48,7 +48,11 @@ void MarkerFitter(py::module& m)
 {
   ::py::class_<dart::biomechanics::MarkerFitterState>(m, "MarkerFitterState")
       .def_readwrite(
+          "bodyNames", &dart::biomechanics::MarkerFitterState::bodyNames)
+      .def_readwrite(
           "bodyScales", &dart::biomechanics::MarkerFitterState::bodyScales)
+      .def_readwrite(
+          "markerOrder", &dart::biomechanics::MarkerFitterState::markerOrder)
       .def_readwrite(
           "markerOffsets",
           &dart::biomechanics::MarkerFitterState::markerOffsets)

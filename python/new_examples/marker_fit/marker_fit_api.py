@@ -93,7 +93,7 @@ def markerZeroConstraint(mocapState: nimble.MarkerMocapOptimizationState):
 
 
 def heightConstraint(mocapState: nimble.MarkerMocapOptimizationState):
-  height_error = scaledHeight - nimble.get_height(osim.skeleton, originalPos, mocapState.bodyScales)
+  height_error = 1.8 - nimble.get_height(osim.skeleton, originalPos, mocapState.bodyScales)
   return torch.square(height_error)
 
 
@@ -118,4 +118,4 @@ mocap.addZeroConstraint("ground", groundConstraint)
 mocap.evaluatePerformance(
     "./S01DN603.trc",
     "./Rajagopal_scaled.osim",
-    "./S01DN603_ik.mot", 15)
+    "./S01DN603_ik.mot", 10)

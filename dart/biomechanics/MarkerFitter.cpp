@@ -43,21 +43,25 @@ MarkerFitterState::MarkerFitterState(
 
   Eigen::VectorXs originalScales = skeleton->getGroupScales();
   skeleton->setGroupScales(flat.segment(0, groupScaleDim));
+  bodyScales = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+      3, skeleton->getNumBodyNodes());
+  bodyScalesGrad = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+      3, skeleton->getNumBodyNodes());
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
-    bodyScales[skeleton->getBodyNode(i)->getName()]
-        = skeleton->getBodyNode(i)->getScale();
-    bodyScalesGrad[skeleton->getBodyNode(i)->getName()]
-        = Eigen::Vector3s::Zero();
+    bodyNames.push_back(skeleton->getBodyNode(i)->getName());
+    bodyScales.col(i) = skeleton->getBodyNode(i)->getScale();
   }
 
   // Read marker offsets
 
+  markerOffsets
+      = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, markerOrder.size());
+  markerOffsetsGrad
+      = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, markerOrder.size());
   for (int i = 0; i < markerOrder.size(); i++)
   {
-    markerOffsets[markerOrder[i]]
-        = Eigen::Vector3s(flat.segment<3>(groupScaleDim + i * 3));
-    markerOffsetsGrad[markerOrder[i]] = Eigen::Vector3s::Zero();
+    markerOffsets.col(i) = flat.segment<3>(groupScaleDim + i * 3);
   }
 
   // Read poses and marker errors
@@ -77,13 +81,22 @@ MarkerFitterState::MarkerFitterState(
     markerMap[fitter->mMarkerNames[i]] = markers[i];
   }
 
+  posesAtTimesteps = Eigen::MatrixXs::Zero(
+      skeleton->getNumDofs(), markerObservations.size());
+  posesAtTimestepsGrad = Eigen::MatrixXs::Zero(
+      skeleton->getNumDofs(), markerObservations.size());
+
+  markerErrorsAtTimesteps = Eigen::MatrixXs::Zero(
+      markerObservations.size() * 3, markerOrder.size());
+  markerErrorsAtTimestepsGrad = Eigen::MatrixXs::Zero(
+      markerObservations.size() * 3, markerOrder.size());
+
   for (int i = 0; i < markerObservations.size(); i++)
   {
     Eigen::VectorXs pos = flat.segment(
         groupScaleDim + markerOffsetDim + (skeleton->getNumDofs() * i),
         skeleton->getNumDofs());
-    posesAtTimesteps.push_back(pos);
-    posesAtTimestepsGrad.push_back(Eigen::VectorXs::Zero(pos.size()));
+    posesAtTimesteps.col(i) = pos;
 
     // Compute marker errors at each timestep
 
@@ -92,23 +105,16 @@ MarkerFitterState::MarkerFitterState(
         = skeleton->getMarkerMapWorldPositions(markerMap);
     std::map<std::string, Eigen::Vector3s> desiredMarkerPoses
         = markerObservations[i];
-    std::map<std::string, Eigen::Vector3s> markerErrors;
-    std::map<std::string, Eigen::Vector3s> markerErrorsGrad;
-    for (std::string markerName : fitter->mMarkerNames)
+
+    for (int j = 0; j < markerOrder.size(); j++)
     {
+      std::string markerName = markerOrder[j];
       if (desiredMarkerPoses.count(markerName))
       {
-        markerErrors[markerName]
+        markerErrorsAtTimesteps.block<3, 1>(i * 3, j)
             = currentMarkerPoses[markerName] - desiredMarkerPoses[markerName];
       }
-      else
-      {
-        markerErrors[markerName] = Eigen::Vector3s::Zero();
-      }
-      markerErrorsGrad[markerName] = Eigen::Vector3s::Zero();
     }
-    markerErrorsAtTimesteps.push_back(markerErrors);
-    markerErrorsAtTimestepsGrad.push_back(markerErrorsGrad);
   }
 
   skeleton->setPositions(originalPos);
@@ -134,8 +140,7 @@ Eigen::VectorXs MarkerFitterState::flattenState()
   Eigen::VectorXs originalScales = skeleton->getGroupScales();
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
-    skeleton->getBodyNode(i)->setScale(
-        bodyScales[skeleton->getBodyNode(i)->getName()]);
+    skeleton->getBodyNode(i)->setScale(bodyScales.col(i));
   }
   flat.segment(0, groupScaleDim) = skeleton->getGroupScales();
   skeleton->setGroupScales(originalScales);
@@ -144,7 +149,7 @@ Eigen::VectorXs MarkerFitterState::flattenState()
 
   for (int i = 0; i < markerOrder.size(); i++)
   {
-    flat.segment<3>(groupScaleDim + i * 3) = markerOffsets[markerOrder[i]];
+    flat.segment<3>(groupScaleDim + i * 3) = markerOffsets.col(i);
   }
 
   // Write poses
@@ -154,7 +159,7 @@ Eigen::VectorXs MarkerFitterState::flattenState()
     flat.segment(
         groupScaleDim + markerOffsetDim + (skeleton->getNumDofs() * i),
         skeleton->getNumDofs())
-        = posesAtTimesteps[i];
+        = posesAtTimesteps.col(i);
   }
 
   return flat;
@@ -177,15 +182,20 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
   Eigen::VectorXs grad
       = Eigen::VectorXs::Zero(groupScaleDim + markerOffsetDim + posesDim);
 
+  std::map<std::string, Eigen::Vector3s> bodyScalesGradMap;
+  for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
+  {
+    bodyScalesGradMap[skeleton->getBodyNode(i)->getName()]
+        = bodyScalesGrad.col(i);
+  }
   grad.segment(0, groupScaleDim)
-      = skeleton->getGroupScaleGradientsFromMap(bodyScalesGrad);
+      = skeleton->getGroupScaleGradientsFromMap(bodyScalesGradMap);
 
   // 2. Write marker offsets grad
 
   for (int i = 0; i < markerOrder.size(); i++)
   {
-    grad.segment<3>(groupScaleDim + (i * 3))
-        = markerOffsetsGrad[markerOrder[i]];
+    grad.segment<3>(groupScaleDim + (i * 3)) = markerOffsetsGrad.col(i);
   }
 
   // 3. Write poses grad
@@ -195,7 +205,7 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
     grad.segment(
         groupScaleDim + markerOffsetDim + (skeleton->getNumDofs() * i),
         skeleton->getNumDofs())
-        = posesAtTimestepsGrad[i];
+        = posesAtTimestepsGrad.col(i);
   }
 
   // 4. Incorporate marker error grads
@@ -207,17 +217,16 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
 
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
-    skeleton->getBodyNode(i)->setScale(
-        bodyScales[skeleton->getBodyNode(i)->getName()]);
+    skeleton->getBodyNode(i)->setScale(bodyScales.col(i));
   }
   Eigen::VectorXs groupScales = skeleton->getGroupScales();
   Eigen::VectorXs markerOffsetsFlat
       = Eigen::VectorXs::Zero(markerOrder.size() * 3);
   for (int i = 0; i < markerOrder.size(); i++)
   {
-    markerOffsetsFlat.segment<3>(i * 3) = markerOffsets[markerOrder[i]];
+    markerOffsetsFlat.segment<3>(i * 3) = markerOffsets.col(i);
   }
-  Eigen::VectorXs firstPose = posesAtTimesteps[0];
+  Eigen::VectorXs firstPose = posesAtTimesteps.col(0);
 
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers
       = fitter->setConfiguration(
@@ -228,7 +237,7 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
   for (int i = 0; i < markerObservations.size(); i++)
   {
     int offset = groupScaleDim + markerOffsetDim + (i * skeleton->getNumDofs());
-    Eigen::VectorXs pose = posesAtTimesteps[i];
+    Eigen::VectorXs pose = posesAtTimesteps.col(i);
     skeleton->setPositions(pose);
 
     Eigen::VectorXs markerErrorGrad
@@ -236,7 +245,7 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
     for (int j = 0; j < markerOrder.size(); j++)
     {
       markerErrorGrad.segment<3>(j * 3)
-          = markerErrorsAtTimestepsGrad[i][markerOrder[j]];
+          = markerErrorsAtTimestepsGrad.block<3, 1>(3 * i, j);
     }
 
     // Get loss wrt joint positions
@@ -311,15 +320,8 @@ MarkerFitter::MarkerFitter(
 
   // Default to a least-squares loss over just the marker errors
   mLossAndGrad = [](MarkerFitterState* state) {
-    s_t loss = 0.0;
-    for (int t = 0; t < state->markerErrorsAtTimesteps.size(); t++)
-    {
-      for (auto pair : state->markerErrorsAtTimesteps[t])
-      {
-        loss += pair.second.squaredNorm();
-        state->markerErrorsAtTimestepsGrad[t][pair.first] = 2 * pair.second;
-      }
-    }
+    s_t loss = state->markerErrorsAtTimesteps.squaredNorm();
+    state->markerErrorsAtTimestepsGrad = 2 * state->markerErrorsAtTimesteps;
     return loss;
   };
 }

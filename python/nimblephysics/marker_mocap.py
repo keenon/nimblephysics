@@ -5,6 +5,7 @@ import numpy as np
 from .loader import absPath
 from .gui_server import NimbleGUI
 import random
+import traceback
 
 
 class MarkerMocapOptimizationState:
@@ -24,60 +25,56 @@ class MarkerMocapOptimizationState:
     self.markerErrorsAtTimesteps: List[Dict[str, torch.Tensor]] = []
     self.posesAtTimesteps: List[torch.Tensor] = []
 
-    for bodyName in rawState.bodyScales:
-      self.bodyScales[bodyName] = torch.tensor(rawState.bodyScales[bodyName], requires_grad=True)
+    for i in range(len(rawState.bodyNames)):
+      self.bodyScales[rawState.bodyNames[i]] = torch.tensor(
+          np.copy(rawState.bodyScales[:, i]), requires_grad=True)
 
-    for markerName in rawState.markerOffsets:
-      self.markerOffsets[markerName] = torch.tensor(
-          rawState.markerOffsets[markerName], requires_grad=True)
+    for i in range(len(rawState.markerOrder)):
+      self.markerOffsets[rawState.markerOrder[i]] = torch.tensor(
+          np.copy(rawState.markerOffsets[:, i]), requires_grad=True)
 
     for t in range(len(rawState.markerErrorsAtTimesteps)):
       markerErrors: Dict[str, torch.Tensor] = {}
-      for markerName in rawState.markerErrorsAtTimesteps[t]:
-        markerErrors[markerName] = torch.tensor(
-            rawState.markerErrorsAtTimesteps[t][markerName],
+      for i in range(len(rawState.markerOrder)):
+        markerErrors[rawState.markerOrder[i]] = torch.tensor(
+            np.copy(rawState.markerErrorsAtTimesteps[t*3:(t+1)*3, i]),
             requires_grad=True)
       self.markerErrorsAtTimesteps.append(markerErrors)
 
-    for t in range(len(rawState.posesAtTimesteps)):
-      self.posesAtTimesteps.append(torch.tensor(rawState.posesAtTimesteps[t], requires_grad=True))
+    for t in range(rawState.posesAtTimesteps.shape[1]):
+      self.posesAtTimesteps.append(torch.tensor(
+          np.copy(rawState.posesAtTimesteps[:, t]), requires_grad=True))
 
   def fillGradients(self, finalLoss: torch.Tensor) -> None:
     finalLoss.backward()
 
-    bodyScalesGrad: Dict[str, np.ndarray] = {}
-    for bodyName in self.bodyScales:
+    bodyScalesGrad: np.ndarray = np.zeros_like(self.rawState.bodyScales)
+    for i in range(len(self.rawState.bodyNames)):
+      bodyName = self.rawState.bodyNames[i]
       if self.bodyScales[bodyName].grad is not None:
-        bodyScalesGrad[bodyName] = self.bodyScales[bodyName].grad.numpy()
-      else:
-        bodyScalesGrad[bodyName] = np.zeros(3)
+        bodyScalesGrad[:, i] = self.bodyScales[bodyName].grad.numpy()
     self.rawState.bodyScalesGrad = bodyScalesGrad
 
-    markerOffsetsGrad: Dict[str, np.ndarray] = {}
-    for markerName in self.markerOffsets:
+    markerOffsetsGrad: np.ndarray = np.zeros_like(self.rawState.markerOffsets)
+    for i in range(len(self.rawState.markerOrder)):
+      markerName = self.rawState.markerOrder[i]
       if self.markerOffsets[markerName].grad is not None:
-        markerOffsetsGrad[markerName] = self.markerOffsets[markerName].grad.numpy()
-      else:
-        markerOffsetsGrad[markerName] = np.zeros(3)
+        markerOffsetsGrad[:, i] = self.markerOffsets[markerName].grad.numpy()
     self.rawState.markerOffsetsGrad = markerOffsetsGrad
 
-    markerErrorsGrad: List[Dict[str, np.ndarray]] = []
+    markerErrorsGrad: np.ndarray = np.zeros_like(self.rawState.markerErrorsAtTimesteps)
     for t in range(len(self.markerErrorsAtTimesteps)):
-      grad: Dict[str, torch.Tensor] = {}
-      for markerName in self.markerErrorsAtTimesteps[t]:
+      for i in range(len(self.rawState.markerOrder)):
+        markerName = self.rawState.markerOrder[i]
         if self.markerErrorsAtTimesteps[t][markerName].grad is not None:
-          grad[markerName] = self.markerErrorsAtTimesteps[t][markerName].grad.numpy()
-        else:
-          grad[markerName] = np.zeros(3)
-      markerErrorsGrad.append(grad)
+          markerErrorsGrad[t*3:(t+1)*3,
+                           i] = self.markerErrorsAtTimesteps[t][markerName].grad.numpy()
     self.rawState.markerErrorsAtTimestepsGrad = markerErrorsGrad
 
-    posesAtTimestepsGrad: List[np.ndarray] = []
+    posesAtTimestepsGrad: np.ndarray = np.zeros_like(self.rawState.posesAtTimesteps)
     for t in range(len(self.posesAtTimesteps)):
       if self.posesAtTimesteps[t].grad is not None:
-        posesAtTimestepsGrad.append(self.posesAtTimesteps[t].grad.numpy())
-      else:
-        posesAtTimestepsGrad.append(np.zeros_like(self.posesAtTimesteps[t].detach().numpy()))
+        posesAtTimestepsGrad[:, t] = self.posesAtTimesteps[t].grad.numpy()
     self.rawState.posesAtTimestepsGrad = posesAtTimestepsGrad
 
 
@@ -113,7 +110,7 @@ class MarkerMocap:
         wrappedState.fillGradients(loss)
         return loss.item()
       except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         return 0
     self.wrappedLoss = wrappedLoss
     self.fitter.setCustomLossAndGrad(self.wrappedLoss)
@@ -225,7 +222,7 @@ class MarkerMocap:
     randomIndices = [i for i in range(len(markerTrajectories.markerTimesteps))]
     random.seed(10)
     random.shuffle(randomIndices)
-    chosenIndices = randomIndices[:numStepsToFit]
+    chosenIndices = randomIndices[: numStepsToFit]
 
     print('Chosen Indices:')
     print(chosenIndices)

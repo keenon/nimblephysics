@@ -43,19 +43,25 @@ struct MarkerFitResult
  */
 struct MarkerFitterState
 {
+  // It's very expensive to bind maps over to Python (for some reason I don't
+  // understand), so we instead send everything as arrays, and reconstruct maps
+  // in the Python API
+
   // The current state
-  std::map<std::string, Eigen::Vector3s> bodyScales;
-  std::map<std::string, Eigen::Vector3s> markerOffsets;
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerErrorsAtTimesteps;
-  std::vector<Eigen::VectorXs> posesAtTimesteps;
+  std::vector<std::string> bodyNames;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyScales;
+
+  std::vector<std::string> markerOrder;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsets;
+  Eigen::MatrixXs markerErrorsAtTimesteps;
+  Eigen::MatrixXs posesAtTimesteps;
 
   // The gradient of the current state, which is not always used, but can help
   // shuttling information back and forth from friendly PyTorch APIs.
-  std::map<std::string, Eigen::Vector3s> bodyScalesGrad;
-  std::map<std::string, Eigen::Vector3s> markerOffsetsGrad;
-  std::vector<std::map<std::string, Eigen::Vector3s>>
-      markerErrorsAtTimestepsGrad;
-  std::vector<Eigen::VectorXs> posesAtTimestepsGrad;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyScalesGrad;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsetsGrad;
+  Eigen::MatrixXs markerErrorsAtTimestepsGrad;
+  Eigen::MatrixXs posesAtTimestepsGrad;
 
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
@@ -73,7 +79,6 @@ struct MarkerFitterState
 protected:
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::shared_ptr<dynamics::Skeleton> skeleton;
-  std::vector<std::string> markerOrder;
   MarkerFitter* fitter;
 };
 
