@@ -134,8 +134,7 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       scaled.skeleton,
       scaled.markersMap,
       mot.poses,
-      markerTrajectories.markerTimesteps,
-      activeMarkers);
+      markerTrajectories.markerTimesteps);
   report.printReport(10);
 }
 // #endif
