@@ -33,8 +33,8 @@
 #include "dart/dynamics/MultiSphereConvexHullShape.hpp"
 
 #include "dart/common/Console.hpp"
-#include "dart/math/Helpers.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -66,7 +66,8 @@ const std::string& MultiSphereConvexHullShape::getStaticType()
 }
 
 //==============================================================================
-void MultiSphereConvexHullShape::addSpheres(const MultiSphereConvexHullShape::Spheres& spheres)
+void MultiSphereConvexHullShape::addSpheres(
+    const MultiSphereConvexHullShape::Spheres& spheres)
 {
   mSpheres.insert(mSpheres.end(), spheres.begin(), spheres.end());
 
@@ -77,7 +78,8 @@ void MultiSphereConvexHullShape::addSpheres(const MultiSphereConvexHullShape::Sp
 }
 
 //==============================================================================
-void MultiSphereConvexHullShape::addSphere(const MultiSphereConvexHullShape::Sphere& sphere)
+void MultiSphereConvexHullShape::addSphere(
+    const MultiSphereConvexHullShape::Sphere& sphere)
 {
   mSpheres.push_back(sphere);
 
@@ -88,7 +90,8 @@ void MultiSphereConvexHullShape::addSphere(const MultiSphereConvexHullShape::Sph
 }
 
 //==============================================================================
-void MultiSphereConvexHullShape::addSphere(s_t radius, const Eigen::Vector3s& position)
+void MultiSphereConvexHullShape::addSphere(
+    s_t radius, const Eigen::Vector3s& position)
 {
   addSphere(std::make_pair(radius, position));
 }
@@ -111,7 +114,8 @@ std::size_t MultiSphereConvexHullShape::getNumSpheres() const
 }
 
 //==============================================================================
-const MultiSphereConvexHullShape::Spheres& MultiSphereConvexHullShape::getSpheres() const
+const MultiSphereConvexHullShape::Spheres&
+MultiSphereConvexHullShape::getSpheres() const
 {
   return mSpheres;
 }
@@ -121,6 +125,14 @@ Eigen::Matrix3s MultiSphereConvexHullShape::computeInertia(s_t mass) const
 {
   // Use bounding box to represent the mesh
   return BoxShape::computeInertia(getBoundingBox().computeFullExtents(), mass);
+}
+
+//==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr MultiSphereConvexHullShape::clone() const
+{
+  return std::make_shared<MultiSphereConvexHullShape>(mSpheres);
 }
 
 //==============================================================================
@@ -153,5 +165,5 @@ void MultiSphereConvexHullShape::updateVolume() const
   mIsVolumeDirty = false;
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

@@ -40,11 +40,11 @@
 namespace dart {
 namespace dynamics {
 
-/// MultiSphereConvexHullShape represents the convex hull of a collection of spheres.
+/// MultiSphereConvexHullShape represents the convex hull of a collection of
+/// spheres.
 class MultiSphereConvexHullShape : public Shape
 {
 public:
-
   using Sphere = std::pair<s_t, Eigen::Vector3s>;
   using Spheres = std::vector<Sphere>;
 
@@ -84,6 +84,10 @@ public:
   /// the axis-alinged bounding box of this MultiSphereConvexHullShape.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;
@@ -102,7 +106,7 @@ private:
 DART_DEPRECATED(6.2)
 typedef MultiSphereConvexHullShape MultiSphereShape;
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_MULTISPHERECONVEXHULLSHAPE_HPP_
+#endif // DART_DYNAMICS_MULTISPHERECONVEXHULLSHAPE_HPP_

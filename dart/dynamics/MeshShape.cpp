@@ -371,6 +371,14 @@ Eigen::Matrix3s MeshShape::computeInertia(s_t _mass) const
 }
 
 //==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr MeshShape::clone() const
+{
+  return std::make_shared<MeshShape>(mScale, mMesh, mMeshUri, nullptr, true);
+}
+
+//==============================================================================
 void MeshShape::updateBoundingBox() const
 {
   if (!mMesh)

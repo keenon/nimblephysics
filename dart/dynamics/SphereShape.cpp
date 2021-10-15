@@ -106,6 +106,14 @@ Eigen::Matrix3s SphereShape::computeInertia(s_t mass) const
 }
 
 //==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr SphereShape::clone() const
+{
+  return std::make_shared<SphereShape>(mRadius);
+}
+
+//==============================================================================
 void SphereShape::updateBoundingBox() const
 {
   mBoundingBox.setMin(Eigen::Vector3s::Constant(-mRadius));

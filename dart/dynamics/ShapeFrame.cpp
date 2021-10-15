@@ -219,7 +219,14 @@ void ShapeFrame::setProperties(const ShapeFrame::UniqueProperties& properties)
 //==============================================================================
 void ShapeFrame::setAspectProperties(const AspectProperties& properties)
 {
-  setShape(properties.mShape);
+  if (properties.mShape)
+  {
+    setShape(properties.mShape->clone());
+  }
+  else
+  {
+    setShape(nullptr);
+  }
 }
 
 //==============================================================================

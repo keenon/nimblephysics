@@ -73,14 +73,18 @@ public:
   void setNormalAndOffset(const Eigen::Vector3s& _normal, s_t _offset);
 
   /// Set plane normal and point
-  void setNormalAndPoint(const Eigen::Vector3s& _normal,
-                         const Eigen::Vector3s& _point);
+  void setNormalAndPoint(
+      const Eigen::Vector3s& _normal, const Eigen::Vector3s& _point);
 
   /// Compute distance between the plane and the given point
   s_t computeDistance(const Eigen::Vector3s& _point) const;
 
   /// Compute signed distance between the plane and the given point
   s_t computeSignedDistance(const Eigen::Vector3s& _point) const;
+
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
 
 private:
   // Documentation inherited.
@@ -96,7 +100,7 @@ private:
   s_t mOffset;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_PLANESHAPE_HPP_
+#endif // DART_DYNAMICS_PLANESHAPE_HPP_

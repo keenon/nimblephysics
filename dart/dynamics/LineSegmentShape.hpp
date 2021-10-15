@@ -49,8 +49,10 @@ public:
   LineSegmentShape(float _thickness = 1.0f);
 
   /// Constructor for creating a simple line segment that connects two vertices
-  LineSegmentShape(const Eigen::Vector3s& _v1, const Eigen::Vector3s& _v2,
-                   float _thickness = 1.0f);
+  LineSegmentShape(
+      const Eigen::Vector3s& _v1,
+      const Eigen::Vector3s& _v2,
+      float _thickness = 1.0f);
 
   // Documentation inherited.
   const std::string& getType() const override;
@@ -107,6 +109,10 @@ public:
   Eigen::Matrix3s computeInertia(s_t mass) const override;
 
   // TODO(MXG): Consider supporting colors-per-vertex
+
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
 
 protected:
   // Documentation inherited.

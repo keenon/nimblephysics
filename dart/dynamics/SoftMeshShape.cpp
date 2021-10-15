@@ -86,6 +86,14 @@ Eigen::Matrix3s SoftMeshShape::computeInertia(s_t /*mass*/) const
 }
 
 //==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr SoftMeshShape::clone() const
+{
+  return std::make_shared<SoftMeshShape>(mSoftBodyNode);
+}
+
+//==============================================================================
 void SoftMeshShape::updateBoundingBox() const
 {
   // TODO(JS): Not implemented.

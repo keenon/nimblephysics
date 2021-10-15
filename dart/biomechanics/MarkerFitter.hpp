@@ -4,6 +4,7 @@
 #include <memory>
 // #include <unordered_map>
 #include <map>
+#include <mutex>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -83,6 +84,18 @@ protected:
 };
 
 /**
+ * We create a single initialization object, and pass it around to optimization
+ * problems to re-use, because it's not super cheap to construct.
+ */
+struct MarkerInitialization
+{
+  Eigen::MatrixXs poses;
+  Eigen::VectorXs groupScales;
+  std::map<std::string, Eigen::Vector3s> markerOffsets;
+  std::map<std::string, Eigen::Vector3s> updatedMarkers;
+};
+
+/**
  * This is the high level object that handles fitting skeletons to mocap data.
  *
  * It's supposed to take labeled point trajectories, and a known "marker set"
@@ -102,6 +115,29 @@ public:
   std::shared_ptr<MarkerFitResult> optimize(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
+
+  /// This finds an initial guess for the body scales and poses, holding
+  /// anatomical marker offsets at 0, that we can use for downstream tasks.
+  ///
+  /// This can multithread over `numBlocks` independent sets of problems.
+  MarkerInitialization getInitialization(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      int numBlocks = 12);
+
+  /// This scales the skeleton and IK fits to the marker observations. It
+  /// returns a pair, with (pose, group scales) from the fit.
+  static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
+      const MarkerFitter* fitter,
+      std::map<std::string, Eigen::Vector3s> markerObservations);
+
+  /// This fits IK to the given trajectory, without scaling
+  static void fitTrajectory(
+      const MarkerFitter* fitter,
+      Eigen::VectorXs groupScales,
+      Eigen::VectorXs firstPoseGuess,
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      Eigen::Ref<Eigen::MatrixXs> result);
 
   /// This lets us pick a subset of the marker observations, to cap the size of
   /// the optimization problem.
@@ -359,6 +395,7 @@ protected:
   std::vector<std::string> mMarkerNames;
   std::vector<bool> mMarkerIsTracking;
 
+  std::mutex mGlobalLock;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<dynamics::Joint*> mObservedJoints;
@@ -384,6 +421,24 @@ protected:
   int mPrintFrequency;
   bool mSilenceOutput;
   bool mDisableLinesearch;
+};
+
+/**
+ * This sets up and finds the joint centers using a non-convex sphere-fitting
+ * method.
+ */
+class SphereFitJointCenterProblem
+{
+  SphereFitJointCenterProblem(
+      MarkerFitter* fitter,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      Eigen::MatrixXs ikPoses);
+
+protected:
+  MarkerFitter* mFitter;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  Eigen::MatrixXs mIkPoses;
 };
 
 /*

@@ -646,6 +646,7 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
 Eigen::Vector3s expMapNestedGradient(
     const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
 {
+  // TODO: replace me with an analytical formula
   return finiteDifferenceExpMapNestedGradient(original, screw);
 }
 

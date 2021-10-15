@@ -140,5 +140,13 @@ Eigen::Matrix3s ConeShape::computeInertia(s_t mass) const
   return computeInertia(mRadius, mHeight, mass);
 }
 
+//==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr ConeShape::clone() const
+{
+  return std::make_shared<ConeShape>(mRadius, mHeight);
+}
+
 } // namespace dynamics
 } // namespace dart

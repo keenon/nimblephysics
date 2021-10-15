@@ -540,6 +540,17 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
     }
   }
 
+  // Fix the scale groups
+  for (auto group : mBodyScaleGroups)
+  {
+    if (group.nodes.size() > 0) {
+      for (int i = 1; i < group.nodes.size(); i++) {
+        skelClone->mergeScaleGroups(skelClone->getBodyNode(group.nodes[0]->getName()), skelClone->getBodyNode(group.nodes[i]->getName()));
+      }
+      skelClone->setScaleGroupUniformScaling(skelClone->getBodyNode(group.nodes[0]->getName()), group.uniformScaling);
+    }
+  }
+
   return skelClone;
 }
 

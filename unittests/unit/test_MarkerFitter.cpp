@@ -1738,8 +1738,53 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 }
 #endif
 
-// #ifdef FULL_EVAL
 // #ifdef ALL_TESTS
+TEST(MarkerFitter, INITIALIZATION)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  // Get the gold data scales in `config`
+  OpenSimFile moddedBase = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
+  standard.markersMap = convertedMarkers;
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+  Eigen::MatrixXs poses = mot.poses;
+  (void)poses;
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  fitter.getInitialization(markerTrajectories.markerTimesteps);
+}
+// #endif
+
+// #ifdef FULL_EVAL
+#ifdef ALL_TESTS
 TEST(MarkerFitter, EVAL_PERFORMANCE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1980,5 +2025,5 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
   std::cout << "gold scales - result scales - error - error %" << std::endl
             << groupScaleCols << std::endl;
 }
-// #endif
+#endif
 // #endif

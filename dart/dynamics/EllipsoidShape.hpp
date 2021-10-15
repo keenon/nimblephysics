@@ -95,6 +95,10 @@ public:
   /// \brief True if all the radii are exactly eqaul.
   bool isSphere(void) const;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;

@@ -33,6 +33,7 @@
 #include "dart/dynamics/CylinderShape.hpp"
 
 #include <cmath>
+
 #include "dart/math/Helpers.hpp"
 
 namespace dart {
@@ -40,9 +41,7 @@ namespace dynamics {
 
 //==============================================================================
 CylinderShape::CylinderShape(s_t _radius, s_t _height)
-  : Shape(CYLINDER),
-    mRadius(_radius),
-    mHeight(_height)
+  : Shape(CYLINDER), mRadius(_radius), mHeight(_height)
 {
   assert(0.0 < _radius);
   assert(0.0 < _height);
@@ -102,13 +101,11 @@ s_t CylinderShape::computeVolume(s_t radius, s_t height)
 }
 
 //==============================================================================
-Eigen::Matrix3s CylinderShape::computeInertia(
-    s_t radius, s_t height, s_t mass)
+Eigen::Matrix3s CylinderShape::computeInertia(s_t radius, s_t height, s_t mass)
 {
   Eigen::Matrix3s inertia = Eigen::Matrix3s::Zero();
 
-  inertia(0, 0) = mass * (3.0 * pow(radius, 2) + pow(height, 2))
-      / 12.0;
+  inertia(0, 0) = mass * (3.0 * pow(radius, 2) + pow(height, 2)) / 12.0;
   inertia(1, 1) = inertia(0, 0);
   inertia(2, 2) = 0.5 * mass * radius * radius;
 
@@ -136,5 +133,13 @@ Eigen::Matrix3s CylinderShape::computeInertia(s_t mass) const
   return computeInertia(mRadius, mHeight, mass);
 }
 
-}  // namespace dynamics
-}  // namespace dart
+//==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr CylinderShape::clone() const
+{
+  return std::make_shared<CylinderShape>(mRadius, mHeight);
+}
+
+} // namespace dynamics
+} // namespace dart

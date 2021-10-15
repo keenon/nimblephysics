@@ -69,6 +69,10 @@ public:
   // Documentation inherited.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;
