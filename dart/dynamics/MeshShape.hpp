@@ -44,6 +44,14 @@
 namespace dart {
 namespace dynamics {
 
+struct SharedMeshWrapper
+{
+  SharedMeshWrapper(const aiScene* mesh);
+  ~SharedMeshWrapper();
+
+  const aiScene* mesh;
+};
+
 class MeshShape : public Shape
 {
 public:
@@ -80,7 +88,7 @@ public:
   /// Constructor.
   MeshShape(
       const Eigen::Vector3s& scale,
-      const aiScene* mesh,
+      std::shared_ptr<SharedMeshWrapper> mesh,
       const common::Uri& uri = "",
       common::ResourceRetrieverPtr resourceRetriever = nullptr,
       bool dontFreeMesh = false);
@@ -111,12 +119,12 @@ public:
   virtual void update();
 
   void setMesh(
-      const aiScene* mesh,
+      std::shared_ptr<SharedMeshWrapper> mesh,
       const std::string& path = "",
       common::ResourceRetrieverPtr resourceRetriever = nullptr);
 
   void setMesh(
-      const aiScene* mesh,
+      std::shared_ptr<SharedMeshWrapper> mesh,
       const common::Uri& path,
       common::ResourceRetrieverPtr resourceRetriever = nullptr);
 
@@ -162,12 +170,13 @@ public:
 
   void setDisplayList(int index);
 
-  static const aiScene* loadMesh(const std::string& filePath);
+  static std::shared_ptr<SharedMeshWrapper> loadMesh(
+      const std::string& filePath);
 
-  static const aiScene* loadMesh(
+  static std::shared_ptr<SharedMeshWrapper> loadMesh(
       const std::string& _uri, const common::ResourceRetrieverPtr& retriever);
 
-  static const aiScene* loadMesh(
+  static std::shared_ptr<SharedMeshWrapper> loadMesh(
       const common::Uri& uri, const common::ResourceRetrieverPtr& retriever);
 
   // Documentation inherited.
@@ -184,7 +193,7 @@ protected:
   // Documentation inherited.
   void updateVolume() const override;
 
-  const aiScene* mMesh;
+  std::shared_ptr<SharedMeshWrapper> mMesh;
 
   /// URI the mesh, if available).
   common::Uri mMeshUri;

@@ -1020,12 +1020,23 @@ void debugTrajectoryAndMarkersToGUI(
     std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         markers,
     Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories)
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
+    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0))
 {
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
   server.setAutoflush(false);
+
+  int numJoints = jointCenters.rows() / 3;
+  for (int i = 0; i < numJoints; i++)
+  {
+    server.createSphere(
+        "joint_center_" + i,
+        0.05,
+        Eigen::Vector3s::Zero(),
+        Eigen::Vector3s(0, 0, 1));
+  }
 
   int timestep = 0;
   Ticker ticker(1.0 / 50);
@@ -1035,6 +1046,7 @@ void debugTrajectoryAndMarkersToGUI(
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerTrajectories[timestep];
+    server.deleteObjectsByPrefix("marker_error_");
     for (auto pair : markerWorldPositions)
     {
       Eigen::Vector3s worldObserved = pair.second;
@@ -1047,6 +1059,12 @@ void debugTrajectoryAndMarkersToGUI(
       points.push_back(worldInferred);
       server.createLine(
           "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
+    }
+
+    for (int i = 0; i < numJoints; i++)
+    {
+      server.setObjectPosition(
+          "joint_center_" + i, jointCenters.block<3, 1>(i * 3, timestep));
     }
 
     server.flush();
@@ -1738,7 +1756,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, INITIALIZATION)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -1779,7 +1797,116 @@ TEST(MarkerFitter, INITIALIZATION)
   // Set all the triads to be tracking markers, instead of anatomical
   fitter.setTriadsToTracking();
 
-  fitter.getInitialization(markerTrajectories.markerTimesteps);
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  for (int i = 0; i < 300; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+
+  MarkerInitialization init = fitter.getInitialization(subsetTimesteps);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  /*
+  // Target markers
+  debugTrajectoryAndMarkersToGUI(
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps);
+  */
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(MarkerFitter, SPHERE_FIT_PROBLEM)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  // Get the gold data scales in `config`
+  OpenSimFile moddedBase = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
+  standard.markersMap = convertedMarkers;
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+  Eigen::MatrixXs poses = mot.poses;
+  (void)poses;
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 5; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init = fitter.getInitialization(subsetTimesteps);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  Eigen::MatrixXs out;
+  SphereFitJointCenterProblem sphereProblem(
+      &fitter,
+      subsetTimesteps,
+      init.poses,
+      standard.skeleton->getJoint("walker_knee_r"),
+      out);
+
+  Eigen::VectorXs analytical = sphereProblem.getGradient();
+  Eigen::VectorXs bruteForce = sphereProblem.finiteDifferenceGradient();
+
+  if (!equals(analytical, bruteForce, 1e-8))
+  {
+    std::cout << "Error on SphereFitJointCenterProblem grad " << std::endl
+              << "Analytical:" << std::endl
+              << analytical << std::endl
+              << "FD:" << std::endl
+              << bruteForce << std::endl
+              << "Diff:" << std::endl
+              << analytical - bruteForce << std::endl;
+    EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+  }
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+  fitter.findJointCenters(init, subsetTimesteps);
+
+  // Target markers
+  debugTrajectoryAndMarkersToGUI(
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      init.jointCenters);
 }
 // #endif
 

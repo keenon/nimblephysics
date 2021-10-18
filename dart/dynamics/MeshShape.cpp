@@ -152,9 +152,18 @@ namespace dart {
 namespace dynamics {
 
 //==============================================================================
+SharedMeshWrapper::SharedMeshWrapper(const aiScene* mesh) : mesh(mesh){};
+
+//==============================================================================
+SharedMeshWrapper::~SharedMeshWrapper()
+{
+  aiReleaseImport(mesh);
+}
+
+//==============================================================================
 MeshShape::MeshShape(
     const Eigen::Vector3s& scale,
-    const aiScene* mesh,
+    std::shared_ptr<SharedMeshWrapper> mesh,
     const common::Uri& path,
     common::ResourceRetrieverPtr resourceRetriever,
     bool dontFreeMesh)
@@ -189,9 +198,6 @@ MeshShape::MeshShape(
 //==============================================================================
 MeshShape::~MeshShape()
 {
-  if (mDontFreeMesh)
-    return;
-  aiReleaseImport(mMesh);
 }
 
 //==============================================================================
@@ -227,7 +233,7 @@ std::vector<Eigen::Vector3s> MeshShape::getVertices() const
 //==============================================================================
 const aiScene* MeshShape::getMesh() const
 {
-  return mMesh;
+  return mMesh->mesh;
 }
 
 //==============================================================================
@@ -262,7 +268,7 @@ common::ResourceRetrieverPtr MeshShape::getResourceRetriever()
 
 //==============================================================================
 void MeshShape::setMesh(
-    const aiScene* mesh,
+    std::shared_ptr<SharedMeshWrapper> mesh,
     const std::string& path,
     common::ResourceRetrieverPtr resourceRetriever)
 {
@@ -271,7 +277,7 @@ void MeshShape::setMesh(
 
 //==============================================================================
 void MeshShape::setMesh(
-    const aiScene* mesh,
+    std::shared_ptr<SharedMeshWrapper> mesh,
     const common::Uri& uri,
     common::ResourceRetrieverPtr resourceRetriever)
 {
@@ -396,22 +402,23 @@ void MeshShape::updateBoundingBox() const
   s_t min_Y = std::numeric_limits<s_t>::infinity();
   s_t min_Z = std::numeric_limits<s_t>::infinity();
 
-  for (unsigned int i = 0; i < mMesh->mNumMeshes; i++)
+  const aiScene* mesh = getMesh();
+  for (unsigned int i = 0; i < mesh->mNumMeshes; i++)
   {
-    for (unsigned int j = 0; j < mMesh->mMeshes[i]->mNumVertices; j++)
+    for (unsigned int j = 0; j < mesh->mMeshes[i]->mNumVertices; j++)
     {
-      if (mMesh->mMeshes[i]->mVertices[j].x > max_X)
-        max_X = mMesh->mMeshes[i]->mVertices[j].x;
-      if (mMesh->mMeshes[i]->mVertices[j].x < min_X)
-        min_X = mMesh->mMeshes[i]->mVertices[j].x;
-      if (mMesh->mMeshes[i]->mVertices[j].y > max_Y)
-        max_Y = mMesh->mMeshes[i]->mVertices[j].y;
-      if (mMesh->mMeshes[i]->mVertices[j].y < min_Y)
-        min_Y = mMesh->mMeshes[i]->mVertices[j].y;
-      if (mMesh->mMeshes[i]->mVertices[j].z > max_Z)
-        max_Z = mMesh->mMeshes[i]->mVertices[j].z;
-      if (mMesh->mMeshes[i]->mVertices[j].z < min_Z)
-        min_Z = mMesh->mMeshes[i]->mVertices[j].z;
+      if (mesh->mMeshes[i]->mVertices[j].x > max_X)
+        max_X = mesh->mMeshes[i]->mVertices[j].x;
+      if (mesh->mMeshes[i]->mVertices[j].x < min_X)
+        min_X = mesh->mMeshes[i]->mVertices[j].x;
+      if (mesh->mMeshes[i]->mVertices[j].y > max_Y)
+        max_Y = mesh->mMeshes[i]->mVertices[j].y;
+      if (mesh->mMeshes[i]->mVertices[j].y < min_Y)
+        min_Y = mesh->mMeshes[i]->mVertices[j].y;
+      if (mesh->mMeshes[i]->mVertices[j].z > max_Z)
+        max_Z = mesh->mMeshes[i]->mVertices[j].z;
+      if (mesh->mMeshes[i]->mVertices[j].z < min_Z)
+        min_Z = mesh->mMeshes[i]->mVertices[j].z;
     }
   }
   mBoundingBox.setMin(
@@ -431,7 +438,7 @@ void MeshShape::updateVolume() const
 }
 
 //==============================================================================
-const aiScene* MeshShape::loadMesh(
+std::shared_ptr<SharedMeshWrapper> MeshShape::loadMesh(
     const std::string& _uri, const common::ResourceRetrieverPtr& retriever)
 {
   // Remove points and lines from the import.
@@ -512,18 +519,19 @@ const aiScene* MeshShape::loadMesh(
 
   aiReleasePropertyStore(propertyStore);
 
-  return scene;
+  return std::make_shared<SharedMeshWrapper>(scene);
 }
 
 //==============================================================================
-const aiScene* MeshShape::loadMesh(
+std::shared_ptr<SharedMeshWrapper> MeshShape::loadMesh(
     const common::Uri& uri, const common::ResourceRetrieverPtr& retriever)
 {
   return loadMesh(uri.toString(), retriever);
 }
 
 //==============================================================================
-const aiScene* MeshShape::loadMesh(const std::string& filePath)
+std::shared_ptr<SharedMeshWrapper> MeshShape::loadMesh(
+    const std::string& filePath)
 {
   const auto retriever = std::make_shared<common::LocalResourceRetriever>();
   return loadMesh("file://" + filePath, retriever);
