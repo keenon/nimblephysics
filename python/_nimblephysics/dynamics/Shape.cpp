@@ -75,8 +75,9 @@ void Shape(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def(
           "computeInertia",
-          +[](const dart::dynamics::Shape* self, s_t mass)
-              -> Eigen::Matrix3s { return self->computeInertia(mass); },
+          +[](const dart::dynamics::Shape* self, s_t mass) -> Eigen::Matrix3s {
+            return self->computeInertia(mass);
+          },
           ::py::arg("mass"))
       .def(
           "computeInertiaFromDensity",
@@ -87,8 +88,9 @@ void Shape(py::module& m)
           ::py::arg("density"))
       .def(
           "computeInertiaFromMass",
-          +[](const dart::dynamics::Shape* self, s_t mass)
-              -> Eigen::Matrix3s { return self->computeInertiaFromMass(mass); },
+          +[](const dart::dynamics::Shape* self, s_t mass) -> Eigen::Matrix3s {
+            return self->computeInertiaFromMass(mass);
+          },
           ::py::arg("mass"))
       .def(
           "getVolume",
@@ -205,10 +207,7 @@ void Shape(py::module& m)
       dart::dynamics::ConeShape,
       dart::dynamics::Shape,
       std::shared_ptr<dart::dynamics::ConeShape>>(m, "ConeShape")
-      .def(
-          ::py::init<s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("height"))
+      .def(::py::init<s_t, s_t>(), ::py::arg("radius"), ::py::arg("height"))
       .def(
           "getType",
           +[](const dart::dynamics::ConeShape* self) -> const std::string& {
@@ -270,13 +269,15 @@ void Shape(py::module& m)
       dart::dynamics::Shape,
       std::shared_ptr<dart::dynamics::MeshShape>>(m, "MeshShape")
       .def(
-          ::py::init<const Eigen::Vector3s&, const aiScene*>(),
+          ::py::init<
+              const Eigen::Vector3s&,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper>>(),
           ::py::arg("scale"),
           ::py::arg("mesh"))
       .def(
           ::py::init<
               const Eigen::Vector3s&,
-              const aiScene*,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper>,
               const dart::common::Uri&>(),
           ::py::arg("scale"),
           ::py::arg("mesh"),
@@ -284,7 +285,7 @@ void Shape(py::module& m)
       .def(
           ::py::init<
               const Eigen::Vector3s&,
-              const aiScene*,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper>,
               const dart::common::Uri&,
               dart::common::ResourceRetrieverPtr>(),
           ::py::arg("scale"),
@@ -292,9 +293,7 @@ void Shape(py::module& m)
           ::py::arg("uri"),
           ::py::arg("resourceRetriever"))
       .def(
-          ::py::init<
-              const Eigen::Vector3d&,
-              const std::string>(),
+          ::py::init<const Eigen::Vector3d&, const std::string>(),
           ::py::arg("scale"),
           ::py::arg("path"))
       .def(
@@ -321,21 +320,22 @@ void Shape(py::module& m)
           ::py::arg("alpha"))
       .def(
           "setMesh",
-          +[](dart::dynamics::MeshShape* self, const aiScene* mesh) {
+          +[](dart::dynamics::MeshShape* self,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper> mesh) {
             self->setMesh(mesh);
           },
           ::py::arg("mesh"))
       .def(
           "setMesh",
           +[](dart::dynamics::MeshShape* self,
-              const aiScene* mesh,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper> mesh,
               const std::string& path) { self->setMesh(mesh, path); },
           ::py::arg("mesh"),
           ::py::arg("path"))
       .def(
           "setMesh",
           +[](dart::dynamics::MeshShape* self,
-              const aiScene* mesh,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper> mesh,
               const std::string& path,
               dart::common::ResourceRetrieverPtr resourceRetriever) {
             self->setMesh(mesh, path, resourceRetriever);
@@ -346,14 +346,14 @@ void Shape(py::module& m)
       .def(
           "setMesh",
           +[](dart::dynamics::MeshShape* self,
-              const aiScene* mesh,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper> mesh,
               const dart::common::Uri& path) { self->setMesh(mesh, path); },
           ::py::arg("mesh"),
           ::py::arg("path"))
       .def(
           "setMesh",
           +[](dart::dynamics::MeshShape* self,
-              const aiScene* mesh,
+              std::shared_ptr<dart::dynamics::SharedMeshWrapper> mesh,
               const dart::common::Uri& path,
               dart::common::ResourceRetrieverPtr resourceRetriever) {
             self->setMesh(mesh, path, resourceRetriever);
@@ -590,8 +590,7 @@ void Shape(py::module& m)
           "mMaxHeadLength",
           &dart::dynamics::ArrowShape::Properties::mMaxHeadLength)
       .def_readwrite(
-          "ms_tArrow",
-          &dart::dynamics::ArrowShape::Properties::ms_tArrow);
+          "ms_tArrow", &dart::dynamics::ArrowShape::Properties::ms_tArrow);
 
   ::py::class_<
       dart::dynamics::PlaneShape,
@@ -725,10 +724,7 @@ void Shape(py::module& m)
       dart::dynamics::CapsuleShape,
       dart::dynamics::Shape,
       std::shared_ptr<dart::dynamics::CapsuleShape>>(m, "CapsuleShape")
-      .def(
-          ::py::init<s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("height"))
+      .def(::py::init<s_t, s_t>(), ::py::arg("radius"), ::py::arg("height"))
       .def(
           "getType",
           +[](const dart::dynamics::CapsuleShape* self) -> const std::string& {
@@ -789,10 +785,7 @@ void Shape(py::module& m)
       dart::dynamics::CylinderShape,
       dart::dynamics::Shape,
       std::shared_ptr<dart::dynamics::CylinderShape>>(m, "CylinderShape")
-      .def(
-          ::py::init<s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("height"))
+      .def(::py::init<s_t, s_t>(), ::py::arg("radius"), ::py::arg("height"))
       .def(
           "getType",
           +[](const dart::dynamics::CylinderShape* self) -> const std::string& {
@@ -932,8 +925,7 @@ void Shape(py::module& m)
           ::py::arg("diameters"))
       .def_static(
           "computeInertiaOf",
-          +[](const Eigen::Vector3s& diameters,
-              s_t mass) -> Eigen::Matrix3s {
+          +[](const Eigen::Vector3s& diameters, s_t mass) -> Eigen::Matrix3s {
             return dart::dynamics::EllipsoidShape::computeInertia(
                 diameters, mass);
           },
@@ -1085,10 +1077,8 @@ void Shape(py::module& m)
               -> std::size_t { return self->getNumSpheres(); })
       .def(
           "computeInertia",
-          +[](const dart::dynamics::MultiSphereConvexHullShape* self,
-              s_t mass) -> Eigen::Matrix3s {
-            return self->computeInertia(mass);
-          },
+          +[](const dart::dynamics::MultiSphereConvexHullShape* self, s_t mass)
+              -> Eigen::Matrix3s { return self->computeInertia(mass); },
           ::py::arg("mass"))
       .def_static(
           "getStaticType",

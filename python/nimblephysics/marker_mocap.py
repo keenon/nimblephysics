@@ -187,7 +187,7 @@ class MarkerMocap:
                           handScaledGoldBodyOsim: str,
                           handScaledGoldIKMot: str,
                           numStepsToFit: int = 3,
-                          debugToGUI: bool = True) -> nimble.biomechanics.MarkerFitResult:
+                          debugToGUI: bool = True) -> nimble.biomechanics.MarkerInitialization:
     """
     This compares the performance of the MarkerMocap system to a manual fit process, and prints a number of stats
     """
@@ -218,32 +218,27 @@ class MarkerMocap:
     print('Original IK:')
     originalIK.printReport(limitTimesteps=10)
 
-    print("Picking a random subset of the marker data")
-    randomIndices = [i for i in range(len(markerTrajectories.markerTimesteps))]
-    random.seed(10)
-    random.shuffle(randomIndices)
-    chosenIndices = randomIndices[: numStepsToFit]
-
-    print('Chosen Indices:')
-    print(chosenIndices)
-
-    goldPoses = mot.poses[:, chosenIndices]
-    markerObservations: List[Dict[str, np.ndarray]
-                             ] = [markerTrajectories.markerTimesteps[i] for i in chosenIndices]
+    goldPoses = mot.poses
+    markerObservations: List[Dict[str, np.ndarray]] = markerTrajectories.markerTimesteps
 
     print("Optimize the fit")
-    result: nimble.biomechanics.MarkerFitResult = self.fitter.optimize(markerObservations)
+    self.fitter.setIterationLimit(200)
+    result: nimble.biomechanics.MarkerInitialization = self.fitter.runKinematicsPipeline(
+        markerObservations, nimble.biomechanics.InitialMarkerFitParams())
     self.skel.setGroupScales(result.groupScales)
     bodyScales: np.ndarray = self.skel.getBodyScales()
 
     finalHeightM = self.skel.getHeight(self.skelOriginalPose)
     print('Final height (meters): '+str(finalHeightM))
 
+    fitMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]] = result.updatedMarkerMap
+    """
     fitMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]] = {}
     for markerName in self.markersMap:
       fitMarkers[markerName] = (
           self.markersMap[markerName][0],
-          self.markersMap[markerName][1] + result.markerErrors[markerName])
+          self.markersMap[markerName][1] + result.markerOffsets[markerName])
+    """
 
     print("Result scales: " + str(bodyScales))
 
@@ -256,16 +251,8 @@ class MarkerMocap:
     print("gold scales - result scales - error - error %")
     print(groupScaleCols)
 
-    posesSubset = np.zeros((mot.poses.shape[0], len(chosenIndices)))
-    for i in range(len(chosenIndices)):
-      posesSubset[:, i] = mot.poses[:, chosenIndices[i]]
-    originalIKSubset: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
-        scaledOsim.skeleton, scaledOsim.markersMap, posesSubset, markerObservations)
-    print('Original IK:')
-    originalIKSubset.printReport(limitTimesteps=10)
-
     resultIK: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
-        self.skel, fitMarkers, result.posesMatrix, markerObservations)
+        self.skel, fitMarkers, result.poses, markerObservations)
     print('Fine tuned IK:')
     resultIK.printReport(limitTimesteps=10)
 
@@ -273,10 +260,13 @@ class MarkerMocap:
       world: nimble.simulation.World = nimble.simulation.World()
       gui: NimbleGUI = NimbleGUI(world)
 
+      ourColor = [235. / 255, 32. / 255, 14. / 255]
+      goldColor = [26. / 255, 99. / 255, 235. / 255]
+
       def renderTimestep(timestep):
         gui.nativeAPI().setAutoflush(False)
         # Render our guessed position
-        self.skel.setPositions(result.poses[timestep])
+        self.skel.setPositions(result.poses[:, timestep])
         gui.nativeAPI().renderSkeleton(self.skel, 'result')
 
         # Calculate where we think markers are
@@ -285,7 +275,7 @@ class MarkerMocap:
 
         # Render the gold position
         scaledOsim.skeleton.setPositions(goldPoses[:, timestep])
-        gui.nativeAPI().renderSkeleton(scaledOsim.skeleton, 'gold', [0, 1, 0])
+        gui.nativeAPI().renderSkeleton(scaledOsim.skeleton, 'gold', goldColor)
 
         # Render compared marker positions
         goldMarkers: Dict[str, np.ndarray] = scaledOsim.skeleton.getMarkerMapWorldPositions(
@@ -295,29 +285,34 @@ class MarkerMocap:
           # Not all markers are observed at all timesteps
           if markerName in realMarkers:
             # Make a triangle between the 3 points
-            points = [
-                observedMarkers[markerName],
-                goldMarkers[markerName],
+            goldErrorLine = [
+                realMarkers[markerName],
+                goldMarkers[markerName]]
+            gui.nativeAPI().createLine(markerName + "_goldError", goldErrorLine, goldColor)
+            ourErrorLine = [
                 realMarkers[markerName],
                 observedMarkers[markerName]]
-            gui.nativeAPI().createLine(markerName, points, [1, 0, 0])
+            gui.nativeAPI().createLine(markerName + "_ourError", ourErrorLine, ourColor)
+
             gui.nativeAPI().createBox(
-                markerName + "_found", [0.005, 0.005, 0.005],
+                markerName + "_found", [0.003, 0.003, 0.003],
                 observedMarkers[markerName],
                 [0, 0, 0],
-                [1, 0, 0])
+                ourColor)
             gui.nativeAPI().createBox(
-                markerName + "_gold", [0.01, 0.01, 0.01],
+                markerName + "_gold", [0.003, 0.003, 0.003],
                 goldMarkers[markerName],
                 [0, 0, 0],
-                [0, 1, 0])
+                goldColor)
             gui.nativeAPI().createBox(
-                markerName + "_real", [0.01, 0.01, 0.01],
+                markerName + "_real", [0.005, 0.005, 0.005],
                 realMarkers[markerName],
                 [0, 0, 0],
                 [1, 1, 0])
           else:
             gui.nativeAPI().deleteObject(markerName)
+            gui.nativeAPI().deleteObject(markerName+"_goldError")
+            gui.nativeAPI().deleteObject(markerName+"_ourError")
             gui.nativeAPI().deleteObject(markerName+"_found")
             gui.nativeAPI().deleteObject(markerName+"_gold")
             gui.nativeAPI().deleteObject(markerName+"_real")
@@ -325,19 +320,33 @@ class MarkerMocap:
         gui.nativeAPI().flush()
 
       cursor = 0
+      playing = True
       renderTimestep(cursor)
 
       def keyListener(key: str):
-        nonlocal cursor
+        nonlocal playing
         if key == " ":
+          playing = not playing
+
+      def onTick(time: float):
+        nonlocal playing
+        nonlocal cursor
+        if playing:
           cursor += 1
-          if cursor >= len(result.poses):
+          if cursor >= result.poses.shape[1]:
             cursor = 0
           renderTimestep(cursor)
+
+      ticker = nimble.realtime.Ticker(1.0 / 60)
+      ticker.registerTickListener(onTick)
 
       gui.nativeAPI().registerKeydownListener(keyListener)
 
       gui.nativeAPI().renderBasis()
+
+      def onConnect():
+        ticker.start()
+      gui.nativeAPI().registerConnectionListener(onConnect)
 
       gui.serve(8080)
       gui.blockWhileServing()

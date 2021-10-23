@@ -24,18 +24,18 @@ namespace biomechanics {
 class MarkerFitter;
 struct MarkerFitterState;
 
-struct MarkerFitResult
+struct BilevelFitResult
 {
   bool success;
 
   Eigen::VectorXs groupScales;
   std::vector<Eigen::VectorXs> poses;
   Eigen::MatrixXs posesMatrix;
-  std::map<std::string, Eigen::Vector3s> markerErrors;
+  std::map<std::string, Eigen::Vector3s> markerOffsets;
 
   Eigen::VectorXs rawMarkerOffsets;
 
-  MarkerFitResult();
+  BilevelFitResult();
 };
 
 /**
@@ -56,6 +56,8 @@ struct MarkerFitterState
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsets;
   Eigen::MatrixXs markerErrorsAtTimesteps;
   Eigen::MatrixXs posesAtTimesteps;
+  std::vector<std::string> jointOrder;
+  Eigen::MatrixXs jointErrorsAtTimesteps;
 
   // The gradient of the current state, which is not always used, but can help
   // shuttling information back and forth from friendly PyTorch APIs.
@@ -63,11 +65,14 @@ struct MarkerFitterState
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsetsGrad;
   Eigen::MatrixXs markerErrorsAtTimestepsGrad;
   Eigen::MatrixXs posesAtTimestepsGrad;
+  Eigen::MatrixXs jointErrorsAtTimestepsGrad;
 
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
       const Eigen::VectorXs& flat,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      std::vector<dynamics::Joint*> joints,
+      Eigen::MatrixXs jointCenters,
       MarkerFitter* fitter);
 
   /// This returns a single flat vector representing this whole problem state
@@ -80,6 +85,8 @@ struct MarkerFitterState
 protected:
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::shared_ptr<dynamics::Skeleton> skeleton;
+  std::vector<dynamics::Joint*> joints;
+  Eigen::MatrixXs jointCenters;
   MarkerFitter* fitter;
 };
 
@@ -264,6 +271,41 @@ public:
 };
 
 /**
+ * Here's some extra, optional params for controlling how initializations
+ * happen.
+ */
+struct InitialMarkerFitParams
+{
+  std::map<std::string, s_t> markerWeights;
+  std::vector<dynamics::Joint*> joints;
+  Eigen::MatrixXs jointCenters;
+  Eigen::VectorXs jointWeights;
+  int numBlocks;
+  Eigen::MatrixXs initPoses;
+
+  std::map<std::string, Eigen::Vector3s> markerOffsets;
+  Eigen::VectorXs groupScales;
+  bool dontRescaleBodies;
+
+  InitialMarkerFitParams();
+  InitialMarkerFitParams(const InitialMarkerFitParams& other);
+  InitialMarkerFitParams& setMarkerWeights(
+      std::map<std::string, s_t> markerWeights);
+  InitialMarkerFitParams& setJointCenters(
+      std::vector<dynamics::Joint*> joints, Eigen::MatrixXs jointCenters);
+  InitialMarkerFitParams& setJointCentersAndWeights(
+      std::vector<dynamics::Joint*> joints,
+      Eigen::MatrixXs jointCenters,
+      Eigen::VectorXs jointWeights);
+  InitialMarkerFitParams& setNumBlocks(int numBlocks);
+  InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
+  InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
+  InitialMarkerFitParams& setMarkerOffsets(
+      std::map<std::string, Eigen::Vector3s> markerOffsets);
+  InitialMarkerFitParams& setGroupScales(Eigen::VectorXs groupScales);
+};
+
+/**
  * This is the high level object that handles fitting skeletons to mocap data.
  *
  * It's supposed to take labeled point trajectories, and a known "marker set"
@@ -278,6 +320,17 @@ public:
       std::shared_ptr<dynamics::Skeleton> skeleton,
       dynamics::MarkerMap markers);
 
+  /// Run the whole pipeline of optimization problems to fit the data as closely
+  /// as we can
+  MarkerInitialization runKinematicsPipeline(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      InitialMarkerFitParams params = InitialMarkerFitParams());
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 1 and 3: (Re)Initialize scaling+IK
+  ///////////////////////////////////////////////////////////////////////////
+
   /// This finds an initial guess for the body scales and poses, holding
   /// anatomical marker offsets at 0, that we can use for downstream tasks.
   ///
@@ -285,7 +338,38 @@ public:
   MarkerInitialization getInitialization(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      int numBlocks = 12);
+      InitialMarkerFitParams params);
+
+  /// This scales the skeleton and IK fits to the marker observations. It
+  /// returns a pair, with (pose, group scales) from the fit.
+  static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
+      const MarkerFitter* fitter,
+      std::map<std::string, Eigen::Vector3s> markerObservations,
+      Eigen::VectorXs firstGuessPose,
+      std::map<std::string, s_t> markerWeights,
+      std::map<std::string, Eigen::Vector3s> markerOffsets,
+      std::vector<dynamics::Joint*> joints,
+      Eigen::VectorXs jointCenters,
+      Eigen::VectorXs jointWeights,
+      bool dontScale = false);
+
+  /// Pipeline step 1, 3, and 5:
+  /// This fits IK to the given trajectory, without scaling
+  static void fitTrajectory(
+      const MarkerFitter* fitter,
+      Eigen::VectorXs groupScales,
+      Eigen::VectorXs firstPoseGuess,
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      std::map<std::string, s_t> markerWeights,
+      std::map<std::string, Eigen::Vector3s> markerOffsets,
+      std::vector<dynamics::Joint*> joints,
+      std::vector<Eigen::VectorXs> jointCenters,
+      Eigen::VectorXs jointWeights,
+      Eigen::Ref<Eigen::MatrixXs> result);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 2: Find joint centers
+  ///////////////////////////////////////////////////////////////////////////
 
   /// This solves a bunch of optimization problems, one per joint, to find and
   /// track the joint centers over time. It puts the results back into
@@ -307,25 +391,18 @@ public:
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
 
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 4: Jointly scale+fit+marker offsets, with joint centers as
+  // part of the loss term
+  ///////////////////////////////////////////////////////////////////////////
+
   /// This solves an optimization problem, trying to get the Skeleton to match
   /// the markers as closely as possible.
-  std::shared_ptr<MarkerFitResult> optimize(
+  std::shared_ptr<BilevelFitResult> optimizeBilevel(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          markerObservations);
-
-  /// This scales the skeleton and IK fits to the marker observations. It
-  /// returns a pair, with (pose, group scales) from the fit.
-  static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
-      const MarkerFitter* fitter,
-      std::map<std::string, Eigen::Vector3s> markerObservations);
-
-  /// This fits IK to the given trajectory, without scaling
-  static void fitTrajectory(
-      const MarkerFitter* fitter,
-      Eigen::VectorXs groupScales,
-      Eigen::VectorXs firstPoseGuess,
-      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-      Eigen::Ref<Eigen::MatrixXs> result);
+          markerObservations,
+      MarkerInitialization& initialization,
+      int numSamples);
 
   /// This lets us pick a subset of the marker observations, to cap the size of
   /// the optimization problem.
@@ -630,7 +707,9 @@ public:
       MarkerFitter* fitter,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      std::shared_ptr<MarkerFitResult>& outResult);
+      MarkerInitialization& initialization,
+      int numSamples,
+      std::shared_ptr<BilevelFitResult>& outResult);
 
   ~BilevelFitProblem();
 
@@ -668,6 +747,23 @@ public:
   /// concatenated vector of all the problem state: [groupSizes, markerOffsets,
   /// q_0, ..., q_N]
   Eigen::MatrixXs finiteDifferenceConstraintsJacobian(Eigen::VectorXs x);
+
+  /// This returns the indices that this problem is using to specify the problem
+  const std::vector<int>& getSampleIndices();
+
+  /// This returns the marker map observations that this problem is using to
+  /// specify the problem
+  const std::vector<std::map<std::string, Eigen::Vector3s>>&
+  getMarkerMapObservations();
+
+  /// This returns the marker observations that this problem is using to specify
+  /// the problem
+  const std::vector<std::vector<std::pair<int, Eigen::Vector3s>>>&
+  getMarkerObservations();
+
+  /// This returns the subset of joint centers, for the selected timestep
+  /// samples
+  const Eigen::MatrixXs& getJointCenters();
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -786,10 +882,18 @@ protected:
   MarkerFitter* mFitter;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerMapObservations;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
+  Eigen::MatrixXs mJointCenters;
+  std::vector<int> mSampleIndices;
+  MarkerInitialization& mInitialization;
   Eigen::VectorXs mObservationWeights;
-  std::shared_ptr<MarkerFitResult>& mOutResult;
-  bool mInitializationCached;
-  Eigen::VectorXs mCachedInitialization;
+  std::shared_ptr<BilevelFitResult>& mOutResult;
+
+  // Thread state
+
+  int mNumThreads;
+  std::vector<std::vector<int>> mPerThreadIndices;
+  std::vector<std::vector<int>> mPerThreadCursor;
+  std::vector<std::shared_ptr<dynamics::Skeleton>> mPerThreadSkeletons;
 };
 
 } // namespace biomechanics
