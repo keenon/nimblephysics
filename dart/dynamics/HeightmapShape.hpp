@@ -149,6 +149,10 @@ public:
   /// Set the color of this arrow
   void notifyColorUpdated(const Eigen::Vector4s& color) override;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;

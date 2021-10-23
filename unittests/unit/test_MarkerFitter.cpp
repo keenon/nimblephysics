@@ -1745,7 +1745,7 @@ TEST(MarkerFitter, DERIVATIVES)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1802,7 +1802,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   EXPECT_TRUE(testBilevelFitProblemGradients(
       fitter, 3, 0.02, osimBallJoints, joints, markers));
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, INITIALIZATION)
@@ -1951,7 +1951,7 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2114,14 +2114,16 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK)
   finalKinematicsReport.printReport(5);
 
   // Target markers
+  /*
   debugTrajectoryAndMarkersToGUI(
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
       subsetTimesteps,
       finalKinematicInit.jointCenters);
+  */
 }
-// #endif
+#endif
 
 // #ifdef FULL_EVAL
 #ifdef ALL_TESTS

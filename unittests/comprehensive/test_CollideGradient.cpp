@@ -185,8 +185,10 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   if (useMesh)
   {
     aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<SharedMeshWrapper> boxMeshHolder
+        = std::make_shared<SharedMeshWrapper>(boxMesh);
     std::shared_ptr<MeshShape> boxShape(
-        new MeshShape(size, boxMesh, "", nullptr, true));
+        new MeshShape(size, boxMeshHolder, "", nullptr, true));
     // ShapeNode* sphereNode =
     box1Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
         boxShape);
@@ -220,8 +222,10 @@ void testEdgeEdgeCollision(bool isSelfCollision, bool useMesh)
   if (useMesh)
   {
     aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<SharedMeshWrapper> boxMeshHolder
+        = std::make_shared<SharedMeshWrapper>(boxMesh);
     std::shared_ptr<MeshShape> boxShape(
-        new MeshShape(size, boxMesh, "", nullptr, true));
+        new MeshShape(size, boxMeshHolder, "", nullptr, true));
     // ShapeNode* sphereNode =
     box2Pair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
         boxShape);
@@ -478,8 +482,7 @@ TEST(GRADIENTS, SPHERE_BOX_SELF_COLLISION_1_FACE)
 /**
  * This sets up two spheres with asymmetric radii colliding with each other
  */
-void testSphereSphereCollision(
-    bool isSelfCollision, s_t radius1, s_t radius2)
+void testSphereSphereCollision(bool isSelfCollision, s_t radius1, s_t radius2)
 {
   // World
   WorldPtr world = World::create();
@@ -570,8 +573,10 @@ void testSphereMeshCollision(bool isSelfCollision, int numFaces)
       = box->createJointAndBodyNodePair<FreeJoint>();
 
   aiScene* boxMesh = createBoxMeshUnsafe();
+  std::shared_ptr<SharedMeshWrapper> boxMeshHolder
+      = std::make_shared<SharedMeshWrapper>(boxMesh);
   std::shared_ptr<MeshShape> boxShape(new MeshShape(
-      Eigen::Vector3s(1.0, 1.0, 1.0), boxMesh, "", nullptr, true));
+      Eigen::Vector3s(1.0, 1.0, 1.0), boxMeshHolder, "", nullptr, true));
 
   // ShapeNode* boxNode =
   boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(boxShape);
@@ -1105,8 +1110,10 @@ void testBoxCapsuleCollision(bool isSelfCollision, bool useMesh, int type)
   if (useMesh)
   {
     aiScene* boxMesh = createBoxMeshUnsafe();
+    std::shared_ptr<SharedMeshWrapper> boxMeshHolder
+        = std::make_shared<SharedMeshWrapper>(boxMesh);
     std::shared_ptr<MeshShape> boxShape(
-        new MeshShape(size, boxMesh, "", nullptr, true));
+        new MeshShape(size, boxMeshHolder, "", nullptr, true));
     // ShapeNode* sphereNode =
     boxPair.second->createShapeNodeWith<VisualAspect, CollisionAspect>(
         boxShape);
