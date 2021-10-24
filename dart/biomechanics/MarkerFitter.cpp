@@ -1029,8 +1029,7 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
                         jointsForSkeletonBallJoints);
         },
         // Generate a random restart position
-        [&skeletonBallJoints, &skeleton, &observedJoints](
-            Eigen::VectorXs& val) {
+        [&skeleton, &observedJoints](Eigen::VectorXs& val) {
           val = skeleton->convertPositionsToBallSpace(
               skeleton->getRandomPoseForJoints(observedJoints));
         },
