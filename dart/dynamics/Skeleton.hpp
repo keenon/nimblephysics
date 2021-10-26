@@ -939,6 +939,11 @@ public:
   /// vector
   Eigen::VectorXs getGroupScalesLowerBound();
 
+  /// This is a general purpose utility to convert a Gradient wrt Body scales to
+  /// one wrt Group scales
+  Eigen::VectorXs convertBodyScalesGradientToGroupScales(
+      Eigen::VectorXs bodyScalesGrad);
+
   /// This is a general purpose utility to convert a Jacobian wrt Body scales to
   /// one wrt Group scales
   Eigen::MatrixXs convertBodyScalesJacobianToGroupScales(
@@ -980,6 +985,32 @@ public:
       const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
       Eigen::VectorXs leftMultiply);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// group scales
+  Eigen::VectorXs getGradientOfDistanceWrtGroupScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// group scales
+  Eigen::VectorXs finiteDifferenceGradientOfDistanceWrtGroupScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// group scales
+  Eigen::VectorXs getGradientOfDistanceAlongAxisWrtGroupScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+      Eigen::Vector3s axis);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// group scales
+  Eigen::VectorXs finiteDifferenceGradientOfDistanceAlongAxisWrtGroupScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+      Eigen::Vector3s axis);
 
   //----------------------------------------------------------------------------
   // Converting EulerJoints->BallJoints and EulerFreeJoints->FreeJoints
@@ -1243,6 +1274,51 @@ public:
       Eigen::VectorXs markerWeights,
       bool scaleBodies = false,
       math::IKConfig config = math::IKConfig());
+
+  //----------------------------------------------------------------------------
+  // Handling anthropometric measurements
+  //----------------------------------------------------------------------------
+
+  /// This measures the distance between two markers in world space, at the
+  /// current configuration and scales.
+  s_t getDistanceInWorldSpace(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// body scales
+  Eigen::VectorXs getGradientOfDistanceWrtBodyScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// body scales
+  Eigen::VectorXs finiteDifferenceGradientOfDistanceWrtBodyScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB);
+
+  /// This measures the distance between two markers in world space **along a
+  /// specific axis**, at the current configuration and scales. For example, if
+  /// the axis is the Y axis, we're just measuring the Y distance between
+  /// markers.
+  s_t getDistanceAlongAxis(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+      Eigen::Vector3s axis);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// body scales
+  Eigen::VectorXs getGradientOfDistanceAlongAxisWrtBodyScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+      Eigen::Vector3s axis);
+
+  /// This returns the gradient of the distance measurement, with respect to
+  /// body scales
+  Eigen::VectorXs finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+      Eigen::Vector3s axis);
 
   //----------------------------------------------------------------------------
   // Integration and finite difference

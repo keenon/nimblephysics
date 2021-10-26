@@ -543,11 +543,17 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
   // Fix the scale groups
   for (auto group : mBodyScaleGroups)
   {
-    if (group.nodes.size() > 0) {
-      for (int i = 1; i < group.nodes.size(); i++) {
-        skelClone->mergeScaleGroups(skelClone->getBodyNode(group.nodes[0]->getName()), skelClone->getBodyNode(group.nodes[i]->getName()));
+    if (group.nodes.size() > 0)
+    {
+      for (int i = 1; i < group.nodes.size(); i++)
+      {
+        skelClone->mergeScaleGroups(
+            skelClone->getBodyNode(group.nodes[0]->getName()),
+            skelClone->getBodyNode(group.nodes[i]->getName()));
       }
-      skelClone->setScaleGroupUniformScaling(skelClone->getBodyNode(group.nodes[0]->getName()), group.uniformScaling);
+      skelClone->setScaleGroupUniformScaling(
+          skelClone->getBodyNode(group.nodes[0]->getName()),
+          group.uniformScaling);
     }
   }
 
@@ -3564,6 +3570,46 @@ Eigen::VectorXs Skeleton::getGroupScalesLowerBound()
 }
 
 //==============================================================================
+/// This is a general purpose utility to convert a Gradient wrt Body scales to
+/// one wrt Group scales
+Eigen::VectorXs Skeleton::convertBodyScalesGradientToGroupScales(
+    Eigen::VectorXs bodyScalesGrad)
+{
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(getGroupScaleDim());
+
+  int cursor = 0;
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (dynamics::BodyNode* node : mBodyScaleGroups[i].nodes)
+    {
+      if (mBodyScaleGroups[i].uniformScaling)
+      {
+        grad(cursor) += bodyScalesGrad(node->getIndexInSkeleton() * 3)
+                        + bodyScalesGrad(node->getIndexInSkeleton() * 3 + 1)
+                        + bodyScalesGrad(node->getIndexInSkeleton() * 3 + 2);
+      }
+      else
+      {
+        grad.segment<3>(cursor)
+            += bodyScalesGrad.segment<3>(node->getIndexInSkeleton() * 3);
+      }
+    }
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      cursor++;
+    }
+    else
+    {
+      cursor += 3;
+    }
+  }
+
+  assert(cursor == grad.size());
+
+  return grad;
+}
+
+//==============================================================================
 /// This is a general purpose utility to convert a Jacobian wrt Body scales to
 /// one wrt Group scales
 Eigen::MatrixXs Skeleton::convertBodyScalesJacobianToGroupScales(
@@ -3738,6 +3784,95 @@ Eigen::MatrixXs Skeleton::
   }
 
   setGroupScales(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// group scales
+Eigen::VectorXs Skeleton::getGradientOfDistanceWrtGroupScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB)
+{
+  return convertBodyScalesGradientToGroupScales(
+      getGradientOfDistanceWrtBodyScales(markerA, markerB));
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// group scales
+Eigen::VectorXs Skeleton::finiteDifferenceGradientOfDistanceWrtGroupScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB)
+{
+  Eigen::VectorXs originalScales = getGroupScales();
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(originalScales.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = originalScales;
+        perturbed(i) += eps;
+        setGroupScales(perturbed);
+
+        out = getDistanceInWorldSpace(markerA, markerB);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// group scales
+Eigen::VectorXs Skeleton::getGradientOfDistanceAlongAxisWrtGroupScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+    Eigen::Vector3s axis)
+{
+  return convertBodyScalesGradientToGroupScales(
+      getGradientOfDistanceAlongAxisWrtBodyScales(markerA, markerB, axis));
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// group scales
+Eigen::VectorXs
+Skeleton::finiteDifferenceGradientOfDistanceAlongAxisWrtGroupScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+    Eigen::Vector3s axis)
+{
+  Eigen::VectorXs originalScales = getGroupScales();
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(originalScales.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = originalScales;
+        perturbed(i) += eps;
+        setGroupScales(perturbed);
+
+        out = getDistanceAlongAxis(markerA, markerB, axis);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -5247,6 +5382,167 @@ s_t Skeleton::fitMarkersToWorldPositions(
         [this](Eigen::VectorXs& val) { val = getRandomPose(); },
         config);
   }
+}
+
+//==============================================================================
+/// This measures the distance between two markers in world space, at the
+/// current configuration and scales.
+s_t Skeleton::getDistanceInWorldSpace(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  markers.push_back(markerA);
+  markers.push_back(markerB);
+  Eigen::VectorXs poses = getMarkerWorldPositions(markers);
+  Eigen::Vector3s poseA = poses.head<3>();
+  Eigen::Vector3s poseB = poses.tail<3>();
+
+  return (poseA - poseB).norm();
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// body scales
+Eigen::VectorXs Skeleton::getGradientOfDistanceWrtBodyScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  markers.push_back(markerA);
+  markers.push_back(markerB);
+  Eigen::VectorXs poses = getMarkerWorldPositions(markers);
+  Eigen::Vector3s poseA = poses.head<3>();
+  Eigen::Vector3s poseB = poses.tail<3>();
+
+  s_t norm = (poseA - poseB).norm();
+
+  Eigen::MatrixXs poseJac
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(poseJac.cols());
+  for (int i = 0; i < poseJac.cols(); i++)
+  {
+    Eigen::Vector3s d_poseA = poseJac.col(i).head<3>();
+    Eigen::Vector3s d_poseB = poseJac.col(i).tail<3>();
+
+    result(i) = (1.0 / norm) * (poseA - poseB).dot(d_poseA - d_poseB);
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// body scales
+Eigen::VectorXs Skeleton::finiteDifferenceGradientOfDistanceWrtBodyScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB)
+{
+  Eigen::VectorXs originalScales = getBodyScales();
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(originalScales.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = originalScales;
+        perturbed(i) += eps;
+        setBodyScales(perturbed);
+
+        out = getDistanceInWorldSpace(markerA, markerB);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
+/// This measures the distance between two markers in world space **along a
+/// specific axis**, at the current configuration and scales. For example, if
+/// the axis is the Y axis, we're just measuring the Y distance between
+/// markers.
+s_t Skeleton::getDistanceAlongAxis(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+    Eigen::Vector3s axis)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  markers.push_back(markerA);
+  markers.push_back(markerB);
+  Eigen::VectorXs poses = getMarkerWorldPositions(markers);
+  Eigen::Vector3s poseA = poses.head<3>();
+  Eigen::Vector3s poseB = poses.tail<3>();
+
+  return (poseA - poseB).dot(axis);
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// body scales
+Eigen::VectorXs Skeleton::getGradientOfDistanceAlongAxisWrtBodyScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+    Eigen::Vector3s axis)
+{
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  markers.push_back(markerA);
+  markers.push_back(markerB);
+
+  Eigen::MatrixXs poseJac
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(poseJac.cols());
+  for (int i = 0; i < poseJac.cols(); i++)
+  {
+    Eigen::Vector3s d_poseA = poseJac.col(i).head<3>();
+    Eigen::Vector3s d_poseB = poseJac.col(i).tail<3>();
+
+    result(i) = axis.dot(d_poseA - d_poseB);
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the gradient of the distance measurement, with respect to
+/// body scales
+Eigen::VectorXs
+Skeleton::finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB,
+    Eigen::Vector3s axis)
+{
+  Eigen::VectorXs originalScales = getBodyScales();
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(originalScales.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = originalScales;
+        perturbed(i) += eps;
+        setBodyScales(perturbed);
+
+        out = getDistanceAlongAxis(markerA, markerB, axis);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
 }
 
 //==============================================================================

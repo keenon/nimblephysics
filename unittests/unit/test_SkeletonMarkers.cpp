@@ -105,3 +105,105 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
   }
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(SkeletonConverter, MARKER_DISTANCE)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim")
+            .skeleton;
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
+
+  osim->mergeScaleGroups(
+      osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
+  osim->setScaleGroupUniformScaling(osim->getBodyNode("tibia_r"));
+
+  std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA = std::make_pair(
+      osim->getBodyNode("radius_l"), Eigen::Vector3s::Random());
+  std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
+      = std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
+
+  s_t dist = osim->getDistanceInWorldSpace(markerA, markerB);
+  EXPECT_TRUE(dist > 0);
+
+  Eigen::VectorXs bodyGrad
+      = osim->getGradientOfDistanceWrtBodyScales(markerA, markerB);
+  Eigen::VectorXs bodyGrad_fd
+      = osim->finiteDifferenceGradientOfDistanceWrtBodyScales(markerA, markerB);
+
+  if (!equals(bodyGrad, bodyGrad_fd, 1e-10))
+  {
+    std::cout << "Grad wrt body scales disagrees!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(bodyGrad.size(), 3);
+    compare.col(0) = bodyGrad;
+    compare.col(1) = bodyGrad_fd;
+    compare.col(2) = bodyGrad - bodyGrad_fd;
+    std::cout << "Grad - FD - Diff" << std::endl << compare << std::endl;
+    EXPECT_TRUE(equals(bodyGrad, bodyGrad_fd, 1e-10));
+  }
+
+  Eigen::VectorXs groupGrad
+      = osim->getGradientOfDistanceWrtGroupScales(markerA, markerB);
+  Eigen::VectorXs groupGrad_fd
+      = osim->finiteDifferenceGradientOfDistanceWrtGroupScales(
+          markerA, markerB);
+
+  if (!equals(groupGrad, groupGrad_fd, 1e-10))
+  {
+    std::cout << "Grad wrt group scales disagrees!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(groupGrad.size(), 3);
+    compare.col(0) = groupGrad;
+    compare.col(1) = groupGrad_fd;
+    compare.col(2) = groupGrad - groupGrad_fd;
+    std::cout << "Grad - FD - Diff" << std::endl << compare << std::endl;
+    EXPECT_TRUE(equals(groupGrad, groupGrad_fd, 1e-10));
+  }
+
+  Eigen::Vector3s axis = Eigen::Vector3s::Random();
+  Eigen::VectorXs axisBodyGrad
+      = osim->getGradientOfDistanceAlongAxisWrtBodyScales(
+          markerA, markerB, axis);
+  Eigen::VectorXs axisBodyGrad_fd
+      = osim->finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
+          markerA, markerB, axis);
+
+  if (!equals(axisBodyGrad, axisBodyGrad_fd, 1e-10))
+  {
+    std::cout << "Grad of axis distance wrt body scales disagrees!"
+              << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(axisBodyGrad.size(), 3);
+    compare.col(0) = axisBodyGrad;
+    compare.col(1) = axisBodyGrad_fd;
+    compare.col(2) = axisBodyGrad - axisBodyGrad_fd;
+    std::cout << "Grad - FD - Diff" << std::endl << compare << std::endl;
+    EXPECT_TRUE(equals(axisBodyGrad, axisBodyGrad_fd, 1e-10));
+  }
+
+  Eigen::VectorXs axisGroupGrad
+      = osim->getGradientOfDistanceAlongAxisWrtGroupScales(
+          markerA, markerB, axis);
+  Eigen::VectorXs axisGroupGrad_fd
+      = osim->finiteDifferenceGradientOfDistanceAlongAxisWrtGroupScales(
+          markerA, markerB, axis);
+
+  if (!equals(axisGroupGrad, axisGroupGrad_fd, 1e-10))
+  {
+    std::cout << "Grad of axis distance wrt group scales disagrees!"
+              << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(axisGroupGrad.size(), 3);
+    compare.col(0) = axisGroupGrad;
+    compare.col(1) = axisGroupGrad_fd;
+    compare.col(2) = axisGroupGrad - axisGroupGrad_fd;
+    std::cout << "Grad - FD - Diff" << std::endl << compare << std::endl;
+    EXPECT_TRUE(equals(axisGroupGrad, axisGroupGrad_fd, 1e-10));
+  }
+}
+#endif

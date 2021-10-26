@@ -78,6 +78,12 @@ if(TARGET dart-utils)
 
   dart_add_test("unit" test_C3D)
   target_link_libraries(test_C3D dart-utils)
+
+  dart_add_test("unit" test_CSVParser)
+  target_link_libraries(test_CSVParser dart-utils)
+
+  dart_add_test("unit" test_MultivariateGaussian)
+  target_link_libraries(test_MultivariateGaussian dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)
