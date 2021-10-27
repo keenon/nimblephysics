@@ -160,6 +160,18 @@ void ConstraintSolver(py::module& m)
             return self->setGradientEnabled(enabled);
           })
       .def(
+          "setPenetrationCorrectionEnabled",
+          +[](dart::constraint::ConstraintSolver* self, bool enable)
+              -> void {
+            return self->setPenetrationCorrectionEnabled(enable);
+          })
+      .def(
+          "setContactClippingDepth",
+          +[](dart::constraint::ConstraintSolver* self, s_t depth)
+              -> void {
+            return self->setContactClippingDepth(depth);
+          })
+      .def(
           "solve",
           +[](dart::constraint::ConstraintSolver* self,
               dart::simulation::World* world) { self->solve(world); });
