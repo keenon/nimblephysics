@@ -61,7 +61,7 @@ ArrowShape::ArrowShape(
     const Properties& _properties,
     const Eigen::Vector4s& _color,
     std::size_t _resolution)
-  : MeshShape(Eigen::Vector3s::Ones(), nullptr),
+  : MeshShape(Eigen::Vector3s::Ones(), nullptr, ""),
     mTail(_tail),
     mHead(_head),
     mProperties(_properties)
@@ -100,12 +100,13 @@ void ArrowShape::setProperties(const Properties& _properties)
 //==============================================================================
 void ArrowShape::notifyColorUpdated(const Eigen::Vector4s& _color)
 {
-  for (std::size_t i = 0; i < mMesh->mNumMeshes; ++i)
+  const aiScene* mesh = getMesh();
+  for (std::size_t i = 0; i < mesh->mNumMeshes; ++i)
   {
-    aiMesh* mesh = mMesh->mMeshes[i];
-    for (std::size_t j = 0; j < mesh->mNumVertices; ++j)
+    aiMesh* submesh = mesh->mMeshes[i];
+    for (std::size_t j = 0; j < submesh->mNumVertices; ++j)
     {
-      mesh->mColors[0][j] = aiColor4D(
+      submesh->mColors[0][j] = aiColor4D(
           static_cast<float>(_color[0]),
           static_cast<float>(_color[1]),
           static_cast<float>(_color[2]),
@@ -199,30 +200,31 @@ void ArrowShape::configureArrow(
   s_t headLength = mProperties.mHeadLengthScale * length;
   headLength = std::min(maxHeadLength, std::max(minHeadLength, headLength));
 
+  const aiScene* mesh = getMesh();
+
   // construct the tail
   if (mProperties.ms_tArrow)
   {
-    constructArrowTip(mMesh->mMeshes[0], headLength, 0, mProperties);
+    constructArrowTip(mesh->mMeshes[0], headLength, 0, mProperties);
   }
   else
   {
-    constructArrowTip(mMesh->mMeshes[0], 0, 0, mProperties);
+    constructArrowTip(mesh->mMeshes[0], 0, 0, mProperties);
   }
 
   // construct the main body
   if (mProperties.ms_tArrow)
   {
     constructArrowBody(
-        mMesh->mMeshes[1], headLength, length - headLength, mProperties);
+        mesh->mMeshes[1], headLength, length - headLength, mProperties);
   }
   else
   {
-    constructArrowBody(mMesh->mMeshes[1], 0, length - headLength, mProperties);
+    constructArrowBody(mesh->mMeshes[1], 0, length - headLength, mProperties);
   }
 
   // construct the head
-  constructArrowTip(
-      mMesh->mMeshes[2], length - headLength, length, mProperties);
+  constructArrowTip(mesh->mMeshes[2], length - headLength, length, mProperties);
 
   Eigen::Isometry3s tf(Eigen::Isometry3s::Identity());
   tf.translation() = mTail;
@@ -241,7 +243,7 @@ void ArrowShape::configureArrow(
     tf.rotate(Eigen::AngleAxis_s(acos(z.dot(v)), axis));
   }
 
-  aiNode* node = mMesh->mRootNode;
+  aiNode* node = getMesh()->mRootNode;
   for (std::size_t i = 0; i < 4; ++i)
     for (std::size_t j = 0; j < 4; ++j)
       node->mTransformation[i][j] = static_cast<float>(tf(i, j));
@@ -386,7 +388,7 @@ void ArrowShape::instantiate(std::size_t resolution)
     face->mIndices[2] = 2 * resolution;
   }
 
-  mMesh = scene;
+  mMesh = std::make_shared<dynamics::SharedMeshWrapper>(scene);
 
   // setColor(mColor);
   // TODO(JS)

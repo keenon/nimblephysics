@@ -39,6 +39,7 @@ class DARTView {
   objects: Map<string, THREE.Group | THREE.Mesh | THREE.Line>;
   keys: Map<THREE.Object3D, string>;
   textures: Map<string, THREE.Texture>;
+  disposeHandlers: Map<string, () => void>;
 
   uiElements: Map<string, Text | Button | Slider | Plot>;
 
@@ -59,6 +60,7 @@ class DARTView {
 
     this.objects = new Map();
     this.keys = new Map();
+    this.disposeHandlers = new Map();
     this.textures = new Map();
     this.uiElements = new Map();
     this.dragListeners = [];
@@ -199,7 +201,7 @@ class DARTView {
     receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
-      this.view.remove(this.objects.get(key));
+      this.deleteObject(key);
     }
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
@@ -221,6 +223,10 @@ class DARTView {
     mesh.scale.set(size[0], size[1], size[2]);
 
     this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+      geometry.dispose();
+    });
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
@@ -240,7 +246,7 @@ class DARTView {
     receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
-      this.view.remove(this.objects.get(key));
+      this.deleteObject(key);
     }
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
@@ -260,6 +266,10 @@ class DARTView {
     mesh.scale.set(radius, radius, radius);
 
     this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+      geometry.dispose();
+    });
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
@@ -281,7 +291,7 @@ class DARTView {
     receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
-      this.view.remove(this.objects.get(key));
+      this.deleteObject(key);
     }
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
@@ -319,6 +329,10 @@ class DARTView {
     mesh.receiveShadow = receiveShadows;
 
     this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+      geometry.dispose();
+    });
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
@@ -331,7 +345,7 @@ class DARTView {
    */
   createLine = (key: string, points: number[][], color: number[]) => {
     if (this.objects.has(key)) {
-      this.view.remove(this.objects.get(key));
+      this.deleteObject(key);
     }
     const pathMaterial = new THREE.LineBasicMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
@@ -349,7 +363,12 @@ class DARTView {
     }
     const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
     const path = new THREE.Line(pathGeometry, pathMaterial);
+
     this.objects.set(key, path);
+    this.disposeHandlers.set(key, () => {
+      pathMaterial.dispose();
+      pathGeometry.dispose();
+    });
     this.keys.set(path, key);
 
     this.view.add(path);
@@ -382,7 +401,7 @@ class DARTView {
     receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
-      this.view.remove(this.objects.get(key));
+      this.deleteObject(key);
     }
     let meshMaterial;
     if (texture_starts.length > 0 && uv.length > 0) {
@@ -452,6 +471,10 @@ class DARTView {
     mesh.scale.set(scale[0], scale[1], scale[2]);
 
     this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      meshMaterial.dispose();
+      meshGeometry.dispose();
+    });
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
@@ -505,6 +528,9 @@ class DARTView {
   deleteObject = (key: string) => {
     const obj = this.objects.get(key);
     if (obj) {
+      this.disposeHandlers.get(key)();
+      this.view.remove(obj);
+      this.keys.delete(obj);
       this.scene.remove(obj);
       this.objects.delete(key);
     }

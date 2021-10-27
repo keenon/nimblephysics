@@ -334,7 +334,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
   Eigen::FullPivLU<Eigen::MatrixXs> luJTJ(JTJ);
   //    Eigen::FullPivLU<Eigen::MatrixXs> luS(mS);
   s_t det = luJTJ.determinant();
-  if (det < 1e-5)
+  if (det < 1e-8)
   {
     std::cout << "ill-conditioned Jacobian in joint."
               << " The determinant of the Jacobian is (" << det << ")."
@@ -1183,7 +1183,9 @@ EulerJoint::EulerJoint(const Properties& properties)
 //==============================================================================
 Joint* EulerJoint::clone() const
 {
-  return new EulerJoint(getEulerJointProperties());
+  EulerJoint* joint = new EulerJoint(getEulerJointProperties());
+  joint->setFlipAxisMap(mFlipAxisMap);
+  return joint;
 }
 
 //==============================================================================

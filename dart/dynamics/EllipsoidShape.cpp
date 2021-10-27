@@ -155,6 +155,14 @@ bool EllipsoidShape::isSphere() const
 }
 
 //==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr EllipsoidShape::clone() const
+{
+  return std::make_shared<EllipsoidShape>(mDiameters);
+}
+
+//==============================================================================
 void EllipsoidShape::updateBoundingBox() const
 {
   mBoundingBox.setMin(-mDiameters * 0.5);

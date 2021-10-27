@@ -220,6 +220,13 @@ void Geometry(py::module& m)
         return dart::math::verifyTransform(_T);
       },
       ::py::arg("T"));
+
+  m.def(
+      "transformBy",
+      +[](const Eigen::Isometry3s& T,
+          const Eigen::Vector3s& p) -> Eigen::Vector3s { return T * p; },
+      ::py::arg("T"),
+      ::py::arg("p"));
 }
 
 } // namespace python

@@ -35,6 +35,7 @@
 #include <dart/dynamics/BodyNode.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -45,19 +46,132 @@ namespace python {
 
 void MarkerFitter(py::module& m)
 {
+  ::py::class_<dart::biomechanics::MarkerFitterState>(m, "MarkerFitterState")
+      .def_readwrite(
+          "bodyNames", &dart::biomechanics::MarkerFitterState::bodyNames)
+      .def_readwrite(
+          "bodyScales", &dart::biomechanics::MarkerFitterState::bodyScales)
+      .def_readwrite(
+          "markerOrder", &dart::biomechanics::MarkerFitterState::markerOrder)
+      .def_readwrite(
+          "markerOffsets",
+          &dart::biomechanics::MarkerFitterState::markerOffsets)
+      .def_readwrite(
+          "markerErrorsAtTimesteps",
+          &dart::biomechanics::MarkerFitterState::markerErrorsAtTimesteps)
+      .def_readwrite(
+          "posesAtTimesteps",
+          &dart::biomechanics::MarkerFitterState::posesAtTimesteps)
+      // Gradient of current state
+      .def_readwrite(
+          "bodyScalesGrad",
+          &dart::biomechanics::MarkerFitterState::bodyScalesGrad)
+      .def_readwrite(
+          "markerOffsetsGrad",
+          &dart::biomechanics::MarkerFitterState::markerOffsetsGrad)
+      .def_readwrite(
+          "markerErrorsAtTimestepsGrad",
+          &dart::biomechanics::MarkerFitterState::markerErrorsAtTimestepsGrad)
+      .def_readwrite(
+          "posesAtTimestepsGrad",
+          &dart::biomechanics::MarkerFitterState::posesAtTimestepsGrad);
+
   ::py::class_<
-      dart::biomechanics::MarkerFitResult,
-      std::shared_ptr<dart::biomechanics::MarkerFitResult>>(
-      m, "MarkerFitResult")
-      .def_readwrite("success", &dart::biomechanics::MarkerFitResult::success)
+      dart::biomechanics::BilevelFitResult,
+      std::shared_ptr<dart::biomechanics::BilevelFitResult>>(
+      m, "BilevelFitResult")
+      .def_readwrite("success", &dart::biomechanics::BilevelFitResult::success)
       .def_readwrite(
-          "groupScales", &dart::biomechanics::MarkerFitResult::groupScales)
+          "groupScales", &dart::biomechanics::BilevelFitResult::groupScales)
       .def_readwrite(
-          "markerErrors", &dart::biomechanics::MarkerFitResult::markerErrors)
-      .def_readwrite("poses", &dart::biomechanics::MarkerFitResult::poses)
+          "markerOffsets", &dart::biomechanics::BilevelFitResult::markerOffsets)
+      .def_readwrite("poses", &dart::biomechanics::BilevelFitResult::poses)
+      .def_readwrite(
+          "posesMatrix", &dart::biomechanics::BilevelFitResult::posesMatrix)
       .def_readwrite(
           "rawMarkerOffsets",
-          &dart::biomechanics::MarkerFitResult::rawMarkerOffsets);
+          &dart::biomechanics::BilevelFitResult::rawMarkerOffsets);
+
+  ::py::class_<dart::biomechanics::MarkerInitialization>(
+      m, "MarkerInitialization")
+      .def_readwrite("poses", &dart::biomechanics::MarkerInitialization::poses)
+      .def_readwrite(
+          "jointCenters",
+          &dart::biomechanics::MarkerInitialization::jointCenters)
+      .def_readwrite(
+          "joints", &dart::biomechanics::MarkerInitialization::joints)
+      .def_readwrite(
+          "groupScales", &dart::biomechanics::MarkerInitialization::groupScales)
+      .def_readwrite(
+          "updatedMarkerMap",
+          &dart::biomechanics::MarkerInitialization::updatedMarkerMap)
+      .def_readwrite(
+          "markerOffsets",
+          &dart::biomechanics::MarkerInitialization::markerOffsets);
+
+  ::py::class_<dart::biomechanics::InitialMarkerFitParams>(
+      m, "InitialMarkerFitParams")
+      .def(::py::init<>())
+      .def_readwrite(
+          "markerWeights",
+          &dart::biomechanics::InitialMarkerFitParams::markerWeights)
+      .def_readwrite(
+          "markerOffsets",
+          &dart::biomechanics::InitialMarkerFitParams::markerOffsets)
+      .def_readwrite(
+          "joints", &dart::biomechanics::InitialMarkerFitParams::joints)
+      .def_readwrite(
+          "jointCenters",
+          &dart::biomechanics::InitialMarkerFitParams::jointCenters)
+      .def_readwrite(
+          "jointWeights",
+          &dart::biomechanics::InitialMarkerFitParams::jointWeights)
+      .def_readwrite(
+          "numBlocks", &dart::biomechanics::InitialMarkerFitParams::numBlocks)
+      .def_readwrite(
+          "initPoses", &dart::biomechanics::InitialMarkerFitParams::initPoses)
+      .def_readwrite(
+          "groupScales",
+          &dart::biomechanics::InitialMarkerFitParams::groupScales)
+      .def_readwrite(
+          "dontRescaleBodies",
+          &dart::biomechanics::InitialMarkerFitParams::dontRescaleBodies)
+      .def(
+          "setMarkerWeights",
+          &dart::biomechanics::InitialMarkerFitParams::setMarkerWeights,
+          ::py::arg("markerWeights"))
+      .def(
+          "setMarkerOffsets",
+          &dart::biomechanics::InitialMarkerFitParams::setMarkerOffsets,
+          ::py::arg("markerOffsets"))
+      .def(
+          "setJointCenters",
+          &dart::biomechanics::InitialMarkerFitParams::setJointCenters,
+          ::py::arg("joints"),
+          ::py::arg("jointCenters"))
+      .def(
+          "setNumBlocks",
+          &dart::biomechanics::InitialMarkerFitParams::setNumBlocks,
+          ::py::arg("numBlocks"))
+      .def(
+          "setInitPoses",
+          &dart::biomechanics::InitialMarkerFitParams::setInitPoses,
+          ::py::arg("initPoses"))
+      .def(
+          "setGroupScales",
+          &dart::biomechanics::InitialMarkerFitParams::setGroupScales,
+          ::py::arg("groupScales"))
+      .def(
+          "setDontRescaleBodies",
+          &dart::biomechanics::InitialMarkerFitParams::setDontRescaleBodies,
+          ::py::arg("dontRescaleBodies"))
+      .def(
+          "setJointCentersAndWeights",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setJointCentersAndWeights,
+          ::py::arg("joints"),
+          ::py::arg("jointCenters"),
+          ::py::arg("jointWeights"));
 
   ::py::class_<
       dart::biomechanics::MarkerFitter,
@@ -67,13 +181,77 @@ void MarkerFitter(py::module& m)
               std::shared_ptr<dynamics::Skeleton>,
               std::map<
                   std::string,
-                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>>(),
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
           ::py::arg("skeleton"),
           ::py::arg("markers"))
       .def(
-          "optimize",
-          &dart::biomechanics::MarkerFitter::optimize,
-          ::py::arg("markerObservations"));
+          "setInitialIKSatisfactoryLoss",
+          &dart::biomechanics::MarkerFitter::setInitialIKSatisfactoryLoss,
+          ::py::arg("loss"))
+      .def(
+          "setInitialIKMaxRestarts",
+          &dart::biomechanics::MarkerFitter::setInitialIKMaxRestarts,
+          ::py::arg("starts"))
+      .def(
+          "setMaxMarkerOffset",
+          &dart::biomechanics::MarkerFitter::setMaxMarkerOffset,
+          ::py::arg("offset"))
+      .def(
+          "setIterationLimit",
+          &dart::biomechanics::MarkerFitter::setIterationLimit,
+          ::py::arg("iters"))
+      .def(
+          "setCustomLossAndGrad",
+          &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
+          ::py::arg("loss"))
+      .def(
+          "addZeroConstraint",
+          &dart::biomechanics::MarkerFitter::addZeroConstraint,
+          ::py::arg("name"),
+          ::py::arg("loss"))
+      .def(
+          "removeZeroConstraint",
+          &dart::biomechanics::MarkerFitter::removeZeroConstraint,
+          ::py::arg("name"))
+      .def(
+          "getInitialization",
+          &dart::biomechanics::MarkerFitter::getInitialization,
+          ::py::arg("markerObservations"),
+          ::py::arg("params") = dart::biomechanics::InitialMarkerFitParams())
+      .def(
+          "findJointCenters",
+          &dart::biomechanics::MarkerFitter::findJointCenters,
+          ::py::arg("initializations"),
+          ::py::arg("markerObservations"))
+      .def(
+          "optimizeBilevel",
+          &dart::biomechanics::MarkerFitter::optimizeBilevel,
+          ::py::arg("markerObservations"),
+          ::py::arg("initialization"),
+          ::py::arg("numSamples"))
+      .def(
+          "runKinematicsPipeline",
+          &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
+          ::py::arg("markerObservations"),
+          ::py::arg("params"))
+      .def_static(
+          "pickSubset",
+          &dart::biomechanics::MarkerFitter::pickSubset,
+          ::py::arg("markerObservations"),
+          ::py::arg("subsetSize"))
+      .def(
+          "setMarkerIsTracking",
+          &dart::biomechanics::MarkerFitter::setMarkerIsTracking,
+          ::py::arg("marker"),
+          ::py::arg("isTracking") = true)
+      .def(
+          "getMarkerIsTracking",
+          &dart::biomechanics::MarkerFitter::getMarkerIsTracking,
+          ::py::arg("marker"))
+      .def(
+          "setTriadsToTracking",
+          &dart::biomechanics::MarkerFitter::setTriadsToTracking)
+      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
 }
 
 } // namespace python

@@ -49,9 +49,42 @@ namespace python {
 void OpenSimParser(py::module& m)
 {
   ::py::class_<dart::biomechanics::OpenSimFile>(m, "OpenSimFile")
+      .def(
+          ::py::init<
+              std::shared_ptr<dynamics::Skeleton>,
+              std::map<
+                  std::string,
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
+          ::py::arg("skeleton"),
+          ::py::arg("markers"))
       .def_readwrite("skeleton", &dart::biomechanics::OpenSimFile::skeleton)
       .def_readwrite(
           "markersMap", &dart::biomechanics::OpenSimFile::markersMap);
+
+  ::py::class_<dart::biomechanics::OpenSimMot>(m, "OpenSimMot")
+      .def_readwrite("poses", &dart::biomechanics::OpenSimMot::poses)
+      .def_readwrite("timestamps", &dart::biomechanics::OpenSimMot::timestamps);
+
+  ::py::class_<dart::biomechanics::OpenSimTRC>(m, "OpenSimTRC")
+      .def_readwrite(
+          "markerTimesteps", &dart::biomechanics::OpenSimTRC::markerTimesteps)
+      .def_readwrite(
+          "markerLines", &dart::biomechanics::OpenSimTRC::markerLines)
+      .def_readwrite("timestamps", &dart::biomechanics::OpenSimTRC::timestamps);
+
+  ::py::class_<dart::biomechanics::OpenSimScaleAndMarkerOffsets>(
+      m, "OpenSimScaleAndMarkerOffsets")
+      .def_readwrite(
+          "success", &dart::biomechanics::OpenSimScaleAndMarkerOffsets::success)
+      .def_readwrite(
+          "bodyScales",
+          &dart::biomechanics::OpenSimScaleAndMarkerOffsets::bodyScales)
+      .def_readwrite(
+          "markerOffsets",
+          &dart::biomechanics::OpenSimScaleAndMarkerOffsets::markerOffsets)
+      .def_readwrite(
+          "markers",
+          &dart::biomechanics::OpenSimScaleAndMarkerOffsets::markers);
 
   auto sm = m.def_submodule("OpenSimParser");
   sm.def(
@@ -60,6 +93,27 @@ void OpenSimParser(py::module& m)
         return dart::biomechanics::OpenSimParser::parseOsim(path);
       },
       ::py::arg("path"));
+
+  sm.def(
+      "loadTRC",
+      +[](const std::string& path) {
+        return dart::biomechanics::OpenSimParser::loadTRC(path);
+      },
+      ::py::arg("path"));
+
+  sm.def(
+      "loadMot",
+      +[](std::shared_ptr<dynamics::Skeleton> skel, const std::string& path) {
+        return dart::biomechanics::OpenSimParser::loadMot(skel, path);
+      },
+      ::py::arg("skel"),
+      ::py::arg("path"));
+
+  sm.def(
+      "getScaleAndMarkerOffsets",
+      &dart::biomechanics::OpenSimParser::getScaleAndMarkerOffsets,
+      ::py::arg("standardSkeleton"),
+      ::py::arg("scaledSkeleton"));
 }
 
 } // namespace python

@@ -33,9 +33,10 @@
 #ifndef DART_DYNAMICS_SOFTMESHSHAPE_HPP_
 #define DART_DYNAMICS_SOFTMESHSHAPE_HPP_
 
-#include <assimp/scene.h>
-#include "dart/dynamics/Shape.hpp"
 #include <Eigen/Dense>
+#include <assimp/scene.h>
+
+#include "dart/dynamics/Shape.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -46,7 +47,6 @@ class SoftBodyNode;
 class SoftMeshShape : public Shape
 {
 public:
-
   friend class SoftBodyNode;
 
   /// \brief Constructor.
@@ -73,6 +73,10 @@ public:
   // Documentation inherited.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;
@@ -91,7 +95,7 @@ private:
   std::unique_ptr<aiMesh> mAssimpMesh;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_SOFTMESHSHAPE_HPP_
+#endif // DART_DYNAMICS_SOFTMESHSHAPE_HPP_

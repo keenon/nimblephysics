@@ -281,6 +281,32 @@ public:
   s_t getRestitutionCoeff() const;
 
   //--------------------------------------------------------------------------
+  // Differentiable Sensors
+  //--------------------------------------------------------------------------
+
+  Eigen::Vector3s getClosestVerticesToMarker(Eigen::Vector3s marker);
+
+  s_t getDistToClosestVerticesToMarker(Eigen::Vector3s marker);
+
+  /// This operates in local space and is therefore invarient to the world
+  /// position of the BodyNode
+  Eigen::Vector3s getGradientOfDistToClosestVerticesToMarkerWrtMarker(
+      Eigen::Vector3s marker);
+
+  Eigen::Vector3s
+  finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtMarker(
+      Eigen::Vector3s marker);
+
+  /// This operates in local space and is therefore invarient to the world
+  /// position of the BodyNode
+  Eigen::Vector3s getGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+      Eigen::Vector3s marker);
+
+  Eigen::Vector3s
+  finiteDifferenceGradientOfDistToClosestVerticesToMarkerWrtBodyScale(
+      Eigen::Vector3s marker);
+
+  //--------------------------------------------------------------------------
   // Structural Properties
   //--------------------------------------------------------------------------
 

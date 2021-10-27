@@ -68,6 +68,10 @@ public:
   // Documentation inherited.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
 
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
+
 protected:
   // Documentation inherited.
   void updateBoundingBox() const override;
@@ -80,7 +84,7 @@ private:
   s_t mRadius;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_SPHERESHAPE_HPP_
+#endif // DART_DYNAMICS_SPHERESHAPE_HPP_

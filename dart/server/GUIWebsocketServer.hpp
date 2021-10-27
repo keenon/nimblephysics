@@ -109,7 +109,8 @@ public:
   /// world by calling the lower-level commands
   GUIWebsocketServer& renderSkeleton(
       const std::shared_ptr<dynamics::Skeleton>& skel,
-      const std::string& prefix = "skel");
+      const std::string& prefix = "skel",
+      Eigen::Vector3s overrideColor = -1 * Eigen::Vector3s::Ones());
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body

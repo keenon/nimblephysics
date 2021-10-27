@@ -39,7 +39,6 @@
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
-#include "dart/math/MathTypes.hpp"
 #include "dart/collision/CollisionObject.hpp"
 #include "dart/collision/dart/DARTCollisionDetector.hpp"
 #include "dart/common/Console.hpp"
@@ -72,6 +71,7 @@
 #include "dart/dynamics/TranslationalJoint2D.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
 #include "dart/dynamics/WeldJoint.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/XmlHelpers.hpp"
@@ -1218,7 +1218,12 @@ SkelBodyNode readSoftBodyNode(
       s_t nStacks = getValueDouble(ellipsoidEle, "num_stacks");
       s_t nRings = getValueDouble(ellipsoidEle, "num_rings");
       newSoftBodyNode = dynamics::SoftBodyNodeHelper::makeCylinderProperties(
-          radius, height, static_cast<std::size_t>(nSlices), static_cast<std::size_t>(nStacks), static_cast<std::size_t>(nRings), totalMass);
+          radius,
+          height,
+          static_cast<std::size_t>(nSlices),
+          static_cast<std::size_t>(nStacks),
+          static_cast<std::size_t>(nRings),
+          totalMass);
     }
     else
     {
@@ -1358,7 +1363,8 @@ dynamics::ShapePtr readShape(
     Eigen::Vector3s scale = getValueVector3s(meshEle, "scale");
 
     const std::string meshUri = common::Uri::getRelativeUri(baseUri, filename);
-    const aiScene* model = dynamics::MeshShape::loadMesh(meshUri, retriever);
+    std::shared_ptr<dynamics::SharedMeshWrapper> model
+        = dynamics::MeshShape::loadMesh(meshUri, retriever);
     if (model)
     {
       newShape = std::make_shared<dynamics::MeshShape>(
@@ -1590,17 +1596,20 @@ void getDofAttributeIfItExists(
     std::size_t _index)
 {
   double val = 0;
-  tinyxml2::XMLError error = _xmlElement->QueryDoubleAttribute(_attribute.c_str(), &val);
+  tinyxml2::XMLError error
+      = _xmlElement->QueryDoubleAttribute(_attribute.c_str(), &val);
   if (error == tinyxml2::XML_WRONG_ATTRIBUTE_TYPE)
   {
     dterr << "[getDofAttributeIfItExists] Invalid type for [" << _attribute
           << "] attribute of [" << _element_type << "] element in the ["
           << _index << "] dof of Joint [" << _jointName << "].\n";
   }
-  else if (error == tinyxml2::XML_NO_ATTRIBUTE) {
+  else if (error == tinyxml2::XML_NO_ATTRIBUTE)
+  {
     // do nothing
   }
-  else {
+  else
+  {
     *_value = static_cast<s_t>(val);
   }
 }

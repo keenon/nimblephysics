@@ -262,6 +262,7 @@ void GUIWebsocketServer(py::module& m)
           &dart::server::GUIWebsocketServer::renderSkeleton,
           ::py::arg("skeleton"),
           ::py::arg("prefix") = "world",
+          ::py::arg("overrideColor") = -1 * Eigen::Vector3s::Ones(),
           ::py::call_guard<py::gil_scoped_release>())
       .def(
           "renderTrajectoryLines",

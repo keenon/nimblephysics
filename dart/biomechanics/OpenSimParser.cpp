@@ -9,7 +9,10 @@
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
+#include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
+#include "dart/dynamics/TranslationalJoint.hpp"
+#include "dart/dynamics/TranslationalJoint2D.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
 #include "dart/dynamics/WeldJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
@@ -36,6 +39,18 @@ using namespace std;
 namespace dart {
 using namespace utils;
 namespace biomechanics {
+
+//==============================================================================
+OpenSimFile::OpenSimFile(
+    dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
+  : skeleton(skeleton), markersMap(markersMap)
+{
+}
+
+//==============================================================================
+OpenSimFile::OpenSimFile()
+{
+}
 
 //==============================================================================
 common::ResourceRetrieverPtr ensureRetriever(
@@ -217,6 +232,348 @@ OpenSimFile OpenSimParser::parseOsim(
 }
 
 //==============================================================================
+/// This grabs the marker trajectories from a TRC file
+OpenSimTRC OpenSimParser::loadTRC(
+    const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  OpenSimTRC result;
+  const std::string content = retriever->readAll(uri);
+  double unitsMultiplier = 1.0;
+
+  std::vector<std::string> markerNames;
+  Eigen::Vector3s markerSwapSpace = Eigen::Vector3s::Zero();
+
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    std::map<std::string, Eigen::Vector3s> markerPositions;
+    double timestamp = 0.0;
+
+    int tokenNumber = 0;
+    std::string whitespace = " \t";
+    auto tokenStart = line.find_first_not_of(whitespace);
+    while (tokenStart != std::string::npos)
+    {
+      auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+      std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+      /////////////////////////////////////////////////////////
+      // Process the token, given tokenNumber and lineNumber
+
+      if (lineNumber == 2)
+      {
+        if (tokenNumber == 0)
+        { // DataRate
+          // timestep = 1.0 / atof(token.c_str());
+        }
+        if (tokenNumber == 4)
+        { // Units
+          if (token == "m")
+            unitsMultiplier = 1.0;
+          else if (token == "mm")
+            unitsMultiplier = 1.0 / 1000;
+          else
+          {
+            std::cout << "Unknown length units in .trc file: \"" << token
+                      << "\"" << std::endl;
+          }
+        }
+      }
+      else if (lineNumber == 3 && tokenNumber > 1)
+      {
+        markerNames.push_back(token);
+      }
+      else if (lineNumber > 5)
+      {
+        if (tokenNumber == 1)
+        {
+          timestamp = atof(token.c_str());
+        }
+        else if (tokenNumber > 1)
+        {
+          int offset
+              = tokenNumber - 2; // first two cols are "frame #" and "time"
+          int markerNumber = (int)floor((double)offset / 3);
+          int axisNumber = offset - (markerNumber * 3);
+          markerSwapSpace(axisNumber) = atof(token.c_str()) * unitsMultiplier;
+          if (axisNumber == 2)
+          {
+            if (!markerSwapSpace.hasNaN())
+            {
+              markerPositions[markerNames[markerNumber]]
+                  = Eigen::Vector3s(markerSwapSpace);
+            }
+          }
+        }
+      }
+
+      /////////////////////////////////////////////////////////
+
+      tokenNumber++;
+      if (tokenEnd == std::string::npos)
+      {
+        break;
+      }
+      tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+    }
+
+    if (lineNumber > 5)
+    {
+      result.markerTimesteps.push_back(markerPositions);
+      result.timestamps.push_back(timestamp);
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+    lineNumber++;
+  }
+
+  // Translate into a "lines" format, where each marker gets a full trajectory
+  for (int i = 0; i < result.markerTimesteps.size(); i++)
+  {
+    // TODO: this will result in a bug if some timesteps are missing marker
+    // observations
+    for (auto pair : result.markerTimesteps[i])
+    {
+      result.markerLines[pair.first].push_back(pair.second);
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This grabs the joint angles from a *.mot file
+OpenSimMot OpenSimParser::loadMot(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const common::Uri& uri,
+    int downsampleByFactor,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  OpenSimTRC result;
+  const std::string content = retriever->readAll(uri);
+  std::vector<int> columnToDof;
+  std::vector<bool> rotationalDof;
+
+  std::vector<Eigen::VectorXs> poses;
+  std::vector<double> timestamps;
+
+  bool inHeader = true;
+  bool inDegrees = false;
+
+  int downsampleClock = 0;
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    if (inHeader)
+    {
+      if (line == "endheader")
+      {
+        inHeader = false;
+      }
+      auto tokenEnd = line.find("=");
+      if (tokenEnd != std::string::npos)
+      {
+        std::string variable = line.substr(0, tokenEnd);
+        std::string value
+            = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
+        if (variable == "inDegrees")
+        {
+          inDegrees = (value == "yes");
+        }
+      }
+    }
+    else
+    {
+      int tokenNumber = 0;
+      std::string whitespace = " \t";
+      auto tokenStart = line.find_first_not_of(whitespace);
+      Eigen::VectorXs pose = Eigen::VectorXs::Zero(skel->getNumDofs());
+      double timestamp = 0.0;
+      while (tokenStart != std::string::npos)
+      {
+        auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+        std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+        /////////////////////////////////////////////////////////
+        // Process the token, given tokenNumber and lineNumber
+
+        if (lineNumber == 0)
+        {
+          if (tokenNumber > 0)
+          {
+            // This means we're on the row defining the names of the joints
+            // we're recording positions of
+            dynamics::DegreeOfFreedom* dof = skel->getDof(token);
+            if (dof != nullptr)
+            {
+              columnToDof.push_back(dof->getIndexInSkeleton());
+            }
+            else
+            {
+              columnToDof.push_back(-1);
+            }
+            dynamics::Joint* joint = dof->getJoint();
+            bool isRotationalJoint = true;
+            if (joint->getType()
+                    == dynamics::TranslationalJoint2D::getStaticType()
+                || joint->getType()
+                       == dynamics::TranslationalJoint::getStaticType()
+                || joint->getType()
+                       == dynamics::PrismaticJoint::getStaticType())
+            {
+              isRotationalJoint = false;
+            }
+            if (joint->getType() == dynamics::EulerFreeJoint::getStaticType()
+                && dof->getIndexInJoint() >= 3)
+            {
+              isRotationalJoint = false;
+            }
+            rotationalDof.push_back(isRotationalJoint);
+          }
+        }
+        else
+        {
+          double value = atof(token.c_str());
+          if (tokenNumber == 0)
+          {
+            timestamp = value;
+          }
+          else
+          {
+            int dofIndex = columnToDof[tokenNumber - 1];
+            if (dofIndex != -1)
+            {
+              bool isRotationalJoint = rotationalDof[tokenNumber - 1];
+              if (inDegrees && isRotationalJoint)
+              {
+                value *= M_PI / 180.0;
+              }
+              pose(dofIndex) = value;
+            }
+          }
+        }
+
+        /////////////////////////////////////////////////////////
+
+        tokenNumber++;
+        if (tokenEnd == std::string::npos)
+        {
+          break;
+        }
+        tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+      }
+
+      if (lineNumber > 0)
+      {
+        downsampleClock--;
+        if (downsampleClock <= 0)
+        {
+          downsampleClock = downsampleByFactor;
+          poses.push_back(pose);
+          timestamps.push_back(timestamp);
+        }
+      }
+      lineNumber++;
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+  }
+  Eigen::MatrixXs posesMatrix
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.size());
+  for (int i = 0; i < poses.size(); i++)
+  {
+    posesMatrix.col(i) = poses[i];
+  }
+  OpenSimMot mot;
+  mot.poses = posesMatrix;
+  mot.timestamps = timestamps;
+
+  return mot;
+}
+
+//==============================================================================
+/// When people finish preparing their model in OpenSim, they save a *.osim
+/// file with all the scales and offsets baked in. This is a utility to go
+/// through and get out the scales and offsets in terms of a standard
+/// skeleton, so that we can include their values in standard datasets.
+OpenSimScaleAndMarkerOffsets OpenSimParser::getScaleAndMarkerOffsets(
+    const OpenSimFile& standardSkeleton, const OpenSimFile& scaledSkeleton)
+{
+  OpenSimScaleAndMarkerOffsets config;
+
+  // Check that the two skeletons are compatible
+  for (int i = 0; i < standardSkeleton.skeleton->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* bodyNode = standardSkeleton.skeleton->getBodyNode(i);
+    if (!scaledSkeleton.skeleton->getBodyNode(bodyNode->getName()))
+    {
+      std::cout << "OpenSimParser::getConfiguration() failed because the "
+                   "skeletons were too different! The standard skeleton has a "
+                   "body named \""
+                << bodyNode->getName() << "\", but the scaled skeleton doesn't."
+                << std::endl;
+      config.success = false;
+      return config;
+    }
+  }
+
+  // Now go through both skeletons and try to work out what the body scales are
+
+  config.bodyScales
+      = Eigen::VectorXs::Ones(standardSkeleton.skeleton->getNumBodyNodes() * 3);
+  for (int i = 0; i < standardSkeleton.skeleton->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* scaledNode = scaledSkeleton.skeleton->getBodyNode(
+        standardSkeleton.skeleton->getBodyNode(i)->getName());
+    dynamics::Shape* shape = scaledNode->getShapeNode(0)->getShape().get();
+    if (shape->getType() == dynamics::MeshShape::getStaticType())
+    {
+      dynamics::MeshShape* mesh = static_cast<dynamics::MeshShape*>(shape);
+      Eigen::Vector3s scale = mesh->getScale();
+      config.bodyScales.segment<3>(i * 3) = scale;
+    }
+  }
+
+  // Try to convert the markers into the standard skeleton
+
+  for (auto pair : scaledSkeleton.markersMap)
+  {
+    std::string markerName = pair.first;
+    dynamics::BodyNode* standardBody
+        = standardSkeleton.skeleton->getBodyNode(pair.second.first->getName());
+    if (standardBody != nullptr)
+    {
+      Eigen::Vector3s bodyScale = config.bodyScales.segment<3>(
+          standardBody->getIndexInSkeleton() * 3);
+      Eigen::Vector3s goldOffset = pair.second.second.cwiseQuotient(bodyScale);
+      config.markers[markerName] = std::make_pair(standardBody, goldOffset);
+      config.markerOffsets[markerName] = goldOffset - pair.second.second;
+    }
+  }
+
+  // Return
+
+  config.success = true;
+  return config;
+}
+
+//==============================================================================
 std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,
@@ -266,10 +623,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     {
       Eigen::Vector3s axis
           = readVec3(transformAxisCursor->FirstChildElement("axis"));
-      if (dofIndex < 3)
-        eulerAxisOrder.push_back(axis);
-      else
-        transformAxisOrder.push_back(axis);
 
       tinyxml2::XMLElement* function
           = transformAxisCursor->FirstChildElement("function");
@@ -327,6 +680,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         allLocked = false;
         Eigen::Vector2s coeffs
             = readVec2(linearFunction->FirstChildElement("coefficients"));
+        // Bake coeff flips into the axis
+        if (coeffs(0) == -1)
+        {
+          axis *= coeffs(0);
+          coeffs(0) = 1.0;
+        }
         // Example coeffs for linear: 1 0
         customFunctions.push_back(
             std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
@@ -352,6 +711,11 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       {
         assert(false && "Unrecognized function type");
       }
+
+      if (dofIndex < 3)
+        eulerAxisOrder.push_back(axis);
+      else
+        transformAxisOrder.push_back(axis);
 
       dofIndex++;
       transformAxisCursor
@@ -936,9 +1300,20 @@ OpenSimFile OpenSimParser::readOsim40(
             = readVec3(markerCursor->FirstChildElement("location"));
         std::string bodyName
             = markerCursor->FirstChildElement("body")->GetText();
+        bool fixed
+            = std::string(markerCursor->FirstChildElement("fixed")->GetText())
+              == "true";
 
         file.markersMap[name]
             = std::make_pair(skel->getBodyNode(bodyName), offset);
+        if (fixed)
+        {
+          file.anatomicalMarkers.push_back(name);
+        }
+        else
+        {
+          file.trackingMarkers.push_back(name);
+        }
 
         markerCursor = markerCursor->NextSiblingElement();
       }

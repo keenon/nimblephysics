@@ -473,7 +473,7 @@ TEST(SkeletonConverter, AMASS_JACOBIANS)
       -0.0808033, -0.05125, -0.0883991, 0.0374933, 0.0712554;
   amass->setPositions(originalPos);
 
-  std::vector<const dynamics::Joint*> joints;
+  std::vector<dynamics::Joint*> joints;
   joints.push_back(amass->getJoint("wrist_l"));
 
   // Check the joint position Jacobian is accurate
@@ -511,7 +511,6 @@ TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
       osim->getBodyNode("radius_l"), osim->getBodyNode("radius_r"));
   osim->mergeScaleGroups(
       osim->getBodyNode("ulna_l"), osim->getBodyNode("ulna_r"));
-  EXPECT_EQ(osim->getNumScaleGroups(), osim->getNumBodyNodes() - 3);
   EXPECT_EQ(
       osim->getScaleGroupIndex(osim->getBodyNode("tibia_l")),
       osim->getScaleGroupIndex(osim->getBodyNode("tibia_r")));
@@ -522,7 +521,7 @@ TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
       osim->getScaleGroupIndex(osim->getBodyNode("ulna_l")),
       osim->getScaleGroupIndex(osim->getBodyNode("ulna_r")));
 
-  std::vector<const dynamics::Joint*> joints;
+  std::vector<dynamics::Joint*> joints;
   joints.push_back(osim->getJoint("radius_hand_l"));
   joints.push_back(osim->getJoint("radius_hand_r"));
   joints.push_back(osim->getJoint("ankle_l"));
@@ -544,7 +543,7 @@ TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
   // Check the body scale Jacobian is accurate
   Eigen::MatrixXs scaleJac
       = osim->getJointWorldPositionsJacobianWrtGroupScales(joints);
-  EXPECT_EQ(scaleJac.cols(), osim->getNumScaleGroups() * 3);
+  EXPECT_EQ(scaleJac.cols(), osim->getGroupScaleDim());
   Eigen::MatrixXs scaleJac_fd
       = osim->finiteDifferenceJointWorldPositionsJacobianWrtGroupScales(joints);
   if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
@@ -558,7 +557,7 @@ TEST(SkeletonConverter, SCALE_EQUALITY_CONSTRAINTS)
         if (!equals(dpos_dscale, dpos_dscale_fd, THRESHOLD))
         {
           const std::vector<dynamics::BodyNode*>& group
-              = osim->getBodyScaleGroup(i);
+              = osim->getBodyScaleGroup(i).nodes;
 
           std::cout << "Error on scale group " << i << ":";
           for (auto node : group)
@@ -790,7 +789,7 @@ TEST(SkeletonConverter, IK_JACOBIANS_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
-  std::vector<const dynamics::Joint*> joints;
+  std::vector<dynamics::Joint*> joints;
   joints.push_back(osimBallJoints->getJoint("radius_hand_l"));
   joints.push_back(osimBallJoints->getJoint("radius_hand_r"));
   joints.push_back(osimBallJoints->getJoint("ankle_l"));

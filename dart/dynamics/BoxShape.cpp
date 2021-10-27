@@ -108,6 +108,14 @@ Eigen::Matrix3s BoxShape::computeInertia(s_t mass) const
 }
 
 //==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr BoxShape::clone() const
+{
+  return std::make_shared<BoxShape>(mSize);
+}
+
+//==============================================================================
 void BoxShape::updateBoundingBox() const
 {
   mBoundingBox.setMin(-mSize * 0.5);

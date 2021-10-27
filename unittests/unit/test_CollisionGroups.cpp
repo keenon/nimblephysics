@@ -100,7 +100,10 @@ TEST_P(CollisionGroupsTest, SkeletonSubscription)
 
   // Now we'll change the properties of one the box shape so that there should
   // no longer be any collisions.
-  boxShape->setSize(Eigen::Vector3s::Constant(0.2));
+  static_cast<dart::dynamics::BoxShape*>(sn1->getShape().get())
+      ->setSize(Eigen::Vector3s::Constant(0.2));
+  static_cast<dart::dynamics::BoxShape*>(sn2->getShape().get())
+      ->setSize(Eigen::Vector3s::Constant(0.2));
   dart::collision::CollisionResult result2;
   EXPECT_FALSE(world->checkCollision());
 
@@ -213,6 +216,10 @@ TEST_P(CollisionGroupsTest, BodyNodeSubscription)
   EXPECT_FALSE(group->collide());
 
   sphere->setRadius(1.01);
+  static_cast<dart::dynamics::SphereShape*>(sn_1a->getShape().get())
+      ->setRadius(1.01);
+  static_cast<dart::dynamics::SphereShape*>(sn_2a->getShape().get())
+      ->setRadius(1.01);
   // The shapes of the collision geometries have been expanded enough that they
   // should collide again.
   EXPECT_TRUE(group->collide());

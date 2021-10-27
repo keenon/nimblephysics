@@ -702,7 +702,33 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self, std::size_t treeIndex)
               -> std::size_t { return self->getNumEndEffectors(treeIndex); },
           ::py::arg("treeIndex"))
+      .def(
+          "getHeight",
+          &dart::dynamics::Skeleton::getHeight,
+          ::py::arg("pos"),
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfHeightWrtBodyScales",
+          &dart::dynamics::Skeleton::getGradientOfHeightWrtBodyScales,
+          ::py::arg("pos"),
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getLowestPoint",
+          &dart::dynamics::Skeleton::getLowestPoint,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfLowestPointWrtBodyScales",
+          &dart::dynamics::Skeleton::getGradientOfLowestPointWrtBodyScales,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
+      .def(
+          "getGradientOfLowestPointWrtJoints",
+          &dart::dynamics::Skeleton::getGradientOfLowestPointWrtJoints,
+          ::py::arg("up") = Eigen::Vector3s::UnitY())
       .def("getRandomPose", &dart::dynamics::Skeleton::getRandomPose)
+      .def(
+          "getRandomPoseForJoints",
+          &dart::dynamics::Skeleton::getRandomPoseForJoints,
+          ::py::arg("joints"))
       .def(
           "getControlForceUpperLimits",
           +[](dart::dynamics::Skeleton* self) -> Eigen::VectorXs {
@@ -753,10 +779,10 @@ void Skeleton(py::module& m)
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
             self->setPositionLowerLimits(limits);
           })
-      .def("getLinkScales", &dart::dynamics::Skeleton::getLinkScales)
+      .def("getBodyScales", &dart::dynamics::Skeleton::getBodyScales)
       .def(
-          "setLinkScales",
-          &dart::dynamics::Skeleton::setLinkScales,
+          "setBodyScales",
+          &dart::dynamics::Skeleton::setBodyScales,
           ::py::arg("scales"))
       .def(
           "clampPositionsToLimits",
@@ -788,7 +814,17 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::mergeScaleGroupsByIndex,
           ::py::arg("groupA"),
           ::py::arg("groupB"))
-      .def("getNumScaleGroups", &dart::dynamics::Skeleton::getNumScaleGroups)
+      .def(
+          "autogroupSymmetricSuffixes",
+          &dart::dynamics::Skeleton::autogroupSymmetricSuffixes,
+          ::py::arg("leftSuffix") = "_l",
+          ::py::arg("rightSuffix") = "_r")
+      .def("getGroupScaleDim", &dart::dynamics::Skeleton::getGroupScaleDim)
+      .def(
+          "setScaleGroupUniformScaling",
+          &dart::dynamics::Skeleton::setScaleGroupUniformScaling,
+          ::py::arg("bodyNode"),
+          ::py::arg("uniform") = true)
       .def(
           "setGroupScales",
           &dart::dynamics::Skeleton::setGroupScales,
@@ -820,11 +856,16 @@ void Skeleton(py::module& m)
       .def(
           "getMarkerMapWorldPositions",
           &dart::dynamics::Skeleton::getMarkerMapWorldPositions,
-          ::py::arg("markers"))
+          ::py::arg("markerMap"))
+      .def(
+          "convertMarkerMap",
+          &dart::dynamics::Skeleton::convertMarkerMap,
+          ::py::arg("markerMap"),
+          ::py::arg("warnOnDrop") = true)
       .def(
           "fitJointsToWorldPositions",
           +[](dart::dynamics::Skeleton* self,
-              const std::vector<const dynamics::Joint*>& positionJoints,
+              const std::vector<dynamics::Joint*>& positionJoints,
               Eigen::VectorXs targetPositions,
               bool scaleBodies,
               double convergenceThreshold,
@@ -855,8 +896,7 @@ void Skeleton(py::module& m)
           "fitMarkersToWorldPositions",
           +[](dart::dynamics::Skeleton* self,
               const std::vector<
-                  std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
-                  markers,
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
               Eigen::VectorXs targetPositions,
               Eigen::VectorXs markerWeights,
               bool scaleBodies,

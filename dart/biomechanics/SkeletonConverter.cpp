@@ -22,7 +22,7 @@ SkeletonConverter::SkeletonConverter(
 /// BallJoint vs a CustomJoint) and we'll do our best to match it up so the
 /// rotations are as close as possible.
 void SkeletonConverter::linkJoints(
-    const dynamics::Joint* sourceJoint, const dynamics::Joint* targetJoint)
+    dynamics::Joint* sourceJoint, dynamics::Joint* targetJoint)
 {
   mSourceJoints.push_back(sourceJoint);
   for (int i = 0; i < mSourceSkeleton->getNumJoints(); i++)
@@ -134,9 +134,9 @@ void SkeletonConverter::rescaleAndPrepTarget(
   // child bodies, which will help preserve rotation information
   for (int i = 0; i < mTargetJoints.size(); i++)
   {
-    const dynamics::BodyNode* targetBody = mTargetJoints[i]->getChildBodyNode();
-    const dynamics::BodyNode* sourceBody = mSourceJoints[i]->getChildBodyNode();
-    const dynamics::BodyNode* sourceBodyWithBalls
+    dynamics::BodyNode* targetBody = mTargetJoints[i]->getChildBodyNode();
+    dynamics::BodyNode* sourceBody = mSourceJoints[i]->getChildBodyNode();
+    dynamics::BodyNode* sourceBodyWithBalls
         = mSourceJointsWithBalls[i]->getChildBodyNode();
     for (int j = 0; j <= addFakeMarkers; j++)
     {
@@ -155,10 +155,10 @@ void SkeletonConverter::rescaleAndPrepTarget(
       }
       cursor++;
       mSourceMarkers.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+          std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               sourceBody, sourceOffset));
       mSourceMarkersBallJoints.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+          std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               sourceBodyWithBalls, sourceOffset));
       Eigen::Vector3s targetOffset = targetBody->getWorldTransform().inverse()
                                      * sourceBody->getWorldTransform()
@@ -167,7 +167,7 @@ void SkeletonConverter::rescaleAndPrepTarget(
       if (j == 0)
         targetOffset.setZero();
       mTargetMarkers.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+          std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               targetBody, targetOffset));
       */
       // Define the unit vectors in the target body space
@@ -183,9 +183,8 @@ void SkeletonConverter::rescaleAndPrepTarget(
         mMarkerWeights(cursor) = weightFakeMarkers;
       }
       cursor++;
-      mTargetMarkers.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
-              targetBody, targetOffset.cwiseQuotient(targetBody->getScale())));
+      mTargetMarkers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+          targetBody, targetOffset.cwiseQuotient(targetBody->getScale())));
       Eigen::Vector3s sourceOffset
           = (sourceBody->getWorldTransform().inverse()
              * targetBody->getWorldTransform() * targetOffset)
@@ -193,11 +192,10 @@ void SkeletonConverter::rescaleAndPrepTarget(
       // Always align the joints to each other directly, without offset
       if (j == 0)
         sourceOffset.setZero();
-      mSourceMarkers.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
-              sourceBody, sourceOffset));
+      mSourceMarkers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+          sourceBody, sourceOffset));
       mSourceMarkersBallJoints.push_back(
-          std::pair<const dynamics::BodyNode*, Eigen::Vector3s>(
+          std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               sourceBodyWithBalls, sourceOffset));
     }
   }
@@ -380,7 +378,7 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
       /*
       std::cout << "Fitting angles" << std::endl;
       mSourceSkeleton->fitJointsToWorldPositions(
-          std::vector<const dynamics::Joint*>(),
+          std::vector<dynamics::Joint*>(),
           Eigen::VectorXs::Zero(0),
           mSourceJoints,
           getTargetJointWorldAngles(),
@@ -461,28 +459,26 @@ void SkeletonConverter::debugToGUI(
 }
 
 //==============================================================================
-const std::vector<const dynamics::Joint*>& SkeletonConverter::getSourceJoints()
-    const
+const std::vector<dynamics::Joint*>& SkeletonConverter::getSourceJoints() const
 {
   return mSourceJoints;
 }
 
 //==============================================================================
-const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
 SkeletonConverter::getSourceMarkers() const
 {
   return mSourceMarkers;
 }
 
 //==============================================================================
-const std::vector<const dynamics::Joint*>& SkeletonConverter::getTargetJoints()
-    const
+const std::vector<dynamics::Joint*>& SkeletonConverter::getTargetJoints() const
 {
   return mTargetJoints;
 }
 
 //==============================================================================
-const std::vector<std::pair<const dynamics::BodyNode*, Eigen::Vector3s>>&
+const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
 SkeletonConverter::getTargetMarkers() const
 {
   return mTargetMarkers;

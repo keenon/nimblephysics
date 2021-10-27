@@ -37,18 +37,14 @@ namespace dynamics {
 
 //==============================================================================
 PlaneShape::PlaneShape(const Eigen::Vector3s& _normal, s_t _offset)
-  : Shape(PLANE),
-    mNormal(_normal.normalized()),
-    mOffset(_offset)
+  : Shape(PLANE), mNormal(_normal.normalized()), mOffset(_offset)
 {
 }
 
 //==============================================================================
-PlaneShape::PlaneShape(const Eigen::Vector3s& _normal,
-                       const Eigen::Vector3s& _point)
-  : Shape(),
-    mNormal(_normal.normalized()),
-    mOffset(mNormal.dot(_point))
+PlaneShape::PlaneShape(
+    const Eigen::Vector3s& _normal, const Eigen::Vector3s& _point)
+  : Shape(), mNormal(_normal.normalized()), mOffset(mNormal.dot(_point))
 {
 }
 
@@ -100,16 +96,15 @@ s_t PlaneShape::getOffset() const
 }
 
 //==============================================================================
-void PlaneShape::setNormalAndOffset(const Eigen::Vector3s& _normal,
-                                    s_t _offset)
+void PlaneShape::setNormalAndOffset(const Eigen::Vector3s& _normal, s_t _offset)
 {
   setNormal(_normal);
   setOffset(_offset);
 }
 
 //==============================================================================
-void PlaneShape::setNormalAndPoint(const Eigen::Vector3s& _normal,
-                                   const Eigen::Vector3s& _point)
+void PlaneShape::setNormalAndPoint(
+    const Eigen::Vector3s& _normal, const Eigen::Vector3s& _point)
 {
   setNormal(_normal);
   setOffset(mNormal.dot(_point));
@@ -125,6 +120,14 @@ s_t PlaneShape::computeDistance(const Eigen::Vector3s& _point) const
 s_t PlaneShape::computeSignedDistance(const Eigen::Vector3s& _point) const
 {
   return mNormal.dot(_point) - mOffset;
+}
+
+//==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+ShapePtr PlaneShape::clone() const
+{
+  return std::make_shared<PlaneShape>(mNormal, mOffset);
 }
 
 //==============================================================================
@@ -145,5 +148,5 @@ void PlaneShape::updateVolume() const
   mIsVolumeDirty = false;
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

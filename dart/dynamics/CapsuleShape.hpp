@@ -43,7 +43,6 @@ namespace dynamics {
 class CapsuleShape : public Shape
 {
 public:
-
   /// Constructor.
   /// \param[in] radius Radius of the capsule.
   /// \param[in] height Height of the cylindrical part.
@@ -76,11 +75,14 @@ public:
   /// \param[in] radius Radius of the capsule.
   /// \param[in] height Height of the cylindrical part.
   /// \param[in] mass Mass of the capsule.
-  static Eigen::Matrix3s computeInertia(
-      s_t radius, s_t height, s_t mass);
+  static Eigen::Matrix3s computeInertia(s_t radius, s_t height, s_t mass);
 
   // Documentation inherited.
   Eigen::Matrix3s computeInertia(s_t mass) const override;
+
+  /// Allow us to clone shapes, to avoid race conditions when scaling shapes
+  /// belonging to different skeletons
+  ShapePtr clone() const override;
 
 protected:
   // Documentation inherited.
@@ -95,10 +97,9 @@ private:
 
   /// Height of the cylindrical part.
   s_t mHeight;
-
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_CAPSULESHAPE_HPP_
+#endif // DART_DYNAMICS_CAPSULESHAPE_HPP_

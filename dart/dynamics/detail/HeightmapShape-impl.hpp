@@ -30,13 +30,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dart/dynamics/HeightmapShape.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
+
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/HeightmapShape.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -182,6 +182,18 @@ template <typename S>
 void HeightmapShape<S>::notifyColorUpdated(const Eigen::Vector4s& /*color*/)
 {
   incrementVersion();
+}
+
+//==============================================================================
+/// Allow us to clone shapes, to avoid race conditions when scaling shapes
+/// belonging to different skeletons
+template <typename S>
+ShapePtr HeightmapShape<S>::clone() const
+{
+  std::shared_ptr<HeightmapShape<S>> map
+      = std::make_shared<HeightmapShape<S>>();
+  map->setHeightField(getHeightField());
+  return map;
 }
 
 //==============================================================================
