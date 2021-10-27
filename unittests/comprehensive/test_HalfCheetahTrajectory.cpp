@@ -88,6 +88,7 @@ using namespace neural;
 using namespace server;
 using namespace realtime;
 
+#ifdef ALL_TESTS
 TEST(HALF_CHEETAH, FIRST_DEMO)
 {
   // Create a world
@@ -121,6 +122,7 @@ TEST(HALF_CHEETAH, FIRST_DEMO)
     }
   }
 }
+#endif
 
 #ifdef ALL_TESTS
 TEST(HALF_CHEETAH, NUMERICAL_INSTABILITY)
@@ -343,6 +345,7 @@ TEST(HALF_CHEETAH, FULL_TEST)
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/half_cheetah.skel");
   // world->setSlowDebugResultsAgainstFD(true);
+  world->setTimeStep(1.0/1000);
 
   for (auto* dof : world->getDofs())
   {

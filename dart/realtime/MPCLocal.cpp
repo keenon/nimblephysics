@@ -534,5 +534,14 @@ void MPCLocal::setCOMchange(Eigen::Vector3s com)
   pre_com = com;
 }
 
+void MPCLocal::setMUchange(s_t mu)
+{
+  if(abs(mu-pre_mu) > 0.001)
+  {
+    mVarchange = true;
+  }
+  pre_mu = mu;
+}
+
 } // namespace realtime
 } // namespace dart

@@ -762,6 +762,16 @@ public:
   /// Returns the size of the getMasses() vector
   std::size_t getLinkMassesDims();
 
+  // Get link coms using mu
+  Eigen::VectorXs getLinkMUs();
+
+  // Get Beta Related
+  Eigen::VectorXs getLinkBetas();
+
+  Eigen::Vector3s getLinkBetaIndex(size_t index);
+
+  s_t getLinkMUIndex(size_t index);
+
   // This gets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together
   Eigen::VectorXs getLinkCOMs();
@@ -797,6 +807,14 @@ public:
 
   // Sets the lower limits of all the joints from a single vector
   void setVelocityLowerLimits(Eigen::VectorXs limits);
+
+  void setLinkMUs(Eigen::VectorXs mus);
+  // This will set COM of a particular link according to mu
+  void setLinkMUIndex(s_t mu, size_t index);
+
+  void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
+
+  void setLinkBetas(Eigen::VectorXs betas);
 
   // This sets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together

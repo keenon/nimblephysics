@@ -40,6 +40,7 @@
 #include <dart/utils/urdf/urdf.hpp>
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
+#include <math.h>
 
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/realtime/MPC.hpp"
@@ -62,6 +63,7 @@
 #include "stdio.h"
 
 #define ALL_TESTS
+//#define NO_VIS
 
 using namespace dart;
 using namespace math;
@@ -71,6 +73,20 @@ using namespace neural;
 using namespace realtime;
 using namespace trajectory;
 using namespace server;
+
+enum BODY_NODE
+{
+  H_PELVIS = 1,
+  H_PELVIS_AUX,
+  H_PELVIS_AUX2,
+  H_HEAD,
+  B_THIGH,
+  B_SHIN,
+  B_FOOT,
+  F_THIGH,
+  F_SHIN,
+  F_FOOT
+};
 
 std::shared_ptr<LossFn> getMPCLoss()
 {
@@ -249,6 +265,256 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
+#ifdef NO_VIS
+
+TEST(HALF_CHEETAH, FULL_TEST)
+{
+  // set precision to 256 bits (double has only 53 bits)
+// #ifdef DART_USE_ARBITRARY_PRECISION
+//   mpfr::mpreal::set_default_prec(256);
+// #endif
+
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  // world->setSlowDebugResultsAgainstFD(true);
+  world->setTimeStep(1.0/1000);
+
+  for (auto* dof : world->getDofs())
+  {
+    std::cout << "DOF: " << dof->getName() << std::endl;
+  }
+
+  Eigen::VectorXs forceLimits
+      = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
+
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+
+  // Create target
+
+  s_t target_x = 0.5;
+  s_t target_y = 0.5;
+
+  SkeletonPtr target = Skeleton::create("target");
+  std::pair<WeldJoint*, BodyNode*> targetJointPair
+      = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* targetJoint = targetJointPair.first;
+  BodyNode* targetBody = targetJointPair.second;
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, 0.0);
+  targetJoint->setTransformFromParentBodyNode(targetOffset);
+  std::shared_ptr<BoxShape> targetShape(
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
+  ShapeNode* targetVisual
+      = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setCastShadows(false);
+
+  world->addSkeleton(target);
+
+  trajectory::LossFn loss(
+      [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
+        const Eigen::VectorXs lastPos
+            = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
+
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
+
+        return diffX * diffX + diffY * diffY;
+      });
+
+  std::shared_ptr<trajectory::MultiShot> trajectory
+      = std::make_shared<trajectory::MultiShot>(world, loss, 300, 10, false);
+  trajectory->setParallelOperationsEnabled(false);
+
+  trajectory::IPOptOptimizer optimizer;
+  optimizer.setLBFGSHistoryLength(5);
+  optimizer.setTolerance(1e-4);
+  // optimizer.setCheckDerivatives(true);
+  optimizer.setIterationLimit(500);
+  optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
+                                             int /* step */,
+                                             s_t /* primal */,
+                                             s_t /* dual */) {
+    const Eigen::MatrixXs poses
+        = problem->getRolloutCache(world)->getPosesConst();
+    const Eigen::MatrixXs vels
+        = problem->getRolloutCache(world)->getVelsConst();
+    std::cout << "Rendering trajectory lines" << std::endl;
+    server.renderTrajectoryLines(world, poses);
+    world->setPositions(poses.col(0));
+    server.renderWorld(world);
+    return true;
+  });
+  std::shared_ptr<trajectory::Solution> result
+      = optimizer.optimize(trajectory.get());
+
+  int i = 0;
+  const Eigen::MatrixXs poses
+      = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
+  const Eigen::MatrixXs vels
+      = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
+
+  server.renderTrajectoryLines(world, poses);
+
+  Ticker ticker(0.1);
+  ticker.registerTickListener([&](long /* time */) {
+    world->setPositions(poses.col(i));
+
+    i++;
+    if (i >= poses.cols())
+    {
+      i = 0;
+    }
+    // world->step();
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  while (server.isServing())
+  {}
+}
+
+TEST(HALF_CHEETAH, FIRST_DEMO)
+{
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+    "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
+  std::cout <<"Time Step:" << world->getTimeStep() << std::endl;
+
+  std::shared_ptr<dynamics::Skeleton> halfCheetah
+      = world->getSkeleton("half_cheetah");
+  std::cout << "Springs: " << halfCheetah->getSpringStiffVector() << std::endl;
+  std::cout << "Damping: " << halfCheetah->getDampingCoeffVector() << std::endl;
+  
+  for(int i=0; i < 3; i++)
+  {
+    world->step();
+    std::cout << i << ":" <<std::endl;
+    std::cout << "Pos:" << std::endl << world->getPositions() << std::endl;
+    std::cout << "Vel:" << std::endl << world->getVelocities() << std::endl;
+    if(world->getPositions().hasNaN())
+    {
+      std::cout << "Got a NaN on timestep " << i << "!!" <<std::endl;
+      EXPECT_FALSE(world->getPositions().hasNaN());
+      break;
+    }
+  }
+}
+
+
+TEST(REALTIME, CARTPOLE_PLOT)
+{
+  ////////////////////////////////////////////////////////////
+  // Create a cartpole example
+  ////////////////////////////////////////////////////////////
+
+  // World
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+      "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
+
+  
+  Eigen::VectorXs forceLimits
+    = Eigen::VectorXs::Ones(world->getNumDofs()) * 50;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
+  world->setTimeStep(1.0 / 1000);
+  
+  size_t mass_idx = 10;
+
+  world->tuneMass(
+      world->getBodyNodeIndex(mass_idx),
+      WrtMassBodyNodeEntryType::INERTIA_MASS,
+      Eigen::VectorXs::Ones(1) * 5.0,
+      Eigen::VectorXs::Ones(1) * 0.2);
+
+  std::shared_ptr<LossFn> lossFn = getSSIDPosLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelPosLoss();
+  ////////////////////////////////
+  // Set up a realtime world and controller
+  ////////////////////////////////////////////////////////////
+
+
+  int millisPerTimestep = world->getTimeStep() * 1000;
+  int steps = 5;
+  int inferenceHistoryMillis = steps * millisPerTimestep;
+
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long /* timestamp */) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    }
+  );
+  
+  
+  world->setLinkMassIndex(2.0,mass_idx);
+  float init_mass = 1.0;
+  std::vector<Eigen::VectorXs> multi_loss;
+  
+  std::vector<s_t> solutions;
+  for (int i = 0; i < 200; i++)
+  {
+    long time = i * millisPerTimestep;
+    Eigen::VectorXs forces = Eigen::VectorXs::Ones(world->getNumDofs());
+    world->setControlForces(forces);
+    world->step();
+    ssid.registerControls(time, forces);
+    ssid.registerSensors(time, world->getPositions(),0);
+    ssid.registerSensors(time, world->getVelocities(),1);
+    
+    if(i%5==0 && i!=0)
+    {
+      multi_loss.push_back(ssid.runPlotting(time,5.0,0.2,200));
+      world->setLinkMassIndex(init_mass,mass_idx);
+      ssid.runInference(time);
+      init_mass = world->getLinkMassIndex(mass_idx);
+      std::cout << "Recovered mass after iteration "<<i<<": "
+                << init_mass << std::endl;
+      solutions.push_back(init_mass);
+      world->setLinkMassIndex(2.0,mass_idx);
+    }
+  }
+  Eigen::MatrixXs lossMatrix = Eigen::MatrixXs::Zero(200,multi_loss.size());
+  Eigen::VectorXs solutionVec = Eigen::VectorXs::Zero(solutions.size());
+  for(int i=0;i<multi_loss.size();i++)
+  {
+    lossMatrix.col(i) = multi_loss[i];
+    solutionVec(i) = solutions[i];
+  }
+  std::ofstream file;
+  file.open("/workspaces/nimblephysics/saved_data/raw_data/Losses_half_cheetah.txt");
+  file<<lossMatrix.transpose();
+  file.close();
+  
+  std::ofstream sfile;
+  sfile.open("/workspaces/nimblephysics/saved_data/raw_data/Solutions_half_cheetah.txt");
+  sfile<<solutionVec;
+  sfile.close();
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_MPC)
@@ -258,9 +524,12 @@ TEST(REALTIME, CARTPOLE_MPC)
   ////////////////////////////////////////////////////////////
 
   // World
-  WorldPtr world = dart::utils::UniversalLoader::loadWorld(
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
       "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
 
+  
   Eigen::VectorXs forceLimits
     = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
   forceLimits(0) = 0;
@@ -273,7 +542,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   ////////////////////////////////////////////////////////////
 
   // 100 fps
-  world->setTimeStep(1.0 / 100);
+  world->setTimeStep(1.0 / 1000);
 
   // 300 timesteps
   int millisPerTimestep = world->getTimeStep() * 1000;
@@ -281,10 +550,9 @@ TEST(REALTIME, CARTPOLE_MPC)
 
   // Create target
 
-  s_t target_x = 0.5;
+  s_t target_x = 3.0;
   s_t target_y = 0.5;
 
-  // BUG: Target pass by value vs pass by reference. 
   TrajectoryLossFn loss = [&target_x, &target_y](const trajectory::TrajectoryRollout* rollout) {
         const Eigen::VectorXs lastPos
             = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
@@ -321,13 +589,14 @@ TEST(REALTIME, CARTPOLE_MPC)
       };
 
   int inferenceSteps = 5;
+  size_t mass_idx = 5;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
   
   
   // Need to get a body node which is useful for SSID
   ssidWorld->tuneMass(
-    world->getBodyNodeIndex(1),
+    world->getBodyNodeIndex(mass_idx),
     WrtMassBodyNodeEntryType::INERTIA_MASS,
     Eigen::VectorXs::Ones(1) * 5.0,
     Eigen::VectorXs::Ones(1) * 0.2);
@@ -364,6 +633,9 @@ TEST(REALTIME, CARTPOLE_MPC)
   MPCLocal& mpcRemote = mpcLocal;
   
   bool init_flag = true;
+  float weight = 0;
+  float stddev = 10;
+  float gamma  = 0.9;
   ssid.registerInferListener([&](long time,
                                  Eigen::VectorXs pos,
                                  Eigen::VectorXs vel,
@@ -373,14 +645,17 @@ TEST(REALTIME, CARTPOLE_MPC)
     mpcRemote.setMasschange(mass(0));
     if(!init_flag)
     {
-      s_t old_mass = world->getLinkMassIndex(1);
-      world->setLinkMassIndex(0.9*old_mass+0.1*mass(0),1);
+      s_t old_mass = world->getLinkMassIndex(mass_idx);
+      weight = exp(-(mass(0)-old_mass)*(mass(0)-old_mass)/stddev);
+      world->setLinkMassIndex((1-weight)*old_mass+weight*mass(0),mass_idx);
     }
     else
     {
-      world->setLinkMassIndex(mass(0),1);
+      world->setLinkMassIndex(mass(0),mass_idx);
+      init_flag = false;
     }
-    
+    if(stddev > 1)
+      stddev*= gamma;
   });
 
   std::function<Eigen::VectorXs()> getControlForces = [&]() {
@@ -413,15 +688,16 @@ TEST(REALTIME, CARTPOLE_MPC)
   Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
 
   float mass = 2.0;
-  float id_mass = 1.0;
+  float id_mass = 2.0;
   size_t total_step = 0;
-  //realtimeUnderlyingWorld->setLinkMassIndex(mass,1);
-  //ssidWorld->setLinkMassIndex(id_mass,1);
-  //world->setLinkMassIndex(id_mass,1);
+  realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
+  ssidWorld->setLinkMassIndex(id_mass,mass_idx);
+  world->setLinkMassIndex(id_mass,mass_idx);
 
   ticker.registerTickListener([&](long now) {
-    //Eigen::VectorXs mpcforces = mpcRemote.getControlForce(now);
-    Eigen::VectorXs mpcforces = Eigen::VectorXs::Zero(world->getNumDofs());
+    Eigen::VectorXs mpcforces = mpcRemote.getControlForce(now);
+    //Eigen::VectorXs mpcforces = 20*Eigen::VectorXs::Random(world->getNumDofs());
+    //mpcforces -= 10*Eigen::VectorXs::Ones(world->getNumDofs());
     realtimeUnderlyingWorld->setControlForces(mpcforces);
 
     if (server.getKeysDown().count("a"))
@@ -442,13 +718,13 @@ TEST(REALTIME, CARTPOLE_MPC)
     {
       // Increase mass
       mass = 3.0;
-      realtimeUnderlyingWorld->setLinkMassIndex(mass,1);
+      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
     }
     else if (server.getKeysDown().count("o"))
     {
       // Decrease mass
       mass = 1.0;
-      realtimeUnderlyingWorld->setLinkMassIndex(mass,1);
+      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
     }
     
     ssid.registerLock();
@@ -457,13 +733,13 @@ TEST(REALTIME, CARTPOLE_MPC)
     ssid.registerSensors(now, realtimeUnderlyingWorld->getVelocities(),1);
     ssid.registerUnlock();
     realtimeUnderlyingWorld->step();
-    id_mass = world->getLinkMassIndex(1);
+    id_mass = world->getLinkMassIndex(mass_idx);
     mpcRemote.recordGroundTruthState(
         now,
         realtimeUnderlyingWorld->getPositions(),
         realtimeUnderlyingWorld->getVelocities(),
         realtimeUnderlyingWorld->getMasses());
-    if(total_step % 5 == 0)
+    if(total_step % 10 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
       server.createText(key,"Current Masses: "+std::to_string(id_mass),Eigen::Vector2i(100,100),Eigen::Vector2i(200,200));
@@ -481,7 +757,7 @@ TEST(REALTIME, CARTPOLE_MPC)
 
   server.registerConnectionListener([&]() {
     ticker.start();
-    //mpcRemote.start();
+    mpcRemote.start();
     //ssid.start();
   });
   server.registerShutdownListener([&]() { mpcRemote.stop(); });

@@ -26,5 +26,8 @@ TAGS
 /doxygen/html/
 docs/readthedocs/site
 data/screencap/*
+dart/realtime/saved_data/images/*
+dart/realtime/saved_data/np_files/*
+dart/realtime/saved_data/raw_data/*
 dist/
 wheelhouse/

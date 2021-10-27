@@ -6,6 +6,8 @@
 #include <mutex>
 
 #include <Eigen/Dense>
+#include <iostream>
+#include <fstream>
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/realtime/VectorLog.hpp"
@@ -88,6 +90,10 @@ public:
   void runInference(long startTime);
 
   Eigen::VectorXs runPlotting(long startTime, s_t upper, s_t lower, int samples);
+
+  Eigen::MatrixXs runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen::Vector3s lower, int x_samples, int y_samples, size_t rest_dim);
+
+  void saveCSVMatrix(std::string filename, Eigen::MatrixXs matrix);
 
   /// This registers a listener to get called when we finish replanning
   void registerInferListener(

@@ -143,6 +143,8 @@ public:
 
   void setCOMchange(Eigen::Vector3s com);
 
+  void setMUchange(s_t mu);
+
 protected:
   /// This is the function for the optimization thread to run when we're live
   void optimizationThreadLoop();
@@ -168,6 +170,7 @@ protected:
   std::thread mOptimizationThread;
   bool mSilent;
   s_t pre_mass;
+  s_t pre_mu;
   Eigen::Vector3s pre_com;
   bool mVarchange = true;
 

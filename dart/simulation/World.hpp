@@ -286,6 +286,11 @@ public:
 
   // This gets all the inertia matrices for all the links in all the skeletons
   // in the world mapped into a flat vector.
+
+  Eigen::VectorXs getLinkMUs();
+
+  s_t getLinkMUIndex(size_t index);
+
   Eigen::VectorXs getLinkCOMs();
 
   Eigen::Vector3s getLinkCOMIndex(size_t index);
@@ -295,6 +300,12 @@ public:
   Eigen::VectorXs getLinkMOIs();
 
   Eigen::Vector6s getLinkMOIIndex(size_t index);
+
+  // This gets all links betas which is used for COM SSID
+
+  Eigen::VectorXs getLinkBetas();
+
+  Eigen::Vector3s getLinkBetaIndex(size_t index);
 
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
@@ -342,6 +353,18 @@ public:
   void setLinkMasses(Eigen::VectorXs masses);
 
   void setLinkMassIndex(s_t mass, size_t index);
+
+  void setLinkCOMs(Eigen::VectorXs coms);
+  
+  void setLinkMOIs(Eigen::VectorXs mois);
+
+  void setLinkMUs(Eigen::VectorXs mus);
+
+  void setLinkMUIndex(s_t mu, size_t index);
+
+  void setLinkBetas(Eigen::VectorXs betas);
+
+  void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
 
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
 

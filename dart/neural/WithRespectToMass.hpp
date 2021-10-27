@@ -28,7 +28,8 @@ enum WrtMassBodyNodeEntryType
   INERTIA_COM,
   INERTIA_DIAGONAL,
   INERTIA_OFF_DIAGONAL,
-  INERTIA_FULL
+  INERTIA_FULL,
+  INERTIA_COM_MU
 };
 
 struct WrtMassBodyNodyEntry

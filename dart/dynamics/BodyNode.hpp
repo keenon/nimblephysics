@@ -191,6 +191,12 @@ public:
   /// Return the mass of the bodynode
   s_t getMass() const;
 
+  /// Set beta
+  void setBeta(Eigen::Vector3s beta);
+
+  /// Get beta
+  Eigen::Vector3s getBeta();
+
   /// Set moment of inertia defined around the center of mass
   ///
   /// Principal moments of inertia (_Ixx, _Iyy, _Izz) must be positive or zero
@@ -1246,6 +1252,9 @@ public:
 
   Eigen::Vector3s mScaleLowerBound;
   Eigen::Vector3s mScaleUpperBound;
+
+  /// This beta describe linear relationship that used for SSID itself could be further optimized later
+  Eigen::Vector3s mBeta;
 
   //--------------------------------------------------------------------------
   // Dynamical Properties

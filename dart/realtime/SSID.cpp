@@ -238,7 +238,7 @@ Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int sampl
   
   Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
   Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
-  //std::cout<<"In SSID Force Hist: \n"<<forceHistory<<"\nPos Hist: \n"<<poseHistory<<"\nVel Hist: \n"<<velHistory<<std::endl;
+  
   registerUnlock();
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", poseHistory);
@@ -271,6 +271,91 @@ Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int sampl
   }
   
   return losses;
+}
+
+
+Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen::Vector3s lower, int x_samples,int y_samples, size_t rest_dim)
+{
+  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int steps = static_cast<int>(
+      ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
+
+  if (!mProblem)
+  {
+    std::shared_ptr<SingleShot> singleshot
+        = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
+    mProblem = singleshot;
+  }
+  
+  registerLock();
+  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
+    startTime, steps+1);
+  for (int i = 0; i < steps; i++)
+  {
+    mProblem->pinForce(i, forceHistory.col(i));
+  }
+  
+  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
+  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
+  
+  registerUnlock();
+  mProblem->setMetadata("forces", forceHistory);
+  mProblem->setMetadata("sensors", poseHistory);
+  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
+  mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
+
+  Eigen::MatrixXs losses = Eigen::MatrixXs::Zero(x_samples,y_samples);
+  
+  
+  
+  Eigen::Vector3s probe = lower;
+  assert(rest_dim < 3);
+  size_t probe_dim_1;
+  size_t probe_dim_2;
+  if(rest_dim==0)
+  {
+    probe_dim_1 = 1;
+    probe_dim_2 = 2;
+  }
+  else if(rest_dim == 1)
+  {
+    probe_dim_1 = 0;
+    probe_dim_2 = 2;
+  }
+  else
+  {
+    probe_dim_1 = 0;
+    probe_dim_2 = 1;
+  }
+  assert(lower(probe_dim_1) < upper(probe_dim_1) && lower(probe_dim_2) < upper(probe_dim_2));
+  s_t x_epsilon = (upper(probe_dim_1)-lower(probe_dim_1))/x_samples;
+  s_t y_epsilon = (upper(probe_dim_2)-lower(probe_dim_2))/y_samples;
+
+  for(int x_i=0;x_i<x_samples;x_i++)
+  {
+    probe(probe_dim_2) = lower(probe_dim_2);
+    for(int y_i=0; y_i < y_samples; y_i++)
+    {
+      mWorld->setMasses(probe);
+      mProblem->resetDirty();
+      losses(x_i,y_i) = mProblem->getLoss(mWorld);
+      probe(probe_dim_2) += y_epsilon;
+    }
+    probe(probe_dim_1) += x_epsilon;
+  }
+  return losses;
+}
+
+void SSID::saveCSVMatrix(std::string filename, Eigen::MatrixXs matrix)
+{
+  const static Eigen::IOFormat CSVFormat(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", "\n");
+  std::ofstream file(filename);
+  if (file.is_open())
+  {
+      file << matrix.format(CSVFormat);
+      file.close();
+  }
 }
 
 /// This registers a listener to get called when we finish replanning

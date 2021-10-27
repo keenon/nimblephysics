@@ -2590,6 +2590,50 @@ std::size_t Skeleton::getLinkMassesDims()
 }
 
 //==============================================================================
+s_t Skeleton::getLinkMUIndex(size_t index)
+{
+  Eigen::Vector3s com = getLinkCOMIndex(index);
+  Eigen::Vector3s beta = getBodyNode(index)->getBeta();
+  if(beta(0)!=0)
+    return com(0)/beta(0);
+  else if(beta(1)!=0)
+    return com(1)/beta(1);
+  else
+    return com(2)/beta(2);
+  // Code should not reach here only to please the compiler
+  return 0;
+}
+
+Eigen::VectorXs Skeleton::getLinkMUs()
+{
+  Eigen::VectorXs mus = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for(size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    mus(i) = getLinkMUIndex(i);
+  }
+  return mus;
+}
+
+//==============================================================================
+Eigen::Vector3s Skeleton::getLinkBetaIndex(size_t index)
+{
+  Eigen::Vector3s beta = getBodyNode(index)->getBeta();
+  return beta;
+}
+
+Eigen::VectorXs Skeleton::getLinkBetas()
+{
+  Eigen::VectorXs betas = Eigen::VectorXs::Zero(3*getNumBodyNodes());
+  size_t cursor = 0;
+  for (size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s beta = getBodyNode(i)->getBeta();
+    betas.segment(cursor,3) = beta;
+    cursor += 3;
+  }
+  return betas;
+}
+//==============================================================================
 Eigen::VectorXs Skeleton::getLinkCOMs()
 {
   Eigen::VectorXs inertias = Eigen::VectorXs::Zero(getLinkCOMDims());
@@ -2597,9 +2641,9 @@ Eigen::VectorXs Skeleton::getLinkCOMs()
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    inertias(cursor++) = inertia.COM_X;
-    inertias(cursor++) = inertia.COM_Y;
-    inertias(cursor++) = inertia.COM_Z;
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_X);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_Y);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_Z);
   }
   return inertias;
 }
@@ -2608,9 +2652,9 @@ Eigen::Vector3s Skeleton::getLinkCOMIndex(size_t index)
 {
   Eigen::Vector3s mass_center = Eigen::Vector3s::Zero();
   const Inertia& node_inertia = getBodyNode(index)->getInertia();
-  mass_center(0) = node_inertia.COM_X;
-  mass_center(1) = node_inertia.COM_Y;
-  mass_center(2) = node_inertia.COM_Z;
+  mass_center(0) = node_inertia.getParameter(dynamics::Inertia::Param::COM_X);
+  mass_center(1) = node_inertia.getParameter(dynamics::Inertia::Param::COM_Y);
+  mass_center(2) = node_inertia.getParameter(dynamics::Inertia::Param::COM_Z);
   return mass_center;
 }
 
@@ -2622,12 +2666,12 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    inertias(cursor++) = inertia.I_XX;
-    inertias(cursor++) = inertia.I_YY;
-    inertias(cursor++) = inertia.I_ZZ;
-    inertias(cursor++) = inertia.I_XY;
-    inertias(cursor++) = inertia.I_XZ;
-    inertias(cursor++) = inertia.I_YZ;
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XX);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_YY);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_ZZ);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XY);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XZ);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_YZ);
   }
   return inertias;
 }
@@ -2636,12 +2680,12 @@ Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
 {
   Eigen::Vector6s inertia = Eigen::Vector6s::Zero();
   const Inertia& node_inertia = getBodyNode(index)->getInertia();
-  inertia(0) = node_inertia.I_XX;
-  inertia(1) = node_inertia.I_YY;
-  inertia(2) = node_inertia.I_ZZ;
-  inertia(3) = node_inertia.I_XY;
-  inertia(4) = node_inertia.I_XZ;
-  inertia(5) = node_inertia.I_YZ;
+  inertia(0) = node_inertia.getParameter(dynamics::Inertia::Param::I_XX);
+  inertia(1) = node_inertia.getParameter(dynamics::Inertia::Param::I_YY);
+  inertia(2) = node_inertia.getParameter(dynamics::Inertia::Param::I_ZZ);
+  inertia(3) = node_inertia.getParameter(dynamics::Inertia::Param::I_XY);
+  inertia(4) = node_inertia.getParameter(dynamics::Inertia::Param::I_XZ);
+  inertia(5) = node_inertia.getParameter(dynamics::Inertia::Param::I_YZ);
   return inertia;
 }
 
@@ -2711,26 +2755,68 @@ void Skeleton::setVelocityLowerLimits(Eigen::VectorXs limits)
 }
 
 //==============================================================================
+void Skeleton::setLinkMUIndex(s_t mu, size_t index)
+{
+  Eigen::Vector3s com = Eigen::Vector3s::Zero();
+  Eigen::Vector3s node_beta = getBodyNode(index)->getBeta();
+  com(0) = node_beta(0)*mu;
+  com(1) = node_beta(1)*mu;
+  com(2) = node_beta(2)*mu;
+  setLinkCOMIndex(com,index);
+}
+
+void Skeleton::setLinkMUs(Eigen::VectorXs mus)
+{
+  assert(mus.size() == getNumBodyNodes());
+  for(size_t i=0; i< getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s com = Eigen::Vector3s::Zero();
+    Eigen::Vector3s beta = getBodyNode(i)->getBeta();
+    com(0) = beta(0)*mus(i);
+    com(1) = beta(1)*mus(i);
+    com(2) = beta(2)*mus(i);
+    setLinkCOMIndex(com,i);
+  }
+}
+
+//==============================================================================
+
+void Skeleton::setLinkBetaIndex(Eigen::Vector3s beta, size_t index)
+{
+  getBodyNode(index)->setBeta(beta);
+}
+
+void Skeleton::setLinkBetas(Eigen::VectorXs betas)
+{
+  size_t cursor = 0;
+  for(size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    getBodyNode(i)->setBeta(betas.segment(cursor,3));
+    cursor += 3;
+  }
+}
+
+//==============================================================================
 void Skeleton::setLinkCOMs(Eigen::VectorXs coms)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    s_t COM_X = coms(cursor++);
-    s_t COM_Y = coms(cursor++);
-    s_t COM_Z = coms(cursor++);
+    s_t com_x = coms(cursor++);
+    s_t com_y = coms(cursor++);
+    s_t com_z = coms(cursor++);
     Inertia newInertia(
-        inertia.MASS,
-        COM_X,
-        COM_Y,
-        COM_Z,
-        inertia.I_XX,
-        inertia.I_YY,
-        inertia.I_ZZ,
-        inertia.I_XY,
-        inertia.I_XZ,
-        inertia.I_YZ);
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        com_x,
+        com_y,
+        com_z,
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
     getBodyNode(i)->setInertia(newInertia);
   }
 }
@@ -2738,20 +2824,20 @@ void Skeleton::setLinkCOMs(Eigen::VectorXs coms)
 void Skeleton::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
 {
   const Inertia& inertia = getBodyNode(index)->getInertia();
-    s_t COM_X = com(0);
-    s_t COM_Y = com(1);
-    s_t COM_Z = com(2);
+    s_t com_x = com(0);
+    s_t com_y = com(1);
+    s_t com_z = com(2);
     Inertia newInertia(
-        inertia.MASS,
-        COM_X,
-        COM_Y,
-        COM_Z,
-        inertia.I_XX,
-        inertia.I_YY,
-        inertia.I_ZZ,
-        inertia.I_XY,
-        inertia.I_XZ,
-        inertia.I_YZ);
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        com_x,
+        com_y,
+        com_z,
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
     getBodyNode(index)->setInertia(newInertia);
 }
 
@@ -2769,9 +2855,9 @@ void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
     s_t I_XZ = mois(cursor++);
     s_t I_YZ = mois(cursor++);
     Inertia newInertia(
-        inertia.MASS,
-        inertia.COM_X,
-        inertia.COM_Y,
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
         inertia.COM_Z,
         I_XX,
         I_YY,
