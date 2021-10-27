@@ -62,8 +62,8 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
-//#define NO_VIS
+//#define ALL_TESTS
+#define NO_VIS
 
 using namespace dart;
 using namespace math;
