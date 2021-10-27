@@ -148,6 +148,18 @@ void ConstraintSolver(py::module& m)
             return self->getCollisionGroup();
           })
       .def(
+          "getGradientEnabled",
+          +[](dart::constraint::ConstraintSolver* self)
+              -> bool {
+            return self->getGradientEnabled();
+          })
+      .def(
+          "setGradientEnabled",
+          +[](dart::constraint::ConstraintSolver* self, bool enabled)
+              -> void {
+            return self->setGradientEnabled(enabled);
+          })
+      .def(
           "solve",
           +[](dart::constraint::ConstraintSolver* self,
               dart::simulation::World* world) { self->solve(world); });
