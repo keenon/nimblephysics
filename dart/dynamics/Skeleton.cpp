@@ -3223,7 +3223,7 @@ void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
         inertia.getParameter(dynamics::Inertia::Param::MASS),
         inertia.getParameter(dynamics::Inertia::Param::COM_X),
         inertia.getParameter(dynamics::Inertia::Param::COM_Y),
-        inertia.COM_Z,
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
         I_XX,
         I_YY,
         I_ZZ,

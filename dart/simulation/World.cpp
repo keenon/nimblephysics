@@ -131,12 +131,12 @@ WorldPtr World::clone() const
   // Clone and add each Skeleton
   for (std::size_t i = 0; i < mSkeletons.size(); ++i)
   {
+    
     dart::dynamics::SkeletonPtr cloned_skel = mSkeletons[i]->cloneSkeleton();
     cloned_skel->setLinkMasses(mSkeletons[i]->getLinkMasses());
     cloned_skel->setLinkCOMs(mSkeletons[i]->getLinkCOMs());
-    cloned_skel->setLinkBetas(mSkeletons[i]->getLinkBetas());
     cloned_skel->setLinkMOIs(mSkeletons[i]->getLinkMOIs());
-    cloned_skel->setLinkMUs(mSkeletons[i]->getLinkMUs());
+    cloned_skel->setLinkBetas(mSkeletons[i]->getLinkBetas());
     worldClone->addSkeleton(cloned_skel);
     
   }
