@@ -192,14 +192,18 @@ std::shared_ptr<Anthropometrics> Anthropometrics::condition(
       = std::make_shared<Anthropometrics>();
   for (auto metric : mMetrics)
   {
-    conditioned->addMetric(
-        metric.name,
-        metric.bodyPose,
-        metric.bodyA,
-        metric.offsetA,
-        metric.bodyB,
-        metric.offsetB,
-        metric.axis);
+    // Only copy over metrics we're not conditioning out already
+    if (observedValues.count(metric.name) == 0)
+    {
+      conditioned->addMetric(
+          metric.name,
+          metric.bodyPose,
+          metric.bodyA,
+          metric.offsetA,
+          metric.bodyB,
+          metric.offsetB,
+          metric.axis);
+    }
   }
   conditioned->setDistribution(mDist->condition(observedValues));
   return conditioned;

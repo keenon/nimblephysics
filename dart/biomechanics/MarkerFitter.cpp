@@ -731,8 +731,16 @@ MarkerInitialization MarkerFitter::getInitialization(
   for (int i = 0; i < numBlocks; i++)
   {
     posesAndScales.push_back(posesAndScalesFutures[i].get());
-    std::cout << "Finished initial scale+fit for first timestep of block " << i
-              << "/" << numBlocks << std::endl;
+    if (params.dontRescaleBodies)
+    {
+      std::cout << "Finished initial fit for first timestep of block " << i
+                << "/" << numBlocks << std::endl;
+    }
+    else
+    {
+      std::cout << "Finished initial scale+fit for first timestep of block "
+                << i << "/" << numBlocks << std::endl;
+    }
   }
 
   // 3. Average the scalings for each block together
