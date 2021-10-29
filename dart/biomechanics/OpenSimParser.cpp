@@ -508,6 +508,249 @@ OpenSimMot OpenSimParser::loadMot(
 }
 
 //==============================================================================
+/// This grabs the GRF forces from a *.mot file
+OpenSimGRF OpenSimParser::loadGRF(
+    const common::Uri& uri,
+    int downsampleByFactor,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  OpenSimGRF result;
+  const std::string content = retriever->readAll(uri);
+
+  bool inHeader = true;
+
+  std::vector<int> colToPlate;
+  std::vector<int> colToCOP;
+  std::vector<int> colToWrench;
+  int numPlates = 0;
+
+  std::vector<s_t> timestamps;
+  std::vector<std::vector<Eigen::Vector3s>> copRows;
+  std::vector<std::vector<Eigen::Vector6s>> wrenchRows;
+
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    if (inHeader)
+    {
+      if (line == "endheader")
+      {
+        inHeader = false;
+      }
+      auto tokenEnd = line.find("=");
+      if (tokenEnd != std::string::npos)
+      {
+        std::string variable = line.substr(0, tokenEnd);
+        std::string value
+            = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
+        // Currently we don't read anything from the variables
+        (void)variable;
+        (void)value;
+      }
+    }
+    else
+    {
+      int tokenNumber = 0;
+      std::string whitespace = " \t";
+      auto tokenStart = line.find_first_not_of(whitespace);
+
+      double timestamp = 0.0;
+      std::vector<Eigen::Vector3s> cops;
+      std::vector<Eigen::Vector6s> wrenches;
+
+      for (int i = 0; i < numPlates; i++)
+      {
+        wrenches.push_back(Eigen::Vector6s::Zero());
+        cops.push_back(Eigen::Vector3s::Zero());
+      }
+
+      while (tokenStart != std::string::npos)
+      {
+        auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+        std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+        /////////////////////////////////////////////////////////
+        // Process the token, given tokenNumber and lineNumber
+
+        if (lineNumber == 0)
+        {
+          int plate = -1;
+          int cop = -1;
+          int wrench = -1;
+
+          if (token != "time")
+          {
+            // Default to plate 0
+            plate = 0;
+          }
+
+          // Find plate number
+          for (int p = 1; p < 10; p++)
+          {
+            if (token.find(std::to_string(p)) != std::string::npos)
+            {
+              plate = p - 1;
+            }
+          }
+
+          if (token.find("px") != std::string::npos)
+          {
+            cop = 0;
+          }
+          if (token.find("py") != std::string::npos)
+          {
+            cop = 1;
+          }
+          if (token.find("pz") != std::string::npos)
+          {
+            cop = 2;
+          }
+          if (token.find("mx") != std::string::npos)
+          {
+            wrench = 0;
+          }
+          if (token.find("my") != std::string::npos)
+          {
+            wrench = 1;
+          }
+          if (token.find("mz") != std::string::npos)
+          {
+            wrench = 2;
+          }
+          if (token.find("vx") != std::string::npos)
+          {
+            wrench = 3;
+          }
+          if (token.find("vy") != std::string::npos)
+          {
+            wrench = 4;
+          }
+          if (token.find("vz") != std::string::npos)
+          {
+            wrench = 5;
+          }
+
+          if (plate + 1 > numPlates)
+          {
+            numPlates = plate + 1;
+          }
+
+          colToPlate.push_back(plate);
+          colToCOP.push_back(cop);
+          colToWrench.push_back(wrench);
+        }
+        else
+        {
+          double value = atof(token.c_str());
+          if (tokenNumber == 0)
+          {
+            timestamp = value;
+          }
+          else
+          {
+            int plateIndex = colToPlate[tokenNumber];
+            int copIndex = colToCOP[tokenNumber];
+            int wrenchIndex = colToWrench[tokenNumber];
+            if (plateIndex != -1)
+            {
+              if (wrenchIndex != -1)
+              {
+                wrenches[plateIndex](wrenchIndex) = value;
+              }
+              if (copIndex != -1)
+              {
+                cops[plateIndex](copIndex) = value;
+              }
+            }
+          }
+        }
+
+        /////////////////////////////////////////////////////////
+
+        tokenNumber++;
+        if (tokenEnd == std::string::npos)
+        {
+          break;
+        }
+        tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+      }
+
+      if (lineNumber > 0)
+      {
+        copRows.push_back(cops);
+        wrenchRows.push_back(wrenches);
+        timestamps.push_back(timestamp);
+      }
+      lineNumber++;
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+  }
+
+  assert(timestamps.size() == copRows.size());
+  assert(timestamps.size() == wrenchRows.size());
+
+  // Process result into its final form
+
+  int numTimesteps = timestamps.size() / downsampleByFactor;
+
+  OpenSimGRF grf;
+  for (int i = 0; i < numPlates; i++)
+  {
+    grf.plateCOPs.push_back(
+        Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, numTimesteps));
+    grf.plateGRFs.push_back(
+        Eigen::Matrix<s_t, 6, Eigen::Dynamic>::Zero(6, numTimesteps));
+
+    int downsampleClock = 0;
+    Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
+    Eigen::Vector6s wrenchAvg = Eigen::Vector6s::Zero();
+    int numAveraged = 0;
+    int cursor = 0;
+    for (int t = 0; t < timestamps.size(); t++)
+    {
+      copAvg += copRows[t][i];
+      wrenchAvg += wrenchRows[t][i];
+      numAveraged++;
+      downsampleClock--;
+
+      if (downsampleClock <= 0)
+      {
+        downsampleClock = downsampleByFactor;
+        grf.plateCOPs[i].col(cursor) = copAvg / numAveraged;
+        grf.plateGRFs[i].col(cursor) = wrenchAvg / numAveraged;
+        cursor++;
+
+        numAveraged = 0;
+        copAvg.setZero();
+        wrenchAvg.setZero();
+      }
+    }
+  }
+
+  int downsampleClock = 0;
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    downsampleClock--;
+    if (downsampleClock <= 0)
+    {
+      grf.timestamps.push_back(timestamps[t]);
+      downsampleClock = downsampleByFactor;
+    }
+  }
+
+  return grf;
+}
+
+//==============================================================================
 /// When people finish preparing their model in OpenSim, they save a *.osim
 /// file with all the scales and offsets baked in. This is a utility to go
 /// through and get out the scales and offsets in terms of a standard

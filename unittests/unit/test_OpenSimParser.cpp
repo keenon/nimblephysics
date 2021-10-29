@@ -113,6 +113,37 @@ TEST(OpenSimParser, LOAD_TRC)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_GRF)
+{
+  OpenSimGRF grf = OpenSimParser::loadGRF(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_grf.mot",
+      10);
+  EXPECT_TRUE(grf.timestamps.size() > 0);
+  EXPECT_EQ(grf.plateCOPs.size(), 2);
+  EXPECT_EQ(grf.plateGRFs.size(), 2);
+  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.plateCOPs[1].cols());
+  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.plateGRFs[0].cols());
+  EXPECT_EQ(grf.plateGRFs[0].cols(), grf.plateGRFs[1].cols());
+  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.timestamps.size());
+
+  // Print out to check that things look reasonable
+  for (int i = 0; i < 3; i++)
+  {
+    std::cout << "Timestep " << i << " [" << grf.timestamps[i]
+              << "s]:" << std::endl;
+    for (int p = 0; p < grf.plateCOPs.size(); p++)
+    {
+      std::cout << "Plate " << p << std::endl;
+      std::cout << "COP: " << std::endl << grf.plateCOPs[p].col(i) << std::endl;
+      std::cout << "Wrench: " << std::endl
+                << grf.plateGRFs[p].col(i) << std::endl;
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_GET_CONFIGURATION)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(

@@ -609,6 +609,14 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
 }
 
 //==============================================================================
+/// This sets up a bunch of linear constraints based on the motion of each
+/// body, and attempts to solve all the equations with least-squares.
+void MarkerFitter::initializeMasses(MarkerInitialization& initialization)
+{
+  (void)initialization;
+}
+
+//==============================================================================
 /// This finds an initial guess for the body scales and poses, holding
 /// anatomical marker offsets at 0, that we can use for downstream tasks.
 ///

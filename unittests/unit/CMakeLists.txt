@@ -64,8 +64,11 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkeletonMarkers)
   target_link_libraries(test_SkeletonMarkers dart-utils)
 
-  dart_add_test("unit" test_MarkerFitter)
-  target_link_libraries(test_MarkerFitter dart-utils)
+  dart_add_test("unit" test_MarkerFitterKinematics)
+  target_link_libraries(test_MarkerFitterKinematics dart-utils)
+
+  dart_add_test("unit" test_MarkerFitterDynamics)
+  target_link_libraries(test_MarkerFitterDynamics dart-utils)
 
   dart_add_test("unit" test_Scaling)
   target_link_libraries(test_Scaling dart-utils)

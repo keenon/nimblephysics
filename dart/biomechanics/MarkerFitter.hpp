@@ -404,6 +404,19 @@ public:
       MarkerInitialization& initialization,
       int numSamples);
 
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 5: Run through and do a linear initialization of masses based
+  // on link masses.
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// This sets up a bunch of linear constraints based on the motion of each
+  /// body, and attempts to solve all the equations with least-squares.
+  void initializeMasses(MarkerInitialization& initialization);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Supporting methods
+  ///////////////////////////////////////////////////////////////////////////
+
   /// This lets us pick a subset of the marker observations, to cap the size of
   /// the optimization problem.
   static std::vector<std::map<std::string, Eigen::Vector3s>> pickSubset(
