@@ -828,7 +828,8 @@ void Skeleton(py::module& m)
       .def(
           "setGroupScales",
           &dart::dynamics::Skeleton::setGroupScales,
-          ::py::arg("scales"))
+          ::py::arg("scales"),
+          ::py::arg("silentlyClamp") = false)
       .def("getGroupScales", &dart::dynamics::Skeleton::getGroupScales)
       .def(
           "getJointWorldPositionsJacobianWrtGroupScales",

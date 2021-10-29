@@ -13,9 +13,11 @@ class MarkerMocapOptimizationState:
   This wraps a MarkerFitterState, but using PyTorch Tensors, so we can autograd any arbitrary user-supplied loss function
   """
   rawState: nimble.biomechanics.MarkerFitterState
+  numTimesteps: int
   bodyScales: Dict[str, torch.Tensor]
   markerOffsets: Dict[str, torch.Tensor]
   markerErrorsAtTimesteps: List[Dict[str, torch.Tensor]]
+  jointErrorsAtTimesteps: List[Dict[str, torch.Tensor]]
   posesAtTimesteps: List[torch.Tensor]
 
   def __init__(self, rawState: nimble.biomechanics.MarkerFitterState) -> None:
@@ -23,7 +25,9 @@ class MarkerMocapOptimizationState:
     self.bodyScales: Dict[str, torch.Tensor] = {}
     self.markerOffsets: Dict[str, torch.Tensor] = {}
     self.markerErrorsAtTimesteps: List[Dict[str, torch.Tensor]] = []
+    self.jointErrorsAtTimesteps: List[Dict[str, torch.Tensor]] = []
     self.posesAtTimesteps: List[torch.Tensor] = []
+    self.numTimesteps = len(rawState.jointErrorsAtTimesteps)
 
     for i in range(len(rawState.bodyNames)):
       self.bodyScales[rawState.bodyNames[i]] = torch.tensor(
@@ -40,6 +44,14 @@ class MarkerMocapOptimizationState:
             np.copy(rawState.markerErrorsAtTimesteps[t*3:(t+1)*3, i]),
             requires_grad=True)
       self.markerErrorsAtTimesteps.append(markerErrors)
+
+    for t in range(len(rawState.jointErrorsAtTimesteps)):
+      jointErrors: Dict[str, torch.Tensor] = {}
+      for i in range(len(rawState.jointOrder)):
+        jointErrors[rawState.jointOrder[i]] = torch.tensor(
+            np.copy(rawState.jointErrorsAtTimesteps[t*3:(t+1)*3, i]),
+            requires_grad=True)
+      self.jointErrorsAtTimesteps.append(jointErrors)
 
     for t in range(rawState.posesAtTimesteps.shape[1]):
       self.posesAtTimesteps.append(torch.tensor(
@@ -70,6 +82,33 @@ class MarkerMocapOptimizationState:
           markerErrorsGrad[t*3:(t+1)*3,
                            i] = self.markerErrorsAtTimesteps[t][markerName].grad.numpy()
     self.rawState.markerErrorsAtTimestepsGrad = markerErrorsGrad
+
+    """
+    print('marker orders:')
+    print(self.rawState.markerOrder)
+    print('raw marker errors:')
+    print(self.rawState.markerErrorsAtTimesteps)
+    print('raw marker errors grad:')
+    print(markerErrorsGrad)
+    """
+
+    jointErrorsGrad: np.ndarray = np.zeros_like(self.rawState.jointErrorsAtTimesteps)
+    for t in range(len(self.jointErrorsAtTimesteps)):
+      for i in range(len(self.rawState.jointOrder)):
+        jointName = self.rawState.jointOrder[i]
+        if self.jointErrorsAtTimesteps[t][jointName].grad is not None:
+          jointErrorsGrad[t*3:(t+1)*3,
+                          i] = self.jointErrorsAtTimesteps[t][jointName].grad.numpy()
+    self.rawState.jointErrorsAtTimestepsGrad = jointErrorsGrad
+
+    """
+    print('joint orders:')
+    print(self.rawState.jointOrder)
+    print('raw joint errors:')
+    print(self.rawState.jointErrorsAtTimesteps)
+    print('raw joint errors grad:')
+    print(jointErrorsGrad)
+    """
 
     posesAtTimestepsGrad: np.ndarray = np.zeros_like(self.rawState.posesAtTimesteps)
     for t in range(len(self.posesAtTimesteps)):

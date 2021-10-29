@@ -482,14 +482,14 @@ void BodyNode::setCollidable(bool _isCollidable)
 /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
 /// it's created/loaded from a file. Subsequent scalings can change that
 /// value.
-void BodyNode::setScale(Eigen::Vector3s newScale)
+void BodyNode::setScale(Eigen::Vector3s newScale, bool silentlyClamp)
 {
   for (int i = 0; i < 3; i++)
   {
     if (newScale(i) < mScaleLowerBound(i))
     {
-      // Don't warn if it's close
-      if (newScale(i) < mScaleLowerBound(i) - 0.001)
+      // Don't warn if it's close, or if we're explicitly silent
+      if (newScale(i) < mScaleLowerBound(i) - 0.001 && !silentlyClamp)
       {
         std::cout << "BodyNode refusing to setScale(" << newScale(i)
                   << ", axis=" << i << ") because " << newScale(i)
@@ -501,8 +501,8 @@ void BodyNode::setScale(Eigen::Vector3s newScale)
     }
     if (newScale(i) > mScaleUpperBound(i))
     {
-      // Don't warn if it's close
-      if (newScale(i) > mScaleUpperBound(i) + 0.001)
+      // Don't warn if it's close, or if we're explicitly silent
+      if (newScale(i) > mScaleUpperBound(i) + 0.001 && !silentlyClamp)
       {
         std::cout << "BodyNode refusing to setScale(" << newScale
                   << ", axis=" << i << ") because " << newScale

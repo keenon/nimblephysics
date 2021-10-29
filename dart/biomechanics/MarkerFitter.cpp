@@ -28,6 +28,11 @@ MarkerFitterState::MarkerFitterState(
     jointCenters(jointCenters),
     fitter(fitter)
 {
+  for (auto joint : joints)
+  {
+    jointOrder.push_back(joint->getName());
+  }
+
   // group scale
   int groupScaleDim = skeleton->getGroupScaleDim();
   // marker offsets

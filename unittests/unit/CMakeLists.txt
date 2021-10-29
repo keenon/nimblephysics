@@ -84,6 +84,9 @@ if(TARGET dart-utils)
 
   dart_add_test("unit" test_MultivariateGaussian)
   target_link_libraries(test_MultivariateGaussian dart-utils)
+
+  dart_add_test("unit" test_Anthropometrics)
+  target_link_libraries(test_Anthropometrics dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)

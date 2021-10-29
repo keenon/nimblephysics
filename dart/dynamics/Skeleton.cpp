@@ -3434,7 +3434,7 @@ int Skeleton::getGroupScaleDim()
 /// This sets the scales of all the body nodes according to their group
 /// membership. The `scale` vector is expected to be 3 times the size of the
 /// number of groups.
-void Skeleton::setGroupScales(Eigen::VectorXs scale)
+void Skeleton::setGroupScales(Eigen::VectorXs scale, bool silentlyClamp)
 {
   ensureBodyScaleGroups();
   int cursor = 0;
@@ -3453,7 +3453,7 @@ void Skeleton::setGroupScales(Eigen::VectorXs scale)
     }
     for (dynamics::BodyNode* node : mBodyScaleGroups[i].nodes)
     {
-      node->setScale(localScale);
+      node->setScale(localScale, silentlyClamp);
     }
   }
   assert(cursor == scale.size());

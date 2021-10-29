@@ -15,6 +15,14 @@ ratio = height_m / skel.getHeight(skel.getPositions())
 skel.setBodyScales(skel.getBodyScales() * ratio)
 print('Scaled height: '+str(skel.getHeight(skel.getPositions())))
 
+anthro: nimble.biomechanics.Anthropometrics = nimble.models.RajagopalANSURModel().condition({
+    'Heightin': height_m * 39.37 * 0.001,
+    'Weightlbs': 150 * 0.001,
+    'Age': 29 * 0.001})
+
+print('skel DOFs: '+str(skel.getNumDofs()))
+print('initial log PDF: '+str(anthro.getLogPDF(skel)))
+
 scaledModel: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
     absPath("./Rajagopal_scaled.osim"))
 scaledHeight = scaledModel.skeleton.getHeight(scaledModel.skeleton.getPositions())
@@ -39,32 +47,33 @@ originalPos = skel.getPositions()
 def customLoss(mocapState: nimble.MarkerMocapOptimizationState):
   sum = torch.zeros(1)
 
-  numMarkerObservations = 0
-  for t in range(len(mocapState.markerErrorsAtTimesteps)):
+  for t in range(mocapState.numTimesteps):
     for markerName in mocapState.markerErrorsAtTimesteps[t]:
-      numMarkerObservations += 1
       sum += mocapState.markerErrorsAtTimesteps[t][markerName].dot(
           mocapState.markerErrorsAtTimesteps[t][markerName])
+    for jointName in mocapState.jointErrorsAtTimesteps[t]:
+      sum += mocapState.jointErrorsAtTimesteps[t][jointName].dot(
+          mocapState.jointErrorsAtTimesteps[t][jointName])
 
+  """
   # Have a strong preference that the torso+head+pelvis doesn't scale too much to get the required height
   for i in range(3):
     # sum += (1.0 * numMarkerObservations) * torch.square(mocapState.bodyScales["torso"][i] - ratio)
     sum += (0.1 * numMarkerObservations) * torch.square(
         mocapState.bodyScales["pelvis"][i] - ratio)
 
-  """
   # Have a light preference for everything being scaled
   for bodyName in mocapState.bodyScales:
     for i in range(3):
       sum += (0.01 * numMarkerObservations) * torch.square(
           mocapState.bodyScales[bodyName][i] - ratio)
-  """
 
   # Have a light preference for anatomical marker offsets being 0
   for markerName in mocapState.markerOffsets:
     if not mocap.fitter.getMarkerIsTracking(markerName):
       sum += (0.01 * numMarkerObservations) * mocapState.markerOffsets[markerName].dot(
           mocapState.markerOffsets[markerName])
+  """
 
   return sum
 

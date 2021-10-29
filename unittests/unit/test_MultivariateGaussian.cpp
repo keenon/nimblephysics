@@ -45,6 +45,9 @@ using namespace math;
 TEST(MultivariateGaussian, BASICS)
 {
   std::vector<std::string> cols;
+  cols.push_back("thumbtipreach");
+  cols.push_back("tibialheight");
+  /*
   cols.push_back("Age");
   cols.push_back("Weightlbs");
   cols.push_back("Heightin");
@@ -54,15 +57,17 @@ TEST(MultivariateGaussian, BASICS)
   cols.push_back("shoulderlength");
   cols.push_back("kneeheightmidpatella");
   cols.push_back("footlength");
-  MultivariateGaussian gauss = MultivariateGaussian::loadFromCSV(
-      "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols);
-  gauss.debugToStdout();
+  */
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols, 0.1);
+  gauss->debugToStdout();
 
   srand(42);
   Eigen::VectorXs x = Eigen::VectorXs::Random(cols.size());
 
-  Eigen::VectorXs grad = gauss.computeLogProbabilityGrad(x);
-  Eigen::VectorXs grad_fd = gauss.finiteDifferenceLogProbabilityGrad(x);
+  Eigen::VectorXs grad = gauss->computeLogPDFGrad(x);
+  Eigen::VectorXs grad_fd = gauss->finiteDifferenceLogPDFGrad(x);
   if (!equals(grad, grad_fd, 1e-9))
   {
     std::cout << "Error on log probability grad!" << std::endl;
@@ -80,56 +85,58 @@ TEST(MultivariateGaussian, OBSERVE_2_TO_1)
   std::vector<std::string> cols;
   cols.push_back("Age");
   cols.push_back("Weightlbs");
-  MultivariateGaussian gauss = MultivariateGaussian::loadFromCSV(
-      "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols);
-  gauss.debugToStdout();
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols);
+  gauss->debugToStdout();
 
   srand(42);
 
   std::map<std::string, s_t> observedValues;
   observedValues["Age"] = 35.0;
 
-  std::vector<int> observedIndices = gauss.getObservedIndices(observedValues);
+  std::vector<int> observedIndices = gauss->getObservedIndices(observedValues);
   std::vector<int> unobservedIndices
-      = gauss.getUnobservedIndices(observedValues);
+      = gauss->getUnobservedIndices(observedValues);
 
   EXPECT_EQ(observedIndices.size(), 1);
   EXPECT_EQ(unobservedIndices.size(), 1);
-  EXPECT_EQ(gauss.getVariableNameAtIndex(observedIndices[0]), "Age");
-  EXPECT_EQ(gauss.getVariableNameAtIndex(unobservedIndices[0]), "Weightlbs");
+  EXPECT_EQ(gauss->getVariableNameAtIndex(observedIndices[0]), "Age");
+  EXPECT_EQ(gauss->getVariableNameAtIndex(unobservedIndices[0]), "Weightlbs");
 
-  Eigen::VectorXs observedMu = gauss.getMuSubset(observedIndices);
-  Eigen::VectorXs unobservedMu = gauss.getMuSubset(unobservedIndices);
+  Eigen::VectorXs observedMu = gauss->getMuSubset(observedIndices);
+  Eigen::VectorXs unobservedMu = gauss->getMuSubset(unobservedIndices);
 
   EXPECT_EQ(observedMu.size(), 1);
   EXPECT_EQ(unobservedMu.size(), 1);
-  EXPECT_EQ(gauss.getMu()(observedIndices[0]), observedMu(0));
-  EXPECT_EQ(gauss.getMu()(unobservedIndices[0]), unobservedMu(0));
+  EXPECT_EQ(gauss->getMu()(observedIndices[0]), observedMu(0));
+  EXPECT_EQ(gauss->getMu()(unobservedIndices[0]), unobservedMu(0));
 
   Eigen::MatrixXs observedCov
-      = gauss.getCovSubset(observedIndices, observedIndices);
+      = gauss->getCovSubset(observedIndices, observedIndices);
   Eigen::MatrixXs unobservedCov
-      = gauss.getCovSubset(unobservedIndices, unobservedIndices);
+      = gauss->getCovSubset(unobservedIndices, unobservedIndices);
   Eigen::MatrixXs offDiagonalCov
-      = gauss.getCovSubset(observedIndices, unobservedIndices);
+      = gauss->getCovSubset(observedIndices, unobservedIndices);
 
   EXPECT_EQ(observedCov.size(), 1);
   EXPECT_EQ(unobservedCov.size(), 1);
   EXPECT_EQ(
-      gauss.getCov()(observedIndices[0], observedIndices[0]),
+      gauss->getCov()(observedIndices[0], observedIndices[0]),
       observedCov(0, 0));
   EXPECT_EQ(
-      gauss.getCov()(unobservedIndices[0], unobservedIndices[0]),
+      gauss->getCov()(unobservedIndices[0], unobservedIndices[0]),
       unobservedCov(0, 0));
   EXPECT_EQ(
-      gauss.getCov()(observedIndices[0], unobservedIndices[0]),
+      gauss->getCov()(observedIndices[0], unobservedIndices[0]),
       offDiagonalCov(0, 0));
 
-  MultivariateGaussian conditioned = gauss.condition(observedValues);
-  EXPECT_EQ(conditioned.getMu().size(), 1);
-  EXPECT_EQ(conditioned.getCov().size(), 1);
+  std::shared_ptr<MultivariateGaussian> conditioned
+      = gauss->condition(observedValues);
+  EXPECT_EQ(conditioned->getMu().size(), 1);
+  EXPECT_EQ(conditioned->getCov().size(), 1);
 
-  conditioned.debugToStdout();
+  conditioned->debugToStdout();
 }
 
 //==============================================================================
@@ -145,9 +152,10 @@ TEST(MultivariateGaussian, OBSERVE)
   cols.push_back("shoulderlength");
   cols.push_back("kneeheightmidpatella");
   cols.push_back("footlength");
-  MultivariateGaussian gauss = MultivariateGaussian::loadFromCSV(
-      "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols);
-  gauss.debugToStdout();
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv", cols);
+  gauss->debugToStdout();
 
   srand(42);
 
@@ -156,9 +164,10 @@ TEST(MultivariateGaussian, OBSERVE)
   observedValues["Weightlbs"] = 190.0;
   observedValues["footlength"] = 250.0;
 
-  MultivariateGaussian conditioned = gauss.condition(observedValues);
-  EXPECT_EQ(conditioned.getMu().size(), cols.size() - observedValues.size());
-  EXPECT_EQ(conditioned.getCov().rows(), conditioned.getMu().size());
+  std::shared_ptr<MultivariateGaussian> conditioned
+      = gauss->condition(observedValues);
+  EXPECT_EQ(conditioned->getMu().size(), cols.size() - observedValues.size());
+  EXPECT_EQ(conditioned->getCov().rows(), conditioned->getMu().size());
 
-  conditioned.debugToStdout();
+  conditioned->debugToStdout();
 }

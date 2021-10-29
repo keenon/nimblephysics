@@ -1,0 +1,127 @@
+<Metrics>
+  <Metric>
+    <!-- (7) BALL OF FOOT LENGTH -->
+    <Name>balloffootlength</Name>
+    <MarkerA>
+      <BodyNode>calcn_l</BodyNode>
+      <Offset>-0.01 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>toes_l</BodyNode>
+      <Offset>0 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <Name>footlength</Name>
+    <MarkerA>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>-0.01 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>toes_r</BodyNode>
+      <Offset>0.07 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (42) HAND BREADTH -->
+    <Name>handbreadth</Name>
+    <MarkerA>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 -0.08 -0.03</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 -0.07 0.04</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (44) HAND LENGTH -->
+    <Name>handlength</Name>
+    <MarkerA>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 -0.16 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (40) FOREARM-HAND LENGTH -->
+    <Name>forearmhandlength</Name>
+    <MarkerA>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 -0.16 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>ulna_l</BodyNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (52) ILIOCRISTALE HEIGHT -->
+    <Name>iliocristaleheight</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>-0.08 0.07 0.15</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (81) TIBIAL HEIGHT -->
+    <Name>tibialheight</Name>
+    <MarkerA>
+      <BodyNode>tibia_r</BodyNode>
+      <Offset>0.0 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0.08 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (75) STATURE -->
+    <Name>stature</Name>
+    <MarkerA>
+      <BodyNode>torso</BodyNode>
+      <Offset>0.18 0.67 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0.18 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <Metric>
+    <!-- (93) WRIST HEIGHT -->
+    <Name>wristheight</Name>
+    <MarkerA>
+      <BodyNode>hand_l</BodyNode>
+      <Offset>0 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_l</BodyNode>
+      <Offset>0 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+</Metrics>

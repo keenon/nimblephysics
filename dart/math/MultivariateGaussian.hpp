@@ -20,17 +20,29 @@ public:
 
   const Eigen::MatrixXs& getCov();
 
-  s_t computeProbablity(Eigen::VectorXs x);
+  s_t getLogNormalizationConstant();
 
-  s_t computeLogProbability(Eigen::VectorXs x);
+  s_t getMean(std::string variable);
 
-  Eigen::VectorXs computeLogProbabilityGrad(Eigen::VectorXs x);
+  Eigen::VectorXs convertFromMap(const std::map<std::string, s_t>& values);
 
-  Eigen::VectorXs finiteDifferenceLogProbabilityGrad(Eigen::VectorXs x);
+  std::map<std::string, s_t> convertToMap(const Eigen::VectorXs& values);
+
+  s_t computePDF(Eigen::VectorXs x);
+
+  /// NOTE: there's a problem with normalizing. The normalization constants
+  /// sometimes push the PDF to be way bigger than zero.
+  s_t computeLogPDF(Eigen::VectorXs x, bool normalized = true);
+
+  Eigen::VectorXs computeLogPDFGrad(Eigen::VectorXs x);
+
+  Eigen::VectorXs finiteDifferenceLogPDFGrad(Eigen::VectorXs x);
+
+  std::vector<std::string> getVariableNames();
 
   std::string getVariableNameAtIndex(int i);
 
-  MultivariateGaussian condition(
+  std::shared_ptr<MultivariateGaussian> condition(
       const std::map<std::string, s_t>& observedValues);
 
   std::vector<int> getObservedIndices(
@@ -44,14 +56,16 @@ public:
   Eigen::MatrixXs getCovSubset(
       const std::vector<int>& rowIndices, const std::vector<int>& colIndices);
 
-  static MultivariateGaussian loadFromCSV(
-      const std::string& file, std::vector<std::string> columns);
+  static std::shared_ptr<MultivariateGaussian> loadFromCSV(
+      const std::string& file,
+      std::vector<std::string> columns,
+      s_t units = 1.0);
 
 protected:
   std::vector<std::string> mVars;
   Eigen::VectorXs mMu;
   Eigen::MatrixXs mCov;
-  Eigen::MatrixXs mCovInv;
+  Eigen::LLT<Eigen::MatrixXs> mCovInv;
   s_t mNormalizationConstant;
   s_t mLogNormalizationConstant;
 };

@@ -921,7 +921,7 @@ public:
   /// This sets the scales of all the body nodes according to their group
   /// membership. The `scale` vector is expected to be the same size as the
   /// number of groups.
-  void setGroupScales(Eigen::VectorXs scale);
+  void setGroupScales(Eigen::VectorXs scale, bool silentlyClamp = false);
 
   /// This gets the scales of the first body in each scale group.
   Eigen::VectorXs getGroupScales();

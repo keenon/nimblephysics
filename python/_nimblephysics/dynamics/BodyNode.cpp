@@ -578,7 +578,11 @@ void BodyNode(py::module& m)
             self->setCollidable(_isCollidable);
           },
           ::py::arg("isCollidable"))
-      .def("setScale", &dart::dynamics::BodyNode::setScale, ::py::arg("scale"))
+      .def(
+          "setScale",
+          &dart::dynamics::BodyNode::setScale,
+          ::py::arg("scale"),
+          ::py::arg("silentlyClamp") = false)
       .def("getScale", &dart::dynamics::BodyNode::getScale)
       .def(
           "setScaleLowerBound",
