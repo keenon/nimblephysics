@@ -5572,6 +5572,20 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 }
 
 //==============================================================================
+/// This solves a simple inverse dynamics problem to get force we need to
+/// apply to arrive at "nextVel" at the next timestep.
+Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
+{
+  Eigen::VectorXs accel
+      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                      - getExternalForces() + getDampingForce()
+                                      + getSpringForce();
+  return massTorques + coriolisAndGravity;
+}
+
+//==============================================================================
 /// This solves the inverse dynamics problem to figure out what forces we
 /// would need to apply (in our _current state_) in order to get the desired
 /// next velocity. This includes arbitrary forces and moments at the
@@ -5590,12 +5604,14 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
       = dynamic_cast<const dynamics::FreeJoint*>(joint);
-  if (freeJoint == nullptr)
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
   {
     std::cout
         << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
-           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
-           "this function won't work and we're returning zeros."
+           "joint of the skeleton is a FreeJoint ro an EulerFreeJoint. Since"
+           "it's neither, this function won't work and we're returning zeros."
         << std::endl;
     result.contactWrench.setZero();
     result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
@@ -5611,9 +5627,9 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
       = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
 
-  Eigen::VectorXs coriolisAndGravity
-      = getCoriolisAndGravityForces() - getExternalForces() 
-        + getDampingForce() + getSpringForce();
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                       - getExternalForces() 
+                                       + getDampingForce() + getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -5720,12 +5736,14 @@ Skeleton::getMultipleContactInverseDynamics(
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
       = dynamic_cast<const dynamics::FreeJoint*>(joint);
-  if (freeJoint == nullptr)
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
   {
     std::cout
         << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
-           "joint of the skeleton is a FreeJoint. Since it's not a FreeJoint, "
-           "this function won't work and we're returning zeros."
+           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "it's neither, this function won't work and we're returning zeros."
         << std::endl;
     result.contactWrenches = std::vector<Eigen::Vector6s>();
     for (int i = 0; i < bodies.size(); i++)
@@ -5748,9 +5766,9 @@ Skeleton::getMultipleContactInverseDynamics(
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
       (nextVel - getVelocities()) / getTimeStep());
 
-  Eigen::VectorXs coriolisAndGravity
-      = getCoriolisAndGravityForces() - getExternalForces() 
-        + getDampingForce()+getSpringForce();
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                       - getExternalForces() 
+                                       + getDampingForce()+getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -7429,9 +7447,16 @@ std::pair<Joint*, BodyNode*> Skeleton::cloneBodyNodeTree(
     // If this is the root of the tree, and the user has requested a change in
     // its parent Joint, use the specified parent Joint instead of created a
     // clone
-    Joint* joint = (i == 0 && _parentJoint != nullptr)
-                       ? _parentJoint
-                       : original->getParentJoint()->clone();
+    Joint* joint;
+    if(i == 0 && _parentJoint != nullptr)
+    {
+      joint = _parentJoint;
+    }
+    else
+    {
+      joint = original->getParentJoint()->clone();
+      joint->copyTransformsFrom(original->getParentJoint());
+    }
 
     BodyNode* newParent
         = i == 0 ? _parentNode

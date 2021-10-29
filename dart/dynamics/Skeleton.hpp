@@ -1330,6 +1330,8 @@ public:
     s_t sumError();
   };
 
+  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
+
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired
   /// next velocity. This includes arbitrary forces and moments at the

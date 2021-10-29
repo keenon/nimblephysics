@@ -88,6 +88,8 @@ TEST(SkeletonConverter, CONVERT_OSIM)
         std::cout << "Teuler: " << std::endl << Teuler << std::endl;
         std::cout << "Tball: " << std::endl << Tball << std::endl;
         std::cout << "Diff: " << std::endl << Teuler - Tball << std::endl;
+        std::cout << "BallSpace: \n" << ballSpace << std::endl;
+        std::cout << "Posittions: \n" << positions << std::endl;
         EXPECT_TRUE(equals(Teuler, Tball, 1e-12));
         return;
       }
