@@ -1156,6 +1156,11 @@ void BodyNode(py::module& m)
           "clearInternalForces",
           +[](dart::dynamics::BodyNode* self) { self->clearInternalForces(); })
       .def(
+          "getExternalForceLocal",
+          +[](const dart::dynamics::BodyNode* self) -> Eigen::Vector6s {
+            return self->getExternalForceLocal();
+          })
+      .def(
           "getExternalForceGlobal",
           +[](const dart::dynamics::BodyNode* self) -> Eigen::Vector6s {
             return self->getExternalForceGlobal();
