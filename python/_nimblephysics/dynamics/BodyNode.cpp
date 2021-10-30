@@ -1170,6 +1170,10 @@ void BodyNode(py::module& m)
           +[](const dart::dynamics::BodyNode* self)
               -> bool { return self->isReactive(); })
       .def(
+          "getConstraintImpulse",
+          +[](const dart::dynamics::BodyNode* self)
+              -> const Eigen::Vector6s& { return self->getConstraintImpulse(); })
+      .def(
           "setConstraintImpulse",
           +[](dart::dynamics::BodyNode* self,
               const Eigen::Vector6s& _constImp) {
