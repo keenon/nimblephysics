@@ -11,31 +11,25 @@ on:
     # Run every day at 02:00
     - cron: "0 2 * * 0-6"
 
-env:
-  # Hosted on: https://hub.docker.com/repository/docker/jslee02/diffdart-dev
-  DIFFDART_DEV_IMAGE: jslee02/diffdart-dev
-  UBUNTU_BUILD_CMD: |
-    docker run \
-      -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE \
-      --env-file ./.ci/docker/env.list \
-      $DIFFDART_DEV_IMAGE:$DOCKER_TAG \
-      /bin/sh -c "cd $GITHUB_WORKSPACE && ./.ci/build.sh"
-
 jobs:
-  focal_gcc_release:
-    name: Ubuntu 20.04 [GCC|Release]
-    runs-on: ubuntu-18.04
+  run_tests:
+    name: Ubuntu CI
+    runs-on: ubuntu-latest
     env:
-      DOCKER_TAG: ubuntu-focal-v0.0
       COMPILER: gcc
       BUILD_TYPE: Release
       BUILD_TEST: ON
-      BUILD_PYTHON: ON
+      BUILD_PYTHON: OFF
       BUILD_BENCHMARKS: OFF
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      - name: Pull dev container
-        run: docker pull ${{ env.DIFFDART_DEV_IMAGE }}:${{ env.DOCKER_TAG }}
-      - name: Build
-        run: ${{ env.UBUNTU_BUILD_CMD }}
+      - name: Run tests
+        run: cd ci/manylinux/tests
+          ./run_tests.sh
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: Testing/**/*.xml
+            - task: PublishTestResults@2
