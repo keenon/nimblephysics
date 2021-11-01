@@ -3,7 +3,6 @@
 set -e
 
 path="./public"
-s3Dir="s3://nimblephysics.org"
 
 echo "Rebuilding docs"
 pushd docs
@@ -14,11 +13,24 @@ mkdir public/docs
 cp -r docs/_build/html/* public/docs/
 echo "Rebuilt docs"
 
-for entry in "$path"/*; do
-    name=`echo $entry | sed 's/.*\///'`  # getting the name of the file or directory
-    if [[ -d  $entry ]]; then  # if it is a directory
-        aws s3 cp  --recursive "$path/$name" "$s3Dir/$name/"
-    else  # if it is a file
-        aws s3 cp "$path/$name" "$s3Dir/"
-    fi
-done
+if [ ! -d "$DIR" ]; then
+  echo "Cloning Github Pages repo"
+  git clone git@github.com:nimblephysics/nimblephysics.github.io.git
+  echo "Cloned Github Pages repo"
+fi
+
+echo "Copying built website contents into repo"
+cp -r public/* nimblephysics.github.io
+echo "Done copying built website contents into repo"
+
+CURRENT_HASH=$(git rev-parse HEAD)
+
+echo "Committing changes to Github Pages repo"
+cd nimblephysics.github.io
+git add .
+git commit -m "Published website changes from main repo ${CURRENT_HASH}"
+git push
+cd ..
+echo "Committed changes to Github Pages repo"
+
+echo "All done!"
