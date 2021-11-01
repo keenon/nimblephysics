@@ -30,25 +30,29 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <pybind11/pybind11.h>
+#include <tuple>
 
-namespace py = pybind11;
+#include <gtest/gtest.h>
 
-namespace dart {
-namespace python {
+#include "dart/utils/CSVParser.hpp"
 
-void Random(py::module& sm);
-void Geometry(py::module& sm);
-void MultivariateGaussian(py::module& sm);
+using namespace dart;
+using namespace utils;
 
-void dart_math(py::module& m)
+//==============================================================================
+TEST(CSVParser, BASICS)
 {
-  auto sm = m.def_submodule("math");
+  std::vector<std::map<std::string, std::string>> result = CSVParser::parseFile(
+      "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv");
 
-  Random(sm);
-  Geometry(sm);
-  MultivariateGaussian(sm);
+  std::cout << "Data length: " << result.size() << std::endl;
+
+  for (int i = 0; i < 5; i++)
+  {
+    std::cout << "Person #" << i << ":" << std::endl;
+    for (auto pair : result[i])
+    {
+      std::cout << "\t" << pair.first << ": " << pair.second << std::endl;
+    }
+  }
 }
-
-} // namespace python
-} // namespace dart

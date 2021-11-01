@@ -46,6 +46,7 @@ void OpenSimParser(py::module& sm);
 void SkeletonConverter(py::module& sm);
 void MarkerFitter(py::module& sm);
 void IKErrorReport(py::module& sm);
+void Anthropometrics(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -61,6 +62,7 @@ void dart_biomechanics(py::module& m)
   SkeletonConverter(sm);
   MarkerFitter(sm);
   IKErrorReport(sm);
+  Anthropometrics(sm);
 }
 
 } // namespace python

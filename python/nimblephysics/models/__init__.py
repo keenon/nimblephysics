@@ -1,1 +1,1 @@
-from .rajagopal import RajagopalHumanBodyModel
+from .rajagopal import RajagopalHumanBodyModel, RajagopalANSURModel

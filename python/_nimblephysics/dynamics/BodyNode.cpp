@@ -578,7 +578,11 @@ void BodyNode(py::module& m)
             self->setCollidable(_isCollidable);
           },
           ::py::arg("isCollidable"))
-      .def("setScale", &dart::dynamics::BodyNode::setScale, ::py::arg("scale"))
+      .def(
+          "setScale",
+          &dart::dynamics::BodyNode::setScale,
+          ::py::arg("scale"),
+          ::py::arg("silentlyClamp") = false)
       .def("getScale", &dart::dynamics::BodyNode::getScale)
       .def(
           "setScaleLowerBound",
@@ -1152,6 +1156,11 @@ void BodyNode(py::module& m)
           "clearInternalForces",
           +[](dart::dynamics::BodyNode* self) { self->clearInternalForces(); })
       .def(
+          "getExternalForceLocal",
+          +[](const dart::dynamics::BodyNode* self) -> Eigen::Vector6s {
+            return self->getExternalForceLocal();
+          })
+      .def(
           "getExternalForceGlobal",
           +[](const dart::dynamics::BodyNode* self) -> Eigen::Vector6s {
             return self->getExternalForceGlobal();
@@ -1160,6 +1169,10 @@ void BodyNode(py::module& m)
           "isReactive",
           +[](const dart::dynamics::BodyNode* self)
               -> bool { return self->isReactive(); })
+      .def(
+          "getConstraintImpulse",
+          +[](const dart::dynamics::BodyNode* self)
+              -> const Eigen::Vector6s& { return self->getConstraintImpulse(); })
       .def(
           "setConstraintImpulse",
           +[](dart::dynamics::BodyNode* self,

@@ -828,7 +828,8 @@ void Skeleton(py::module& m)
       .def(
           "setGroupScales",
           &dart::dynamics::Skeleton::setGroupScales,
-          ::py::arg("scales"))
+          ::py::arg("scales"),
+          ::py::arg("silentlyClamp") = false)
       .def("getGroupScales", &dart::dynamics::Skeleton::getGroupScales)
       .def(
           "getJointWorldPositionsJacobianWrtGroupScales",
@@ -943,11 +944,21 @@ void Skeleton(py::module& m)
           },
           ::py::arg("dt"))
       .def(
+          "integratePositionsExplicit",
+          +[](dart::dynamics::Skeleton* self, Eigen::VectorXs _pos, 
+              Eigen::VectorXs _vel, s_t _dt) -> Eigen::VectorXs {
+            return self->integratePositionsExplicit(_pos, _vel, _dt);
+          },
+          ::py::arg("pos"),
+          ::py::arg("vel"),
+          ::py::arg("dt"))
+      .def(
           "integrateVelocities",
           +[](dart::dynamics::Skeleton* self, s_t _dt) -> void {
             return self->integrateVelocities(_dt);
           },
           ::py::arg("dt"))
+
       .def(
           "getPositionDifferences",
           +[](const dart::dynamics::Skeleton* self,

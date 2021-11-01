@@ -60,6 +60,11 @@ void MarkerFitter(py::module& m)
           "markerErrorsAtTimesteps",
           &dart::biomechanics::MarkerFitterState::markerErrorsAtTimesteps)
       .def_readwrite(
+          "jointErrorsAtTimesteps",
+          &dart::biomechanics::MarkerFitterState::jointErrorsAtTimesteps)
+      .def_readwrite(
+          "jointOrder", &dart::biomechanics::MarkerFitterState::jointOrder)
+      .def_readwrite(
           "posesAtTimesteps",
           &dart::biomechanics::MarkerFitterState::posesAtTimesteps)
       // Gradient of current state
@@ -72,6 +77,9 @@ void MarkerFitter(py::module& m)
       .def_readwrite(
           "markerErrorsAtTimestepsGrad",
           &dart::biomechanics::MarkerFitterState::markerErrorsAtTimestepsGrad)
+      .def_readwrite(
+          "jointErrorsAtTimestepsGrad",
+          &dart::biomechanics::MarkerFitterState::jointErrorsAtTimestepsGrad)
       .def_readwrite(
           "posesAtTimestepsGrad",
           &dart::biomechanics::MarkerFitterState::posesAtTimestepsGrad);

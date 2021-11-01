@@ -175,7 +175,7 @@ public:
   /// Re-scales the body node. The original scale of the BodyNode is 1.0, when
   /// it's created/loaded from a file. Subsequent scalings can change that
   /// value.
-  void setScale(Eigen::Vector3s newScale);
+  void setScale(Eigen::Vector3s newScale, bool silentlyClamp = false);
 
   /// Returns the scale of the body node.
   Eigen::Vector3s getScale() const;

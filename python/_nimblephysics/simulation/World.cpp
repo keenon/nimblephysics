@@ -429,6 +429,9 @@ void World(py::module& m)
           &dart::simulation::World::setPenetrationCorrectionEnabled,
           ::py::arg("enabled"))
       .def(
+          "getContactClippingDepth",
+          &dart::simulation::World::getContactClippingDepth)
+      .def(
           "getFallbackConstraintForceMixingConstant",
           &dart::simulation::World::getFallbackConstraintForceMixingConstant)
       .def(
