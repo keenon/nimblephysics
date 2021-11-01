@@ -34,6 +34,7 @@
 #include <dart/dynamics/BodyNode.hpp>
 #include <dart/dynamics/ShapeFrame.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -48,6 +49,18 @@ void CollisionResult(py::module& m)
           "getNumContacts",
           +[](const dart::collision::CollisionResult* self) -> std::size_t {
             return self->getNumContacts();
+          })
+      .def(
+          "getContact",
+          +[](const dart::collision::CollisionResult* self,
+              std::size_t index) -> dart::collision::Contact {
+            return self->getContact(index);
+          })
+      .def(
+          "getContacts",
+          +[](const dart::collision::CollisionResult* self) 
+          -> std::vector<dart::collision::Contact> {
+            return self->getContacts();
           })
       .def(
           "inCollision",
