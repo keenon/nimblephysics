@@ -52,7 +52,7 @@ void SSID(py::module& m)
               std::shared_ptr<dart::simulation::World>,
               std::shared_ptr<dart::trajectory::LossFn>,
               int,
-              int,
+              Eigen::VectorXs,
               int>(),
           ::py::arg("world"),
           ::py::arg("loss"),
