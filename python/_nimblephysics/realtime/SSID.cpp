@@ -52,11 +52,13 @@ void SSID(py::module& m)
               std::shared_ptr<dart::simulation::World>,
               std::shared_ptr<dart::trajectory::LossFn>,
               int,
+              int,
               int>(),
           ::py::arg("world"),
           ::py::arg("loss"),
           ::py::arg("planningHorizonMillis"),
-          ::py::arg("sensorDim"))
+          ::py::arg("sensorDim"),
+          ::py::arg("steps"))
       .def("setLoss", &dart::realtime::SSID::setLoss, ::py::arg("loss"))
       .def(
           "setOptimizer",
