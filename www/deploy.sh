@@ -13,7 +13,7 @@ mkdir public/docs
 cp -r docs/_build/html/* public/docs/
 echo "Rebuilt docs"
 
-if [ ! -d "$DIR" ]; then
+if [ ! -d nimblephysics.github.io ]; then
   echo "Cloning Github Pages repo"
   git clone git@github.com:nimblephysics/nimblephysics.github.io.git
   echo "Cloned Github Pages repo"
