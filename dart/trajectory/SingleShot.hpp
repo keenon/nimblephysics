@@ -157,6 +157,9 @@ public:
   /// This sets the start vel
   void setStartVel(Eigen::VectorXs startVel) override;
 
+  /// This reset the dirty bit for reset the problem
+  void resetDirty() override;
+
   /// This unrolls the shot, and returns the (pos, vel) state concatenated at
   /// the end of the shot
   Eigen::VectorXs getFinalState(
