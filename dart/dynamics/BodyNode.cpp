@@ -642,6 +642,18 @@ s_t BodyNode::getMass() const
   return mAspectProperties.mInertia.getMass();
 }
 
+void BodyNode::setBeta(Eigen::Vector3s beta)
+{
+  // In order to prevent numerical issue or divide by zero issue.
+  assert(beta.norm()>=1e-6);
+  mBeta = beta;
+}
+
+Eigen::Vector3s BodyNode::getBeta()
+{
+  return mBeta;
+}
+
 //==============================================================================
 void BodyNode::setMomentOfInertia(
     s_t _Ixx, s_t _Iyy, s_t _Izz, s_t _Ixy, s_t _Ixz, s_t _Iyz)
@@ -1594,7 +1606,8 @@ BodyNode::BodyNode(
     mImpF(Eigen::Vector6s::Zero()),
     onColShapeAdded(mColShapeAddedSignal),
     onColShapeRemoved(mColShapeRemovedSignal),
-    onStructuralChange(mStructuralChangeSignal)
+    onStructuralChange(mStructuralChangeSignal),
+    mBeta(Eigen::Vector3s::Ones())
 {
   // Generate an inert destructor to make sure that it will not try to
   // s_t-delete this BodyNode when it gets destroyed.
@@ -3834,12 +3847,10 @@ bool BodyNode::debugJacobianOfMBackward(
     /*
     dMddq.block(iStart, jStart, jointNumDofs, 1)
         = S.transpose() * mMddq_F_p.col(i); // m x 1
-
     if (mParentJoint->hasDof(dof))
     {
       const Jacobian DS_Dq
           = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
-
       dMddq.block(iStart, jStart, jointNumDofs, 1)
           += DS_Dq.transpose() * mMddq_F;
     }
