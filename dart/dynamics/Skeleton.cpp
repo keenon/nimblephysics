@@ -1124,6 +1124,18 @@ Joint* Skeleton::getJoint(std::size_t _idx)
 }
 
 //==============================================================================
+// Gets the index in the skeleton where this joint lives
+int Skeleton::getJointIndex(const Joint* joint)
+{
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    if (getJoint(i) == joint)
+      return i;
+  }
+  return -1;
+}
+
+//==============================================================================
 const Joint* Skeleton::getJoint(std::size_t _idx) const
 {
   return const_cast<Skeleton*>(this)->getJoint(_idx);
@@ -1533,15 +1545,16 @@ bool Skeleton::checkIndexingConsistency() const
 /// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
 /// interpreted as:
 ///
-/// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-/// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+/// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+/// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
 ///
 /// This is computed in bulk, and cached in the skeleton.
-const Eigen::MatrixXi& Skeleton::getParentMap()
+const Eigen::MatrixXi& Skeleton::getDofParentMap()
 {
-  if (mSkelCache.mDirty.mParentMap)
+  if (mSkelCache.mDirty.mDofParentMap)
   {
-    mSkelCache.mParentMap = Eigen::MatrixXi::Zero(getNumDofs(), getNumDofs());
+    mSkelCache.mDofParentMap
+        = Eigen::MatrixXi::Zero(getNumDofs(), getNumDofs());
     for (int row = 0; row < getNumDofs(); row++)
     {
       /*
@@ -1549,7 +1562,7 @@ const Eigen::MatrixXi& Skeleton::getParentMap()
       for (int col = 0; col < getNumDofs(); col++) {
         dynamics::DegreeOfFreedom* colDof = getDof(col);
         if (rowDof->isParentOf(colDof)) {
-          mSkelCache.mParentMap(row, col) = 1;
+          mSkelCache.mDofParentMap(row, col) = 1;
         }
       }
       */
@@ -1570,14 +1583,59 @@ const Eigen::MatrixXi& Skeleton::getParentMap()
 
           for (int j = 0; j < childJoint->getNumDofs(); j++)
           {
-            mSkelCache.mParentMap(row, childJoint->getIndexInSkeleton(j)) = 1;
+            mSkelCache.mDofParentMap(row, childJoint->getIndexInSkeleton(j))
+                = 1;
           }
         }
       }
     }
-    mSkelCache.mDirty.mParentMap = false;
+    mSkelCache.mDirty.mDofParentMap = false;
   }
-  return mSkelCache.mParentMap;
+  return mSkelCache.mDofParentMap;
+}
+
+/// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
+/// interpreted as:
+///
+/// getJointParentMap(i,j) == 1: Joint[i] is a parent of Joint[j]
+/// getJointParentMap(i,j) == 0: Joint[i] is NOT a parent of Joint[j]
+///
+/// This is computed in bulk, and cached in the skeleton.
+const Eigen::MatrixXi& Skeleton::getJointParentMap()
+{
+  if (mSkelCache.mDirty.mJointParentMap)
+  {
+    mSkelCache.mJointParentMap
+        = Eigen::MatrixXi::Zero(getNumJoints(), getNumJoints());
+    for (int row = 0; row < getNumJoints(); row++)
+    {
+      dynamics::Joint* joint = getJoint(row);
+
+      std::vector<dynamics::Joint*> visit;
+      visit.push_back(joint);
+      while (visit.size() > 0)
+      {
+        dynamics::Joint* cursor = visit.back();
+        visit.pop_back();
+
+        dynamics::BodyNode* cursorChildBodyNode = cursor->getChildBodyNode();
+        for (int i = 0; i < cursorChildBodyNode->getNumChildJoints(); i++)
+        {
+          dynamics::Joint* childJoint = cursorChildBodyNode->getChildJoint(i);
+          visit.push_back(childJoint);
+
+          // Find which index the childJoint is at in the skeleton
+          std::size_t index = getJointIndex(childJoint);
+
+          assert(index != -1);
+
+          mSkelCache.mJointParentMap(row, index) = 1;
+        }
+      }
+    }
+    mSkelCache.mDirty.mJointParentMap = false;
+  }
+  return mSkelCache.mJointParentMap;
 }
 
 //==============================================================================
@@ -4240,7 +4298,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
   Eigen::MatrixXs jac
       = Eigen::MatrixXs::Zero(joints.size() * 3, getNumBodyNodes() * 3);
 
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
   // Scaling a body will cause the joint offsets to scale, which will move the
   // downstream joint positions by those vectors
   for (int i = 0; i < getNumBodyNodes(); i++)
@@ -4258,13 +4316,12 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
 
       for (int j = 0; j < joints.size(); j++)
       {
-        int sourceJointDof = joints[j]->getDof(0)->getIndexInSkeleton();
+        int sourceJointIndex = getJointIndex(joints[j]);
         for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
         {
           dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
           if (childJoint == joints[j]
-              || parentMap(
-                  childJoint->getDof(0)->getIndexInSkeleton(), sourceJointDof))
+              || parentMap(getJointIndex(childJoint), sourceJointIndex))
           {
             // This is the child joint
 
@@ -4447,7 +4504,7 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
   Eigen::MatrixXs jac
       = Eigen::MatrixXs::Zero(markers.size() * 3, getNumBodyNodes() * 3);
 
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
   // Scaling a body will cause the joint offsets to scale, which will move the
   // downstream joint positions by those vectors
   for (int i = 0; i < getNumBodyNodes(); i++)
@@ -4467,10 +4524,8 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
       // Now begin iterating rows, for each marker
       for (int j = 0; j < markers.size(); j++)
       {
-        int sourceJointDof = markers[j]
-                                 .first->getParentJoint()
-                                 ->getDof(0)
-                                 ->getIndexInSkeleton();
+        int sourceJointIndex
+            = getJointIndex(markers[j].first->getParentJoint());
 
         // If this marker is directly attached to the body node we're scaling,
         // we need to account for that
@@ -4487,9 +4542,7 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
           {
             dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
             if (childJoint == markers[j].first->getParentJoint()
-                || parentMap(
-                    childJoint->getDof(0)->getIndexInSkeleton(),
-                    sourceJointDof))
+                || parentMap(getJointIndex(childJoint), sourceJointIndex))
             {
               // This is the child joint
               Eigen::Vector3s childOffset
@@ -4664,22 +4717,22 @@ Skeleton::getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
-    int parentJointDof = j;
+    int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
       dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
-      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+      int sourceJointIndex = getJointIndex(sourceJoint);
 
-      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
-      if (parentMap(parentJointDof, sourceJointDof) == 1
+      /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
         jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
@@ -4702,28 +4755,28 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   // Differentiating the whole mess wrt this joint
   dynamics::Joint* rootJoint = getDof(index)->getJoint();
   Eigen::Vector6s rootScrew = rootJoint->getWorldAxisScrewForPosition(
       getDof(index)->getIndexInJoint());
-  int rootJointDof = index;
+  int rootJointIndex = getJointIndex(rootJoint);
 
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
-    int parentJointDof = j;
+    int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
       dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
-      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+      int sourceJointIndex = getJointIndex(sourceJoint);
 
-      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
-      if (parentMap(parentJointDof, sourceJointDof) == 1
+      /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
         // The original value in this cell is the following
@@ -4737,7 +4790,7 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
         // this column of the Jac, _and_ of the marker. That means that all
         // we're doing is rotating (and translating, but that's irrelevant) the
         // joint-marker system. So all we need is the gradient of the rotation.
-        if (parentMap(rootJointDof, parentJointDof) == 1)
+        if (parentMap(rootJointIndex, parentJointIndex) == 1)
         {
           Eigen::Vector3s originalJac = math::gradientWrtTheta(
               screw, worldMarkers.segment<3>(i * 3), 0.0);
@@ -4776,7 +4829,7 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
 
           Eigen::Vector3s markerGradWrtRoot = Eigen::Vector3s::Zero();
 
-          if (parentMap(rootJointDof, sourceJointDof) == 1
+          if (parentMap(rootJointIndex, sourceJointIndex) == 1
               || (rootJoint == sourceJoint))
           {
             markerGradWrtRoot = math::gradientWrtTheta(
@@ -4903,35 +4956,35 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
 {
   dynamics::BodyNode* scaleBody = getBodyNode(index);
   dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
-  int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
+  int scaleJointIndex = getJointIndex(scaleJoint);
   int markerGradCol = index * 3 + axis;
 
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
-    int parentJointDof = j;
+    int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
       dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
-      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+      int sourceJointIndex = getJointIndex(sourceJoint);
 
-      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
-      if (parentMap(parentJointDof, sourceJointDof) == 1
+      /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
         bool isScalingBodyParentOfMarker
-            = (parentMap(scaleJointDof, sourceJointDof) == 1
+            = (parentMap(scaleJointIndex, sourceJointIndex) == 1
                || scaleBody == markers[i].first);
         bool isScalingBodyParentOfAxisJoint
-            = parentMap(scaleJointDof, parentJointDof) == 1;
+            = parentMap(scaleJointIndex, parentJointIndex) == 1;
         if (isScalingBodyParentOfMarker && !isScalingBodyParentOfAxisJoint)
         {
           Eigen::Vector3s markerGrad
@@ -5069,22 +5122,22 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
-  const Eigen::MatrixXi& parentMap = getParentMap();
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
-    int parentJointDof = j;
+    int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
       dynamics::Joint* sourceJoint = markers[i].first->getParentJoint();
-      int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
+      int sourceJointIndex = getJointIndex(sourceJoint);
 
-      /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-      /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
-      if (parentMap(parentJointDof, sourceJointDof) == 1
+      /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+      /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+      if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
         Eigen::Vector3s markerGrad
@@ -9168,7 +9221,8 @@ Skeleton::DirtyFlags::DirtyFlags()
     mExternalForces(true),
     mDampingForces(true),
     mSupport(true),
-    mParentMap(true),
+    mDofParentMap(true),
+    mJointParentMap(true),
     mSupportVersion(0)
 {
   // Do nothing

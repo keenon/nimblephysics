@@ -19,6 +19,7 @@
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/PolynomialFunction.hpp"
 #include "dart/math/SimmSpline.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -379,9 +380,17 @@ OpenSimMot OpenSimParser::loadMot(
   {
     std::string line = content.substr(start, end - start);
 
+    // Trim '\r', in case this file was saved on a Windows machine
+    if (line.size() > 0 && line[line.size() - 1] == '\r')
+    {
+      line = line.substr(0, line.size() - 1);
+    }
+
     if (inHeader)
     {
-      if (line == "endheader")
+      std::string ENDHEADER = "endheader";
+      if (line.size() >= ENDHEADER.size()
+          && line.substr(0, ENDHEADER.size()) == ENDHEADER)
       {
         inHeader = false;
       }
@@ -538,9 +547,17 @@ OpenSimGRF OpenSimParser::loadGRF(
   {
     std::string line = content.substr(start, end - start);
 
+    // Trim '\r', in case this file was saved on a Windows machine
+    if (line.size() > 0 && line[line.size() - 1] == '\r')
+    {
+      line = line.substr(0, line.size() - 1);
+    }
+
     if (inHeader)
     {
-      if (line == "endheader")
+      std::string ENDHEADER = "endheader";
+      if (line.size() >= ENDHEADER.size()
+          && line.substr(0, ENDHEADER.size()) == ENDHEADER)
       {
         inHeader = false;
       }
@@ -598,6 +615,17 @@ OpenSimGRF OpenSimParser::loadGRF(
             {
               plate = p - 1;
             }
+          }
+          // It's pretty common to do R and L plates, instead of numbered plates
+          if (token.find("R") != std::string::npos
+              || token.find("r") != std::string::npos)
+          {
+            plate = 0;
+          }
+          if (token.find("L") != std::string::npos
+              || token.find("l") != std::string::npos)
+          {
+            plate = 1;
           }
 
           if (token.find("px") != std::string::npos)
@@ -700,7 +728,7 @@ OpenSimGRF OpenSimParser::loadGRF(
 
   // Process result into its final form
 
-  int numTimesteps = timestamps.size() / downsampleByFactor;
+  int numTimesteps = (int)ceil((double)timestamps.size() / downsampleByFactor);
 
   OpenSimGRF grf;
   for (int i = 0; i < numPlates; i++)
@@ -879,6 +907,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           = function->FirstChildElement("LinearFunction");
       tinyxml2::XMLElement* simmSpline
           = function->FirstChildElement("SimmSpline");
+      tinyxml2::XMLElement* polynomialFunction
+          = function->FirstChildElement("PolynomialFunction");
       // This only exists in v4 files
       tinyxml2::XMLElement* constant = function->FirstChildElement("Constant");
       // This only exists in v3 files
@@ -894,7 +924,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           constant = childFunction->FirstChildElement("Constant");
           simmSpline = childFunction->FirstChildElement("SimmSpline");
           linearFunction = childFunction->FirstChildElement("LinearFunction");
-          assert(constant || simmSpline || linearFunction);
+          polynomialFunction
+              = childFunction->FirstChildElement("PolynomialFunction");
+          assert(
+              constant || simmSpline || linearFunction || polynomialFunction);
         }
       }
 
@@ -932,6 +965,15 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         // Example coeffs for linear: 1 0
         customFunctions.push_back(
             std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
+      }
+      else if (polynomialFunction != nullptr)
+      {
+        anySpline = true;
+        allLocked = false;
+        std::vector<s_t> coeffs
+            = readVecX(polynomialFunction->FirstChildElement("coefficients"));
+        customFunctions.push_back(
+            std::make_shared<math::PolynomialFunction>(coeffs));
       }
       else if (simmSpline != nullptr)
       {
@@ -1134,6 +1176,20 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       assert(false);
     }
   }
+  if (jointType == "WeldJoint")
+  {
+    dynamics::WeldJoint::Properties props;
+    props.mName = jointName;
+    auto pair
+        = parentBody->createChildJointAndBodyNodePair<dynamics::WeldJoint>(
+            props, bodyProps);
+    joint = pair.first;
+    childBody = pair.second;
+    std::cout << "WARNING! Creating a WeldJoint as an intermediate "
+                 "(non-root) joint, there is a known bug that will cause "
+                 "dynamics to be wrong. This is only useful for kinematics."
+              << std::endl;
+  }
   if (jointType == "PinJoint")
   {
     // Create a RevoluteJoint
@@ -1206,7 +1262,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   if (coordinateCursor == nullptr)
   {
     coordinateSet = jointDetail->FirstChildElement("coordinates");
-    coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    if (coordinateSet != nullptr)
+    {
+      coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    }
   }
   // Iterate through the coordinates
   int i = 0;
@@ -1280,22 +1339,25 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
           common::Uri meshUri = common::Uri::createFromRelativeUri(
               uri, "./Geometry/" + mesh_file + ".ply");
-          std::shared_ptr<dynamics::MeshShape> meshShape
-              = std::make_shared<dynamics::MeshShape>(
-                  scale,
-                  dynamics::MeshShape::loadMesh(meshUri, retriever),
-                  meshUri,
-                  retriever);
+          std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+              = dynamics::MeshShape::loadMesh(meshUri, retriever);
 
-          dynamics::ShapeNode* meshShapeNode
-              = childBody->createShapeNodeWith<dynamics::VisualAspect>(
-                  meshShape);
-          meshShapeNode->setRelativeTransform(transform);
+          if (meshPtr)
+          {
+            std::shared_ptr<dynamics::MeshShape> meshShape
+                = std::make_shared<dynamics::MeshShape>(
+                    scale, meshPtr, meshUri, retriever);
 
-          dynamics::VisualAspect* meshVisualAspect
-              = meshShapeNode->getVisualAspect();
-          meshVisualAspect->setColor(colors);
-          meshVisualAspect->setAlpha(opacity);
+            dynamics::ShapeNode* meshShapeNode
+                = childBody->createShapeNodeWith<dynamics::VisualAspect>(
+                    meshShape);
+            meshShapeNode->setRelativeTransform(transform);
+
+            dynamics::VisualAspect* meshVisualAspect
+                = meshShapeNode->getVisualAspect();
+            meshVisualAspect->setColor(colors);
+            meshVisualAspect->setAlpha(opacity);
+          }
 
           displayGeometryCursor
               = displayGeometryCursor->NextSiblingElement("DisplayGeometry");
@@ -1319,38 +1381,41 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
       common::Uri meshUri = common::Uri::createFromRelativeUri(
           uri, "./Geometry/" + mesh_file + ".ply");
-      std::shared_ptr<dynamics::MeshShape> meshShape
-          = std::make_shared<dynamics::MeshShape>(
-              scale,
-              dynamics::MeshShape::loadMesh(meshUri, retriever),
-              meshUri,
-              retriever);
+      std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+          = dynamics::MeshShape::loadMesh(meshUri, retriever);
 
-      dynamics::ShapeNode* meshShapeNode
-          = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
-
-      /*
-      Eigen::Vector6s transformVec
-          = readVec6(displayGeometryCursor->FirstChildElement("transform"));
-      Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
-      transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-      transform.translation() = transformVec.tail<3>();
-      meshShapeNode->setRelativeTransform(transform);
-      */
-
-      dynamics::VisualAspect* meshVisualAspect
-          = meshShapeNode->getVisualAspect();
-
-      tinyxml2::XMLElement* appearance
-          = meshCursor->FirstChildElement("Appearance");
-      if (appearance != nullptr)
+      if (meshPtr)
       {
-        Eigen::Vector3s colors
-            = readVec3(appearance->FirstChildElement("color")) * 0.7;
-        double opacity
-            = atof(appearance->FirstChildElement("opacity")->GetText());
-        meshVisualAspect->setColor(colors);
-        meshVisualAspect->setAlpha(opacity);
+        std::shared_ptr<dynamics::MeshShape> meshShape
+            = std::make_shared<dynamics::MeshShape>(
+                scale, meshPtr, meshUri, retriever);
+
+        dynamics::ShapeNode* meshShapeNode
+            = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
+
+        /*
+        Eigen::Vector6s transformVec
+            = readVec6(displayGeometryCursor->FirstChildElement("transform"));
+        Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+        transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+        transform.translation() = transformVec.tail<3>();
+        meshShapeNode->setRelativeTransform(transform);
+        */
+
+        dynamics::VisualAspect* meshVisualAspect
+            = meshShapeNode->getVisualAspect();
+
+        tinyxml2::XMLElement* appearance
+            = meshCursor->FirstChildElement("Appearance");
+        if (appearance != nullptr)
+        {
+          Eigen::Vector3s colors
+              = readVec3(appearance->FirstChildElement("color")) * 0.7;
+          double opacity
+              = atof(appearance->FirstChildElement("opacity")->GetText());
+          meshVisualAspect->setColor(colors);
+          meshVisualAspect->setAlpha(opacity);
+        }
       }
 
       meshCursor = meshCursor->NextSiblingElement("Mesh");

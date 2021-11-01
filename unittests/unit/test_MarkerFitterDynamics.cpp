@@ -45,7 +45,7 @@ void debugGRFToGUI(
     {
       // Eigen::Isometry3s T = skel->getRootBodyNode()->getWorldTransform();
 
-      Eigen::Vector3s cop = grf.plateCOPs[i].col(timestep) * 0.2;
+      Eigen::Vector3s cop = grf.plateCOPs[i].col(timestep);
       Eigen::Vector6s wrench = grf.plateGRFs[i].col(timestep) * 0.001;
 
       std::vector<Eigen::Vector3s> points;
@@ -67,6 +67,46 @@ void debugGRFToGUI(
 }
 
 // #ifdef ALL_TESTS
+TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)
+{
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "walking1.trc");
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "walking1.mot");
+  OpenSimGRF grf = OpenSimParser::loadGRF(
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "walking1_forces.mot",
+      20);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(scaled.skeleton, scaled.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  MarkerInitialization init;
+  init.poses = mot.poses;
+  init.groupScales = scaled.skeleton->getGroupScales();
+
+  fitter.initializeMasses(init);
+
+  // Target markers
+  debugGRFToGUI(scaled.skeleton, init.poses, grf);
+}
+// #endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)
 {
   // Get the raw marker trajectory data
@@ -101,9 +141,9 @@ TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)
   fitter.initializeMasses(init);
 
   // Target markers
-  // debugGRFToGUI(scaled.skeleton, init.poses, grf);
+  debugGRFToGUI(scaled.skeleton, init.poses, grf);
 }
-// #endif
+#endif
 
 // #ifdef FULL_EVAL
 #ifdef ALL_TESTS
