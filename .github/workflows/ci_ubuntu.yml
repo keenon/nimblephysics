@@ -16,8 +16,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
       - name: Run tests
-        run: cd ci/manylinux/tests
-          ./run_tests.sh
+        run: cd ci/manylinux/tests && ./run_tests.sh
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:
