@@ -1,9 +1,10 @@
-name: Build Wheels
+name: Build and Publish Wheels
 
 on: workflow_dispatch
 
 jobs:
-  build:
+  build-linux:
+    name: Build and Publish Linux Wheels
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
     strategy:
@@ -83,3 +84,63 @@ jobs:
         with:
           name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
           path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: wheelhouse/
+          skip_existing: true
+  build-mac:
+    name: Build and Publish Mac OSX Wheels
+    runs-on: macos-10.15
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        include:
+          - python-version: 3.6
+            PYTHON_VERSION_CODE: cp36-cp36m
+          - python-version: 3.7
+            PYTHON_VERSION_CODE: cp37-cp37m
+          - python-version: 3.8
+            PYTHON_VERSION_CODE: cp38-cp38
+          - python-version: 3.9
+            PYTHON_VERSION_CODE: cp39-cp39
+    name: OSX wheel for Python ${{ matrix.python-version }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Select Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
+      - name: Set variables
+        run: |
+          VER=$(cat ./VERSION.txt)
+          echo "VERSION=$VER"
+          echo "VERSION=$VER" >> $GITHUB_ENV
+      - name: Test environment
+        run: |
+          echo "VERSION=${{ env.VERSION }}"
+          echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
+      - name: Install pytest, wheel and auditwheel
+        run: python -m pip install pytest wheel auditwheel
+      - name: Install dependencies
+        run: ci/mac/install_dependencies.sh
+      - name: Build wheel
+        run: |
+          cd ci/mac
+          ./build_wheels.sh
+      - name: Publish artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: wheelhouse/
+          skip_existing: true
