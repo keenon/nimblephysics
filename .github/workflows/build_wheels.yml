@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   build-linux:
-    name: Build and Publish Linux Wheels
+    name: Build and Publish Linux Wheels for Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
     strategy:
@@ -39,7 +39,6 @@ jobs:
             PATH_PATH: /opt/python/cp39-cp39/bin/
             PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
             PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
-    name: Manylinux wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -92,7 +91,7 @@ jobs:
           packages_dir: wheelhouse/
           skip_existing: true
   build-mac:
-    name: Build and Publish Mac OSX Wheels
+    name: Build and Publish Mac OSX Wheels for Python ${{ matrix.python-version }}
     runs-on: macos-10.15
     strategy:
       matrix:
@@ -106,7 +105,6 @@ jobs:
             PYTHON_VERSION_CODE: cp38-cp38
           - python-version: 3.9
             PYTHON_VERSION_CODE: cp39-cp39
-    name: OSX wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
