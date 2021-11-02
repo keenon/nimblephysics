@@ -4,6 +4,8 @@ FROM keenon/diffdart:base
 ARG VERSION
 ARG GIT_HASH
 
+COPY . /nimblephysics
+
 # Build Python 3.8
 
 ENV PYTHON="/opt/python/cp38-cp38/bin/python3.8"
@@ -25,14 +27,12 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
-RUN git clone https://github.com/keenon/diffdart.git
 RUN mkdir /Testing
-RUN cd diffdart && \
-    git checkout ${GIT_HASH} && \
+RUN cd nimblephysics && \
     mkdir build && \
     cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     make tests -j2
-RUN cd diffdart/build && \
+RUN cd nimblephysics/build && \
     ctest -T Test; exit 0
-RUN mv /diffdart/build/Testing /Testing
+RUN mv /nimblephysics/build/Testing /Testing
