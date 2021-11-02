@@ -53,8 +53,8 @@ jobs:
           pushd pybind11
           mkdir build
           pushd build
-          PATH="${{ matrix.PATH }}:${PATH}" cmake ..
-          PATH="${{ matrix.PATH }}:${PATH}" make install -j2
+          PATH="${{ matrix.PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
+          PATH="${{ matrix.PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
         env:
           PYTHON: ${{ matrix.PYTHON }}
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
@@ -63,8 +63,8 @@ jobs:
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
       - name: Build wheel
         run: |
-          PATH="${{ matrix.PATH }}:${PATH}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel
-          PATH="${{ matrix.PATH }}:${PATH}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl
+          PATH="${{ matrix.PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel
+          PATH="${{ matrix.PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl
         env:
           PYTHON: ${{ matrix.PYTHON }}
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
