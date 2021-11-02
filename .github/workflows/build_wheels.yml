@@ -30,7 +30,7 @@ jobs:
           echo "VERSION=$VER" >> $GITHUB_ENV
       - name: Test environment
         run: |
-          echo "VERSION=${{ env.version }}"
+          echo "VERSION=${{ env.VERSION }}"
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Setup python
