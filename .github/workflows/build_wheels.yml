@@ -139,11 +139,9 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: wheelhouse
-
       - name: Display structure of downloaded files
         run: ls -R
         working-directory: wheelhouse
-
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
