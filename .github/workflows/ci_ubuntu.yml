@@ -7,20 +7,11 @@ on:
   pull_request:
     branches:
       - "**"
-  schedule:
-    # Run every day at 02:00
-    - cron: "0 2 * * 0-6"
 
 jobs:
-  run_tests:
+  test:
     name: Ubuntu CI
     runs-on: ubuntu-latest
-    env:
-      COMPILER: gcc
-      BUILD_TYPE: Release
-      BUILD_TEST: ON
-      BUILD_PYTHON: OFF
-      BUILD_BENCHMARKS: OFF
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -29,7 +20,5 @@ jobs:
           ./run_tests.sh
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1
-        if: always()
         with:
           files: Testing/**/*.xml
-            - task: PublishTestResults@2
