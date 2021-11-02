@@ -49,12 +49,12 @@ jobs:
         run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel
       - name: Install Pybind11 for this Python version
         run: |
-          PATH="${{ matrix.PATH }}:${PATH}" git clone https://github.com/pybind/pybind11.git
+          git clone https://github.com/pybind/pybind11.git
           pushd pybind11
           mkdir build
           pushd build
-          cmake ..
-          make install -j2
+          PATH="${{ matrix.PATH }}:${PATH}" cmake ..
+          PATH="${{ matrix.PATH }}:${PATH}" make install -j2
         env:
           PYTHON: ${{ matrix.PYTHON }}
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
