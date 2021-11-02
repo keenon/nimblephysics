@@ -11,21 +11,21 @@ jobs:
         python-version: ["3.6", "3.7", "3.8", "3.9"]
         include:
           - python-version: 3.6
-            PYTHON_VERSION_CODE: cp36-36m
+            PYTHON_VERSION_CODE: cp36-cp36m
             PYTHON_VERSION_NUMBER: 3.6
             PYTHON: /opt/python/cp36-cp36m/bin/python3.6
             PYTHON_PATH: /opt/python/cp36-cp36m/bin/
             PYTHON_INCLUDE: /opt/python/cp36-cp36m/include/python3.6m/
             PYTHON_LIB: /opt/python/cp36-cp36m/lib/python3.6
           - python-version: 3.7
-            PYTHON_VERSION_CODE: cp37-37m
+            PYTHON_VERSION_CODE: cp37-cp37m
             PYTHON_VERSION_NUMBER: 3.7
             PYTHON: /opt/python/cp37-cp37m/bin/python3.7
             PYTHON_PATH: /opt/python/cp37-cp37m/bin/
             PYTHON_INCLUDE: /opt/python/cp37-cp37m/include/python3.7m/
             PYTHON_LIB: /opt/python/cp37-cp37m/lib/python3.7
           - python-version: 3.8
-            PYTHON_VERSION_CODE: cp38-38
+            PYTHON_VERSION_CODE: cp38-cp38
             PYTHON_VERSION_NUMBER: 3.8
             PYTHON: /opt/python/cp38-cp38/bin/python3.8
             PYTHON_PATH: /opt/python/cp38-cp38/bin/
