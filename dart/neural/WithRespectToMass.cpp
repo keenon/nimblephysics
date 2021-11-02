@@ -27,6 +27,8 @@ int WrtMassBodyNodyEntry::dim()
     return 1;
   if (type == INERTIA_COM)
     return 3;
+  if (type == INERTIA_COM_MU)
+    return 1;
   if (type == INERTIA_DIAGONAL)
     return 3;
   if (type == INERTIA_OFF_DIAGONAL)
@@ -56,6 +58,22 @@ void WrtMassBodyNodyEntry::set(
         value(0), // COM_X
         value(1), // COM_Y
         value(2), // COM_Z
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
+    node->setInertia(newInertia);
+  }
+  if (type == INERTIA_COM_MU)
+  {
+    Eigen::Vector3s beta = node->getBeta();
+    dynamics::Inertia newInertia(
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        beta(0)*value(0), // COM_X
+        beta(1)*value(0), // COM_Y
+        beta(2)*value(0), // COM_Z
         inertia.getParameter(dynamics::Inertia::Param::I_XX),
         inertia.getParameter(dynamics::Inertia::Param::I_YY),
         inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
@@ -127,6 +145,16 @@ void WrtMassBodyNodyEntry::get(
   if (type == INERTIA_COM)
   {
     out = node->getInertia().getLocalCOM();
+    return;
+  }
+  if (type == INERTIA_COM_MU)
+  {
+    if(node->getBeta()(0)!=0)
+      out(0) = node->getInertia().getLocalCOM()(0)/node->getBeta()(0);
+    else if(node->getBeta()(1)!=0)
+      out(0) = node->getInertia().getLocalCOM()(1)/node->getBeta()(1);
+    else
+      out(0) = node->getInertia().getLocalCOM()(2)/node->getBeta()(2);
     return;
   }
 

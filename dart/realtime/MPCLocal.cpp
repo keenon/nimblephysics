@@ -199,7 +199,7 @@ void MPCLocal::optimizePlan(long startTime)
 
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
-    //std::cout<<"Mass current: \n"<<worldClone->getLinkMasses()<<std::endl;
+    std::cout<<"Optimization Stage"<<std::endl;
     if (!mOptimizer)
     {
       PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
@@ -253,7 +253,7 @@ void MPCLocal::optimizePlan(long startTime)
   else
   {
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
-    //std::cout<<"Mass current: \n"<<worldClone->getLinkMasses()<<std::endl;
+    std::cout<<"Re-optimization stage "<<startTime<<std::endl;
     int diff = startTime - mLastOptimizedTime;
     int steps
         = static_cast<int>(floor(static_cast<s_t>(diff) / mMillisPerStep));
