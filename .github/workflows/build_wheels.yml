@@ -1,7 +1,9 @@
 name: Build and Publish Wheels
 
-on: workflow_dispatch
-
+on:
+  workflow_dispatch
+  release:
+    types: [published]
 jobs:
   build-linux:
     name: Linux Python ${{ matrix.python-version }} - Build and Publish Wheels
