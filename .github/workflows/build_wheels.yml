@@ -149,3 +149,4 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages_dir: wheelhouse/
           skip_existing: true
+          verbose: true
