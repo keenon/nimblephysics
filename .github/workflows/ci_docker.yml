@@ -22,5 +22,5 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release &&
           make tests -j2
       - name: Run tests
-        run: cd nimblephysics/build &&
+        run: cd build &&
           ctest -T Test
