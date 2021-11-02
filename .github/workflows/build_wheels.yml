@@ -23,6 +23,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
+      - name: Install pytest, wheel and auditwheel
+        run: python -m pip install pytest wheel auditwheel
       - name: Install Pybind11 for this Python version
         run: |
           git clone https://github.com/pybind/pybind11.git
@@ -31,11 +33,9 @@ jobs:
           pushd build
           cmake ..
           make install -j2
-      - name: Install pytest and auditwheel
-        run: python -m pip install pytest auditwheel wheel
       - name: Build wheel
         run: |
-          python setup.py sdist bdist_wheel
+          NO_PYTHON_ARGS=YES python setup.py sdist bdist_wheel
           python -m auditwheel repair dist/nimblephysics-${{ env.version }}-${{ matrix.python-version }}-linux_x86_64.whl
       - name: Publish artifact
         uses: actions/upload-artifact@v2
