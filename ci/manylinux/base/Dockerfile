@@ -31,7 +31,7 @@ RUN curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > 
     pushd eigen-3.3.7 && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j14 && \
     popd && \
     popd && \
@@ -42,7 +42,7 @@ RUN git clone https://github.com/danfis/libccd.git && \
     pushd libccd && \
     mkdir build && \
     pushd build && \
-    cmake .. -DENABLE_DOUBLE_PRECISION=ON && \
+    cmake .. -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j14 && \
     popd && \
     popd && \
@@ -93,7 +93,7 @@ RUN git clone https://github.com/flexible-collision-library/fcl.git && \
     # sed -i '1696s/v0_dist/(double)v0_dist/' include/fcl/narrowphase/detail/convexity_based_algorithm/gjk_libccd-inl.h && \
     mkdir build && \
     pushd build && \
-    cmake .. -DFCL_WITH_OCTOMAP=OFF && \
+    cmake .. -DFCL_WITH_OCTOMAP=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j14 && \
     popd && \
     popd && \
@@ -105,7 +105,7 @@ RUN git clone https://github.com/OctoMap/octomap.git && \
     git checkout v1.8.1 && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -116,7 +116,7 @@ RUN git clone https://github.com/leethomason/tinyxml2.git && \
     pushd tinyxml2 && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -155,7 +155,7 @@ RUN git clone https://github.com/robotology-dependencies/tinyxml.git && \
     pushd tinyxml && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -166,7 +166,7 @@ RUN git clone https://github.com/ros/urdfdom_headers.git && \
     pushd urdfdom_headers && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -177,7 +177,7 @@ RUN git clone https://github.com/ros/console_bridge.git && \
     pushd console_bridge && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -188,7 +188,7 @@ RUN git clone https://github.com/ros/urdfdom.git && \
     pushd urdfdom && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install -j10 && \
     popd && \
     popd && \
@@ -205,7 +205,7 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
     sed -i '36i\ \ \ \ CXX_EXTENSIONS NO' CMakeLists.txt && \
     mkdir build && \
     pushd build && \
-    cmake .. && \
+    cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
     make install && \
     popd && \
     popd && \
@@ -235,6 +235,7 @@ RUN pushd grpc && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON \
           -DgRPC_BUILD_TESTS=OFF \
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
           ../.. && \
     make -j3 && \
     make install && \
@@ -248,7 +249,7 @@ RUN git clone https://github.com/google/googletest.git benchmark/googletest
 RUN pushd benchmark && \
     mkdir build && \
     pushd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && \
     make install && \
     popd && \
     popd
