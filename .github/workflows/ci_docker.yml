@@ -1,0 +1,26 @@
+name: CI Docker
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  test:
+    name: Ubuntu CI
+    runs-on: ubuntu-latest
+    container: keenon/diffdart:test_base
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Build
+        run: mkdir build &&
+          cd build &&
+          cmake .. -DCMAKE_BUILD_TYPE=Release &&
+          make tests -j2
+      - name: Run tests
+        run: cd nimblephysics/build &&
+          ctest -T Test
