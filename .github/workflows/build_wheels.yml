@@ -9,6 +9,16 @@ jobs:
     strategy:
       matrix:
         python-version: ["pypy-3.6", "pypy-3.7", "pypy-3.8"]
+        include:
+          - python-version: pypy-3.6
+            PYTHON_VERSION_CODE: cp36-36m
+            PYTHON_VERSION_NUMBER: 3.6
+          - python-version: pypy-3.7
+            PYTHON_VERSION_CODE: cp37-37m
+            PYTHON_VERSION_NUMBER: 3.7
+          - python-version: pypy-3.8
+            PYTHON_VERSION_CODE: cp38-38
+            PYTHON_VERSION_NUMBER: 3.8
     name: Manylinux wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
@@ -18,6 +28,11 @@ jobs:
           VER=$(cat ./VERSION.txt)
           echo "VERSION=$VER"
           echo "VERSION=$VER" >> $GITHUB_ENV
+      - name: Test environment
+        run: |
+          echo "VERSION=${{ env.version }}"
+          echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
+          echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Setup python
         uses: actions/setup-python@v2
         with:
@@ -35,10 +50,10 @@ jobs:
           make install -j2
       - name: Build wheel
         run: |
-          NO_PYTHON_ARGS=YES python setup.py sdist bdist_wheel
-          python -m auditwheel repair dist/nimblephysics-${{ env.version }}-${{ matrix.python-version }}-linux_x86_64.whl
+          NO_PYTHON_ARGS=YES PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }} python setup.py sdist bdist_wheel
+          python -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:
-          name: nimblephysics-${{ env.version }}-${{ matrix.python-version }}-manylinux
-          path: /nimblephysics/wheelhouse/nimblephysics-${{ env.version }}-${{ matrix.python-version }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux
+          path: /nimblephysics/wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl

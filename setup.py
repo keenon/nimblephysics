@@ -39,18 +39,18 @@ class CMakeBuild(build_ext):
     if not extdir.endswith(os.path.sep):
       extdir += os.path.sep
 
-    add_python_args = os.getenv('NO_PYTHON_ARGS', 'NO') == 'NO'
-    print('Add python args: '+str(add_python_args))
+    add_python_path_args = os.getenv('NO_PYTHON_ARGS', 'NO') == 'NO'
+    print('Add python path args: '+str(add_python_path_args))
 
     cmake_args = []
-    if add_python_args:
-      cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
-                    '-DPYTHON_EXECUTABLE:FILEPATH=' + sys.executable]
-      # Set our Python version, default to 3.8
-      cmake_args += ['-DDARTPY_PYTHON_VERSION:STRING=' +
-                     os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
-      cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
-                     os.getenv('PYTHON_VERSION_NUMBER', '3.8')]
+    # Set our Python version, default to 3.6
+    cmake_args += ['-DDARTPY_PYTHON_VERSION:STRING=' +
+                   os.getenv('PYTHON_VERSION_NUMBER', '3.6')]
+    cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
+                   os.getenv('PYTHON_VERSION_NUMBER', '3.6')]
+    if add_python_path_args:
+      cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                     '-DPYTHON_EXECUTABLE:FILEPATH=' + sys.executable]
 
     # TODO: We include debug info in our released binaries, because it makes
     # it easier to profile and debug in the wild, which is more valuable than
@@ -72,7 +72,7 @@ class CMakeBuild(build_ext):
     else:
       cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
       # We need this on the manylinux2010 Docker images to find the correct Python
-      if platform.system() == 'Linux' and add_python_args:
+      if platform.system() == 'Linux' and add_python_path_args:
         # Use ENV vars, and default to 3.8 if we don't specify
         PYTHON_INCLUDE_DIR = os.getenv(
             'PYTHON_INCLUDE', '/opt/python/cp38-cp38/include/python3.8/')
