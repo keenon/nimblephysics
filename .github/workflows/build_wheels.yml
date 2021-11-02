@@ -9,13 +9,14 @@ jobs:
     strategy:
       matrix:
         python-version: ["pypy-3.6", "pypy-3.7", "pypy-3.8", "pypy-3.9"]
-    name: Python ${{ matrix.python-version }} sample
+    name: Manylinux wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
       - name: Set variables
         run: |
-          VER=$(cat VERSION)
+          VER=$(cat ./VERSION.txt)
+          echo "VERSION=$VER"
           echo "VERSION=$VER" >> $GITHUB_ENV
       - name: Setup python
         uses: actions/setup-python@v2
@@ -23,11 +24,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: Install Pybind11 for this Python version
-        run: git clone https://github.com/pybind/pybind11.git &&
-          pushd pybind11 &&
-          mkdir build &&
-          pushd build &&
-          cmake .. &&
+        run: |
+          git clone https://github.com/pybind/pybind11.git
+          pushd pybind11
+          mkdir build
+          pushd build
+          cmake ..
           make install -j2
       - name: Install pytest and auditwheel
         run: python -m pip install pytest auditwheel
