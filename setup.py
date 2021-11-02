@@ -48,9 +48,8 @@ class CMakeBuild(build_ext):
                    os.getenv('PYTHON_VERSION_NUMBER', '3.6')]
     cmake_args += ['-DPYBIND11_PYTHON_VERSION:STRING=' +
                    os.getenv('PYTHON_VERSION_NUMBER', '3.6')]
-    if add_python_path_args:
-      cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
-                     '-DPYTHON_EXECUTABLE:FILEPATH=' + sys.executable]
+    cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                   '-DPYTHON_EXECUTABLE:FILEPATH=' + sys.executable]
 
     # TODO: We include debug info in our released binaries, because it makes
     # it easier to profile and debug in the wild, which is more valuable than
