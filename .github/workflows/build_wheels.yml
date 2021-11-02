@@ -8,7 +8,7 @@ jobs:
     container: keenon/diffdart:base
     strategy:
       matrix:
-        python-version: ["pypy-3.6", "pypy-3.7", "pypy-3.8", "pypy-3.9"]
+        python-version: ["pypy-3.6", "pypy-3.7", "pypy-3.8"]
     name: Manylinux wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
