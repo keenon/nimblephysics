@@ -20,6 +20,7 @@ void VectorLog::record(long time, Eigen::VectorXs val)
   mObservations.emplace_back(time, val);
 }
 
+// start = current - mInferenceHorizon
 Eigen::MatrixXs VectorLog::getValues(long start, int steps, long millisPerStep)
 {
   Eigen::MatrixXs observations = Eigen::MatrixXs::Zero(mDim, steps);
@@ -51,6 +52,7 @@ Eigen::MatrixXs VectorLog::getValues(long start, int steps, long millisPerStep)
     }
   }
   // Sweep the last cursor value forward to the end of the block
+  // Which may cause even the action has been taken nothing will affect
   while (cursorStep < steps)
   {
     observations.col(cursorStep) = cursorValue;
@@ -58,6 +60,40 @@ Eigen::MatrixXs VectorLog::getValues(long start, int steps, long millisPerStep)
   }
 
   return observations;
+}
+// Assmue there are enough data prior to a particular time stamp
+Eigen::MatrixXs VectorLog::getRecentValuesBefore(long time, int steps)
+{
+  Eigen::MatrixXs observations = Eigen::MatrixXs::Zero(mDim,steps);
+  int cnt = 0;
+  for(int i=mObservations.size()-1;i>=0;i--)
+  {
+    if(mObservations[i].time<time)
+    {
+      cnt++;
+      observations.col(steps-cnt) = mObservations[i].value;
+      if(cnt >= steps)
+        break;
+    }
+  }
+  return observations;
+}
+
+int VectorLog::availableStepsBefore(long time)
+{
+  if(time - mStartTime<0)
+  {
+    return -1;
+  }
+  for(int i= mObservations.size();i>0;i--)
+  {
+    if(mObservations[i-1].time<time)
+    {
+      return i;
+    }
+  }
+  // Should not reach here just to make compiler happy
+  return 0;
 }
 
 long VectorLog::availableHistoryBefore(long time)
