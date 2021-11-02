@@ -27,9 +27,13 @@ public:
 
   Eigen::MatrixXs getValues(long start, int steps, long millisPerStep);
 
+  Eigen::MatrixXs getRecentValuesBefore(long time, int steps);
+
   void discardBefore(long time);
 
   long availableHistoryBefore(long time);
+
+  int availableStepsBefore(long time);
 
 protected:
   int mDim;

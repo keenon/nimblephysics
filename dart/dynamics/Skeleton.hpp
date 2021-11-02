@@ -820,13 +820,29 @@ public:
   /// Returns the size of the getMasses() vector
   std::size_t getLinkMassesDims();
 
+  // Get link coms using mu
+  Eigen::VectorXs getLinkMUs();
+
+  // Get Beta Related
+  Eigen::VectorXs getLinkBetas();
+
+  Eigen::Vector3s getLinkBetaIndex(size_t index);
+
+  s_t getLinkMUIndex(size_t index);
+
   // This gets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together
   Eigen::VectorXs getLinkCOMs();
 
+  // This gets particular center-of-mass vectors of a body node
+  Eigen::Vector3s getLinkCOMIndex(size_t index);
+
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   Eigen::VectorXs getLinkMOIs();
+
+  // This get particular moment of inertia of a body node
+  Eigen::Vector6s getLinkMOIIndex(size_t index);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
@@ -850,13 +866,25 @@ public:
   // Sets the lower limits of all the joints from a single vector
   void setVelocityLowerLimits(Eigen::VectorXs limits);
 
+  void setLinkMUs(Eigen::VectorXs mus);
+  // This will set COM of a particular link according to mu
+  void setLinkMUIndex(s_t mu, size_t index);
+
+  void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
+
+  void setLinkBetas(Eigen::VectorXs betas);
+
   // This sets all the inertia center-of-mass vectors for all the links in this
   // skeleton concatenated together
   void setLinkCOMs(Eigen::VectorXs coms);
 
+  void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
+
   // This sets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   void setLinkMOIs(Eigen::VectorXs mois);
+
+  void setLinkMOIIndex(Eigen::Vector6s moi, size_t index);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
@@ -1361,10 +1389,6 @@ public:
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
 
-  /// This solves a simple inverse dynamics problem to get forces we need to
-  /// apply to arrive at "nextVel" at the next timestep.
-  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
-
   struct ContactInverseDynamicsResult
   {
     dynamics::Skeleton* skel;
@@ -1381,6 +1405,8 @@ public:
     /// solution differ from the goal solution.
     s_t sumError();
   };
+
+  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
 
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired
@@ -1663,16 +1689,16 @@ public:
       const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
-
+  
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
-  math::Jacobian getWorldPositionJacobian(
-      const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const;
+  math::Jacobian getWorldPositionJacobian(const JacobianNode* _node,
+                                          const Eigen::Vector3s& _localOffset) const;
 
   // Documentation inherited
   math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node,
+      const JacobianNode* _node, 
       const Eigen::Vector3s& _localOffset,
       bool useRidders = true);
 
@@ -1818,21 +1844,21 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
-
+  
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
-
+  
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
-  // Get spring coefficients
+  //Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
 
-  // Get rest positions
+  //Get rest positions
   Eigen::VectorXs getRestPositions();
 
-  // Get Spring Forces
-  Eigen::VectorXs getSpringForce();
+  //Get Spring Forces
+  Eigen::VectorXs getSpringForce(); 
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;

@@ -3742,8 +3742,11 @@ inline void setCcdDefaultSettings(ccd_t& ccd)
 /// cacheing
 void clearCcdCache()
 {
-  _ccdDirCache.clear();
-  _ccdPosCache.clear();
+  const std::thread::id tid = std::this_thread::get_id();
+  _ccdDirCache[tid].clear();
+  _ccdPosCache[tid].clear();
+  // _ccdDirCache.clear();
+  // _ccdPosCache.clear();
 }
 
 /*

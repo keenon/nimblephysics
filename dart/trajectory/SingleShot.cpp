@@ -192,6 +192,13 @@ void SingleShot::unflatten(
 }
 
 //==============================================================================
+void SingleShot::resetDirty()
+{
+  mRolloutCacheDirty = true;
+  mSnapshotsCacheDirty = true;
+}
+
+//==============================================================================
 /// This gets the fixed upper bounds for a flat vector, used during
 /// optimization
 void SingleShot::getUpperBounds(

@@ -158,11 +158,15 @@ public:
   /// Get all the bodies attached to all the skeletons in this world
   std::vector<dynamics::BodyNode*> getAllBodyNodes();
 
+  dynamics::BodyNode* getBodyNodeIndex(size_t index);
+
   /// Get the number of skeletons
   std::size_t getNumSkeletons() const;
 
   /// Add a skeleton to this world
-  std::string addSkeleton(const dynamics::SkeletonPtr& _skeleton);
+  std::string addSkeleton(
+      const dynamics::SkeletonPtr& _skeleton
+    );
 
   /// Remove a skeleton from this world
   void removeSkeleton(const dynamics::SkeletonPtr& _skeleton);
@@ -244,6 +248,10 @@ public:
   /// single vector
   Eigen::VectorXs getMasses();
 
+  //Eigen::VectorXs getLinkMasses();
+
+  size_t getLinkMassesDims();
+
   // This gives the vector of force upper limits for all the DOFs in this
   // world
   Eigen::VectorXs getControlForceUpperLimits();
@@ -278,15 +286,32 @@ public:
 
   // This gets all the inertia matrices for all the links in all the skeletons
   // in the world mapped into a flat vector.
+
+  Eigen::VectorXs getLinkMUs();
+
+  s_t getLinkMUIndex(size_t index);
+
   Eigen::VectorXs getLinkCOMs();
+
+  Eigen::Vector3s getLinkCOMIndex(size_t index);
 
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // all the skeletons in this world concatenated together
   Eigen::VectorXs getLinkMOIs();
 
+  Eigen::Vector6s getLinkMOIIndex(size_t index);
+
+  // This gets all links betas which is used for COM SSID
+
+  Eigen::VectorXs getLinkBetas();
+
+  Eigen::Vector3s getLinkBetaIndex(size_t index);
+
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
+
+  s_t getLinkMassIndex(size_t index);
 
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
@@ -325,6 +350,26 @@ public:
   // This sets all the masses for all the registered bodies in the world
   void setMasses(Eigen::VectorXs masses);
 
+  void setLinkMasses(Eigen::VectorXs masses);
+
+  void setLinkMassIndex(s_t mass, size_t index);
+
+  void setLinkCOMs(Eigen::VectorXs coms);
+  
+  void setLinkMOIs(Eigen::VectorXs mois);
+
+  void setLinkMUs(Eigen::VectorXs mus);
+
+  void setLinkMUIndex(s_t mu, size_t index);
+
+  void setLinkBetas(Eigen::VectorXs betas);
+
+  void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
+
+  void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
+
+  void setLinkMOIIndex(Eigen::Vector6s com, size_t index);
+
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces
   Eigen::VectorXs getCoriolisAndGravityForces();
@@ -340,10 +385,7 @@ public:
   /// block-diagonal concatenation of each skeleton's inverse mass matrix.
   Eigen::MatrixXs getInvMassMatrix();
 
-  // This sets all the positions of the joints to within their limit range, if
-  // they're currently outside it.
   void clampPositionsToLimits();
-
   //--------------------------------------------------------------------------
   // High Level ("Reinforcement Learning style") API
   //
@@ -570,6 +612,8 @@ public:
   void setSlowDebugResultsAgainstFD(bool slowDebug);
 
   bool getSlowDebugResultsAgainstFD();
+
+  void DisableWrtMass();
 
 protected:
   /// If this is true, we use finite-differencing to compute all of the

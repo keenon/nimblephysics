@@ -444,6 +444,12 @@ int Problem::getConstraintDim() const
 }
 
 //==============================================================================
+void Problem::resetDirty()
+{
+  mRolloutCacheDirty = true;
+}
+
+//==============================================================================
 /// This computes the values of the constraints, assuming that the constraint
 /// vector being passed in is only the size of mConstraints
 void Problem::computeConstraints(
