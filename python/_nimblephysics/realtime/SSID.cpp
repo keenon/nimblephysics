@@ -75,7 +75,8 @@ void SSID(py::module& m)
       .def(
           "registerSensorsNow",
           &dart::realtime::SSID::registerSensorsNow,
-          ::py::arg("sensors"))
+          ::py::arg("sensors"),
+          ::py::arg("sensor_id"))
       .def(
           "registerControlsNow",
           &dart::realtime::SSID::registerControlsNow,
@@ -84,7 +85,8 @@ void SSID(py::module& m)
           "registerSensors",
           &dart::realtime::SSID::registerSensors,
           ::py::arg("now"),
-          ::py::arg("sensors"))
+          ::py::arg("sensors"),
+          ::py::arg("sensor_id"))
       .def(
           "registerControls",
           &dart::realtime::SSID::registerControls,
