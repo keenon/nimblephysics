@@ -53,7 +53,7 @@ jobs:
           pushd pybind11
           mkdir build
           pushd build
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake .. -DPYBIND11_FINDPYTHON=ON -DPython_ROOT_DIR=${{ matrix.PYTHON_PATH }}
+          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
         env:
           PYTHON: ${{ matrix.PYTHON }}
