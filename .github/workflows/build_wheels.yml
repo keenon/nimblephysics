@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   build-linux:
-    name: Build and Publish Linux Wheels for Python ${{ matrix.python-version }}
+    name: Linux Python ${{ matrix.python-version }} - Build and Publish Wheels
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
     strategy:
@@ -91,7 +91,7 @@ jobs:
           packages_dir: wheelhouse/
           skip_existing: true
   build-mac:
-    name: Build and Publish Mac OSX Wheels for Python ${{ matrix.python-version }}
+    name: Mac OSX Python ${{ matrix.python-version }} - Build and Publish Wheels
     runs-on: macos-10.15
     strategy:
       matrix:
