@@ -1,11 +1,10 @@
-name: Build Wheels
+name: Build Wheels OSX
 
 on: workflow_dispatch
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: keenon/diffdart:base
+    runs-on: osx-latest
     strategy:
       matrix:
         python-version: ["3.6", "3.7", "3.8", "3.9"]
@@ -38,10 +37,15 @@ jobs:
             PATH_PATH: /opt/python/cp39-cp39/bin/
             PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
             PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
-    name: Manylinux wheel for Python ${{ matrix.python-version }}
+    name: OSX wheel for Python ${{ matrix.python-version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
+      - name: Select Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
       - name: Set variables
         run: |
           VER=$(cat ./VERSION.txt)
@@ -54,32 +58,14 @@ jobs:
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Install pytest, wheel and auditwheel
         run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel
-      - name: Install Pybind11 for this Python version
-        run: |
-          git clone https://github.com/pybind/pybind11.git
-          pushd pybind11
-          mkdir build
-          pushd build
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
-        env:
-          PYTHON: ${{ matrix.PYTHON }}
-          PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
-          PYTHON_INCLUDE: ${{ matrix.PYTHON_INCLUDE }}
-          PYTHON_LIB: ${{ matrix.PYTHON_LIB }}
-          PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
+      - name: Install dependencies
+        run: ci/mac/install_dependencies.sh
       - name: Build wheel
         run: |
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl
-        env:
-          PYTHON: ${{ matrix.PYTHON }}
-          PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
-          PYTHON_INCLUDE: ${{ matrix.PYTHON_INCLUDE }}
-          PYTHON_LIB: ${{ matrix.PYTHON_LIB }}
-          PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
+          cd ci/mac
+          ./build_wheels.sh
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:
-          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-          path: /nimblephysics/wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
