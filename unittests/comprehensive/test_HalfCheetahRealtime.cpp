@@ -62,7 +62,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-//#define ALL_TESTS
+// #define ALL_TESTS
 #define NO_VIS
 
 using namespace dart;
@@ -402,6 +402,255 @@ TEST(REALTIME, HALF_CHEETAH_PLOT)
 
 #ifdef ALL_TESTS
 
+TEST(REALTIME, CARTPOLE_MPC)
+{
+  ////////////////////////////////////////////////////////////
+  // Create a half Cheetah example
+  ////////////////////////////////////////////////////////////
+
+  // World
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+      "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
+
+  
+  Eigen::VectorXs forceLimits
+    = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
+  
+  ////////////////////////////////////////////////////////////
+  // Set up a realtime world and controller
+  ////////////////////////////////////////////////////////////
+
+  // 100 fps
+  world->setTimeStep(1.0 / 1000);
+
+  // 300 timesteps
+  int millisPerTimestep = world->getTimeStep() * 1000;
+  int planningHorizonMillis = 100 * millisPerTimestep;
+
+  // Create target
+
+  s_t target_x = 2.0;
+  s_t target_y = 0.5;
+
+  TrajectoryLossFn loss = [&target_x, &target_y](const trajectory::TrajectoryRollout* rollout) {
+        const Eigen::VectorXs lastPos
+            = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
+
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
+
+        return diffX * diffX + diffY * diffY;
+      };
+
+  TrajectoryLossFnAndGrad lossGrad =
+      [&target_x,&target_y](
+          const TrajectoryRollout* rollout,
+          TrajectoryRollout* gradWrtRollout // OUT
+      ) {
+        gradWrtRollout->getPoses().setZero();
+        gradWrtRollout->getVels().setZero();
+        gradWrtRollout->getControlForces().setZero();
+        int steps = rollout->getPosesConst().cols();
+        const Eigen::VectorXs lastPos
+            = rollout->getPosesConst().col(steps-1);
+
+        gradWrtRollout->getPoses()(0, steps-1)
+              = 2 * (rollout->getPosesConst()(0, steps-1) - target_x);
+        
+        gradWrtRollout->getPoses()(1, steps-1) 
+              = 2 * (rollout->getPosesConst()(1, steps-1) - target_y);
+        
+        
+        s_t sum = 0.0;
+        sum += (lastPos(0) - target_x)*(lastPos(0) - target_x);
+        sum += (lastPos(1) - target_y)*(lastPos(1) - target_y);
+        return sum;
+      };
+
+  int inferenceSteps = 5;
+  size_t mass_idx = 5;
+  int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
+  std::shared_ptr<simulation::World> ssidWorld = world->clone();
+  
+  // Need to get a body node which is useful for SSID
+  ssidWorld->tuneMass(
+    world->getBodyNodeIndex(mass_idx),
+    WrtMassBodyNodeEntryType::INERTIA_MASS,
+    Eigen::VectorXs::Ones(1) * 5.0,
+    Eigen::VectorXs::Ones(1) * 0.2);
+  
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(
+      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
+  
+  std::mutex lock;
+  ssid.attachMutex(lock);
+  
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long){
+      return sensors.col(0);
+    });
+
+  world->clearTunableMassThisInstance();
+  MPCLocal mpcLocal = MPCLocal(
+      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
+  mpcLocal.setSilent(true);
+  
+  mpcLocal.setMaxIterations(3);
+
+  mpcLocal.setEnableLineSearch(false);
+  mpcLocal.setEnableOptimizationGuards(true);
+
+  MPCLocal& mpcRemote = mpcLocal;
+  
+  bool init_flag = true;
+  float weight = 0;
+  float stddev = 10;
+  float gamma  = 0.9;
+  ssid.registerInferListener([&](long time,
+                                 Eigen::VectorXs pos,
+                                 Eigen::VectorXs vel,
+                                 Eigen::VectorXs mass,
+                                 long) {
+    mass(0) = 1.0;
+    mpcRemote.recordGroundTruthState(time, pos, vel, mass);
+    mpcRemote.setMasschange(mass(0));
+    if(!init_flag)
+    {
+      s_t old_mass = world->getLinkMassIndex(mass_idx);
+      weight = exp(-(mass(0)-old_mass)*(mass(0)-old_mass)/stddev);
+      world->setLinkMassIndex((1-weight)*old_mass+weight*mass(0),mass_idx);
+    }
+    else
+    {
+      world->setLinkMassIndex(mass(0),mass_idx);
+      init_flag = false;
+    }
+    if(stddev > 1)
+      stddev*= gamma;
+  });
+
+  std::function<Eigen::VectorXs()> getControlForces = [&]() {
+    Eigen::VectorXs forces = mpcRemote.getControlForceNow();
+    // ssid.registerControlsNow(forces);
+    return forces;
+  };
+  std::function<void(Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs)>
+      recordState
+      = [&](Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass) {
+          mpcRemote.recordGroundTruthStateNow(pos, vel, mass);
+        };
+  
+  std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
+  GUIWebsocketServer server;
+
+  server.createSphere(
+      "goal",
+      0.1,
+      Eigen::Vector3s(target_x, target_y, 0),
+      Eigen::Vector3s(1.0, 0.0, 0.0));
+  server.registerDragListener("goal", [&](Eigen::Vector3s dragTo) {
+    target_x = dragTo(0);
+    dragTo(1) = 0.5;
+    dragTo(2) = 0.0;
+    server.setObjectPosition("goal", dragTo);
+  });
+  std::string key = "mass";
+
+  Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
+
+  float mass = 1.0;
+  float id_mass = 1.0;
+  size_t total_step = 0;
+  realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
+  ssidWorld->setLinkMassIndex(id_mass,mass_idx);
+  world->setLinkMassIndex(id_mass,mass_idx);
+
+  ticker.registerTickListener([&](long now) {
+    Eigen::VectorXs mpcforces = mpcRemote.getControlForce(now);
+    //Eigen::VectorXs mpcforces = 20*Eigen::VectorXs::Random(world->getNumDofs());
+    //mpcforces -= 10*Eigen::VectorXs::Ones(world->getNumDofs());
+    // std::cout<<"Norm of control force: \n"<<mpcforces<<std::endl;
+    realtimeUnderlyingWorld->setControlForces(mpcforces);
+
+    if (server.getKeysDown().count("a"))
+    {
+      Eigen::VectorXs perturbedForces
+          = realtimeUnderlyingWorld->getControlForces();
+      perturbedForces(0) = -15.0;
+      realtimeUnderlyingWorld->setControlForces(perturbedForces);
+    }
+    else if (server.getKeysDown().count("e"))
+    {
+      Eigen::VectorXs perturbedForces
+          = realtimeUnderlyingWorld->getControlForces();
+      perturbedForces(0) = 15.0;
+      realtimeUnderlyingWorld->setControlForces(perturbedForces);
+    }
+    if (server.getKeysDown().count(","))
+    {
+      // Increase mass
+      mass = 3.0;
+      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
+    }
+    else if (server.getKeysDown().count("o"))
+    {
+      // Decrease mass
+      mass = 1.0;
+      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
+    }
+    
+    ssid.registerLock();
+    ssid.registerControls(now, realtimeUnderlyingWorld->getControlForces());
+    ssid.registerSensors(now, realtimeUnderlyingWorld->getPositions(),0);
+    ssid.registerSensors(now, realtimeUnderlyingWorld->getVelocities(),1);
+    ssid.registerUnlock();
+    realtimeUnderlyingWorld->step();
+    id_mass = world->getLinkMassIndex(mass_idx);
+    mpcRemote.recordGroundTruthState(
+        now,
+        realtimeUnderlyingWorld->getPositions(),
+        realtimeUnderlyingWorld->getVelocities(),
+        realtimeUnderlyingWorld->getMasses());
+    if(total_step % 10 == 0)
+    {
+      server.renderWorld(realtimeUnderlyingWorld);
+      server.createText(key,"Current Masses: "+std::to_string(id_mass),Eigen::Vector2i(100,100),Eigen::Vector2i(200,200));
+      total_step = 0;
+    }
+    total_step += 1;
+  });
+
+  mpcRemote.registerReplanningListener(
+      [&](long /* time */,
+          const trajectory::TrajectoryRollout* rollout,
+          long /* duration */) {
+        server.renderTrajectoryLines(world, rollout->getPosesConst());
+      });
+
+  server.registerConnectionListener([&]() {
+    ticker.start();
+    mpcRemote.start();
+    ssid.start();
+  });
+  server.registerShutdownListener([&]() { mpcRemote.stop(); });
+  server.serve(8070);
+  server.blockWhileServing();
+}
+
 TEST(HALF_CHEETAH, FULL_TEST)
 {
   // set precision to 256 bits (double has only 53 bits)
@@ -508,7 +757,7 @@ TEST(HALF_CHEETAH, FULL_TEST)
     {
       i = 0;
     }
-    // world->step();
+    world->step();
     server.renderWorld(world);
   });
 
@@ -518,252 +767,4 @@ TEST(HALF_CHEETAH, FULL_TEST)
   {}
 }
 
-
-TEST(REALTIME, CARTPOLE_MPC)
-{
-  ////////////////////////////////////////////////////////////
-  // Create a half Cheetah example
-  ////////////////////////////////////////////////////////////
-
-  // World
-  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
-      "dart://sample/skel/half_cheetah.skel");
-  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
-  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
-
-  
-  Eigen::VectorXs forceLimits
-    = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
-  forceLimits(0) = 0;
-  forceLimits(1) = 0;
-  world->setControlForceUpperLimits(forceLimits);
-  world->setControlForceLowerLimits(-1 * forceLimits);
-  
-  ////////////////////////////////////////////////////////////
-  // Set up a realtime world and controller
-  ////////////////////////////////////////////////////////////
-
-  // 100 fps
-  world->setTimeStep(1.0 / 1000);
-
-  // 300 timesteps
-  int millisPerTimestep = world->getTimeStep() * 1000;
-  int planningHorizonMillis = 300 * millisPerTimestep;
-
-  // Create target
-
-  s_t target_x = 3.0;
-  s_t target_y = 0.5;
-
-  TrajectoryLossFn loss = [&target_x, &target_y](const trajectory::TrajectoryRollout* rollout) {
-        const Eigen::VectorXs lastPos
-            = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
-
-        s_t diffX = lastPos(0) - target_x;
-        s_t diffY = lastPos(1) - target_y;
-
-        return diffX * diffX + diffY * diffY;
-      };
-
-  TrajectoryLossFnAndGrad lossGrad =
-      [&target_x,&target_y](
-          const TrajectoryRollout* rollout,
-          TrajectoryRollout* gradWrtRollout // OUT
-      ) {
-        gradWrtRollout->getPoses().setZero();
-        gradWrtRollout->getVels().setZero();
-        gradWrtRollout->getControlForces().setZero();
-        int steps = rollout->getPosesConst().cols();
-        const Eigen::VectorXs lastPos
-            = rollout->getPosesConst().col(steps-1);
-
-        gradWrtRollout->getPoses()(0, steps-1)
-              = 2 * (rollout->getPosesConst()(0, steps-1) - target_x);
-        
-        gradWrtRollout->getPoses()(1, steps-1) 
-              = 2 * (rollout->getPosesConst()(1, steps-1) - target_y);
-        
-        
-        s_t sum = 0.0;
-        sum += (lastPos(0) - target_x)*(lastPos(0) - target_x);
-        sum += (lastPos(1) - target_y)*(lastPos(1) - target_y);
-        return sum;
-      };
-
-  int inferenceSteps = 5;
-  size_t mass_idx = 5;
-  int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
-  std::shared_ptr<simulation::World> ssidWorld = world->clone();
-  
-  
-  // Need to get a body node which is useful for SSID
-  ssidWorld->tuneMass(
-    world->getBodyNodeIndex(mass_idx),
-    WrtMassBodyNodeEntryType::INERTIA_MASS,
-    Eigen::VectorXs::Ones(1) * 5.0,
-    Eigen::VectorXs::Ones(1) * 0.2);
-  
-  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
-  sensorDims(0) = world->getNumDofs();
-  sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(
-      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
-  
-  std::mutex lock;
-  ssid.attachMutex(lock);
-  
-  ssid.setInitialPosEstimator(
-      [](Eigen::MatrixXs sensors, long) {
-        return sensors.col(0);
-      });
-  
-  ssid.setInitialVelEstimator(
-    [](Eigen::MatrixXs sensors, long){
-      return sensors.col(0);
-    });
-
-  world->clearTunableMassThisInstance();
-  MPCLocal mpcLocal = MPCLocal(
-      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
-  mpcLocal.setSilent(true);
-  
-  mpcLocal.setMaxIterations(7);
-
-  mpcLocal.setEnableLineSearch(false);
-  mpcLocal.setEnableOptimizationGuards(true);
-
-  MPCLocal& mpcRemote = mpcLocal;
-  
-  bool init_flag = true;
-  float weight = 0;
-  float stddev = 10;
-  float gamma  = 0.9;
-  ssid.registerInferListener([&](long time,
-                                 Eigen::VectorXs pos,
-                                 Eigen::VectorXs vel,
-                                 Eigen::VectorXs mass,
-                                 long) {
-    mpcRemote.recordGroundTruthState(time, pos, vel, mass);
-    mpcRemote.setMasschange(mass(0));
-    if(!init_flag)
-    {
-      s_t old_mass = world->getLinkMassIndex(mass_idx);
-      weight = exp(-(mass(0)-old_mass)*(mass(0)-old_mass)/stddev);
-      world->setLinkMassIndex((1-weight)*old_mass+weight*mass(0),mass_idx);
-    }
-    else
-    {
-      world->setLinkMassIndex(mass(0),mass_idx);
-      init_flag = false;
-    }
-    if(stddev > 1)
-      stddev*= gamma;
-  });
-
-  std::function<Eigen::VectorXs()> getControlForces = [&]() {
-    Eigen::VectorXs forces = mpcRemote.getControlForceNow();
-    // ssid.registerControlsNow(forces);
-    return forces;
-  };
-  std::function<void(Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs)>
-      recordState
-      = [&](Eigen::VectorXs pos, Eigen::VectorXs vel, Eigen::VectorXs mass) {
-          mpcRemote.recordGroundTruthStateNow(pos, vel, mass);
-        };
-  
-  std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
-  GUIWebsocketServer server;
-
-  server.createSphere(
-      "goal",
-      0.1,
-      Eigen::Vector3s(target_x, target_y, 0),
-      Eigen::Vector3s(1.0, 0.0, 0.0));
-  server.registerDragListener("goal", [&](Eigen::Vector3s dragTo) {
-    target_x = dragTo(0);
-    dragTo(1) = 1.0;
-    dragTo(2) = 0.0;
-    server.setObjectPosition("goal", dragTo);
-  });
-  std::string key = "mass";
-
-  Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
-
-  float mass = 2.0;
-  float id_mass = 2.0;
-  size_t total_step = 0;
-  realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
-  ssidWorld->setLinkMassIndex(id_mass,mass_idx);
-  world->setLinkMassIndex(id_mass,mass_idx);
-
-  ticker.registerTickListener([&](long now) {
-    Eigen::VectorXs mpcforces = mpcRemote.getControlForce(now);
-    //Eigen::VectorXs mpcforces = 20*Eigen::VectorXs::Random(world->getNumDofs());
-    //mpcforces -= 10*Eigen::VectorXs::Ones(world->getNumDofs());
-    realtimeUnderlyingWorld->setControlForces(mpcforces);
-
-    if (server.getKeysDown().count("a"))
-    {
-      Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = -15.0;
-      realtimeUnderlyingWorld->setControlForces(perturbedForces);
-    }
-    else if (server.getKeysDown().count("e"))
-    {
-      Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = 15.0;
-      realtimeUnderlyingWorld->setControlForces(perturbedForces);
-    }
-    if (server.getKeysDown().count(","))
-    {
-      // Increase mass
-      mass = 3.0;
-      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
-    }
-    else if (server.getKeysDown().count("o"))
-    {
-      // Decrease mass
-      mass = 1.0;
-      realtimeUnderlyingWorld->setLinkMassIndex(mass,mass_idx);
-    }
-    
-    ssid.registerLock();
-    ssid.registerControls(now, realtimeUnderlyingWorld->getControlForces());
-    ssid.registerSensors(now, realtimeUnderlyingWorld->getPositions(),0);
-    ssid.registerSensors(now, realtimeUnderlyingWorld->getVelocities(),1);
-    ssid.registerUnlock();
-    realtimeUnderlyingWorld->step();
-    id_mass = world->getLinkMassIndex(mass_idx);
-    mpcRemote.recordGroundTruthState(
-        now,
-        realtimeUnderlyingWorld->getPositions(),
-        realtimeUnderlyingWorld->getVelocities(),
-        realtimeUnderlyingWorld->getMasses());
-    if(total_step % 10 == 0)
-    {
-      server.renderWorld(realtimeUnderlyingWorld);
-      server.createText(key,"Current Masses: "+std::to_string(id_mass),Eigen::Vector2i(100,100),Eigen::Vector2i(200,200));
-      total_step = 0;
-    }
-    total_step += 1;
-  });
-
-  mpcRemote.registerReplanningListener(
-      [&](long /* time */,
-          const trajectory::TrajectoryRollout* rollout,
-          long /* duration */) {
-        server.renderTrajectoryLines(world, rollout->getPosesConst());
-      });
-
-  server.registerConnectionListener([&]() {
-    ticker.start();
-    mpcRemote.start();
-    //ssid.start();
-  });
-  server.registerShutdownListener([&]() { mpcRemote.stop(); });
-  server.serve(8070);
-  server.blockWhileServing();
-}
 #endif
