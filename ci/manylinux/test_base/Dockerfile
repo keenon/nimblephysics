@@ -1,11 +1,5 @@
 FROM keenon/diffdart:base
 
-# This is allowed to be empty string, but if it's not it must be prefixed by
-ARG VERSION
-ARG GIT_HASH
-
-COPY . /nimblephysics
-
 # Build Python 3.8
 
 ENV PYTHON="/opt/python/cp38-cp38/bin/python3.8"
@@ -27,12 +21,3 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
-RUN mkdir /Testing
-RUN cd nimblephysics && \
-    mkdir build && \
-    cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make tests -j2
-RUN cd nimblephysics/build && \
-    ctest -T Test; exit 0
-RUN mv /nimblephysics/build/Testing /Testing

@@ -1,0 +1,7 @@
+build/
+.vscode
+.mypi_cache
+.devcontainer
+dist/
+PerfUtils/
+wiki_resources/
