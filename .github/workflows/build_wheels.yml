@@ -139,7 +139,14 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           path: wheelhouse
-      - name: Display structure of downloaded files
+      - name: Display structure of downloaded files before flattening
+        run: ls -R
+        working-directory: wheelhouse
+      - name: Flatten files
+        run: |
+          find wheelhouse -type f -exec mv {} wheelhouse \;
+          find wheelhouse -depth -type d -exec rmdir --ignore-fail-on-non-empty {} \;
+      - name: Display structure of downloaded files after flattening
         run: ls -R
         working-directory: wheelhouse
       - name: Publish package to PyPI
