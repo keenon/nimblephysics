@@ -58,7 +58,6 @@
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
-#include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 
@@ -2057,19 +2056,19 @@ Eigen::MatrixXs Skeleton::getJacobianOfDampSpring(neural::WithRespectTo* wrt)
   size_t nDofs = getNumDofs();
   Eigen::MatrixXs damp_coeff = getDampingCoeffVector().asDiagonal();
   Eigen::MatrixXs spring_stiff = getSpringStiffVector().asDiagonal();
-  if (wrt == neural::WithRespectTo::VELOCITY)
+  if(wrt==neural::WithRespectTo::VELOCITY)
   {
-    Eigen::MatrixXs jacobian = damp_coeff + dt * spring_stiff;
+    Eigen::MatrixXs jacobian = damp_coeff + dt*spring_stiff;
     return jacobian;
   }
-  else if (wrt == neural::WithRespectTo::POSITION)
+  else if(wrt==neural::WithRespectTo::POSITION)
   {
     Eigen::MatrixXs jacobian = spring_stiff;
     return jacobian;
   }
   else
   {
-    Eigen::MatrixXs jacobian = Eigen::MatrixXs::Zero(nDofs, nDofs);
+    Eigen::MatrixXs jacobian = Eigen::MatrixXs::Zero(nDofs,nDofs);
     return jacobian;
   }
 }
@@ -2083,12 +2082,11 @@ Eigen::MatrixXs Skeleton::getJacobianOfFD(neural::WithRespectTo* wrt)
   const auto& spring_force = getSpringForce();
   const auto& damping_force = getDampingForce();
 
-  const auto& DMinv_Dp
-      = getJacobianOfMinv(tau - Cg - damping_force - spring_force, wrt);
+  const auto& DMinv_Dp = getJacobianOfMinv(tau - Cg - damping_force - spring_force, wrt);
   const auto& DC_Dp = getJacobianOfC(wrt);
   const auto& D_damp_spring = getJacobianOfDampSpring(wrt);
 
-  return DMinv_Dp - Minv * DC_Dp - Minv * D_damp_spring;
+  return DMinv_Dp - Minv * DC_Dp - Minv*D_damp_spring;
 }
 
 //==============================================================================
@@ -2103,8 +2101,7 @@ Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
-    Eigen::MatrixXs dM = getJacobianOfMinv(
-        dt * (tau - C - getDampingForce() - getSpringForce()), wrt);
+    Eigen::MatrixXs dM = getJacobianOfMinv(dt * (tau - C - getDampingForce()-getSpringForce()), wrt);
     return dM - Minv * dt * dC;
   }
   else
@@ -3022,6 +3019,50 @@ std::size_t Skeleton::getLinkMassesDims()
 }
 
 //==============================================================================
+s_t Skeleton::getLinkMUIndex(size_t index)
+{
+  Eigen::Vector3s com = getLinkCOMIndex(index);
+  Eigen::Vector3s beta = getBodyNode(index)->getBeta();
+  if(beta(0)!=0)
+    return com(0)/beta(0);
+  else if(beta(1)!=0)
+    return com(1)/beta(1);
+  else
+    return com(2)/beta(2);
+  // Code should not reach here only to please the compiler
+  return 0;
+}
+
+Eigen::VectorXs Skeleton::getLinkMUs()
+{
+  Eigen::VectorXs mus = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for(size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    mus(i) = getLinkMUIndex(i);
+  }
+  return mus;
+}
+
+//==============================================================================
+Eigen::Vector3s Skeleton::getLinkBetaIndex(size_t index)
+{
+  Eigen::Vector3s beta = getBodyNode(index)->getBeta();
+  return beta;
+}
+
+Eigen::VectorXs Skeleton::getLinkBetas()
+{
+  Eigen::VectorXs betas = Eigen::VectorXs::Zero(3*getNumBodyNodes());
+  size_t cursor = 0;
+  for (size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s beta = getBodyNode(i)->getBeta();
+    betas.segment(cursor,3) = beta;
+    cursor += 3;
+  }
+  return betas;
+}
+//==============================================================================
 Eigen::VectorXs Skeleton::getLinkCOMs()
 {
   Eigen::VectorXs inertias = Eigen::VectorXs::Zero(getLinkCOMDims());
@@ -3029,11 +3070,21 @@ Eigen::VectorXs Skeleton::getLinkCOMs()
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    inertias(cursor++) = inertia.COM_X;
-    inertias(cursor++) = inertia.COM_Y;
-    inertias(cursor++) = inertia.COM_Z;
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_X);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_Y);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::COM_Z);
   }
   return inertias;
+}
+
+Eigen::Vector3s Skeleton::getLinkCOMIndex(size_t index)
+{
+  Eigen::Vector3s mass_center = Eigen::Vector3s::Zero();
+  const Inertia& node_inertia = getBodyNode(index)->getInertia();
+  mass_center(0) = node_inertia.getParameter(dynamics::Inertia::Param::COM_X);
+  mass_center(1) = node_inertia.getParameter(dynamics::Inertia::Param::COM_Y);
+  mass_center(2) = node_inertia.getParameter(dynamics::Inertia::Param::COM_Z);
+  return mass_center;
 }
 
 //==============================================================================
@@ -3044,14 +3095,27 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    inertias(cursor++) = inertia.I_XX;
-    inertias(cursor++) = inertia.I_YY;
-    inertias(cursor++) = inertia.I_ZZ;
-    inertias(cursor++) = inertia.I_XY;
-    inertias(cursor++) = inertia.I_XZ;
-    inertias(cursor++) = inertia.I_YZ;
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XX);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_YY);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_ZZ);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XY);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XZ);
+    inertias(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_YZ);
   }
   return inertias;
+}
+
+Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
+{
+  Eigen::Vector6s inertia = Eigen::Vector6s::Zero();
+  const Inertia& node_inertia = getBodyNode(index)->getInertia();
+  inertia(0) = node_inertia.getParameter(dynamics::Inertia::Param::I_XX);
+  inertia(1) = node_inertia.getParameter(dynamics::Inertia::Param::I_YY);
+  inertia(2) = node_inertia.getParameter(dynamics::Inertia::Param::I_ZZ);
+  inertia(3) = node_inertia.getParameter(dynamics::Inertia::Param::I_XY);
+  inertia(4) = node_inertia.getParameter(dynamics::Inertia::Param::I_XZ);
+  inertia(5) = node_inertia.getParameter(dynamics::Inertia::Param::I_YZ);
+  return inertia;
 }
 
 //==============================================================================
@@ -3120,28 +3184,90 @@ void Skeleton::setVelocityLowerLimits(Eigen::VectorXs limits)
 }
 
 //==============================================================================
+void Skeleton::setLinkMUIndex(s_t mu, size_t index)
+{
+  Eigen::Vector3s com = Eigen::Vector3s::Zero();
+  Eigen::Vector3s node_beta = getBodyNode(index)->getBeta();
+  com(0) = node_beta(0)*mu;
+  com(1) = node_beta(1)*mu;
+  com(2) = node_beta(2)*mu;
+  setLinkCOMIndex(com,index);
+}
+
+void Skeleton::setLinkMUs(Eigen::VectorXs mus)
+{
+  assert(mus.size() == getNumBodyNodes());
+  for(size_t i=0; i< getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s com = Eigen::Vector3s::Zero();
+    Eigen::Vector3s beta = getBodyNode(i)->getBeta();
+    com(0) = beta(0)*mus(i);
+    com(1) = beta(1)*mus(i);
+    com(2) = beta(2)*mus(i);
+    setLinkCOMIndex(com,i);
+  }
+}
+
+//==============================================================================
+
+void Skeleton::setLinkBetaIndex(Eigen::Vector3s beta, size_t index)
+{
+  getBodyNode(index)->setBeta(beta);
+}
+
+void Skeleton::setLinkBetas(Eigen::VectorXs betas)
+{
+  size_t cursor = 0;
+  for(size_t i=0; i < getNumBodyNodes(); i++)
+  {
+    getBodyNode(i)->setBeta(betas.segment(cursor,3));
+    cursor += 3;
+  }
+}
+
+//==============================================================================
 void Skeleton::setLinkCOMs(Eigen::VectorXs coms)
 {
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < getNumBodyNodes(); i++)
   {
     const Inertia& inertia = getBodyNode(i)->getInertia();
-    s_t COM_X = coms(cursor++);
-    s_t COM_Y = coms(cursor++);
-    s_t COM_Z = coms(cursor++);
+    s_t com_x = coms(cursor++);
+    s_t com_y = coms(cursor++);
+    s_t com_z = coms(cursor++);
     Inertia newInertia(
-        inertia.MASS,
-        COM_X,
-        COM_Y,
-        COM_Z,
-        inertia.I_XX,
-        inertia.I_YY,
-        inertia.I_ZZ,
-        inertia.I_XY,
-        inertia.I_XZ,
-        inertia.I_YZ);
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        com_x,
+        com_y,
+        com_z,
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
     getBodyNode(i)->setInertia(newInertia);
   }
+}
+
+void Skeleton::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
+{
+  const Inertia& inertia = getBodyNode(index)->getInertia();
+    s_t com_x = com(0);
+    s_t com_y = com(1);
+    s_t com_z = com(2);
+    Inertia newInertia(
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        com_x,
+        com_y,
+        com_z,
+        inertia.getParameter(dynamics::Inertia::Param::I_XX),
+        inertia.getParameter(dynamics::Inertia::Param::I_YY),
+        inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
+    getBodyNode(index)->setInertia(newInertia);
 }
 
 //==============================================================================
@@ -3158,6 +3284,30 @@ void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
     s_t I_XZ = mois(cursor++);
     s_t I_YZ = mois(cursor++);
     Inertia newInertia(
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
+        I_XX,
+        I_YY,
+        I_ZZ,
+        I_XY,
+        I_XZ,
+        I_YZ);
+    getBodyNode(i)->setInertia(newInertia);
+  }
+}
+
+void Skeleton::setLinkMOIIndex(Eigen::Vector6s moi, size_t index)
+{
+  const Inertia& inertia = getBodyNode(index)->getInertia();
+  s_t I_XX = moi(0);
+  s_t I_YY = moi(1);
+  s_t I_ZZ = moi(2);
+  s_t I_XY = moi(3);
+  s_t I_XZ = moi(4);
+  s_t I_YZ = moi(5);
+  Inertia newInertia(
         inertia.MASS,
         inertia.COM_X,
         inertia.COM_Y,
@@ -3168,8 +3318,7 @@ void Skeleton::setLinkMOIs(Eigen::VectorXs mois)
         I_XY,
         I_XZ,
         I_YZ);
-    getBodyNode(i)->setInertia(newInertia);
-  }
+    getBodyNode(index)->setInertia(newInertia);
 }
 
 //==============================================================================
@@ -5772,7 +5921,7 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 }
 
 //==============================================================================
-/// This solves a simple inverse dynamics problem to get forces we need to
+/// This solves a simple inverse dynamics problem to get force we need to
 /// apply to arrive at "nextVel" at the next timestep.
 Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
 {
@@ -5780,8 +5929,8 @@ Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
       = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
-                                       - getExternalForces() + getDampingForce()
-                                       + getSpringForce();
+                                      - getExternalForces() + getDampingForce()
+                                      + getSpringForce();
   return massTorques + coriolisAndGravity;
 }
 
@@ -5810,7 +5959,7 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   {
     std::cout
         << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
-           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "joint of the skeleton is a FreeJoint ro an EulerFreeJoint. Since"
            "it's neither, this function won't work and we're returning zeros."
         << std::endl;
     result.contactWrench.setZero();
@@ -5828,8 +5977,8 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
-                                       - getExternalForces() + getDampingForce()
-                                       + getSpringForce();
+                                       - getExternalForces() 
+                                       + getDampingForce() + getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -5893,8 +6042,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
   skel->setControlForces(oldControl);
   for (int i = 0; i < contactBodies.size(); i++)
   {
-    const_cast<dynamics::BodyNode*>(contactBodies[i])
-        ->setExtWrench(oldExtForces[i]);
+    const_cast<dynamics::BodyNode*>(contactBodies[i])->setExtWrench(oldExtForces[i]);
   }
 
   return error;
@@ -5968,8 +6116,8 @@ Skeleton::getMultipleContactInverseDynamics(
       (nextVel - getVelocities()) / getTimeStep());
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
-                                       - getExternalForces() + getDampingForce()
-                                       + getSpringForce();
+                                       - getExternalForces() 
+                                       + getDampingForce()+getSpringForce();
 
   Eigen::Vector6s rootTorque
       = massTorques.head<6>() + coriolisAndGravity.head<6>();
@@ -6217,11 +6365,12 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
       }
     }
 
+
     Eigen::VectorXs vel
         = getPositionDifferences(positions.col(i + 1), positions.col(i))
           / getTimeStep();
     Eigen::VectorXs nextVel
-        = getPositionDifferences(positions.col(i + 2), positions.col(i + 1))
+         = getPositionDifferences(positions.col(i + 2), positions.col(i + 1))
           / getTimeStep();
     Eigen::VectorXs accel
         = getVelocityDifferences(nextVel, vel) / getTimeStep();
@@ -6498,7 +6647,7 @@ math::Jacobian Skeleton::getWorldPositionJacobian(
 
 //==============================================================================
 math::Jacobian Skeleton::finiteDifferenceWorldPositionJacobian(
-    const JacobianNode* _node,
+    const JacobianNode* _node, 
     const Eigen::Vector3s& _localOffset,
     bool useRidders)
 {
@@ -7030,7 +7179,7 @@ Eigen::VectorXs Skeleton::getDampingCoeffVector()
   std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
   size_t nDofs = getNumDofs();
   Eigen::VectorXs damp_coeffs = Eigen::VectorXs::Zero(nDofs);
-  for (int i = 0; i < nDofs; i++)
+  for(int i=0;i<nDofs;i++)
   {
     damp_coeffs(i) = dofs[i]->getDampingCoefficient();
   }
@@ -7041,7 +7190,7 @@ Eigen::VectorXs Skeleton::getDampingForce()
 {
   Eigen::VectorXs velocities = getVelocities();
   Eigen::VectorXs damp_coeffs = getDampingCoeffVector();
-  Eigen::VectorXs damp_force = damp_coeffs.asDiagonal() * velocities;
+  Eigen::VectorXs damp_force = damp_coeffs.asDiagonal()*velocities;
   return damp_force;
 }
 
@@ -7051,7 +7200,7 @@ Eigen::VectorXs Skeleton::getSpringStiffVector()
   std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
   size_t nDofs = getNumDofs();
   Eigen::VectorXs spring_stiffs = Eigen::VectorXs::Zero(nDofs);
-  for (int i = 0; i < nDofs; i++)
+  for(int i=0;i<nDofs;i++)
   {
     spring_stiffs(i) = dofs[i]->getSpringStiffness();
   }
@@ -7063,9 +7212,9 @@ Eigen::VectorXs Skeleton::getRestPositions()
   std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
   size_t nDofs = getNumDofs();
   Eigen::VectorXs rest_pose = Eigen::VectorXs::Zero(nDofs);
-  for (int i = 0; i < nDofs; i++)
+  for (int i=0;i<nDofs;i++)
   {
-    rest_pose(i) = dofs[i]->getRestPosition();
+    rest_pose(i) = dofs[i]->getRestPosition(); 
   }
   return rest_pose;
 }
@@ -7077,8 +7226,7 @@ Eigen::VectorXs Skeleton::getSpringForce()
   Eigen::VectorXs velocities = getVelocities();
   Eigen::VectorXs pose = getPositions();
   s_t dt = getTimeStep();
-  Eigen::VectorXs spring_force
-      = spring_stiffs.asDiagonal() * (pose - rest_pose + dt * velocities);
+  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(pose-rest_pose+dt*velocities);
   return spring_force;
 }
 //==============================================================================
@@ -7649,7 +7797,7 @@ std::pair<Joint*, BodyNode*> Skeleton::cloneBodyNodeTree(
     // its parent Joint, use the specified parent Joint instead of created a
     // clone
     Joint* joint;
-    if (i == 0 && _parentJoint != nullptr)
+    if(i == 0 && _parentJoint != nullptr)
     {
       joint = _parentJoint;
     }

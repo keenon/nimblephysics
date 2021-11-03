@@ -131,7 +131,7 @@ std::shared_ptr<Solution> IPOptOptimizer::optimize(
   SmartPtr<IPOptShotWrapper> problemPtr(problem);
   status = app->OptimizeTNLP(problemPtr);
 
-  if (status == Solve_Succeeded)
+  if (status == Solve_Succeeded && !mSilenceOutput)
   {
     // Retrieve some statistics about the solve
     Index iter_count = app->Statistics()->IterationCount();

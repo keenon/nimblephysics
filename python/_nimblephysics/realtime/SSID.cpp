@@ -52,11 +52,13 @@ void SSID(py::module& m)
               std::shared_ptr<dart::simulation::World>,
               std::shared_ptr<dart::trajectory::LossFn>,
               int,
+              Eigen::VectorXs,
               int>(),
           ::py::arg("world"),
           ::py::arg("loss"),
           ::py::arg("planningHorizonMillis"),
-          ::py::arg("sensorDim"))
+          ::py::arg("sensorDim"),
+          ::py::arg("steps"))
       .def("setLoss", &dart::realtime::SSID::setLoss, ::py::arg("loss"))
       .def(
           "setOptimizer",
@@ -73,7 +75,8 @@ void SSID(py::module& m)
       .def(
           "registerSensorsNow",
           &dart::realtime::SSID::registerSensorsNow,
-          ::py::arg("sensors"))
+          ::py::arg("sensors"),
+          ::py::arg("sensor_id"))
       .def(
           "registerControlsNow",
           &dart::realtime::SSID::registerControlsNow,
@@ -82,7 +85,8 @@ void SSID(py::module& m)
           "registerSensors",
           &dart::realtime::SSID::registerSensors,
           ::py::arg("now"),
-          ::py::arg("sensors"))
+          ::py::arg("sensors"),
+          ::py::arg("sensor_id"))
       .def(
           "registerControls",
           &dart::realtime::SSID::registerControls,

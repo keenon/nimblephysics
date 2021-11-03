@@ -1072,7 +1072,7 @@ void debugTrajectoryAndMarkersToGUI(
   for (int i = 0; i < numJoints; i++)
   {
     server.createSphere(
-        "joint_center_" + i,
+        "joint_center_" + std::to_string(i),
         0.02,
         Eigen::Vector3s::Zero(),
         Eigen::Vector3s(0, 0, 1));
@@ -1104,7 +1104,7 @@ void debugTrajectoryAndMarkersToGUI(
     for (int i = 0; i < numJoints; i++)
     {
       server.setObjectPosition(
-          "joint_center_" + i, jointCenters.block<3, 1>(i * 3, timestep));
+          "joint_center_" + std::to_string(i), jointCenters.block<3, 1>(i * 3, timestep));
     }
 
     server.flush();

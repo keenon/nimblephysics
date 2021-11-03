@@ -131,7 +131,14 @@ WorldPtr World::clone() const
   // Clone and add each Skeleton
   for (std::size_t i = 0; i < mSkeletons.size(); ++i)
   {
-    worldClone->addSkeleton(mSkeletons[i]->cloneSkeleton());
+    
+    dart::dynamics::SkeletonPtr cloned_skel = mSkeletons[i]->cloneSkeleton();
+    cloned_skel->setLinkMasses(mSkeletons[i]->getLinkMasses());
+    cloned_skel->setLinkCOMs(mSkeletons[i]->getLinkCOMs());
+    cloned_skel->setLinkMOIs(mSkeletons[i]->getLinkMOIs());
+    cloned_skel->setLinkBetas(mSkeletons[i]->getLinkBetas());
+    worldClone->addSkeleton(cloned_skel);
+    
   }
 
   // Clone and add each SimpleFrame
@@ -579,6 +586,11 @@ bool World::getSlowDebugResultsAgainstFD()
   return mSlowDebugResultsAgainstFD;
 }
 
+void World::DisableWrtMass()
+{
+  mWrtMass = nullptr;
+}
+
 //==============================================================================
 int World::getSimFrames() const
 {
@@ -677,6 +689,13 @@ std::vector<dynamics::BodyNode*> World::getAllBodyNodes()
   return nodes;
 }
 
+dynamics::BodyNode* World::getBodyNodeIndex(size_t index)
+{
+  std::vector<dynamics::BodyNode*> nodes = getAllBodyNodes();
+  assert(index<nodes.size());
+  return nodes[index];
+}
+
 //==============================================================================
 std::size_t World::getNumSkeletons() const
 {
@@ -684,7 +703,9 @@ std::size_t World::getNumSkeletons() const
 }
 
 //==============================================================================
-std::string World::addSkeleton(const dynamics::SkeletonPtr& _skeleton)
+std::string World::addSkeleton(
+    const dynamics::SkeletonPtr& _skeleton
+    )
 {
   if (nullptr == _skeleton)
   {
@@ -990,6 +1011,133 @@ Eigen::VectorXs World::getMasses()
   return mWrtMass->get(this);
 }
 
+size_t World::getLinkMassesDims()
+{
+  size_t mass_dim = 0;
+  for (int i=0;i< mSkeletons.size();i++)
+  {
+    mass_dim += mSkeletons[i]->getLinkMassesDims();
+  }
+  return mass_dim;
+}
+
+Eigen::VectorXs World::getLinkMasses()
+{
+  Eigen::VectorXs masses = Eigen::VectorXs::Zero(getLinkMassesDims());
+  size_t cur = 0;
+  for(size_t i = 0;i < mSkeletons.size();i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    masses.segment(cur,mdim) = mSkeletons[i]->getLinkMasses();
+    cur += mdim;
+  }
+  return masses;
+}
+
+Eigen::VectorXs World::getLinkMUs()
+{
+  Eigen::VectorXs mus = Eigen::VectorXs::Zero(getLinkMassesDims());
+  size_t cur = 0;
+  for (size_t i = 0; i < mSkeletons.size();i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    mus.segment(cur, mdim) = mSkeletons[i]->getLinkMUs();
+    cur += mdim;
+  }
+  return mus;
+}
+
+Eigen::VectorXs World::getLinkCOMs()
+{
+  Eigen::VectorXs coms = Eigen::VectorXs::Zero(3*getLinkMassesDims());
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    Eigen::VectorXs skel_coms = mSkeletons[i]->getLinkCOMs();
+    coms.segment(cursor,skel_coms.size());
+    cursor += skel_coms.size();
+  }
+  return coms;
+}
+
+Eigen::VectorXs World::getLinkMOIs()
+{
+  Eigen::VectorXs mois = Eigen::VectorXs::Zero(6*getLinkMassesDims());
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    Eigen::VectorXs skel_mois = mSkeletons[i]->getLinkMOIs();
+    mois.segment(cursor, skel_mois.size());
+    cursor += skel_mois.size();
+  }
+  return mois;
+}
+
+s_t World::getLinkMassIndex(size_t index)
+{
+  Eigen::VectorXs masses = getLinkMasses();
+  return masses(index);
+}
+
+s_t World::getLinkMUIndex(size_t index)
+{
+  Eigen::VectorXs mus = getLinkMUs();
+  return mus(index);
+}
+
+Eigen::VectorXs World::getLinkBetas()
+{
+  Eigen::VectorXs betas = Eigen::VectorXs::Zero(3*getLinkMassesDims());
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t dim = 3*mSkeletons[i]->getLinkMassesDims();
+    betas.segment(cursor,dim) = mSkeletons[i]->getLinkBetas();
+    cursor += dim;
+  }
+  return betas;
+}
+
+Eigen::Vector3s World::getLinkBetaIndex(size_t index)
+{
+  Eigen::VectorXs betas = getLinkBetas();
+  return betas.segment(index*3,3);
+}
+
+Eigen::Vector3s World::getLinkCOMIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkCOMIndex(index-probe);
+}
+
+Eigen::Vector6s World::getLinkMOIIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkMOIIndex(index-probe);
+}
+
 //==============================================================================
 Eigen::VectorXs World::getPositions()
 {
@@ -1271,6 +1419,120 @@ void World::setVelocityLowerLimits(Eigen::VectorXs limits)
 void World::setMasses(Eigen::VectorXs masses)
 {
   mWrtMass->set(this, masses);
+}
+
+void World::setLinkMasses(Eigen::VectorXs masses)
+{
+  assert(masses.size()==getLinkMassesDims());
+  size_t cur = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    mSkeletons[i]->setLinkMasses(masses.segment(cur,mdim));
+    cur += mdim;
+  }
+}
+
+void World::setLinkMassIndex(s_t mass, size_t index)
+{
+  Eigen::VectorXs masses = getLinkMasses();
+  masses(index) = mass;
+  setLinkMasses(masses);
+}
+
+void World::setLinkMUs(Eigen::VectorXs mus)
+{
+  assert(mus.size() == getLinkMassesDims());
+  size_t cur = 0;
+  for (size_t i=0; i< mSkeletons.size(); i++)
+  {
+    size_t mdim = mSkeletons[i]->getLinkMassesDims();
+    mSkeletons[i]->setLinkMUs(mus.segment(cur,mdim));
+    cur += mdim;
+  }
+}
+
+void World::setLinkMUIndex(s_t mu, size_t index)
+{
+  Eigen::VectorXs mus = getLinkMUs();
+  mus(index) = mu;
+  setLinkMUs(mus);
+}
+
+void World::setLinkBetas(Eigen::VectorXs betas)
+{
+  assert(betas.size() == getLinkMassesDims()*3);
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t dim = mSkeletons[i]->getLinkMassesDims()*3;
+    mSkeletons[i]->setLinkBetas(betas.segment(cursor,dim));
+    cursor += dim;
+  }
+}
+
+void World::setLinkBetaIndex(Eigen::Vector3s beta, size_t index)
+{
+  Eigen::VectorXs betas = getLinkBetas();
+  betas.segment(index*3,3) = beta;
+  setLinkBetas(betas);
+}
+
+void World::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  mSkeletons[skeleton_id]->setLinkCOMIndex(com,index-probe);
+}
+
+void World::setLinkCOMs(Eigen::VectorXs coms)
+{
+  assert(coms.size() == getLinkMassesDims()*3);
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t dim = mSkeletons[i]->getLinkMassesDims()*3;
+    mSkeletons[i]->setLinkCOMs(coms.segment(cursor,dim));
+    cursor += dim;
+  }
+}
+
+void World::setLinkMOIIndex(Eigen::Vector6s moi, size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  mSkeletons[skeleton_id]->setLinkMOIIndex(moi,index-probe);
+}
+
+void World::setLinkMOIs(Eigen::VectorXs mois)
+{
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t dim = 6 * mSkeletons[i]->getLinkMassesDims();
+    mSkeletons[i]->setLinkMOIs(mois.segment(cursor,dim));
+    cursor += dim;
+  }
 }
 
 //==============================================================================
