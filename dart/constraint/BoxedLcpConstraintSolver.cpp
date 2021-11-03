@@ -613,6 +613,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     }
     else
     {
+      mXReduced.setZero();
+
       int reducedN = mXReduced.size();
       Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
           reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
@@ -647,6 +649,23 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       mX = mapOut * mXReduced;
       // Don't bother checking validity at this point, because we know the
       // solution is invalid with friction constraints, and that's ok.
+
+      /*
+#ifndef NDEBUG
+      // If we still haven't succeeded, let's debug
+      if (!success)
+      {
+        std::cout << "Failed to solve LCP, even after disabling friction!"
+                  << std::endl;
+        std::cout << "mAReduced: " << std::endl << mAReduced << std::endl;
+        std::cout << "mBReduced: " << std::endl << mBReduced << std::endl;
+        std::cout << "mFIndexReduced: " << std::endl
+                  << mFIndexReduced << std::endl;
+        std::cout << "eigenvalues: " << std::endl
+                  << mAReduced.eigenvalues() << std::endl;
+      }
+#endif
+      */
     }
   }
 

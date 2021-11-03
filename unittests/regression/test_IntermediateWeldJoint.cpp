@@ -38,7 +38,7 @@
 
 using namespace dart;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 //==============================================================================
 TEST(IntermediateWeldJoint, SIMPLE)

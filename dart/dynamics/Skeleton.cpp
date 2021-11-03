@@ -1851,8 +1851,8 @@ Eigen::MatrixXs Skeleton::getJacobianOfMinv(
   if (hasAnyZeroDof)
   {
     Eigen::MatrixXs Minv = getInvMassMatrix();
-    // Use the traditional formula, d/dx A^{-1} = A^{-1} (d/dx A) A^{-1}
-    return Minv * getJacobianOfM(Minv * f, wrt);
+    // Use the traditional formula, d/dx A^{-1} = -A^{-1} (d/dx A) A^{-1}
+    return -1 * Minv * getJacobianOfM(Minv * f, wrt);
   }
 
   return getJacobianOfMinv_ID(f, wrt);
