@@ -7,6 +7,10 @@ if(TARGET dart-utils-urdf)
   dart_add_test("regression" test_Issue838)
   target_link_libraries(test_Issue838 dart-utils-urdf)
 
+  dart_add_test("regression" test_IntermediateWeldJoint)
+  target_link_libraries(test_IntermediateWeldJoint dart-utils)
+  target_link_libraries(test_IntermediateWeldJoint dart-utils-urdf)
+
   dart_add_test("regression" test_Issue892)
 
   dart_add_test("regression" test_Issue895)

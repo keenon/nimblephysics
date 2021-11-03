@@ -582,6 +582,9 @@ public:
   /// Returns true if there were any bounces in this snapshot.
   bool hasBounces();
 
+  /// Returns true if we had to deliberately ignore friction on any of our sub-groups in order to solve.
+  bool getDeliberatelyIgnoreFriction();
+
   /// Returns the number of contacts (regardless of state) in this snapshot.
   std::size_t getNumContacts();
 
