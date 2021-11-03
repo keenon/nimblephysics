@@ -11,8 +11,7 @@ jobs:
     container: keenon/diffdart:base
     strategy:
       matrix:
-        python-version: ["3.7", "3.8"]
-        # python-version: ["3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.6", "3.7"] # , "3.8", "3.9"]
         include:
           - python-version: 3.6
             PYTHON_VERSION_CODE: cp36-cp36m
@@ -28,20 +27,20 @@ jobs:
             PYTHON_PATH: /opt/python/cp37-cp37m/bin/
             PYTHON_INCLUDE: /opt/python/cp37-cp37m/include/python3.7m/
             PYTHON_LIB: /opt/python/cp37-cp37m/lib/python3.7
-          - python-version: 3.8
-            PYTHON_VERSION_CODE: cp38-cp38
-            PYTHON_VERSION_NUMBER: 3.8
-            PYTHON: /opt/python/cp38-cp38/bin/python3.8
-            PYTHON_PATH: /opt/python/cp38-cp38/bin/
-            PYTHON_INCLUDE: /opt/python/cp38-cp38/include/python3.8/
-            PYTHON_LIB: /opt/python/cp38-cp38/lib/python3.8
-          - python-version: 3.9
-            PYTHON_VERSION_CODE: cp39-cp39
-            PYTHON_VERSION_NUMBER: 3.9
-            PYTHON: /opt/python/cp39-cp39/bin/python3.9
-            PATH_PATH: /opt/python/cp39-cp39/bin/
-            PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
-            PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
+          # - python-version: 3.8
+          #   PYTHON_VERSION_CODE: cp38-cp38
+          #   PYTHON_VERSION_NUMBER: 3.8
+          #   PYTHON: /opt/python/cp38-cp38/bin/python3.8
+          #   PYTHON_PATH: /opt/python/cp38-cp38/bin/
+          #   PYTHON_INCLUDE: /opt/python/cp38-cp38/include/python3.8/
+          #   PYTHON_LIB: /opt/python/cp38-cp38/lib/python3.8
+          # - python-version: 3.9
+          #   PYTHON_VERSION_CODE: cp39-cp39
+          #   PYTHON_VERSION_NUMBER: 3.9
+          #   PYTHON: /opt/python/cp39-cp39/bin/python3.9
+          #   PATH_PATH: /opt/python/cp39-cp39/bin/
+          #   PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
+          #   PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -146,7 +145,7 @@ jobs:
       - name: Flatten files
         run: |
           mkdir wheelhouse2
-          find wheelhouse -type f -exec mv {} test2 \;
+          find wheelhouse -type f -exec mv {} wheelhouse2 \;
           rm -rf wheelhouse
           mv wheelhouse2 wheelhouse
       - name: Display structure of downloaded files after flattening
