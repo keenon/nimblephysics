@@ -732,8 +732,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       joint = pair.first;
       childBody = pair.second;
       std::cout << "WARNING! Creating a WeldJoint as an intermediate "
-                   "(non-root) joint, there is a known bug that will cause "
-                   "dynamics to be wrong. This is only useful for kinematics."
+                   "(non-root) joint. This will cause the gradient "
+                   "computations to run with slower algorithms. If you find a "
+                   "way to remove this WeldJoint, things should run faster."
                 << std::endl;
     }
     else if (anySpline)

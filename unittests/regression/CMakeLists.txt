@@ -1,12 +1,15 @@
 dart_add_test("regression" test_Issue000Template test_Issue000Template.cpp)
 
 dart_add_test("regression" test_Issue1243 test_Issue1243.cpp)
-dart_add_test("regression" test_IntermediateWeldJoint)
 
 if(TARGET dart-utils-urdf)
 
   dart_add_test("regression" test_Issue838)
   target_link_libraries(test_Issue838 dart-utils-urdf)
+
+  dart_add_test("regression" test_IntermediateWeldJoint)
+  target_link_libraries(test_IntermediateWeldJoint dart-utils)
+  target_link_libraries(test_IntermediateWeldJoint dart-utils-urdf)
 
   dart_add_test("regression" test_Issue892)
 

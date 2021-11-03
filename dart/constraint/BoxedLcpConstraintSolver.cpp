@@ -597,40 +597,57 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         mHiReduced,
         mLoReduced,
         mFIndexReduced);
-    int reducedN = mXReduced.size();
-    Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-        reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
-    reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
-    // Prefer using PGS to Dantzig at this point, if it's available
-    if (mSecondaryBoxedLcpSolver)
+
+    Eigen::VectorXs guessedX = LCPUtils::guessSolution(
+        mAReduced, mBReduced, mHiReduced, mLoReduced, mFIndexReduced);
+    if (LCPUtils::isLCPSolutionValid(
+            mAReduced,
+            guessedX,
+            mBReduced,
+            mHiReduced,
+            mLoReduced,
+            mFIndexReduced,
+            true))
     {
-      success = mSecondaryBoxedLcpSolver->solve(
-          reducedN,
-          reducedAPadded.data(),
-          mXReduced.data(),
-          mBReduced.data(),
-          0,
-          mLoReduced.data(),
-          mHiReduced.data(),
-          mFIndexReduced.data(),
-          false);
+      mX = mapOut * guessedX;
     }
     else
     {
-      success = mBoxedLcpSolver->solve(
-          reducedN,
-          reducedAPadded.data(),
-          mXReduced.data(),
-          mBReduced.data(),
-          0,
-          mLoReduced.data(),
-          mHiReduced.data(),
-          mFIndexReduced.data(),
-          true);
+      int reducedN = mXReduced.size();
+      Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+          reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
+      reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
+      // Prefer using PGS to Dantzig at this point, if it's available
+      if (mSecondaryBoxedLcpSolver)
+      {
+        success = mSecondaryBoxedLcpSolver->solve(
+            reducedN,
+            reducedAPadded.data(),
+            mXReduced.data(),
+            mBReduced.data(),
+            0,
+            mLoReduced.data(),
+            mHiReduced.data(),
+            mFIndexReduced.data(),
+            false);
+      }
+      else
+      {
+        success = mBoxedLcpSolver->solve(
+            reducedN,
+            reducedAPadded.data(),
+            mXReduced.data(),
+            mBReduced.data(),
+            0,
+            mLoReduced.data(),
+            mHiReduced.data(),
+            mFIndexReduced.data(),
+            true);
+      }
+      mX = mapOut * mXReduced;
+      // Don't bother checking validity at this point, because we know the
+      // solution is invalid with friction constraints, and that's ok.
     }
-    mX = mapOut * mXReduced;
-    // Don't bother checking validity at this point, because we know the
-    // solution is invalid with friction constraints, and that's ok.
   }
 
   if (mX.hasNaN())

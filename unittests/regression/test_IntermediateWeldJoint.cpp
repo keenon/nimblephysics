@@ -38,8 +38,45 @@
 
 using namespace dart;
 
+// #define ALL_TESTS
+
 //==============================================================================
-TEST(IntermediateWeldJoint, Basic)
+TEST(IntermediateWeldJoint, SIMPLE)
+{
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+  T.translation() = Eigen::Vector3s::UnitX();
+
+  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
+  auto rootPair = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>();
+  auto weldPair
+      = rootPair.second->createChildJointAndBodyNodePair<dynamics::WeldJoint>();
+  weldPair.first->setTransformFromChildBodyNode(T);
+  auto tailPair
+      = weldPair.second
+            ->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
+  tailPair.first->setTransformFromChildBodyNode(T);
+
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(skel);
+
+  Eigen::VectorXs worldVel = Eigen::VectorXs::Random(world->getNumDofs());
+
+  Eigen::MatrixXs M = skel->getMassMatrix();
+
+  Eigen::MatrixXs bruteMinv = M.inverse();
+
+  Eigen::MatrixXs Minv = skel->getInvMassMatrix();
+
+  EXPECT_TRUE(verifyAnalyticalA_c(world));
+  EXPECT_TRUE(verifyAnalyticalJacobians(world, true));
+  EXPECT_TRUE(verifyVelGradients(world, worldVel));
+  EXPECT_TRUE(verifyAnalyticalBackprop(world));
+  EXPECT_TRUE(verifyWrtMass(world));
+}
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(IntermediateWeldJoint, AMASS_FD)
 {
   std::shared_ptr<simulation::World> world
       = dart::utils::UniversalLoader::loadWorld(
@@ -110,3 +147,4 @@ TEST(IntermediateWeldJoint, Basic)
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
   EXPECT_TRUE(verifyWrtMass(world));
 }
+#endif
