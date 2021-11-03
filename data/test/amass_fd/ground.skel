@@ -1,0 +1,41 @@
+<?xml version="1.0" ?>
+<skel version="1.0">
+    <world name="world 1">
+        <physics>
+            <!-- YF: changed to 0.002 -->
+            <time_step>0.002</time_step>
+            <gravity>0 -9.8 0</gravity>
+            <collision_detector>dart</collision_detector>
+        </physics>
+
+        <skeleton name="ground skeleton">
+            <mobile>false</mobile>
+            <body name="ground">
+                <!-- <transformation>0 -1.1825 0 0 0 0</transformation> -->
+<!--                TODO: make ground a bit tilted to break symmetry-->
+                <transformation>0 -1.4745 0 0.02 0.02 0.02</transformation>
+                <visualization_shape>
+                    <transformation>0 0 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>4.0 1.0 2.0</size>
+                        </box>
+                    </geometry>
+                    <color>0.4 0.4 0.4</color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>0 0 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>4.0 1.0 2.0</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+            </body>
+            <joint name="joint 1" type="weld">
+                <parent>world</parent>
+                <child>ground</child>
+            </joint>
+        </skeleton>
+    </world>
+</skel>
