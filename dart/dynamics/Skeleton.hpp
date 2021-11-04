@@ -1362,11 +1362,11 @@ public:
       Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // This is d/dpos integratePositionsExplicit()
-  Eigen::MatrixXs getPosPosJac(
+  Eigen::MatrixXs getPosPosJacobian(
       Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // This is d/dvel integratePositionsExplicit()
-  Eigen::MatrixXs getVelPosJac(
+  Eigen::MatrixXs getVelPosJacobian(
       Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt);
 
   // Documentation inherited

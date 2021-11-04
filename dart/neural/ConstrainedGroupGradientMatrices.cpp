@@ -1206,7 +1206,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsPosPosJacobian(
   {
     SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
     int dofs = skel->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJac(
+    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJacobian(
         skel->getPositions(), skel->getVelocities(), mTimeStep);
     cursor += dofs;
   }
@@ -1223,7 +1223,7 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsVelPosJacobian(
   {
     SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
     int dofs = skel->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJac(
+    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJacobian(
         skel->getPositions(), skel->getVelocities(), mTimeStep);
     cursor += dofs;
   }

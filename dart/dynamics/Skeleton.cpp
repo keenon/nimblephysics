@@ -5747,7 +5747,7 @@ Eigen::VectorXs Skeleton::integratePositionsExplicit(
 }
 
 //==============================================================================
-Eigen::MatrixXs Skeleton::getPosPosJac(
+Eigen::MatrixXs Skeleton::getPosPosJacobian(
     Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt)
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(pos.size(), pos.size());
@@ -5766,7 +5766,7 @@ Eigen::MatrixXs Skeleton::getPosPosJac(
 }
 
 //==============================================================================
-Eigen::MatrixXs Skeleton::getVelPosJac(
+Eigen::MatrixXs Skeleton::getVelPosJacobian(
     Eigen::VectorXs pos, Eigen::VectorXs vel, s_t dt)
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(pos.size(), pos.size());

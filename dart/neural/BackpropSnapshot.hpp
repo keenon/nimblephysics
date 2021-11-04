@@ -88,6 +88,30 @@ public:
   const Eigen::MatrixXs& getMassVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and return the whole vel-acc jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getVelAccJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  /// This computes and return the whole pos-acc jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getPosAccJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  /// This computes and return the whole force-acc jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want to access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getControlForceAccJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  /// This computes and return the whole mass-acc jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want to access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getMassAccJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -299,6 +323,12 @@ public:
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXs getPosJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This computes and returns the whole wrt-acc jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason
+  Eigen::MatrixXs getAccJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
 
   /// This returns the jacobian of constraint force, holding everyhing constant
@@ -734,6 +764,14 @@ private:
   Eigen::MatrixXs mCachedForceVel;
   bool mCachedMassVelDirty;
   Eigen::MatrixXs mCachedMassVel;
+  bool mCachedVelAccDirty;
+  Eigen::MatrixXs mCachedVelAcc;
+  bool mCachedPosAccDirty;
+  Eigen::MatrixXs mCachedPosAcc;
+  bool mCachedForceAccDirty;
+  Eigen::MatrixXs mCachedForceAcc;
+  bool mCachedMassAccDirty;
+  Eigen::MatrixXs mCachedMassAcc;
   bool mCachedPosCDirty;
   Eigen::MatrixXs mCachedPosC;
   bool mCachedVelCDirty;

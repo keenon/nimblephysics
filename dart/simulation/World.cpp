@@ -2017,7 +2017,7 @@ Eigen::MatrixXs World::getPosPosJacobian() const
   for (auto& skel : mSkeletons)
   {
     int dofs = skel->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJac(
+    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJacobian(
         skel->getPositions(), skel->getVelocities(), mTimeStep);
     cursor += dofs;
   }
@@ -2036,7 +2036,7 @@ Eigen::MatrixXs World::getVelPosJacobian() const
   for (auto& skel : mSkeletons)
   {
     int dofs = skel->getNumDofs();
-    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJac(
+    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJacobian(
         skel->getPositions(), skel->getVelocities(), mTimeStep);
     cursor += dofs;
   }

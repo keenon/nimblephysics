@@ -92,8 +92,8 @@ TEST(FreeJointGradients, ATLAS_JACOBIANS)
     Eigen::VectorXs pos = Eigen::VectorXs::Random(dofs);
     Eigen::VectorXs vel = Eigen::VectorXs::Random(dofs);
 
-    Eigen::MatrixXs posPosAnalytical = atlas->getPosPosJac(pos, vel, dt);
-    Eigen::MatrixXs velPosAnalytical = atlas->getVelPosJac(pos, vel, dt);
+    Eigen::MatrixXs posPosAnalytical = atlas->getPosPosJacobian(pos, vel, dt);
+    Eigen::MatrixXs velPosAnalytical = atlas->getVelPosJacobian(pos, vel, dt);
     Eigen::MatrixXs posPosFD = skelPosPosJacFD(atlas, pos, vel, dt);
     Eigen::MatrixXs velPosFD = skelVelPosJacFD(atlas, pos, vel, dt);
 
