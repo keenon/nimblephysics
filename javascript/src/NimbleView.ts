@@ -139,6 +139,122 @@ class DARTView {
   }
 
   /**
+   * This reads and handles a command sent from the backend
+   */
+  handleCommand = (command: Command) => {
+    if (command.type === "create_box") {
+      this.createBox(
+        command.key,
+        command.size,
+        command.pos,
+        command.euler,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
+    } else if (command.type === "create_sphere") {
+      this.createSphere(
+        command.key,
+        command.radius,
+        command.pos,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
+    } else if (command.type === "create_capsule") {
+      this.createCapsule(
+        command.key,
+        command.radius,
+        command.height,
+        command.pos,
+        command.euler,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
+    } else if (command.type === "create_line") {
+      this.createLine(command.key, command.points, command.color);
+    } else if (command.type === "create_mesh") {
+      this.createMesh(
+        command.key,
+        command.vertices,
+        command.vertex_normals,
+        command.faces,
+        command.uv,
+        command.texture_starts,
+        command.pos,
+        command.euler,
+        command.scale,
+        command.color,
+        command.cast_shadows,
+        command.receive_shadows
+      );
+    } else if (command.type === "create_texture") {
+      this.createTexture(command.key, command.base64);
+    } else if (command.type === "set_object_pos") {
+      this.setObjectPos(command.key, command.pos);
+    } else if (command.type === "set_object_rotation") {
+      this.setObjectRotation(command.key, command.euler);
+    } else if (command.type === "set_object_color") {
+      this.setObjectColor(command.key, command.color);
+    } else if (command.type === "set_object_scale") {
+      this.setObjectScale(command.key, command.scale);
+    } else if (command.type === "enable_mouse") {
+      this.enableMouseInteraction(command.key);
+    } else if (command.type === "disable_mouse") {
+      this.disableMouseInteraction(command.key);
+    } else if (command.type === "create_text") {
+      this.createText(
+        command.key,
+        command.from_top_left,
+        command.size,
+        command.contents
+      );
+    } else if (command.type === "create_plot") {
+      this.createPlot(
+        command.key,
+        command.from_top_left,
+        command.size,
+        command.min_x,
+        command.max_x,
+        command.xs,
+        command.min_y,
+        command.max_y,
+        command.ys,
+        command.plot_type
+      );
+    } else if (command.type === "set_ui_elem_pos") {
+      this.setUIElementPosition(command.key, command.from_top_left);
+    } else if (command.type === "set_ui_elem_size") {
+      this.setUIElementSize(command.key, command.size);
+    } else if (command.type === "delete_ui_elem") {
+      this.deleteUIElement(command.key);
+    } else if (command.type === "delete_object") {
+      this.deleteObject(command.key);
+    } else if (command.type === "set_text_contents") {
+      this.setTextContents(command.key, command.contents);
+    } else if (command.type === "set_button_label") {
+      this.setButtonLabel(command.key, command.label);
+    } else if (command.type === "set_slider_value") {
+      this.setSliderValue(command.key, command.value);
+    } else if (command.type === "set_slider_min") {
+      this.setSliderMin(command.key, command.min);
+    } else if (command.type === "set_slider_max") {
+      this.setSliderMax(command.key, command.max);
+    } else if (command.type === "set_plot_data") {
+      this.setPlotData(
+        command.key,
+        command.min_x,
+        command.max_x,
+        command.xs,
+        command.min_y,
+        command.max_y,
+        command.ys
+      );
+    }
+  };
+
+  /**
    * This marks the GUI as connected or not, which allows us to clearly display connection status on the GUI.
    */
   setConnected = (connected: boolean) => {
@@ -506,6 +622,16 @@ class DARTView {
       obj.rotation.y = euler[1];
       obj.rotation.z = euler[2];
     }
+  };
+
+  /**
+   * Sets the color of an object
+   *
+   * Must call render() to see results!
+   */
+  setObjectColor = (key: string, color: number[]) => {
+    const obj = this.objects.get(key);
+    (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
   };
 
   /**
