@@ -665,6 +665,9 @@ public:
       const std::vector<std::pair<int, Eigen::Vector3s>>&
           visibleMarkerWorldPoses);
 
+  void setLBFGSHistory(int hist);
+  void setCheckDerivatives(bool checkDerivatives);
+
   friend class BilevelFitProblem;
   friend class SphereFitJointCenterProblem;
   friend struct MarkerFitterState;

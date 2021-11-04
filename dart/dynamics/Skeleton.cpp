@@ -2754,6 +2754,7 @@ Eigen::VectorXs Skeleton::getRandomPose()
     pose(i) = withinBounds;
   }
 
+  /*
 #ifndef NDEBUG
   Eigen::VectorXs oldPose = getPositions();
   setPositions(pose);
@@ -2762,6 +2763,7 @@ Eigen::VectorXs Skeleton::getRandomPose()
   assert(clampedPos == pose);
   setPositions(oldPose);
 #endif
+  */
 
   return pose;
 }
@@ -4150,6 +4152,10 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
       assert(
           pair.first->getChildScale()
           == body->getParentJoint()->getChildScale());
+      pair.first->setPositionUpperLimits(
+          body->getParentJoint()->getPositionUpperLimits());
+      pair.first->setPositionLowerLimits(
+          body->getParentJoint()->getPositionLowerLimits());
     }
   }
 

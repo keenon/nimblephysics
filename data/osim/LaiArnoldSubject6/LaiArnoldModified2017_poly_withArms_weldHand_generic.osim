@@ -14747,7 +14747,7 @@
 				</Marker>
 				<Marker name="R_wrist_ulna">
 					<!--Path to a Component that satisfies the Socket 'parent_frame' of type PhysicalFrame (description: The frame to which this station is fixed.).-->
-					<socket_parent_frame>/bodyset/radius_r</socket_parent_frame>
+					<socket_parent_frame>/bodyset/ulna_r</socket_parent_frame>
 					<!--The fixed location of the station expressed in its parent frame.-->
 					<location>-0.029803361869166458 -0.22533647324862682 -0.010893526752108699</location>
 					<!--Flag (true or false) specifying whether the marker is fixed in its parent frame during the marker placement step of scaling.  If false, the marker is free to move within its parent Frame to match its experimental counterpart.-->
@@ -14779,7 +14779,7 @@
 				</Marker>
 				<Marker name="L_wrist_ulna">
 					<!--Path to a Component that satisfies the Socket 'parent_frame' of type PhysicalFrame (description: The frame to which this station is fixed.).-->
-					<socket_parent_frame>/bodyset/radius_l</socket_parent_frame>
+					<socket_parent_frame>/bodyset/ulna_l</socket_parent_frame>
 					<!--The fixed location of the station expressed in its parent frame.-->
 					<location>-0.040183163628235909 -0.22672428894042967 0.0056233991074078633</location>
 					<!--Flag (true or false) specifying whether the marker is fixed in its parent frame during the marker placement step of scaling.  If false, the marker is free to move within its parent Frame to match its experimental counterpart.-->

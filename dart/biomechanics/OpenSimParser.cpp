@@ -428,29 +428,29 @@ OpenSimMot OpenSimParser::loadMot(
             // This means we're on the row defining the names of the joints
             // we're recording positions of
             dynamics::DegreeOfFreedom* dof = skel->getDof(token);
+            bool isRotationalJoint = true;
             if (dof != nullptr)
             {
               columnToDof.push_back(dof->getIndexInSkeleton());
+              dynamics::Joint* joint = dof->getJoint();
+              if (joint->getType()
+                      == dynamics::TranslationalJoint2D::getStaticType()
+                  || joint->getType()
+                         == dynamics::TranslationalJoint::getStaticType()
+                  || joint->getType()
+                         == dynamics::PrismaticJoint::getStaticType())
+              {
+                isRotationalJoint = false;
+              }
+              if (joint->getType() == dynamics::EulerFreeJoint::getStaticType()
+                  && dof->getIndexInJoint() >= 3)
+              {
+                isRotationalJoint = false;
+              }
             }
             else
             {
               columnToDof.push_back(-1);
-            }
-            dynamics::Joint* joint = dof->getJoint();
-            bool isRotationalJoint = true;
-            if (joint->getType()
-                    == dynamics::TranslationalJoint2D::getStaticType()
-                || joint->getType()
-                       == dynamics::TranslationalJoint::getStaticType()
-                || joint->getType()
-                       == dynamics::PrismaticJoint::getStaticType())
-            {
-              isRotationalJoint = false;
-            }
-            if (joint->getType() == dynamics::EulerFreeJoint::getStaticType()
-                && dof->getIndexInJoint() >= 3)
-            {
-              isRotationalJoint = false;
             }
             rotationalDof.push_back(isRotationalJoint);
           }
@@ -1187,8 +1187,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     joint = pair.first;
     childBody = pair.second;
     std::cout << "WARNING! Creating a WeldJoint as an intermediate "
-                 "(non-root) joint, there is a known bug that will cause "
-                 "dynamics to be wrong. This is only useful for kinematics."
+                 "(non-root) joint. This will cause the gradient "
+                 "computations to run with slower algorithms. If you find a "
+                 "way to remove this WeldJoint, things should run faster."
               << std::endl;
   }
   if (jointType == "PinJoint")
@@ -1613,15 +1614,25 @@ OpenSimFile OpenSimParser::readOsim40(
             = std::string(markerCursor->FirstChildElement("fixed")->GetText())
               == "true";
 
-        file.markersMap[name]
-            = std::make_pair(skel->getBodyNode(bodyName), offset);
-        if (fixed)
+        dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+        if (body != nullptr)
         {
-          file.anatomicalMarkers.push_back(name);
+          file.markersMap[name] = std::make_pair(body, offset);
+          if (fixed)
+          {
+            file.anatomicalMarkers.push_back(name);
+          }
+          else
+          {
+            file.trackingMarkers.push_back(name);
+          }
         }
         else
         {
-          file.trackingMarkers.push_back(name);
+          std::cout << "Warning: OpenSimParser attempting to read marker \""
+                    << name << "\" attached to body \"" << bodyName
+                    << "\" which does not exist! Marker will be ignored."
+                    << std::endl;
         }
 
         markerCursor = markerCursor->NextSiblingElement();
@@ -1747,6 +1758,12 @@ OpenSimFile OpenSimParser::readOsim30(
     std::string name(bodyCursor->Attribute("name"));
     // std::cout << name << std::endl;
 
+    if (name == "patella_r" || name == "patella_l")
+    {
+      bodyCursor = bodyCursor->NextSiblingElement();
+      continue;
+    }
+
     bodyLookupMap["/bodyset/" + name].xml = bodyCursor;
     bodyLookupMap["/bodyset/" + name].parent = nullptr;
     bodyLookupMap["/bodyset/" + name].children.clear();
@@ -1765,6 +1782,12 @@ OpenSimFile OpenSimParser::readOsim30(
   {
     std::string type(jointCursor->Name());
     std::string name(jointCursor->Attribute("name"));
+
+    if (name == "patellofemoral_r" || name == "patellofemoral_l")
+    {
+      jointCursor = jointCursor->NextSiblingElement();
+      continue;
+    }
 
     string parent_offset_frame = string(
         jointCursor->FirstChildElement("socket_parent_frame")->GetText());
@@ -1880,8 +1903,30 @@ OpenSimFile OpenSimParser::readOsim30(
             = markerCursor->FirstChildElement("socket_parent_frame")->GetText();
         std::string bodyName = bodyLookupMap[socketName].name;
 
-        file.markersMap[name]
-            = std::make_pair(skel->getBodyNode(bodyName), offset);
+        bool fixed
+            = std::string(markerCursor->FirstChildElement("fixed")->GetText())
+              == "true";
+        dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+
+        if (body != nullptr) {
+          file.markersMap[name]
+              = std::make_pair(skel->getBodyNode(bodyName), offset);
+          if (fixed)
+          {
+            file.anatomicalMarkers.push_back(name);
+          }
+          else
+          {
+            file.trackingMarkers.push_back(name);
+          }
+        }
+        else
+        {
+          std::cout << "Warning: OpenSimParser attempting to read marker \""
+                    << name << "\" attached to body \"" << bodyName
+                    << "\" which does not exist! Marker will be ignored."
+                    << std::endl;
+        }
 
         markerCursor = markerCursor->NextSiblingElement();
       }

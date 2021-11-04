@@ -17,13 +17,13 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
   Eigen::Vector6s customP_dp = custom->getCustomFunctionGradientAt(pos);
   Eigen::Vector6s customP_dp_fd
       = custom->finiteDifferenceCustomFunctionGradientAt(pos);
-  if (!equals(customP_dp, customP_dp_fd, 1e-12))
+  if (!equals(customP_dp, customP_dp_fd, 1e-10))
   {
     std::cout << "Custom dP/dx: " << std::endl << customP_dp << std::endl;
     std::cout << "FD Custom dP/dx: " << std::endl << customP_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl
               << customP_dp - customP_dp_fd << std::endl;
-    EXPECT_TRUE(equals(customP_dp, customP_dp_fd, 1e-12));
+    EXPECT_TRUE(equals(customP_dp, customP_dp_fd, 1e-10));
     return false;
   }
 
@@ -39,6 +39,18 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
     std::cout << "Diff: " << std::endl
               << customV_dp - customV_dp_fd << std::endl;
     EXPECT_TRUE(equals(customV_dp, customV_dp_fd, TEST_THRESHOLD));
+
+    for (int i = 0; i < 6; i++)
+    {
+      std::cout << "Custom function " << i << ":" << std::endl;
+      std::cout << "     ddx:"
+                << custom->getCustomFunction(i)->calcDerivative(2, pos)
+                << std::endl;
+      std::cout << "  fd_ddx:"
+                << custom->getCustomFunction(i)->finiteDifferenceDerivative(
+                       2, pos)
+                << std::endl;
+    }
     return false;
   }
 
@@ -47,14 +59,14 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
   Eigen::Vector6s customAcc_dp_fd
       = custom->finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
           pos, vel, 0.0);
-  if (!equals(customAcc_dp, customAcc_dp_fd, 1e-10))
+  if (!equals(customAcc_dp, customAcc_dp_fd, 1e-9))
   {
     std::cout << "Custom dAcc/dp: " << std::endl << customAcc_dp << std::endl;
     std::cout << "FD Custom dAcc/dp: " << std::endl
               << customAcc_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl
               << customAcc_dp - customAcc_dp_fd << std::endl;
-    EXPECT_TRUE(equals(customAcc_dp, customAcc_dp_fd, 1e-10));
+    EXPECT_TRUE(equals(customAcc_dp, customAcc_dp_fd, 1e-9));
     return false;
   }
 
@@ -471,12 +483,12 @@ TEST(CustomJoint, OpenSim_Knee)
   std::shared_ptr<math::SimmSpline> rotY
       = std::make_shared<math::SimmSpline>(rotY_x, rotY_y);
   (void)rotY;
-  // joint.setCustomFunction(2, rotY);
+  joint.setCustomFunction(2, rotY);
 
   std::shared_ptr<math::ConstantFunction> zero
       = std::make_shared<math::ConstantFunction>(0.0);
   (void)zero;
-  // joint.setCustomFunction(5, zero);
+  joint.setCustomFunction(5, zero);
   /*
               <SpatialTransform>
                 <!--3 Axes for rotations are listed first.-->
@@ -580,13 +592,54 @@ TEST(CustomJoint, OpenSim_Knee)
   */
   for (int i = 0; i < 10; i++)
   {
-    /*
     joint.setPositions(Eigen::Vector1s::Random());
     joint.setVelocities(Eigen::Vector1s::Random());
-    */
 
+    /*
     joint.setPosition(0, 0.0);
     joint.setVelocity(0, 1.0);
+    */
+    std::cout << "Testing (" << joint.getPosition(0) << ","
+              << joint.getVelocity(0) << ")" << std::endl;
+    if (!verifyCustomJoint(&joint, 1e-9))
+    {
+      return;
+    }
+  }
+}
+
+//==============================================================================
+TEST(CustomJoint, Polynomial)
+{
+  CustomJoint::Properties props;
+  CustomJoint joint(props);
+  joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
+
+  // Make 6 random polynomials
+  srand(42);
+  for (int i = 0; i < 6; i++)
+  {
+    std::vector<s_t> coeffs;
+    for (int j = 0; j < 10; j++)
+    {
+      coeffs.push_back((((double)rand() / RAND_MAX) * 0.1) - 0.05);
+    }
+
+    std::shared_ptr<PolynomialFunction> poly
+        = std::make_shared<PolynomialFunction>(coeffs);
+    joint.setCustomFunction(i, poly);
+  }
+
+  // Check at random positions
+  for (int i = 0; i < 10; i++)
+  {
+    joint.setPositions(Eigen::Vector1s::Random());
+    joint.setVelocities(Eigen::Vector1s::Random());
+
+    /*
+    joint.setPosition(0, 0.0);
+    joint.setVelocity(0, 1.0);
+    */
     std::cout << "Testing (" << joint.getPosition(0) << ","
               << joint.getVelocity(0) << ")" << std::endl;
     if (!verifyCustomJoint(&joint, 1e-9))

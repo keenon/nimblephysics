@@ -26,14 +26,11 @@ s_t PolynomialFunction::calcDerivative(int order, s_t x) const
   s_t x_pow = 1.0;
   for (int i = order; i < mCoeffs.size(); i++)
   {
-    s_t multiple = 0.0;
-    if (order == 1)
+    s_t multiple = i; // order 1
+    // for order >1
+    for (int j = 1; j < order; j++)
     {
-      multiple = i;
-    }
-    else if (order == 2)
-    {
-      multiple = (i - 1) * i;
+      multiple *= (i - j);
     }
     sum += multiple * mCoeffs[i] * x_pow;
     x_pow *= x;
