@@ -36,7 +36,8 @@ public:
   MPCLocal(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<trajectory::LossFn> loss,
-      int planningHorizonMillis);
+      int planningHorizonMillis,
+      s_t scale);
 
   /// Copy constructor
   MPCLocal(const MPCLocal& mpc);

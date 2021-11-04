@@ -21,14 +21,16 @@ SSID::SSID(
     std::shared_ptr<trajectory::LossFn> loss,
     int planningHistoryMillis,
     Eigen::VectorXs sensorDims,
-    int steps)
+    int steps,
+    s_t scale)
   : mRunning(false),
     mWorld(world),
     mLoss(loss),
     mPlanningHistoryMillis(planningHistoryMillis),
     mSensorDims(sensorDims),
     mControlLog(VectorLog(world->getNumDofs())),
-    mPlanningSteps(steps)
+    mPlanningSteps(steps),
+    mScale(scale)
 {
   for(int i=0;i<mSensorDims.size();i++)
   {
@@ -155,7 +157,7 @@ void SSID::runInference(long startTime)
   // registerLock();
   long startComputeWallTime = timeSinceEpochMillis();
 
-  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
@@ -217,7 +219,7 @@ void SSID::runInference(long startTime)
 
 Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int samples)
 {
-  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
@@ -276,7 +278,7 @@ Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int sampl
 
 Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen::Vector3s lower, int x_samples,int y_samples, size_t rest_dim)
 {
-  int millisPerStep = static_cast<int>(ceil(mWorld->getTimeStep() * 1000.0));
+  int millisPerStep = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 

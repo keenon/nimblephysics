@@ -26,7 +26,8 @@ namespace realtime {
 MPCLocal::MPCLocal(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<trajectory::LossFn> loss,
-    int planningHorizonMillis)
+    int planningHorizonMillis,
+    s_t scale)
   : mRunning(false),
     mWorld(world),
     mLoss(loss),
@@ -39,7 +40,7 @@ MPCLocal::MPCLocal(
     mEnableOptimizationGuards(false),
     mRecordIterations(false),
     mPlanningHorizonMillis(planningHorizonMillis),
-    mMillisPerStep(1000 * world->getTimeStep()),
+    mMillisPerStep(scale*1000 * world->getTimeStep()),
     mSteps((int)ceil((s_t)planningHorizonMillis / mMillisPerStep)),
     mShotLength(50),
     mMaxIterations(5),

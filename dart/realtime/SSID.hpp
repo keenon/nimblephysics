@@ -35,7 +35,8 @@ public:
       std::shared_ptr<trajectory::LossFn> loss,
       int planningHistoryMillis,
       Eigen::VectorXs sensorDims,
-      int steps);
+      int steps,
+      s_t scale);
 
   /// This updates the loss function that we're going to move in real time to
   /// minimize. This can happen quite frequently, for example if our loss
@@ -115,6 +116,7 @@ protected:
   std::shared_ptr<trajectory::LossFn> mLoss;
   int mPlanningHistoryMillis;
   int mPlanningSteps;
+  s_t mScale;
   Eigen::VectorXs mSensorDims;
   std::vector<VectorLog> mSensorLogs;
   VectorLog mControlLog;

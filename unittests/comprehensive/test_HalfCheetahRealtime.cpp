@@ -62,8 +62,8 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
-#define NO_VIS
+#define ALL_TESTS
+// #define NO_VIS
 
 using namespace dart;
 using namespace math;
@@ -402,6 +402,125 @@ TEST(REALTIME, HALF_CHEETAH_PLOT)
 
 #ifdef ALL_TESTS
 
+
+TEST(HALF_CHEETAH, FULL_TEST)
+{
+  // set precision to 256 bits (double has only 53 bits)
+// #ifdef DART_USE_ARBITRARY_PRECISION
+//   mpfr::mpreal::set_default_prec(256);
+// #endif
+
+  // Create a world
+  std::shared_ptr<simulation::World> world
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/half_cheetah.skel");
+  // world->setSlowDebugResultsAgainstFD(true);
+  // world->setTimeStep(2.0/1000);
+
+  for (auto* dof : world->getDofs())
+  {
+    std::cout << "DOF: " << dof->getName() << std::endl;
+  }
+
+  Eigen::VectorXs forceLimits
+      = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  forceLimits(2) = 0;
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
+
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderWorld(world);
+
+  // Create target
+
+  s_t target_x = 3.5;
+  s_t target_y = 0.5;
+
+  SkeletonPtr target = Skeleton::create("target");
+  std::pair<WeldJoint*, BodyNode*> targetJointPair
+      = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
+  WeldJoint* targetJoint = targetJointPair.first;
+  BodyNode* targetBody = targetJointPair.second;
+  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
+  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, 0.0);
+  targetJoint->setTransformFromParentBodyNode(targetOffset);
+  std::shared_ptr<BoxShape> targetShape(
+      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
+  ShapeNode* targetVisual
+      = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
+  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
+  targetVisual->getVisualAspect()->setCastShadows(false);
+
+  world->addSkeleton(target);
+
+  trajectory::LossFn loss(
+      [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
+        const Eigen::VectorXs lastPos
+            = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
+
+        s_t diffX = lastPos(0) - target_x;
+        s_t diffY = lastPos(1) - target_y;
+
+        return diffX * diffX + diffY * diffY;
+      });
+
+  std::shared_ptr<trajectory::MultiShot> trajectory
+      = std::make_shared<trajectory::MultiShot>(world, loss, 200, 10, false);
+  trajectory->setParallelOperationsEnabled(false);
+
+  trajectory::IPOptOptimizer optimizer;
+  optimizer.setLBFGSHistoryLength(5);
+  optimizer.setTolerance(1e-4);
+  // optimizer.setCheckDerivatives(true);
+  optimizer.setIterationLimit(300);
+  optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
+                                             int /* step */,
+                                             s_t /* primal */,
+                                             s_t /* dual */) {
+    const Eigen::MatrixXs poses
+        = problem->getRolloutCache(world)->getPosesConst();
+    const Eigen::MatrixXs vels
+        = problem->getRolloutCache(world)->getVelsConst();
+    std::cout << "Rendering trajectory lines" << std::endl;
+    server.renderTrajectoryLines(world, poses);
+    world->setPositions(poses.col(0));
+    server.renderWorld(world);
+    return true;
+  });
+  std::shared_ptr<trajectory::Solution> result
+      = optimizer.optimize(trajectory.get());
+
+  int i = 0;
+  const Eigen::MatrixXs poses
+      = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
+  const Eigen::MatrixXs vels
+      = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
+
+  server.renderTrajectoryLines(world, poses);
+
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long /* time */) {
+    world->setPositions(poses.col(i));
+
+    i++;
+    if (i >= poses.cols())
+    {
+      i = 0;
+    }
+    // world->step();
+    std::cout << "Frame: " << i << std::endl;
+    server.renderWorld(world);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  while (server.isServing())
+  {}
+}
+
 TEST(REALTIME, CARTPOLE_MPC)
 {
   ////////////////////////////////////////////////////////////
@@ -427,15 +546,16 @@ TEST(REALTIME, CARTPOLE_MPC)
   ////////////////////////////////////////////////////////////
 
   // 100 fps
-  world->setTimeStep(1.0 / 1000);
+  world->setTimeStep(2.0 / 1000);
+  s_t scale = 10.0;
 
   // 300 timesteps
-  int millisPerTimestep = world->getTimeStep() * 1000;
+  int millisPerTimestep = scale * world->getTimeStep() * 1000;
   int planningHorizonMillis = 100 * millisPerTimestep;
 
   // Create target
 
-  s_t target_x = 2.0;
+  s_t target_x = 2.5;
   s_t target_y = 0.5;
 
   TrajectoryLossFn loss = [&target_x, &target_y](const trajectory::TrajectoryRollout* rollout) {
@@ -489,7 +609,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
   SSID ssid = SSID(
-      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
+      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps, scale);
   
   std::mutex lock;
   ssid.attachMutex(lock);
@@ -506,10 +626,10 @@ TEST(REALTIME, CARTPOLE_MPC)
 
   world->clearTunableMassThisInstance();
   MPCLocal mpcLocal = MPCLocal(
-      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
+      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis, scale);
   mpcLocal.setSilent(true);
   
-  mpcLocal.setMaxIterations(3);
+  mpcLocal.setMaxIterations(20);
 
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
@@ -570,7 +690,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   });
   std::string key = "mass";
 
-  Ticker ticker = Ticker(realtimeUnderlyingWorld->getTimeStep());
+  Ticker ticker = Ticker(scale*realtimeUnderlyingWorld->getTimeStep());
 
   float mass = 1.0;
   float id_mass = 1.0;
@@ -644,127 +764,11 @@ TEST(REALTIME, CARTPOLE_MPC)
   server.registerConnectionListener([&]() {
     ticker.start();
     mpcRemote.start();
-    ssid.start();
+    //ssid.start();
   });
   server.registerShutdownListener([&]() { mpcRemote.stop(); });
   server.serve(8070);
   server.blockWhileServing();
-}
-
-TEST(HALF_CHEETAH, FULL_TEST)
-{
-  // set precision to 256 bits (double has only 53 bits)
-// #ifdef DART_USE_ARBITRARY_PRECISION
-//   mpfr::mpreal::set_default_prec(256);
-// #endif
-
-  // Create a world
-  std::shared_ptr<simulation::World> world
-      = dart::utils::UniversalLoader::loadWorld(
-          "dart://sample/skel/half_cheetah.skel");
-  // world->setSlowDebugResultsAgainstFD(true);
-  world->setTimeStep(1.0/1000);
-
-  for (auto* dof : world->getDofs())
-  {
-    std::cout << "DOF: " << dof->getName() << std::endl;
-  }
-
-  Eigen::VectorXs forceLimits
-      = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
-  forceLimits(0) = 0;
-  forceLimits(1) = 0;
-  world->setControlForceUpperLimits(forceLimits);
-  world->setControlForceLowerLimits(-1 * forceLimits);
-
-  GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderWorld(world);
-
-  // Create target
-
-  s_t target_x = 0.5;
-  s_t target_y = 0.5;
-
-  SkeletonPtr target = Skeleton::create("target");
-  std::pair<WeldJoint*, BodyNode*> targetJointPair
-      = target->createJointAndBodyNodePair<WeldJoint>(nullptr);
-  WeldJoint* targetJoint = targetJointPair.first;
-  BodyNode* targetBody = targetJointPair.second;
-  Eigen::Isometry3s targetOffset = Eigen::Isometry3s::Identity();
-  targetOffset.translation() = Eigen::Vector3s(target_x, target_y, 0.0);
-  targetJoint->setTransformFromParentBodyNode(targetOffset);
-  std::shared_ptr<BoxShape> targetShape(
-      new BoxShape(Eigen::Vector3s(0.1, 0.1, 0.1)));
-  ShapeNode* targetVisual
-      = targetBody->createShapeNodeWith<VisualAspect>(targetShape);
-  targetVisual->getVisualAspect()->setColor(Eigen::Vector3s(0.8, 0.5, 0.5));
-  targetVisual->getVisualAspect()->setCastShadows(false);
-
-  world->addSkeleton(target);
-
-  trajectory::LossFn loss(
-      [target_x, target_y](const trajectory::TrajectoryRollout* rollout) {
-        const Eigen::VectorXs lastPos
-            = rollout->getPosesConst().col(rollout->getPosesConst().cols() - 1);
-
-        s_t diffX = lastPos(0) - target_x;
-        s_t diffY = lastPos(1) - target_y;
-
-        return diffX * diffX + diffY * diffY;
-      });
-
-  std::shared_ptr<trajectory::MultiShot> trajectory
-      = std::make_shared<trajectory::MultiShot>(world, loss, 300, 10, false);
-  trajectory->setParallelOperationsEnabled(false);
-
-  trajectory::IPOptOptimizer optimizer;
-  optimizer.setLBFGSHistoryLength(5);
-  optimizer.setTolerance(1e-4);
-  // optimizer.setCheckDerivatives(true);
-  optimizer.setIterationLimit(500);
-  optimizer.registerIntermediateCallback([&](trajectory::Problem* problem,
-                                             int /* step */,
-                                             s_t /* primal */,
-                                             s_t /* dual */) {
-    const Eigen::MatrixXs poses
-        = problem->getRolloutCache(world)->getPosesConst();
-    const Eigen::MatrixXs vels
-        = problem->getRolloutCache(world)->getVelsConst();
-    std::cout << "Rendering trajectory lines" << std::endl;
-    server.renderTrajectoryLines(world, poses);
-    world->setPositions(poses.col(0));
-    server.renderWorld(world);
-    return true;
-  });
-  std::shared_ptr<trajectory::Solution> result
-      = optimizer.optimize(trajectory.get());
-
-  int i = 0;
-  const Eigen::MatrixXs poses
-      = result->getStep(result->getNumSteps() - 1).rollout->getPosesConst();
-  const Eigen::MatrixXs vels
-      = result->getStep(result->getNumSteps() - 1).rollout->getVelsConst();
-
-  server.renderTrajectoryLines(world, poses);
-
-  Ticker ticker(0.1);
-  ticker.registerTickListener([&](long /* time */) {
-    world->setPositions(poses.col(i));
-
-    i++;
-    if (i >= poses.cols())
-    {
-      i = 0;
-    }
-    world->step();
-    server.renderWorld(world);
-  });
-
-  server.registerConnectionListener([&]() { ticker.start(); });
-
-  while (server.isServing())
-  {}
 }
 
 #endif
