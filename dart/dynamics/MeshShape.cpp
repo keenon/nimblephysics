@@ -191,7 +191,8 @@ MeshShape::MeshShape(
     mColorIndex(0),
     mDontFreeMesh(dontFreeMesh)
 {
-  setMesh(loadMesh(path), path, std::move(resourceRetriever));
+  setMesh(
+      loadMesh(path, resourceRetriever), path, std::move(resourceRetriever));
   setScale(scale);
 }
 
@@ -381,7 +382,10 @@ Eigen::Matrix3s MeshShape::computeInertia(s_t _mass) const
 /// belonging to different skeletons
 ShapePtr MeshShape::clone() const
 {
-  return std::make_shared<MeshShape>(mScale, mMesh, mMeshUri, nullptr, true);
+  std::shared_ptr<MeshShape> shape
+      = std::make_shared<MeshShape>(mScale, mMesh, mMeshUri, nullptr, true);
+  shape->mMeshPath = mMeshPath;
+  return shape;
 }
 
 //==============================================================================
