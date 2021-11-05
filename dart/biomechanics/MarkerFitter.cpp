@@ -609,6 +609,14 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
 }
 
 //==============================================================================
+/// This sets up a bunch of linear constraints based on the motion of each
+/// body, and attempts to solve all the equations with least-squares.
+void MarkerFitter::initializeMasses(MarkerInitialization& initialization)
+{
+  (void)initialization;
+}
+
+//==============================================================================
 /// This finds an initial guess for the body scales and poses, holding
 /// anatomical marker offsets at 0, that we can use for downstream tasks.
 ///
@@ -797,13 +805,15 @@ MarkerInitialization MarkerFitter::getInitialization(
   // 5. Find the local offsets for the anthropometric markers as a simple
   // average
 
+  bool offsetAnthropometricMarkersToo = false;
+
   // 5.1. Initialize empty maps to accumulate sums into
 
   std::map<std::string, Eigen::Vector3s> trackingMarkerObservationsSum;
   std::map<std::string, int> trackingMarkerNumObservations;
   for (int i = 0; i < mMarkerNames.size(); i++)
   {
-    if (mMarkerIsTracking[i])
+    if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
     {
       std::string name = mMarkerNames[i];
       trackingMarkerObservationsSum[name] = Eigen::Vector3s::Zero();
@@ -823,7 +833,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     {
       std::string name = pair.first;
       int index = mMarkerIndices[name];
-      if (mMarkerIsTracking[index] || true)
+      if (mMarkerIsTracking[index] || offsetAnthropometricMarkersToo)
       {
         std::pair<dynamics::BodyNode*, Eigen::Vector3s> trackingMarker
             = mMarkers[index];
@@ -856,7 +866,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     }
     else
     {
-      if (mMarkerIsTracking[i] || true)
+      if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
       {
         // Avoid divide-by-zero edge case
         if (trackingMarkerNumObservations[name] == 0)
@@ -1072,7 +1082,7 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
         = skeletonBallJoints->getGroupScales();
 
     // 2. Actually solve the IK
-    math::solveIK(
+    s_t result = math::solveIK(
         initialPos,
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
@@ -1201,6 +1211,7 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
             .setLogOutput(false));
+    std::cout << "Best result: " << result << std::endl;
   }
 
   // 3. Return the result from the best fit we had
@@ -1669,7 +1680,8 @@ void MarkerFitter::setTriadsToTracking()
   {
     std::string markerName = getMarkerNameAtIndex(i);
     char lastChar = markerName[markerName.size() - 1];
-    if (lastChar == '1' || lastChar == '2' || lastChar == '3')
+    if (lastChar == '1' || lastChar == '2' || lastChar == '3' || lastChar == '4'
+        || lastChar == '5')
     {
       setMarkerIsTracking(markerName);
     }
@@ -2417,6 +2429,18 @@ MarkerFitter::finiteDifferenceIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
+void MarkerFitter::setLBFGSHistory(int hist)
+{
+  mLBFGSHistoryLength = hist;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+void MarkerFitter::setCheckDerivatives(bool checkDerivatives)
+{
+  mCheckDerivatives = checkDerivatives;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
 // The SphereFitJointCenterProblem, which maps the sphere-fitting joint-center
 // problem onto a format that IPOpt can work with.
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3088,8 +3112,11 @@ BilevelFitProblem::BilevelFitProblem(
   for (int i : mSampleIndices)
   {
     auto observation = markerObservations[i];
-    mJointCenters.col(mMarkerMapObservations.size())
-        = initialization.jointCenters.col(i);
+    if (initialization.jointCenters.rows() > 0)
+    {
+      mJointCenters.col(mMarkerMapObservations.size())
+          = initialization.jointCenters.col(i);
+    }
     mMarkerMapObservations.push_back(observation);
     std::vector<std::pair<int, Eigen::Vector3s>> translated;
     for (auto pair : observation)
