@@ -618,12 +618,14 @@ OpenSimGRF OpenSimParser::loadGRF(
           }
           // It's pretty common to do R and L plates, instead of numbered plates
           if (token.find("R") != std::string::npos
-              || token.find("r") != std::string::npos)
+              || token.find("_r") != std::string::npos
+              || token.find("r_") != std::string::npos)
           {
             plate = 0;
           }
           if (token.find("L") != std::string::npos
-              || token.find("l") != std::string::npos)
+              || token.find("_l") != std::string::npos
+              || token.find("l_") != std::string::npos)
           {
             plate = 1;
           }
@@ -1903,12 +1905,14 @@ OpenSimFile OpenSimParser::readOsim30(
             = markerCursor->FirstChildElement("socket_parent_frame")->GetText();
         std::string bodyName = bodyLookupMap[socketName].name;
 
-        bool fixed
-            = std::string(markerCursor->FirstChildElement("fixed")->GetText())
-              == "true";
+        tinyxml2::XMLElement* fixedElem
+            = markerCursor->FirstChildElement("fixed");
+        bool fixed = fixedElem == nullptr
+                     || std::string(fixedElem->GetText()) == "true";
         dynamics::BodyNode* body = skel->getBodyNode(bodyName);
 
-        if (body != nullptr) {
+        if (body != nullptr)
+        {
           file.markersMap[name]
               = std::make_pair(skel->getBodyNode(bodyName), offset);
           if (fixed)

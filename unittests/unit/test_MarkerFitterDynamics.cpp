@@ -66,7 +66,7 @@ void debugGRFToGUI(
   server.blockWhileServing();
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)
 {
   // Get the raw marker trajectory data
@@ -104,7 +104,7 @@ TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)
   // Target markers
   debugGRFToGUI(scaled.skeleton, init.poses, grf);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, DYNAMICS_OFF_PRE_SCALED)

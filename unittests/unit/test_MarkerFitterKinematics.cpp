@@ -1887,7 +1887,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 
   EXPECT_TRUE(testFitterGradients(fitter, osim, markers, observedMarkers));
 
-  EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
+  // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
 }
 // #endif
 
