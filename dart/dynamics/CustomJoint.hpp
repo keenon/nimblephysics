@@ -62,6 +62,8 @@ public:
   void setCustomFunction(
       std::size_t i, std::shared_ptr<math::CustomFunction> fn);
 
+  std::shared_ptr<math::CustomFunction> getCustomFunction(std::size_t i);
+
   /// This gets the Jacobian of the mapping functions. That is, for every
   /// epsilon change in x, how does each custom function change?
   Eigen::Vector6s getCustomFunctionGradientAt(s_t x) const;

@@ -31,16 +31,17 @@
  */
 
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/dynamics/BodyNode.hpp"
 
 namespace dart {
 namespace dynamics {
 
 //==============================================================================
-const std::string& DegreeOfFreedom::setName(const std::string& _name,
-                                            bool _preserveName)
+const std::string& DegreeOfFreedom::setName(
+    const std::string& _name, bool _preserveName)
 {
   return mJoint->setDofName(mIndexInJoint, _name, _preserveName);
 }
@@ -125,16 +126,15 @@ void DegreeOfFreedom::setPositionLimits(s_t _lowerLimit, s_t _upperLimit)
 }
 
 //==============================================================================
-void DegreeOfFreedom::setPositionLimits(const std::pair<s_t,s_t>& _limits)
+void DegreeOfFreedom::setPositionLimits(const std::pair<s_t, s_t>& _limits)
 {
   setPositionLimits(_limits.first, _limits.second);
 }
 
 //==============================================================================
-std::pair<s_t,s_t> DegreeOfFreedom::getPositionLimits() const
+std::pair<s_t, s_t> DegreeOfFreedom::getPositionLimits() const
 {
-  return std::pair<s_t,s_t>(getPositionLowerLimit(),
-                                  getPositionUpperLimit());
+  return std::pair<s_t, s_t>(getPositionLowerLimit(), getPositionUpperLimit());
 }
 
 //==============================================================================
@@ -218,16 +218,15 @@ void DegreeOfFreedom::setVelocityLimits(s_t _lowerLimit, s_t _upperLimit)
 }
 
 //==============================================================================
-void DegreeOfFreedom::setVelocityLimits(const std::pair<s_t,s_t>& _limits)
+void DegreeOfFreedom::setVelocityLimits(const std::pair<s_t, s_t>& _limits)
 {
   setVelocityLimits(_limits.first, _limits.second);
 }
 
 //==============================================================================
-std::pair<s_t,s_t> DegreeOfFreedom::getVelocityLimits() const
+std::pair<s_t, s_t> DegreeOfFreedom::getVelocityLimits() const
 {
-  return std::pair<s_t,s_t>(getVelocityLowerLimit(),
-                                  getVelocityUpperLimit());
+  return std::pair<s_t, s_t>(getVelocityLowerLimit(), getVelocityUpperLimit());
 }
 
 //==============================================================================
@@ -285,25 +284,23 @@ void DegreeOfFreedom::resetAcceleration()
 }
 
 //==============================================================================
-void DegreeOfFreedom::setAccelerationLimits(s_t _lowerLimit,
-                                            s_t _upperLimit)
+void DegreeOfFreedom::setAccelerationLimits(s_t _lowerLimit, s_t _upperLimit)
 {
   setAccelerationLowerLimit(_lowerLimit);
   setAccelerationUpperLimit(_upperLimit);
 }
 
 //==============================================================================
-void DegreeOfFreedom::setAccelerationLimits(
-                                        const std::pair<s_t,s_t>& _limits)
+void DegreeOfFreedom::setAccelerationLimits(const std::pair<s_t, s_t>& _limits)
 {
   setAccelerationLimits(_limits.first, _limits.second);
 }
 
 //==============================================================================
-std::pair<s_t,s_t> DegreeOfFreedom::getAccelerationLimits() const
+std::pair<s_t, s_t> DegreeOfFreedom::getAccelerationLimits() const
 {
-  return std::pair<s_t,s_t>(getAccelerationLowerLimit(),
-                                  getAccelerationUpperLimit());
+  return std::pair<s_t, s_t>(
+      getAccelerationLowerLimit(), getAccelerationUpperLimit());
 }
 
 //==============================================================================
@@ -356,15 +353,16 @@ void DegreeOfFreedom::setControlForceLimits(s_t _lowerLimit, s_t _upperLimit)
 }
 
 //==============================================================================
-void DegreeOfFreedom::setControlForceLimits(const std::pair<s_t, s_t> &_limits)
+void DegreeOfFreedom::setControlForceLimits(const std::pair<s_t, s_t>& _limits)
 {
   setControlForceLimits(_limits.first, _limits.second);
 }
 
 //==============================================================================
-std::pair<s_t,s_t> DegreeOfFreedom::getControlForceLimits() const
+std::pair<s_t, s_t> DegreeOfFreedom::getControlForceLimits() const
 {
-  return std::pair<s_t,s_t>(getControlForceLowerLimit(), getControlForceUpperLimit());
+  return std::pair<s_t, s_t>(
+      getControlForceLowerLimit(), getControlForceUpperLimit());
 }
 
 //==============================================================================
@@ -556,12 +554,14 @@ bool DegreeOfFreedom::isParentOf(const DegreeOfFreedom* target) const
 }
 
 //==============================================================================
-/// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+/// This uses the cached version, stored on the parent Skeleton, to return the
+/// same value as isParentOf()
 bool DegreeOfFreedom::isParentOfFast(const DegreeOfFreedom* target) const
 {
   const dynamics::Joint* parentJoint = getJoint();
   const dynamics::Joint* childJoint = target->getJoint();
-  dynamics::Skeleton* parentSkel = const_cast<dynamics::Skeleton*>(getSkeleton().get());
+  dynamics::Skeleton* parentSkel
+      = const_cast<dynamics::Skeleton*>(getSkeleton().get());
   if (parentJoint == childJoint)
   {
     // For multi-DOF joints, each axis affects all the others.
@@ -569,16 +569,17 @@ bool DegreeOfFreedom::isParentOfFast(const DegreeOfFreedom* target) const
   }
   // If these joints aren't in the same skeleton, or aren't in the same tree
   // within that skeleton, this is trivially false
-  if (parentSkel->getName()
-          != childJoint->getSkeleton()->getName()
+  if (parentSkel->getName() != childJoint->getSkeleton()->getName()
       || parentJoint->getTreeIndex() != childJoint->getTreeIndex())
     return false;
 
-  bool result = parentSkel->getParentMap()(getIndexInSkeleton(), target->getIndexInSkeleton()) == 1;
-  #ifndef NDEBUG
+  bool result = parentSkel->getDofParentMap()(
+                    getIndexInSkeleton(), target->getIndexInSkeleton())
+                == 1;
+#ifndef NDEBUG
   bool slowResult = isParentOf(target);
   assert(result == slowResult);
-  #endif
+#endif
   return result;
 }
 
@@ -632,7 +633,8 @@ bool DegreeOfFreedom::isParentOf(const BodyNode* target) const
 }
 
 //==============================================================================
-/// This uses the cached version, stored on the parent Skeleton, to return the same value as isParentOf()
+/// This uses the cached version, stored on the parent Skeleton, to return the
+/// same value as isParentOf()
 bool DegreeOfFreedom::isParentOfFast(const BodyNode* target) const
 {
   const dynamics::Joint* dofJoint = getJoint();
@@ -668,12 +670,19 @@ bool DegreeOfFreedom::isParentOfFast(const BodyNode* target) const
   if (nodeParentJoint->getName() == dofJoint->getName())
     return true;
 
-  bool result = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())->getParentMap()(getIndexInSkeleton(), nodeParentJoint->getIndexInSkeleton(0)) == 1;
+  bool result
+      = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())
+            ->getDofParentMap()(
+                getIndexInSkeleton(), nodeParentJoint->getIndexInSkeleton(0))
+        == 1;
 
-  #ifndef NDEBUG
+#ifndef NDEBUG
   bool slowResult = isParentOf(target);
-  if (result != slowResult) {
-    Eigen::MatrixXi parentMap = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())->getParentMap();
+  if (result != slowResult)
+  {
+    Eigen::MatrixXi parentMap
+        = const_cast<dynamics::Skeleton*>(nodeParentJoint->getSkeleton().get())
+              ->getDofParentMap();
     int myIndex = getIndexInSkeleton();
     int childIndex = nodeParentJoint->getIndexInSkeleton(0);
     std::cout << "Parent map: " << std::endl << parentMap << std::endl;
@@ -684,13 +693,12 @@ bool DegreeOfFreedom::isParentOfFast(const BodyNode* target) const
     slowResult = isParentOf(target);
   }
   assert(result == slowResult);
-  #endif
+#endif
   return result;
 }
 
 //==============================================================================
-DegreeOfFreedom::DegreeOfFreedom(Joint* _joint,
-                                 std::size_t _indexInJoint)
+DegreeOfFreedom::DegreeOfFreedom(Joint* _joint, std::size_t _indexInJoint)
   : mIndexInJoint(_indexInJoint),
     mIndexInSkeleton(0),
     mIndexInTree(0),

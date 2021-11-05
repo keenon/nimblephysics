@@ -5,8 +5,8 @@
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
-#include "dart/math/LinearFunction.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/LinearFunction.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -34,6 +34,13 @@ void CustomJoint::setCustomFunction(
 }
 
 //==============================================================================
+std::shared_ptr<math::CustomFunction> CustomJoint::getCustomFunction(
+    std::size_t i)
+{
+  return mFunctions[i];
+}
+
+//==============================================================================
 /// This gets the Jacobian of the mapping functions. That is, for every
 /// epsilon change in x, how does each custom function change?
 Eigen::Vector6s CustomJoint::getCustomFunctionGradientAt(s_t x) const
@@ -54,15 +61,15 @@ Eigen::Vector6s CustomJoint::finiteDifferenceCustomFunctionGradientAt(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ s_t& perturbed) {
-      perturbed = mFunctions[dof]->calcValue(x + eps);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        perturbed = mFunctions[dof]->calcValue(x + eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -373,18 +380,18 @@ Eigen::Matrix6s CustomJoint::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      perturbed = EulerFreeJoint::computeRelativeJacobianStatic(
-          getCustomFunctionPositions(pos + eps),
-          mAxisOrder,
-          mFlipAxisMap,
-          Joint::mAspectProperties.mT_ChildBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        perturbed = EulerFreeJoint::computeRelativeJacobianStatic(
+            getCustomFunctionPositions(pos + eps),
+            mAxisOrder,
+            mFlipAxisMap,
+            Joint::mAspectProperties.mT_ChildBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -417,19 +424,19 @@ math::Jacobian CustomJoint::finiteDifferenceRelativeJacobianDeriv(
 
   Eigen::Vector1s original = getPositionsStatic();
   Eigen::Vector6s result;
-  
+
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Vector6s& perturbed) {
-      Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-      setPositionsStatic(tweaked);
-      perturbed = getRelativeJacobian();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
+        setPositionsStatic(tweaked);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   setPositionsStatic(original);
   return result;
@@ -517,19 +524,19 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-          getCustomFunctionPositions(pos + eps),
-          getCustomFunctionVelocities(pos + eps, vel),
-          mAxisOrder,
-          mFlipAxisMap,
-          Joint::mAspectProperties.mT_ChildBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
+            getCustomFunctionPositions(pos + eps),
+            getCustomFunctionVelocities(pos + eps, vel),
+            mAxisOrder,
+            mFlipAxisMap,
+            Joint::mAspectProperties.mT_ChildBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -563,19 +570,19 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   math::finiteDifference<Eigen::Matrix6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix6s& perturbed) {
-      perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-          getCustomFunctionPositions(pos),
-          getCustomFunctionVelocities(pos, vel + eps),
-          mAxisOrder,
-          mFlipAxisMap,
-          Joint::mAspectProperties.mT_ChildBodyToJoint);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& perturbed) {
+        perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
+            getCustomFunctionPositions(pos),
+            getCustomFunctionVelocities(pos, vel + eps),
+            mAxisOrder,
+            mFlipAxisMap,
+            Joint::mAspectProperties.mT_ChildBodyToJoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -657,16 +664,16 @@ Eigen::Vector6s CustomJoint::scratchFd()
   bool useRidders = false;
   s_t eps = 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Vector6s& perturbed) {
-      Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-      setPositionsStatic(tweaked);
-      perturbed = scratch();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
+        setPositionsStatic(tweaked);
+        perturbed = scratch();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   setPositionsStatic(original);
   return result;
@@ -703,16 +710,16 @@ CustomJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Vector6s& perturbed) {
-      Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-      setPositionsStatic(tweaked);
-      perturbed = getRelativeJacobianTimeDeriv();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
+        setPositionsStatic(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   setPositionsStatic(original);
   return result;
@@ -781,16 +788,16 @@ CustomJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Vector6s& perturbed) {
-      Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-      setVelocitiesStatic(tweaked);
-      perturbed = getRelativeJacobianTimeDeriv();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
+        setVelocitiesStatic(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   setVelocitiesStatic(original);
   return result;

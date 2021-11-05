@@ -30,17 +30,20 @@ IKErrorReport::IKErrorReport(
     for (auto pair : observations[i])
     {
       std::string markerName = pair.first;
-      Eigen::Vector3s diff
-          = observations[i][markerName] - worldMarkers[markerName];
-      s_t squaredError = diff.squaredNorm();
-      thisTotalSquaredError += squaredError;
-      thisMaxError = std::max(thisMaxError, diff.norm());
-      if (diff.squaredNorm() > worstMarkerError.squaredNorm())
+      if (worldMarkers.count(markerName) > 0)
       {
-        worstMarker = markerName;
-        worstMarkerError = diff;
-        worstMarkerReal = observations[i][markerName];
-        worstMarkerPredicted = worldMarkers[markerName];
+        Eigen::Vector3s diff
+            = observations[i][markerName] - worldMarkers[markerName];
+        s_t squaredError = diff.squaredNorm();
+        thisTotalSquaredError += squaredError;
+        thisMaxError = std::max(thisMaxError, diff.norm());
+        if (diff.squaredNorm() > worstMarkerError.squaredNorm())
+        {
+          worstMarker = markerName;
+          worstMarkerError = diff;
+          worstMarkerReal = observations[i][markerName];
+          worstMarkerPredicted = worldMarkers[markerName];
+        }
       }
     }
     worstMarkers.push_back(worstMarker);

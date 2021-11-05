@@ -4370,7 +4370,7 @@ bool verifySkeletonMarkerJacobians(
                 = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
             if (markerDiff.norm() > 1e-8)
             {
-              const Eigen::MatrixXi& parentMap = skel->getParentMap();
+              const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
               int rootJointDof = j;
               dynamics::Joint* sourceJoint = markers[k].first->getParentJoint();
               int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
@@ -4450,7 +4450,7 @@ bool verifySkeletonMarkerJacobians(
                   = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
               if (markerDiff.norm() > 1e-8)
               {
-                const Eigen::MatrixXi& parentMap = skel->getParentMap();
+                const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
@@ -4544,7 +4544,7 @@ bool verifySkeletonMarkerJacobians(
                   = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
               if (markerDiff.norm() > 1e-8)
               {
-                const Eigen::MatrixXi& parentMap = skel->getParentMap();
+                const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();

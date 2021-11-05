@@ -468,6 +468,9 @@ public:
   // Documentation inherited
   Joint* getJoint(std::size_t _idx) override;
 
+  // Gets the index in the skeleton where this joint lives
+  int getJointIndex(const Joint* joint);
+
   // Documentation inherited
   const Joint* getJoint(std::size_t _idx) const override;
 
@@ -551,11 +554,20 @@ public:
   /// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
   /// interpreted as:
   ///
-  /// getParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
-  /// getParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+  /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+  /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
   ///
   /// This is computed in bulk, and cached in the skeleton.
-  const Eigen::MatrixXi& getParentMap();
+  const Eigen::MatrixXi& getDofParentMap();
+
+  /// This returns a square (N x N) matrix, filled with 1s and 0s. This can be
+  /// interpreted as:
+  ///
+  /// getJointParentMap(i,j) == 1: Joint[i] is a parent of Joint[j]
+  /// getJointParentMap(i,j) == 0: Joint[i] is NOT a parent of Joint[j]
+  ///
+  /// This is computed in bulk, and cached in the skeleton.
+  const Eigen::MatrixXi& getJointParentMap();
 
   /// \}
 
@@ -2208,8 +2220,9 @@ protected:
     /// Dirty flag for the support polygon
     bool mSupport;
 
-    /// Dirty flag for the parent map
-    bool mParentMap;
+    /// Dirty flag for the parent maps
+    bool mDofParentMap;
+    bool mJointParentMap;
 
     /// Increments each time a new support polygon is computed to help keep
     /// track of changes in the support polygon
@@ -2278,7 +2291,8 @@ protected:
     Eigen::Vector2s mSupportCentroid;
 
     /// A map of the parent relationships between dofs in this skeleton.
-    Eigen::MatrixXi mParentMap;
+    Eigen::MatrixXi mDofParentMap;
+    Eigen::MatrixXi mJointParentMap;
 
     /// A shared pointer to the saved gradient matrices for the ConstrainedGroup
     /// this skeleton was part of in the last LCP solve.
