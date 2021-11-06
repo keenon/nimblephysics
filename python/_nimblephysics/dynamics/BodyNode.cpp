@@ -1150,6 +1150,12 @@ void BodyNode(py::module& m)
           ::py::arg("torque"),
           ::py::arg("isLocal"))
       .def(
+          "setExtWrench",
+          +[](dart::dynamics::BodyNode* self, const Eigen::Vector6s& wrench) {
+            self->setExtWrench(wrench);
+          },
+          ::py::arg("wrench"))
+      .def(
           "clearExternalForces",
           +[](dart::dynamics::BodyNode* self) { self->clearExternalForces(); })
       .def(
@@ -1171,8 +1177,9 @@ void BodyNode(py::module& m)
               -> bool { return self->isReactive(); })
       .def(
           "getConstraintImpulse",
-          +[](const dart::dynamics::BodyNode* self)
-              -> const Eigen::Vector6s& { return self->getConstraintImpulse(); })
+          +[](const dart::dynamics::BodyNode* self) -> const Eigen::Vector6s& {
+            return self->getConstraintImpulse();
+          })
       .def(
           "setConstraintImpulse",
           +[](dart::dynamics::BodyNode* self,
