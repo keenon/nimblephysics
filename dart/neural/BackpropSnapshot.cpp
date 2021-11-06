@@ -678,55 +678,9 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
     }
     else
     {
-      Eigen::VectorXs ddamp = getDampingVector(world);
-      Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
-      Eigen::MatrixXs Minv = getInvMassMatrix(world);
       s_t dt = world->getTimeStep();
-
-
       mCachedVelVel = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-                      + getAccJacobianWrt(world, WithRespectTo::VELOCITY)
-                      - dt * Minv * ddamp.asDiagonal()
-                      - dt * dt * Minv * spring_stiffs.asDiagonal();
-
-        /*
-        Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
-        Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-        Eigen::MatrixXs P_c = getProjectionIntoClampsMatrix(world);
-        Eigen::MatrixXs Minv = getInvMassMatrix(world);
-        Eigen::MatrixXs dF_c
-            = getJacobianOfConstraintForce(world, WithRespectTo::VELOCITY);
-        Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
-        Eigen::MatrixXs parts2 = Minv * A_c_ub_E * dF_c;
-
-        mCachedVelVel = (Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) + parts2)
-                        - getControlForceVelJacobian(world) *
-        getVelCJacobian(world);
-        */
-
-        /*
-        std::cout << "A_c: " << std::endl << A_c << std::endl;
-        std::cout << "A_ub: " << std::endl << A_ub << std::endl;
-        std::cout << "E: " << std::endl << E << std::endl;
-        std::cout << "P_c: " << std::endl << P_c << std::endl;
-        std::cout << "Minv: " << std::endl << Minv << std::endl;
-        std::cout << "mTimestep: " << mTimeStep << std::endl;
-        std::cout << "A_c + A_ub * E: " << std::endl << parts1 << std::endl;
-        */
-        /*
-         std::cout << "Vel-vel construction pieces: " << std::endl;
-         std::cout << "1: I " << std::endl
-                   << Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) <<
-         std::endl; std::cout << "2: - mTimestep * Minv * (A_c + A_ub * E) *
-         P_c" << std::endl
-                   << -parts2 << std::endl;
-         std::cout << "2.5: velC" << std::endl << getVelCJacobian(world) <<
-         std::endl; std::cout << "3: - forceVel * velC" << std::endl
-                   << -getControlForceVelJacobian(world) *
-         getVelCJacobian(world)
-                   << std::endl;
-         */
-        
+                      + dt * getAccJacobianWrt(world, WithRespectTo::VELOCITY);
     }
 
     if (mSlowDebugResultsAgainstFD)
@@ -781,26 +735,7 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelAccJacobian(
           "BackpropSnapshot.getVelAccJacobian#refreshCache");
     }
 #endif
-    Eigen::VectorXs ddamp = getDampingVector(world);
-    Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
-    Eigen::MatrixXs Minv = getInvMassMatrix(world);
-    s_t dt = world->getTimeStep();
-    Eigen::MatrixXs A_c = getClampingConstraintMatrix(world);
-
-    // If there are no clamping constraints, then vel-vel is just the identity
-    if (A_c.size() == 0)
-    {
-      mCachedVelAcc = - Minv * ddamp.asDiagonal()
-                      - dt * Minv * spring_stiffs.asDiagonal()
-                      - Minv * getVelCJacobian(world);
-    }
-    else
-    {
-      mCachedVelAcc = getAccJacobianWrt(world, WithRespectTo::VELOCITY)
-                      + Minv * ddamp.asDiagonal()
-                      + dt * Minv * spring_stiffs.asDiagonal();
-    }
-
+    mCachedVelAcc = getAccJacobianWrt(world, WithRespectTo::VELOCITY);
     mCachedVelAccDirty = false;
 #ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
     if (refreshLog != nullptr)
@@ -1365,7 +1300,7 @@ Eigen::MatrixXs BackpropSnapshot::getAccJacobianWrt(
   Eigen::VectorXs damping_force = ddamp.asDiagonal() * v_t;
   Eigen::MatrixXs dM = getJacobianOfMinv(
       world,
-      tau - C - damping_force - spring_force + A_c_ub_E * f_c,
+      tau - C - damping_force - spring_force + A_c_ub_E * f_c / dt,
       wrt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
@@ -1374,16 +1309,32 @@ Eigen::MatrixXs BackpropSnapshot::getAccJacobianWrt(
 
   if (wrt == WithRespectTo::FORCE)
   {
-    // snapshot.restore();
-    return Minv * ((A_c_ub_E * dF_c) / dt + Eigen::MatrixXs::Identity(world->getNumDofs(), world->getNumDofs()));
+    if(A_c.size() == 0)
+    {
+      return Minv;
+    }
+    else
+    {
+      return Minv * ((A_c_ub_E * dF_c) / dt 
+             + Eigen::MatrixXs::Identity(world->getNumDofs(), world->getNumDofs()));
+    }
   }
-
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
-
   if (wrt == WithRespectTo::VELOCITY)
   {
     // snapshot.restore();
-    return Minv * (A_c_ub_E * dF_c / dt - dC);
+    if(A_c.size() == 0)
+    {
+      return - Minv * dC 
+             - Minv * ddamp.asDiagonal() 
+             - dt * Minv * spring_stiffs.asDiagonal();
+    }
+    else
+    {
+      return Minv * (A_c_ub_E * dF_c / dt - dC) 
+             - Minv * ddamp.asDiagonal()
+             - dt * Minv * spring_stiffs.asDiagonal();
+    }
   }
   else if (wrt == WithRespectTo::POSITION)
   {

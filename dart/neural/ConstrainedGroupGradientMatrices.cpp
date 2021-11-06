@@ -922,26 +922,11 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelVelJacobian(
         "ConstrainedGroupGradientMatrices.getVelVelJacobian");
   }
 #endif
-
-  const Eigen::MatrixXs& A_c = getClampingConstraintMatrix();
   Eigen::MatrixXs jac;
-
-  // If there are no clamping constraints, then vel-vel is just the identity
-  Eigen::VectorXs ddamp = getDampingVector(world);
-  Eigen::MatrixXs Minv = getInvMassMatrix(world);
-  Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
   s_t dt = world->getTimeStep();
-  if (A_c.size() == 0)
-  {
-    jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
-          - getControlForceVelJacobian(world) * getVelCJacobian(world)
-          - dt*Minv*ddamp.asDiagonal()-dt*dt*Minv*spring_stiffs.asDiagonal();
-  }
-  else
-  {
-    jac = getVelJacobianWrt(world, WithRespectTo::VELOCITY) 
-          - dt*Minv*ddamp.asDiagonal()-dt*dt*Minv*spring_stiffs.asDiagonal();
-  }
+  
+  jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
+        + dt*getAccJacobianWrt(world, WithRespectTo::VELOCITY);
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
   if (thisLog != nullptr)
@@ -1060,6 +1045,85 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelCJacobian(
     cursor += skelDOF;
   }
   return velCJac;
+}
+
+//==============================================================================
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelAccJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun(
+        "ConstrainedGroupGradientMatrices.getVelAccJacobian");
+  }
+#endif
+  Eigen::MatrixXs jac;
+
+  jac = getAccJacobianWrt(world, WithRespectTo::VELOCITY);
+
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getPosAccJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun(
+        "ConstrainedGroupGradientMatrices.getPosAccJacobian");
+  }
+#endif
+  Eigen::MatrixXs jac;
+
+  jac = getAccJacobianWrt(world, WithRespectTo::POSITION);
+
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getControlForceAccJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun(
+        "ConstrainedGroupGradientMatrices.getControlForceAccJacobian");
+  }
+#endif
+  Eigen::MatrixXs jac;
+
+  jac = getAccJacobianWrt(world, WithRespectTo::FORCE);
+
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+  return jac;
 }
 
 //==============================================================================
@@ -1368,6 +1432,93 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelJacobianWrt(
     return dM + Minv * (A_c_ub_E * dF_c - dt * dC);
   }
 }
+
+//==============================================================================
+/// This computes and returns the whole pos-vel jacobian. For backprop, you
+/// don't actually need this matrix, you can compute backprop directly. This
+/// is here if you want access to the full Jacobian for some reason.
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getAccJacobianWrt(
+    simulation::WorldPtr world, WithRespectTo* wrt)
+{
+  int wrtDim = 0;
+  int dofs = 0;
+  for (const std::string& skelName : mSkeletons)
+  {
+    auto skel = world->getSkeleton(skelName);
+    wrtDim += wrt->dim(skel.get());
+    dofs += skel->getNumDofs();
+  }
+  if (wrtDim == 0)
+  {
+    return Eigen::MatrixXs::Zero(dofs, 0);
+  }
+  const Eigen::MatrixXs& A_c = getClampingConstraintMatrix();
+  const Eigen::MatrixXs& A_ub = getUpperBoundConstraintMatrix();
+  const Eigen::MatrixXs& E = getUpperBoundMappingMatrix();
+  Eigen::MatrixXs A_c_ub_E = A_c + A_ub * E;
+
+  Eigen::VectorXs tau = mPreStepTorques;
+  Eigen::VectorXs C = getCoriolisAndGravityAndExternalForces(world);
+  const Eigen::VectorXs& f_c = getClampingConstraintImpulses();
+  s_t dt = world->getTimeStep();
+  Eigen::VectorXs ddamp = getDampingVector(world);
+  Eigen::VectorXs v_t = getVelocities(world);
+  Eigen::VectorXs p_t = getPositions(world);
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector(world);
+  Eigen::VectorXs p_rest = getRestPositions(world);
+  Eigen::VectorXs spring_forces = spring_stiffs.asDiagonal()*(p_t - p_rest + dt*v_t);
+  Eigen::VectorXs damping_forces = ddamp.asDiagonal()*v_t;
+
+  Eigen::MatrixXs dM
+      = getJacobianOfMinv(world, tau - C - damping_forces - spring_forces + A_c_ub_E * f_c / dt, wrt);
+
+  Eigen::MatrixXs Minv = getInvMassMatrix(world);
+
+  Eigen::MatrixXs dF_c = getJacobianOfConstraintForce(world, wrt);
+
+  if (wrt == WithRespectTo::FORCE)
+  {
+    if(A_c.size() == 0)
+    {
+      return Minv;
+    }
+    else
+    {
+      return Minv * ((A_c_ub_E * dF_c) / dt
+                + Eigen::MatrixXs::Identity(dofs, wrtDim));
+    }
+  }
+
+  Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
+
+  if (wrt == WithRespectTo::VELOCITY)
+  {
+    if(A_c.size() == 0)
+    {
+      return - Minv * dC
+             - Minv * ddamp.asDiagonal()
+             - dt * Minv * spring_stiffs.asDiagonal();
+    }
+    else
+    {
+      return Minv * (A_c_ub_E * dF_c / dt - dC)
+             - Minv * ddamp.asDiagonal()
+             - dt * Minv * spring_stiffs.asDiagonal();
+    }
+  }
+  else if (wrt == WithRespectTo::POSITION)
+  {
+    Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
+    Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
+    return dM + Minv * (A_c_ub_E * dF_c / dt + dA_c / dt + dA_ubE / dt - dC) 
+           - Minv*spring_stiffs.asDiagonal();
+  }
+  else
+  {
+    return dM + Minv * (A_c_ub_E * dF_c / dt - dC);
+  }
+}
+
 
 //==============================================================================
 /// This returns the jacobian of constraint force, holding everyhing constant
