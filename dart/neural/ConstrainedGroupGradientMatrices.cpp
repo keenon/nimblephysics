@@ -974,9 +974,20 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getPosPosJacobian(
         "ConstrainedGroupGradientMatrices.getPosPosJacobian");
   }
 #endif
-
-  Eigen::MatrixXs jac = getJointsPosPosJacobian(world)
-                        * getBounceApproximationJacobian(thisLog);
+  Eigen::MatrixXs jac;
+  if(world->getParallelVelocityAndPositionUpdates())
+  {
+    jac = getJointsPosPosJacobian(world)
+          * getBounceApproximationJacobian(thisLog);
+  }
+  else
+  {
+    Eigen::MatrixXs dacc_dp = getAccJacobianWrt(world, WithRespectTo::POSITION);
+    s_t dt = world->getTimeStep();
+    jac = (getJointsPosPosJacobian(world) + dt * dt * eliminateFDBlock(world, dacc_dp))
+          * getBounceApproximationJacobian(thisLog);
+  }
+  
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
   if (thisLog != nullptr)
@@ -999,9 +1010,47 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelPosJacobian(
         "ConstrainedGroupGradientMatrices.getVelPosJacobian");
   }
 #endif
+  Eigen::MatrixXs jac;
+  if(world->getParallelVelocityAndPositionUpdates())
+  {
+    jac = getJointsVelPosJacobian(world)
+                        * getBounceApproximationJacobian(thisLog); 
+  }
+  else
+  {
+    Eigen::MatrixXs dacc_dv = getAccJacobianWrt(world, WithRespectTo::VELOCITY);
+    Eigen::MatrixXs dacc_dp = getAccJacobianWrt(world, WithRespectTo::POSITION);
+    s_t dt = world->getTimeStep();
 
-  Eigen::MatrixXs jac = getJointsVelPosJacobian(world)
-                        * getBounceApproximationJacobian(thisLog);
+    jac = (getJointsVelPosJacobian(world) + getVelCurrentPosJacobian(world, thisLog)
+           + dt * dt * eliminateFDBlock(world, dacc_dv + 
+                                               dacc_dp * getVelCurrentPosJacobian(world, thisLog)))
+          * getBounceApproximationJacobian(thisLog);
+  }
+
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelCurrentPosJacobian(
+    simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun(
+        "ConstrainedGroupGradientMatrices.getVelCurrentPosJacobian");
+  }
+#endif
+  s_t dt = world->getTimeStep();
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) * dt;
 
 #ifdef LOG_PERFORMANCE_CONSTRAINED_GROUP
   if (thisLog != nullptr)
@@ -1045,6 +1094,31 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getVelCJacobian(
     cursor += skelDOF;
   }
   return velCJac;
+}
+
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::eliminateFDBlock(simulation::WorldPtr world, Eigen::MatrixXs jac)
+{
+  size_t cursor = 0;
+  Eigen::MatrixXs jacobian = Eigen::MatrixXs::Zero(jac.rows(),jac.cols());
+  jacobian.block(0,0,jac.rows(),jac.cols()) = jac;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    for(size_t j = 0; j < skel->getNumJoints(); j++)
+    {
+      if(skel->getJoint(j)->getType() == "BallJoint")
+      {
+        jacobian.block(cursor, cursor, 3, 3) = Eigen::Matrix3s::Zero();
+      }
+      else if(skel->getJoint(j)->getType() == "FreeJoint")
+      {
+        jacobian.block(cursor, cursor, 6, 6) = Eigen::Matrix6s::Zero();
+      }
+      cursor += skel->getJoint(j)->getNumDofs();
+    }
+  }
+  return jacobian;
 }
 
 //==============================================================================
@@ -1278,6 +1352,23 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsPosPosJacobian(
 }
 
 //==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsPosPosJacobian(
+    simulation::WorldPtr world, Eigen::VectorXs pos, Eigen::VectorXs vel)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJacobian(
+        pos.segment(cursor,dofs), vel.segment(cursor,dofs), mTimeStep);
+    cursor += dofs;
+  }
+  return jac;
+}
+
+//==============================================================================
 Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsVelPosJacobian(
     simulation::WorldPtr world)
 {
@@ -1289,6 +1380,23 @@ Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsVelPosJacobian(
     int dofs = skel->getNumDofs();
     jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJacobian(
         skel->getPositions(), skel->getVelocities(), mTimeStep);
+    cursor += dofs;
+  }
+  return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs ConstrainedGroupGradientMatrices::getJointsVelPosJacobian(
+    simulation::WorldPtr world, Eigen::VectorXs pos, Eigen::VectorXs vel)
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mNumDOFs, mNumDOFs);
+  int cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(mSkeletons[i]);
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJacobian(
+        pos.segment(cursor, dofs), vel.segment(cursor, dofs), mTimeStep);
     cursor += dofs;
   }
   return jac;

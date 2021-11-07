@@ -174,6 +174,13 @@ public:
   Eigen::MatrixXs getPosPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and returns the whole vel-current_pos Jacobian for this group. For
+  /// backprop, you don't actually need this matrix, you can compute backprop
+  /// directly. This is here if you want access to the full Jacobian for some
+  /// reason
+  Eigen::MatrixXs getVelCurrentPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole vel-pos jacobian for this group. For
   /// backprop, you don't actually need this matrix, you can compute backprop
   /// directly. This is here if you want access to the full Jacobian for some
@@ -188,6 +195,9 @@ public:
   /// This returns the [dC(pos,vel)/dvel] for the group, a block diagonal
   /// concatenation of the skeleton [dC(pos,vel)/dvel] matrices.
   Eigen::MatrixXs getVelCJacobian(simulation::WorldPtr world);
+
+  Eigen::MatrixXs eliminateFDBlock(simulation::WorldPtr world,
+                                   Eigen::MatrixXs jac);
 
   /// This returns the mass matrix for the group, a block diagonal
   /// concatenation of the skeleton mass matrices.
@@ -215,9 +225,21 @@ public:
   /// integration scheme is reflected.
   Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world);
 
+  /// This has similar function to previous one except it is used for
+  /// semi-implicit integration
+  Eigen::MatrixXs getJointsPosPosJacobian(simulation::WorldPtr world,
+                                          Eigen::VectorXs pos,
+                                          Eigen::VectorXs vel);
+
   /// This returns the block diagonal matrix where each skeleton's joints
   /// integration scheme is reflected.
   Eigen::MatrixXs getJointsVelPosJacobian(simulation::WorldPtr world);
+
+  /// This has similar function to previuos one except it is used for
+  /// semi-implicit integration
+  Eigen::MatrixXs getJointsVelPosJacobian(simulation::WorldPtr world,
+                                          Eigen::VectorXs pos,
+                                          Eigen::VectorXs vel);
 
   /// This computes and returns the component of the pos-pos and pos-vel
   /// jacobians due to bounce approximation. For backprop, you don't actually

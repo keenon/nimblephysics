@@ -527,12 +527,22 @@ public:
   /// complicated function to integrate to the next position.
   Eigen::MatrixXs getPosPosJacobian() const;
 
+  /// Having similar function as the previous one. This pos pos Jacobian is
+  /// for semi-implicit integrator, which uses current velocity for integration
+  /// instead of previous one
+  Eigen::MatrixXs getPosPosJacobian(Eigen::VectorXs pos, Eigen::VectorXs vel) const;
+
   /// This gets the Jacobian relating how changing our current velocity will
   /// change our next position after a step. Intuitively, you'd expect this to
   /// just be an identity matrix * dt, and often it is, but if we have any
   /// FreeJoints or BallJoints things get more complicated, because they
   /// actually use a complicated function to integrate to the next position.
   Eigen::MatrixXs getVelPosJacobian() const;
+
+  /// Having similar function as the previous one. This vel pos jacobian is
+  /// for semi-implicit integrator, which uses current velocity for integration
+  /// instead of previous one.
+  Eigen::MatrixXs getVelPosJacobian(Eigen::VectorXs pos, Eigen::VectorXs vel) const;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about

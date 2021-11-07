@@ -100,6 +100,12 @@ public:
   const Eigen::MatrixXs& getPosAccJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and return the whole vel-current_pos jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getVelCurrentPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and return the whole force-acc jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want to access to the full Jacobian for some reason.
@@ -173,6 +179,10 @@ public:
 
   /// Returns the LCP's cached solution from before the step
   const Eigen::VectorXs& getPreStepLCPCache();
+
+  /// Eliminate the block diagonal jacobian matrix of acceleration related to ball
+  /// and free joint since their Jacobian depends on the finite differencing
+  Eigen::MatrixXs eliminateFDBlock(simulation::WorldPtr world, Eigen::MatrixXs jac);
 
   /////////////////////////////////////////////////////////////////////////////
   /// Just public for testing

@@ -170,6 +170,7 @@ void BackpropSnapshot::backprop(
         = getControlForceVelJacobian(world, thisLog);
     const Eigen::MatrixXs& massVel = getMassVelJacobian(world, thisLog);
 
+    // The update scheme should be the same as explicit integration
     thisTimestepLoss.lossWrtPosition
         = posPos.transpose() * nextTimestepLoss.lossWrtPosition
           + posVel.transpose() * nextTimestepLoss.lossWrtVelocity;
@@ -799,6 +800,37 @@ const Eigen::MatrixXs& BackpropSnapshot::getPosAccJacobian(
   }
 #endif
   return mCachedPosAcc;
+}
+
+//==============================================================================
+// TODO: Eric Chen: Finish implementation for BallJoint and FreeJoint
+const Eigen::MatrixXs& BackpropSnapshot::getVelCurrentPosJacobian(
+  simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+#ifndef NDEBUG
+  assert(
+    world->getPositions() == mPreStepPosition
+    && world->getVelocities() == mPreStepVelocity);
+#endif
+  PerformanceLog* thislog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getVelCurrentPosJacobian");
+  }
+#endif
+
+  s_t dt = world->getTimeStep();
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Identity(world->getNumDofs(), world->getNumDofs())*dt;
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if(thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+
+return jac;
 }
 
 //==============================================================================
@@ -1539,17 +1571,19 @@ const Eigen::MatrixXs& BackpropSnapshot::getPosPosJacobian(
     }
     else
     {
-      /*
-      RestorableSnapshot snapshot(world);
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      */
-
-      mCachedPosPos = world->getPosPosJacobian()
+      if(world->getParallelVelocityAndPositionUpdates())
+      {
+        mCachedPosPos = world->getPosPosJacobian()
                       * getBounceApproximationJacobian(world, thisLog);
-
+      }
+      else
+      {
+        Eigen::MatrixXs dacc_dp = getAccJacobianWrt(world, WithRespectTo::POSITION);
+        s_t dt = world->getTimeStep();
+        mCachedPosPos = (world->getPosPosJacobian(mPreStepPosition, mPostStepVelocity) + dt * dt * eliminateFDBlock(world, dacc_dp))
+                      * getBounceApproximationJacobian(world, thisLog);
+      }
+      
       // snapshot.restore();
     }
 
@@ -1614,8 +1648,22 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelPosJacobian(
     }
     else
     {
-      mCachedVelPos = world->getVelPosJacobian()
+      if(world->getParallelVelocityAndPositionUpdates())
+      {
+        mCachedVelPos = world->getVelPosJacobian()
                       * getBounceApproximationJacobian(world, thisLog);
+      }
+      else
+      {
+        Eigen::MatrixXs dacc_dv = getAccJacobianWrt(world, WithRespectTo::VELOCITY);
+        Eigen::MatrixXs dacc_dp = getAccJacobianWrt(world, WithRespectTo::POSITION);
+        s_t dt = world->getTimeStep();
+        mCachedVelPos = (world->getVelPosJacobian(mPreStepPosition, mPostStepVelocity) 
+                         + getVelCurrentPosJacobian(world, thisLog) 
+                         + dt * dt * eliminateFDBlock(world, dacc_dv 
+                                                             + dacc_dp * getVelCurrentPosJacobian(world, thisLog)))
+                      * getBounceApproximationJacobian(world, thisLog);
+      }
     }
 
     if (mSlowDebugResultsAgainstFD)
@@ -1693,6 +1741,33 @@ Eigen::VectorXs BackpropSnapshot::getPostStepTorques()
 const Eigen::VectorXs& BackpropSnapshot::getPreStepLCPCache()
 {
   return mPreStepLCPCache;
+}
+
+//==============================================================================
+/// Eliminate the block diagonal jacobian matrix of acceleration related to ball
+/// and free joint since their Jacobian depends on the finite differencing
+Eigen::MatrixXs eliminateFDBlock(simulation::WorldPtr world, Eigen::MatrixXs jac)
+{
+  size_t cursor = 0;
+  Eigen::MatrixXs jacobian = Eigen::MatrixXs::Zero(jac.rows(),jac.cols());
+  jacobian.block(0,0,jac.rows(),jac.cols()) = jac;
+  for(size_t i = 0; i < world->getNumSkeletons(); i++)
+  {
+    SkeletonPtr skel = world->getSkeleton(i);
+    for(size_t j = 0; j < skel->getNumJoints(); j++)
+    {
+      if(skel->getJoint(j)->getType() == "BallJoint")
+      {
+        jacobian.block(cursor,cursor,3,3) = Eigen::Matrix3s::Zero();
+      }
+      else if(skel->getJoint(j)->getType() == "FreeJoint")
+      {
+        jacobian.block(cursor,cursor,6,6) = Eigen::Matrix6s::Zero();
+      }
+      cursor += skel->getJoint(j)->getNumDofs();
+    }
+  }
+  return jacobian;
 }
 
 //==============================================================================

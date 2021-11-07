@@ -2024,6 +2024,23 @@ Eigen::MatrixXs World::getPosPosJacobian() const
   return jac;
 }
 
+/// Having similar function as the previous one. This pos pos Jacobian is
+/// for semi-implicit integrator, which uses current velocity for integration
+/// instead of previous one
+Eigen::MatrixXs World::getPosPosJacobian(Eigen::VectorXs pos, Eigen::VectorXs vel) const
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mDofs, mDofs);
+  int cursor = 0;
+  for(auto& skel : mSkeletons)
+  {
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getPosPosJacobian(
+        pos.segment(cursor,dofs), vel.segment(cursor, dofs), mTimeStep);
+    cursor += dofs;
+  }
+  return jac;
+}
+
 /// This gets the Jacobian relating how changing our current velocity will
 /// change our next position after a step. Intuitively, you'd expect this to
 /// just be an identity matrix * dt, and often it is, but if we have any
@@ -2041,6 +2058,23 @@ Eigen::MatrixXs World::getVelPosJacobian() const
     cursor += dofs;
   }
   return jac;
+}
+
+/// Having similar function as the previous one. This vel pos jacobian is
+/// for semi-implicit integrator, which uses current velocity for integration
+/// instead of previous one.
+Eigen::MatrixXs World::getVelPosJacobian(Eigen::VectorXs pos, Eigen::VectorXs vel) const
+{
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(mDofs, mDofs);
+  int cursor = 0;
+  for(auto& skel : mSkeletons)
+  {
+    int dofs = skel->getNumDofs();
+    jac.block(cursor, cursor, dofs, dofs) = skel->getVelPosJacobian(
+      pos.segment(cursor, dofs), vel.segment(cursor, dofs), mTimeStep);
+    cursor += dofs;
+  }
+  return jac
 }
 
 //==============================================================================
