@@ -19,6 +19,7 @@
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/PolynomialFunction.hpp"
 #include "dart/math/SimmSpline.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -379,9 +380,17 @@ OpenSimMot OpenSimParser::loadMot(
   {
     std::string line = content.substr(start, end - start);
 
+    // Trim '\r', in case this file was saved on a Windows machine
+    if (line.size() > 0 && line[line.size() - 1] == '\r')
+    {
+      line = line.substr(0, line.size() - 1);
+    }
+
     if (inHeader)
     {
-      if (line == "endheader")
+      std::string ENDHEADER = "endheader";
+      if (line.size() >= ENDHEADER.size()
+          && line.substr(0, ENDHEADER.size()) == ENDHEADER)
       {
         inHeader = false;
       }
@@ -419,29 +428,29 @@ OpenSimMot OpenSimParser::loadMot(
             // This means we're on the row defining the names of the joints
             // we're recording positions of
             dynamics::DegreeOfFreedom* dof = skel->getDof(token);
+            bool isRotationalJoint = true;
             if (dof != nullptr)
             {
               columnToDof.push_back(dof->getIndexInSkeleton());
+              dynamics::Joint* joint = dof->getJoint();
+              if (joint->getType()
+                      == dynamics::TranslationalJoint2D::getStaticType()
+                  || joint->getType()
+                         == dynamics::TranslationalJoint::getStaticType()
+                  || joint->getType()
+                         == dynamics::PrismaticJoint::getStaticType())
+              {
+                isRotationalJoint = false;
+              }
+              if (joint->getType() == dynamics::EulerFreeJoint::getStaticType()
+                  && dof->getIndexInJoint() >= 3)
+              {
+                isRotationalJoint = false;
+              }
             }
             else
             {
               columnToDof.push_back(-1);
-            }
-            dynamics::Joint* joint = dof->getJoint();
-            bool isRotationalJoint = true;
-            if (joint->getType()
-                    == dynamics::TranslationalJoint2D::getStaticType()
-                || joint->getType()
-                       == dynamics::TranslationalJoint::getStaticType()
-                || joint->getType()
-                       == dynamics::PrismaticJoint::getStaticType())
-            {
-              isRotationalJoint = false;
-            }
-            if (joint->getType() == dynamics::EulerFreeJoint::getStaticType()
-                && dof->getIndexInJoint() >= 3)
-            {
-              isRotationalJoint = false;
             }
             rotationalDof.push_back(isRotationalJoint);
           }
@@ -505,6 +514,270 @@ OpenSimMot OpenSimParser::loadMot(
   mot.timestamps = timestamps;
 
   return mot;
+}
+
+//==============================================================================
+/// This grabs the GRF forces from a *.mot file
+OpenSimGRF OpenSimParser::loadGRF(
+    const common::Uri& uri,
+    int downsampleByFactor,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  OpenSimGRF result;
+  const std::string content = retriever->readAll(uri);
+
+  bool inHeader = true;
+
+  std::vector<int> colToPlate;
+  std::vector<int> colToCOP;
+  std::vector<int> colToWrench;
+  int numPlates = 0;
+
+  std::vector<s_t> timestamps;
+  std::vector<std::vector<Eigen::Vector3s>> copRows;
+  std::vector<std::vector<Eigen::Vector6s>> wrenchRows;
+
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    // Trim '\r', in case this file was saved on a Windows machine
+    if (line.size() > 0 && line[line.size() - 1] == '\r')
+    {
+      line = line.substr(0, line.size() - 1);
+    }
+
+    if (inHeader)
+    {
+      std::string ENDHEADER = "endheader";
+      if (line.size() >= ENDHEADER.size()
+          && line.substr(0, ENDHEADER.size()) == ENDHEADER)
+      {
+        inHeader = false;
+      }
+      auto tokenEnd = line.find("=");
+      if (tokenEnd != std::string::npos)
+      {
+        std::string variable = line.substr(0, tokenEnd);
+        std::string value
+            = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
+        // Currently we don't read anything from the variables
+        (void)variable;
+        (void)value;
+      }
+    }
+    else
+    {
+      int tokenNumber = 0;
+      std::string whitespace = " \t";
+      auto tokenStart = line.find_first_not_of(whitespace);
+
+      double timestamp = 0.0;
+      std::vector<Eigen::Vector3s> cops;
+      std::vector<Eigen::Vector6s> wrenches;
+
+      for (int i = 0; i < numPlates; i++)
+      {
+        wrenches.push_back(Eigen::Vector6s::Zero());
+        cops.push_back(Eigen::Vector3s::Zero());
+      }
+
+      while (tokenStart != std::string::npos)
+      {
+        auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+        std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+        /////////////////////////////////////////////////////////
+        // Process the token, given tokenNumber and lineNumber
+
+        if (lineNumber == 0)
+        {
+          int plate = -1;
+          int cop = -1;
+          int wrench = -1;
+
+          if (token != "time")
+          {
+            // Default to plate 0
+            plate = 0;
+          }
+
+          // Find plate number
+          for (int p = 1; p < 10; p++)
+          {
+            if (token.find(std::to_string(p)) != std::string::npos)
+            {
+              plate = p - 1;
+            }
+          }
+          // It's pretty common to do R and L plates, instead of numbered plates
+          if (token.find("R") != std::string::npos
+              || token.find("_r") != std::string::npos
+              || token.find("r_") != std::string::npos)
+          {
+            plate = 0;
+          }
+          if (token.find("L") != std::string::npos
+              || token.find("_l") != std::string::npos
+              || token.find("l_") != std::string::npos)
+          {
+            plate = 1;
+          }
+
+          if (token.find("px") != std::string::npos)
+          {
+            cop = 0;
+          }
+          if (token.find("py") != std::string::npos)
+          {
+            cop = 1;
+          }
+          if (token.find("pz") != std::string::npos)
+          {
+            cop = 2;
+          }
+          if (token.find("mx") != std::string::npos)
+          {
+            wrench = 0;
+          }
+          if (token.find("my") != std::string::npos)
+          {
+            wrench = 1;
+          }
+          if (token.find("mz") != std::string::npos)
+          {
+            wrench = 2;
+          }
+          if (token.find("vx") != std::string::npos)
+          {
+            wrench = 3;
+          }
+          if (token.find("vy") != std::string::npos)
+          {
+            wrench = 4;
+          }
+          if (token.find("vz") != std::string::npos)
+          {
+            wrench = 5;
+          }
+
+          if (plate + 1 > numPlates)
+          {
+            numPlates = plate + 1;
+          }
+
+          colToPlate.push_back(plate);
+          colToCOP.push_back(cop);
+          colToWrench.push_back(wrench);
+        }
+        else
+        {
+          double value = atof(token.c_str());
+          if (tokenNumber == 0)
+          {
+            timestamp = value;
+          }
+          else
+          {
+            int plateIndex = colToPlate[tokenNumber];
+            int copIndex = colToCOP[tokenNumber];
+            int wrenchIndex = colToWrench[tokenNumber];
+            if (plateIndex != -1)
+            {
+              if (wrenchIndex != -1)
+              {
+                wrenches[plateIndex](wrenchIndex) = value;
+              }
+              if (copIndex != -1)
+              {
+                cops[plateIndex](copIndex) = value;
+              }
+            }
+          }
+        }
+
+        /////////////////////////////////////////////////////////
+
+        tokenNumber++;
+        if (tokenEnd == std::string::npos)
+        {
+          break;
+        }
+        tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+      }
+
+      if (lineNumber > 0)
+      {
+        copRows.push_back(cops);
+        wrenchRows.push_back(wrenches);
+        timestamps.push_back(timestamp);
+      }
+      lineNumber++;
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+  }
+
+  assert(timestamps.size() == copRows.size());
+  assert(timestamps.size() == wrenchRows.size());
+
+  // Process result into its final form
+
+  int numTimesteps = (int)ceil((double)timestamps.size() / downsampleByFactor);
+
+  OpenSimGRF grf;
+  for (int i = 0; i < numPlates; i++)
+  {
+    grf.plateCOPs.push_back(
+        Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, numTimesteps));
+    grf.plateGRFs.push_back(
+        Eigen::Matrix<s_t, 6, Eigen::Dynamic>::Zero(6, numTimesteps));
+
+    int downsampleClock = 0;
+    Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
+    Eigen::Vector6s wrenchAvg = Eigen::Vector6s::Zero();
+    int numAveraged = 0;
+    int cursor = 0;
+    for (int t = 0; t < timestamps.size(); t++)
+    {
+      copAvg += copRows[t][i];
+      wrenchAvg += wrenchRows[t][i];
+      numAveraged++;
+      downsampleClock--;
+
+      if (downsampleClock <= 0)
+      {
+        downsampleClock = downsampleByFactor;
+        grf.plateCOPs[i].col(cursor) = copAvg / numAveraged;
+        grf.plateGRFs[i].col(cursor) = wrenchAvg / numAveraged;
+        cursor++;
+
+        numAveraged = 0;
+        copAvg.setZero();
+        wrenchAvg.setZero();
+      }
+    }
+  }
+
+  int downsampleClock = 0;
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    downsampleClock--;
+    if (downsampleClock <= 0)
+    {
+      grf.timestamps.push_back(timestamps[t]);
+      downsampleClock = downsampleByFactor;
+    }
+  }
+
+  return grf;
 }
 
 //==============================================================================
@@ -636,6 +909,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           = function->FirstChildElement("LinearFunction");
       tinyxml2::XMLElement* simmSpline
           = function->FirstChildElement("SimmSpline");
+      tinyxml2::XMLElement* polynomialFunction
+          = function->FirstChildElement("PolynomialFunction");
       // This only exists in v4 files
       tinyxml2::XMLElement* constant = function->FirstChildElement("Constant");
       // This only exists in v3 files
@@ -651,7 +926,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           constant = childFunction->FirstChildElement("Constant");
           simmSpline = childFunction->FirstChildElement("SimmSpline");
           linearFunction = childFunction->FirstChildElement("LinearFunction");
-          assert(constant || simmSpline || linearFunction);
+          polynomialFunction
+              = childFunction->FirstChildElement("PolynomialFunction");
+          assert(
+              constant || simmSpline || linearFunction || polynomialFunction);
         }
       }
 
@@ -689,6 +967,15 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         // Example coeffs for linear: 1 0
         customFunctions.push_back(
             std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
+      }
+      else if (polynomialFunction != nullptr)
+      {
+        anySpline = true;
+        allLocked = false;
+        std::vector<s_t> coeffs
+            = readVecX(polynomialFunction->FirstChildElement("coefficients"));
+        customFunctions.push_back(
+            std::make_shared<math::PolynomialFunction>(coeffs));
       }
       else if (simmSpline != nullptr)
       {
@@ -732,8 +1019,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       joint = pair.first;
       childBody = pair.second;
       std::cout << "WARNING! Creating a WeldJoint as an intermediate "
-                   "(non-root) joint, there is a known bug that will cause "
-                   "dynamics to be wrong. This is only useful for kinematics."
+                   "(non-root) joint. This will cause the gradient "
+                   "computations to run with slower algorithms. If you find a "
+                   "way to remove this WeldJoint, things should run faster."
                 << std::endl;
     }
     else if (anySpline)
@@ -891,6 +1179,21 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       assert(false);
     }
   }
+  if (jointType == "WeldJoint")
+  {
+    dynamics::WeldJoint::Properties props;
+    props.mName = jointName;
+    auto pair
+        = parentBody->createChildJointAndBodyNodePair<dynamics::WeldJoint>(
+            props, bodyProps);
+    joint = pair.first;
+    childBody = pair.second;
+    std::cout << "WARNING! Creating a WeldJoint as an intermediate "
+                 "(non-root) joint. This will cause the gradient "
+                 "computations to run with slower algorithms. If you find a "
+                 "way to remove this WeldJoint, things should run faster."
+              << std::endl;
+  }
   if (jointType == "PinJoint")
   {
     // Create a RevoluteJoint
@@ -963,7 +1266,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   if (coordinateCursor == nullptr)
   {
     coordinateSet = jointDetail->FirstChildElement("coordinates");
-    coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    if (coordinateSet != nullptr)
+    {
+      coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    }
   }
   // Iterate through the coordinates
   int i = 0;
@@ -1037,22 +1343,25 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
           common::Uri meshUri = common::Uri::createFromRelativeUri(
               uri, "./Geometry/" + mesh_file + ".ply");
-          std::shared_ptr<dynamics::MeshShape> meshShape
-              = std::make_shared<dynamics::MeshShape>(
-                  scale,
-                  dynamics::MeshShape::loadMesh(meshUri, retriever),
-                  meshUri,
-                  retriever);
+          std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+              = dynamics::MeshShape::loadMesh(meshUri, retriever);
 
-          dynamics::ShapeNode* meshShapeNode
-              = childBody->createShapeNodeWith<dynamics::VisualAspect>(
-                  meshShape);
-          meshShapeNode->setRelativeTransform(transform);
+          if (meshPtr)
+          {
+            std::shared_ptr<dynamics::MeshShape> meshShape
+                = std::make_shared<dynamics::MeshShape>(
+                    scale, meshPtr, meshUri, retriever);
 
-          dynamics::VisualAspect* meshVisualAspect
-              = meshShapeNode->getVisualAspect();
-          meshVisualAspect->setColor(colors);
-          meshVisualAspect->setAlpha(opacity);
+            dynamics::ShapeNode* meshShapeNode
+                = childBody->createShapeNodeWith<dynamics::VisualAspect>(
+                    meshShape);
+            meshShapeNode->setRelativeTransform(transform);
+
+            dynamics::VisualAspect* meshVisualAspect
+                = meshShapeNode->getVisualAspect();
+            meshVisualAspect->setColor(colors);
+            meshVisualAspect->setAlpha(opacity);
+          }
 
           displayGeometryCursor
               = displayGeometryCursor->NextSiblingElement("DisplayGeometry");
@@ -1076,38 +1385,41 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
       common::Uri meshUri = common::Uri::createFromRelativeUri(
           uri, "./Geometry/" + mesh_file + ".ply");
-      std::shared_ptr<dynamics::MeshShape> meshShape
-          = std::make_shared<dynamics::MeshShape>(
-              scale,
-              dynamics::MeshShape::loadMesh(meshUri, retriever),
-              meshUri,
-              retriever);
+      std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+          = dynamics::MeshShape::loadMesh(meshUri, retriever);
 
-      dynamics::ShapeNode* meshShapeNode
-          = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
-
-      /*
-      Eigen::Vector6s transformVec
-          = readVec6(displayGeometryCursor->FirstChildElement("transform"));
-      Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
-      transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-      transform.translation() = transformVec.tail<3>();
-      meshShapeNode->setRelativeTransform(transform);
-      */
-
-      dynamics::VisualAspect* meshVisualAspect
-          = meshShapeNode->getVisualAspect();
-
-      tinyxml2::XMLElement* appearance
-          = meshCursor->FirstChildElement("Appearance");
-      if (appearance != nullptr)
+      if (meshPtr)
       {
-        Eigen::Vector3s colors
-            = readVec3(appearance->FirstChildElement("color")) * 0.7;
-        double opacity
-            = atof(appearance->FirstChildElement("opacity")->GetText());
-        meshVisualAspect->setColor(colors);
-        meshVisualAspect->setAlpha(opacity);
+        std::shared_ptr<dynamics::MeshShape> meshShape
+            = std::make_shared<dynamics::MeshShape>(
+                scale, meshPtr, meshUri, retriever);
+
+        dynamics::ShapeNode* meshShapeNode
+            = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
+
+        /*
+        Eigen::Vector6s transformVec
+            = readVec6(displayGeometryCursor->FirstChildElement("transform"));
+        Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+        transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+        transform.translation() = transformVec.tail<3>();
+        meshShapeNode->setRelativeTransform(transform);
+        */
+
+        dynamics::VisualAspect* meshVisualAspect
+            = meshShapeNode->getVisualAspect();
+
+        tinyxml2::XMLElement* appearance
+            = meshCursor->FirstChildElement("Appearance");
+        if (appearance != nullptr)
+        {
+          Eigen::Vector3s colors
+              = readVec3(appearance->FirstChildElement("color")) * 0.7;
+          double opacity
+              = atof(appearance->FirstChildElement("opacity")->GetText());
+          meshVisualAspect->setColor(colors);
+          meshVisualAspect->setAlpha(opacity);
+        }
       }
 
       meshCursor = meshCursor->NextSiblingElement("Mesh");
@@ -1304,15 +1616,25 @@ OpenSimFile OpenSimParser::readOsim40(
             = std::string(markerCursor->FirstChildElement("fixed")->GetText())
               == "true";
 
-        file.markersMap[name]
-            = std::make_pair(skel->getBodyNode(bodyName), offset);
-        if (fixed)
+        dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+        if (body != nullptr)
         {
-          file.anatomicalMarkers.push_back(name);
+          file.markersMap[name] = std::make_pair(body, offset);
+          if (fixed)
+          {
+            file.anatomicalMarkers.push_back(name);
+          }
+          else
+          {
+            file.trackingMarkers.push_back(name);
+          }
         }
         else
         {
-          file.trackingMarkers.push_back(name);
+          std::cout << "Warning: OpenSimParser attempting to read marker \""
+                    << name << "\" attached to body \"" << bodyName
+                    << "\" which does not exist! Marker will be ignored."
+                    << std::endl;
         }
 
         markerCursor = markerCursor->NextSiblingElement();
@@ -1438,6 +1760,12 @@ OpenSimFile OpenSimParser::readOsim30(
     std::string name(bodyCursor->Attribute("name"));
     // std::cout << name << std::endl;
 
+    if (name == "patella_r" || name == "patella_l")
+    {
+      bodyCursor = bodyCursor->NextSiblingElement();
+      continue;
+    }
+
     bodyLookupMap["/bodyset/" + name].xml = bodyCursor;
     bodyLookupMap["/bodyset/" + name].parent = nullptr;
     bodyLookupMap["/bodyset/" + name].children.clear();
@@ -1456,6 +1784,12 @@ OpenSimFile OpenSimParser::readOsim30(
   {
     std::string type(jointCursor->Name());
     std::string name(jointCursor->Attribute("name"));
+
+    if (name == "patellofemoral_r" || name == "patellofemoral_l")
+    {
+      jointCursor = jointCursor->NextSiblingElement();
+      continue;
+    }
 
     string parent_offset_frame = string(
         jointCursor->FirstChildElement("socket_parent_frame")->GetText());
@@ -1571,8 +1905,32 @@ OpenSimFile OpenSimParser::readOsim30(
             = markerCursor->FirstChildElement("socket_parent_frame")->GetText();
         std::string bodyName = bodyLookupMap[socketName].name;
 
-        file.markersMap[name]
-            = std::make_pair(skel->getBodyNode(bodyName), offset);
+        tinyxml2::XMLElement* fixedElem
+            = markerCursor->FirstChildElement("fixed");
+        bool fixed = fixedElem == nullptr
+                     || std::string(fixedElem->GetText()) == "true";
+        dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+
+        if (body != nullptr)
+        {
+          file.markersMap[name]
+              = std::make_pair(skel->getBodyNode(bodyName), offset);
+          if (fixed)
+          {
+            file.anatomicalMarkers.push_back(name);
+          }
+          else
+          {
+            file.trackingMarkers.push_back(name);
+          }
+        }
+        else
+        {
+          std::cout << "Warning: OpenSimParser attempting to read marker \""
+                    << name << "\" attached to body \"" << bodyName
+                    << "\" which does not exist! Marker will be ignored."
+                    << std::endl;
+        }
 
         markerCursor = markerCursor->NextSiblingElement();
       }

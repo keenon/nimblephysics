@@ -51,6 +51,13 @@ struct OpenSimMot
   Eigen::MatrixXs poses;
 };
 
+struct OpenSimGRF
+{
+  std::vector<double> timestamps;
+  std::vector<Eigen::Matrix<s_t, 3, Eigen::Dynamic>> plateCOPs;
+  std::vector<Eigen::Matrix<s_t, 6, Eigen::Dynamic>> plateGRFs;
+};
+
 class OpenSimParser
 {
 public:
@@ -67,6 +74,12 @@ public:
   /// This grabs the joint angles from a *.mot file
   static OpenSimMot loadMot(
       std::shared_ptr<dynamics::Skeleton> skel,
+      const common::Uri& uri,
+      int downsampleByFactor = 1,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// This grabs the GRF forces from a *.mot file
+  static OpenSimGRF loadGRF(
       const common::Uri& uri,
       int downsampleByFactor = 1,
       const common::ResourceRetrieverPtr& retriever = nullptr);

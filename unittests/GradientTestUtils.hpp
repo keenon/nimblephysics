@@ -2330,7 +2330,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXs proposedVelocities)
   // the matrices become more complex
   if (classicPtr->getNumUpperBound() == 0)
   {
-    if (!equals(Q, realQ, 1e-8))
+    if (!equals(Q, realQ, 1e-12))
     {
       std::cout << "Error in verifyRecoveredLCPConstraints Q():" << std::endl;
       std::cout << "analytical Q:" << std::endl << Q << std::endl;
@@ -2350,6 +2350,24 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXs proposedVelocities)
   // partRealX is computed using the "real" Q matrix.
   if (!equals(X, realX, 1e-8))
   {
+    std::cout << "Num upper bound: " << classicPtr->getNumUpperBound()
+              << std::endl;
+    if (classicPtr->getNumUpperBound() == 0)
+    {
+      std::cout << "That means we DID check the Q matrix, and it matches."
+                << std::endl;
+    }
+    else
+    {
+      std::cout << "That means we DID NOT check the Q matrix." << std::endl;
+    }
+    std::cout
+        << "CFM value: "
+        << classicPtr->mGradientMatrices[0]->mConstraintForceMixingConstant
+        << std::endl;
+    std::cout << "Deliberately ignored friction to solve: "
+              << classicPtr->getDeliberatelyIgnoreFriction()
+              << std::endl;
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical X:" << std::endl << X << std::endl;
     std::cout << "real X:" << std::endl << realX << std::endl;
@@ -4352,7 +4370,7 @@ bool verifySkeletonMarkerJacobians(
                 = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
             if (markerDiff.norm() > 1e-8)
             {
-              const Eigen::MatrixXi& parentMap = skel->getParentMap();
+              const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
               int rootJointDof = j;
               dynamics::Joint* sourceJoint = markers[k].first->getParentJoint();
               int sourceJointDof = sourceJoint->getDof(0)->getIndexInSkeleton();
@@ -4432,7 +4450,7 @@ bool verifySkeletonMarkerJacobians(
                   = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
               if (markerDiff.norm() > 1e-8)
               {
-                const Eigen::MatrixXi& parentMap = skel->getParentMap();
+                const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();
@@ -4526,7 +4544,7 @@ bool verifySkeletonMarkerJacobians(
                   = diffBlock.block(k * 3, 0, 3, diffBlock.cols());
               if (markerDiff.norm() > 1e-8)
               {
-                const Eigen::MatrixXi& parentMap = skel->getParentMap();
+                const Eigen::MatrixXi& parentMap = skel->getDofParentMap();
                 dynamics::BodyNode* scaleBody = skel->getBodyNode(j);
                 dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
                 int scaleJointDof = scaleJoint->getDof(0)->getIndexInSkeleton();

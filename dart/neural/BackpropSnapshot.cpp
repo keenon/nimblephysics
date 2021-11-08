@@ -7,8 +7,8 @@
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/math/Geometry.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
@@ -683,16 +683,16 @@ const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
       // If there are no clamping constraints, then vel-vel is just the identity
       if (A_c.size() == 0)
       {
-        mCachedVelVel
-            = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs) 
-            - dt*Minv*ddamp.asDiagonal() - dt*dt*Minv*spring_stiffs.asDiagonal()
-              - dt*Minv* getVelCJacobian(world);
+        mCachedVelVel = Eigen::MatrixXs::Identity(mNumDOFs, mNumDOFs)
+                        - dt * Minv * ddamp.asDiagonal()
+                        - dt * dt * Minv * spring_stiffs.asDiagonal()
+                        - dt * Minv * getVelCJacobian(world);
       }
       else
       {
-        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY) 
-        - dt*Minv*ddamp.asDiagonal() - dt*dt*Minv*spring_stiffs.asDiagonal();
-        
+        mCachedVelVel = getVelJacobianWrt(world, WithRespectTo::VELOCITY)
+                        - dt * Minv * ddamp.asDiagonal()
+                        - dt * dt * Minv * spring_stiffs.asDiagonal();
 
         /*
         Eigen::MatrixXs A_ub = getUpperBoundConstraintMatrix(world);
@@ -958,18 +958,18 @@ Eigen::MatrixXs BackpropSnapshot::getScratchFiniteDifference(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      perturbed = scratch(world);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        perturbed = scratch(world);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
@@ -1007,10 +1007,13 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   Eigen::VectorXs p_rest = getRestPositions(world);
   Eigen::VectorXs v_t = world->getVelocities();
   Eigen::VectorXs p_t = world->getPositions();
-  Eigen::VectorXs spring_force = spring_stiffs.asDiagonal()*(p_t-p_rest+dt*v_t);
-  Eigen::VectorXs damping_force = ddamp.asDiagonal()*v_t;
-  Eigen::MatrixXs dM
-      = getJacobianOfMinv(world, dt * (tau - C - damping_force - spring_force) + A_c_ub_E * f_c, wrt);
+  Eigen::VectorXs spring_force
+      = spring_stiffs.asDiagonal() * (p_t - p_rest + dt * v_t);
+  Eigen::VectorXs damping_force = ddamp.asDiagonal() * v_t;
+  Eigen::MatrixXs dM = getJacobianOfMinv(
+      world,
+      dt * (tau - C - damping_force - spring_force) + A_c_ub_E * f_c,
+      wrt);
 
   Eigen::MatrixXs Minv = world->getInvMassMatrix();
 
@@ -1053,7 +1056,8 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
     Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
     // snapshot.restore();
-    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC) - Minv*dt*spring_stiffs.asDiagonal();
+    return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC)
+           - Minv * dt * spring_stiffs.asDiagonal();
   }
   else
   {
@@ -1533,39 +1537,33 @@ Eigen::MatrixXs BackpropSnapshot::getInvMassMatrix(
       forFiniteDifferencing);
 }
 
-Eigen::VectorXs BackpropSnapshot::getDampingVector(
-  WorldPtr world
-)
+Eigen::VectorXs BackpropSnapshot::getDampingVector(WorldPtr world)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
-  for (int i=0;i<mNumDOFs;i++)
+  for (int i = 0; i < mNumDOFs; i++)
   {
     result(i) = dofs[i]->getDampingCoefficient();
   }
   return result;
 }
 
-Eigen::VectorXs BackpropSnapshot::getSpringStiffVector(
-  WorldPtr world
-)
+Eigen::VectorXs BackpropSnapshot::getSpringStiffVector(WorldPtr world)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
-  for (int i=0;i<mNumDOFs;i++)
+  for (int i = 0; i < mNumDOFs; i++)
   {
     result(i) = dofs[i]->getSpringStiffness();
   }
   return result;
 }
 
-Eigen::VectorXs BackpropSnapshot::getRestPositions(
-  WorldPtr world
-)
+Eigen::VectorXs BackpropSnapshot::getRestPositions(WorldPtr world)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(mNumDOFs);
   std::vector<dynamics::DegreeOfFreedom*> dofs = world->getDofs();
-  for (int i=0;i<mNumDOFs;i++)
+  for (int i = 0; i < mNumDOFs; i++)
   {
     result(i) = dofs[i]->getRestPosition();
   }
@@ -1668,6 +1666,17 @@ Eigen::VectorXs BackpropSnapshot::getPreLCPVelocity()
 bool BackpropSnapshot::hasBounces()
 {
   return mNumBouncing > 0;
+}
+
+//==============================================================================
+/// Returns true if we had to deliberately ignore friction on any of our sub-groups in order to solve.
+bool BackpropSnapshot::getDeliberatelyIgnoreFriction()
+{
+  for (auto gradientMatrices : mGradientMatrices)
+  {
+    if (gradientMatrices->mDeliberatelyIgnoreFriction) return true;
+  }
+  return false;
 }
 
 //==============================================================================
@@ -2261,32 +2270,33 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelVelJacobian(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        world->setPositions(mPreStepPosition);
-        world->setControlForces(mPreStepTorques);
-        world->setCachedLCPSolution(mPreStepLCPCache);
-        Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
-        tweakedVel(dof) += eps;
-        world->setVelocities(tweakedVel);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        perturbed = snapshot->getPostStepVelocity();
-        return (!areResultsStandardized() || snapshot->areResultsStandardized())
-              && snapshot->getNumClamping() == getNumClamping()
-              && snapshot->getNumUpperBound() == getNumUpperBound();
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          world->setPositions(mPreStepPosition);
+          world->setControlForces(mPreStepTorques);
+          world->setCachedLCPSolution(mPreStepLCPCache);
+          Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
+          tweakedVel(dof) += eps;
+          world->setVelocities(tweakedVel);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          perturbed = snapshot->getPostStepVelocity();
+          return (!areResultsStandardized()
+                  || snapshot->areResultsStandardized())
+                 && snapshot->getNumClamping() == getNumClamping()
+                 && snapshot->getNumUpperBound() == getNumUpperBound();
+        },
+        result,
+        eps,
+        useRidders);
     snapshot.restore();
     world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
-    std::cout << "Error in finiteDifferenceVelVelJacobian(): " 
-        << e.what() << std::endl;
+    std::cout << "Error in finiteDifferenceVelVelJacobian(): " << e.what()
+              << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -2312,34 +2322,35 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosVelJacobian(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        world->setControlForces(mPreStepTorques);
-        world->setCachedLCPSolution(mPreStepLCPCache);
-        world->setVelocities(mPreStepVelocity);
-        Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
-        tweakedPos(dof) += eps;
-        world->setPositions(tweakedPos);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        perturbed = snapshot->getPostStepVelocity();
-        return (!areResultsStandardized() || snapshot->areResultsStandardized())
-              && snapshot->getNumContacts() == getNumContacts()
-              && snapshot->getNumClamping() == getNumClamping()
-              && snapshot->getNumUpperBound() == getNumUpperBound();
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          world->setControlForces(mPreStepTorques);
+          world->setCachedLCPSolution(mPreStepLCPCache);
+          world->setVelocities(mPreStepVelocity);
+          Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
+          tweakedPos(dof) += eps;
+          world->setPositions(tweakedPos);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          perturbed = snapshot->getPostStepVelocity();
+          return (!areResultsStandardized()
+                  || snapshot->areResultsStandardized())
+                 && snapshot->getNumContacts() == getNumContacts()
+                 && snapshot->getNumClamping() == getNumClamping()
+                 && snapshot->getNumUpperBound() == getNumUpperBound();
+        },
+        result,
+        eps,
+        useRidders);
     snapshot.restore();
     world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
     world->setPenetrationCorrectionEnabled(oldPenetrationCorrectionEnabled);
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
-    std::cout << "Error in finiteDifferencePosVelJacobian(): " 
-        << e.what() << std::endl;
+    std::cout << "Error in finiteDifferencePosVelJacobian(): " << e.what()
+              << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -2358,32 +2369,33 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceForceVelJacobian(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        world->setPositions(mPreStepPosition);
-        world->setVelocities(mPreStepVelocity);
-        world->setCachedLCPSolution(mPreStepLCPCache);
-        Eigen::VectorXs tweakedForces = Eigen::VectorXs(mPreStepTorques);
-        tweakedForces(dof) += eps;
-        world->setControlForces(tweakedForces);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        perturbed = snapshot->getPostStepVelocity();
-        return (!areResultsStandardized() || snapshot->areResultsStandardized())
-              && snapshot->getNumClamping() == getNumClamping()
-              && snapshot->getNumUpperBound() == getNumUpperBound();
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          world->setPositions(mPreStepPosition);
+          world->setVelocities(mPreStepVelocity);
+          world->setCachedLCPSolution(mPreStepLCPCache);
+          Eigen::VectorXs tweakedForces = Eigen::VectorXs(mPreStepTorques);
+          tweakedForces(dof) += eps;
+          world->setControlForces(tweakedForces);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          perturbed = snapshot->getPostStepVelocity();
+          return (!areResultsStandardized()
+                  || snapshot->areResultsStandardized())
+                 && snapshot->getNumClamping() == getNumClamping()
+                 && snapshot->getNumUpperBound() == getNumUpperBound();
+        },
+        result,
+        eps,
+        useRidders);
     snapshot.restore();
     world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
-    std::cout << "Error in finiteDifferenceForceVelJacobian(): "
-        << e.what() << std::endl;
+    std::cout << "Error in finiteDifferenceForceVelJacobian(): " << e.what()
+              << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -2402,21 +2414,21 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceMassVelJacobian(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      world->setPositions(mPreStepPosition);
-      world->setVelocities(mPreStepVelocity);
-      Eigen::VectorXs tweakedMass = Eigen::VectorXs(originalMass);
-      tweakedMass(dof) += eps;
-      world->getWrtMass()->set(world.get(), tweakedMass);
-      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-      perturbed = snapshot->getPostStepVelocity();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setPositions(mPreStepPosition);
+        world->setVelocities(mPreStepVelocity);
+        Eigen::VectorXs tweakedMass = Eigen::VectorXs(originalMass);
+        tweakedMass(dof) += eps;
+        world->getWrtMass()->set(world.get(), tweakedMass);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepVelocity();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   return result;
@@ -2431,28 +2443,28 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosPosJacobian(
   world->getConstraintSolver()->setGradientEnabled(true);
 
   Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
-  s_t eps = useRidders ? 1e-3 / subdivisions : 
-      ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
+  s_t eps = useRidders ? 1e-3 / subdivisions
+                       : ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
   s_t oldTimestep = world->getTimeStep();
   world->setTimeStep(oldTimestep / subdivisions);
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      world->setVelocities(mPreStepVelocity);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
-      tweakedPos(dof) += eps;
-      world->setPositions(tweakedPos);
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-      perturbed = world->getPositions();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setVelocities(mPreStepVelocity);
+        world->setControlForces(mPreStepTorques);
+        world->setCachedLCPSolution(mPreStepLCPCache);
+        Eigen::VectorXs tweakedPos = Eigen::VectorXs(mPreStepPosition);
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        for (std::size_t j = 0; j < subdivisions; j++)
+          world->step(false);
+        perturbed = world->getPositions();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   world->setTimeStep(oldTimestep);
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
@@ -2468,28 +2480,28 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelPosJacobian(
   // world->getConstraintSolver()->setGradientEnabled(false);
 
   Eigen::MatrixXs result(mNumDOFs, mNumDOFs);
-  s_t eps = useRidders ? 1e-3 / subdivisions : 
-      ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
+  s_t eps = useRidders ? 1e-3 / subdivisions
+                       : ((subdivisions > 1) ? (1e-2 / subdivisions) : 1e-6);
   s_t oldTimestep = world->getTimeStep();
   world->setTimeStep(oldTimestep / subdivisions);
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      world->setPositions(mPreStepPosition);
-      world->setControlForces(mPreStepTorques);
-      world->setCachedLCPSolution(mPreStepLCPCache);
-      Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
-      tweakedVel(dof) += eps;
-      world->setVelocities(tweakedVel);
-      for (std::size_t j = 0; j < subdivisions; j++)
-        world->step(false);
-      perturbed = world->getPositions();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        world->setPositions(mPreStepPosition);
+        world->setControlForces(mPreStepTorques);
+        world->setCachedLCPSolution(mPreStepLCPCache);
+        Eigen::VectorXs tweakedVel = Eigen::VectorXs(mPreStepVelocity);
+        tweakedVel(dof) += eps;
+        world->setVelocities(tweakedVel);
+        for (std::size_t j = 0; j < subdivisions; j++)
+          world->step(false);
+        perturbed = world->getPositions();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   world->setTimeStep(oldTimestep);
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
   snapshot.restore();
@@ -2515,19 +2527,19 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceVelJacobianWrt(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-      perturbed = snapshot->getPostStepVelocity();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepVelocity();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
@@ -2553,19 +2565,19 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferencePosJacobianWrt(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-      perturbed = snapshot->getPostStepPosition();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = Eigen::VectorXs(originalWrt);
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getPostStepPosition();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   world->getConstraintSolver()->setGradientEnabled(oldGradientEnabled);
@@ -2837,26 +2849,26 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfQb(
 
   s_t eps = useRidders ? 1e-3 : 1e-6;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      Eigen::MatrixXs A_c
-          = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      Eigen::MatrixXs A_ub
-          = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-      Eigen::MatrixXs Q
-          = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      Q.diagonal() += getConstraintForceMixingDiagonal();
-      perturbed = Q * b;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        Eigen::MatrixXs A_c
+            = estimateClampingConstraintMatrixAt(world, world->getPositions());
+        Eigen::MatrixXs A_ub = estimateUpperBoundConstraintMatrixAt(
+            world, world->getPositions());
+        Eigen::MatrixXs E = getUpperBoundMappingMatrix();
+        Eigen::MatrixXs Q
+            = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+        Q.diagonal() += getConstraintForceMixingDiagonal();
+        perturbed = Q * b;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -3044,26 +3056,26 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPConstraintMatrixClampingSubset(
 
   s_t eps = useRidders ? 1e-2 : 1e-6;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      Eigen::MatrixXs A_c
-          = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      Eigen::MatrixXs A_ub
-          = estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      Eigen::MatrixXs E = getUpperBoundMappingMatrix();
-      Eigen::MatrixXs Q
-          = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
-      Q.diagonal() += getConstraintForceMixingDiagonal();
-      perturbed = Q.completeOrthogonalDecomposition().solve(b);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        Eigen::MatrixXs A_c
+            = estimateClampingConstraintMatrixAt(world, world->getPositions());
+        Eigen::MatrixXs A_ub = estimateUpperBoundConstraintMatrixAt(
+            world, world->getPositions());
+        Eigen::MatrixXs E = getUpperBoundMappingMatrix();
+        Eigen::MatrixXs Q
+            = A_c.transpose() * world->getInvMassMatrix() * (A_c + A_ub * E);
+        Q.diagonal() += getConstraintForceMixingDiagonal();
+        perturbed = Q.completeOrthogonalDecomposition().solve(b);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -3095,7 +3107,7 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
     return getBounceDiagonals().asDiagonal() * -A_c.transpose()
            * (Eigen::MatrixXs::Identity(
                   world->getNumDofs(), world->getNumDofs())
-              - dt * Minv * (dC+ddamp+dt*spring_stiffs));
+              - dt * Minv * (dC + ddamp + dt * spring_stiffs));
   }
   else if (wrt == WithRespectTo::FORCE)
   {
@@ -3108,8 +3120,8 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
   Eigen::VectorXs v_f = getPreConstraintVelocity();
   Eigen::VectorXs v_t = world->getVelocities();
   Eigen::VectorXs p_t = world->getPositions();
-  Eigen::VectorXs spring_force = spring_stiffs*(p_t - p_rest+dt*v_t);
-  Eigen::VectorXs damping_force = ddamp*v_t;
+  Eigen::VectorXs spring_force = spring_stiffs * (p_t - p_rest + dt * v_t);
+  Eigen::VectorXs damping_force = ddamp * v_t;
   f = f - damping_force - spring_force;
   Eigen::MatrixXs dMinv_f = getJacobianOfMinv(world, f, wrt);
   if (wrt == WithRespectTo::POSITION)
@@ -3119,7 +3131,9 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfLCPOffsetClampingSubset(
 
     // snapshot.restore();
     return getBounceDiagonals().asDiagonal()
-           * -(dA_c_f + A_c.transpose() * dt * (dMinv_f - Minv * dC - Minv*spring_stiffs));
+           * -(dA_c_f
+               + A_c.transpose() * dt
+                     * (dMinv_f - Minv * dC - Minv * spring_stiffs));
   }
   else
   {
@@ -3146,19 +3160,19 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPOffsetClampingSubset(
 
   s_t eps = useRidders ? 1e-4 : 1e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-      perturbed = snapshot->getClampingConstraintRelativeVels();
-      return perturbed.size() == mNumClamping;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed = snapshot->getClampingConstraintRelativeVels();
+        return perturbed.size() == mNumClamping;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -3182,21 +3196,22 @@ BackpropSnapshot::finiteDifferenceJacobianOfLCPEstimatedOffsetClampingSubset(
 
   s_t eps = useRidders ? 1e-3 : 1e-8;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      if (wrt == WithRespectTo::POSITION)
-        A_c = estimateClampingConstraintMatrixAt(world, world->getPositions());
-      perturbed = Eigen::VectorXs::Zero(mNumClamping);
-      computeLCPOffsetClampingSubset(world, perturbed, A_c);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        if (wrt == WithRespectTo::POSITION)
+          A_c = estimateClampingConstraintMatrixAt(
+              world, world->getPositions());
+        perturbed = Eigen::VectorXs::Zero(mNumClamping);
+        computeLCPOffsetClampingSubset(world, perturbed, A_c);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -3259,8 +3274,8 @@ void BackpropSnapshot::computeLCPOffsetClampingSubset(
   Eigen::VectorXs p_t = world->getPositions();
   Eigen::VectorXs v_t = world->getVelocities();
   Eigen::VectorXs p_rest = getRestPositions(world);
-  Eigen::VectorXs damping_force = damp*world->getVelocities();
-  Eigen::VectorXs spring_force = spring_stiffs*(p_t-p_rest+dt*v_t);
+  Eigen::VectorXs damping_force = damp * world->getVelocities();
+  Eigen::VectorXs spring_force = spring_stiffs * (p_t - p_rest + dt * v_t);
   b = -getBounceDiagonals().cwiseProduct(
       A_c.transpose()
       * (v_t
@@ -3747,31 +3762,33 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraints(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        Eigen::VectorXs tweakedPos = mPreStepPosition;
-        tweakedPos(dof) += eps;
-        world->setPositions(tweakedPos);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        Eigen::MatrixXs perturbedA_c = snapshot->getClampingConstraintMatrix(world);
-        // don't attempt to multipy if they aren't the same dim, invalid
-        if (perturbedA_c.cols() != f0.size())
-          return false;
-        perturbed = perturbedA_c * f0;
-        // we require that the perturbed result is not too far away from original
-        return (original - perturbed).squaredNorm() < 100 * abs(eps);
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          Eigen::VectorXs tweakedPos = mPreStepPosition;
+          tweakedPos(dof) += eps;
+          world->setPositions(tweakedPos);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          Eigen::MatrixXs perturbedA_c
+              = snapshot->getClampingConstraintMatrix(world);
+          // don't attempt to multipy if they aren't the same dim, invalid
+          if (perturbedA_c.cols() != f0.size())
+            return false;
+          perturbed = perturbedA_c * f0;
+          // we require that the perturbed result is not too far away from
+          // original
+          return (original - perturbed).squaredNorm() < 100 * abs(eps);
+        },
+        result,
+        eps,
+        useRidders);
     snapshot.restore();
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
-    std::cout << "Error in finiteDifferenceJacobianOfClampingConstraints(): " 
-        << e.what() << std::endl;
+    std::cout << "Error in finiteDifferenceJacobianOfClampingConstraints(): "
+              << e.what() << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -3796,19 +3813,20 @@ BackpropSnapshot::finiteDifferenceJacobianOfClampingConstraintsTranspose(
 
   s_t eps = useRidders ? 1e-4 : 5e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedPos = mPreStepPosition;
-      tweakedPos(dof) += eps;
-      world->setPositions(tweakedPos);
-      BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-      perturbed = snapshot->getClampingConstraintMatrix(world).transpose() * v0;
-      return perturbed.size() == original.size();
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = mPreStepPosition;
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+        perturbed
+            = snapshot->getClampingConstraintMatrix(world).transpose() * v0;
+        return perturbed.size() == original.size();
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   return result;
 }
@@ -3836,29 +3854,29 @@ BackpropSnapshot::finiteDifferenceJacobianOfUpperBoundConstraints(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        Eigen::VectorXs tweakedPos = mPreStepPosition;
-        tweakedPos(dof) += eps;
-        world->setPositions(tweakedPos);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        Eigen::MatrixXs A_ub = snapshot->getUpperBoundConstraintMatrix(world);
-        if (A_ub.size() != originalA_ub.size())
-          return false;
-        perturbed = A_ub * f0;
-        return true;
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          Eigen::VectorXs tweakedPos = mPreStepPosition;
+          tweakedPos(dof) += eps;
+          world->setPositions(tweakedPos);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          Eigen::MatrixXs A_ub = snapshot->getUpperBoundConstraintMatrix(world);
+          if (A_ub.size() != originalA_ub.size())
+            return false;
+          perturbed = A_ub * f0;
+          return true;
+        },
+        result,
+        eps,
+        useRidders);
     snapshot.restore();
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
     std::cout << "Error in finiteDifferenceJacobianOfUpperBoundConstraints: "
-        << e.what() << std::endl;
+              << e.what() << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -3888,30 +3906,31 @@ BackpropSnapshot::finiteDifferenceJacobianOfProjectionIntoClampsMatrix(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        Eigen::VectorXs tweakedWrt = originalWrt;
-        tweakedWrt(dof) += eps;
-        wrt->set(world.get(), tweakedWrt);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        Eigen::MatrixXs P_c = snapshot->getProjectionIntoClampsMatrix(world);
-        if (P_c.rows() != originalP_c.rows())
-          return false;
-        perturbed = P_c * v;
-        return true;
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          Eigen::VectorXs tweakedWrt = originalWrt;
+          tweakedWrt(dof) += eps;
+          wrt->set(world.get(), tweakedWrt);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          Eigen::MatrixXs P_c = snapshot->getProjectionIntoClampsMatrix(world);
+          if (P_c.rows() != originalP_c.rows())
+            return false;
+          perturbed = P_c * v;
+          return true;
+        },
+        result,
+        eps,
+        useRidders);
     wrt->set(world.get(), originalWrt);
     snapshot.restore();
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
     std::cout << "Error in finiteDifferenceJacobianOfProjectionIntoClamps"
-        "Matrix: " << e.what() << std::endl;
+                 "Matrix: "
+              << e.what() << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -3937,18 +3956,18 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinv(
 
   s_t eps = useRidders ? 1e-3 : 5e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      perturbed = implicitMultiplyByInvMassMatrix(world, tau);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        perturbed = implicitMultiplyByInvMassMatrix(world, tau);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -3996,18 +4015,18 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfM(
 
   s_t eps = useRidders ? 1e-3 : 5e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      perturbed = world->getMassMatrix() * v;
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        perturbed = world->getMassMatrix() * v;
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -4030,18 +4049,18 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfC(
 
   s_t eps = useRidders ? 1e-3 : 5e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      perturbed = world->getCoriolisAndGravityAndExternalForces();
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        perturbed = world->getCoriolisAndGravityAndExternalForces();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -4066,20 +4085,20 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfMinvC(
 
   s_t eps = useRidders ? 1e-3 : 5e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      perturbed = implicitMultiplyByInvMassMatrix(
-          world,
-          mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        perturbed = implicitMultiplyByInvMassMatrix(
+            world,
+            mPreStepTorques - world->getCoriolisAndGravityAndExternalForces());
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
@@ -4109,34 +4128,37 @@ Eigen::MatrixXs BackpropSnapshot::finiteDifferenceJacobianOfConstraintForce(
   try
   {
     finiteDifference(
-      [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        Eigen::VectorXs tweakedWrt = originalWrt;
-        tweakedWrt(dof) += eps;
-        wrt->set(world.get(), tweakedWrt);
-        BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
-        perturbed = snapshot->getClampingConstraintImpulses();
-        return snapshot->getNumClamping() == f0.size()
-          && snapshot->getNumUpperBound() == originalSnapshot->getNumUpperBound()
-          && (!areResultsStandardized()
-              || snapshot->areResultsStandardized())
-          && snapshot->getNumContacts() == originalSnapshot->getNumContacts()
-          && snapshot->getConstraintForceMixingDiagonal()(0)
-                 == originalSnapshot->getConstraintForceMixingDiagonal()(0);
-      },
-      result,
-      eps,
-      useRidders);
+        [&](/* in*/ s_t eps,
+            /* in*/ int dof,
+            /*out*/ Eigen::VectorXs& perturbed) {
+          Eigen::VectorXs tweakedWrt = originalWrt;
+          tweakedWrt(dof) += eps;
+          wrt->set(world.get(), tweakedWrt);
+          BackpropSnapshotPtr snapshot = neural::forwardPass(world, true);
+          perturbed = snapshot->getClampingConstraintImpulses();
+          return snapshot->getNumClamping() == f0.size()
+                 && snapshot->getNumUpperBound()
+                        == originalSnapshot->getNumUpperBound()
+                 && (!areResultsStandardized()
+                     || snapshot->areResultsStandardized())
+                 && snapshot->getNumContacts()
+                        == originalSnapshot->getNumContacts()
+                 && snapshot->getConstraintForceMixingDiagonal()(0)
+                        == originalSnapshot->getConstraintForceMixingDiagonal()(
+                            0);
+        },
+        result,
+        eps,
+        useRidders);
     wrt->set(world.get(), originalWrt);
     snapshot.restore();
     world->setPenetrationCorrectionEnabled(oldPenetrationCorrection);
     return result;
   }
-  catch(const std::exception& e)
+  catch (const std::exception& e)
   {
-    std::cout << "Error in finiteDifferenceJacobianOfConstraintForce: " 
-        << e.what() << std::endl;
+    std::cout << "Error in finiteDifferenceJacobianOfConstraintForce: "
+              << e.what() << std::endl;
     printReplicationInstructions(world);
     throw e;
   }
@@ -4163,25 +4185,25 @@ BackpropSnapshot::finiteDifferenceJacobianOfEstimatedConstraintForce(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedWrt = originalWrt;
-      tweakedWrt(dof) += eps;
-      wrt->set(world.get(), tweakedWrt);
-      if (wrt == WithRespectTo::POSITION)
-      {
-        A_c = 
-          estimateClampingConstraintMatrixAt(world, world->getPositions());
-        A_ub = 
-          estimateUpperBoundConstraintMatrixAt(world, world->getPositions());
-      }
-      perturbed = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedWrt = originalWrt;
+        tweakedWrt(dof) += eps;
+        wrt->set(world.get(), tweakedWrt);
+        if (wrt == WithRespectTo::POSITION)
+        {
+          A_c = estimateClampingConstraintMatrixAt(
+              world, world->getPositions());
+          A_ub = estimateUpperBoundConstraintMatrixAt(
+              world, world->getPositions());
+        }
+        perturbed = estimateClampingConstraintImpulses(world, A_c, A_ub, E);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   wrt->set(world.get(), originalWrt);
   snapshot.restore();
   return result;
