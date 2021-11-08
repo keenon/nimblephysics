@@ -30,28 +30,46 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include <Python.h>
+#include <dart/server/GUIRecording.hpp>
+#include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void GUIStateMachine(py::module& sm);
-void GUIWebsocketServer(py::module& sm);
-void GUIRecording(py::module& sm);
-
-void dart_server(py::module& m)
+void GUIRecording(py::module& m)
 {
-  auto sm = m.def_submodule("server");
-
-  sm.doc() = "This provides a native WebSocket server infrastructure.";
-
-  GUIStateMachine(sm);
-  GUIWebsocketServer(sm);
-  GUIRecording(sm);
+  ::py::class_<
+      dart::server::GUIRecording,
+      dart::server::GUIStateMachine,
+      std::shared_ptr<dart::server::GUIRecording>>(m, "GUIRecording")
+      .def(::py::init<>())
+      .def("saveFrame", &dart::server::GUIRecording::saveFrame)
+      .def("getNumFrames", &dart::server::GUIRecording::getNumFrames)
+      .def(
+          "getFramesJson",
+          &dart::server::GUIRecording::getFramesJson,
+          ::py::arg("startFrame") = 0)
+      .def(
+          "getFrameJson",
+          &dart::server::GUIRecording::getFrameJson,
+          ::py::arg("frame"))
+      .def(
+          "writeFramesJson",
+          &dart::server::GUIRecording::writeFramesJson,
+          ::py::arg("path"),
+          ::py::arg("startFrame") = 0)
+      .def(
+          "writeFrameJson",
+          &dart::server::GUIRecording::writeFrameJson,
+          ::py::arg("path"),
+          ::py::arg("frame"));
 }
 
 } // namespace python
