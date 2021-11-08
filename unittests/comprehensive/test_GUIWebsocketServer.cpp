@@ -47,7 +47,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;

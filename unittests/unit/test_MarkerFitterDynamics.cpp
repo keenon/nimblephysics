@@ -32,7 +32,6 @@ void debugGRFToGUI(
   server.serve(8070);
   server.renderSkeleton(skel);
   server.renderBasis();
-  server.setAutoflush(false);
 
   int timestep = 0;
   Ticker ticker(1.0 / 50);
