@@ -44,6 +44,8 @@
 
 .NimbleStandalone-progress-bar-scrub {
   position: absolute;
+  pointer-events: none;
+  user-select: none;
   top: 0px;
   left: 65%;
   height: 20px;
@@ -53,16 +55,6 @@
   background-color: rgba(141, 25, 233, 1);
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
-}
-
-.NimbleStandalone-progress-bar-scrub-bg {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 184, 0, 1) 0%,
-    rgba(245, 71, 71, 1) 33%,
-    rgba(207, 50, 158, 1) 67%,
-    rgba(141, 25, 233, 1) 100%
-  );
 }
 
 .NimbleStandalone-progress-bar-container:hover
