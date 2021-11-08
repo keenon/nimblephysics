@@ -1,4 +1,4 @@
-import DARTView from "./DARTView";
+import NimbleStandalone from "./NimbleStandalone";
 
 // Publish this so that any downstream object can use it
-(document as any).DARTView = DARTView;
+(document as any).NimbleStandalone = NimbleStandalone;

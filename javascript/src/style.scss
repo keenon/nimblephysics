@@ -1,4 +1,141 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Advent+Pro:wght@400;700&display=swap");
+
+.NimbleStandalone-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.NimbleStandalone-progress-bar-container {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  height: 20px;
+  width: calc(100% - 40px);
+  cursor: pointer;
+}
+
+.NimbleStandalone-progress-bar-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 5px;
+  width: 100%;
+  background: rgb(255, 184, 0);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 184, 0, 1) 0%,
+    rgba(245, 71, 71, 1) 33%,
+    rgba(207, 50, 158, 1) 67%,
+    rgba(141, 25, 233, 1) 100%
+  );
+}
+
+.NimbleStandalone-progress-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 5px;
+  width: 65%;
+  background-color: #999999;
+  user-select: none;
+}
+
+.NimbleStandalone-progress-bar-scrub {
+  position: absolute;
+  top: 0px;
+  left: 65%;
+  height: 20px;
+  width: 20px;
+  transform: translate(-10px, -7px);
+  border-radius: 20px;
+  background-color: rgba(141, 25, 233, 1);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.NimbleStandalone-progress-bar-scrub-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 184, 0, 1) 0%,
+    rgba(245, 71, 71, 1) 33%,
+    rgba(207, 50, 158, 1) 67%,
+    rgba(141, 25, 233, 1) 100%
+  );
+}
+
+.NimbleStandalone-progress-bar-container:hover
+  .NimbleStandalone-progress-bar-scrub {
+  opacity: 1;
+}
+
+.NimbleStandalone-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 5;
+}
+
+.NimbleStandalone-loading-text {
+  font-family: "Advent Pro", sans-serif;
+  font-size: 25px;
+  margin: 10px 0;
+}
+
+.NimbleStandalone-loading-bar-container {
+  position: relative;
+  width: 80%;
+  height: 25px;
+  border-radius: 15px;
+  background: linear-gradient(
+    90deg,
+    rgba(141, 25, 233, 1) 0%,
+    rgba(207, 50, 158, 1) 33%,
+    rgba(245, 71, 71, 1) 67%,
+    rgba(255, 184, 0, 1) 100%
+  );
+}
+
+.NimbleStandalone-loading-bar-container-inner-bg {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  border-radius: 12px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  background-color: #ffffff;
+}
+
+.NimbleStandalone-loading-bar-container-inner-bar-container {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  border-radius: 12px;
+  width: 0%;
+  height: calc(100% - 6px);
+  overflow: hidden;
+}
+
+.NimbleStandalone-loading-bar-container-inner-bar-container-bg {
+  position: absolute;
+  width: 166%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(141, 25, 233, 1) 0%,
+    rgba(207, 50, 158, 1) 33%,
+    rgba(245, 71, 71, 1) 67%,
+    rgba(255, 184, 0, 1) 100%
+  );
+}
 
 .DARTWindow {
   background-color: #aaaaaa;
@@ -92,14 +229,39 @@
   }
 
   .GUI_title {
+    pointer-events: all;
+    cursor: pointer;
     position: absolute;
     top: 10px;
-    left: 0;
-    width: 100%;
+    left: 10px;
     user-select: none;
-    text-align: center;
-    font-size: 14px;
+    text-align: left;
+    font-size: 18px;
+    color: black;
+    text-decoration: none;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    font-family: "Advent Pro", sans-serif;
+  }
+
+  .GUI_title svg {
+    margin-right: 10px;
+  }
+
+  .GUI_instruction {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    user-select: none;
+    font-family: "Advent Pro", sans-serif;
+    color: #848484;
+    font-weight: bold;
+    font-size: 16px;
+  }
+
+  .GUI_instruction td {
+    vertical-align: middle;
   }
 
   .View__container {

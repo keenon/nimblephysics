@@ -10,6 +10,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/math/IKSolver.hpp"
 #include "dart/realtime/Ticker.hpp"
+#include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 
@@ -621,7 +622,6 @@ bool debugIKInitializationToGUI(
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
-  server.setAutoflush(false);
 
   Eigen::VectorXs originalGroupScales = skel->getGroupScales();
 
@@ -798,7 +798,6 @@ bool debugIKInitializationToGUI(
                 line,
                 Eigen::Vector3s::UnitX());
           }
-          server.flush();
 
           return clampedPos;
         },
@@ -877,7 +876,6 @@ bool debugFitToGUI(
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
-  server.setAutoflush(false);
 
   Eigen::VectorXs originalGroupScales = skel->getGroupScales();
 
@@ -994,7 +992,6 @@ bool debugFitToGUI(
                 line,
                 Eigen::Vector3s::UnitX());
           }
-          server.flush();
 
           return clampedPos;
         },
@@ -1073,7 +1070,6 @@ void debugTrajectoryAndMarkersToGUI(
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
-  server.setAutoflush(false);
 
   int numJoints = jointCenters.rows() / 3;
   for (int i = 0; i < numJoints; i++)
@@ -1118,8 +1114,6 @@ void debugTrajectoryAndMarkersToGUI(
           jointCenters.block<3, 1>(i * 3, timestep));
     }
 
-    server.flush();
-
     timestep++;
     if (timestep >= poses.cols())
     {
@@ -1128,6 +1122,66 @@ void debugTrajectoryAndMarkersToGUI(
   });
   server.registerConnectionListener([&]() { ticker.start(); });
   server.blockWhileServing();
+}
+
+void saveTrajectoryAndMarkersToGUI(
+    std::string path,
+    std::shared_ptr<dynamics::Skeleton>& skel,
+    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+        markers,
+    Eigen::MatrixXs poses,
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
+    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0))
+{
+  server::GUIRecording server;
+  server.renderSkeleton(skel);
+
+  int numJoints = jointCenters.rows() / 3;
+  for (int i = 0; i < numJoints; i++)
+  {
+    server.createSphere(
+        "joint_center_" + std::to_string(i),
+        0.02,
+        Eigen::Vector3s::Zero(),
+        Eigen::Vector3s(0, 0, 1));
+  }
+
+  for (int timestep = 0; timestep < poses.cols(); timestep++)
+  {
+    skel->setPositions(poses.col(timestep));
+    server.renderSkeleton(skel);
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPositions
+        = markerTrajectories[timestep];
+    server.deleteObjectsByPrefix("marker_error_");
+    for (auto pair : markerWorldPositions)
+    {
+      if (markers.count(pair.first) > 0)
+      {
+        Eigen::Vector3s worldObserved = pair.second;
+        Eigen::Vector3s worldInferred
+            = markers[pair.first].first->getWorldTransform()
+              * (markers[pair.first].second.cwiseProduct(
+                  markers[pair.first].first->getScale()));
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(worldObserved);
+        points.push_back(worldInferred);
+        server.createLine(
+            "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
+      }
+    }
+
+    for (int i = 0; i < numJoints; i++)
+    {
+      server.setObjectPosition(
+          "joint_center_" + std::to_string(i),
+          jointCenters.block<3, 1>(i * 3, timestep));
+    }
+
+    server.saveFrame();
+  }
+
+  server.writeFramesJson(path);
 }
 
 #ifdef ALL_TESTS
@@ -2261,14 +2315,21 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK)
   finalKinematicsReport.printReport(5);
 
   // Target markers
-  /*
+
+  saveTrajectoryAndMarkersToGUI(
+      "./michael.json",
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps,
+      finalKinematicInit.jointCenters);
+
   debugTrajectoryAndMarkersToGUI(
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
       subsetTimesteps,
       finalKinematicInit.jointCenters);
-  */
 }
 #endif
 
@@ -2475,6 +2536,14 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
   afterJointCentersReport.printReport(5);
   std::cout << "Final kinematic fit report:" << std::endl;
   finalKinematicsReport.printReport(5);
+
+  saveTrajectoryAndMarkersToGUI(
+      "./laiArnold.json",
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps,
+      finalKinematicInit.jointCenters);
 
   // Target markers
   debugTrajectoryAndMarkersToGUI(

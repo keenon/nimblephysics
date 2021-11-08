@@ -36,7 +36,7 @@ GUIStateMachine::~GUIStateMachine()
 {
 }
 
-std::string GUIStateMachine::getCurrentStateAsJSON()
+std::string GUIStateMachine::getCurrentStateAsJson()
 {
   std::stringstream json;
   json << "[";
@@ -136,7 +136,7 @@ std::string GUIStateMachine::getCurrentStateAsJSON()
 }
 
 /// This formats the latest set of commands as JSON, and clears the buffer
-std::string GUIStateMachine::flushJSON()
+std::string GUIStateMachine::flushJson()
 {
   const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
 

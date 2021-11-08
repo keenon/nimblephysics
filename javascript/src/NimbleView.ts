@@ -6,6 +6,9 @@ import View from "./components/View";
 import Slider from "./components/Slider";
 import Plot from "./components/Plot";
 import VERSION_NUM from "../../VERSION.txt";
+import logoSvg from "!!raw-loader!./nimblelogo.svg";
+import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
+import rightMouseSvg from "!!raw-loader!./rightMouse.svg";
 
 const SCALE_FACTOR = 100;
 
@@ -40,10 +43,13 @@ class DARTView {
   keys: Map<THREE.Object3D, string>;
   textures: Map<string, THREE.Texture>;
   disposeHandlers: Map<string, () => void>;
+  objectType: Map<string, string>;
 
   uiElements: Map<string, Text | Button | Slider | Plot>;
 
   dragListeners: ((key: string, pos: number[]) => void)[];
+
+  sphereGeometry: THREE.SphereBufferGeometry;
 
   connected: boolean;
   notConnectedWarning: HTMLElement;
@@ -63,6 +69,7 @@ class DARTView {
     this.disposeHandlers = new Map();
     this.textures = new Map();
     this.uiElements = new Map();
+    this.objectType = new Map();
     this.dragListeners = [];
 
     this.scene = new THREE.Scene();
@@ -131,11 +138,58 @@ class DARTView {
 
     /// Random GUI stuff
 
-    const title = document.createElement("div");
-    title.innerHTML = "Nimble Visualizer - v" + VERSION_NUM;
+    const title = document.createElement("a");
+    title.href = "https://www.nimblephysics.org";
+    title.target = "#";
     title.className = "GUI_title";
+
+    const logo = document.createElement("svg");
+    logo.innerHTML = logoSvg;
+    title.appendChild(logo);
+
+    const titleText = document.createElement("span");
+    titleText.innerHTML = "nimble<b>visualizer</b> v" + VERSION_NUM;
+    title.appendChild(titleText);
+
     this.uiContainer.appendChild(title);
     this.setConnected(startConnected);
+
+    const instructions = document.createElement("table");
+    instructions.className = "GUI_instruction";
+
+    const instructionsRow1 = document.createElement("tr");
+    instructions.appendChild(instructionsRow1);
+    const instructionsRow2 = document.createElement("tr");
+    instructions.appendChild(instructionsRow2);
+
+    const leftMouseCell = document.createElement("td");
+    instructionsRow1.appendChild(leftMouseCell);
+    const leftMouseImg = document.createElement("svg");
+    leftMouseImg.innerHTML = leftMouseSvg;
+    leftMouseCell.appendChild(leftMouseImg);
+    const leftMouseInstructionsCell = document.createElement("td");
+    instructionsRow1.appendChild(leftMouseInstructionsCell);
+    leftMouseInstructionsCell.innerHTML = "Rotate view";
+
+    const rightMouseCell = document.createElement("td");
+    instructionsRow2.appendChild(rightMouseCell);
+    const rightMouseImg = document.createElement("svg");
+    rightMouseImg.innerHTML = rightMouseSvg;
+    rightMouseCell.appendChild(rightMouseImg);
+    const rightMouseInstructionsCell = document.createElement("td");
+    instructionsRow2.appendChild(rightMouseInstructionsCell);
+    rightMouseInstructionsCell.innerHTML = "Translate view";
+
+    this.uiContainer.appendChild(instructions);
+
+    // Set up the reusable sphere geometry
+
+    const NUM_SPHERE_SEGMENTS = 18;
+    this.sphereGeometry = new THREE.SphereBufferGeometry(
+      SCALE_FACTOR,
+      NUM_SPHERE_SEGMENTS,
+      NUM_SPHERE_SEGMENTS
+    );
   }
 
   /**
@@ -367,13 +421,7 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
-    const NUM_SPHERE_SEGMENTS = 18;
-    const geometry = new THREE.SphereBufferGeometry(
-      SCALE_FACTOR,
-      NUM_SPHERE_SEGMENTS,
-      NUM_SPHERE_SEGMENTS
-    );
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(this.sphereGeometry, material);
     mesh.position.x = pos[0] * SCALE_FACTOR;
     mesh.position.y = pos[1] * SCALE_FACTOR;
     mesh.position.z = pos[2] * SCALE_FACTOR;
@@ -384,7 +432,6 @@ class DARTView {
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
       material.dispose();
-      geometry.dispose();
     });
     this.keys.set(mesh, key);
 
@@ -409,6 +456,7 @@ class DARTView {
     if (this.objects.has(key)) {
       this.deleteObject(key);
     }
+    this.objectType.set(key, "capsule");
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
@@ -460,41 +508,67 @@ class DARTView {
    * Must call render() to see results!
    */
   createLine = (key: string, points: number[][], color: number[]) => {
+    this.objectType.set(key, "line");
+    // Try not to recreate geometry. If we already created a line in the past,
+    // let's just update its buffers instead of creating fresh ones.
     if (this.objects.has(key)) {
-      this.deleteObject(key);
-    }
-    const pathMaterial = new THREE.LineBasicMaterial({
-      color: new THREE.Color(color[0], color[1], color[2]),
-      linewidth: 2,
-    });
-    const pathPoints = [];
-    for (let i = 0; i < points.length; i++) {
-      pathPoints.push(
-        new THREE.Vector3(
-          points[i][0] * SCALE_FACTOR,
-          points[i][1] * SCALE_FACTOR,
-          points[i][2] * SCALE_FACTOR
-        )
+      // console.log("Not creating line " + key);
+      const line: THREE.Line = this.objects.get(key) as any;
+      const positions = (line as any).geometry.attributes.position.array;
+      (line as any).material.color = new THREE.Color(
+        color[0],
+        color[1],
+        color[2]
       );
+
+      let cursor = 0;
+      for (let i = 0; i < points.length; i++) {
+        positions[cursor++] = points[i][0] * SCALE_FACTOR;
+        positions[cursor++] = points[i][1] * SCALE_FACTOR;
+        positions[cursor++] = points[i][2] * SCALE_FACTOR;
+      }
+
+      (line as any).geometry.attributes.position.needsUpdate = true; // required after the first render
+      // line.geometry.computeBoundingBox();
+      // line.geometry.computeBoundingSphere();
+
+      this.view.add(line);
+    } else {
+      const pathMaterial = new THREE.LineBasicMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+        linewidth: 2,
+      });
+      const pathPoints = [];
+      for (let i = 0; i < points.length; i++) {
+        pathPoints.push(
+          new THREE.Vector3(
+            points[i][0] * SCALE_FACTOR,
+            points[i][1] * SCALE_FACTOR,
+            points[i][2] * SCALE_FACTOR
+          )
+        );
+      }
+      const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
+      const path = new THREE.Line(pathGeometry, pathMaterial);
+
+      this.objects.set(key, path);
+      this.disposeHandlers.set(key, () => {
+        pathMaterial.dispose();
+        pathGeometry.dispose();
+      });
+      this.keys.set(path, key);
+
+      this.view.add(path);
     }
-    const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
-    const path = new THREE.Line(pathGeometry, pathMaterial);
-
-    this.objects.set(key, path);
-    this.disposeHandlers.set(key, () => {
-      pathMaterial.dispose();
-      pathGeometry.dispose();
-    });
-    this.keys.set(path, key);
-
-    this.view.add(path);
   };
 
   /**
    * This loads a texture from a Base64 string encoding of it
    */
   createTexture = (key: string, base64: string) => {
-    this.textures.set(key, new THREE.TextureLoader().load(base64));
+    if (!this.textures.has(key)) {
+      this.textures.set(key, new THREE.TextureLoader().load(base64));
+    }
   };
 
   /**
@@ -516,84 +590,97 @@ class DARTView {
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
+    // Try not to recreate geometry. If we already created a mesh in the past,
+    // let's just update its state instead of creating a new one.
     if (this.objects.has(key)) {
-      this.deleteObject(key);
-    }
-    let meshMaterial;
-    if (texture_starts.length > 0 && uv.length > 0) {
-      // TODO: respect multiple texture_starts per object
-      meshMaterial = new THREE.MeshLambertMaterial({
-        color: new THREE.Color(1, 1, 1),
-        map: this.textures.get(texture_starts[0].key),
-      });
+      const mesh: THREE.Mesh = this.objects.get(key) as THREE.Mesh;
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+      this.view.add(mesh);
     } else {
-      meshMaterial = new THREE.MeshLambertMaterial({
-        color: new THREE.Color(color[0], color[1], color[2]),
-      });
-    }
+      let meshMaterial;
+      if (texture_starts.length > 0 && uv.length > 0) {
+        // TODO: respect multiple texture_starts per object
+        meshMaterial = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(1, 1, 1),
+          map: this.textures.get(texture_starts[0].key),
+        });
+      } else {
+        meshMaterial = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(color[0], color[1], color[2]),
+        });
+      }
 
-    const meshPoints = [];
-    const rawUVs = [];
-    const rawNormals = [];
+      const meshPoints = [];
+      const rawUVs = [];
+      const rawNormals = [];
 
-    for (let i = 0; i < faces.length; i++) {
-      for (let j = 0; j < 3; j++) {
-        let vertexIndex = faces[i][j];
-        meshPoints.push(
-          new THREE.Vector3(
-            vertices[vertexIndex][0] * SCALE_FACTOR,
-            vertices[vertexIndex][1] * SCALE_FACTOR,
-            vertices[vertexIndex][2] * SCALE_FACTOR
-          )
-        );
-        if (uv != null && uv.length > vertexIndex) {
-          rawUVs.push(uv[vertexIndex][0]);
-          rawUVs.push(uv[vertexIndex][1]);
-        }
-        if (vertexNormals != null && vertexNormals.length > vertexIndex) {
-          rawNormals.push(vertexNormals[vertexIndex][0]);
-          rawNormals.push(vertexNormals[vertexIndex][1]);
-          rawNormals.push(vertexNormals[vertexIndex][2]);
+      for (let i = 0; i < faces.length; i++) {
+        for (let j = 0; j < 3; j++) {
+          let vertexIndex = faces[i][j];
+          meshPoints.push(
+            new THREE.Vector3(
+              vertices[vertexIndex][0] * SCALE_FACTOR,
+              vertices[vertexIndex][1] * SCALE_FACTOR,
+              vertices[vertexIndex][2] * SCALE_FACTOR
+            )
+          );
+          if (uv != null && uv.length > vertexIndex) {
+            rawUVs.push(uv[vertexIndex][0]);
+            rawUVs.push(uv[vertexIndex][1]);
+          }
+          if (vertexNormals != null && vertexNormals.length > vertexIndex) {
+            rawNormals.push(vertexNormals[vertexIndex][0]);
+            rawNormals.push(vertexNormals[vertexIndex][1]);
+            rawNormals.push(vertexNormals[vertexIndex][2]);
+          }
         }
       }
+
+      const meshGeometry = new THREE.BufferGeometry().setFromPoints(meshPoints);
+      if (rawUVs.length > 0) {
+        meshGeometry.setAttribute(
+          "uv",
+          new THREE.BufferAttribute(new Float32Array(rawUVs), 2)
+        );
+      }
+      if (rawNormals.length > 0) {
+        meshGeometry.setAttribute(
+          "normal",
+          new THREE.BufferAttribute(new Float32Array(rawNormals), 3)
+        );
+      } else {
+        meshGeometry.computeVertexNormals();
+      }
+      meshGeometry.computeBoundingBox();
+
+      const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        meshMaterial.dispose();
+        meshGeometry.dispose();
+      });
+      this.keys.set(mesh, key);
+
+      this.view.add(mesh);
     }
-
-    const meshGeometry = new THREE.BufferGeometry().setFromPoints(meshPoints);
-    if (rawUVs.length > 0) {
-      meshGeometry.setAttribute(
-        "uv",
-        new THREE.BufferAttribute(new Float32Array(rawUVs), 2)
-      );
-    }
-    if (rawNormals.length > 0) {
-      meshGeometry.setAttribute(
-        "normal",
-        new THREE.BufferAttribute(new Float32Array(rawNormals), 3)
-      );
-    } else {
-      meshGeometry.computeVertexNormals();
-    }
-    meshGeometry.computeBoundingBox();
-
-    const mesh = new THREE.Mesh(meshGeometry, meshMaterial);
-    mesh.position.x = pos[0] * SCALE_FACTOR;
-    mesh.position.y = pos[1] * SCALE_FACTOR;
-    mesh.position.z = pos[2] * SCALE_FACTOR;
-    mesh.rotation.x = euler[0];
-    mesh.rotation.y = euler[1];
-    mesh.rotation.z = euler[2];
-    mesh.castShadow = castShadows;
-    mesh.receiveShadow = receiveShadows;
-    mesh.scale.set(scale[0], scale[1], scale[2]);
-
-    this.objects.set(key, mesh);
-    this.disposeHandlers.set(key, () => {
-      meshMaterial.dispose();
-      meshGeometry.dispose();
-    });
-    this.keys.set(mesh, key);
-
-    this.view.add(mesh);
   };
 
   /**
@@ -641,7 +728,8 @@ class DARTView {
    */
   setObjectScale = (key: string, scale: number[]) => {
     const obj = this.objects.get(key);
-    if (obj) {
+    // Don't dynamically set scales on capsules
+    if (obj && this.objectType.get(key) != "capsule") {
       (obj as any).scale.set(scale[0], scale[1], scale[2]);
     }
   };
@@ -654,11 +742,17 @@ class DARTView {
   deleteObject = (key: string) => {
     const obj = this.objects.get(key);
     if (obj) {
-      this.disposeHandlers.get(key)();
       this.view.remove(obj);
       this.keys.delete(obj);
       this.scene.remove(obj);
-      this.objects.delete(key);
+      // Keep lines around, and just update the buffers if they ever get recreated
+      if (this.objectType.get(key) != "line") {
+        // console.log("Deleting object " + key);
+        this.objects.delete(key);
+        this.disposeHandlers.get(key)();
+      } else {
+        // console.log("Not deleting line " + key);
+      }
     }
   };
 
@@ -902,6 +996,7 @@ class DARTView {
     this.objects.forEach((v, k) => {
       this.view.remove(v);
     });
+    this.disposeHandlers.forEach((v, k) => v());
     this.objects.clear();
     this.keys.clear();
 

@@ -47,10 +47,10 @@ public:
 
   /// This returns the current state of the GUI as a JSON blob, for example if
   /// we have a websocket reconnecting
-  std::string getCurrentStateAsJSON();
+  std::string getCurrentStateAsJson();
 
   /// This formats the latest set of commands as JSON, and clears the buffer
-  std::string flushJSON();
+  std::string flushJson();
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands

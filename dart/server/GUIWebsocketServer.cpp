@@ -85,7 +85,7 @@ void GUIWebsocketServer::serve(int port)
     // mServer->send(conn) seems to break, cause conn appears to get cleaned
     // up in race conditions (it's a weak pointer)
 
-    std::string jsonStr = getCurrentStateAsJSON();
+    std::string jsonStr = getCurrentStateAsJson();
     try
     {
       mServer->send(conn, jsonStr);
@@ -382,7 +382,7 @@ void GUIWebsocketServer::flush()
 {
   if (mServing && mMessagesQueued > 0)
   {
-    std::string json = flushJSON();
+    std::string json = flushJson();
     try
     {
       mServer->broadcast(json);
