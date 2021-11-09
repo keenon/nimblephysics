@@ -303,7 +303,6 @@ class MarkerMocap:
       goldColor = [26. / 255, 99. / 255, 235. / 255]
 
       def renderTimestep(timestep):
-        gui.nativeAPI().setAutoflush(False)
         # Render our guessed position
         self.skel.setPositions(result.poses[:, timestep])
         gui.nativeAPI().renderSkeleton(self.skel, 'result')
@@ -355,7 +354,6 @@ class MarkerMocap:
             gui.nativeAPI().deleteObject(markerName+"_found")
             gui.nativeAPI().deleteObject(markerName+"_gold")
             gui.nativeAPI().deleteObject(markerName+"_real")
-        gui.nativeAPI().setAutoflush(True)
         gui.nativeAPI().flush()
 
       cursor = 0

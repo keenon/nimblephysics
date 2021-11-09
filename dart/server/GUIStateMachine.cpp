@@ -368,7 +368,8 @@ void GUIStateMachine::renderSkeleton(
           Eigen::Vector3s pos = shapeNode->getWorldTransform().translation();
           Eigen::Vector3s euler
               = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
-          Eigen::Vector3s color = visual->getColor();
+          Eigen::Vector3s color
+              = useOriginalColor ? visual->getColor() : overrideColor;
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
           Eigen::Vector3s scale = Eigen::Vector3s::Zero();
           if (shape->getType() == "BoxShape")

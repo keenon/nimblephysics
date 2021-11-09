@@ -77,29 +77,36 @@ void GUIWebsocketServer::serve(int port)
   // Register our network callbacks, ensuring the logic is run on the main
   // thread's event loop
   mServer->connect([this](ClientConnection conn) {
-    // We don't need high throughput, so run everything through a global mutex
-    // to avoid data races
-    const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
-
-    // Send a hello message to the client
-    // mServer->send(conn) seems to break, cause conn appears to get cleaned
-    // up in race conditions (it's a weak pointer)
-
-    std::string jsonStr = getCurrentStateAsJson();
-    try
     {
-      mServer->send(conn, jsonStr);
+      // We don't need high throughput, so run everything through a global mutex
+      // to avoid data races
+      const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+      // Send a hello message to the client
+      // mServer->send(conn) seems to break, cause conn appears to get cleaned
+      // up in race conditions (it's a weak pointer)
+
+      std::string jsonStr = getCurrentStateAsJson();
+      try
+      {
+        mServer->send(conn, jsonStr);
+      }
+      catch (...)
+      {
+        dterr << "GUIWebsocketServer caught an error broadcasting message \""
+              << jsonStr << "\"" << std::endl;
+      }
+      // mServer->broadcast("{\"type\": 1}");
+      /*
+      mServer->broadcast(
+          "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
+      */
     }
-    catch (...)
-    {
-      dterr << "GUIWebsocketServer caught an error broadcasting message \""
-            << jsonStr << "\"" << std::endl;
-    }
-    // mServer->broadcast("{\"type\": 1}");
-    /*
-    mServer->broadcast(
-        "{\"type\": \"init\", \"world\": " + mWorld->toJson() + "}");
-    */
+
+    // Don't hold the globalMutex when calling connection listeners, because
+    // that can lead to deadlocks if the connection listeners call out to Python
+    // (which tries to grab the GIL) while other Python code (holding the GIL)
+    // tries to grab the globalMutex.
 
     for (auto listener : mConnectionListeners)
     {
@@ -234,10 +241,12 @@ void GUIWebsocketServer::serve(int port)
     // Note that we've started, but do it from within the server's event loop
     // once the server has _actually_ started.
     mServer->eventLoop.post([&]() {
-      const std::unique_lock<std::mutex> lock(this->mServingMutex);
-      mStartingServer = false;
-      mServing = true;
-      mServingConditionValue.notify_all();
+      {
+        const std::unique_lock<std::mutex> lock(this->mServingMutex);
+        mStartingServer = false;
+        mServing = true;
+        mServingConditionValue.notify_all();
+      }
 
       // Start the flush thread
       mFlushThread = new std::thread([this]() { this->flushThread(); });

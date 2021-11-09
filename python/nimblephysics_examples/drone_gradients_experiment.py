@@ -169,8 +169,6 @@ def main():
 
   i = 0
 
-  gui.stateMachine().setAutoflush(False)
-
   def onTick(now):
     nonlocal i
     nonlocal naiveDronePos
