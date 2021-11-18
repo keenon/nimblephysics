@@ -144,6 +144,8 @@ public:
 
   void setCOMchange(Eigen::Vector3s com);
 
+  void setMOIchange(Eigen::Vector6s moi);
+
   void setMUchange(s_t mu);
 
 protected:
@@ -173,6 +175,7 @@ protected:
   s_t pre_mass;
   s_t pre_mu;
   Eigen::Vector3s pre_com;
+  Eigen::Vector6s pre_moi;
   bool mVarchange = true;
 
   std::shared_ptr<trajectory::Optimizer> mOptimizer;

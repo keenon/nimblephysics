@@ -535,6 +535,15 @@ void MPCLocal::setCOMchange(Eigen::Vector3s com)
   pre_com = com;
 }
 
+void MPCLocal::setMOIchange(Eigen::Vector6s moi)
+{
+  if((moi - pre_moi).norm() > 0.001)
+  {
+    mVarchange = true;
+  }
+  pre_moi = moi;
+}
+
 void MPCLocal::setMUchange(s_t mu)
 {
   if(abs(mu-pre_mu) > 0.001)

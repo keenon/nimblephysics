@@ -8,15 +8,28 @@ namespace dart {
 namespace realtime {
 
 RealTimeControlBuffer::RealTimeControlBuffer(
-    int forceDim, int steps, int millisPerStep)
+    int forceDim, int steps, int millisPerStep, int stateDim)
   : mForceDim(forceDim),
+    mStateDim(stateDim),
     mNumSteps(steps),
     mMillisPerStep(millisPerStep),
     mActiveBuffer(UNINITIALIZED),
+    mActiveBufferLaw(UNINITIALIZED),
     mBufA(Eigen::MatrixXs::Zero(forceDim, steps)),
     mBufB(Eigen::MatrixXs::Zero(forceDim, steps)),
+    mkBufA(Eigen::MatrixXs::Zero(forceDim, steps)),
+    mkBufB(Eigen::MatrixXs::Zero(forceDim, steps)),
+    mxBufA(Eigen::MatrixXs::Zero(stateDim, steps)),
+    mxBufB(Eigen::MatrixXs::Zero(stateDim, steps)),
     mControlLog(ControlLog(forceDim, millisPerStep))
 {
+  // std::cout<<"Initializing Buffer..." << std::endl;
+  for(int i=0; i < steps; i++)
+  {
+    mKBufA.push_back(Eigen::MatrixXs::Zero(forceDim, stateDim));
+    mKBufB.push_back(Eigen::MatrixXs::Zero(forceDim, stateDim));
+  }
+  // std::cout << "Initialization Complete" <<std::endl;
 }
 
 /// Gets the force at a given timestep
@@ -64,13 +77,144 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
   throw std::runtime_error{"Execution should never reach this point"};
 }
 
+Eigen::VectorXs RealTimeControlBuffer::getPlannedk(long time, bool dontLog)
+{
+  if(dontLog)
+  {
+    std::cout << "Don't Use Log" << std::endl;
+  }
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to no force
+    return Eigen::VectorXs::Zero(mForceDim);
+  }
+  int elapsed = time - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to no force
+    return Eigen::VectorXs::Zero(mForceDim);
+  }
+
+  int step = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (step < mNumSteps)
+  {
+    if (mActiveBufferLaw == BUF_A)
+    {
+      return mkBufA.col(step);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      return mkBufB.col(step);
+    }
+    else
+      assert(false && "Should never reach this point");
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    Eigen::VectorXs oob = Eigen::VectorXs::Zero(mForceDim);
+    return oob;
+  }
+  // The code should never reach here, but it's here to keep the compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
+
+Eigen::VectorXs RealTimeControlBuffer::getPlannedState(long time, bool dontLog)
+{
+  if(dontLog)
+  {
+    std::cout << "Don't use Log" << std::endl;
+  }
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to no force
+    return Eigen::VectorXs::Zero(mStateDim);
+  }
+  int elapsed = time - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to no force
+    return Eigen::VectorXs::Zero(mStateDim);
+  }
+
+  int step = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (step < mNumSteps)
+  {
+    if (mActiveBufferLaw == BUF_A)
+    {
+      return mxBufA.col(step);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      return mxBufB.col(step);
+    }
+    else
+      assert(false && "Should never reach this point");
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    Eigen::VectorXs oob = Eigen::VectorXs::Zero(mStateDim);
+    return oob;
+  }
+  // The code should never reach here, but it's here to keep the compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
+
+Eigen::MatrixXs RealTimeControlBuffer::getPlannedK(long time, bool dontLog)
+{
+  if(dontLog)
+  {
+    std::cout << "Don't Use Log" << std::endl;
+  }
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to no force
+    return Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+  }
+  int elapsed = time - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to no force
+    return Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+  }
+
+  int step = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (step < mNumSteps)
+  {
+    if (mActiveBufferLaw == BUF_A)
+    {
+      return mKBufA[step];
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      return mKBufB[step];
+    }
+    else
+      assert(false && "Should never reach this point");
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    Eigen::MatrixXs oob = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+    return oob;
+  }
+  // The code should never reach here, but it's here to keep the compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
 /// This gets planned forces starting at `start`, and continuing for the
 /// length of our buffer size `mSteps`. This is useful for initializing MPC
 /// runs. It supports walking off the end of known future, and assumes 0
 /// forces in all extrapolation.
+/// Assume forcesOut has 50 steps
 void RealTimeControlBuffer::getPlannedForcesStartingAt(
     long start, Eigen::Ref<Eigen::MatrixXs> forcesOut)
 {
+  assert(forcesOut.rows() == mForceDim);
+  assert(forcesOut.cols() == mNumSteps);
   if (mActiveBuffer == UNINITIALIZED)
   {
     // Unitialized, default to 0
@@ -110,22 +254,199 @@ void RealTimeControlBuffer::getPlannedForcesStartingAt(
   }
 }
 
+void RealTimeControlBuffer::getPlannedkStartingAt(
+    long start, Eigen::Ref<Eigen::MatrixXs> kOut)
+{
+  assert(kOut.rows() == mForceDim);
+  assert(kOut.cols() == mNumSteps);
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to 0
+    kOut.setZero();
+    return;
+  }
+  int elapsed = start - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to 0
+    kOut.setZero();
+    return;
+  }
+  int startStep = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (startStep < mNumSteps)
+  {
+    // Copy the appropriate block of our active buffer to the forcesOut block
+    if (mActiveBufferLaw == BUF_A)
+    {
+      kOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mkBufA.block(0, startStep, mForceDim, mNumSteps - startStep);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      kOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mkBufB.block(0, startStep, mForceDim, mNumSteps - startStep);
+    }
+    else
+      assert(false && "Should never reach this point");
+    // Zero out the remainder of the forcesOut block
+    kOut.block(0, mNumSteps - startStep, mForceDim, startStep).setZero();
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    kOut.setZero();
+  }
+}
+
+void RealTimeControlBuffer::getPlannedStateStartingAt(
+    long start, Eigen::Ref<Eigen::MatrixXs> stateOut)
+{
+  assert(stateOut.rows() == mStateDim);
+  assert(stateOut.cols() == mNumSteps);
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to 0
+    stateOut.setZero();
+    return;
+  }
+  int elapsed = start - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to 0
+    stateOut.setZero();
+    return;
+  }
+  int startStep = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (startStep < mNumSteps)
+  {
+    // Copy the appropriate block of our active buffer to the forcesOut block
+    if (mActiveBufferLaw == BUF_A)
+    {
+      stateOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mxBufA.block(0, startStep, mForceDim, mNumSteps - startStep);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      stateOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mxBufB.block(0, startStep, mForceDim, mNumSteps - startStep);
+    }
+    else
+      assert(false && "Should never reach this point");
+    // Zero out the remainder of the forcesOut block
+    stateOut.block(0, mNumSteps - startStep, mForceDim, startStep).setZero();
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    stateOut.setZero();
+  }
+}
+
+void RealTimeControlBuffer::getPlannedKStartingAt(long start, 
+  std::vector<Eigen::MatrixXs> &KOut)
+{
+  // Need to make sure that empty and filed KOut will be treated similarly
+  assert(KOut.size() == mNumSteps);
+  assert(KOut[0].rows() == mForceDim);
+  assert(KOut[1].rows() == mStateDim);
+
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to 0
+    for(int i=0; i < KOut.size(); i++)
+    {
+      KOut[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+    }
+    return;
+  }
+  int elapsed = start - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to 0
+    for(int i = 0; i < KOut.size(); i++)
+    {
+      KOut[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+    }
+    return;
+  }
+  int startStep = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (startStep < mNumSteps)
+  {
+    // Copy the appropriate block of our active buffer to the forcesOut block
+    if (mActiveBufferLaw == BUF_A)
+    {
+      /*
+      kOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mkBufA.block(0, startStep, mForceDim, mNumSteps - startStep);
+      */
+      for(int i = 0; i < mNumSteps- startStep; i++)
+      {
+        KOut[i] = mKBufA[i];
+      }
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      /*
+      kOut.block(0, 0, mForceDim, mNumSteps - startStep)
+          = mkBufB.block(0, startStep, mForceDim, mNumSteps - startStep);
+      */
+      for(int i = 0; i < mNumSteps- startStep; i++)
+      {
+        KOut[i] = mKBufB[i];
+      }
+    }
+    else
+    {
+      assert(false && "Should never reach this point");
+    }
+    // Zero out the remainder of the forcesOut block
+    
+    // KOut.block(0, mNumSteps - startStep, mForceDim, startStep).setZero();
+    for(int i = 0; i < mNumSteps- startStep; i++)
+    {
+      KOut[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+    }
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    for(int i = 0; i < KOut.size(); i++)
+    {
+      KOut[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+    }
+  }
+}
+
+size_t RealTimeControlBuffer::getRemainSteps(long start)
+{
+  int elapsed = start - mLastWroteBufferAt;
+  if(elapsed < 0)
+  {
+    return 0;
+  }
+  size_t remain_steps = mNumSteps - (int)(((s_t)elapsed / mMillisPerStep));
+  return remain_steps;
+}
+
 /// This swaps in a new buffer of forces. The assumption is that "startAt" is
 /// before "now", because we'll erase old data in this process.
 void RealTimeControlBuffer::setControlForcePlan(
     long startAt, long now, Eigen::MatrixXs forces)
 {
+  // The solve is too fast that problem is solved before expected time
   if (startAt > now)
   {
     long padMillis = startAt - now;
     int padSteps = (int)floor((s_t)padMillis / mMillisPerStep);
     // If we're trying to set the force plan too far out in the future, this
-    // whole exercise is a no-op
+    // whole exercise is a not allowed
     if (padSteps >= mNumSteps)
     {
       return;
     }
     // Otherwise, we're going to copy part of the existing plan
+    // Since the first time pointer of control force plan should
+    // always be earlier than actual time that get the buffer
     int currentStep
         = (int)floor((s_t)(now - mLastWroteBufferAt) / mMillisPerStep);
     int remainingSteps = mNumSteps - currentStep;
@@ -134,6 +455,7 @@ void RealTimeControlBuffer::setControlForcePlan(
     // If we've overflowed our old buffer, this is bad, but recoverable. We'll
     // just not copy anything from our old plan, since it's all in the past now
     // anyways.
+    // Previous time the MPC doesn't catch up
     if (remainingSteps < 0)
     {
       mBufA = forces;
@@ -141,12 +463,16 @@ void RealTimeControlBuffer::setControlForcePlan(
       return;
     }
 
+    // With in pad step uses previous force until now, use current force
     int copySteps = padSteps;
     int zeroSteps = 0;
+    // usestep will use new force
     int useSteps = mNumSteps - padSteps;
     if (padSteps > remainingSteps)
     {
       copySteps = remainingSteps;
+      // There are some forces in the middle that need to set to zero since no information
+      // can be provided either from incoming force or original plan
       zeroSteps = padSteps - remainingSteps;
       useSteps = mNumSteps - padSteps;
     }
@@ -201,6 +527,218 @@ void RealTimeControlBuffer::setControlForcePlan(
   }
 }
 
+
+void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
+                                              std::vector<Eigen::VectorXs> ks,
+                                              std::vector<Eigen::MatrixXs> Ks,
+                                              std::vector<Eigen::VectorXs> states)
+{
+  assert(ks.size() == Ks.size() && states.size() == Ks.size());
+  if (startAt > now)
+  {
+    long padMillis = startAt - now;
+    int padSteps = (int)floor((s_t)padMillis / mMillisPerStep);
+    // If we're trying to set the force plan too far out in the future, this
+    // whole exercise is a no-op
+    if (padSteps >= mNumSteps)
+    {
+      return;
+    }
+    // Otherwise, we're going to copy part of the existing plan
+    int currentStep
+        = (int)floor((s_t)(now - mLastWroteLawBufferAt) / mMillisPerStep);
+    int remainingSteps = mNumSteps - currentStep;
+    mLastWroteLawBufferAt = now;
+
+    // If we've overflowed our old buffer, this is bad, but recoverable. We'll
+    // just not copy anything from our old plan, since it's all in the past now
+    // anyways.
+    if (remainingSteps < 0)
+    {
+      mkBufA = Eigen::MatrixXs::Zero(mForceDim, ks.size());
+      mxBufA = Eigen::MatrixXs::Zero(mStateDim, states.size());
+      mKBufA = Ks;
+      for(int i = 0; i < ks.size(); i++)
+      {
+        mkBufA.col(i) = ks[i];
+        mxBufA.col(i) = states[i];
+      }
+
+      mActiveBufferLaw = BUF_A;
+      return;
+    }
+
+    int copySteps = padSteps;
+    int zeroSteps = 0;
+    int useSteps = mNumSteps - padSteps;
+    if (padSteps > remainingSteps)
+    {
+      copySteps = remainingSteps;
+      zeroSteps = padSteps - remainingSteps;
+      useSteps = mNumSteps - padSteps;
+    }
+    assert(copySteps + zeroSteps + useSteps == mNumSteps);
+
+    if (mActiveBufferLaw == UNINITIALIZED)
+    {
+      /*
+      mBufA.block(0, 0, mForceDim, copySteps).setZero();
+      mBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufA.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_A;
+      */
+     // For k
+     mkBufA.block(0, 0, mForceDim, copySteps).setZero();
+     mkBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+     for(int i = 0; i < useSteps; i++)
+     {
+       mkBufA.col(i + copySteps + zeroSteps) = ks[i];
+     }
+     // For states
+     mxBufA.block(0, 0, mStateDim, copySteps).setZero();
+     mxBufA.block(0, copySteps, mStateDim, zeroSteps).setZero();
+     for(int i = 0; i < useSteps; i++)
+     {
+       mxBufA.col(i + copySteps + zeroSteps) = states[i];
+     }
+     // For K
+     for(int i = 0; i < copySteps + zeroSteps; i++)
+     {
+       mKBufA[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+     }
+     for(int i = 0; i < useSteps; i++)
+     {
+       mKBufA[i + copySteps + zeroSteps] = Ks[i];
+     }
+     mActiveBufferLaw = BUF_A;
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      /*
+      mBufA.block(0, 0, mForceDim, copySteps)
+          = mBufB.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufA.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_A;
+      */
+      // For k
+      mkBufA.block(0, 0, mForceDim, copySteps)
+          = mkBufB.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mkBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      for(int i = 0; i > useSteps;i++)
+      {
+        mkBufA.col(i + copySteps + zeroSteps) = ks[i];
+      }
+      // For state
+      mxBufA.block(0, 0, mStateDim, copySteps)
+          = mxBufB.block(0, mNumSteps - copySteps, mStateDim, copySteps);
+      mxBufA.block(0, copySteps, mStateDim, zeroSteps).setZero();
+      for(int i = 0; i > useSteps;i++)
+      {
+        mxBufA.col(i + copySteps + zeroSteps) = states[i];
+      }
+
+      // Set K buffer
+      for(int i = 0;i < copySteps + zeroSteps; i++)
+      {
+        if(i < copySteps)
+        {
+          mKBufA[i] = mKBufB[mNumSteps - copySteps + i];
+        }
+        else
+        {
+          mKBufA[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+        }
+      }
+      for(int i = 0; i > useSteps;i++)
+      {
+        mKBufA[i + copySteps + zeroSteps] = Ks[i];
+      }
+      // change active buffer
+      mActiveBufferLaw = BUF_A;
+      
+    }
+    else if (mActiveBufferLaw == BUF_A)
+    {
+      /*
+      mBufB.block(0, 0, mForceDim, copySteps)
+          = mBufA.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mBufB.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      mBufB.block(0, copySteps + zeroSteps, mForceDim, useSteps)
+          = forces.block(0, 0, mForceDim, useSteps);
+      mActiveBuffer = BUF_B;
+      */
+      // For k
+      mkBufB.block(0, 0, mForceDim, copySteps)
+          = mkBufA.block(0, mNumSteps - copySteps, mForceDim, copySteps);
+      mkBufB.block(0, copySteps, mForceDim, zeroSteps).setZero();
+      for(int i = 0; i > useSteps;i++)
+      {
+        mkBufB.col(i + copySteps + zeroSteps) = ks[i];
+      }
+
+      // For state
+      mxBufB.block(0, 0, mStateDim, copySteps)
+          = mxBufA.block(0, mNumSteps - copySteps, mStateDim, copySteps);
+      mxBufB.block(0, copySteps, mStateDim, zeroSteps).setZero();
+      for(int i = 0; i > useSteps;i++)
+      {
+        mxBufB.col(i + copySteps + zeroSteps) = states[i];
+      }
+
+      // Set K buffer
+      for(int i = 0;i < copySteps + zeroSteps; i++)
+      {
+        if(i < copySteps)
+        {
+          mKBufB[i] = mKBufA[mNumSteps - copySteps + i];
+        }
+        else
+        {
+          mKBufB[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
+        }
+      }
+      for(int i = 0; i > useSteps;i++)
+      {
+        mKBufB[i + copySteps + zeroSteps] = Ks[i];
+      }
+      // change active buffer
+      mActiveBufferLaw = BUF_B;
+    }
+  }
+  else
+  {
+    mLastWroteLawBufferAt = startAt;
+    if (mActiveBufferLaw == UNINITIALIZED || mActiveBufferLaw == BUF_B)
+    {
+      mKBufA = Ks;
+      for(int i = 0; i < ks.size(); i++)
+      {
+        mkBufA.col(i) = ks[i];
+        mxBufA.col(i) = states[i];
+      }
+      // Crucial for lock-free behavior: copy the buffer BEFORE setting the
+      // active buffer. Not a huge deal if we're a bit off here in the
+      // optimizer, but not ideal.
+      mActiveBufferLaw = BUF_A;
+    }
+    else
+    {
+      mKBufB = Ks;
+      for(int i = 0; i < ks.size(); i++)
+      {
+        mkBufB.col(i) = ks[i];
+        mxBufB.col(i) = states[i];
+      }
+      // Crucial for lock-free behavior: copy the buffer BEFORE setting the
+      // active buffer. Not a huge deal if we're a bit off here in the
+      // optimizer, but not ideal.
+      mActiveBufferLaw = BUF_B;
+    }
+  }
+}
 /// This retrieves the state of the world at a given time, assuming that we've
 /// been applying forces from the buffer since the last state that we fully
 /// observed.
@@ -307,6 +845,7 @@ void RealTimeControlBuffer::manuallyRecordObservedForce(
 
 /// This is a helper to rescale the timestep size of a buffer while leaving
 /// the data otherwise unchanged.
+/// TODO: Eric Enable rescale of K buffers
 void RealTimeControlBuffer::rescaleBuffer(
     Eigen::MatrixXs& buf, int oldMillisPerStep, int newMillisPerStep)
 {

@@ -22,6 +22,7 @@ dart_add_test("comprehensive" test_KR5Trajectory)
 dart_add_test("comprehensive" test_SaddlepointEscape)
 dart_add_test("comprehensive" test_DampGradient)
 dart_add_test("comprehensive" test_SpringGradient)
+dart_add_test("comprehensive" test_iLQRRealtime)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)
