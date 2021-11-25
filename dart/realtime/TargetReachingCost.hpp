@@ -7,6 +7,8 @@
 #include <boost/function.hpp>
 #include "dart/trajectory/TrajectoryConstants.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/simulation/World.hpp"
+#include "dart/simulation/SmartPointer.hpp"
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/math/MathTypes.hpp"
 
@@ -37,20 +39,18 @@ public:
       Eigen::VectorXs runningStateWeight,
       Eigen::VectorXs runningActionWeight,
       Eigen::VectorXs finalStateWeight,
-      Eigen::VectorXi actuatedJoint);
+      std::shared_ptr<simulation::World> world);
 
   // API for iLQR Gradient and Loss compute
   // It should call protected function
   std::vector<Eigen::VectorXs> ilqrGradientEstimator(const trajectory::TrajectoryRollout* rollout,
                                                      s_t& total_cost,
-                                                     WRTFLAG wrt,
-                                                     s_t dt);
+                                                     WRTFLAG wrt);
 
   // API for iLQR Hessian compute
   // It should call protected function
   std::vector<Eigen::MatrixXs> ilqrHessianEstimator(const trajectory::TrajectoryRollout* rollout,
-                                                    WRTFLAG wrt,
-                                                    s_t dt);
+                                                    WRTFLAG wrt);
 
   // API for IP-OPT LossFn
   // It should call protected function
@@ -67,14 +67,16 @@ public:
   // set target
   void setTarget(Eigen::VectorXs target);
 
-protected:
-  // Compute Loss and Gradient
+  void setTimeStep(s_t timestep);
+
   s_t computeLoss(const trajectory::TrajectoryRollout* rollout);
 
+  // Compute Loss and Gradient
   void computeGradX(const trajectory::TrajectoryRollout* rollout, Eigen::Ref<Eigen::MatrixXs> grads);
 
   void computeGradU(const trajectory::TrajectoryRollout* rollout, Eigen::Ref<Eigen::MatrixXs> grads);
 
+  void computeGradForce(const trajectory::TrajectoryRollout* rollout, Eigen::Ref<Eigen::MatrixXs> grads);
   // Compute Hessian from trajectory
   void computeHessXX(const trajectory::TrajectoryRollout* rollout, std::vector<Eigen::MatrixXs> &hess);
 
@@ -83,7 +85,8 @@ protected:
   void computeHessUX(const trajectory::TrajectoryRollout* rollout, std::vector<Eigen::MatrixXs> &hess);
 
   void computeHessXU(const trajectory::TrajectoryRollout* rollout, std::vector<Eigen::MatrixXs> &hess);
-
+  
+protected:
   // Internal information
   Eigen::VectorXs mRunningStateWeight;
 
@@ -93,7 +96,7 @@ protected:
 
   Eigen::VectorXs mFinalStateWeight;
 
-  Eigen::VectorXi mActuatedJoint;
+  std::shared_ptr<simulation::World> mWorld;
 
   // Target
 
@@ -103,7 +106,7 @@ protected:
 
   int mActionDim;
 
-  bool mUseFullAction;
+  s_t dt = 1.0;
 
 };
 

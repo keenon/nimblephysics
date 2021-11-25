@@ -437,6 +437,16 @@ public:
   // This returns the Jacobian for action_t -> state_{t+1}.
   Eigen::MatrixXs getActionJacobian();
 
+  // This function map any forces to actions
+  Eigen::MatrixXs mapToActionSpace(Eigen::MatrixXs forces);
+
+  Eigen::VectorXs mapToActionSpaceVector(Eigen::VectorXs force);
+
+  // This function map any actions to to full dof control forces
+  Eigen::MatrixXs mapToForceSpace(Eigen::MatrixXs actions);
+
+  Eigen::VectorXs mapToForceSpaceVector(Eigen::VectorXs action);
+
   Eigen::MatrixXs finiteDifferenceStateJacobian();
   Eigen::MatrixXs finiteDifferenceActionJacobian();
 

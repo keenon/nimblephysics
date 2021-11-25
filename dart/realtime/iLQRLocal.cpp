@@ -41,7 +41,7 @@ LQRBuffer::LQRBuffer(
   {
     X.push_back(Eigen::VectorXs::Zero(state_dim));
     Xnew.push_back(Eigen::VectorXs::Zero(state_dim));
-    U.push_back(Eigen::VectorXs::Zero(control_dim));
+    U.push_back(0.1 * Eigen::VectorXs::Random(control_dim));
     Unew.push_back(Eigen::VectorXs::Zero(control_dim));
     K.push_back(Eigen::MatrixXs::Zero(control_dim, state_dim));
     k.push_back(Eigen::VectorXs::Zero(control_dim));
@@ -80,7 +80,6 @@ void LQRBuffer::updateXUOld()
 
 // From Buffer Read Plan for execution as well as control law starting from timestamp
 // Which should have equivalent effectiveness of advancePlan
-// TODO: What is the difference between set plan and 
 void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
 {
   Eigen::MatrixXs existForce = Eigen::MatrixXs::Zero(control_dim, nsteps);
@@ -113,19 +112,32 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
       }
       break;
     case LAST:
-      for(; i < nsteps; i++)
+      if(last==0)
       {
-        U[i].segment(0, control_dim) = U[last];
-        k[i].segment(0, control_dim) = k[last];
-        K[i].block(0, 0, control_dim, state_dim) = K[last];
+          for(; i < nsteps; i++)
+        {
+          U[i] = Eigen::VectorXs::Zero(control_dim);
+          k[i] = Eigen::VectorXs::Zero(control_dim);
+          K[i] = Eigen::MatrixXs::Zero(control_dim, state_dim);
+        }
+        break;
       }
-      break;
+      else
+      {
+        for(; i < nsteps; i++)
+        {
+          U[i].segment(0, control_dim) = U[last];
+          k[i].segment(0, control_dim) = Eigen::VectorXs::Zero(control_dim);
+          K[i].block(0, 0, control_dim, state_dim) = Eigen::MatrixXs::Zero(control_dim, state_dim);
+        }
+        break;
+      }
     case RANDOM:
       for(; i < nsteps; i++)
       {
-        U[i] = Eigen::VectorXs::Random(control_dim);
-        k[i] = Eigen::VectorXs::Random(control_dim);
-        K[i] = Eigen::MatrixXs::Random(control_dim, state_dim);
+        U[i] = 0.1 * Eigen::VectorXs::Random(control_dim);
+        k[i] = Eigen::VectorXs::Zero(control_dim);
+        K[i] = Eigen::MatrixXs::Zero(control_dim, state_dim);
       }
       break;
     default:
@@ -193,7 +205,7 @@ bool LQRBuffer::validateXnew()
 iLQRLocal::iLQRLocal(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<TargetReachingCost> costFn,
-    Eigen::VectorXi actuatedJoint,
+    size_t nControls,
     int planningHorizonMillis,
     s_t scale)
   : mRunning(false),
@@ -214,10 +226,10 @@ iLQRLocal::iLQRLocal(
     mMaxIterations(5),
     mMillisInAdvanceToPlan(0),
     mLastOptimizedTime(0L),
-    mBuffer(RealTimeControlBuffer(world->getNumDofs(), mSteps, mMillisPerStep, world->getNumDofs() * 2)),
+    // mBuffer still use world Dofs ...
+    mBuffer(RealTimeControlBuffer(nControls, mSteps, mMillisPerStep, world->getNumDofs() * 2)),
     mSilent(false),
     // Below are iLQR related information
-    mActuatedJoint(actuatedJoint),
     mAlpha_reset_value(1.0),
     mAlpha(1.0),
     mPatience_reset_value(8),
@@ -228,11 +240,12 @@ iLQRLocal::iLQRLocal(
     mMU(100.*1e-6),
     mMU_reset_value(100.*1e-6),
     mCost(0.0),
-    last_loss(std::numeric_limits<s_t>::max()),
-    mlqrBuffer(LQRBuffer(mSteps, world->getNumDofs(), actuatedJoint.size(), Extrapolate_Method::LAST))
+    mlqrBuffer(LQRBuffer(mSteps, world->getNumDofs(), nControls, Extrapolate_Method::RANDOM)),
+    mCostFn(costFn),
+    mLast_U(Eigen::VectorXs::Zero(nControls)),
+    mActionDim(nControls),
+    mStateDim(world->getNumDofs() * 2)
 {
-  size_t nControls = actuatedJoint.size();
-  mLast_U = Eigen::VectorXs::Zero(nControls);
 }
 
 
@@ -266,7 +279,7 @@ std::shared_ptr<trajectory::Problem> iLQRLocal::getProblem()
 /// computed anything for this instant yet, this just returns 0s.
 Eigen::VectorXs iLQRLocal::getControlForce(long now)
 {
-  return mBuffer.getPlannedForce(now);
+  return mWorld->mapToForceSpaceVector(mBuffer.getPlannedForce(now));
 }
 
 /// This gets the force from LQR control law and current state
@@ -275,11 +288,10 @@ Eigen::VectorXs iLQRLocal::computeForce(Eigen::VectorXs state, long now)
   Eigen::MatrixXs K = getControlK(now);
   Eigen::VectorXs k = getControlk(now);
   Eigen::VectorXs x = mBuffer.getPlannedState(now);
-
-  Eigen::VectorXs force = mLast_U + mAlpha * k 
-                         + K * (state - x);
-  return force;
-
+  Eigen::VectorXs action = (mLast_U + mAlpha *k 
+                         + K * (state - x)).cwiseMin(mActionBound).cwiseMax(-mActionBound);
+  mLast_U = action;
+  return mWorld->mapToForceSpaceVector(action);
 }
 
 /// This returns how many millis we have left until we've run out of plan.
@@ -410,10 +422,13 @@ void iLQRLocal::optimizePlan(long startTime)
 
     mLastOptimizedTime = startTime;
 
+    // Here mBuffer should have access to mapping of control force
+    Eigen::MatrixXs actions = worldClone->mapToActionSpace(mProblem->getRolloutCache(worldClone)->getControlForcesConst());
+
     mBuffer.setControlForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
+        actions);
 
     log->end();
 
@@ -462,10 +477,11 @@ void iLQRLocal::optimizePlan(long startTime)
     // Update the control force plan from current time stamp.
     // The new optimization problem is started at start time, however since the replanning
     // Process take an non trivial amount of time, the force to be set is from now.
+    Eigen::MatrixXs actions = worldClone->mapToActionSpace(mProblem->getRolloutCache(worldClone)->getControlForcesConst());
     mBuffer.setControlForcePlan(
         startTime,
         timeSinceEpochMillis(),
-        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
+        actions);
 
     long computeDurationWallTime
         = timeSinceEpochMillis() - startComputeWallTime;
@@ -558,10 +574,10 @@ std::shared_ptr<trajectory::Solution> iLQRLocal::getCurrentSolution()
 /// ============ Here are functions for iLQR =================================
 /// This will run forward pass from start time and record info such as Jacobian
 /// of each timestep and gradient as well as hessian from cost function
-bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
+/// Assume the initial state from world coordinate is starting position
+bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
 {
   bool nan_flag = false;
-  mBuffer.estimateWorldStateAt(world, &mObservationLog, startTime);
   Eigen::VectorXs pos = world->getPositions();
   Eigen::VectorXs vel = world->getVelocities();
   Eigen::VectorXs mass = world->getMasses();
@@ -576,6 +592,8 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
   while(mPatience > 0)
   {
     // Reset Control Force
+    // Let New State and control force equals to old one.
+    // Which is equivalent to deep copy.
     mlqrBuffer.resetXUNew();
     
     // set control force and initial condition
@@ -584,31 +602,20 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
     world->setMasses(mass);
 
     // Rollout Trajectory
-    Eigen::MatrixXs pos = Eigen::MatrixXs::Zero(world->getNumDofs(), mSteps);
-    std::unordered_map<std::string, Eigen::MatrixXs> pos_map;
-    pos_map.emplace("identity", pos);
-    Eigen::MatrixXs vel = Eigen::MatrixXs::Zero(world->getNumDofs(), mSteps);
-    std::unordered_map<std::string, Eigen::MatrixXs> vel_map;
-    vel_map.emplace("identity", vel);
-    Eigen::MatrixXs forces = Eigen::MatrixXs::Zero(world->getNumDofs(), mSteps);
-    std::unordered_map<std::string, Eigen::MatrixXs> force_map;
-    force_map.emplace("identity", forces);
-    Eigen::VectorXs mass = Eigen::VectorXs::Zero(world->getMassDims());
-    std::unordered_map<std::string, Eigen::MatrixXs> meta;
-    TrajectoryRolloutReal rollout = TrajectoryRolloutReal(pos_map, vel_map, force_map, mass, meta);
+    TrajectoryRolloutReal rollout = createRollout(mSteps, world->getNumDofs(), world->getMassDims());
     s_t loss = 0;
-    s_t dt = world->getTimeStep();
 
     // Executing the trajectory according to control law
     getTrajectory(world, &rollout, &mlqrBuffer);
 
     // Require states be stored in rollout
     // Assume loss except the final loss are multiplied by dt
-    Lx       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X, dt);
-    Lu       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U, dt);
-    Lxx      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX, dt);
-    Luu      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU, dt);
-    Lux      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX, dt);
+    Lx       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
+    Lu       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
+    Lxx      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
+    Luu      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
+    Lux      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
+    
     
     
 
@@ -620,7 +627,7 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
       nan_flag = true;
       continue;
     }
-    else if(!((last_loss - loss) >= 0))
+    else if((mCost - loss) < 0)
     {
       mAlpha *= 0.5;
       mPatience--;
@@ -629,10 +636,11 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
     }
     else // Good to leave
     {
-      mCost = loss;
+      mCost = loss; //Update cost with current loss
       mPatience = mPatience_reset_value;
       mAlpha = mAlpha_reset_value;
       nan_flag = false;
+      std::cout << "Loss Set: " << loss << std::endl;
       break;
     }
   }
@@ -642,14 +650,15 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
     // The out of patience is due to nan
     if(nan_flag)
     {
+      std::cout << "nan_detected" << std::endl;
       return false;
     }
     else // The out of patience is due to loss not decrease
     {
-      // 
+      std::cout << "Cost Doesn't decrease, exiting..." << std::endl;
       // Record new gradient and Hessian
-      mlqrBuffer.updateXUOld();
-      mlqrBuffer.updateL(Lx, Lu, Lxx, Luu, Lux);
+      // mlqrBuffer.updateXUOld();
+      // mlqrBuffer.updateL(Lx, Lu, Lxx, Luu, Lux);
       return true;
     }
   }
@@ -659,17 +668,17 @@ bool iLQRLocal::ilqrForward(long startTime, simulation::WorldPtr world)
   return true;
 }
 
-bool iLQRLocal::ilqrBackward(simulation::WorldPtr world)
+bool iLQRLocal::ilqrBackward()
 {
-  s_t dt = world->getTimeStep();
+  // s_t dt = world->getTimeStep();
   bool done = false;
   bool early_termination = false;
   // The loop should exit either done or early terminate
-  while(!early_termination && !done)
+  while(!(early_termination || done))
   {
-    Eigen::VectorXs Vx = mlqrBuffer.Lx[mSteps-1] / dt;
-    Eigen::MatrixXs Vxx = mlqrBuffer.Lxx[mSteps-1] / dt;    
-    for(size_t cursor = mSteps - 2; cursor > 0; cursor--)
+    Eigen::VectorXs Vx = mlqrBuffer.Lx[mSteps-1];
+    Eigen::MatrixXs Vxx = mlqrBuffer.Lxx[mSteps-1];    
+    for(int cursor = mSteps - 2; cursor >= 0; cursor--)
     {
       // Build up Q matrices
       Eigen::VectorXs Qx = mlqrBuffer.Lx[cursor] +  mlqrBuffer.Fx[cursor].transpose() * Vx;
@@ -683,7 +692,7 @@ bool iLQRLocal::ilqrBackward(simulation::WorldPtr world)
       Eigen::MatrixXs I = Eigen::MatrixXs::Identity(Vxx.rows(),Vxx.cols());
       Eigen::MatrixXs Quubar = mlqrBuffer.Luu[cursor] 
                             + mlqrBuffer.Fu[cursor].transpose() * (Vxx + mMU * I) * mlqrBuffer.Fu[cursor];
-      Eigen::MatrixXs Quxbar = mlqrBuffer.Luu[cursor] 
+      Eigen::MatrixXs Quxbar = mlqrBuffer.Lux[cursor] 
                             + (mlqrBuffer.Fu[cursor].transpose() * (Vxx + mMU * I) * mlqrBuffer.Fx[cursor]).transpose();
       if (abs(Quubar.determinant()) < 1e-5)
       {
@@ -695,7 +704,9 @@ bool iLQRLocal::ilqrBackward(simulation::WorldPtr world)
         }
         else
         {
-          std::cout << "Warning Singular Quu, iteration: "<< cursor <<"- repeating backward pass with increased mu."<< std::endl;
+          std::cout << "Warning Singular Quu, iteration: "<< cursor 
+                    <<" -repeating backward pass with increased mu. Patience: "
+                    <<mPatience<< std::endl;
           // Increase mu
           if(mDelta * mDelta0 > mDelta0)
           {
@@ -720,6 +731,7 @@ bool iLQRLocal::ilqrBackward(simulation::WorldPtr world)
       else
       {
         // Compute K matrix
+        //std::cout << "Reached Correct Backward pass"<< cursor << std::endl;
         Eigen::MatrixXs Quubar_inv = Quubar.inverse();
         mlqrBuffer.K[cursor] = -Quubar_inv * Quxbar.transpose();
         mlqrBuffer.k[cursor] = -Quubar_inv * Qu;
@@ -727,7 +739,7 @@ bool iLQRLocal::ilqrBackward(simulation::WorldPtr world)
         Vx = Qx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.k[cursor] 
                 + mlqrBuffer.K[cursor].transpose() * Qu 
                 + Qux.transpose() * mlqrBuffer.k[cursor];
-        Vxx = Qxx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.k[cursor] 
+        Vxx = Qxx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.K[cursor] 
                   + mlqrBuffer.K[cursor].transpose() * Qux 
                   + Qux.transpose() * mlqrBuffer.K[cursor];
         if(cursor == 0)
@@ -770,33 +782,32 @@ void iLQRLocal::getTrajectory(simulation::WorldPtr world,
                               LQRBuffer* lqrBuffer)
 {
   // Need to store the state and actions in rollout
+  Eigen::MatrixXs actions = Eigen::MatrixXs::Zero(mActionDim, mSteps);
   for(int i = 0; i < mSteps - 1; i++)
   {
     // Compute New actions
-    lqrBuffer->Unew[i] = lqrBuffer->Unew[i] + mAlpha * lqrBuffer->k[i] 
-                         + lqrBuffer->K[i] * (lqrBuffer->Xnew[i] - lqrBuffer->X[i]);
+    lqrBuffer->Unew[i] = (lqrBuffer->Unew[i] + mAlpha * lqrBuffer->k[i]
+                         + lqrBuffer->K[i] * (lqrBuffer->Xnew[i] - lqrBuffer->X[i])).cwiseMin(mActionBound).cwiseMax(-mActionBound);
     // Record state and action on rollout
     rollout->getPoses().col(i) = world->getPositions();
     rollout->getVels().col(i) = world->getVelocities();
-    for(int j = 0; j < mActuatedJoint.size(); j++)
-    {
-      rollout->getControlForces()(mActuatedJoint(j),i) = lqrBuffer->Unew[i](j);
-    }
+    actions.col(i) = lqrBuffer->Unew[i];
     
-
     // Set the control force just computed from control law
-    Eigen::VectorXs action = rollout->getControlForces().col(i);
-    world->setControlForces(action);
+    world->setAction(actions.col(i));
     // Step the world
     std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, false);
     // set new state
     lqrBuffer->Xnew[i+1].segment(0, world->getNumDofs()) = snapshot->getPostStepPosition();
+    lqrBuffer->Xnew[i+1].segment(world->getNumDofs(), world->getNumDofs()) = snapshot->getPostStepVelocity();
     // set new Jacobian for linearization
-    lqrBuffer->Fx[i] = snapshot->getStateJacobian(world);
+    lqrBuffer->Fx[i] = world->getStateJacobian();
     // Need to reassemble the matrix by actuated dofs
-    lqrBuffer->Fu[i] = assembleJacobianMatrix(snapshot->getActionJacobian(world));
-    
+    lqrBuffer->Fu[i] = world->getActionJacobian();
   }
+  rollout->getPoses().col(mSteps-1) = world->getPositions();
+  rollout->getVels().col(mSteps-1) = world->getVelocities();
+  rollout->getControlForces() = world->mapToForceSpace(actions);
 }
 
 bool iLQRLocal::ilqroptimizePlan(long startTime)
@@ -820,10 +831,14 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
 
   for(int iter = 0; iter < mMaxIterations; iter++)
   {
-    forward_flag = ilqrForward(startTime, worldClone);
+    // This function will forward world to the current point
+    mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
+    forward_flag = ilqrForward(worldClone);
     if(forward_flag)
     {
-      backward_flag = ilqrBackward(worldClone);
+      std::cout << "Backward Start" <<std::endl;
+      backward_flag = ilqrBackward();
+      std::cout << "Backward Complete" << std::endl;
     }
     if(!forward_flag || !backward_flag)
     {
@@ -847,7 +862,6 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
     mPatience = mPatience_reset_value;
     mMU = mMU_reset_value;
     mDelta = mDelta0;
-    last_loss = std::numeric_limits<s_t>::max();
     mAlpha = mAlpha_reset_value;
     return true;
   }
@@ -876,6 +890,38 @@ void iLQRLocal::setAlpha(s_t alpha)
   mAlpha_reset_value = alpha;
 }
 
+s_t iLQRLocal::getAlpha()
+{
+  return mAlpha;
+}
+
+void iLQRLocal::setMU(s_t mu)
+{
+  mMU = mu;
+}
+
+s_t iLQRLocal::getMU()
+{
+  return mMU;
+}
+
+TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t mass_dim)
+{
+  Eigen::MatrixXs pos = Eigen::MatrixXs::Zero(dofs, steps);
+  std::unordered_map<std::string, Eigen::MatrixXs> pos_map;
+  pos_map.emplace("identity", pos);
+  Eigen::MatrixXs vel = Eigen::MatrixXs::Zero(dofs, steps);
+  std::unordered_map<std::string, Eigen::MatrixXs> vel_map;
+  vel_map.emplace("identity", vel);
+  Eigen::MatrixXs forces = Eigen::MatrixXs::Zero(dofs, steps);
+  std::unordered_map<std::string, Eigen::MatrixXs> force_map;
+  force_map.emplace("identity", forces);
+  Eigen::VectorXs mass = Eigen::VectorXs::Zero(mass_dim);
+  std::unordered_map<std::string, Eigen::MatrixXs> meta;
+  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(pos_map, vel_map, force_map, mass, meta);
+  return rollout;
+}
+
 Eigen::VectorXs iLQRLocal::getControlk(long now)
 {
   return mBuffer.getPlannedk(now);
@@ -897,6 +943,13 @@ void iLQRLocal::setTargetReachingCostFn(std::shared_ptr<TargetReachingCost> cost
   mLoss = costFn->getLossFn();
 }
 
+/// Set action hard bound that any action computed by control law will be clipped to this.
+void iLQRLocal::setActionBound(s_t actionBound)
+{
+  assert(actionBound >= 0);
+  mActionBound = actionBound;
+}
+
 Eigen::MatrixXs iLQRLocal::assembleJacobianMatrix(Eigen::MatrixXs B)
 {
   size_t ndim = mActuatedJoint.size();
@@ -911,6 +964,25 @@ Eigen::MatrixXs iLQRLocal::assembleJacobianMatrix(Eigen::MatrixXs B)
   return Bnew;
 }
 
+std::vector<Eigen::VectorXs> iLQRLocal::getStatesFromiLQRBuffer()
+{
+  return mlqrBuffer.X;
+}
+
+std::vector<Eigen::VectorXs> iLQRLocal::getActionsFromiLQRBuffer()
+{
+  return mlqrBuffer.U;
+}
+
+void iLQRLocal::setCurrentCost(s_t cost)
+{
+  mCost = cost;
+}
+
+s_t iLQRLocal::getCurrentCost()
+{
+  return mCost;
+}
 /// This registers a listener to get called when we finish replanning
 void iLQRLocal::registerReplanningListener(
     std::function<void(long, const trajectory::TrajectoryRollout*, long)>
@@ -1017,6 +1089,7 @@ grpc::Status RPCWrapperiLQRLocal::ObserveForce(
     proto::MPCObserveForceReply* /* reply */)
 {
   // std::cout << "gRPC server: ObserveForce" << std::endl;
+  // TODO: Change according to change in dim
   mLocal.mBuffer.manuallyRecordObservedForce(
       request->time(), deserializeVector(request->force()));
   return grpc::Status::OK;
@@ -1057,6 +1130,7 @@ void iLQRLocal::iLQRoptimizationThreadLoop()
   {
     long startTime = timeSinceEpochMillis();
     bool status = ilqroptimizePlan(startTime + mMillisInAdvanceToPlan);
+    std::cout << "Planning Continue..." << std::endl;
     if(!status)
     {
       std::cout << "iLQR Fail to solve the problem !!" << std::endl;

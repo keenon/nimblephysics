@@ -348,7 +348,7 @@ void RealTimeControlBuffer::getPlannedKStartingAt(long start,
   // Need to make sure that empty and filed KOut will be treated similarly
   assert(KOut.size() == mNumSteps);
   assert(KOut[0].rows() == mForceDim);
-  assert(KOut[1].rows() == mStateDim);
+  assert(KOut[0].cols() == mStateDim);
 
   if (mActiveBufferLaw == UNINITIALIZED)
   {
@@ -424,7 +424,12 @@ size_t RealTimeControlBuffer::getRemainSteps(long start)
   {
     return 0;
   }
-  size_t remain_steps = mNumSteps - (int)(((s_t)elapsed / mMillisPerStep));
+  size_t elapsed_steps = (size_t)(((s_t)elapsed / mMillisPerStep));
+  size_t remain_steps;
+  if(mNumSteps > elapsed_steps)
+    remain_steps = mNumSteps - elapsed_steps;
+  else
+    remain_steps = 0;
   return remain_steps;
 }
 
@@ -773,16 +778,25 @@ void RealTimeControlBuffer::estimateWorldStateAt(
     // In the future, project assuming planned forces
     if (at > mControlLog.last())
     {
-      world->setControlForces(getPlannedForce(at, true));
+      Eigen::VectorXs action = getPlannedForce(at, true);
+      if(action.size() == world->getNumDofs())
+        world->setControlForces(action);
+      else
+        world->setAction(action);
     }
     // In the past, project using known forces read from the buffer
     else
     {
-      world->setControlForces(mControlLog.get(at));
+      Eigen::VectorXs action = mControlLog.get(at);
+      if(action.size() == world->getNumDofs())
+        world->setControlForces(action);
+      else
+        world->setAction(action);
     }
     world->step();
   }
 }
+// TODO: Need to add a version that estimate the world state using control law
 
 /// This rescales the timestep size. This is useful because larger timesteps
 /// mean fewer time steps per real unit of time, and thus we can run our

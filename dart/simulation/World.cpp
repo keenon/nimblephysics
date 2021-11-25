@@ -1841,6 +1841,58 @@ Eigen::MatrixXs World::getActionJacobian()
 }
 
 //==============================================================================
+// This map force to action space
+Eigen::MatrixXs World::mapToActionSpace(Eigen::MatrixXs forces)
+{
+  size_t steps = forces.cols();
+  Eigen::MatrixXs actions = Eigen::MatrixXs::Zero(mActionSpace.size(), steps);
+  for(size_t i = 0; i < steps; i++)
+  {
+    for(size_t j = 0; j < mActionSpace.size();j++)
+    {
+      actions(j,i) = forces(mActionSpace[j],i);
+    }
+  }
+  return actions;
+}
+
+Eigen::VectorXs World::mapToActionSpaceVector(Eigen::VectorXs force)
+{
+  Eigen::VectorXs action = Eigen::VectorXs::Zero(mActionSpace.size());
+  for(size_t i = 0; i < mActionSpace.size(); i++)
+  {
+    action(i) = force(mActionSpace[i]);
+  }
+  return action;
+}
+
+//==============================================================================
+// This map force to action space
+Eigen::MatrixXs World::mapToForceSpace(Eigen::MatrixXs actions)
+{
+  size_t steps = actions.cols();
+  Eigen::MatrixXs forces = Eigen::MatrixXs::Zero(getNumDofs(), steps);
+  for(size_t i = 0; i < steps; i++)
+  {
+    for(size_t j = 0; j < mActionSpace.size(); j++)
+    {
+      forces(mActionSpace[j],i) = actions(j, i);
+    }
+  }
+  return forces;
+}
+
+Eigen::VectorXs World::mapToForceSpaceVector(Eigen::VectorXs action)
+{
+  Eigen::VectorXs force = Eigen::VectorXs::Zero(getNumDofs());
+  for(size_t i = 0; i < mActionSpace.size();i++)
+  {
+    force(mActionSpace[i]) = action(i);
+  }
+  return force;
+}
+
+//==============================================================================
 Eigen::MatrixXs World::finiteDifferenceStateJacobian()
 {
   WorldPtr sharedThis = shared_from_this();

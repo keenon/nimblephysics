@@ -11,32 +11,23 @@ TargetReachingCost::TargetReachingCost(
   Eigen::VectorXs runningStateWeight,
   Eigen::VectorXs runningActionWeight,
   Eigen::VectorXs finalStateWeight,
-  Eigen::VectorXi actuatedJoint):
+  std::shared_ptr<simulation::World> world):
   mRunningStateWeight(runningStateWeight),
   mRunningActionWeight(runningActionWeight),
   mFinalStateWeight(finalStateWeight),
-  mActuatedJoint(actuatedJoint),
-  mUseFullAction(false)
+  mStateDim(runningStateWeight.size()),
+  mActionDim(runningActionWeight.size()),
+  mWorld(world)
 {
-  assert(runningActionWeight.size() == actuatedJoint.size());
-  mRunningActionWeightFull = Eigen::VectorXs::Zero((int)(runningStateWeight.size()/2));
-  for(size_t i = 0;i < runningActionWeight.size(); i++)
-  {
-    mRunningActionWeightFull(actuatedJoint(i)) = runningActionWeight(i);
-  }
-  mStateDim = runningStateWeight.size();
-  // Which is smaller
-  mActionDim = runningActionWeight.size();
-  
+  std::cout << "State and Action Dim in Cost Fn: " << mStateDim << " " << mActionDim << std::endl;
+  mRunningActionWeight = runningActionWeight;
 }
 
 std::vector<Eigen::VectorXs> TargetReachingCost::ilqrGradientEstimator(
   const TrajectoryRollout* rollout,
   s_t& total_cost,
-  WRTFLAG wrt,
-  s_t dt)
+  WRTFLAG wrt)
 {
-  mUseFullAction = false;
   total_cost = computeLoss(rollout);
   int steps = rollout->getPosesConst().cols();
   Eigen::MatrixXs grad;
@@ -44,13 +35,11 @@ std::vector<Eigen::VectorXs> TargetReachingCost::ilqrGradientEstimator(
   {
     grad = Eigen::MatrixXs::Zero(mStateDim, steps);
     computeGradX(rollout, grad);
-    grad.block(0,0,mStateDim, steps-1) *= dt;
   }
   else if(wrt == WRTFLAG::U)
   {
     grad = Eigen::MatrixXs::Zero(mActionDim, steps - 1);
     computeGradU(rollout, grad);
-    grad *= dt;
   }
   else
     assert(false && "Shouldn't reach here");
@@ -66,11 +55,8 @@ std::vector<Eigen::VectorXs> TargetReachingCost::ilqrGradientEstimator(
 
 std::vector<Eigen::MatrixXs> TargetReachingCost::ilqrHessianEstimator(
   const TrajectoryRollout* rollout,
-  WRTFLAG wrt,
-  s_t dt)
+  WRTFLAG wrt)
 {
-  mUseFullAction = false;
-  int steps = rollout->getPosesConst().cols();
   std::vector<Eigen::MatrixXs> hess;
   switch (wrt)
   {
@@ -91,33 +77,27 @@ std::vector<Eigen::MatrixXs> TargetReachingCost::ilqrHessianEstimator(
     computeHessXU(rollout, hess);
     break;
   }
-  for(int i = 0; i< steps - 1; i++)
-  {
-    hess[i] *= dt;
-  }
   return hess;
 }
 
 s_t TargetReachingCost::loss(const TrajectoryRollout* rollout)
 {
-  mUseFullAction = true;
   return computeLoss(rollout);
 }
 
 s_t TargetReachingCost::lossGrad(const TrajectoryRollout* rollout, TrajectoryRollout* gradWrtRollout)
 {
-  mUseFullAction = true;
   int steps = rollout->getPosesConst().cols();
   Eigen::MatrixXs grad_x = Eigen::MatrixXs::Zero(mStateDim, steps);
   Eigen::MatrixXs grad_u = Eigen::MatrixXs::Zero((int)(mStateDim/2), steps);
   computeGradX(rollout, grad_x);
-  computeGradU(rollout, grad_u.block(0, 0, (int)(mStateDim/2), steps-1));
+  computeGradForce(rollout, grad_u.block(0, 0, (int)(mStateDim/2), steps-1));
   gradWrtRollout->getPoses().setZero();
   gradWrtRollout->getVels().setZero();
   gradWrtRollout->getControlForces().setZero();
-  gradWrtRollout->getPoses().block(0, 0, (int)(mStateDim/2), steps) 
+  gradWrtRollout->getPoses().block(0, 0, (int)(mStateDim/2), steps)
     = grad_x.block(0, 0, (int)(mStateDim/2), steps);
-  gradWrtRollout->getVels().block(0, 0, (int)(mStateDim/2), steps) 
+  gradWrtRollout->getVels().block(0, 0, (int)(mStateDim/2), steps)
     = grad_x.block((int)(mStateDim/2), 0, (int)(mStateDim/2), steps);
   gradWrtRollout->getControlForces().block(0, 0, (int)(mStateDim/2), steps)
     = grad_u;
@@ -139,6 +119,12 @@ void TargetReachingCost::setTarget(Eigen::VectorXs target)
   mTarget = target;
 }
 
+void TargetReachingCost::setTimeStep(s_t timestep)
+{
+  assert(timestep > 0.001);
+  dt = timestep;
+}
+
 // For the Velocity we can use loss or not use
 s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
 {
@@ -148,20 +134,22 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
   for(int i = 0; i < steps - 1; i++)
   {
     Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
-    Eigen::VectorXs action = rollout->getControlForcesConst().col(i);
+    Eigen::VectorXs action = mWorld->mapToActionSpaceVector(rollout->getControlForcesConst().col(i));
 
     state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(i);
     state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i);
 
-    loss += (mRunningStateWeight.asDiagonal() * (state - mTarget).cwiseAbs2()).sum();
-    loss += (mRunningActionWeightFull.asDiagonal() * action.cwiseAbs2()).sum();
+    loss += (mRunningStateWeight.asDiagonal() * ((state - mTarget).cwiseAbs2())).sum() * dt;
+    loss += (mRunningActionWeight.asDiagonal() * (action.cwiseAbs2())).sum() * dt;
   }
-
+  // std::cout<< "None Final Loss: " << loss << std::endl;
   // Add Final State Error
   Eigen::VectorXs finalState = Eigen::VectorXs::Zero(mStateDim);
   finalState.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(steps-1);
   finalState.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(steps-1);
-  loss += (mFinalStateWeight.asDiagonal() * (finalState - mTarget).cwiseAbs2()).sum();
+  s_t final_loss = (mFinalStateWeight.asDiagonal() * ((finalState - mTarget).cwiseAbs2())).sum();
+  // std::cout << "Final Loss:\n " << final_loss << std::endl;
+  loss += final_loss;
   return loss;
 }
 
@@ -177,7 +165,7 @@ void TargetReachingCost::computeGradX(const TrajectoryRollout* rollout, Eigen::R
     state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(i);
     state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i);
 
-    grads.col(i) = 2*mRunningStateWeight.asDiagonal() * (state - mTarget);
+    grads.col(i) = 2*mRunningStateWeight.asDiagonal() * (state - mTarget) * dt;
   }
   // Compute Grad for final state
   Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
@@ -186,40 +174,39 @@ void TargetReachingCost::computeGradX(const TrajectoryRollout* rollout, Eigen::R
   grads.col(steps - 1) = 2 * mFinalStateWeight.asDiagonal() * (state - mTarget);
 }
 
-// Here compute gradients of actions which will not have final steps
-void TargetReachingCost::computeGradU(const TrajectoryRollout* rollout, 
-                                      Eigen::Ref<Eigen::MatrixXs> grads)
+void TargetReachingCost::computeGradU(const TrajectoryRollout* rollout,
+                                    Eigen::Ref<Eigen::MatrixXs> grads)
 {
   int steps = rollout->getPosesConst().cols();
-  if(mUseFullAction)
-  {
-    assert(grads.cols() == steps - 1 && grads.rows() == (int)(mStateDim/2));
-  }
-  else
-  {
-    assert(grads.cols() == steps - 1 && grads.rows() == mActionDim);
-  }
+  assert(grads.cols() == steps - 1 && grads.rows() == mActionDim);
   
   // Compute Grad for Running action
   for(int i = 0; i < steps - 1; i++)
   {
-    Eigen::VectorXs action;
-    if(mUseFullAction)
-    {
-      action = rollout->getControlForcesConst().col(i);
-      grads.col(i) = 2 * mRunningActionWeightFull.asDiagonal() * action;
-    }
-    else
-    { 
-      action = Eigen::VectorXs(mActionDim);
-      for(size_t j = 0; j < mActionDim; j++)
-      {
-        action(j) = (rollout->getControlForcesConst()(mActuatedJoint(j),i));
-      }
-      grads.col(i) = 2 * mRunningActionWeight.asDiagonal() * action;
-    }
+    Eigen::VectorXs action;    
+    action = mWorld->mapToActionSpaceVector(rollout->getControlForcesConst().col(i));
+    grads.col(i) = 2 * mRunningActionWeight.asDiagonal() * action * dt;
+    
   }
 }
+
+// Here compute gradients of actions which will not have final steps
+void TargetReachingCost::computeGradForce(const TrajectoryRollout* rollout, 
+                                      Eigen::Ref<Eigen::MatrixXs> grads)
+{
+  int steps = rollout->getPosesConst().cols();
+  assert(grads.cols() == steps - 1 && grads.rows() == (int)(mStateDim/2));
+  
+  // Compute Grad for Running action
+  for(int i = 0; i < steps - 1; i++)
+  {
+    Eigen::VectorXs force;    
+    force = rollout->getControlForcesConst().col(i);
+    grads.col(i) = 2 * mWorld->mapToForceSpaceVector(mRunningActionWeight).asDiagonal() * force * dt;
+    
+  }
+}
+
 
 // Compute Hessian of XX which should have length of steps
 // Assume hess is an empty vector
@@ -231,7 +218,7 @@ void TargetReachingCost::computeHessXX(
   Eigen::MatrixXs hess_xx;
   for(int i = 0; i < steps - 1; i++)
   {
-    hess_xx = 2*mRunningStateWeight.asDiagonal();
+    hess_xx = 2*mRunningStateWeight.asDiagonal() * dt;
     hess.push_back(hess_xx);
   }
   Eigen::MatrixXs final_hess_xx = 2*mFinalStateWeight.asDiagonal();
@@ -244,11 +231,10 @@ void TargetReachingCost::computeHessXU(
 {
   assert(hess.size() == 0);
   int steps = rollout->getPosesConst().cols();
-  size_t a_dim = mUseFullAction?(int)(mStateDim/2):mActionDim;
 
   for(int i = 0; i < steps - 1; i++)
   {
-    hess.push_back(Eigen::MatrixXs::Zero(a_dim, mStateDim));
+    hess.push_back(Eigen::MatrixXs::Zero(mActionDim, mStateDim) * dt);
   }
 }
 
@@ -258,10 +244,9 @@ void TargetReachingCost::computeHessUX(
 {
   assert(hess.size() == 0);
   int steps = rollout->getPosesConst().cols();
-  size_t a_dim = mUseFullAction?(int)(mStateDim/2):mActionDim;
   for(int i = 0; i < steps - 1; i++)
   {
-    hess.push_back(Eigen::MatrixXs::Zero(mStateDim,a_dim));
+    hess.push_back(Eigen::MatrixXs::Zero(mStateDim,mActionDim) * dt);
   }
 }
 
@@ -271,21 +256,11 @@ void TargetReachingCost::computeHessUU(
   assert(hess.size() == 0);
   int steps = rollout->getPosesConst().cols();
   Eigen::MatrixXs hess_uu;
-  if(mUseFullAction)
+
+  for(int i = 0; i < steps - 1; i++)
   {
-    for(int i = 0; i < steps - 1; i++)
-    {
-      hess_uu = 2*mRunningActionWeightFull.asDiagonal();
-      hess.push_back(hess_uu);
-    }
-  }
-  else
-  {
-    for(int i = 0; i < steps - 1; i++)
-    {
-      hess_uu = 2 * mRunningActionWeight.asDiagonal();
-      hess.push_back(hess_uu);
-    }
+    hess_uu = 2*mRunningActionWeight.asDiagonal() * dt;
+    hess.push_back(hess_uu);
   }
 }
 

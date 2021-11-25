@@ -106,7 +106,7 @@ public:
   iLQRLocal(
       std::shared_ptr<simulation::World> world,
       std::shared_ptr<TargetReachingCost> costFn,
-      Eigen::VectorXi actuatedJoint,
+      size_t nControls,
       int planningHorizonMillis,
       s_t scale);
 
@@ -177,9 +177,9 @@ public:
   /// This will run forward pass from starttime and record info
   /// such as Jacobian of each step and gradient as well as
   /// hessian from cost function
-  bool ilqrForward(long startTime, simulation::WorldPtr world);
+  bool ilqrForward(simulation::WorldPtr world);
 
-  bool ilqrBackward(simulation::WorldPtr world);
+  bool ilqrBackward();
 
   bool ilqroptimizePlan(long startTime);
 
@@ -200,6 +200,10 @@ public:
   void setAlpha(s_t alpha);
 
   s_t getAlpha();
+
+  void setMU(s_t mu);
+
+  s_t getMU();
 
   /// ==========================================================
 
@@ -226,6 +230,19 @@ public:
   void stop() override;
 
   void ilqrstop();
+
+  // For Debug
+  std::vector<Eigen::VectorXs> getStatesFromiLQRBuffer();
+
+  std::vector<Eigen::VectorXs> getActionsFromiLQRBuffer();
+
+  void setCurrentCost(s_t cost);
+
+  s_t getCurrentCost();
+
+  trajectory::TrajectoryRolloutReal createRollout(size_t steps, size_t dofs, size_t mass_dim);
+
+  void setActionBound(s_t actionBound);
 
 protected:
     void optimizationThreadLoop();
@@ -257,9 +274,9 @@ protected:
 
     RealTimeControlBuffer mBuffer;
     LQRBuffer mlqrBuffer;
+    s_t mCost;
     // Some Parameters of ilqr
     Eigen::VectorXi mActuatedJoint;
-    s_t mCost;
     s_t mAlpha_reset_value;
     s_t mAlpha;
     int mPatience_reset_value;
@@ -269,8 +286,10 @@ protected:
     s_t mMU_MIN;
     s_t mMU;
     s_t mMU_reset_value;
-    s_t last_loss;
     s_t mTolerence;
+    int mActionDim;
+    int mStateDim;
+    s_t mActionBound = 1000; // Default 1000 or numerical issue will occur
 
 
     std::thread mOptimizationThread;
