@@ -1,8 +1,9 @@
 import NimbleView from "./NimbleView";
-import logoSvg from "!!raw-loader!./nimblelogo.svg";
+// import logoSvg from "!!raw-loader!./nimblelogo.svg";
+import { CommandRecording } from "./types";
 
 class NimbleStandalone {
-  view: NimbleView;
+  view: NimbleView | null;
   recording: CommandRecording;
   playing: boolean;
   startedPlaying: number;
@@ -51,8 +52,10 @@ class NimbleStandalone {
       if (percentage > 1) percentage = 1;
       if (this.playing) this.togglePlay();
       this.lastFrame = Math.round(this.recording.length * percentage);
-      this.recording[this.lastFrame].forEach(this.view.handleCommand);
-      this.view.render();
+      if (this.view != null) {
+        this.recording[this.lastFrame].forEach(this.view.handleCommand);
+        this.view.render();
+      }
       this.setProgress(percentage);
     };
 
@@ -67,14 +70,12 @@ class NimbleStandalone {
       window.addEventListener("mouseup", mouseUp);
     });
 
-    window.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key.toString() == " ") {
-        this.togglePlay();
-      }
-    });
+    window.addEventListener("keydown", this.keyboardListener);
 
     this.view.addDragListener((key: string, pos: number[]) => {
-      this.view.setObjectPos(key, pos);
+      if (this.view != null) {
+        this.view.setObjectPos(key, pos);
+      }
     });
 
     this.recording = [];
@@ -82,6 +83,7 @@ class NimbleStandalone {
     this.startedPlaying = new Date().getTime();
     this.lastFrame = -1;
     this.msPerFrame = 20;
+    this.startFrame = 0;
 
     this.loadingContainer = document.createElement("div");
     this.loadingContainer.className = "NimbleStandalone-loading-overlay";
@@ -117,6 +119,27 @@ class NimbleStandalone {
     this.loadingProgressBarContainer.appendChild(this.loadingProgressBarBg);
   }
 
+  /**
+   * This is our keyboard listener, which we keep around until we clean up the player.
+   */
+  keyboardListener = (e: KeyboardEvent) => {
+    if (e.key.toString() == " ") {
+      this.togglePlay();
+    }
+  };
+
+  /**
+   * This cleans up and kills the standalone player.
+   */
+  dispose = () => {
+    if (this.view != null) {
+      this.view.clear();
+    }
+    this.playing = false;
+    this.view = null;
+    window.removeEventListener("keydown", this.keyboardListener);
+  };
+
   setProgress = (percentage: number) => {
     this.progressBar.style.width = (1.0 - percentage) * 100 + "%";
     this.progressScrub.style.left = percentage * 100 + "%";
@@ -126,7 +149,7 @@ class NimbleStandalone {
     const twoThirdRGB = [207, 50, 158];
     const fullRGB = [141, 25, 233];
 
-    function pickHex(color1, color2, weight) {
+    function pickHex(color1: number[], color2: number[], weight: number) {
       var w2 = weight;
       var w1 = 1 - w2;
       return (
@@ -243,12 +266,13 @@ class NimbleStandalone {
         this.lastFrame = -1;
       }
       this.setProgress(frameNumber / this.recording.length);
-      for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
-        this.recording[i].forEach(this.view.handleCommand);
+      if (this.view != null) {
+        for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
+          this.recording[i].forEach(this.view.handleCommand);
+        }
+        this.view.render();
       }
       this.lastFrame = frameNumber;
-
-      this.view.render();
     }
 
     if (this.playing) {

@@ -1,4 +1,4 @@
-type CreateBoxCommand = {
+export type CreateBoxCommand = {
   type: "create_box";
   key: string;
   size: number[];
@@ -9,7 +9,7 @@ type CreateBoxCommand = {
   receive_shadows: boolean;
 };
 
-type CreateSphereCommand = {
+export type CreateSphereCommand = {
   type: "create_sphere";
   key: string;
   radius: number;
@@ -19,7 +19,7 @@ type CreateSphereCommand = {
   receive_shadows: boolean;
 };
 
-type CreateCapsuleCommand = {
+export type CreateCapsuleCommand = {
   type: "create_capsule";
   key: string;
   radius: number;
@@ -31,14 +31,14 @@ type CreateCapsuleCommand = {
   receive_shadows: boolean;
 };
 
-type CreateLineCommand = {
+export type CreateLineCommand = {
   type: "create_line";
   key: string;
   points: number[][];
   color: number[];
 };
 
-type CreateMeshCommand = {
+export type CreateMeshCommand = {
   type: "create_mesh";
   key: string;
   vertices: number[][];
@@ -54,52 +54,52 @@ type CreateMeshCommand = {
   receive_shadows: boolean;
 };
 
-type CreateTextureCommand = {
+export type CreateTextureCommand = {
   type: "create_texture";
   key: string;
   base64: string;
 };
 
-type SetObjectPosCommand = {
+export type SetObjectPosCommand = {
   type: "set_object_pos";
   key: string;
   pos: number[];
 };
 
-type SetObjectRotationCommand = {
+export type SetObjectRotationCommand = {
   type: "set_object_rotation";
   key: string;
   euler: number[];
 };
 
-type DeleteObjectCommand = {
+export type DeleteObjectCommand = {
   type: "delete_object";
   key: string;
 };
 
-type SetObjectColorCommand = {
+export type SetObjectColorCommand = {
   type: "set_object_color";
   key: string;
   color: number[];
 };
 
-type SetObjectScaleCommand = {
+export type SetObjectScaleCommand = {
   type: "set_object_scale";
   key: string;
   scale: number[];
 };
 
-type EnableMouseInteractionCommand = {
+export type EnableMouseInteractionCommand = {
   type: "enable_mouse";
   key: string;
 };
 
-type DisableMouseInteractionCommand = {
+export type DisableMouseInteractionCommand = {
   type: "disable_mouse";
   key: string;
 };
 
-type CreateTextCommand = {
+export type CreateTextCommand = {
   type: "create_text";
   key: string;
   from_top_left: number[];
@@ -107,7 +107,7 @@ type CreateTextCommand = {
   contents: string;
 };
 
-type CreateButtonCommand = {
+export type CreateButtonCommand = {
   type: "create_button";
   key: string;
   from_top_left: number[];
@@ -115,7 +115,7 @@ type CreateButtonCommand = {
   label: string;
 };
 
-type CreateSliderCommand = {
+export type CreateSliderCommand = {
   type: "create_slider";
   key: string;
   from_top_left: number[];
@@ -127,7 +127,7 @@ type CreateSliderCommand = {
   horizontal: boolean;
 };
 
-type CreatePlotCommand = {
+export type CreatePlotCommand = {
   type: "create_plot";
   key: string;
   from_top_left: number[];
@@ -141,54 +141,54 @@ type CreatePlotCommand = {
   plot_type: "line" | "scatter";
 };
 
-type SetUIElementPositionCommmand = {
+export type SetUIElementPositionCommmand = {
   type: "set_ui_elem_pos";
   key: string;
   from_top_left: number[];
 };
 
-type SetUIElementSizeCommmand = {
+export type SetUIElementSizeCommmand = {
   type: "set_ui_elem_size";
   key: string;
   size: number[];
 };
 
-type DeleteUIElementCommmand = {
+export type DeleteUIElementCommmand = {
   type: "delete_ui_elem";
   key: string;
 };
 
-type SetTextContents = {
+export type SetTextContents = {
   type: "set_text_contents";
   key: string;
   contents: string;
 };
 
-type SetButtonLabel = {
+export type SetButtonLabel = {
   type: "set_button_label";
   key: string;
   label: string;
 };
 
-type SetSliderValue = {
+export type SetSliderValue = {
   type: "set_slider_value";
   key: string;
   value: number;
 };
 
-type SetSliderMin = {
+export type SetSliderMin = {
   type: "set_slider_min";
   key: string;
   min: number;
 };
 
-type SetSliderMax = {
+export type SetSliderMax = {
   type: "set_slider_max";
   key: string;
   max: number;
 };
 
-type SetPlotData = {
+export type SetPlotData = {
   type: "set_plot_data";
   key: string;
   min_x: number;
@@ -199,7 +199,7 @@ type SetPlotData = {
   ys: number[];
 };
 
-type Command =
+export type Command =
   | CreateBoxCommand
   | CreateSphereCommand
   | CreateCapsuleCommand
@@ -227,4 +227,4 @@ type Command =
   | SetSliderMax
   | SetPlotData;
 
-type CommandRecording = Command[][];
+export type CommandRecording = Command[][];
