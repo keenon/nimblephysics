@@ -23,13 +23,15 @@ anthro: nimble.biomechanics.Anthropometrics = nimble.models.RajagopalANSURModel(
 print('skel DOFs: '+str(skel.getNumDofs()))
 print('initial log PDF: '+str(anthro.getLogPDF(skel)))
 
+#scaledModel: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(absPath("./Rajagopal_scaled.osim"))
 scaledModel: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
-    absPath("./Rajagopal_scaled.osim"))
+    absPath("./sprinter_scaled.osim"))
 scaledHeight = scaledModel.skeleton.getHeight(scaledModel.skeleton.getPositions())
 print('scaled model height: '+str(scaledHeight))
 
+# markerSet: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(absPath("./Rajagopal2015_passiveCal_hipAbdMoved.osim"))
 markerSet: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(
-    absPath("./Rajagopal2015_passiveCal_hipAbdMoved.osim"))
+    absPath("./sprinter.osim"))
 convertedMarkers: Dict[str, Tuple[nimble.dynamics.BodyNode, np.ndarray]
                        ] = skel.convertMarkerMap(markerSet.markersMap)
 
@@ -124,7 +126,14 @@ mocap.addZeroConstraint("height", heightConstraint)
 # mocap.addZeroConstraint("marker", markerDistanceConstraint)
 # mocap.addZeroConstraint("marker_zero", markerZeroConstraint)
 
+"""
 mocap.evaluatePerformance(
     "./S01DN603.trc",
     "./Rajagopal_scaled.osim",
     "./S01DN603_ik.mot", 10)
+"""
+
+mocap.evaluatePerformance(
+    "./run0500cms.trc",
+    "./sprinter_scaled.osim",
+    "./run500cms.mot", 10)
