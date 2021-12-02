@@ -18,8 +18,8 @@ This model comes bundled with Nimble, and is fully differentiable! You can creat
 
   # Create a Rajagopal skeleton and add it to the world
 
-  human: nimble.dynamics.Skeleton = nimble.RajagopalHumanBodyModel()
-  world.addSkeleton(human)
+  human: nimble.biomechanics.OpenSimFile = nimble.RajagopalHumanBodyModel()
+  world.addSkeleton(human.skeleton)
 
 That will create a skeleton that looks like the figure below. We've called out some of the features of the skeleton in the doc.
 
