@@ -192,7 +192,7 @@ MeshShape::MeshShape(
     mDontFreeMesh(dontFreeMesh)
 {
   setMesh(
-      loadMesh(path, resourceRetriever), path, std::move(resourceRetriever));
+      resourceRetriever ? loadMesh(path, resourceRetriever) : loadMesh(path), path, std::move(resourceRetriever));
   setScale(scale);
 }
 
