@@ -945,8 +945,10 @@ void Skeleton(py::module& m)
           ::py::arg("dt"))
       .def(
           "integratePositionsExplicit",
-          +[](dart::dynamics::Skeleton* self, Eigen::VectorXs _pos, 
-              Eigen::VectorXs _vel, s_t _dt) -> Eigen::VectorXs {
+          +[](dart::dynamics::Skeleton* self,
+              Eigen::VectorXs _pos,
+              Eigen::VectorXs _vel,
+              s_t _dt) -> Eigen::VectorXs {
             return self->integratePositionsExplicit(_pos, _vel, _dt);
           },
           ::py::arg("pos"),
@@ -1537,8 +1539,10 @@ void Skeleton(py::module& m)
           +[](const dart::dynamics::Skeleton* self) -> s_t {
             return self->computePotentialEnergy();
           })
-      //      .def("clearCollidingBodies", +[](dart::dynamics::Skeleton *self)
-      //      -> void { return self->clearCollidingBodies(); })
+      .def(
+          "clearCollidingBodies",
+          +[](dart::dynamics::Skeleton* self)
+              -> void { return self->clearCollidingBodies(); })
       .def(
           "getCOM",
           +[](const dart::dynamics::Skeleton* self) -> Eigen::Vector3s {
