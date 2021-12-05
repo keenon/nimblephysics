@@ -149,27 +149,39 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "getGradientEnabled",
-          +[](dart::constraint::ConstraintSolver* self)
-              -> bool {
+          +[](dart::constraint::ConstraintSolver* self) -> bool {
             return self->getGradientEnabled();
           })
       .def(
           "setGradientEnabled",
-          +[](dart::constraint::ConstraintSolver* self, bool enabled)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, bool enabled) -> void {
             return self->setGradientEnabled(enabled);
           })
       .def(
           "setPenetrationCorrectionEnabled",
-          +[](dart::constraint::ConstraintSolver* self, bool enable)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, bool enable) -> void {
             return self->setPenetrationCorrectionEnabled(enable);
           })
       .def(
           "setContactClippingDepth",
-          +[](dart::constraint::ConstraintSolver* self, s_t depth)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, s_t depth) -> void {
             return self->setContactClippingDepth(depth);
+          })
+      .def(
+          "updateConstraints",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->updateConstraints();
+          })
+      .def(
+          "buildConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->buildConstrainedGroups();
+          })
+      .def(
+          "solveConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self,
+              dart::simulation::World* world) {
+            self->solveConstrainedGroups(world);
           })
       .def(
           "solve",
