@@ -32,6 +32,7 @@
 
 #include <dart/collision/CollisionDetector.hpp>
 #include <dart/collision/CollisionGroup.hpp>
+#include <dart/constraint/ConstrainedGroup.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
@@ -178,6 +179,12 @@ void ConstraintSolver(py::module& m)
           +[](dart::constraint::ConstraintSolver* self)
               -> std::vector<constraint::ConstraintBasePtr> {
             return self->getConstraints();
+          })
+      .def(
+          "getConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self)
+              -> std::vector<constraint::ConstrainedGroup> {
+            return self->getConstrainedGroups();
           })
       .def(
           "buildConstrainedGroups",

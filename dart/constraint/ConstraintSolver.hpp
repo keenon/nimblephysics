@@ -195,6 +195,9 @@ public:
   /// Solve constrained groups
   void solveConstrainedGroups(simulation::World* world);
 
+  /// Get constrained groups
+  const std::vector<ConstrainedGroup>& getConstrainedGroups() const;
+
   /// Sets this constraint solver using other constraint solver. All the
   /// properties and registered skeletons and constraints will be copied over.
   virtual void setFromOtherConstraintSolver(const ConstraintSolver& other);

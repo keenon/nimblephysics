@@ -30,6 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/collision/CollisionDetector.hpp>
+#include <dart/collision/CollisionGroup.hpp>
+#include <dart/constraint/ConstrainedGroup.hpp>
+#include <dart/constraint/ConstraintSolver.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,47 +42,24 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void ConstraintBase(py::module& sm);
-void JointConstraint(py::module& sm);
-void JointLimitConstraint(py::module& sm);
-void JointCoulombFrictionConstraint(py::module& sm);
-
-void BoxedLcpSolver(py::module& sm);
-void DantzigBoxedLcpSolver(py::module& sm);
-void PgsBoxedLcpSolver(py::module& sm);
-
-void ConstraintSolver(py::module& sm);
-void BoxedLcpConstraintSolver(py::module& sm);
-void ConstrainedGroup(py::module& sm);
-
-// void ConstraintBase(py::module& sm);
-// void ConstraintBase(py::module& sm);
-// void ConstraintBase(py::module& sm);
-
-void dart_constraint(py::module& m)
+void ConstrainedGroup(py::module& m)
 {
-  auto sm = m.def_submodule("constraint");
-
-  ConstraintBase(sm);
-  JointConstraint(sm);
-  JointLimitConstraint(sm);
-  JointCoulombFrictionConstraint(sm);
-
-  BoxedLcpSolver(sm);
-  DantzigBoxedLcpSolver(sm);
-  PgsBoxedLcpSolver(sm);
-
-  ConstraintSolver(sm);
-  BoxedLcpConstraintSolver(sm);
-  ConstrainedGroup(sm);
-
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
+  ::py::class_<
+      dart::constraint::ConstrainedGroup,
+      std::shared_ptr<dart::constraint::ConstrainedGroup>>(
+      m, "ConstrainedGroup")
+      .def(::py::init<>())
+      .def(
+          "getNumConstraints",
+          +[](const dart::constraint::ConstrainedGroup* self) -> std::size_t {
+            return self->getNumConstraints();
+          })
+      .def(
+          "getConstraint",
+          +[](const dart::constraint::ConstrainedGroup* self,
+              std::size_t index) -> dart::constraint::ConstConstraintBasePtr {
+            return self->getConstraint(index);
+          });
 }
 
 } // namespace python

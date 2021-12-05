@@ -237,6 +237,13 @@ std::vector<ConstConstraintBasePtr> ConstraintSolver::getConstraints() const
 }
 
 //==============================================================================
+const std::vector<ConstrainedGroup>& ConstraintSolver::getConstrainedGroups()
+    const
+{
+  return mConstrainedGroups;
+}
+
+//==============================================================================
 void ConstraintSolver::clearLastCollisionResult()
 {
   mCollisionResult.clear();
