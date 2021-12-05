@@ -35,6 +35,7 @@
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -171,6 +172,12 @@ void ConstraintSolver(py::module& m)
           "updateConstraints",
           +[](dart::constraint::ConstraintSolver* self) {
             self->updateConstraints();
+          })
+      .def(
+          "getConstraints",
+          +[](dart::constraint::ConstraintSolver* self)
+              -> std::vector<constraint::ConstraintBasePtr> {
+            return self->getConstraints();
           })
       .def(
           "buildConstrainedGroups",
