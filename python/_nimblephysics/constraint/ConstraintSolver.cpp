@@ -32,9 +32,11 @@
 
 #include <dart/collision/CollisionDetector.hpp>
 #include <dart/collision/CollisionGroup.hpp>
+#include <dart/constraint/ConstrainedGroup.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -149,27 +151,51 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "getGradientEnabled",
-          +[](dart::constraint::ConstraintSolver* self)
-              -> bool {
+          +[](dart::constraint::ConstraintSolver* self) -> bool {
             return self->getGradientEnabled();
           })
       .def(
           "setGradientEnabled",
-          +[](dart::constraint::ConstraintSolver* self, bool enabled)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, bool enabled) -> void {
             return self->setGradientEnabled(enabled);
           })
       .def(
           "setPenetrationCorrectionEnabled",
-          +[](dart::constraint::ConstraintSolver* self, bool enable)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, bool enable) -> void {
             return self->setPenetrationCorrectionEnabled(enable);
           })
       .def(
           "setContactClippingDepth",
-          +[](dart::constraint::ConstraintSolver* self, s_t depth)
-              -> void {
+          +[](dart::constraint::ConstraintSolver* self, s_t depth) -> void {
             return self->setContactClippingDepth(depth);
+          })
+      .def(
+          "updateConstraints",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->updateConstraints();
+          })
+      .def(
+          "getConstraints",
+          +[](dart::constraint::ConstraintSolver* self)
+              -> std::vector<constraint::ConstraintBasePtr> {
+            return self->getConstraints();
+          })
+      .def(
+          "getConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self)
+              -> std::vector<constraint::ConstrainedGroup> {
+            return self->getConstrainedGroups();
+          })
+      .def(
+          "buildConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->buildConstrainedGroups();
+          })
+      .def(
+          "solveConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self,
+              dart::simulation::World* world) {
+            self->solveConstrainedGroups(world);
           })
       .def(
           "solve",

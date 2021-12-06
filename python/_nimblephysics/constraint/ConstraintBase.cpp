@@ -68,9 +68,9 @@ void ConstraintBase(py::module& m)
           ::py::arg("index"))
       .def(
           "getVelocityChange",
-          +[](dart::constraint::ConstraintBase* self,
-              s_t* vel,
-              bool withCfm) { self->getVelocityChange(vel, withCfm); },
+          +[](dart::constraint::ConstraintBase* self, s_t* vel, bool withCfm) {
+            self->getVelocityChange(vel, withCfm);
+          },
           ::py::arg("vel"),
           ::py::arg("withCfm"))
       .def(
@@ -89,6 +89,11 @@ void ConstraintBase(py::module& m)
           "isActive",
           +[](const dart::constraint::ConstraintBase* self) -> bool {
             return self->isActive();
+          })
+      .def(
+          "isContactConstraint",
+          +[](const dart::constraint::ConstraintBase* self) -> bool {
+            return self->isContactConstraint();
           })
       .def(
           "getRootSkeleton",

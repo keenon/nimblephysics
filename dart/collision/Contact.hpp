@@ -119,12 +119,30 @@ struct Contact
   /// \brief User data.
   void* userData;
 
-  /// This holds the amount of force the LCP solved for for this contact
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// normal direction.
   s_t lcpResult;
+
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// first tangential direction.
+  s_t lcpResultTangent1;
+
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// second tangential direction.
+  s_t lcpResultTangent2;
+
+  /// Whether friction is on.
+  bool isFrictionOn;
 
   /// This is necessary for computing gradients. This tells us what type of
   /// contact generated these contacts.
   ContactType type;
+
+  /// Local body jacobians for BodyNode1
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> spatialNormalA;
+
+  /// Local body jacobians for BodyNode2
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> spatialNormalB;
 
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
   /// point on edge A to edge B.

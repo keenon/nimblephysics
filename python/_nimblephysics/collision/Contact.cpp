@@ -30,8 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/collision/Contact.hpp>
 #include <dart/collision/CollisionObject.hpp>
+#include <dart/collision/Contact.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -46,9 +46,7 @@ void Contact(py::module& m)
       .def(::py::init<>())
       .def_static(
           "getNormalEpsilon",
-          +[]() -> s_t {
-            return dart::collision::Contact::getNormalEpsilon();
-          })
+          +[]() -> s_t { return dart::collision::Contact::getNormalEpsilon(); })
       .def_static(
           "getNormalEpsilonSquared",
           +[]() -> s_t {
@@ -77,7 +75,17 @@ void Contact(py::module& m)
           "penetrationDepth", &dart::collision::Contact::penetrationDepth)
       .def_readwrite("triID1", &dart::collision::Contact::triID1)
       .def_readwrite("triID2", &dart::collision::Contact::triID2)
-      .def_readwrite("userData", &dart::collision::Contact::userData);
+      .def_readwrite("userData", &dart::collision::Contact::userData)
+      .def_readwrite("lcpResult", &dart::collision::Contact::lcpResult)
+      .def_readwrite(
+          "lcpResultTangent1", &dart::collision::Contact::lcpResultTangent1)
+      .def_readwrite(
+          "lcpResultTangent2", &dart::collision::Contact::lcpResultTangent2)
+      .def_readwrite("isFrictionOn", &dart::collision::Contact::isFrictionOn)
+      .def_readwrite(
+          "spatialNormalA", &dart::collision::Contact::spatialNormalA)
+      .def_readwrite(
+          "spatialNormalB", &dart::collision::Contact::spatialNormalB);
 }
 
 } // namespace python
