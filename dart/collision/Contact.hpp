@@ -119,8 +119,20 @@ struct Contact
   /// \brief User data.
   void* userData;
 
-  /// This holds the amount of force the LCP solved for for this contact
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// normal direction.
   s_t lcpResult;
+
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// first tangential direction.
+  s_t lcpResultTangent1;
+
+  /// This holds the amount of force the LCP solved for for this contact in the
+  /// second tangential direction.
+  s_t lcpResultTangent2;
+
+  /// Whether friction is on.
+  bool isFrictionOn;
 
   /// This is necessary for computing gradients. This tells us what type of
   /// contact generated these contacts.

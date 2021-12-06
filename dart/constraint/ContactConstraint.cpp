@@ -701,6 +701,12 @@ bool ContactConstraint::isActive() const
 }
 
 //==============================================================================
+bool ContactConstraint::isFrictionOn() const
+{
+  return mIsFrictionOn;
+}
+
+//==============================================================================
 dynamics::SkeletonPtr ContactConstraint::getRootSkeleton() const
 {
   assert(isActive());

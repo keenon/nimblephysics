@@ -78,6 +78,11 @@ void Contact(py::module& m)
       .def_readwrite("userData", &dart::collision::Contact::userData)
       .def_readwrite("lcpResult", &dart::collision::Contact::lcpResult)
       .def_readwrite(
+          "lcpResultTangent1", &dart::collision::Contact::lcpResultTangent1)
+      .def_readwrite(
+          "lcpResultTangent2", &dart::collision::Contact::lcpResultTangent2)
+      .def_readwrite("isFrictionOn", &dart::collision::Contact::isFrictionOn)
+      .def_readwrite(
           "spatialNormalA", &dart::collision::Contact::spatialNormalA)
       .def_readwrite(
           "spatialNormalB", &dart::collision::Contact::spatialNormalB);

@@ -108,6 +108,9 @@ public:
   /// Get contact Jacobian for bodyNodeB
   const Eigen::MatrixXs getSpatialNormalB() const;
 
+  /// Check whether friction is on.
+  bool isFrictionOn() const;
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------
