@@ -21,6 +21,8 @@ RealTimeControlBuffer::RealTimeControlBuffer(
     mkBufB(Eigen::MatrixXs::Zero(forceDim, steps)),
     mxBufA(Eigen::MatrixXs::Zero(stateDim, steps)),
     mxBufB(Eigen::MatrixXs::Zero(stateDim, steps)),
+    mAlphaBufA(Eigen::VectorXs::Zero(steps)),
+    mAlphaBufB(Eigen::VectorXs::Zero(steps)),
     mControlLog(ControlLog(forceDim, millisPerStep))
 {
   // std::cout<<"Initializing Buffer..." << std::endl;
@@ -129,12 +131,14 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedState(long time, bool dontLog)
   if (mActiveBufferLaw == UNINITIALIZED)
   {
     // Unitialized, default to no force
+    std::cout << "Buffer Not Initialized from state!" << std::endl;
     return Eigen::VectorXs::Zero(mStateDim);
   }
   int elapsed = time - mLastWroteLawBufferAt;
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
+    std::cout << "Ask for time in the past" << std::endl;
     return Eigen::VectorXs::Zero(mStateDim);
   }
 
@@ -154,8 +158,50 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedState(long time, bool dontLog)
   }
   else
   {
-    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
     Eigen::VectorXs oob = Eigen::VectorXs::Zero(mStateDim);
+    return oob;
+  }
+  // The code should never reach here, but it's here to keep the compiler happy
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
+s_t RealTimeControlBuffer::getPlannedAlpha(long time, bool dontLog)
+{
+  if(dontLog)
+  {
+    std::cout << "Don't use Log" << std::endl;
+  }
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to no force
+    return 0.0;
+  }
+  int elapsed = time - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to no force
+    return 0.0;
+  }
+
+  int step = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (step < mNumSteps)
+  {
+    if (mActiveBufferLaw == BUF_A)
+    {
+      return mAlphaBufA(step);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      return mAlphaBufB(step);
+    }
+    else
+      assert(false && "Should never reach this point");
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    s_t oob = 0.0;
     return oob;
   }
   // The code should never reach here, but it's here to keep the compiler happy
@@ -322,23 +368,66 @@ void RealTimeControlBuffer::getPlannedStateStartingAt(
     // Copy the appropriate block of our active buffer to the forcesOut block
     if (mActiveBufferLaw == BUF_A)
     {
-      stateOut.block(0, 0, mForceDim, mNumSteps - startStep)
-          = mxBufA.block(0, startStep, mForceDim, mNumSteps - startStep);
+      stateOut.block(0, 0, mStateDim, mNumSteps - startStep)
+          = mxBufA.block(0, startStep, mStateDim, mNumSteps - startStep);
     }
     else if (mActiveBufferLaw == BUF_B)
     {
-      stateOut.block(0, 0, mForceDim, mNumSteps - startStep)
-          = mxBufB.block(0, startStep, mForceDim, mNumSteps - startStep);
+      stateOut.block(0, 0, mStateDim, mNumSteps - startStep)
+          = mxBufB.block(0, startStep, mStateDim, mNumSteps - startStep);
     }
     else
       assert(false && "Should never reach this point");
     // Zero out the remainder of the forcesOut block
-    stateOut.block(0, mNumSteps - startStep, mForceDim, startStep).setZero();
+    stateOut.block(0, mNumSteps - startStep, mStateDim, startStep).setZero();
   }
   else
   {
     // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
     stateOut.setZero();
+  }
+}
+
+void RealTimeControlBuffer::getPlannedAlphaStartingAt(long start,
+                                                      Eigen::Ref<Eigen::VectorXs> alphaOut)
+{
+  assert(alphaOut.size() == mNumSteps);
+  if (mActiveBufferLaw == UNINITIALIZED)
+  {
+    // Unitialized, default to 0
+    alphaOut.setZero();
+    return;
+  }
+  int elapsed = start - mLastWroteLawBufferAt;
+  if (elapsed < 0)
+  {
+    // Asking for some time in the past, default to 0
+    alphaOut.setZero();
+    return;
+  }
+  int startStep = (int)floor((s_t)elapsed / mMillisPerStep);
+  if (startStep < mNumSteps)
+  {
+    // Copy the appropriate block of our active buffer to the forcesOut block
+    if (mActiveBufferLaw == BUF_A)
+    {
+      alphaOut.segment(0,mNumSteps - startStep)
+          = mAlphaBufA.segment(startStep, mNumSteps - startStep);
+    }
+    else if (mActiveBufferLaw == BUF_B)
+    {
+      alphaOut.segment(0, mNumSteps - startStep)
+          = mAlphaBufB.segment(startStep, mNumSteps - startStep);
+    }
+    else
+      assert(false && "Should never reach this point");
+    // Zero out the remainder of the forcesOut block
+    alphaOut.segment(mNumSteps - startStep, startStep).setZero();
+  }
+  else
+  {
+    // std::cout << "WARNING: MPC isn't keeping up!" << std::endl;
+    alphaOut.setZero();
   }
 }
 
@@ -532,13 +621,16 @@ void RealTimeControlBuffer::setControlForcePlan(
   }
 }
 
-
+// Big Bug fixed hopefully the performance will be better
 void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
                                               std::vector<Eigen::VectorXs> ks,
                                               std::vector<Eigen::MatrixXs> Ks,
-                                              std::vector<Eigen::VectorXs> states)
+                                              std::vector<Eigen::VectorXs> states,
+                                              std::vector<s_t> alphas)
 {
-  assert(ks.size() == Ks.size() && states.size() == Ks.size());
+  // remove the last state
+  states.pop_back();
+  assert(ks.size() == Ks.size() && states.size() == Ks.size() && Ks.size() == alphas.size());
   if (startAt > now)
   {
     long padMillis = startAt - now;
@@ -562,11 +654,13 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
     {
       mkBufA = Eigen::MatrixXs::Zero(mForceDim, ks.size());
       mxBufA = Eigen::MatrixXs::Zero(mStateDim, states.size());
+      mAlphaBufA = Eigen::VectorXs::Zero(alphas.size());
       mKBufA = Ks;
       for(int i = 0; i < ks.size(); i++)
       {
         mkBufA.col(i) = ks[i];
         mxBufA.col(i) = states[i];
+        mAlphaBufA(i) = alphas[i];
       }
 
       mActiveBufferLaw = BUF_A;
@@ -607,6 +701,14 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
      {
        mxBufA.col(i + copySteps + zeroSteps) = states[i];
      }
+
+     // For Alpha
+     mAlphaBufA.segment(0, copySteps).setZero();
+     mAlphaBufA.segment(copySteps,zeroSteps).setZero();
+     for(int i = 0; i < useSteps;i++)
+     {
+       mAlphaBufA(i + copySteps + zeroSteps) = alphas[i];
+     }
      // For K
      for(int i = 0; i < copySteps + zeroSteps; i++)
      {
@@ -632,7 +734,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       mkBufA.block(0, 0, mForceDim, copySteps)
           = mkBufB.block(0, mNumSteps - copySteps, mForceDim, copySteps);
       mkBufA.block(0, copySteps, mForceDim, zeroSteps).setZero();
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mkBufA.col(i + copySteps + zeroSteps) = ks[i];
       }
@@ -640,12 +742,18 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       mxBufA.block(0, 0, mStateDim, copySteps)
           = mxBufB.block(0, mNumSteps - copySteps, mStateDim, copySteps);
       mxBufA.block(0, copySteps, mStateDim, zeroSteps).setZero();
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mxBufA.col(i + copySteps + zeroSteps) = states[i];
       }
-
-      // Set K buffer
+      // For Alpha
+      mAlphaBufA.segment(0, copySteps) = mAlphaBufB.segment(mNumSteps - copySteps, copySteps);
+      mAlphaBufA.segment(copySteps, zeroSteps).setZero();
+      for(int i = 0; i < useSteps; i++)
+      {
+        mAlphaBufA(i + copySteps + zeroSteps) = alphas[i];
+      }
+      // For K
       for(int i = 0;i < copySteps + zeroSteps; i++)
       {
         if(i < copySteps)
@@ -657,7 +765,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
           mKBufA[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
         }
       }
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mKBufA[i + copySteps + zeroSteps] = Ks[i];
       }
@@ -679,7 +787,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       mkBufB.block(0, 0, mForceDim, copySteps)
           = mkBufA.block(0, mNumSteps - copySteps, mForceDim, copySteps);
       mkBufB.block(0, copySteps, mForceDim, zeroSteps).setZero();
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mkBufB.col(i + copySteps + zeroSteps) = ks[i];
       }
@@ -688,12 +796,18 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       mxBufB.block(0, 0, mStateDim, copySteps)
           = mxBufA.block(0, mNumSteps - copySteps, mStateDim, copySteps);
       mxBufB.block(0, copySteps, mStateDim, zeroSteps).setZero();
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mxBufB.col(i + copySteps + zeroSteps) = states[i];
       }
-
-      // Set K buffer
+      // For Alpha
+      mAlphaBufB.segment(0, copySteps) = mAlphaBufA.segment(mNumSteps - copySteps, copySteps);
+      mAlphaBufB.segment(copySteps, zeroSteps).setZero();
+      for(int i = 0; i < useSteps; i++)
+      {
+        mAlphaBufB(i + copySteps + zeroSteps) = alphas[i];
+      }
+      // For K
       for(int i = 0;i < copySteps + zeroSteps; i++)
       {
         if(i < copySteps)
@@ -705,7 +819,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
           mKBufB[i] = Eigen::MatrixXs::Zero(mForceDim, mStateDim);
         }
       }
-      for(int i = 0; i > useSteps;i++)
+      for(int i = 0; i < useSteps;i++)
       {
         mKBufB[i + copySteps + zeroSteps] = Ks[i];
       }
@@ -723,6 +837,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       {
         mkBufA.col(i) = ks[i];
         mxBufA.col(i) = states[i];
+        mAlphaBufA(i) = alphas[i]; 
       }
       // Crucial for lock-free behavior: copy the buffer BEFORE setting the
       // active buffer. Not a huge deal if we're a bit off here in the
@@ -736,6 +851,7 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
       {
         mkBufB.col(i) = ks[i];
         mxBufB.col(i) = states[i];
+        mAlphaBufB(i) = alphas[i];
       }
       // Crucial for lock-free behavior: copy the buffer BEFORE setting the
       // active buffer. Not a huge deal if we're a bit off here in the
@@ -778,13 +894,34 @@ void RealTimeControlBuffer::estimateWorldStateAt(
     // In the future, project assuming planned forces
     if (at > mControlLog.last())
     {
-      Eigen::VectorXs action = getPlannedForce(at, true);
-      if(action.size() == world->getNumDofs())
-        world->setControlForces(action);
+      if(!mUseiLQR)
+      {
+        Eigen::VectorXs action = getPlannedForce(at, true);
+        if(action.size() == world->getNumDofs())
+          world->setControlForces(action);
+        else
+          world->setAction(action);
+      }
       else
+      {
+        Eigen::VectorXs action = getPlannedForce(at, true);
+        Eigen::VectorXs k = getPlannedk(at);
+        Eigen::VectorXs x = getPlannedState(at);
+        Eigen::MatrixXs K = getPlannedK(at);
+        Eigen::VectorXs stateErr = world->getState() - x;
+        s_t alpha = getPlannedAlpha(at);
+        if(stateErr.norm() < 0.1)
+        {
+          action = (action + alpha * k
+                   + K*(world->getState() - x).cwiseMin(mActionBound)).cwiseMax(-mActionBound);
+        }
         world->setAction(action);
+      }
+      
     }
     // In the past, project using known forces read from the buffer
+    // Here no need to differentiate iLQR and Trajectory Opt since they 
+    // all set the executed force here
     else
     {
       Eigen::VectorXs action = mControlLog.get(at);
@@ -886,6 +1023,26 @@ void RealTimeControlBuffer::rescaleBuffer(
   }
 
   buf = newBuf;
+}
+
+long RealTimeControlBuffer::getLastWriteBufferTime()
+{
+  return mLastWroteBufferAt;
+}
+
+long RealTimeControlBuffer::getLastWriteBufferLawTime()
+{
+  return mLastWroteLawBufferAt;
+}
+
+void RealTimeControlBuffer::setiLQRFlag(bool ilqr_flag)
+{
+  mUseiLQR = ilqr_flag;
+}
+
+void RealTimeControlBuffer::setActionBound(s_t bound)
+{
+  mActionBound = bound;
 }
 
 } // namespace realtime

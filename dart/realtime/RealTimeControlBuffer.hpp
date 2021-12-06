@@ -40,6 +40,8 @@ public:
 
   Eigen::VectorXs getPlannedState(long time, bool dontLog = false);
 
+  s_t getPlannedAlpha(long time, bool dontLog = false);
+
   /// This gets planned forces starting at `start`, and continuing for the
   /// length of our buffer size `mSteps`. This is useful for initializing MPC
   /// runs. It supports walking off the end of known future, and assumes 0
@@ -55,6 +57,8 @@ public:
 
   void getPlannedStateStartingAt(
     long start, Eigen::Ref<Eigen::MatrixXs> stateOut);
+
+  void getPlannedAlphaStartingAt(long start, Eigen::Ref<Eigen::VectorXs> alphaOut);
   
   size_t getRemainSteps(long start);
 
@@ -63,8 +67,12 @@ public:
   /// current trajectory.
   void setControlForcePlan(long startAt, long now, Eigen::MatrixXs forces);
 
-  void setControlLawPlan(long startAt, long now, std::vector<Eigen::VectorXs> ks,
-                         std::vector<Eigen::MatrixXs> Ks, std::vector<Eigen::VectorXs> states);
+  void setControlLawPlan(long startAt, 
+                         long now, 
+                         std::vector<Eigen::VectorXs> ks,
+                         std::vector<Eigen::MatrixXs> Ks, 
+                         std::vector<Eigen::VectorXs> states,
+                         std::vector<s_t> alphas);
 
   /// This retrieves the state of the world at a given time, assuming that we've
   /// been applying forces from the buffer since the last state that we fully
@@ -89,6 +97,15 @@ public:
   /// This is useful when we're replicating a log across a network boundary,
   /// which comes up in distributed MPC.
   void manuallyRecordObservedForce(long time, Eigen::VectorXs observation);
+
+  /// For debug only
+  long getLastWriteBufferTime();
+
+  long getLastWriteBufferLawTime();
+
+  void setiLQRFlag(bool ilqr_flag);
+
+  void setActionBound(s_t bound);
 
 protected:
   int mForceDim;
@@ -133,6 +150,12 @@ protected:
 
   Eigen::MatrixXs mxBufB;
 
+  // This is the A buffer of Alpha
+  Eigen::VectorXs mAlphaBufA;
+
+  // This is the B buffer of Alpha
+  Eigen::VectorXs mAlphaBufB;
+
   /// This is the time when the last buffer was written to
   long mLastWroteBufferAt;
 
@@ -143,6 +166,10 @@ protected:
   /// the current state on request, even if we last had an observation a while
   /// ago.
   ControlLog mControlLog;
+
+  bool mUseiLQR = false;
+
+  s_t mActionBound = 1000;
 };
 
 } // namespace realtime

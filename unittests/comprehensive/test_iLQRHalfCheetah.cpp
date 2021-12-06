@@ -22,6 +22,9 @@
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/utils/UniversalLoader.hpp"
+#include "dart/utils/sdf/sdf.hpp"
+#include "dart/utils/urdf/urdf.hpp"
 
 #include "TestHelpers.hpp"
 #include "stdio.h"
@@ -230,89 +233,61 @@ TEST(REALTIME, CARTPOLE_ILQR)
 #ifdef iLQR_MPC_TEST
 TEST(REALTIME, CARTPOLE_MPC)
 {
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+      "dart://sample/skel/half_cheetah.skel");
+  world->setPositions(Eigen::VectorXs::Zero(world->getNumDofs()));
+  world->setVelocities(Eigen::VectorXs::Zero(world->getNumDofs()));
 
-  // Create World of cartpole
-  SkeletonPtr cartpole = Skeleton::create("cartpole");
+  
+  Eigen::VectorXs forceLimits
+    = Eigen::VectorXs::Ones(world->getNumDofs()) * 100;
+  forceLimits(0) = 0;
+  forceLimits(1) = 0;
+  forceLimits(2) = 0;
+  world->setControlForceUpperLimits(forceLimits);
+  world->setControlForceLowerLimits(-1 * forceLimits);
 
-  std::pair<PrismaticJoint*, BodyNode*> sledPair
-      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
-  std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3s(0.5, 0.1, 0.1)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
-  sledShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
-
-  std::pair<RevoluteJoint*, BodyNode*> armPair
-      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
-  std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3s(0.1, 1.0, 0.1)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
-  armShape->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
-
-  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
-  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
-  armPair.first->setTransformFromChildBodyNode(armOffset);
-
-  world->addSkeleton(cartpole);
-
-  cartpole->setControlForceUpperLimit(0, 15);
-  cartpole->setControlForceLowerLimit(0, -15);
-  cartpole->setVelocityUpperLimit(0, 1000);
-  cartpole->setVelocityLowerLimit(0, -1000);
-  cartpole->setPositionUpperLimit(0, 10);
-  cartpole->setPositionLowerLimit(0, -10);
-  // The second DOF cannot be controlled
-  cartpole->setControlForceUpperLimit(1, 0);
-  cartpole->setControlForceLowerLimit(1, 0);
-  cartpole->setVelocityUpperLimit(1, 1000);
-  cartpole->setVelocityLowerLimit(1, -1000);
-  cartpole->setPositionUpperLimit(1, 10);
-  cartpole->setPositionLowerLimit(1, -10);
-
-  cartpole->setPosition(0, 0);
-  cartpole->setPosition(1, 3.1415);
-  cartpole->computeForwardDynamics();
-  cartpole->integrateVelocities(world->getTimeStep());
-
-  world->setTimeStep(1.0 / 100);
+  world->setTimeStep(2.0 / 1000);
 
   int steps = 200;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = steps * millisPerTimestep;
 
+  world->removeDofFromActionSpace(0);
   world->removeDofFromActionSpace(1);
+  world->removeDofFromActionSpace(2);
   // Create Goal
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
-  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Zero(1);
-  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * 2);
-  finalStateWeight(0) = 10.0;
-  finalStateWeight(1) = 50.0;
-  finalStateWeight(2) = 10.0;
-  finalStateWeight(3) = 10.0;
-  runningActionWeight(0) = 0.01;
-
+  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Ones(2 * world->getNumDofs())*5;
+  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(world->getNumDofs()-3)*0.1;
+  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Ones(2 * world->getNumDofs())*1;
+  finalStateWeight(0) = 20.0;
+  finalStateWeight(1) = 20.0;
+  // Speed must be zero
+  finalStateWeight(world->getNumDofs()) = 20.0;
+  finalStateWeight(world->getNumDofs() + 1) = 20.0;
+  // Running State need to have some weight
+  runningStateWeight(0) = 10;
+  runningStateWeight(1) = 10;
+  
   std::shared_ptr<TargetReachingCost> costFn
     = std::make_shared<TargetReachingCost>(runningStateWeight,
                                            runningActionWeight, 
                                            finalStateWeight,
                                            world);
   costFn->setTimeStep(world->getTimeStep());
-  Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
-  goal(0) = 0.5;
+  Eigen::VectorXs goal = world->getState();
+  goal(0) += 2.5;
+  goal(1) = 0.5;
+  goal(2) += 2.5;
   costFn->setTarget(goal);
   std::cout << "Before MPC Local Initialization" << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
-    world, costFn, 1, planningHorizonMillis, 1.0);
+    world, costFn, world->getNumDofs()-3, planningHorizonMillis, 1.0);
 
   std::cout << "mpcLocal Created Successfully" << std::endl;
 
   mpcLocal.setSilent(true);
-  mpcLocal.setMaxIterations(5);
+  mpcLocal.setMaxIterations(3);
   mpcLocal.setPatience(1);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
@@ -335,11 +310,6 @@ TEST(REALTIME, CARTPOLE_MPC)
   std::cout << "Reach Here Before Ticker" << std::endl;
   Ticker ticker = Ticker(1*realtimeUnderlyingWorld->getTimeStep());
 
-  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
-                            ->getBodyNodes()[0]
-                            ->getShapeNodesWith<VisualAspect>()[0]
-                            ->getVisualAspect();
-  Eigen::Vector3s originalColor = sledBodyVisual->getColor();
   long total_steps = 0;
   ticker.registerTickListener([&](long now) {
     // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
@@ -350,26 +320,7 @@ TEST(REALTIME, CARTPOLE_MPC)
     // std::cout <<"Force:\n" << mpcforces << std::endl;
     //Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
     realtimeUnderlyingWorld->setControlForces(mpcforces);
-    if (server.getKeysDown().count("a"))
-    {
-      Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = -15.0;
-      realtimeUnderlyingWorld->setControlForces(perturbedForces);
-      sledBodyVisual->setColor(Eigen::Vector3s(1, 0, 0));
-    }
-    else if (server.getKeysDown().count("e"))
-    {
-      Eigen::VectorXs perturbedForces
-          = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = 15.0;
-      realtimeUnderlyingWorld->setControlForces(perturbedForces);
-      sledBodyVisual->setColor(Eigen::Vector3s(0, 1, 0));
-    }
-    else
-    {
-      sledBodyVisual->setColor(originalColor);
-    }
+    
     realtimeUnderlyingWorld->step();
     mpcLocal.recordGroundTruthState(
         now,

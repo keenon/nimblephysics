@@ -479,6 +479,11 @@ void ConstrainedGroupGradientMatrices::deduplicateConstraints()
 /// after the LCP has run, with the result from the LCP solver. This can only
 /// be called once, and after this is called you cannot call
 /// measureConstraintImpulse() again!
+/// This function is used to construct J aka A_c matrix according to forward
+/// Detected collision as well as modified overrideClasses
+/// This function assume size of overrideClasses equals to size of constrained velocities
+/// Not necessary equals to constraint points number
+/// Constraints is not limited to contact.
 void ConstrainedGroupGradientMatrices::constructMatrices(
     simulation::World* world, Eigen::VectorXi overrideClasses)
 {
@@ -1916,7 +1921,7 @@ void ConstrainedGroupGradientMatrices::backprop(
     bool exploreAlternateStrategies)
 {
   // First, we compute the correct gradients through backprop
-
+  // The type of contact is consistent with forward pass
   Eigen::MatrixXs forceVelJacobian = getControlForceVelJacobian(world);
   // p_t+1 <-- v_t
   Eigen::MatrixXs posVelJacobian = getPosVelJacobian(world);
@@ -1959,6 +1964,8 @@ void ConstrainedGroupGradientMatrices::backprop(
     */
 
     Eigen::MatrixXs jac = getAllConstraintMatrix();
+    // This is a flag variable of velocities of
+    // each contact point concatenate together.
     Eigen::VectorXs lossWrtContactVels
         = jac.transpose() * nextTimestepLoss.lossWrtVelocity;
 
@@ -1969,6 +1976,10 @@ void ConstrainedGroupGradientMatrices::backprop(
 
     Eigen::VectorXi overrideClasses
         = Eigen::VectorXi::Zero(lossWrtContactVels.size());
+
+    // This operation is on each degree of freedom
+    // Size of overrideClasses is number of contact point
+    // 
     for (int i = 0; i < lossWrtContactVels.size(); i++)
     {
       // If this is a frictional contact force
@@ -1993,6 +2004,9 @@ void ConstrainedGroupGradientMatrices::backprop(
         }
       }
     }
+    // Although it seems to be simple, this term is rather sophesticated
+    // This function is try to construct the prerequisite for Jacobian Matrix
+    // Computation
     constructMatrices(world.get(), overrideClasses);
 
     Eigen::MatrixXs stratForceVelJacobian = getControlForceVelJacobian(world);
@@ -2033,6 +2047,7 @@ void ConstrainedGroupGradientMatrices::backprop(
 
     // Reset the matrices, just in case people ask for Jacobians or something
     // later, don't want to give them the wrong one.
+    // Which is not the case for iLQR
     constructMatrices(world.get());
   }
 

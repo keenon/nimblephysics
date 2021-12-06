@@ -196,9 +196,11 @@ void BackpropSnapshot::backprop(
   //////////////////////////////////////////////////////////
   // Exploring alternate strategies requires breaking down into the individual
   // constrained groups and doing backprop there
+  // Which is basically complimentarity aware gradient
   //////////////////////////////////////////////////////////
 
   // Handle mass the old fashioned way, for now
+  // Since massXXX Jacobian is only useful for SSID, we can ignore this temporarily
 
   const Eigen::MatrixXs& massVel = getMassVelJacobian(world, thisLog);
   thisTimestepLoss.lossWrtMass
@@ -246,7 +248,7 @@ void BackpropSnapshot::backprop(
     }
 
     // Now actually run the backprop
-
+    // explore Alternative Strategies is a flag
     group->backprop(
         world,
         groupThisTimestepLoss,

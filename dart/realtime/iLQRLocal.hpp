@@ -56,11 +56,14 @@ public:
 
   void updateXUOld();
 
+  void updateAlpha(s_t a);
+
   void readNewActionPlan(long timestamp, RealTimeControlBuffer buffer);
 
   // Write New Action to Buffer
   void setNewActionPlan(long timestamp, RealTimeControlBuffer *buffer);
 
+  // This will simutaneously update K, k ,state, alpha
   void setNewControlLaw(long timestamp, RealTimeControlBuffer *buffer);
 
   void updateL(std::vector<Eigen::VectorXs> Lx_new, std::vector<Eigen::VectorXs> Lu_new,
@@ -70,6 +73,8 @@ public:
   void updateF(std::vector<Eigen::MatrixXs> Fx_new, std::vector<Eigen::MatrixXs> Fu_new);
 
   bool validateXnew();
+
+  bool detectXContinuity();
 
 
   // Parameters
@@ -85,6 +90,7 @@ public:
   std::vector<Eigen::VectorXs> Unew;
   std::vector<Eigen::MatrixXs> K;
   std::vector<Eigen::VectorXs> k;
+  std::vector<s_t> alpha;
   // jacobians
   std::vector<Eigen::MatrixXs> Fx;
   std::vector<Eigen::MatrixXs> Fu;
@@ -133,6 +139,10 @@ public:
 
   /// This get feedback matrix from current timestep
   Eigen::MatrixXs getControlK(long now);
+
+  s_t getControlAlpha(long now);
+
+  Eigen::VectorXs getControlAction(long now);
 
   Eigen::VectorXs computeForce(Eigen::VectorXs state, long now);
 
@@ -244,6 +254,8 @@ public:
 
   void setActionBound(s_t actionBound);
 
+  void setPredictUsingFeedback(bool feedback_flag);
+
 protected:
     void optimizationThreadLoop();
 
@@ -279,6 +291,7 @@ protected:
     Eigen::VectorXi mActuatedJoint;
     s_t mAlpha_reset_value;
     s_t mAlpha;
+    s_t mAlpha_opt;
     int mPatience_reset_value;
     int mPatience;
     int mDelta0;
@@ -290,6 +303,10 @@ protected:
     int mActionDim;
     int mStateDim;
     s_t mActionBound = 1000; // Default 1000 or numerical issue will occur
+
+    // Some Flags for iteration
+    bool mNaN_Flag = false;
+    trajectory::TrajectoryRolloutReal mRollout;
 
 
     std::thread mOptimizationThread;

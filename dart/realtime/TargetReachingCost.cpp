@@ -38,7 +38,7 @@ std::vector<Eigen::VectorXs> TargetReachingCost::ilqrGradientEstimator(
   }
   else if(wrt == WRTFLAG::U)
   {
-    grad = Eigen::MatrixXs::Zero(mActionDim, steps - 1);
+    grad = Eigen::MatrixXs::Zero(mActionDim, steps-1);
     computeGradU(rollout, grad);
   }
   else
@@ -145,8 +145,8 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
   // std::cout<< "None Final Loss: " << loss << std::endl;
   // Add Final State Error
   Eigen::VectorXs finalState = Eigen::VectorXs::Zero(mStateDim);
-  finalState.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(steps-1);
-  finalState.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(steps-1);
+  finalState.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(steps - 1);
+  finalState.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(steps - 1);
   s_t final_loss = (mFinalStateWeight.asDiagonal() * ((finalState - mTarget).cwiseAbs2())).sum();
   // std::cout << "Final Loss:\n " << final_loss << std::endl;
   loss += final_loss;
@@ -158,7 +158,7 @@ void TargetReachingCost::computeGradX(const TrajectoryRollout* rollout, Eigen::R
   int steps = rollout->getPosesConst().cols();
   assert(grads.cols() == steps && grads.rows() == mStateDim);
   // Compute Grad for running state
-  for(int i = 0; i < steps-1; i++)
+  for(int i = 0; i < steps - 1; i++)
   {
     Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
     //std::cout<< "State Dim: " << mStateDim << "Half Dim: " << (int)(mStateDim/2) << std::endl;
