@@ -126,6 +126,12 @@ struct Contact
   /// contact generated these contacts.
   ContactType type;
 
+  /// Local body jacobians for BodyNode1
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> spatialNormalA;
+
+  /// Local body jacobians for BodyNode2
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> spatialNormalB;
+
   /// This is only filled for (type == EDGE_EDGE) contacts. This is the closest
   /// point on edge A to edge B.
   Eigen::Vector3s edgeAClosestPoint;

@@ -230,6 +230,17 @@ ContactConstraint::ContactConstraint(
 }
 
 //==============================================================================
+const Eigen::MatrixXs ContactConstraint::getSpatialNormalA() const
+{
+  return mSpatialNormalA;
+}
+
+const Eigen::MatrixXs ContactConstraint::getSpatialNormalB() const
+{
+  return mSpatialNormalB;
+}
+
+//==============================================================================
 void ContactConstraint::setErrorAllowance(s_t allowance)
 {
   // Clamp error reduction parameter if it is out of the range
