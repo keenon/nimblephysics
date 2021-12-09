@@ -6,7 +6,7 @@
 #
 # This file is provided under the "BSD-style" License
 
-find_package(IPOPT 3.11.9 QUIET MODULE)
+find_package(IPOPT 3.11.9 REQUIRED MODULE)
 
 # HAVE_CSTDDEF is necessary to workaround this bug:
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=684062

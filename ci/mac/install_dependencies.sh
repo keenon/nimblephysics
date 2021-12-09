@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# Use sudo for sudo commands, but only if we're not already root
+sudo ()
+{
+    [[ $EUID = 0 ]] || set -- command sudo "$@"
+    "$@"
+}
+
 # brew install gnu-sed
 brew reinstall gcc
 export FC=$(which gfortran)
@@ -12,21 +19,30 @@ export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
 
 # Install perfutils - Keenon's fork, compatible with Mac OSX
-git clone https://github.com/keenon/PerfUtils.git
-pushd PerfUtils
-mkdir build
-pushd build
-cmake ..
-make install
-popd
-popd
-rm -rf PerfUtils
+# This doesn't work with ARM on mac, since it inlines x86 instructions
+# git clone https://github.com/keenon/PerfUtils.git
+# pushd PerfUtils
+# mkdir build
+# pushd build
+# cmake ..
+# make install
+# popd
+# popd
+# rm -rf PerfUtils
 
 brew install boost # @1.73
 brew install eigen
 
 brew install openssl@1.1
-cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+if [ -f "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
+      # x86 Macs
+      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+else
+      # ARM64 Macs
+      # TODO: unsudo this command
+      sudo mkdir -p /usr/local/lib/pkgconfig
+      sudo cp /opt/homebrew/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+fi
 
 # Install CCD
 git clone https://github.com/danfis/libccd.git
@@ -35,7 +51,7 @@ git checkout v2.1
 mkdir build
 pushd build
 cmake .. -DENABLE_DOUBLE_PRECISION=ON
-make install -j
+sudo make install -j
 popd
 popd
 rm -rf libccd
@@ -47,7 +63,7 @@ git checkout v5.0.1
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
 rm -rf assimp
@@ -60,20 +76,19 @@ git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
 ./configure
-make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
-make install
+# make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
+sudo make install
 popd
-rm -rf ThirdParty-Mumps
+sudo rm -rf ThirdParty-Mumps
 
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
 ./configure --with-mumps --disable-java
-make -j
-make install
+sudo make install -j
 popd
-rm -rf Ipopt
-ln -s /usr/local/include/coin-or /usr/local/include/coin
+sudo rm -rf Ipopt
+sudo ln -s /usr/local/include/coin-or /usr/local/include/coin
 
 # Install pybind11
 git clone https://github.com/pybind/pybind11.git
@@ -82,10 +97,10 @@ git checkout v2.7.0
 mkdir build
 pushd build
 cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf pybind11
+sudo rm -rf pybind11
 
 # Install FCL
 # Key note: this needs to happen before octomap
@@ -119,10 +134,10 @@ git checkout 8.0.0
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf tinyxml2
+sudo rm -rf tinyxml2
 
 # Install freeglut
 # brew cask install xquartz
@@ -141,10 +156,10 @@ pushd tinyxml
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf tinyxml
+sudo rm -rf tinyxml
 
 # Install urdfdom_headers
 git clone https://github.com/ros/urdfdom_headers.git
@@ -152,10 +167,10 @@ pushd urdfdom_headers
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf urdfdom_headers
+sudo rm -rf urdfdom_headers
 
 # Install console_bridge
 git clone https://github.com/ros/console_bridge.git
@@ -163,10 +178,10 @@ pushd console_bridge
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf console_bridge
+sudo rm -rf console_bridge
 
 # Install urdfdom
 git clone https://github.com/ros/urdfdom.git
@@ -174,10 +189,10 @@ pushd urdfdom
 mkdir build
 pushd build
 cmake ..
-make install -j
+sudo make install -j
 popd
 popd
-rm -rf urdfdom
+sudo rm -rf urdfdom
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
@@ -206,11 +221,10 @@ cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
       ../..
-make -j
-make install
+sudo make install -j
 popd
 popd
-rm -rf grpc
+sudo rm -rf grpc
 
 # Install Google benchmark
 git clone https://github.com/google/benchmark.git
@@ -222,20 +236,20 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 sudo make install
 popd
 popd
-rm -rf benchmark
+sudo rm -rf benchmark
 
 # Reset the IDs for our libraries to absolute paths
-install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
-install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
-install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/liburdfdom_model.dylib
-install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
-install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
-install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
+sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
+sudo install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
+sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/liburdfdom_model.dylib
+sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
+sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
+sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
 # install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
 # install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
-install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
+sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
 # install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
-install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
+sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
 # We're not installing Open Scene Graph, so these aren't necessary
 # install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
 # install_name_tool -id /usr/local/lib/libosgViewer.161.dylib /usr/local/lib/libosgViewer.161.dylib
@@ -253,7 +267,11 @@ install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
 ICU4C_FULL_VERSION="69.1"
-pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+if [ -f "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
+      pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+else
+      pushd /opt/homebrew/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+fi
 sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
 sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
 sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
@@ -267,18 +285,25 @@ sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dyl
 sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
 sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
 sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuuc.${ICU4C_FULL_VERSION}.dylib 
+sudo codesign -f -s - libicui18n.${ICU4C_FULL_VERSION}.dylib
+sudo codesign -f -s - libicuio.${ICU4C_FULL_VERSION}.dylib
+sudo codesign -f -s - libicutest.${ICU4C_FULL_VERSION}.dylib
+sudo codesign -f -s - libicutu.${ICU4C_FULL_VERSION}.dylib
+sudo codesign -f -s - libicuuc.${ICU4C_FULL_VERSION}.dylib
 popd
 
 # Get ready to bundle the links
-ls /usr/local/lib/
-sudo mv /usr/local/lib/libjpeg.dylib /usr/local/lib/libjpeg.old.dylib
-ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib /usr/local/lib/libjpeg.lib
-# sudo mv /usr/local/lib/libGIF.dylib /usr/local/lib/libGIF.old.dylib
-# ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libGIF.dylib /usr/local/lib/libGIF.lib
-sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
-ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
-sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
-ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
+if [ -f "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib" ]; then
+    ls /usr/local/lib/
+    sudo mv /usr/local/lib/libjpeg.dylib /usr/local/lib/libjpeg.old.dylib
+    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib /usr/local/lib/libjpeg.lib
+    # sudo mv /usr/local/lib/libGIF.dylib /usr/local/lib/libGIF.old.dylib
+    # ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libGIF.dylib /usr/local/lib/libGIF.lib
+    sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
+    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
+    sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
+    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
+fi
 
 
 # Replace liblzma with a hard copy of the library, instead of a link
@@ -296,4 +321,7 @@ ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Framew
 # echo "Symbolic links complete"
 
 # Install our build tools
-python -m pip install pytest delocate
+pip3 install pytest delocate
+
+# Install pkgconfig, which CMake uses to look for dependencies
+brew install pkgconfig
