@@ -34,7 +34,7 @@ brew install boost # @1.73
 brew install eigen
 
 brew install openssl@1.1
-if [ -f "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
+if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
       # x86 Macs
       cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
 else
@@ -267,7 +267,7 @@ sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libas
 # Fix "icu4c" installed by Brew
 ICU4C_MAJOR_VERSION="69"
 ICU4C_FULL_VERSION="69.1"
-if [ -f "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
+if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
       pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 else
       pushd /opt/homebrew/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
