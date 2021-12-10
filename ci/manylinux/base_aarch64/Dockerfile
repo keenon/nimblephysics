@@ -1,6 +1,6 @@
 FROM quay.io/pypa/manylinux2014_aarch64
 MAINTAINER keenonwerling@gmail.com
-# TAG keenon/diffdart:base
+# TAG keenon/diffdart:base_aarch64
 
 ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig/"
 
