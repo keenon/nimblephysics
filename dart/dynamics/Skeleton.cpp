@@ -2117,12 +2117,13 @@ Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
 
   Eigen::MatrixXs Minv = getInvMassMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(wrt);
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector();
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
     Eigen::MatrixXs dM = getJacobianOfMinv(
         dt * (tau - C - getDampingForce() - getSpringForce()), wrt);
-    return dM - Minv * dt * dC;
+    return dM - Minv * dt * dC - Minv * dt *  spring_stiffs.asDiagonal();
   }
   else
   {

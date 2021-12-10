@@ -1820,6 +1820,22 @@ Eigen::MatrixXs World::getStateJacobian()
   return stateJac;
 }
 
+//===============================================================================
+Eigen::MatrixXs World::getContactFreeStateJacobian()
+{
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = getCachedBackpropSnapshot();
+  int dofs = getNumDofs();
+  Eigen::MatrixXs stateJac = Eigen::MatrixXs::Zero(2 * dofs, 2 * dofs);
+  WorldPtr sharedThis = shared_from_this();
+  stateJac.block(0, 0, dofs, dofs) = snapshot->getContactFreePosPosJacobian(sharedThis);
+  stateJac.block(dofs, 0, dofs, dofs) = snapshot->getContactFreePosVelJacobian(sharedThis);
+  stateJac.block(0, dofs, dofs, dofs) = snapshot->getContactFreeVelPosJacobian(sharedThis);
+  stateJac.block(dofs, dofs, dofs, dofs)
+      = snapshot->getContactFreeVelVelJacobian(sharedThis);
+  return stateJac;
+}
+
 //==============================================================================
 // This returns the Jacobian for action_t -> state_{t+1}.
 Eigen::MatrixXs World::getActionJacobian()
@@ -1830,6 +1846,25 @@ Eigen::MatrixXs World::getActionJacobian()
   WorldPtr sharedThis = shared_from_this();
   const Eigen::MatrixXs& forceVelJac
       = snapshot->getControlForceVelJacobian(sharedThis);
+
+  int actionDim = mActionSpace.size();
+  Eigen::MatrixXs actionJac = Eigen::MatrixXs::Zero(2 * dofs, actionDim);
+  for (int i = 0; i < actionDim; i++)
+  {
+    actionJac.block(dofs, i, dofs, 1) = forceVelJac.col(mActionSpace[i]);
+  }
+  return actionJac;
+}
+
+//==============================================================================
+Eigen::MatrixXs World::getContactFreeActionJacobian()
+{
+  std::shared_ptr<neural::BackpropSnapshot> snapshot
+      = getCachedBackpropSnapshot();
+  int dofs = getNumDofs();
+  WorldPtr sharedThis = shared_from_this();
+  const Eigen::MatrixXs& forceVelJac
+      = snapshot->getContactFreeControlForceVelJacobian(sharedThis);
 
   int actionDim = mActionSpace.size();
   Eigen::MatrixXs actionJac = Eigen::MatrixXs::Zero(2 * dofs, actionDim);

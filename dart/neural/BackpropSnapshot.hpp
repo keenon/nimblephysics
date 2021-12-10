@@ -70,16 +70,25 @@ public:
   const Eigen::MatrixXs& getVelVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  const Eigen::MatrixXs& getContactFreeVelVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   const Eigen::MatrixXs& getPosVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  const Eigen::MatrixXs& getContactFreePosVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   const Eigen::MatrixXs& getControlForceVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  const Eigen::MatrixXs& getContactFreeControlForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole mass-vel jacobian. For backprop, you
@@ -94,10 +103,16 @@ public:
   const Eigen::MatrixXs& getPosPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  const Eigen::MatrixXs& getContactFreePosPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole vel-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
   const Eigen::MatrixXs& getVelPosJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  const Eigen::MatrixXs& getContactFreeVelPosJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the component of the pos-pos and pos-vel
@@ -110,8 +125,12 @@ public:
   /// This returns the Jacobian for state_t -> state_{t+1}.
   Eigen::MatrixXs getStateJacobian(simulation::WorldPtr world);
 
+  Eigen::MatrixXs getContactFreeStateJacobian(simulation::WorldPtr world);
+
   /// This returns the Jacobian for action_t -> state_{t+1}.
   Eigen::MatrixXs getActionJacobian(simulation::WorldPtr world);
+
+  Eigen::MatrixXs getContactFreeActionJacobian(simulation::WorldPtr world);
 
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
@@ -178,6 +197,10 @@ public:
   /// This returns the B matrix. You shouldn't ever need this matrix, it's
   /// just here to enable testing.
   Eigen::MatrixXs getBouncingConstraintMatrix(simulation::WorldPtr world);
+
+  /// This return the entire constraint matrix which may be used to provide heuristic
+  /// For iLQR planning through contact
+  Eigen::MatrixXs getAllConstraintMatrix(simulation::WorldPtr world);
 
   /// This returns the mass matrix for the whole world, a block diagonal
   /// concatenation of the skeleton mass matrices.
@@ -594,6 +617,9 @@ public:
   /// Returns the number of upper bound contacts in this snapshot.
   std::size_t getNumUpperBound();
 
+  // Returns number of constraint dimension
+  std::size_t getNumConstraintDim();
+
   /// These are the gradient constraint matrices from the LCP solver
   std::vector<std::shared_ptr<ConstrainedGroupGradientMatrices>>
       mGradientMatrices;
@@ -747,7 +773,8 @@ private:
     MASSED_CLAMPING,
     UPPER_BOUND,
     MASSED_UPPER_BOUND,
-    BOUNCING
+    BOUNCING,
+    ALL
   };
 
   Eigen::MatrixXs assembleMatrix(
