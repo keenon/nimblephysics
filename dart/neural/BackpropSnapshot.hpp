@@ -746,18 +746,30 @@ private:
   /// These are mCached versions of the various Jacobians
   bool mCachedPosPosDirty;
   Eigen::MatrixXs mCachedPosPos;
+  bool mCachedContactFreePosPosDirty;
+  Eigen::MatrixXs mCachedContactFreePosPos;
   bool mCachedPosVelDirty;
   Eigen::MatrixXs mCachedPosVel;
+  bool mCachedContactFreePosVelDirty;
+  Eigen::MatrixXs mCachedContactFreePosVel;
   bool mCachedBounceApproximationDirty;
   Eigen::MatrixXs mCachedBounceApproximation;
   bool mCachedVelPosDirty;
   Eigen::MatrixXs mCachedVelPos;
+  bool mCachedContactFreeVelPosDirty;
+  Eigen::MatrixXs mCachedContactFreeVelPos;
   bool mCachedVelVelDirty;
   Eigen::MatrixXs mCachedVelVel;
+  bool mCachedContactFreeVelVelDirty;
+  Eigen::MatrixXs mCachedContactFreeVelVel;
   bool mCachedForcePosDirty;
   Eigen::MatrixXs mCachedForcePos;
+  bool mCachedContactFreeForcePosDirty;
+  Eigen::MatrixXs mCachedContactFreeForcePos
   bool mCachedForceVelDirty;
   Eigen::MatrixXs mCachedForceVel;
+  bool mCachedContactFreeForceVelDirty;
+  Eigen::MatrixXs mCachedContactFreeForceVel;
   bool mCachedMassVelDirty;
   Eigen::MatrixXs mCachedMassVel;
   bool mCachedPosCDirty;
