@@ -765,7 +765,7 @@ private:
   bool mCachedForcePosDirty;
   Eigen::MatrixXs mCachedForcePos;
   bool mCachedContactFreeForcePosDirty;
-  Eigen::MatrixXs mCachedContactFreeForcePos
+  Eigen::MatrixXs mCachedContactFreeForcePos;
   bool mCachedForceVelDirty;
   Eigen::MatrixXs mCachedForceVel;
   bool mCachedContactFreeForceVelDirty;
