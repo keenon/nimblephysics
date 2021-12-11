@@ -720,6 +720,15 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent2
             = mX(mOffset[i] + 2);
+        const ContactConstraint::TangentBasisMatrix D
+            = contactConstraint->getTangentBasisMatrixODE(
+                contactConstraint->getContact().normal);
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->tangent1
+            = D.col(0);
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->tangent2
+            = D.col(1);
       }
     }
     constraint->applyImpulse(mX.data() + mOffset[i]);

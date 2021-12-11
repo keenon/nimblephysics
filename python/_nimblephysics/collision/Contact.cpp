@@ -66,6 +66,8 @@ void Contact(py::module& m)
           ::py::arg("normal"))
       .def_readwrite("point", &dart::collision::Contact::point)
       .def_readwrite("normal", &dart::collision::Contact::normal)
+      .def_readwrite("tangent1", &dart::collision::Contact::tangent1)
+      .def_readwrite("tangent2", &dart::collision::Contact::tangent2)
       .def_readwrite("force", &dart::collision::Contact::force)
       .def_readwrite(
           "collisionObject1", &dart::collision::Contact::collisionObject1)
