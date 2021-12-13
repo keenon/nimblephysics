@@ -73,6 +73,10 @@ public:
   const Eigen::MatrixXs& getContactFreeVelVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// Index should specify which contact will be kept
+  const Eigen::MatrixXs& getContactReducedVelVelJacobian(
+      simulation::WorldPtr world, Eigen::VectorXs indexs, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole pos-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -82,6 +86,9 @@ public:
   const Eigen::MatrixXs& getContactFreePosVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  const Eigen::MatrixXs& getContactReducedPosVelJacobian(
+      simulation::WorldPtr world, Eigen::VectorXs indexs, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole force-vel jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -89,6 +96,9 @@ public:
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   const Eigen::MatrixXs& getContactFreeControlForceVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  const Eigen::MatrixXs& getContactReducedCControlForceVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
   /// This computes and returns the whole mass-vel jacobian. For backprop, you
@@ -127,11 +137,18 @@ public:
 
   Eigen::MatrixXs getContactFreeStateJacobian(simulation::WorldPtr world);
 
+  Eigen::MatrixXs getContactReducedStateJacobian(
+      simulation::WorldPtr world,
+      Eigen::VectorXs indexs);
+
   /// This returns the Jacobian for action_t -> state_{t+1}.
   Eigen::MatrixXs getActionJacobian(simulation::WorldPtr world);
 
   Eigen::MatrixXs getContactFreeActionJacobian(simulation::WorldPtr world);
 
+  Eigen::MatrixXs getContactReducedActionJacobian(
+      simulation::WorldPtr world,
+      Eigen::VectorXs indexs);
   /// Returns a concatenated vector of all the Skeletons' position()'s in the
   /// World, in order in which the Skeletons appear in the World's
   /// getSkeleton(i) returns them, BEFORE the timestep.
@@ -317,6 +334,12 @@ public:
   /// is here if you want access to the full Jacobian for some reason.
   Eigen::MatrixXs getVelJacobianWrt(
       simulation::WorldPtr world, WithRespectTo* wrt);
+
+  /// This computes and returns the whole wrt-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason
+  Eigen::MatrixXs getContactReducedVelJacobianWrt(
+      simulation::WorldPtr world, WithRespectTo* wrt, Eigen::VectorXs index);
 
   /// This computes and returns the whole wrt-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This

@@ -79,8 +79,18 @@ void BackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
+          "getContactFreeVelVelJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreeVelVelJacobian,
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
           "getControlForceVelJacobian",
           &dart::neural::BackpropSnapshot::getControlForceVelJacobian,
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
+          "getContactFreeControlForceVelJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreeControlForceVelJacobian,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
@@ -89,13 +99,28 @@ void BackpropSnapshot(py::module& m)
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
+          "getContactFreePosPosJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreePosPosJacobian,
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
           "getVelPosJacobian",
           &dart::neural::BackpropSnapshot::getVelPosJacobian,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
+          "getContactFreeVelPosJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreeVelPosJacobian,
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
           "getPosVelJacobian",
           &dart::neural::BackpropSnapshot::getPosVelJacobian,
+          ::py::arg("world"),
+          ::py::arg("perfLog") = nullptr)
+      .def(
+          "getContactFreePosVelJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreePosVelJacobian,
           ::py::arg("world"),
           ::py::arg("perfLog") = nullptr)
       .def(
@@ -108,8 +133,16 @@ void BackpropSnapshot(py::module& m)
           &dart::neural::BackpropSnapshot::getStateJacobian,
           ::py::arg("world"))
       .def(
+          "getContactFreeStateJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreeStateJacobian,
+          ::py::arg("world"))
+      .def(
           "getActionJacobian",
           &dart::neural::BackpropSnapshot::getActionJacobian,
+          ::py::arg("world"))
+      .def(
+          "getContactFreeActionJacobian",
+          &dart::neural::BackpropSnapshot::getContactFreeActionJacobian,
           ::py::arg("world"))
       .def(
           "getPreStepPosition",
@@ -129,6 +162,16 @@ void BackpropSnapshot(py::module& m)
       .def(
           "getPostStepTorques",
           &dart::neural::BackpropSnapshot::getPostStepTorques)
+      .def("getAllConstraintMatrix", 
+           &dart::neural::BackpropSnapshot::getAllConstraintMatrix,
+           ::py::arg("world"))
+      .def("getClampingConstraintMatrix",
+           &dart::neural::BackpropSnapshot::getClampingConstraintMatrix,
+           ::py::arg("world"))
+      .def("getNumConstraintDim",
+           &dart::neural::BackpropSnapshot::getNumConstraintDim)
+      .def("getNumContact",
+           &dart::neural::BackpropSnapshot::getNumContacts)
       .def("getMassMatrix", &dart::neural::BackpropSnapshot::getMassMatrix)
       .def(
           "getInvMassMatrix", &dart::neural::BackpropSnapshot::getInvMassMatrix)
