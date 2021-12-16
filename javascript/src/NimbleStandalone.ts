@@ -17,6 +17,7 @@ class NimbleStandalone {
   progressBar: HTMLDivElement;
   progressScrub: HTMLDivElement;
 
+  loadingContainerMounted: boolean;
   loadingContainer: HTMLDivElement;
   loadingProgressBarContainer: HTMLDivElement;
   loadingProgressBarBg: HTMLDivElement;
@@ -85,6 +86,7 @@ class NimbleStandalone {
     this.msPerFrame = 20;
     this.startFrame = 0;
 
+    this.loadingContainerMounted = false;
     this.loadingContainer = document.createElement("div");
     this.loadingContainer.className = "NimbleStandalone-loading-overlay";
 
@@ -133,7 +135,8 @@ class NimbleStandalone {
    */
   dispose = () => {
     if (this.view != null) {
-      this.view.clear();
+      this.view.dispose();
+      this.viewContainer.remove();
     }
     this.playing = false;
     this.view = null;
@@ -190,9 +193,20 @@ class NimbleStandalone {
    * @param progress The progress from 0-1 in loading
    */
   setLoadingProgress = (progress: number) => {
+    if (!this.loadingContainerMounted) {
+      this.viewContainer.appendChild(this.loadingContainer);
+      this.loadingContainerMounted = true;
+    }
     this.loadingProgressBarContainer.style.width = progress * 100 + "%";
     this.loadingProgressBarBg.style.width = (1.0 / progress) * 100 + "%";
   };
+
+  /**
+   * This hides the loading bar, which unmounts it from the DOM (if it was previously mounted).
+   */
+  hideLoadingBar = () => {
+    this.viewContainer.removeChild(this.loadingContainer);
+  }
 
   /**
    * This loads a recording to play back. It attempts to display a progress bar while loading the model.
@@ -200,7 +214,7 @@ class NimbleStandalone {
    * @param url The URL to load a recording from, in order to play back
    */
   loadRecording = (url: string) => {
-    this.viewContainer.appendChild(this.loadingContainer);
+    this.setLoadingProgress(0.0);
 
     let xhr = new XMLHttpRequest();
     xhr.open("GET", url);
@@ -216,10 +230,10 @@ class NimbleStandalone {
       } else {
         let response = JSON.parse(xhr.response);
         this.setRecording(response);
+        setTimeout(() => {
+          this.hideLoadingBar();
+        }, 100);
       }
-      setTimeout(() => {
-        this.viewContainer.removeChild(this.loadingContainer);
-      }, 100);
     };
 
     xhr.send();

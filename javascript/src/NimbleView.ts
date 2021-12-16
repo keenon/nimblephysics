@@ -193,6 +193,17 @@ class DARTView {
   }
 
   /**
+   * This cleans up any resources that the view is using
+   */
+  dispose = () => {
+    this.scene = null;
+    this.view = null;
+    this.clear();
+    this.glContainer.remove();
+    this.uiContainer.remove();
+  };
+
+  /**
    * This reads and handles a command sent from the backend
    */
   handleCommand = (command: Command) => {
