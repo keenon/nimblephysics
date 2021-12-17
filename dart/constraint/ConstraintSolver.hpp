@@ -195,6 +195,9 @@ public:
   /// Solve constrained groups
   void solveConstrainedGroups(simulation::World* world);
 
+  /// Apply constraint impulses
+  void applyConstraintImpulses(ConstrainedGroup& group);
+
   /// Get constrained groups
   const std::vector<ConstrainedGroup>& getConstrainedGroups() const;
 

@@ -129,5 +129,15 @@ s_t ConstraintBase::getPenetrationCorrectionVelocity()
   return 0;
 }
 
+s_t* ConstraintBase::getImpulseToApply()
+{
+  return mImpulseToApply;
+}
+
+void ConstraintBase::setImpulseToApply(s_t* lambda)
+{
+  mImpulseToApply = lambda;
+}
+
 } // namespace constraint
 } // namespace dart

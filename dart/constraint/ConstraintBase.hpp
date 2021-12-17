@@ -97,6 +97,12 @@ public:
   /// Unexcite the constraint
   virtual void unexcite() = 0;
 
+  /// Get constraint impulse to apply
+  virtual s_t* getImpulseToApply();
+
+  /// Set constraint impulse to apply
+  virtual void setImpulseToApply(s_t* lambda);
+
   /// Apply computed constraint impulse to constrained skeletons
   virtual void applyImpulse(s_t* lambda) = 0;
 
@@ -148,6 +154,9 @@ protected:
 protected:
   /// Dimension of constraint
   std::size_t mDim;
+
+  /// Constraint impulse to apply
+  s_t* mImpulseToApply;
 };
 
 } // namespace constraint

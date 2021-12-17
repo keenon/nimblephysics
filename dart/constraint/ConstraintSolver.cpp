@@ -761,7 +761,22 @@ void ConstraintSolver::buildConstrainedGroups()
 void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
 {
   for (auto& constraintGroup : mConstrainedGroups)
+  {
     solveConstrainedGroup(constraintGroup, world);
+    applyConstraintImpulses(constraintGroup);
+  }
+}
+
+void ConstraintSolver::applyConstraintImpulses(ConstrainedGroup& group)
+{
+  // Apply constraint impulses to each constraint.
+  const std::size_t numConstraints = group.getNumConstraints();
+  for (std::size_t i = 0; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = group.getConstraint(i);
+    constraint->applyImpulse(constraint->getImpulseToApply());
+    constraint->excite();
+  }
 }
 
 //==============================================================================

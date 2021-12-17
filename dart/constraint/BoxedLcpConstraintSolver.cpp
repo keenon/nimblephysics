@@ -726,6 +726,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->lcpResult
           = mX(mOffset[i]);
+      // Similar to storing lcpResult, we're storing a bunch of other useful
+      // contact information users may want related to each contact.
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->spatialNormalA
           = contactConstraint->getSpatialNormalA();
@@ -751,8 +753,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
             = D.col(1);
       }
     }
-    constraint->applyImpulse(mX.data() + mOffset[i]);
-    constraint->excite();
+    constraint->setImpulseToApply(mX.data() + mOffset[i]);
   }
 }
 
