@@ -7,6 +7,7 @@ import previewJson from './data/preview.json';
 const ReactTestBed = () => {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0.0);
 
   let children = [];
@@ -24,6 +25,12 @@ const ReactTestBed = () => {
       },
       key: 'loading'
     }, loading ? "Set Not Loading" : "Set Loading"));
+    children.push(React.createElement("button", {
+      onClick: () => {
+        setLoaded(!loaded);
+      },
+      key: 'loaded'
+    }, loaded ? "Set Not Loaded" : "Set Loaded"));
     if (loading) {
       children.push(React.createElement("input", {
         type: 'range',
@@ -41,7 +48,7 @@ const ReactTestBed = () => {
     children.push(React.createElement(NimbleStandaloneReact, {
       loading,
       loadingProgress,
-      recording: loading ? null : previewJson,
+      recording: loaded ? previewJson : null,
       style: {
         width: "500px",
         height: "500px"

@@ -251,6 +251,7 @@ class NimbleStandalone {
   setRecording = (recording: CommandRecording) => {
     if (recording != this.recording) {
       this.recording = recording;
+      this.view.view.onWindowResize();
       if (!this.playing) {
         this.togglePlay();
       }

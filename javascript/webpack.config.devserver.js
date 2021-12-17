@@ -45,13 +45,7 @@ module.exports = {
   output: {
     path: path.join(__dirname, "dist"),
     publicPath: "/",
-    filename: "[name].js",
-    // TODO: we may need to remove these options for the "live" entrypoint
-    library: "[name]",
-    libraryTarget: "umd"
-  },
-  externals: {
-    react: 'commonjs2 react'
+    filename: "[name].js"
   },
   plugins: [
     new HtmlWebpackPlugin({

@@ -20,6 +20,12 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
         gui.hideLoadingBar();
         if (pr.recording != null) {
           gui.setRecording(pr.recording);
+          // Call onWindowResize() a few times right after mounting, to try to prevent grey screen syndrome
+          for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+              gui.view.view.onWindowResize();
+            }, i * 200);
+          }
         }
       }
     }
@@ -30,8 +36,6 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
   let standaloneRef = useCallback((node?: HTMLDivElement) => {
     // Only call the update when the node ref actually changes out from under us
     if (node != null && standaloneNode.current !== node) {
-      console.log("New NODE object created!");
-      console.log(node);
       standaloneNode.current = node;
       // Clean up the old standalone GUI, if we still had one
       if (standalone.current != null) {

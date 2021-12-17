@@ -1,16 +1,17 @@
 {
   "name": "nimble-visualizer",
-  "version": "0.6.3",
+  "version": "0.6.10",
   "description": "A WebGL-based visualizer for Nimble trajectories",
   "entry": {
     "index": "index.js",
     "embedded": "embedded.js"
   },
   "scripts": {
-    "dev": "webpack-dev-server",
+    "dev": "webpack-dev-server --config webpack.config.devserver.js",
     "watch": "webpack --watch --mode=development",
     "prod": "webpack --mode=production",
     "build": "webpack && tsc || true && cp src/types.d.ts dist/types.d.ts && echo \"Success!\"",
+    "build-for-python": "webpack --config webpack.config.python.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Keenon Werling",
@@ -26,17 +27,19 @@
     "html-webpack-plugin": "^4.5.0",
     "path": "^0.12.7",
     "raw-loader": "^4.0.2",
-    "react-dom": "^17.0.2",
     "sass": "^1.26.11",
     "sass-loader": "^10.0.2",
     "style-loader": "^1.2.1",
     "webpack": "^4.44.2",
     "webpack-cli": "^3.3.12",
-    "webpack-dev-server": "^3.11.0"
+    "webpack-dev-server": "^3.11.0",
+    "declaration-bundler-webpack-plugin": "^1.0.3",
+    "react-dom": "^17.0.2"
+  },
+  "peerDependencies": {
+    "react": "^17.0.2"
   },
   "dependencies": {
-    "declaration-bundler-webpack-plugin": "^1.0.3",
-    "react": "^17.0.2",
     "three": "^0.121.1"
   }
 }

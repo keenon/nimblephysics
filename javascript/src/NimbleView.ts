@@ -206,6 +206,7 @@ class DARTView {
     this.glContainer.removeEventListener("keydown", this.glContainerKeyboardEventListener);
 
     this.scene = null;
+    this.view.dispose();
     this.view = null;
     this.glContainer.remove();
     this.uiContainer.remove();

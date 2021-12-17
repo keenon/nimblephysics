@@ -31,7 +31,7 @@ class View {
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(this.width, this.height);
     (this.renderer as any).shadowMap.enabled = true;
-    (this.renderer as any).shadowMapType = THREE.PCFSoftShadowMap;
+    (this.renderer as any).shadowMap.type = THREE.PCFSoftShadowMap;
     (this.renderer as any).outputEncoding = THREE.sRGBEncoding;
 
     this.container.appendChild(this.renderer.domElement);
@@ -45,6 +45,7 @@ class View {
     this.camera.position.z = 500;
 
     this.composer = new EffectComposer(this.renderer);
+    this.composer.setSize(this.width, this.height);
 
     var ssaoPass = new SSAOPass(scene, this.camera, this.width, this.height);
     ssaoPass.kernelRadius = 5;
@@ -78,7 +79,18 @@ class View {
     this.dragControls.addEventListener("drag", () => {
       this.composer.render();
     });
+
+    this.composer.render();
   }
+
+  /**
+   * This cleans up any resources that the view is using
+   */
+  dispose = () => {
+    this.dragControls.dispose();
+    this.orbitControls.dispose();
+    window.removeEventListener("resize", this.onWindowResize, false);
+  };
 
   setDragHandler = (
     handler: (obj: THREE.Object3D, pos: THREE.Vector3) => void

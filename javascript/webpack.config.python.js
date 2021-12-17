@@ -4,16 +4,11 @@ var DeclarationBundlerPlugin = require('declaration-bundler-webpack-plugin');
 
 /// Set this to "true" to serve the `embedded_dev.ts` entry point from the dev server.
 /// Set this to "false" to serve the `live.ts` entry point from the dev server.
-const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = true;
+const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = false;
 
 module.exports = {
   entry: {
-    live: "./src/live.ts",
-    embedded: "./src/embedded.ts",
-    embedded_dev: "./src/embedded_dev.ts",
-    NimbleStandaloneReact: "./src/NimbleStandaloneReact.ts",
-    NimbleStandalone: "./src/NimbleStandalone.ts",
-    NimbleRemote: "./src/NimbleRemote.ts"
+    live: "./src/live.ts"
   },
   module: {
     rules: [
@@ -46,12 +41,6 @@ module.exports = {
     path: path.join(__dirname, "dist"),
     publicPath: "/",
     filename: "[name].js",
-    // TODO: we may need to remove these options for the "live" entrypoint
-    library: "[name]",
-    libraryTarget: "umd"
-  },
-  externals: {
-    react: 'commonjs2 react'
   },
   plugins: [
     new HtmlWebpackPlugin({
