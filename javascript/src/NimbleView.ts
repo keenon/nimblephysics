@@ -116,11 +116,7 @@ class DARTView {
     this.view = new View(this.scene, this.glContainer);
     this.running = false;
 
-    this.glContainer.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === " ") {
-        e.preventDefault();
-      }
-    });
+    this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
 
     /// Get ready to deal with object dragging
 
@@ -192,13 +188,25 @@ class DARTView {
     );
   }
 
+  glContainerKeyboardEventListener = (e: KeyboardEvent) => {
+    if (e.key === " ") {
+      e.preventDefault();
+    }
+  };
+
   /**
    * This cleans up any resources that the view is using
    */
   dispose = () => {
+    this.clear();
+
+    // Clean up leftover callbacks that could cause a leak
+    this.disposeHandlers.clear();
+    this.view.setDragHandler(null);
+    this.glContainer.removeEventListener("keydown", this.glContainerKeyboardEventListener);
+
     this.scene = null;
     this.view = null;
-    this.clear();
     this.glContainer.remove();
     this.uiContainer.remove();
   };

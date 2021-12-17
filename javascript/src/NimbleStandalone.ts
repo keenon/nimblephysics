@@ -194,10 +194,11 @@ class NimbleStandalone {
    */
   setLoadingProgress = (progress: number) => {
     if (!this.loadingContainerMounted) {
+      this.loadingContainer.remove();
       this.viewContainer.appendChild(this.loadingContainer);
       this.loadingContainerMounted = true;
     }
-    this.loadingProgressBarContainer.style.width = progress * 100 + "%";
+    this.loadingProgressBarContainer.style.width = "calc(" + progress * 100 + "% - 6px)";
     this.loadingProgressBarBg.style.width = (1.0 / progress) * 100 + "%";
   };
 
@@ -205,7 +206,10 @@ class NimbleStandalone {
    * This hides the loading bar, which unmounts it from the DOM (if it was previously mounted).
    */
   hideLoadingBar = () => {
-    this.viewContainer.removeChild(this.loadingContainer);
+    if (this.loadingContainerMounted) {
+      this.loadingContainer.remove();
+      this.loadingContainerMounted = false;
+    }
   }
 
   /**
@@ -245,9 +249,11 @@ class NimbleStandalone {
    * @param recording The JSON object representing a recording of timestep(s) command(s)
    */
   setRecording = (recording: CommandRecording) => {
-    this.recording = recording;
-    if (!this.playing) {
-      this.togglePlay();
+    if (recording != this.recording) {
+      this.recording = recording;
+      if (!this.playing) {
+        this.togglePlay();
+      }
     }
   };
 

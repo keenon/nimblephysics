@@ -1,6 +1,14 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "sourceMap": true
-  }
+    "emitDeclarationOnly": true,
+    "declarationDir": "dist/"
+  },
+  "files": [
+    "src/types.d.ts",
+    "src/NimbleRemote.ts",
+    "src/NimbleView.ts",
+    "src/NimbleStandalone.ts",
+    "src/NimbleStandaloneReact.ts",
+  ]
 }
