@@ -9,7 +9,7 @@ class Slider {
   value: number;
   onlyInts: boolean;
   horizontal: boolean;
-  onChange: (number) => void;
+  onChange: (n: number) => void;
 
   backgroundElem: HTMLDivElement;
   sliderElem: HTMLDivElement;
@@ -24,7 +24,7 @@ class Slider {
     value: number,
     onlyInts: boolean,
     horizontal: boolean,
-    onChange: (number) => void
+    onChange: (n: number) => void
   ) {
     this.type = "slider";
     this.key = key;

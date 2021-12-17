@@ -24,7 +24,9 @@ class View {
     parent.appendChild(this.container);
     this.parent = parent;
 
-    this.refreshSize();
+    // these two lines are essentially this.refreshSize(), but fix TS errors
+    this.width = this.parent.getBoundingClientRect().width;
+    this.height = this.parent.getBoundingClientRect().height;
 
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(this.width, this.height);

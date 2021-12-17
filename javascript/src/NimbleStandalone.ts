@@ -1,8 +1,9 @@
 import NimbleView from "./NimbleView";
-import logoSvg from "!!raw-loader!./nimblelogo.svg";
+// import logoSvg from "!!raw-loader!./nimblelogo.svg";
+import { CommandRecording } from "./types";
 
 class NimbleStandalone {
-  view: NimbleView;
+  view: NimbleView | null;
   recording: CommandRecording;
   playing: boolean;
   startedPlaying: number;
@@ -16,6 +17,7 @@ class NimbleStandalone {
   progressBar: HTMLDivElement;
   progressScrub: HTMLDivElement;
 
+  loadingContainerMounted: boolean;
   loadingContainer: HTMLDivElement;
   loadingProgressBarContainer: HTMLDivElement;
   loadingProgressBarBg: HTMLDivElement;
@@ -51,8 +53,10 @@ class NimbleStandalone {
       if (percentage > 1) percentage = 1;
       if (this.playing) this.togglePlay();
       this.lastFrame = Math.round(this.recording.length * percentage);
-      this.recording[this.lastFrame].forEach(this.view.handleCommand);
-      this.view.render();
+      if (this.view != null) {
+        this.recording[this.lastFrame].forEach(this.view.handleCommand);
+        this.view.render();
+      }
       this.setProgress(percentage);
     };
 
@@ -67,14 +71,12 @@ class NimbleStandalone {
       window.addEventListener("mouseup", mouseUp);
     });
 
-    window.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key.toString() == " ") {
-        this.togglePlay();
-      }
-    });
+    window.addEventListener("keydown", this.keyboardListener);
 
     this.view.addDragListener((key: string, pos: number[]) => {
-      this.view.setObjectPos(key, pos);
+      if (this.view != null) {
+        this.view.setObjectPos(key, pos);
+      }
     });
 
     this.recording = [];
@@ -82,7 +84,9 @@ class NimbleStandalone {
     this.startedPlaying = new Date().getTime();
     this.lastFrame = -1;
     this.msPerFrame = 20;
+    this.startFrame = 0;
 
+    this.loadingContainerMounted = false;
     this.loadingContainer = document.createElement("div");
     this.loadingContainer.className = "NimbleStandalone-loading-overlay";
 
@@ -117,6 +121,28 @@ class NimbleStandalone {
     this.loadingProgressBarContainer.appendChild(this.loadingProgressBarBg);
   }
 
+  /**
+   * This is our keyboard listener, which we keep around until we clean up the player.
+   */
+  keyboardListener = (e: KeyboardEvent) => {
+    if (e.key.toString() == " ") {
+      this.togglePlay();
+    }
+  };
+
+  /**
+   * This cleans up and kills the standalone player.
+   */
+  dispose = () => {
+    if (this.view != null) {
+      this.view.dispose();
+      this.viewContainer.remove();
+    }
+    this.playing = false;
+    this.view = null;
+    window.removeEventListener("keydown", this.keyboardListener);
+  };
+
   setProgress = (percentage: number) => {
     this.progressBar.style.width = (1.0 - percentage) * 100 + "%";
     this.progressScrub.style.left = percentage * 100 + "%";
@@ -126,7 +152,7 @@ class NimbleStandalone {
     const twoThirdRGB = [207, 50, 158];
     const fullRGB = [141, 25, 233];
 
-    function pickHex(color1, color2, weight) {
+    function pickHex(color1: number[], color2: number[], weight: number) {
       var w2 = weight;
       var w1 = 1 - w2;
       return (
@@ -167,9 +193,24 @@ class NimbleStandalone {
    * @param progress The progress from 0-1 in loading
    */
   setLoadingProgress = (progress: number) => {
-    this.loadingProgressBarContainer.style.width = progress * 100 + "%";
+    if (!this.loadingContainerMounted) {
+      this.loadingContainer.remove();
+      this.viewContainer.appendChild(this.loadingContainer);
+      this.loadingContainerMounted = true;
+    }
+    this.loadingProgressBarContainer.style.width = "calc(" + progress * 100 + "% - 6px)";
     this.loadingProgressBarBg.style.width = (1.0 / progress) * 100 + "%";
   };
+
+  /**
+   * This hides the loading bar, which unmounts it from the DOM (if it was previously mounted).
+   */
+  hideLoadingBar = () => {
+    if (this.loadingContainerMounted) {
+      this.loadingContainer.remove();
+      this.loadingContainerMounted = false;
+    }
+  }
 
   /**
    * This loads a recording to play back. It attempts to display a progress bar while loading the model.
@@ -177,7 +218,7 @@ class NimbleStandalone {
    * @param url The URL to load a recording from, in order to play back
    */
   loadRecording = (url: string) => {
-    this.viewContainer.appendChild(this.loadingContainer);
+    this.setLoadingProgress(0.0);
 
     let xhr = new XMLHttpRequest();
     xhr.open("GET", url);
@@ -193,10 +234,10 @@ class NimbleStandalone {
       } else {
         let response = JSON.parse(xhr.response);
         this.setRecording(response);
+        setTimeout(() => {
+          this.hideLoadingBar();
+        }, 100);
       }
-      setTimeout(() => {
-        this.viewContainer.removeChild(this.loadingContainer);
-      }, 100);
     };
 
     xhr.send();
@@ -208,9 +249,11 @@ class NimbleStandalone {
    * @param recording The JSON object representing a recording of timestep(s) command(s)
    */
   setRecording = (recording: CommandRecording) => {
-    this.recording = recording;
-    if (!this.playing) {
-      this.togglePlay();
+    if (recording != this.recording) {
+      this.recording = recording;
+      if (!this.playing) {
+        this.togglePlay();
+      }
     }
   };
 
@@ -243,12 +286,13 @@ class NimbleStandalone {
         this.lastFrame = -1;
       }
       this.setProgress(frameNumber / this.recording.length);
-      for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
-        this.recording[i].forEach(this.view.handleCommand);
+      if (this.view != null) {
+        for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
+          this.recording[i].forEach(this.view.handleCommand);
+        }
+        this.view.render();
       }
       this.lastFrame = frameNumber;
-
-      this.view.render();
     }
 
     if (this.playing) {

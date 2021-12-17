@@ -47,7 +47,7 @@ class Plot {
     this.canvas.width = this.container.getBoundingClientRect().width;
     this.canvas.height = this.container.getBoundingClientRect().height;
     this.container.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
 
     this.redraw();
   }
