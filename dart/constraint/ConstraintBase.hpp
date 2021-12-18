@@ -97,12 +97,6 @@ public:
   /// Unexcite the constraint
   virtual void unexcite() = 0;
 
-  /// Get constraint impulse to apply
-  virtual s_t* getImpulseToApply();
-
-  /// Set constraint impulse to apply
-  virtual void setImpulseToApply(s_t* lambda);
-
   /// Apply computed constraint impulse to constrained skeletons
   virtual void applyImpulse(s_t* lambda) = 0;
 
