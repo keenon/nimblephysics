@@ -112,11 +112,11 @@ public:
   /// our optimistic LCP-stabilization-to-acceptance approach.
   virtual void setCachedLCPSolution(Eigen::VectorXs X) override;
 
-protected:
   // Documentation inherited.
   std::vector<s_t*> solveConstrainedGroup(
       ConstrainedGroup& group, simulation::World* world) override;
 
+protected:
   /// Boxed LCP solver
   BoxedLcpSolverPtr mBoxedLcpSolver;
   // TODO(JS): Hold as unique_ptr because there is no reason to share. Make this

@@ -195,6 +195,11 @@ public:
   /// Solve constrained groups
   void solveConstrainedGroups(simulation::World* world);
 
+  // Solve for constraint impulses to apply to each constraint in group.
+  virtual std::vector<s_t*> solveConstrainedGroup(
+      ConstrainedGroup& group, simulation::World* world)
+      = 0;
+
   /// Apply constraint impulses to each constraint.
   void applyConstraintImpulses(
       std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses);
@@ -238,11 +243,6 @@ public:
   s_t getContactClippingDepth();
 
 protected:
-  // Solve for constraint impulses to apply to each constraint in group.
-  virtual std::vector<s_t*> solveConstrainedGroup(
-      ConstrainedGroup& group, simulation::World* world)
-      = 0;
-
   /// Check if the skeleton is contained in this solver
   bool containSkeleton(const dynamics::ConstSkeletonPtr& skeleton) const;
 

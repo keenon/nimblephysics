@@ -45,10 +45,14 @@ using namespace dart::neural;
 
 TEST(ConstraintSolver, SIMPLE)
 {
-  std::vector<dart::constraint::ConstraintBasePtr> constraints;
-  std::vector<s_t*> impulses;
+  std::shared_ptr<simulation::World> world
+      = std::make_shared<simulation::World>();
+  auto solver = world->getConstraintSolver();
 
-  auto world = std::make_shared<simulation::World>();
-
-  world->getConstraintSolver()->applyConstraintImpulses(constraints, impulses);
+  for (auto constraintGroup : solver->getConstrainedGroups())
+  {
+    std::vector<s_t*> impulses
+        = solver->solveConstrainedGroup(constraintGroup, world.get());
+    solver->applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
+  }
 }
