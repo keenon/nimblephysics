@@ -771,9 +771,9 @@ void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
     // Build LCP terms by aggregating them from constraints
     const std::size_t n = constraintGroup.getTotalDimension();
 
-    // If there are no constraints, then we are done.
+    // If there are no constraints, then we are done with the group.
     if (0u == n)
-      return;
+      continue;
 
     std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup, world);
     applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
