@@ -187,7 +187,7 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
-bool BoxedLcpConstraintSolver::buildLCPInputs(ConstrainedGroup& group)
+bool BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
@@ -332,7 +332,7 @@ bool BoxedLcpConstraintSolver::buildLCPInputs(ConstrainedGroup& group)
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveLCP(
+std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
     ConstrainedGroup& group,
     simulation::World* world,
     bool shouldReinitializeMx)
@@ -775,8 +775,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLCP(
 std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group, simulation::World* world)
 {
-  bool shouldReinitializeMx = buildLCPInputs(group);
-  return solveLCP(group, world, shouldReinitializeMx);
+  bool shouldReinitializeMx = buildLcpInputs(group);
+  return solveLcp(group, world, shouldReinitializeMx);
 }
 
 //==============================================================================

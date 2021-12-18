@@ -117,10 +117,10 @@ public:
       ConstrainedGroup& group, simulation::World* world) override;
 
   /// Build the inputs to the LCP from the constraint group.
-  bool buildLCPInputs(ConstrainedGroup& group);
+  bool buildLcpInputs(ConstrainedGroup& group);
 
   /// Solve LCP from inputs.
-  std::vector<s_t*> solveLCP(
+  std::vector<s_t*> solveLcp(
       ConstrainedGroup& group,
       simulation::World* world,
       bool shouldReinitializeMx);
