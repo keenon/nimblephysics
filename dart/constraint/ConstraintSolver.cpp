@@ -762,19 +762,20 @@ void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
 {
   for (auto& constraintGroup : mConstrainedGroups)
   {
-    solveConstrainedGroup(constraintGroup, world);
-    applyConstraintImpulses(constraintGroup);
+    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup, world);
+    applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }
 }
 
-void ConstraintSolver::applyConstraintImpulses(ConstrainedGroup& group)
+//==============================================================================
+void ConstraintSolver::applyConstraintImpulses(
+    std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses)
 {
-  // Apply constraint impulses to each constraint.
-  const std::size_t numConstraints = group.getNumConstraints();
+  const std::size_t numConstraints = constraints.size();
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
-    const ConstraintBasePtr& constraint = group.getConstraint(i);
-    constraint->applyImpulse(constraint->getImpulseToApply());
+    const ConstraintBasePtr& constraint = constraints[i];
+    constraint->applyImpulse(impulses[i]);
     constraint->excite();
   }
 }

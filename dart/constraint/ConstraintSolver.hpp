@@ -195,8 +195,9 @@ public:
   /// Solve constrained groups
   void solveConstrainedGroups(simulation::World* world);
 
-  /// Apply constraint impulses
-  void applyConstraintImpulses(ConstrainedGroup& group);
+  /// Apply constraint impulses to each constraint.
+  void applyConstraintImpulses(
+      std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses);
 
   /// Get constrained groups
   const std::vector<ConstrainedGroup>& getConstrainedGroups() const;
@@ -237,8 +238,8 @@ public:
   s_t getContactClippingDepth();
 
 protected:
-  // TODO(JS): Docstring
-  virtual void solveConstrainedGroup(
+  // Solve for constraint impulses to apply to each constraint in group.
+  virtual std::vector<s_t*> solveConstrainedGroup(
       ConstrainedGroup& group, simulation::World* world)
       = 0;
 
