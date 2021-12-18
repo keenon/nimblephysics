@@ -116,6 +116,10 @@ public:
   std::vector<s_t*> solveConstrainedGroup(
       ConstrainedGroup& group, simulation::World* world) override;
 
+  /// Build the inputs to the LCP from the constraint group.
+  std::vector<s_t*> BoxedLcpConstraintSolver::buildLCPInputs(
+      ConstrainedGroup& group, simulation::World* world);
+
 protected:
   /// Boxed LCP solver
   BoxedLcpSolverPtr mBoxedLcpSolver;

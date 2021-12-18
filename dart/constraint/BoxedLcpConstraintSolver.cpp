@@ -187,6 +187,159 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
+std::vector<s_t*> BoxedLcpConstraintSolver::buildLCPInputs(
+    ConstrainedGroup& group, simulation::World* world)
+{
+  // Build LCP terms by aggregating them from constraints
+  const std::size_t numConstraints = group.getNumConstraints();
+  const std::size_t n = group.getTotalDimension();
+
+  // Initialize the vector of constraint impulses we will eventually return.
+  // Each ith element of the vector will contain a pointer to the constraint
+  // impulse to be applied for the ith constraint.
+  std::vector<s_t*> constraintImpulses;
+
+  // If there are no constraints, then just return the empty vector of impulses.
+  if (0u == n)
+    return constraintImpulses;
+
+  const int nSkip = dPAD(n); // nSkip = n + (n % 4);
+#ifdef NDEBUG                // release
+  mA.resize(n, nSkip);
+#else // debug
+  mA.setZero(n, nSkip); // rows = n, cols = n + (n % 4)
+#endif
+  bool mXResized = mX.size() != n;
+  if (mXResized)
+  {
+    mX.resize(n);
+    mX.setZero();
+  }
+  mB.resize(n);
+  mW.setZero(n); // set w to 0
+  mLo.resize(n);
+  mHi.resize(n);
+  mFIndex.setConstant(n, -1); // set findex to -1
+
+  // Compute offset indices
+  mOffset.resize(numConstraints);
+  mOffset[0] = 0;
+  for (std::size_t i = 1; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = group.getConstraint(i - 1);
+    assert(constraint->getDimension() > 0);
+    mOffset[i] = mOffset[i - 1] + constraint->getDimension();
+  }
+
+  // For each constraint
+  ConstraintInfo constInfo;
+  constInfo.invTimeStep = 1.0 / mTimeStep;
+  for (std::size_t i = 0; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = group.getConstraint(i);
+
+    constInfo.x = mX.data() + mOffset[i];
+    constInfo.lo = mLo.data() + mOffset[i];
+    constInfo.hi = mHi.data() + mOffset[i];
+    constInfo.b = mB.data() + mOffset[i];
+    constInfo.findex = mFIndex.data() + mOffset[i];
+    constInfo.w = mW.data() + mOffset[i];
+
+    // Fill vectors: lo, hi, b, w
+    constraint->getInformation(&constInfo);
+
+    // Register this constraint with our gradient matrices. It's important that
+    // this be called _after_ the getInformation() call, because it relies on
+    // state being filled from that call.
+    if (group.getGradientConstraintMatrices())
+    {
+      group.getGradientConstraintMatrices()->registerConstraint(constraint);
+    }
+
+    // Fill a matrix by impulse tests: A
+    constraint->excite();
+
+    s_t* impulses = new s_t[constraint->getDimension()];
+    for (std::size_t j = 0; j < constraint->getDimension(); ++j)
+    {
+      // Adjust findex for global index
+      if (mFIndex[mOffset[i] + j] >= 0)
+        mFIndex[mOffset[i] + j] += mOffset[i];
+
+      // Apply impulse for mipulse test
+      constraint->applyUnitImpulse(j);
+
+      // Fill upper triangle blocks of A matrix
+
+      // mA is row-major order, n rows by nSkip cols
+      // nSkip * (mOffset[i] + j) takes us to the (mOffset[i] + j)'th row
+      // mOffset[i] into that row
+      //
+      // -------------------------------
+      //                                |
+      //                   nSkip * (mOffset[i] + j)
+      //                                |
+      //                                v
+      // ------- mOffset[i] ----------> xxxxxxxxxx
+      //
+      // This whole loop fills the entire row (mOffset[i] + j) of A with
+      // the effect that the unit impluse on constraint for j for this
+      // constraint has on the relative velocities for each constraint
+      // force direction.
+      //
+      // As an efficiency tweak, since you know that A is symmetric, only
+      // bother to actually compute half of the velocity changes (upper
+      // triangle, arbitrarily) and then just copy that into the other half.
+
+      // Create a 3x3 square from A(mOffset[i], mOffset[i]) iterating over j
+      // This iteration fill in row j
+      int index = nSkip * (mOffset[i] + j) + mOffset[i];
+      // We never apply constraint force mixing in the individual constraints,
+      // instead we apply it at the whole matrix level to make it easier to
+      // differentiate.
+      constraint->getVelocityChange(mA.data() + index, false);
+
+      for (std::size_t k = i + 1; k < numConstraints; ++k)
+      {
+        // Create a 3x3 square from A(mOffset[i], mOffset[k]), iterating over j
+        // This iteration fill in row j
+        // Probably mostly 0s
+        index = nSkip * (mOffset[i] + j) + mOffset[k];
+        group.getConstraint(k)->getVelocityChange(mA.data() + index, false);
+      }
+
+      // Filling symmetric part of A matrix
+      for (std::size_t k = 0; k < i; ++k)
+      {
+        const int indexI = mOffset[i] + j;
+        for (std::size_t l = 0; l < group.getConstraint(k)->getDimension(); ++l)
+        {
+          const int indexJ = mOffset[k] + l;
+          // We've already calculate the velocity of
+          // mA(column for this constraint, previous constraint row) =
+          //     mA(previous constraint row, column for this constraint)
+          mA(indexI, indexJ) = mA(indexJ, indexI);
+        }
+      }
+
+      if (group.getGradientConstraintMatrices())
+      {
+        group.getGradientConstraintMatrices()->measureConstraintImpulse(
+            constraint, j);
+      }
+    }
+    delete[] impulses;
+
+    assert(isSymmetric(
+        n, mA.data(), mOffset[i], mOffset[i] + constraint->getDimension() - 1));
+
+    constraint->unexcite();
+  }
+
+  assert(isSymmetric(n, mA.data()));
+}
+
+//==============================================================================
 std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group, simulation::World* world)
 {
