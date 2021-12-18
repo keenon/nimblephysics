@@ -148,9 +148,6 @@ protected:
 protected:
   /// Dimension of constraint
   std::size_t mDim;
-
-  /// Constraint impulse to apply
-  s_t* mImpulseToApply;
 };
 
 } // namespace constraint
