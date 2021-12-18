@@ -46,6 +46,5 @@ TEST(LCPSolver, SIMPLE)
   std::shared_ptr<simulation::World> world
       = std::make_shared<simulation::World>();
   auto solver = world->getConstraintSolver();
-  auto inputs = solver->buildLCPInputs();
-  auto impulses = solver->solveLCP(inputs);
+  solver->solveConstrainedGroups(world.get());
 }
