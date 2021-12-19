@@ -33,6 +33,7 @@
 #ifndef DART_CONSTRAINT_BOXEDLCPCONSTRAINTSOLVER_HPP_
 #define DART_CONSTRAINT_BOXEDLCPCONSTRAINTSOLVER_HPP_
 
+#include "dart/constraint/BoxedLcpSolver.hpp"
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/constraint/SmartPointer.hpp"
 
@@ -117,10 +118,11 @@ public:
       ConstrainedGroup& group, simulation::World* world) override;
 
   /// Build the inputs to the LCP from the constraint group.
-  void buildLcpInputs(ConstrainedGroup& group);
+  LcpInputs buildLcpInputs(ConstrainedGroup& group);
 
   /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
-  std::vector<s_t*> solveLcp(ConstrainedGroup& group, simulation::World* world);
+  std::vector<s_t*> solveLcp(
+      LcpInputs lcpInputs, ConstrainedGroup& group, simulation::World* world);
 
 protected:
   /// Boxed LCP solver

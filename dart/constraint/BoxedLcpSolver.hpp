@@ -42,6 +42,36 @@
 namespace dart {
 namespace constraint {
 
+/// LcpInputs
+struct LcpInputs
+{
+  /// J*M^-1*J, which is the transformation from contact space to joint space,
+  /// multiplied by the inverse mass matrix, then transformed back into contact
+  /// space.
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mA;
+
+  /// Impulse
+  Eigen::VectorXs mX;
+
+  /// Bias term
+  Eigen::VectorXs mB;
+
+  /// Slack variable
+  Eigen::VectorXs mW;
+
+  /// Lower bound of x
+  Eigen::VectorXs mLo;
+
+  /// Upper bound of x
+  Eigen::VectorXs mHi;
+
+  /// Friction index
+  Eigen::VectorXi mFIndex;
+
+  /// Offset indices
+  Eigen::VectorXi mOffset;
+};
+
 class BoxedLcpSolver
 {
 public:

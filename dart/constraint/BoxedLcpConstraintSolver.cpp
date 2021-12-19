@@ -187,7 +187,7 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
-void BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
+LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
@@ -335,14 +335,35 @@ void BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
   {
     mX = LCPUtils::guessSolution(mA.block(0, 0, n, n), mB, mHi, mLo, mFIndex);
   }
+
+  LcpInputs lcpInputs;
+  lcpInputs.mA = mA;
+  lcpInputs.mX = mX;
+  lcpInputs.mB = mB;
+  lcpInputs.mW = mW;
+  lcpInputs.mLo = mLo;
+  lcpInputs.mHi = mHi;
+  lcpInputs.mFIndex = mFIndex;
+  lcpInputs.mOffset = mOffset;
+  return lcpInputs;
 }
 
 //==============================================================================
 std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
-    ConstrainedGroup& group, simulation::World* world)
+    LcpInputs lcpInputs, ConstrainedGroup& group, simulation::World* world)
 {
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
+
+  mA = lcpInputs.mA;
+  mX = lcpInputs.mX;
+  mB = lcpInputs.mB;
+  mW = lcpInputs.mW;
+  mLo = lcpInputs.mLo;
+  mHi = lcpInputs.mHi;
+  mFIndex = lcpInputs.mFIndex;
+  mOffset = lcpInputs.mOffset;
+
   // Print LCP formulation
   /*
   dtdbg << "Before solve:" << std::endl;
@@ -771,8 +792,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
 std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group, simulation::World* world)
 {
-  buildLcpInputs(group);
-  return solveLcp(group, world);
+  LcpInputs lcpInputs = buildLcpInputs(group);
+  return solveLcp(lcpInputs, group, world);
 }
 
 //==============================================================================
