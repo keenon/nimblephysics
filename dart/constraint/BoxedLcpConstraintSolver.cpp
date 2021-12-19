@@ -187,7 +187,7 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
-bool BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
+void BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
@@ -200,6 +200,7 @@ bool BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
   mA.setZero(n, nSkip); // rows = n, cols = n + (n % 4)
 #endif
   bool mXResized = mX.size() != n;
+  bool shouldReinitializeMx = mXResized;
   if (mXResized)
   {
     mX.resize(n);
@@ -256,7 +257,7 @@ bool BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
       if (mFIndex[mOffset[i] + j] >= 0)
         mFIndex[mOffset[i] + j] += mOffset[i];
 
-      // Apply impulse for mipulse test
+      // Apply impulse for impulse test
       constraint->applyUnitImpulse(j);
 
       // Fill upper triangle blocks of A matrix
@@ -327,15 +328,18 @@ bool BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
   }
 
   assert(isSymmetric(n, mA.data()));
-  bool shouldReinitializeMx = mXResized;
-  return shouldReinitializeMx;
+
+  // If we just zeroed out the mX vector, let's re-initialize it with a
+  // reasonable guess, since those are often correct.
+  if (shouldReinitializeMx)
+  {
+    mX = LCPUtils::guessSolution(mA.block(0, 0, n, n), mB, mHi, mLo, mFIndex);
+  }
 }
 
 //==============================================================================
 std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
-    ConstrainedGroup& group,
-    simulation::World* world,
-    bool shouldReinitializeMx)
+    ConstrainedGroup& group, simulation::World* world)
 {
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
@@ -393,14 +397,6 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   bool success = false;
   bool shortCircuitLCP = false;
   bool hadToIgnoreFrictionToSolve = false;
-
-  // If we just zeroed out the mX vector, let's re-initialize it with a
-  // reasonable guess, since those are often correct.
-  if (shouldReinitializeMx)
-  {
-    mX = LCPUtils::guessSolution(aGradientBackup, mB, mHi, mLo, mFIndex);
-    mXBackup = mX;
-  }
 
   // Pre-solve, if we're using gradients. We're going to assume that the
   // initialization mX is from last time step, and then guess that nothing has
@@ -775,8 +771,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
 std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group, simulation::World* world)
 {
-  bool shouldReinitializeMx = buildLcpInputs(group);
-  return solveLcp(group, world, shouldReinitializeMx);
+  buildLcpInputs(group);
+  return solveLcp(group, world);
 }
 
 //==============================================================================
