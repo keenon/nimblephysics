@@ -39,20 +39,31 @@
 #include "dart/simulation/World.hpp"
 #include "dart/utils/UniversalLoader.hpp"
 
-#include "TestHelpers.hpp"
+// #include "TestHelpers.hpp"
 
 using namespace dart;
 
 TEST(ConstraintSolver, SIMPLE)
 {
   std::shared_ptr<simulation::World> world
-      = dart::utils::UniversalLoader::loadWorld("dart://sample/skel/cube.skel");
+      = dart::utils::UniversalLoader::loadWorld(
+          "dart://sample/skel/test/colliding_cube.skel");
   auto solver = world->getConstraintSolver();
+  solver->updateConstraints();
+  solver->buildConstrainedGroups();
 
+  std::cout << "number of contacts: "
+            << solver->getLastCollisionResult().getNumContacts() << std::endl;
+  EXPECT_TRUE(solver->getLastCollisionResult().getNumContacts() > 0);
+  std::cout << "number of constrained groups: "
+            << solver->getConstrainedGroups().size() << std::endl;
   for (auto constraintGroup : solver->getConstrainedGroups())
   {
     std::vector<s_t*> impulses
         = solver->solveConstrainedGroup(constraintGroup, world.get());
+    std::cout << "inside constraint group" << std::endl;
+
     solver->applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }
+  std::cout << "rel vel should be >= 0" << std::endl;
 }
