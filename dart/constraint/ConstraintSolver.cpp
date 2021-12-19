@@ -244,6 +244,12 @@ const std::vector<ConstrainedGroup>& ConstraintSolver::getConstrainedGroups()
 }
 
 //==============================================================================
+std::size_t ConstraintSolver::getNumConstrainedGroups() const
+{
+  return mConstrainedGroups.size();
+}
+
+//==============================================================================
 void ConstraintSolver::clearLastCollisionResult()
 {
   mCollisionResult.clear();

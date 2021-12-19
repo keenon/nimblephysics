@@ -204,8 +204,11 @@ public:
   void applyConstraintImpulses(
       std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses);
 
-  /// Get constrained groups
+  /// Get constrained groups.
   const std::vector<ConstrainedGroup>& getConstrainedGroups() const;
+
+  /// Get number of constrained groups.
+  std::size_t getNumConstrainedGroups() const;
 
   /// Sets this constraint solver using other constraint solver. All the
   /// properties and registered skeletons and constraints will be copied over.

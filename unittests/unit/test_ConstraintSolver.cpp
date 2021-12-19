@@ -34,36 +34,51 @@
 
 #include <gtest/gtest.h>
 
-#include "dart/constraint/ConstraintBase.hpp"
+// #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/UniversalLoader.hpp"
-
-// #include "TestHelpers.hpp"
 
 using namespace dart;
 
 TEST(ConstraintSolver, SIMPLE)
 {
+  // Load a world where a cube is colliding with the ground.
   std::shared_ptr<simulation::World> world
       = dart::utils::UniversalLoader::loadWorld(
           "dart://sample/skel/test/colliding_cube.skel");
+  auto skel = world->getSkeleton("box skeleton");
+  auto box = skel->getBodyNode("box");
+
+  // Initially velocity is zero.
+  Eigen::Vector6s dq0 = Eigen::Vector6s::Zero();
+  EXPECT_EQ(box->getRelativeSpatialVelocity(), dq0);
+
+  // Integrate non-constraint forces, velocity should be negative
+  skel->computeForwardDynamics();
+  skel->integrateVelocities(world->getTimeStep());
+  // 0, 0, 0, 0, -0.00981, 0
+  EXPECT_TRUE(box->getRelativeSpatialVelocity()[4] < 0);
+
+  // Collision detection.
   auto solver = world->getConstraintSolver();
   solver->updateConstraints();
   solver->buildConstrainedGroups();
-
-  std::cout << "number of contacts: "
-            << solver->getLastCollisionResult().getNumContacts() << std::endl;
   EXPECT_TRUE(solver->getLastCollisionResult().getNumContacts() > 0);
-  std::cout << "number of constrained groups: "
-            << solver->getConstrainedGroups().size() << std::endl;
+  EXPECT_TRUE(solver->getNumConstrainedGroups() > 0);
+
+  // Solve constraint impulses.
   for (auto constraintGroup : solver->getConstrainedGroups())
   {
     std::vector<s_t*> impulses
         = solver->solveConstrainedGroup(constraintGroup, world.get());
-    std::cout << "inside constraint group" << std::endl;
-
+    EXPECT_TRUE(impulses.size() > 0);
     solver->applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }
-  std::cout << "rel vel should be >= 0" << std::endl;
+
+  // Integrate velocities from solved impulses. Should have non-negative normal
+  // velocity after integration.
+  EXPECT_TRUE(skel->isImpulseApplied());
+  skel->computeImpulseForwardDynamics();
+  EXPECT_TRUE(box->getRelativeSpatialVelocity()[4] >= 0);
 }

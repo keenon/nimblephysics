@@ -37,7 +37,7 @@
         <skeleton name="box skeleton">
             <body name="box">
                 <gravity>1</gravity>
-                <transformation>0 0 0 1 2 3</transformation>
+                <transformation>0 0.08 0 0 0 0</transformation>
                 <inertia>
                     <mass>1</mass>
                     <offset>0 0 0</offset>
