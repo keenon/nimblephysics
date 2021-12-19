@@ -37,16 +37,16 @@
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/simulation/World.hpp"
+#include "dart/utils/UniversalLoader.hpp"
 
 #include "TestHelpers.hpp"
 
 using namespace dart;
-using namespace dart::neural;
 
 TEST(ConstraintSolver, SIMPLE)
 {
   std::shared_ptr<simulation::World> world
-      = std::make_shared<simulation::World>();
+      = dart::utils::UniversalLoader::loadWorld("dart://sample/skel/cube.skel");
   auto solver = world->getConstraintSolver();
 
   for (auto constraintGroup : solver->getConstrainedGroups())
