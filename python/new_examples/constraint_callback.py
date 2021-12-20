@@ -31,10 +31,13 @@ def main():
     state = torch.tensor(world.getState())
     action = torch.zeros((world.getNumDofs()))
     solver = world.getConstraintSolver()
-    callbacks = [None, dummy_callback, lcp_callback, frictionless_lcp_callback]
+    callbacks = [None, dummy_callback, solver.lcpSolveCallback, lcp_callback, frictionless_lcp_callback]
     for callback in callbacks:
         if callback is not None:
             solver.replaceSolveCallback(callback)
+            print(callback.__name__)
+        else:
+            print("None")
         new_state = nimble.timestep(world, state, action)
         print(new_state)
 
