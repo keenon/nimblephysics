@@ -46,6 +46,11 @@ def frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
     world.lcpConstraintEngine(reset)
 
 
+def full_frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
+    lcp_callback(world, reset)
+    frictionless_lcp_callback(world, reset)
+
+
 def main():
     world = nimble.loadWorld("../../data/skel/test/colliding_cube.skel")
     state = torch.tensor(world.getState())
@@ -55,6 +60,14 @@ def main():
     # Try the default arg
     world.integrateVelocitiesFromImpulses()
     callbacks = [None, dummy_callback, world.lcpConstraintEngine, lcp_callback, frictionless_lcp_callback]
+    callbacks = [
+        None, 
+        dummy_callback, 
+        world.lcpConstraintEngine, 
+        lcp_callback,
+        frictionless_lcp_callback, 
+        full_frictionless_lcp_callback,
+    ]
     for callback in callbacks:
         if callback is not None:
             world.replaceConstraintEngine(callback)
