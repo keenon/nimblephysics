@@ -303,6 +303,30 @@ void World::integratePositions(Eigen::VectorXs initialVelocity)
 }
 
 //==============================================================================
+void World::integrateVelocitiesFromImpulses(bool _resetCommand)
+{
+  // Compute velocity changes given constraint impulses
+  for (auto& skel : mSkeletons)
+  {
+    if (!skel->isMobile())
+      continue;
+
+    if (skel->isImpulseApplied())
+    {
+      skel->computeImpulseForwardDynamics();
+      skel->setImpulseApplied(false);
+    }
+
+    if (_resetCommand)
+    {
+      skel->clearInternalForces();
+      skel->clearExternalForces();
+      skel->resetCommands();
+    }
+  }
+}
+
+//==============================================================================
 void World::setTime(s_t _time)
 {
   mTime = _time;
