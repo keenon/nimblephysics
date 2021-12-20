@@ -179,18 +179,10 @@ void SSID::runInference(long startTime)
   {
     mProblem->pinForce(i, forceHistory.col(i));
   }
-  //std::cout<<"ForcePinned"<<std::endl;
-  // We also need to set all the sensor history into metadata
 
-  //Eigen::MatrixXs poseHistory = mSensorLogs[0].getValues(
-  //    startTime - mPlanningHistoryMillis, steps, millisPerStep);
-  //Eigen::MatrixXs velHistory = mSensorLogs[1].getValues(
-  //  startTime - mPlanningHistoryMillis, steps, millisPerStep
-  // );
   Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
   Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
   registerUnlock();
-  //std::cout<<"In SSID Force Hist: \n"<<forceHistory<<"\nPos Hist: \n"<<poseHistory<<"\nVel Hist: \n"<<velHistory<<std::endl;
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", poseHistory);
   mProblem->setMetadata("velocities",velHistory);
@@ -198,9 +190,7 @@ void SSID::runInference(long startTime)
   // TODO: Set initial velocity
   mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
   // Then actually run the optimization
-  //std::cout<<"Ready to Optimize"<<std::endl;
   mSolution = mOptimizer->optimize(mProblem.get());
-  //std::cout<<"Optimization End"<<std::endl;
 
   long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
 
@@ -209,6 +199,7 @@ void SSID::runInference(long startTime)
 
   Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
   Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
+  // Here the masses should be the concatenation of all registered mass nodes
   Eigen::VectorXs mass = mWorld->getMasses();
 
   for (auto listener : mInferListeners)

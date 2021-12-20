@@ -140,13 +140,9 @@ public:
 
   bool variableChange();
 
-  void setMasschange(s_t mass);
+  void setParameterChange(Eigen::VectorXs params);
 
-  void setCOMchange(Eigen::Vector3s com);
-
-  void setMOIchange(Eigen::Vector6s moi);
-
-  void setMUchange(s_t mu);
+  void setReOptThreshold(s_t thresh);
 
 protected:
   /// This is the function for the optimization thread to run when we're live
@@ -172,10 +168,11 @@ protected:
   RealTimeControlBuffer mBuffer;
   std::thread mOptimizationThread;
   bool mSilent;
-  s_t pre_mass;
-  s_t pre_mu;
-  Eigen::Vector3s pre_com;
-  Eigen::Vector6s pre_moi;
+  // The shape of mass should be equal to number of body nodes that registered
+  Eigen::VectorXs mPre_parameter;
+  bool mInitialized = false;
+  s_t mReOpt_thresh;
+
   bool mVarchange = true;
 
   std::shared_ptr<trajectory::Optimizer> mOptimizer;

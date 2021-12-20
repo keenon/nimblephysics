@@ -46,6 +46,8 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedForce(long time, bool dontLog)
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
+    // Which means 
+    std::cout << "Ask for force time in the past" << std::endl;
     return Eigen::VectorXs::Zero(mForceDim);
   }
 
@@ -94,6 +96,7 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedk(long time, bool dontLog)
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
+    std::cout << "Ask for k time in the past" << std::endl;
     return Eigen::VectorXs::Zero(mForceDim);
   }
 
@@ -138,7 +141,7 @@ Eigen::VectorXs RealTimeControlBuffer::getPlannedState(long time, bool dontLog)
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
-    std::cout << "Ask for time in the past" << std::endl;
+    std::cout << "Ask for state time in the past" << std::endl;
     return Eigen::VectorXs::Zero(mStateDim);
   }
 
@@ -181,6 +184,7 @@ s_t RealTimeControlBuffer::getPlannedAlpha(long time, bool dontLog)
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
+    std::cout << "Ask for alpha time in the past" << std::endl;
     return 0.0;
   }
 
@@ -224,6 +228,7 @@ Eigen::MatrixXs RealTimeControlBuffer::getPlannedK(long time, bool dontLog)
   if (elapsed < 0)
   {
     // Asking for some time in the past, default to no force
+    std::cout << "Ask for K time in the past" <<std::endl;
     return Eigen::MatrixXs::Zero(mForceDim, mStateDim);
   }
 
@@ -904,6 +909,9 @@ void RealTimeControlBuffer::estimateWorldStateAt(
       }
       else
       {
+        // TODO: Eric This may be quite problematic since it report that we require time from past..
+        // Which means the 'at' time is before the last time the control force was written to the buffer
+        
         Eigen::VectorXs action = getPlannedForce(at, true);
         Eigen::VectorXs k = getPlannedk(at);
         Eigen::VectorXs x = getPlannedState(at);

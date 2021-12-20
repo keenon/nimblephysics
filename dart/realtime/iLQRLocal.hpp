@@ -225,13 +225,7 @@ public:
 
   bool variableChange();
 
-  void setMasschange(s_t mass);
-
-  void setCOMchange(Eigen::Vector3s com);
-
-  void setMOIchange(Eigen::Vector6s moi);
-
-  void setMUchange(s_t mu);
+  void setParameterChange(Eigen::VectorXs params);
 
   void start() override;
 
@@ -312,10 +306,8 @@ protected:
     std::thread mOptimizationThread;
     bool mSilent;
     // Some history track for compare and set in SSID
-    s_t pre_mass;
-    s_t pre_mu;
-    Eigen::Vector3s pre_com;
-    Eigen::Vector6s pre_moi;
+    Eigen::VectorXs mPre_parameter;
+    bool mInitialized = false;
     bool mVarchange = false;
 
     Eigen::VectorXs mLast_U;

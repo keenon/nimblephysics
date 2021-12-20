@@ -10,6 +10,8 @@
 
 
 #include <gtest/gtest.h>
+#include <random>
+#include <cmath>
 
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/realtime/MPC.hpp"
@@ -26,7 +28,6 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-//#define iLQR_TEST
 #define iLQR_MPC_TEST
 
 using namespace dart;
@@ -38,253 +39,294 @@ using namespace realtime;
 using namespace trajectory;
 using namespace server;
 
-#ifdef iLQR_TEST
-TEST(REALTIME, CARTPOLE_ILQR)
+std::shared_ptr<LossFn> getSSIDPosLoss()
 {
-  // Create the world
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0.0, -9.81, 0.0));
-  SkeletonPtr cartpole = Skeleton::create("cartpole");
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+    int steps = rollout->getPosesConst().cols();
 
-  std::pair<PrismaticJoint*, BodyNode*> sledPair
-      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
-  std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3s(0.5, 0.1, 0.1)));
-  ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
-  sledShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
 
-  std::pair<RevoluteJoint*, BodyNode*> armPair
-      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
-  std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3s(0.1, 1.0, 0.1)));
-  ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
-  armShape->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
+    //std::cout << "Pos In Buffer: " << std::endl << sensorPositions << std::endl;
+    //std::cout << "Pos In Traj  : " << std::endl << rollout->getPosesConst() << std::endl;
 
-  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
-  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
-  armPair.first->setTransformFromChildBodyNode(armOffset);
-
-  world->addSkeleton(cartpole);
-
-  cartpole->setControlForceUpperLimit(0, 20);
-  cartpole->setControlForceLowerLimit(0, -20);
-  cartpole->setVelocityUpperLimit(0, 1000);
-  cartpole->setVelocityLowerLimit(0, -1000);
-  cartpole->setPositionUpperLimit(0, 10);
-  cartpole->setPositionLowerLimit(0, -10);
-  // The second DOF cannot be controlled
-  cartpole->setControlForceUpperLimit(1, 0);
-  cartpole->setControlForceLowerLimit(1, 0);
-  cartpole->setVelocityUpperLimit(1, 1000);
-  cartpole->setVelocityLowerLimit(1, -1000);
-  cartpole->setPositionUpperLimit(1, 10);
-  cartpole->setPositionLowerLimit(1, -10);
-
-  cartpole->setPosition(0, 1.0);
-  cartpole->setPosition(1, 3.1415);
-
-  world->setTimeStep(1.0 / 100);
-
-  // Create iLQR instance
-  int steps = 400;
-  int millisPerTimestep = world->getTimeStep() * 1000;
-  int planningHorizonMillis = steps * millisPerTimestep;
-
-  world->removeDofFromActionSpace(1);
-  // Create Goal
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
-  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Zero(1);
-  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * 2);
-  finalStateWeight(0) = 10.0;
-  finalStateWeight(1) = 50.0;
-  finalStateWeight(2) = 10.0;
-  finalStateWeight(3) = 10.0;
-  runningActionWeight(0) = 0.01;
-
-  std::shared_ptr<TargetReachingCost> costFn
-    = std::make_shared<TargetReachingCost>(runningStateWeight,
-                                           runningActionWeight, 
-                                           finalStateWeight,
-                                           world);
-  costFn->setTimeStep(world->getTimeStep());
-  Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
-  goal(0) = 0.5;
-  costFn->setTarget(goal);
-  std::cout << "Before MPC Local Initialization" << std::endl;
-  std::cout << "Planning Millis: " << planningHorizonMillis << std::endl;
-  iLQRLocal ilqr = iLQRLocal(
-    world, costFn, 1, planningHorizonMillis, 1.0);
-
-  Eigen::VectorXs init_state = world->getState();
-
-  std::cout << "mpcLocal Created Successfully" << std::endl;
-  int maxIter = 10;
-  ilqr.setSilent(true);
-  ilqr.setMaxIterations(maxIter);
-  ilqr.setAlpha(0.5);
-  ilqr.setPatience(1);
-  ilqr.setActionBound(100.0);
-  // Create Server for rendering
-  GUIWebsocketServer server;
-  server.serve(8070);
-  // Initialize a fresh rollout for loss computation
-  TrajectoryRolloutReal rollout = ilqr.createRollout(steps, world->getNumDofs(), world->getMassDims());
-
-  // Define a lambda function for simulate traj
-  auto simulate_traj = [&](std::vector<Eigen::VectorXs> X, std::vector<Eigen::VectorXs> U, bool render)
-  {
-    world->setState(init_state);
-    if(render)
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
     {
-      server.renderWorld(world);
-      for(int i = 0; i < steps-1; i++)
-      {
-        rollout.getPoses().col(i) = world->getPositions();
-        rollout.getVels().col(i) = world->getVelocities();
-        rollout.getControlForces().col(i) = world->mapToForceSpaceVector(U[i]);
-        world->setAction(U[i]);
-        world->step();
-        X[i+1] = world->getState();
-        server.renderWorld(world);
-        usleep(10000);
-      }
-      rollout.getPoses().col(steps-1) = world->getPositions();
-      rollout.getVels().col(steps-1) = world->getVelocities();
-      s_t loss = costFn->computeLoss(&rollout);
-      return loss;
+      sum += posError.col(i).squaredNorm();
     }
-    else
-    {
-      for(int i = 0; i < steps-1; i++)
-      {
-        rollout.getPoses().col(i) = world->getPositions();
-        rollout.getVels().col(i) = world->getVelocities();
-        rollout.getControlForces().col(i) = world->mapToForceSpaceVector(U[i]);
-        world->setAction(U[i]);
-        world->step();
-        X[i+1] = world->getState();
-      }
-      rollout.getPoses().col(steps-1) = world->getPositions();
-      rollout.getVels().col(steps-1) = world->getVelocities();
-      s_t loss = costFn->computeLoss(&rollout);
-      return loss;
-    }
+    return sum;
   };
-  // Instead of starting a single thread, iLQR Trajectory optimization from starting state
-  s_t init_cost = simulate_traj(ilqr.getStatesFromiLQRBuffer(), ilqr.getActionsFromiLQRBuffer(), false);
-  std::cout << "Initial Cost: " << init_cost << std::endl;
-  ilqr.setCurrentCost(init_cost);
-  s_t prev_cost = 1e10;
-  s_t threshold = 0.01;
-  
-  // Print out current parameters settings
-  std::cout << "Alpha: " << ilqr.getAlpha() << "\n"
-            << "MU: " << ilqr.getMU() << std::endl;
-  
-  int iter = 0;
-  while(iter < maxIter)
-  {
-    // Set the world to initial state
-    world->setState(init_state);
-    
-    bool forwardFlag = ilqr.ilqrForward(world);
-    bool backwardFlag = false;
-    if(!forwardFlag)
-    {
-      std::cout << "Optimization Terminated, Exiting ..." <<std::endl;
-      break;
-    }
-    else
-    {
-      backwardFlag = ilqr.ilqrBackward();
-    }
-    std::cout << "Iteration: " << iter+1 << " Cost: " << ilqr.getCurrentCost() << std::endl;
-    if(!backwardFlag)
-    {
-      std::cout << "Backward Terminated, Exiting ..." << std::endl;
-      break; 
-    }
-    if(abs(prev_cost-ilqr.getCurrentCost()) < threshold)
-    {
-      std::cout << "Optimization Converged, Existing ..." << std::endl;
-      break;
-    }
-    prev_cost = ilqr.getCurrentCost();
-    iter++;
-  }
 
-  // Demonstrate the performance
-  s_t final_cost = 0;
-  for(int i = 0; i < 5; i++)
-  {
-    final_cost = simulate_traj(ilqr.getStatesFromiLQRBuffer(), ilqr.getActionsFromiLQRBuffer(), true);
-  }
-  std::cout << "Final Cost: " << final_cost << std::endl;
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getControlForces().setZero();
+    int steps = rollout->getPosesConst().cols();
+
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
+
+    gradWrtRollout->getPoses() = 2 * posError;
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += posError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  return std::make_shared<LossFn>(loss, lossGrad);
 }
-#endif
 
-#ifdef iLQR_MPC_TEST
-TEST(REALTIME, CARTPOLE_MPC)
+std::shared_ptr<LossFn> getSSIDVelPosLoss()
+{
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+    int steps = rollout->getPosesConst().cols();
+
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    // std::cout << "Pos Error: " << std::endl << posError << std::endl;
+
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += posError.col(i).squaredNorm();
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getControlForces().setZero();
+    int steps = rollout->getPosesConst().cols();
+
+    Eigen::MatrixXs rawPos = rollout->getMetadata("sensors");
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorPositions = rawPos.block(0,1,rawPos.rows(),rawPos.cols()-1);
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+
+    Eigen::MatrixXs posError = rollout->getPosesConst() - sensorPositions;
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    gradWrtRollout->getPoses() = 2 * posError;
+    gradWrtRollout->getVels() = 2 * velError;
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += posError.col(i).squaredNorm();
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  return std::make_shared<LossFn>(loss, lossGrad);
+}
+
+std::shared_ptr<LossFn> getSSIDVelLoss()
+{
+  TrajectoryLossFn loss = [](const TrajectoryRollout* rollout) {
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+    int steps = rollout->getVelsConst().cols();
+
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    // std::cout << "Pos Error: " << std::endl << posError << std::endl;
+
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  TrajectoryLossFnAndGrad lossGrad = [](const TrajectoryRollout* rollout,
+                                        TrajectoryRollout* gradWrtRollout // OUT
+                                     ) {
+    gradWrtRollout->getPoses().setZero();
+    gradWrtRollout->getVels().setZero();
+    gradWrtRollout->getControlForces().setZero();
+    int steps = rollout->getVelsConst().cols();
+
+    Eigen::MatrixXs rawVel = rollout->getMetadata("velocities");
+    Eigen::MatrixXs sensorVelocities = rawVel.block(0,1,rawVel.rows(),rawVel.cols()-1);
+
+    Eigen::MatrixXs velError = rollout->getVelsConst() - sensorVelocities;
+
+    gradWrtRollout->getVels() = 2 * velError;
+    s_t sum = 0.0;
+    for (int i = 0; i < steps; i++)
+    {
+      sum += velError.col(i).squaredNorm();
+    }
+    return sum;
+  };
+
+  return std::make_shared<LossFn>(loss, lossGrad);
+}
+
+
+WorldPtr createWorld(s_t timestep)
 {
   WorldPtr world = World::create();
   world->setGravity(Eigen::Vector3s(0, -9.81, 0));
-
-  // Create World of cartpole
   SkeletonPtr cartpole = Skeleton::create("cartpole");
-
+  // Create Cart
   std::pair<PrismaticJoint*, BodyNode*> sledPair
-      = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+    = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
   sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
   std::shared_ptr<BoxShape> sledShapeBox(
       new BoxShape(Eigen::Vector3s(0.5, 0.1, 0.1)));
   ShapeNode* sledShape
-      = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
+    = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
   sledShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
-
+  
+  // Create Pole
   std::pair<RevoluteJoint*, BodyNode*> armPair
-      = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
+    = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
   armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
   std::shared_ptr<BoxShape> armShapeBox(
       new BoxShape(Eigen::Vector3s(0.1, 1.0, 0.1)));
   ShapeNode* armShape
-      = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
+    = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
   armShape->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
-
   Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
   armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
   armPair.first->setTransformFromChildBodyNode(armOffset);
 
   world->addSkeleton(cartpole);
-
   cartpole->setControlForceUpperLimit(0, 15);
   cartpole->setControlForceLowerLimit(0, -15);
+  cartpole->setControlForceUpperLimit(1, 0);
+  cartpole->setControlForceLowerLimit(1, 0);
   cartpole->setVelocityUpperLimit(0, 1000);
   cartpole->setVelocityLowerLimit(0, -1000);
   cartpole->setPositionUpperLimit(0, 10);
   cartpole->setPositionLowerLimit(0, -10);
-  // The second DOF cannot be controlled
-  cartpole->setControlForceUpperLimit(1, 0);
-  cartpole->setControlForceLowerLimit(1, 0);
-  cartpole->setVelocityUpperLimit(1, 1000);
-  cartpole->setVelocityLowerLimit(1, -1000);
-  cartpole->setPositionUpperLimit(1, 10);
-  cartpole->setPositionLowerLimit(1, -10);
-
   cartpole->setPosition(0, 0);
   cartpole->setPosition(1, 3.1415);
-  cartpole->computeForwardDynamics();
-  cartpole->integrateVelocities(world->getTimeStep());
+  world->setTimeStep(timestep);
+  
+  return world;
+}
 
-  world->setTimeStep(1.0 / 100);
+std::mt19937 initializeRandom()
+{
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  return gen;
+}
 
+Eigen::VectorXs rand_normal(size_t length, s_t mean, s_t stddev, std::mt19937 random_gen)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(length);
+  std::normal_distribution<> dist{mean, stddev};
+  
+  for(int i = 0; i < length; i++)
+  {
+    result(i) += (s_t)(dist(random_gen));
+  }
+  return result;
+}
+
+void recordObs(size_t now, SSID* ssid, WorldPtr realtimeWorld)
+{
+  ssid->registerLock();
+  ssid->registerControls(now, realtimeWorld->getControlForces());
+  ssid->registerSensors(now, realtimeWorld->getPositions(),0);
+  ssid->registerSensors(now, realtimeWorld->getVelocities(),1);
+  ssid->registerUnlock();
+}
+
+void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t noise_scale, std::mt19937 random_gen)
+{
+  ssid->registerLock();
+  Eigen::VectorXs control_force = realtimeWorld->getControlForces();
+  Eigen::VectorXs force_eps = rand_normal(control_force.size(), 0, noise_scale, random_gen);
+  ssid->registerControls(now, control_force + force_eps);
+
+  Eigen::VectorXs position = realtimeWorld->getPositions();
+  Eigen::VectorXs position_eps = rand_normal(position.size(), 0, noise_scale, random_gen);
+  ssid->registerSensors(now, position + position_eps, 0);
+
+  Eigen::VectorXs velocity = realtimeWorld->getVelocities();
+  Eigen::VectorXs velocity_eps = rand_normal(velocity.size(), 0, noise_scale, random_gen);
+  ssid->registerSensors(now, velocity + velocity_eps, 1);
+  ssid->registerUnlock();
+}
+
+#ifdef iLQR_MPC_TEST
+TEST(REALTIME, CARTPOLE_MPC_MASS)
+{
+  WorldPtr world = createWorld(1.0 / 100);
+
+  // Initialize Hyper Parameters
   int steps = 200;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = steps * millisPerTimestep;
 
+  // For SSID
+  s_t scale = 1.0;
+  size_t ssid_index = 0;
+  size_t ssid_index2 = 1;
+  int inferenceSteps = 5;
+  int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
+
+  std::shared_ptr<simulation::World> ssidWorld = world->clone();
+  ssidWorld->tuneMass(
+    world->getBodyNodeIndex(ssid_index),
+    WrtMassBodyNodeEntryType::INERTIA_MASS,
+    Eigen::VectorXs::Ones(1) * 5.0,
+    Eigen::VectorXs::Ones(1) * 0.2);
+
+  ssidWorld->tuneMass(
+    world->getBodyNodeIndex(ssid_index2),
+    WrtMassBodyNodeEntryType::INERTIA_MASS,
+    Eigen::VectorXs::Ones(1) * 5.0,
+    Eigen::VectorXs::Ones(1) * 0.2);
+
+  Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
+
+  SSID ssid = SSID(ssidWorld,
+                   getSSIDPosLoss(),
+                   inferenceHistoryMillis,
+                   sensorDims,
+                   inferenceSteps,
+                   scale);
+  std::mutex lock;
+  ssid.attachMutex(lock);
+  ssid.attachMutex(lock);
+
+  ssid.setInitialPosEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    });
+
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    });
+
+  world->clearTunableMassThisInstance();
   world->removeDofFromActionSpace(1);
   // Create Goal
   Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
@@ -319,6 +361,31 @@ TEST(REALTIME, CARTPOLE_MPC)
   mpcLocal.setActionBound(20.0);
   mpcLocal.setAlpha(1);
 
+  bool init_flag = true;
+
+  ssid.registerInferListener([&](long,
+                                 Eigen::VectorXs,
+                                 Eigen::VectorXs,
+                                 Eigen::VectorXs mass,
+                                 long){
+    // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
+    mpcLocal.setParameterChange(mass);
+    if(!init_flag)
+    {
+      s_t old_mass = world->getLinkMassIndex(ssid_index);
+      world->setLinkMassIndex(0.9 * old_mass + 0.1 * mass(0), ssid_index);
+      s_t old_mass2 = world->getLinkMassIndex(ssid_index2);
+      world->setLinkMassIndex(0.9 * old_mass2 + 0.1 * mass(1), ssid_index2);
+    }
+    else
+    {
+      world->setLinkMassIndex(mass(0), ssid_index);
+      world->setLinkMassIndex(mass(1), ssid_index2);
+      init_flag = false;
+    }
+  });
+
+
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
   GUIWebsocketServer server;
 
@@ -332,8 +399,10 @@ TEST(REALTIME, CARTPOLE_MPC)
     costFn->setTarget(goal);
     server.setObjectPosition("goal", dragTo);
   });
-  std::cout << "Reach Here Before Ticker" << std::endl;
-  Ticker ticker = Ticker(1*realtimeUnderlyingWorld->getTimeStep());
+
+  std::string key = "mass";
+
+  Ticker ticker = Ticker(scale * realtimeUnderlyingWorld->getTimeStep());
 
   auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
                             ->getBodyNodes()[0]
@@ -341,6 +410,17 @@ TEST(REALTIME, CARTPOLE_MPC)
                             ->getVisualAspect();
   Eigen::Vector3s originalColor = sledBodyVisual->getColor();
   long total_steps = 0;
+
+  Eigen::Vector2s masses(2.0, 1.5);
+  Eigen::Vector2s id_masses(1.0, 1.0);
+
+  realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
+  realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+  ssidWorld->setLinkMassIndex(id_masses(0), ssid_index);
+  ssidWorld->setLinkMassIndex(id_masses(1), ssid_index2);
+  world->setLinkMassIndex(id_masses(0), ssid_index);
+  world->setLinkMassIndex(id_masses(1), ssid_index2);
+
   ticker.registerTickListener([&](long now) {
     // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
     Eigen::VectorXs mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
@@ -370,7 +450,26 @@ TEST(REALTIME, CARTPOLE_MPC)
     {
       sledBodyVisual->setColor(originalColor);
     }
+    if (server.getKeysDown().count(","))
+    {
+      // Increase mass
+      masses(0) = 3.0;
+      masses(1) = 2.5;
+      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
+      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+    }
+    else if (server.getKeysDown().count("o"))
+    {
+      // Decrease mass
+      masses(0) = 1.0;
+      masses(1) = 0.5;
+      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
+      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+    }
+    recordObs(now, &ssid, realtimeUnderlyingWorld);
     realtimeUnderlyingWorld->step();
+    id_masses(0) = world->getLinkMassIndex(ssid_index);
+    id_masses(1) = world->getLinkMassIndex(ssid_index2);
     mpcLocal.recordGroundTruthState(
         now,
         realtimeUnderlyingWorld->getPositions(),
@@ -380,6 +479,10 @@ TEST(REALTIME, CARTPOLE_MPC)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
+      server.createText(key,
+                        "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1)),
+                        Eigen::Vector2i(100,100),
+                        Eigen::Vector2i(200,200));
       total_steps = 0;
     }
     total_steps ++;
@@ -397,6 +500,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   server.registerConnectionListener([&](){
     ticker.start();
     // mpcLocal.start();
+    ssid.start();
     mpcLocal.setPredictUsingFeedback(true);
     mpcLocal.ilqrstart();
   });

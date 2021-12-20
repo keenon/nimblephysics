@@ -200,7 +200,7 @@ void MPCLocal::optimizePlan(long startTime)
 
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
-    std::cout<<"Optimization Stage"<<std::endl;
+    //std::cout<<"Optimization Stage"<<std::endl;
     if (!mOptimizer)
     {
       PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
@@ -254,7 +254,7 @@ void MPCLocal::optimizePlan(long startTime)
   else
   {
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
-    std::cout<<"Re-optimization stage "<<startTime<<std::endl;
+    //std::cout<<"Re-optimization stage "<<startTime<<std::endl;
     int diff = startTime - mLastOptimizedTime;
     int steps
         = static_cast<int>(floor(static_cast<s_t>(diff) / mMillisPerStep));
@@ -517,40 +517,28 @@ bool MPCLocal::variableChange()
   return mVarchange;
 }
 
-void MPCLocal::setMasschange(s_t mass)
+void MPCLocal::setParameterChange(Eigen::VectorXs params)
 {
-  if(abs(mass-pre_mass)>0.001)
+  if(mInitialized == false)
   {
+    mPre_parameter = params;
+    mInitialized = true;
     mVarchange = true;
   }
-  pre_mass = mass;
+  else
+  {
+    assert(params.size() == pre_parameter.size());
+    if((params-mPre_parameter).norm()>0.001)
+    {
+      mVarchange = true;
+    }
+    mPre_parameter = params;
+  }
 }
 
-void MPCLocal::setCOMchange(Eigen::Vector3s com)
+void MPCLocal::setReOptThreshold(s_t thresh)
 {
-  if((com-pre_com).norm()>0.001)
-  {
-    mVarchange = true;
-  }
-  pre_com = com;
-}
-
-void MPCLocal::setMOIchange(Eigen::Vector6s moi)
-{
-  if((moi - pre_moi).norm() > 0.001)
-  {
-    mVarchange = true;
-  }
-  pre_moi = moi;
-}
-
-void MPCLocal::setMUchange(s_t mu)
-{
-  if(abs(mu-pre_mu) > 0.001)
-  {
-    mVarchange = true;
-  }
-  pre_mu = mu;
+  mReOpt_thresh = thresh;
 }
 
 } // namespace realtime

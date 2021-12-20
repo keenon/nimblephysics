@@ -1226,7 +1226,7 @@ void iLQRLocal::optimizationThreadLoop()
     long startTime = timeSinceEpochMillis();
     optimizePlan(startTime + mMillisInAdvanceToPlan);
     long endTime = timeSinceEpochMillis();
-    std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
+    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
     adjustPerformance(endTime - startTime);
   }
 }
@@ -1254,7 +1254,7 @@ void iLQRLocal::iLQRoptimizationThreadLoop()
       // break;
     }
     long endTime = timeSinceEpochMillis();
-    std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
+    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
     adjustPerformance(endTime - startTime);
   }
 }
@@ -1264,40 +1264,23 @@ bool iLQRLocal::variableChange()
   return mVarchange;
 }
 
-void iLQRLocal::setMasschange(s_t mass)
+void iLQRLocal::setParameterChange(Eigen::VectorXs params)
 {
-  if(abs(mass-pre_mass)>0.001)
+  if(mInitialized == false)
   {
+    mPre_parameter = params;
+    mInitialized = true;
     mVarchange = true;
   }
-  pre_mass = mass;
-}
-
-void iLQRLocal::setCOMchange(Eigen::Vector3s com)
-{
-  if((com-pre_com).norm()>0.001)
+  else
   {
-    mVarchange = true;
+    assert(params.size() == pre_parameter.size());
+    if((params-mPre_parameter).norm()>0.001)
+    {
+      mVarchange = true;
+    }
+    mPre_parameter = params;
   }
-  pre_com = com;
-}
-
-void iLQRLocal::setMOIchange(Eigen::Vector6s moi)
-{
-  if((moi - pre_moi).norm()>0.001)
-  {
-    mVarchange = true;
-  }
-  pre_moi = moi;
-}
-
-void iLQRLocal::setMUchange(s_t mu)
-{
-  if(abs(mu-pre_mu) > 0.001)
-  {
-    mVarchange = true;
-  }
-  pre_mu = mu;
 }
 
 } // namespace realtime
