@@ -327,6 +327,35 @@ void World::integrateVelocitiesFromImpulses(bool _resetCommand)
 }
 
 //==============================================================================
+void World::integratePositions(Eigen::VectorXs initialVelocity)
+{
+  int cursor = 0;
+  for (auto& skel : mSkeletons)
+  {
+    if (mParallelVelocityAndPositionUpdates)
+    {
+      // <Nimble>: This is an easier way to compute gradients for. We update
+      // p_t+1 using v_t, instead of v_t+1
+      int dofs = skel->getNumDofs();
+      skel->setPositions(skel->integratePositionsExplicit(
+          skel->getPositions(),
+          initialVelocity.segment(cursor, dofs),
+          mTimeStep));
+      cursor += dofs;
+      // </Nimble>: Integrate positions before velocity changes, instead of
+      // after
+    }
+    else
+    {
+      // <Nimble>: This is the original way integration happened, right after
+      // velocity updates
+      skel->integratePositions(mTimeStep);
+      // </Nimble>
+    }
+  }
+}
+
+//==============================================================================
 void World::setTime(s_t _time)
 {
   mTime = _time;
