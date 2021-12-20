@@ -244,6 +244,12 @@ const std::vector<ConstrainedGroup>& ConstraintSolver::getConstrainedGroups()
 }
 
 //==============================================================================
+std::size_t ConstraintSolver::getNumConstrainedGroups() const
+{
+  return mConstrainedGroups.size();
+}
+
+//==============================================================================
 void ConstraintSolver::clearLastCollisionResult()
 {
   mCollisionResult.clear();
@@ -761,7 +767,23 @@ void ConstraintSolver::buildConstrainedGroups()
 void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
 {
   for (auto& constraintGroup : mConstrainedGroups)
-    solveConstrainedGroup(constraintGroup, world);
+  {
+    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup, world);
+    applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
+  }
+}
+
+//==============================================================================
+void ConstraintSolver::applyConstraintImpulses(
+    std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses)
+{
+  const std::size_t numConstraints = constraints.size();
+  for (std::size_t i = 0; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = constraints[i];
+    constraint->applyImpulse(impulses[i]);
+    constraint->excite();
+  }
 }
 
 //==============================================================================

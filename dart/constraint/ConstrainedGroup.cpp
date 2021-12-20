@@ -72,6 +72,12 @@ std::size_t ConstrainedGroup::getNumConstraints() const
 }
 
 //==============================================================================
+std::vector<ConstraintBasePtr> ConstrainedGroup::getConstraints()
+{
+  return mConstraints;
+}
+
+//==============================================================================
 ConstraintBasePtr ConstrainedGroup::getConstraint(std::size_t _index)
 {
   assert(_index < mConstraints.size());

@@ -187,16 +187,21 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
-void BoxedLcpConstraintSolver::solveConstrainedGroup(
+std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group, simulation::World* world)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
 
-  // If there is no constraint, then just return.
+  // Initialize the vector of constraint impulses we will eventually return.
+  // Each ith element of the vector will contain a pointer to the constraint
+  // impulse to be applied for the ith constraint.
+  std::vector<s_t*> constraintImpulses;
+
+  // If there are no constraints, then just return the empty vector of impulses.
   if (0u == n)
-    return;
+    return constraintImpulses;
 
   const int nSkip = dPAD(n); // nSkip = n + (n % 4);
 #ifdef NDEBUG                // release
@@ -712,7 +717,9 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     }
   }
 
-  // Apply constraint impulses
+  // Collect the final solved constraint impulses to apply per constraint.
+  // TODO(mguo): Make impulse magnitudes all have 3 elements regardless of
+  // whether friction exists or not.
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
     const ConstraintBasePtr& constraint = group.getConstraint(i);
@@ -726,6 +733,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->lcpResult
           = mX(mOffset[i]);
+      // Similar to storing lcpResult, we're storing a bunch of other useful
+      // contact information users may want related to each contact.
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->spatialNormalA
           = contactConstraint->getSpatialNormalA();
@@ -751,9 +760,9 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
             = D.col(1);
       }
     }
-    constraint->applyImpulse(mX.data() + mOffset[i]);
-    constraint->excite();
+    constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
+  return constraintImpulses;
 }
 
 //==============================================================================
