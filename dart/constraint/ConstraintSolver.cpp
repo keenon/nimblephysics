@@ -378,6 +378,12 @@ void ConstraintSolver::solve(simulation::World* world)
 }
 
 //==============================================================================
+void ConstraintSolver::replaceSolveCallback(const solveCallback& f)
+{
+  mSolveCallback = f;
+}
+
+//==============================================================================
 void ConstraintSolver::lcpSolveCallback(simulation::World* world)
 {
   for (auto& skeleton : mSkeletons)

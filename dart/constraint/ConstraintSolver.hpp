@@ -62,6 +62,8 @@ namespace constraint {
 class ConstraintSolver
 {
 public:
+  using solveCallback = std::function<void(simulation::World* world)>;
+
   /// Constructor
   ///
   /// \deprecated Deprecated in DART 6.8. Please use other constructors that
@@ -188,6 +190,9 @@ public:
 
   /// Solve callback function that uses LCP.
   void lcpSolveCallback(simulation::World* world);
+
+  /// Replace the default solve callback function.
+  void replaceSolveCallback(const solveCallback& f);
 
   /// Update constraints
   void updateConstraints();
@@ -322,8 +327,6 @@ protected:
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
   s_t mContactClippingDepth;
-
-  using solveCallback = std::function<void(simulation::World* world)>;
 
   /// Solve constraints callback function.
   solveCallback mSolveCallback;

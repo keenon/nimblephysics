@@ -200,7 +200,16 @@ void ConstraintSolver(py::module& m)
       .def(
           "solve",
           +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) { self->solve(world); });
+              dart::simulation::World* world) { self->solve(world); })
+      .def(
+          "lcpSolveCallback",
+          +[](dart::constraint::ConstraintSolver* self,
+              dart::simulation::World* world) {
+            self->lcpSolveCallback(world);
+          })
+      .def(
+          "replaceSolveCallback",
+          &dart::constraint::ConstraintSolver::replaceSolveCallback);
 }
 
 } // namespace python
