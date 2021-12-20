@@ -186,6 +186,9 @@ public:
   /// Solve constraint impulses and apply them to the skeletons
   void solve(simulation::World* world);
 
+  /// Solve callback function that uses LCP.
+  void lcpSolveCallback(simulation::World* world);
+
   /// Update constraints
   void updateConstraints();
 
@@ -319,6 +322,11 @@ protected:
   /// This is a simple solution to avoid extremely nasty situations with
   /// impossibly deep inter-penetration during multiple shooting optimization.
   s_t mContactClippingDepth;
+
+  using solveCallback = std::function<void(simulation::World* world)>;
+
+  /// Solve constraints callback function.
+  solveCallback mSolveCallback;
 };
 
 } // namespace constraint

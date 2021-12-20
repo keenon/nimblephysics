@@ -87,7 +87,9 @@ ConstraintSolver::ConstraintSolver()
         false), // Default to no penetration correction, because it breaks our
                 // gradients
     mContactClippingDepth(
-        0.03) // Default to clipping only after fairly deep penetration
+        0.03), // Default to clipping only after fairly deep penetration
+    mSolveCallback(
+        [this](simulation::World* world) { return lcpSolveCallback(world); })
 {
 }
 
@@ -371,6 +373,12 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 
 //==============================================================================
 void ConstraintSolver::solve(simulation::World* world)
+{
+  mSolveCallback(world);
+}
+
+//==============================================================================
+void ConstraintSolver::lcpSolveCallback(simulation::World* world)
 {
   for (auto& skeleton : mSkeletons)
   {
