@@ -170,6 +170,17 @@ void World(py::module& m)
           },
           ::py::arg("index"))
       .def(
+          "getNumBodyNodes",
+          +[](dart::simulation::World* self) -> std::size_t {
+            return self->getNumBodyNodes();
+          })
+      .def(
+          "getBodyNodeIndex",
+          +[](dart::simulation::World* self,
+              std::size_t _index) -> dart::dynamics::BodyNode* {
+            return self->getBodyNodeIndex(_index);
+          })
+      .def(
           "getSimpleFrame",
           +[](const dart::simulation::World* self,
               std::size_t _index) -> dart::dynamics::SimpleFramePtr {

@@ -16,15 +16,15 @@ def frictionless_lcp_callback(world: nimble.simulation.World):
     for i in range(world.getNumBodyNodes()):
         body = world.getBodyNodeIndex(i)
         bodies.append(body)
-        friction_coefs.append(body.getFrictionCoef())
-        body.setFrictionCoef(0.0)
-        
+        friction_coefs.append(body.getFrictionCoeff())
+        body.setFrictionCoeff(0.0)
+
     # Frictionless LCP
     lcp_callback(world)
 
     # Restore friction.
     for friction_coef, body in zip(friction_coefs, bodies):
-        body.setFrictionCoef(friction_coef)
+        body.setFrictionCoeff(friction_coef)
 
 def main():
     world = nimble.loadWorld("../../data/skel/test/colliding_cube.skel")
