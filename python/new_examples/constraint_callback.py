@@ -6,11 +6,8 @@ import torch
 def dummy_callback():
     pass
 
-<<<<<<< HEAD
-=======
 def lcp_callback(reset_command):
     world.lcpConstraintEngine(reset_command)
->>>>>>> include world as argument to callback
 
 # def frictionless_lcp_callback():
 #     # Backup and remove friction.
@@ -28,6 +25,25 @@ def lcp_callback(reset_command):
 #     # Restore friction.
 #     for friction_coef, body in zip(friction_coefs, bodies):
 #         body.setFrictionCoeff(friction_coef)
+
+def dummy_callback(world: nimble.simulation.World, reset: bool):
+    pass
+
+def lcp_callback(world: nimble.simulation.World, reset: bool):
+    world.lcpConstraintEngine(reset)
+
+def frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
+    # Backup and remove friction.
+    friction_coefs = []
+    bodies = []
+    for i in range(world.getNumBodyNodes()):
+        body = world.getBodyNodeIndex(i)
+        bodies.append(body)
+        friction_coefs.append(body.getFrictionCoeff())
+        body.setFrictionCoeff(0.0)
+
+    # Frictionless LCP
+    world.lcpConstraintEngine(reset)
 
 
 def main():

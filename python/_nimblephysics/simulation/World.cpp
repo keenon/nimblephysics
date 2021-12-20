@@ -37,6 +37,7 @@
 #include <dart/simulation/World.hpp>
 #include <dart/utils/UniversalLoader.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -294,7 +295,7 @@ void World(py::module& m)
       .def(
           "runConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
-            return self->runConstraintEngine(self, _resetCommand);
+            return self->runConstraintEngine(_resetCommand);
           })
       .def(
           "lcpConstraintEngine",
