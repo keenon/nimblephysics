@@ -480,6 +480,9 @@ public:
   /// Integrate velocities given impulses.
   void integrateVelocitiesFromImpulses(bool _resetCommand);
 
+  /// Integrate positions.
+  void integratePositions(Eigen::VectorXs initialVelocity);
+
   /// Set current time
   void setTime(s_t _time);
 
