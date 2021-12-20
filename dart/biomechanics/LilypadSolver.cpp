@@ -64,7 +64,8 @@ std::vector<const dynamics::BodyNode*> LilypadSolver::getContactBodies()
 
       if (cell.groundLowerBound < vertHeight
           && cell.groundUpperBound > vertHeight
-          && ((verticalVel > 0 && verticalVel < mVerticalVelThreshold) || (verticalVel < 0 && -verticalVel < mVerticalVelThreshold))
+          && ((verticalVel > 0 && verticalVel < mVerticalVelThreshold)
+              || (verticalVel < 0 && -verticalVel < mVerticalVelThreshold))
           && lateralVel < mLateralVelThreshold)
       {
         bodies.push_back(body);
@@ -129,7 +130,8 @@ void LilypadSolver::process(Eigen::MatrixXs poses, int startTime)
             = vert.vel - mGroundNormal * verticalVel;
         s_t lateralVel = lateralVelVector.norm();
         s_t verticalAccel = vert.accel.dot(mGroundNormal);
-        if ((verticalVel > 0 && verticalVel > mVerticalVelThreshold) || (verticalVel < 0 && -verticalVel > mVerticalVelThreshold)
+        if ((verticalVel > 0 && verticalVel > mVerticalVelThreshold)
+            || (verticalVel < 0 && -verticalVel > mVerticalVelThreshold)
             || lateralVel > mLateralVelThreshold
             || verticalAccel < mVerticalAccelerationThreshold)
         {
@@ -221,9 +223,6 @@ LilypadCell& LilypadSolver::getCell(Eigen::Vector3s pos)
 void LilypadSolver::debugToGUI(
     std::shared_ptr<server::GUIWebsocketServer> server)
 {
-  bool oldAutoflush = server->getAutoflush();
-  server->setAutoflush(false);
-
   server->deleteObjectsByPrefix("lilypad_tile_");
 
   for (auto& pair : mPads)
@@ -279,9 +278,6 @@ void LilypadSolver::debugToGUI(
         false,
         true);
   }
-
-  server->flush();
-  server->setAutoflush(oldAutoflush);
 };
 
 void LilypadSolver::clear()

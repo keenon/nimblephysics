@@ -34,7 +34,6 @@ TEST(Scaling, SCALE_BODY_NODES)
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(osim);
-  server.setAutoflush(false);
 
   Ticker ticker(1.0 / 20);
 

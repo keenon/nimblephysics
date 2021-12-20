@@ -110,7 +110,7 @@ TEST(REALTIME, GUI_SERVER)
   server.renderWorld(world);
 
   Ticker ticker(world->getTimeStep());
-  ticker.registerTickListener([&](long time) {
+  ticker.registerTickListener([&](long /* time */) {
     world->step();
     server.renderWorld(world);
   });

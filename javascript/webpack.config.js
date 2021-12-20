@@ -1,8 +1,14 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
+const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = false;
+
 module.exports = {
-  entry: "./src/index.ts",
+  entry: {
+    live: "./src/live.ts",
+    embedded: "./src/embedded.ts",
+    embedded_dev: "./src/embedded_dev.ts"
+  },
   module: {
     rules: [
       {
@@ -22,7 +28,7 @@ module.exports = {
         ],
       },
       {
-        test: /\.(txt|json)$/i,
+        test: /\.txt$/i,
         use: "raw-loader",
       },
     ],
@@ -33,11 +39,12 @@ module.exports = {
   output: {
     path: path.join(__dirname, "dist"),
     publicPath: "/",
-    filename: "bundle.js",
+    filename: "[name].js",
   },
   plugins: [
     new HtmlWebpackPlugin({
       template: path.join(__dirname, "src", "index.html"),
+      excludeChunks: ['embedded', DEV_SERVER_SERVE_EMBEDDED_DEV_CODE ? 'live' : 'embedded_dev']
     }),
   ],
   devServer: {

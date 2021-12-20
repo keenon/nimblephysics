@@ -434,6 +434,8 @@ public:
 
   // This returns the Jacobian for state_t -> state_{t+1}.
   Eigen::MatrixXs getStateJacobian();
+
+  Eigen::MatrixXs getContactFreeStateJacobian();
   // This returns the Jacobian for action_t -> state_{t+1}.
   Eigen::MatrixXs getActionJacobian();
 
@@ -446,6 +448,7 @@ public:
   Eigen::MatrixXs mapToForceSpace(Eigen::MatrixXs actions);
 
   Eigen::VectorXs mapToForceSpaceVector(Eigen::VectorXs action);
+  Eigen::MatrixXs getContactFreeActionJacobian();
 
   Eigen::MatrixXs finiteDifferenceStateJacobian();
   Eigen::MatrixXs finiteDifferenceActionJacobian();

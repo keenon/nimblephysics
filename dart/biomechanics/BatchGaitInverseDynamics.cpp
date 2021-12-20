@@ -293,9 +293,6 @@ void BatchGaitInverseDynamics::debugTimestepToGUI(
 {
   mSkeleton->setPositions(mPoses.col(timestep));
 
-  bool oldAutoflush = server->getAutoflush();
-  server->setAutoflush(false);
-
   server->renderSkeleton(mSkeleton, "world");
 
   for (const dynamics::BodyNode* body : mBodies)
@@ -312,9 +309,6 @@ void BatchGaitInverseDynamics::debugTimestepToGUI(
   {
     server->renderBodyWrench(bodies[i], wrenches[i], 0.01);
   }
-
-  server->flush();
-  server->setAutoflush(oldAutoflush);
 }
 
 } // namespace biomechanics

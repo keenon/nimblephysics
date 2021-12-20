@@ -123,9 +123,6 @@ void Anthropometrics::debugToGUI(
     std::shared_ptr<server::GUIWebsocketServer> server,
     std::shared_ptr<dynamics::Skeleton> skel)
 {
-  bool oldAutoflush = server->getAutoflush();
-  server->setAutoflush(false);
-
   server->deleteObjectsByPrefix("anthro_metric_");
   for (AnthroMetric& metric : mMetrics)
   {
@@ -143,10 +140,6 @@ void Anthropometrics::debugToGUI(
     points.push_back(markerB);
     server->createLine("anthro_metric_" + metric.name, points);
   }
-
-  if (oldAutoflush)
-    server->flush();
-  server->setAutoflush(oldAutoflush);
 }
 
 //==============================================================================
