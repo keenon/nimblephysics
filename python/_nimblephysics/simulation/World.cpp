@@ -294,12 +294,12 @@ void World(py::module& m)
       .def(
           "runConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
-            return self->runConstraintEngine(_resetCommand);
+            return self->runConstraintEngine(self, _resetCommand);
           })
       .def(
           "lcpConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
-            return self->lcpConstraintEngine(_resetCommand);
+            return self->lcpConstraintEngine(self, _resetCommand);
           })
       .def(
           "replaceConstraintEngine",

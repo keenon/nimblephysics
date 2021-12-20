@@ -88,8 +88,8 @@ World::World(const std::string& _name)
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false),
-    mConstraintEngine([this](bool _resetCommand) {
-      return lcpConstraintEngine(_resetCommand);
+    mConstraintEngine([this](simulation::World* world, bool _resetCommand) {
+      return lcpConstraintEngine(world, _resetCommand);
     })
 {
   mIndices.push_back(0);
@@ -254,13 +254,13 @@ void World::step(bool _resetCommand)
 //==============================================================================
 void World::runConstraintEngine(bool _resetCommand)
 {
-  mConstraintEngine(_resetCommand);
+  mConstraintEngine(this, _resetCommand);
 }
 
 //==============================================================================
-void World::lcpConstraintEngine(bool _resetCommand)
+void World::lcpConstraintEngine(simulation::World* world, bool _resetCommand)
 {
-  mConstraintSolver->solve(this);
+  mConstraintSolver->solve(world);
   integrateVelocitiesFromImpulses(_resetCommand);
 }
 

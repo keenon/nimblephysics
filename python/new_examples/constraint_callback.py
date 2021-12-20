@@ -6,6 +6,11 @@ import torch
 def dummy_callback():
     pass
 
+<<<<<<< HEAD
+=======
+def lcp_callback(reset_command):
+    world.lcpConstraintEngine(reset_command)
+>>>>>>> include world as argument to callback
 
 # def frictionless_lcp_callback():
 #     # Backup and remove friction.
@@ -33,16 +38,10 @@ def main():
 
     # Try the default arg
     world.integrateVelocitiesFromImpulses()
-
-    callbacks = [
-        None,  # Use default LCP, don't replace
-        dummy_callback,  # Replace with dummy function
-        solver.enforceContactAndJointAndCustomConstraintsWithLcp,  # Replace with the same function as default
-        # frictionless_lcp_callback,
-    ]
+    callbacks = [None, dummy_callback, world.lcpConstraintEngine, lcp_callback, frictionless_lcp_callback]
     for callback in callbacks:
         if callback is not None:
-            solver.replaceEnforceContactAndJointAndCustomConstraintsFn(callback)
+            world.replaceConstraintEngine(callback)
             print(callback.__name__)
         else:
             print("None")
