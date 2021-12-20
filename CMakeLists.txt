@@ -476,6 +476,7 @@ endif()
 #   http://mementocodex.wordpress.com/2013/01/19/how-to-generate-code-documentation-with-doxygen-and-cmake-a-slightly-improved-approach/
 #   http://www.cmake.org/pipermail/cmake/2007-February/012796.html
 #===============================================================================
+set(DOXYGEN_FOUND OFF) # Temporarily disable Doxygen
 if(DOXYGEN_FOUND)
 
   set(DOXYGEN_DOXYFILE_IN      "${PROJECT_SOURCE_DIR}/doxygen/Doxyfile.in"    )

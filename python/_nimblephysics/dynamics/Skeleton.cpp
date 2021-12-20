@@ -583,32 +583,41 @@ void Skeleton(py::module& m)
               -> dart::dynamics::Joint* { return self->getJoint(name); },
           ::py::arg("name"),
           py::return_value_policy::reference_internal)
-      .def(
-          "getJoints",
-          +[](dart::dynamics::Skeleton* self)
-              -> std::vector<dart::dynamics::Joint*> {
-            return self->getJoints();
-          })
-      .def(
-          "getJoints",
-          +[](const dart::dynamics::Skeleton* self)
-              -> std::vector<const dart::dynamics::Joint*> {
-            return self->getJoints();
-          })
-      .def(
-          "getJoints",
-          +[](dart::dynamics::Skeleton* self,
-              const std::string& name) -> std::vector<dart::dynamics::Joint*> {
-            return self->getJoints(name);
-          },
-          ::py::arg("name"))
-      .def(
-          "getJoints",
-          +[](const dart::dynamics::Skeleton* self, const std::string& name)
-              -> std::vector<const dart::dynamics::Joint*> {
-            return self->getJoints(name);
-          },
-          ::py::arg("name"))
+      /*
+      // These methods all crash because pybind11 tries to take ownership of
+      // the joints within the list
+      // When the list of joints is freed on the Python side, it attempts to
+      // free the joint pointers too.
+      // This seems to be a limitation of pybind11, it's challenging to assign
+      // different return policies
+      // to a vector, and the contents of that vector:
+      // https://github.com/pybind/pybind11/issues/637
+    .def( "getJoints",
+        +[](dart::dynamics::Skeleton* self)
+            -> std::vector<dart::dynamics::Joint*> {
+          return self->getJoints();
+        })
+    .def(
+        "getJoints",
+        +[](const dart::dynamics::Skeleton* self)
+            -> std::vector<const dart::dynamics::Joint*> {
+          return self->getJoints();
+        })
+    .def(
+        "getJoints",
+        +[](dart::dynamics::Skeleton* self,
+            const std::string& name) -> std::vector<dart::dynamics::Joint*> {
+          return self->getJoints(name);
+        },
+        ::py::arg("name"))
+    .def(
+        "getJoints",
+        +[](const dart::dynamics::Skeleton* self, const std::string& name)
+            -> std::vector<const dart::dynamics::Joint*> {
+          return self->getJoints(name);
+        },
+        ::py::arg("name"))
+        */
       .def(
           "hasJoint",
           +[](const dart::dynamics::Skeleton* self,
