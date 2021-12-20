@@ -50,7 +50,10 @@ void debugGRFToGUI(
       std::vector<Eigen::Vector3s> points;
       points.push_back(cop);
       points.push_back(cop + wrench.tail<3>());
-      server.createLine("grf_" + i, points, Eigen::Vector3s::UnitX());
+      server.createLine(
+          "grf_" + std::to_string(i),
+          points,
+          Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
     }
 
     server.flush();

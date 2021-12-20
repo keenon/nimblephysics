@@ -42,6 +42,13 @@ void vec3ToJson(std::stringstream& json, const Eigen::Vector3s& vec)
 }
 
 //==============================================================================
+void vec4ToJson(std::stringstream& json, const Eigen::Vector4s& vec)
+{
+  json << "[" << numberToJson(vec(0)) << "," << numberToJson(vec(1)) << ","
+       << numberToJson(vec(2)) << "," << numberToJson(vec(3)) << "]";
+}
+
+//==============================================================================
 void vec3iToJson(std::stringstream& json, const Eigen::Vector3i& vec)
 {
   json << "[" << numberToJson(vec(0)) << "," << numberToJson(vec(1)) << ","

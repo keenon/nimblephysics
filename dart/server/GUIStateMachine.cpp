@@ -184,7 +184,7 @@ void GUIStateMachine::renderWorld(
       createLine(
           prefix + "__contact_" + std::to_string(i) + "_b",
           pointsB,
-          Eigen::Vector3s(0, 1, 0));
+          Eigen::Vector4s(0, 1, 0, 1.0));
     }
   }
 }
@@ -213,9 +213,12 @@ void GUIStateMachine::renderBasis(
   pointsZ.push_back(T * (Eigen::Vector3s::UnitZ() * scale));
 
   deleteObjectsByPrefix(prefix + "__basis_");
-  createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3s::UnitX());
-  createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3s::UnitY());
-  createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3s::UnitZ());
+  createLine(
+      prefix + "__basis_unitX", pointsX, Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+  createLine(
+      prefix + "__basis_unitY", pointsY, Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
+  createLine(
+      prefix + "__basis_unitZ", pointsZ, Eigen::Vector4s(0.0, 0.0, 1.0, 1.0));
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -223,11 +226,11 @@ void GUIStateMachine::renderBasis(
 void GUIStateMachine::renderSkeleton(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::string& prefix,
-    Eigen::Vector3s overrideColor)
+    Eigen::Vector4s overrideColor)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  bool useOriginalColor = overrideColor == -1 * Eigen::Vector3s::Ones();
+  bool useOriginalColor = overrideColor == -1 * Eigen::Vector4s::Ones();
 
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
@@ -284,7 +287,7 @@ void GUIStateMachine::renderSkeleton(
                 boxShape->getSize(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -299,7 +302,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 meshShape->getScale(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -311,7 +314,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeName,
                 sphereShape->getRadius(),
                 shapeNode->getWorldTransform().translation(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -325,7 +328,7 @@ void GUIStateMachine::renderSkeleton(
                 capsuleShape->getHeight(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -339,7 +342,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeName,
                 sphereShape->getRadii()[0],
                 shapeNode->getWorldTransform().translation(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -368,8 +371,8 @@ void GUIStateMachine::renderSkeleton(
           Eigen::Vector3s pos = shapeNode->getWorldTransform().translation();
           Eigen::Vector3s euler
               = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
-          Eigen::Vector3s color
-              = useOriginalColor ? visual->getColor() : overrideColor;
+          Eigen::Vector4s color
+              = useOriginalColor ? visual->getRGBA() : overrideColor;
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
           Eigen::Vector3s scale = Eigen::Vector3s::Zero();
           if (shape->getType() == "BoxShape")
@@ -438,7 +441,7 @@ void GUIStateMachine::renderTrajectoryLines(
   assert(positions.rows() == world->getNumDofs());
 
   std::unordered_map<std::string, std::vector<Eigen::Vector3s>> paths;
-  std::unordered_map<std::string, Eigen::Vector3s> colors;
+  std::unordered_map<std::string, Eigen::Vector4s> colors;
 
   neural::RestorableSnapshot snapshot(world);
   for (int t = 0; t < positions.cols(); t++)
@@ -462,7 +465,7 @@ void GUIStateMachine::renderTrajectoryLines(
                           << node->getName() << "_" << k;
           std::string shapeName = shapeNameStream.str();
           paths[shapeName].push_back(node->getWorldTransform().translation());
-          colors[shapeName] = visual->getColor();
+          colors[shapeName] = visual->getRGBA();
         }
       }
     }
@@ -512,11 +515,11 @@ void GUIStateMachine::renderBodyWrench(
   createLine(
       prefix + "_" + body->getName() + "_torque",
       torqueLine,
-      Eigen::Vector3s(0.8, 0.8, 0.8));
+      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0));
   createLine(
       prefix + "_" + body->getName() + "_force",
       forceLine,
-      Eigen::Vector3s(1.0, 0.0, 0.0));
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
 }
 
 /// This renders little velocity lines starting at every vertex in the passed
@@ -535,7 +538,7 @@ void GUIStateMachine::renderMovingBodyNodeVertices(
     createLine(
         prefix + "_" + body->getName() + "_" + std::to_string(i),
         line,
-        Eigen::Vector3s(1.0, 0.0, 0.0));
+        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
   }
 }
 
@@ -573,7 +576,7 @@ void GUIStateMachine::createBox(
     const Eigen::Vector3s& size,
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -598,7 +601,7 @@ void GUIStateMachine::createSphere(
     std::string key,
     s_t radius,
     const Eigen::Vector3s& pos,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -624,7 +627,7 @@ void GUIStateMachine::createCapsule(
     s_t height,
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -649,7 +652,7 @@ void GUIStateMachine::createCapsule(
 void GUIStateMachine::createLine(
     std::string key,
     const std::vector<Eigen::Vector3s>& points,
-    const Eigen::Vector3s& color)
+    const Eigen::Vector4s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -676,7 +679,7 @@ void GUIStateMachine::createMesh(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -711,7 +714,7 @@ void GUIStateMachine::createMeshASSIMP(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -808,7 +811,7 @@ void GUIStateMachine::createMeshFromShape(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -908,7 +911,7 @@ Eigen::Vector3s GUIStateMachine::getObjectRotation(const std::string& key)
 
 /// This returns the color of an object, if we've got it. Otherwise it returns
 /// Vector3s::Zero().
-Eigen::Vector3s GUIStateMachine::getObjectColor(const std::string& key)
+Eigen::Vector4s GUIStateMachine::getObjectColor(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -922,7 +925,7 @@ Eigen::Vector3s GUIStateMachine::getObjectColor(const std::string& key)
     return mLines[key].color;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].color;
-  return Eigen::Vector3s::Zero();
+  return Eigen::Vector4s::Zero();
 }
 
 /// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
@@ -1000,7 +1003,7 @@ void GUIStateMachine::setObjectRotation(
 
 /// This changes an object (e.g. box, sphere, line) color
 void GUIStateMachine::setObjectColor(
-    const std::string& key, const Eigen::Vector3s& color)
+    const std::string& key, const Eigen::Vector4s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1028,7 +1031,7 @@ void GUIStateMachine::setObjectColor(
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
          << "\", \"color\": ";
-    vec3ToJson(json, color);
+    vec4ToJson(json, color);
     json << "}";
   });
 }
@@ -1534,7 +1537,7 @@ void GUIStateMachine::encodeCreateBox(std::stringstream& json, Box& box)
   json << ", \"euler\": ";
   vec3ToJson(json, box.euler);
   json << ", \"color\": ";
-  vec3ToJson(json, box.color);
+  vec4ToJson(json, box.color);
   json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
   json << "}";
@@ -1548,7 +1551,7 @@ void GUIStateMachine::encodeCreateSphere(
   json << ", \"pos\": ";
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
-  vec3ToJson(json, sphere.color);
+  vec4ToJson(json, sphere.color);
   json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
@@ -1566,7 +1569,7 @@ void GUIStateMachine::encodeCreateCapsule(
   json << ", \"euler\": ";
   vec3ToJson(json, capsule.euler);
   json << ", \"color\": ";
-  vec3ToJson(json, capsule.color);
+  vec4ToJson(json, capsule.color);
   json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (capsule.receiveShadows ? "true" : "false");
@@ -1587,7 +1590,7 @@ void GUIStateMachine::encodeCreateLine(std::stringstream& json, Line& line)
     vec3ToJson(json, point);
   }
   json << "], \"color\": ";
-  vec3ToJson(json, line.color);
+  vec4ToJson(json, line.color);
   json << "}";
 }
 
@@ -1646,7 +1649,7 @@ void GUIStateMachine::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
          << "\", \"start\": " << mesh.textureStartIndices[i] << "}";
   }
   json << "], \"color\": ";
-  vec3ToJson(json, mesh.color);
+  vec4ToJson(json, mesh.color);
   json << ", \"pos\": ";
   vec3ToJson(json, mesh.pos);
   json << ", \"euler\": ";
