@@ -93,6 +93,8 @@ public:
   using NameChangedSignal = common::Signal<void(
       const std::string& _oldName, const std::string& _newName)>;
 
+  using constraintEngine = std::function<void(bool)>;
+
   /// Creates World as shared_ptr
   template <typename... Args>
   static WorldPtr create(Args&&... args);
@@ -477,6 +479,16 @@ public:
   /// Integrate non-constraint forces.
   void integrateVelocities();
 
+  /// Run the constraint engine which solves for constraint impulses and
+  /// integrates velocities given these constraint impulses.
+  void runConstraintEngine(bool _resetCommand);
+
+  /// The default constraint engine which runs an LCP.
+  void lcpConstraintEngine(bool _resetCommand);
+
+  /// Replace the default constraint engine with a custom one.
+  void replaceConstraintEngine(const constraintEngine& engine);
+
   /// Integrate velocities given impulses.
   void integrateVelocitiesFromImpulses(bool _resetCommand = true);
 
@@ -702,6 +714,10 @@ protected:
   /// This holds the unconstrained velocities that we found in the last
   /// timestep, before we solved the LCP for constraints
   Eigen::VectorXs mLastPreConstraintVelocity;
+
+  /// Constraint engine which solves for constraint impulses and integrates
+  /// velocities according to the given impulses.
+  constraintEngine mConstraintEngine;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about

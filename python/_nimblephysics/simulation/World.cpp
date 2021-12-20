@@ -292,6 +292,19 @@ void World(py::module& m)
           },
           ::py::return_value_policy::reference_internal)
       .def(
+          "runConstraintEngine",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runConstraintEngine(_resetCommand);
+          })
+      .def(
+          "lcpConstraintEngine",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->lcpConstraintEngine(_resetCommand);
+          })
+      .def(
+          "replaceConstraintEngine",
+          &dart::simulation::World::replaceConstraintEngine)
+      .def(
           "bake",
           +[](dart::simulation::World* self) -> void { return self->bake(); })
       .def(

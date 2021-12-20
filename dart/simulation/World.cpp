@@ -87,7 +87,10 @@ World::World(const std::string& _name)
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
-    mSlowDebugResultsAgainstFD(false)
+    mSlowDebugResultsAgainstFD(false),
+    mConstraintEngine([this](bool _resetCommand) {
+      return lcpConstraintEngine(_resetCommand);
+    })
 {
   mIndices.push_back(0);
 
@@ -241,12 +244,30 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
-  mConstraintSolver->solve();
-  integrateVelocitiesFromImpulses(_resetCommand);
+  runConstraintEngine(_resetCommand);
   integratePositions(initialVelocity);
 
   mTime += mTimeStep;
   mFrame++;
+}
+
+//==============================================================================
+void World::runConstraintEngine(bool _resetCommand)
+{
+  mConstraintEngine(_resetCommand);
+}
+
+//==============================================================================
+void World::lcpConstraintEngine(bool _resetCommand)
+{
+  mConstraintSolver->solve(this);
+  integrateVelocitiesFromImpulses(_resetCommand);
+}
+
+//==============================================================================
+void World::replaceConstraintEngine(const constraintEngine& engine)
+{
+  mConstraintEngine = engine;
 }
 
 //==============================================================================
