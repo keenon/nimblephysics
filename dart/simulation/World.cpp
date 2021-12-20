@@ -242,26 +242,7 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
   mConstraintSolver->solve();
-
-  // Compute velocity changes given constraint impulses
-  for (auto& skel : mSkeletons)
-  {
-    if (!skel->isMobile())
-      continue;
-
-    if (skel->isImpulseApplied())
-    {
-      skel->computeImpulseForwardDynamics();
-      skel->setImpulseApplied(false);
-    }
-
-    if (_resetCommand)
-    {
-      skel->clearInternalForces();
-      skel->clearExternalForces();
-      skel->resetCommands();
-    }
-  }
+  integrateVelocitiesFromImpulses(_resetCommand);
 
   int cursor = 0;
   for (auto& skel : mSkeletons)
@@ -290,6 +271,30 @@ void World::step(bool _resetCommand)
 
   mTime += mTimeStep;
   mFrame++;
+}
+
+//==============================================================================
+void World::integrateVelocitiesFromImpulses(bool _resetCommand)
+{
+  // Compute velocity changes given constraint impulses
+  for (auto& skel : mSkeletons)
+  {
+    if (!skel->isMobile())
+      continue;
+
+    if (skel->isImpulseApplied())
+    {
+      skel->computeImpulseForwardDynamics();
+      skel->setImpulseApplied(false);
+    }
+
+    if (_resetCommand)
+    {
+      skel->clearInternalForces();
+      skel->clearExternalForces();
+      skel->resetCommands();
+    }
+  }
 }
 
 //==============================================================================
