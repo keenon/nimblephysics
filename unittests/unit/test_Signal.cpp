@@ -31,6 +31,7 @@
  */
 
 #include <numeric>
+
 #include <gtest/gtest.h>
 
 #include "dart/dart.hpp"
@@ -47,19 +48,43 @@ static int callCount1 = 0;
 static int callCount2 = 0;
 
 //==============================================================================
-void foo0() { callCount0++; }
-void foo1(int /*_val*/) { callCount1++; }
-void foo2(int /*_val1*/, float /*_val2*/) { callCount2++; }
-s_t foo3() { return 10.0; }
+void foo0()
+{
+  callCount0++;
+}
+void foo1(int /*_val*/)
+{
+  callCount1++;
+}
+void foo2(int /*_val1*/, float /*_val2*/)
+{
+  callCount2++;
+}
+s_t foo3()
+{
+  return 10.0;
+}
 
 //==============================================================================
 class Viewer
 {
 public:
-  static void onSignal1Static(int /*_val*/) { callCount1++; }
-  static void onSignal2Static(int /*_val1*/, float /*_val2*/) { callCount2++; }
-  void onSignal1(int /*_val*/) { callCount1++; }
-  void onSignal2(int /*_val1*/, float /*_val2*/) { callCount2++; }
+  static void onSignal1Static(int /*_val*/)
+  {
+    callCount1++;
+  }
+  static void onSignal2Static(int /*_val1*/, float /*_val2*/)
+  {
+    callCount2++;
+  }
+  void onSignal1(int /*_val*/)
+  {
+    callCount1++;
+  }
+  void onSignal2(int /*_val1*/, float /*_val2*/)
+  {
+    callCount2++;
+  }
 };
 
 //==============================================================================
@@ -115,8 +140,8 @@ TEST(Signal, NonStaticMemberFunction)
   signal2.connect(&Viewer::onSignal2Static);
 
   // Connect non-static member function
-  using placeholders::_1;
-  using placeholders::_2;
+  using std::placeholders::_1;
+  using std::placeholders::_2;
   signal1.connect(bind(&Viewer::onSignal1, &viewer, _1));
   signal2.connect(bind(&Viewer::onSignal2, &viewer, _1, _2));
 
@@ -175,10 +200,22 @@ TEST(Signal, ConnectionLifeTime)
 }
 
 //==============================================================================
-float product(float x, float y) { return x * y; }
-float quotient(float x, float y) { return x / y; }
-float sum(float x, float y) { return x + y; }
-float difference(float x, float y) { return x - y; }
+float product(float x, float y)
+{
+  return x * y;
+}
+float quotient(float x, float y)
+{
+  return x / y;
+}
+float sum(float x, float y)
+{
+  return x + y;
+}
+float difference(float x, float y)
+{
+  return x - y;
+}
 
 // combiner which returns the maximum value returned by all slots
 template <typename T>
@@ -266,9 +303,10 @@ TEST(Signal, ReturnValues)
 }
 
 //==============================================================================
-void frameChangeCallback(const Entity* _entity,
-                         const Frame* _oldParentFrame,
-                         const Frame* _newParentFrame)
+void frameChangeCallback(
+    const Entity* _entity,
+    const Frame* _oldParentFrame,
+    const Frame* _newParentFrame)
 {
   assert(_entity);
 
@@ -277,37 +315,38 @@ void frameChangeCallback(const Entity* _entity,
   std::string newFrameName
       = _newParentFrame == nullptr ? "(empty)" : _newParentFrame->getName();
 
-  if(_newParentFrame)
-    std::cout << "[" << _entity->getName() << "]: "
-              << oldFrameName << " --> " << newFrameName << std::endl;
+  if (_newParentFrame)
+    std::cout << "[" << _entity->getName() << "]: " << oldFrameName << " --> "
+              << newFrameName << std::endl;
   else
     std::cout << "Entity (" << _entity << ") has been destroyed" << std::endl;
 }
 
 //==============================================================================
-void nameChangedCallback(const Entity* entity,
-                         const std::string& oldName,
-                         const std::string& newName)
+void nameChangedCallback(
+    const Entity* entity,
+    const std::string& oldName,
+    const std::string& newName)
 {
   assert(entity);
 
-  std::cout << "[" << entity->getName() << "]: Name changed: '"
-            << oldName << "' --> '" << newName << "'.\n";
+  std::cout << "[" << entity->getName() << "]: Name changed: '" << oldName
+            << "' --> '" << newName << "'.\n";
 }
 
 //==============================================================================
 TEST(Signal, FrameSignals)
 {
   Isometry3s tf1(Isometry3s::Identity());
-  tf1.translate(Vector3s(0.1,-0.1,0));
+  tf1.translate(Vector3s(0.1, -0.1, 0));
 
   Isometry3s tf2(Isometry3s::Identity());
-  tf2.translate(Vector3s(0,0.1,0));
-  tf2.rotate(AngleAxis_s(45.0*M_PI/180.0, Vector3s(1,0,0)));
+  tf2.translate(Vector3s(0, 0.1, 0));
+  tf2.rotate(AngleAxis_s(45.0 * M_PI / 180.0, Vector3s(1, 0, 0)));
 
   Isometry3s tf3(Isometry3s::Identity());
-  tf3.translate(Vector3s(0,0,0.1));
-  tf3.rotate(AngleAxis_s(60*M_PI/180.0, Vector3s(0,1,0)));
+  tf3.translate(Vector3s(0, 0, 0.1));
+  tf3.rotate(AngleAxis_s(60 * M_PI / 180.0, Vector3s(0, 1, 0)));
 
   SimpleFrame F1(Frame::World(), "F1", tf1);
   SimpleFrame F2(&F1, "F2", tf2);

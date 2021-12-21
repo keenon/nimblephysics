@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "webpack-dev-server --config webpack.config.devserver.js",
+    "dev-python": "webpack-dev-server --config webpack.config.devserver-python.js",
     "watch": "webpack --watch --mode=development",
     "prod": "webpack --mode=production",
     "build": "webpack && tsc || true && cp src/types.d.ts dist/types.d.ts && echo \"Success!\"",

@@ -32,6 +32,8 @@
 
 #include <iostream>
 
+#ifdef HAVE_PERF_UTILS
+
 #include <PerfUtils/TimeTrace.h>
 #include <gtest/gtest.h>
 
@@ -95,3 +97,5 @@ TEST(PERFORMANCE, NESTED)
 
   std::cout << finalizedRoot->prettyPrint() << std::endl;
 }
+
+#endif

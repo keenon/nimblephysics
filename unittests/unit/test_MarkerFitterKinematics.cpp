@@ -796,7 +796,7 @@ bool debugIKInitializationToGUI(
             server.createLine(
                 "marker_error_" + std::to_string(i),
                 line,
-                Eigen::Vector3s::UnitX());
+                Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
           }
 
           return clampedPos;
@@ -990,7 +990,7 @@ bool debugFitToGUI(
             server.createLine(
                 "marker_error_" + std::to_string(i),
                 line,
-                Eigen::Vector3s::UnitX());
+                Eigen::Vector4s(1, 0, 0, 1));
           }
 
           return clampedPos;
@@ -1078,7 +1078,7 @@ void debugTrajectoryAndMarkersToGUI(
         "joint_center_" + std::to_string(i),
         0.02,
         Eigen::Vector3s::Zero(),
-        Eigen::Vector3s(0, 0, 1));
+        Eigen::Vector4s(0, 0, 1, 1));
   }
 
   int timestep = 0;
@@ -1103,7 +1103,7 @@ void debugTrajectoryAndMarkersToGUI(
         points.push_back(worldObserved);
         points.push_back(worldInferred);
         server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
+            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
       }
     }
 
@@ -1143,7 +1143,7 @@ void saveTrajectoryAndMarkersToGUI(
         "joint_center_" + std::to_string(i),
         0.02,
         Eigen::Vector3s::Zero(),
-        Eigen::Vector3s(0, 0, 1));
+        Eigen::Vector4s(0, 0, 1, 1));
   }
 
   for (int timestep = 0; timestep < poses.cols(); timestep++)
@@ -1167,7 +1167,7 @@ void saveTrajectoryAndMarkersToGUI(
         points.push_back(worldObserved);
         points.push_back(worldInferred);
         server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
+            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
       }
     }
 

@@ -396,6 +396,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const geometry = new THREE.BoxBufferGeometry(
       SCALE_FACTOR,
       SCALE_FACTOR,
@@ -441,6 +445,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const mesh = new THREE.Mesh(this.sphereGeometry, material);
     mesh.position.x = pos[0] * SCALE_FACTOR;
     mesh.position.y = pos[1] * SCALE_FACTOR;
@@ -480,6 +488,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const NUM_SPHERE_SEGMENTS = 18;
     const geometry = new CapsuleBufferGeometry(
       radius * SCALE_FACTOR,
@@ -637,6 +649,10 @@ class DARTView {
           color: new THREE.Color(color[0], color[1], color[2]),
         });
       }
+      if (color.length > 3 && color[3] < 1.0) {
+        meshMaterial.transparent = true;
+        meshMaterial.opacity = color[3];
+      }
 
       const meshPoints = [];
       const rawUVs = [];
@@ -739,6 +755,15 @@ class DARTView {
   setObjectColor = (key: string, color: number[]) => {
     const obj = this.objects.get(key);
     (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
+    if (color.length > 3) {
+      if (color[3] == 1.0) {
+        (obj as any).material.transparent = false;
+      }
+      else {
+        (obj as any).material.transparent = true;
+        (obj as any).material.opacity = color[3];
+      }
+    }
   };
 
   /**
