@@ -30,6 +30,10 @@ def main():
     state = torch.tensor(world.getState())
     action = torch.zeros((world.getNumDofs()))
     solver = world.getConstraintSolver()
+
+    # Try the default arg
+    world.integrateVelocitiesFromImpulses()
+
     callbacks = [
         None,  # Use default LCP, don't replace
         dummy_callback,  # Replace with dummy function
