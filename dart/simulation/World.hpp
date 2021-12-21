@@ -478,7 +478,7 @@ public:
   void integrateVelocities();
 
   /// Integrate velocities given impulses.
-  void integrateVelocitiesFromImpulses(bool _resetCommand);
+  void integrateVelocitiesFromImpulses(bool _resetCommand = true);
 
   /// Integrate positions.
   void integratePositions(Eigen::VectorXs initialVelocity);

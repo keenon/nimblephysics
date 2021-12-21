@@ -268,7 +268,7 @@ void World(py::module& m)
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
             return self->integrateVelocitiesFromImpulses(_resetCommand);
           },
-          ::py::arg("resetCommand"))
+          ::py::arg("resetCommand") = true)
       .def(
           "setTime",
           +[](dart::simulation::World* self, s_t _time) -> void {
