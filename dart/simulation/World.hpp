@@ -717,7 +717,7 @@ protected:
 
   /// Constraint engine which solves for constraint impulses and integrates
   /// velocities according to the given impulses.
-  constraintEngineFnType mConstraintEngineFn;
+  constraintEngineFnType mRegisteredConstraintEngine;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about

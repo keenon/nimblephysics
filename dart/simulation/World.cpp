@@ -88,7 +88,7 @@ World::World(const std::string& _name)
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false),
-    mConstraintEngineFn([this](bool _resetCommand) {
+    mRegisteredConstraintEngine([this](bool _resetCommand) {
       return runLcpConstraintEngine(_resetCommand);
     })
 {
@@ -254,7 +254,7 @@ void World::step(bool _resetCommand)
 //==============================================================================
 void World::runRegisteredConstraintEngine(bool _resetCommand)
 {
-  mConstraintEngineFn(_resetCommand);
+  mRegisteredConstraintEngine(_resetCommand);
 }
 
 //==============================================================================
@@ -279,7 +279,7 @@ void World::runFrictionlessLcpConstraintEngine(bool _resetCommand)
 //==============================================================================
 void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
 {
-  mConstraintEngineFn = engineFn;
+  mRegisteredConstraintEngine = engineFn;
 }
 
 //==============================================================================
