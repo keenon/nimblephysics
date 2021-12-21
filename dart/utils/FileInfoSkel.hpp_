@@ -16,7 +16,7 @@
 #include <iostream>
 #include <sstream>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "renderer/RenderInterface.h"
 #include "Skeleton.h"

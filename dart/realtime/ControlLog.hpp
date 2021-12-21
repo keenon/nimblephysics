@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/MathTypes.hpp"
 

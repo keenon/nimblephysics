@@ -44,7 +44,7 @@
 #include <random>
 
 // External Libraries
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 // Local Headers
 #include "dart/math/Constants.hpp"
 #include "dart/math/MathTypes.hpp"

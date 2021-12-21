@@ -34,7 +34,7 @@
 #define DART_UTILS_XMLHELPERS_HPP_
 
 #include <string>
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <tinyxml2.h>
 
 #include "dart/common/Deprecated.hpp"

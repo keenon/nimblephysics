@@ -33,7 +33,7 @@
 #ifndef DART_DYNAMICS_MARKER_HPP_
 #define DART_DYNAMICS_MARKER_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include "dart/common/Deprecated.hpp"
 #include "dart/dynamics/detail/MarkerAspect.hpp"
 #include "dart/dynamics/FixedJacobianNode.hpp"

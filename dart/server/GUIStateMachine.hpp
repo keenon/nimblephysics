@@ -12,7 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <asio/io_service.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/cimport.h>

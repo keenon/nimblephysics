@@ -4,7 +4,7 @@
 #include <memory>
 #include <optional>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/neural/Mapping.hpp"
 

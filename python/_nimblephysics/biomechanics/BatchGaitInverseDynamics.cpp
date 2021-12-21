@@ -30,7 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <dart/biomechanics/BatchGaitInverseDynamics.hpp>
 #include <dart/dynamics/BodyNode.hpp>
 #include <dart/dynamics/Skeleton.hpp>

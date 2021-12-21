@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"

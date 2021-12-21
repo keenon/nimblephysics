@@ -33,7 +33,7 @@
 #ifndef DART_LCPSOLVER_LEMKE_HPP_
 #define DART_LCPSOLVER_LEMKE_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/MathTypes.hpp"
 

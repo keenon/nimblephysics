@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/MathTypes.hpp"

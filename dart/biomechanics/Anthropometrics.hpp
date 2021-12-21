@@ -6,7 +6,7 @@
 #include <map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/biomechanics/LilypadSolver.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"

@@ -33,7 +33,7 @@
 #ifndef DART_COLLISION_DISTANCE_RESULT_HPP_
 #define DART_COLLISION_DISTANCE_RESULT_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/MathTypes.hpp"
 

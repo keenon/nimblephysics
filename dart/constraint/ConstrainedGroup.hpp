@@ -36,7 +36,7 @@
 #include <memory>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/constraint/SmartPointer.hpp"
 

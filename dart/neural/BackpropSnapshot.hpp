@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"

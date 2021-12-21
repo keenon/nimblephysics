@@ -33,7 +33,7 @@
 #ifndef DART_DYNAMICS_SHAPEFRAME_HPP_
 #define DART_DYNAMICS_SHAPEFRAME_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/AspectWithVersion.hpp"
 #include "dart/common/Signal.hpp"

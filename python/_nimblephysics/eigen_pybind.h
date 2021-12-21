@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include "pybind11/eigen.h"
 
 namespace dart {

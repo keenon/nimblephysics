@@ -37,7 +37,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <assimp/scene.h>
 #include <ccd/ccd.h>
 #include <ccd/vec3.h>

@@ -3,7 +3,7 @@
 
 #include <functional>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 namespace dart {
 namespace trajectory {

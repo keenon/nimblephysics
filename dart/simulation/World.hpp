@@ -43,7 +43,7 @@
 #include <string>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/collision/CollisionOption.hpp"
 #include "dart/common/NameManager.hpp"

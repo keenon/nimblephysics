@@ -1,7 +1,7 @@
 #ifndef DART_PROTO_EIGEN
 #define DART_PROTO_EIGEN
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/MathTypes.hpp"
 #include "dart/proto/Eigen.pb.h"

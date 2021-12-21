@@ -37,7 +37,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 // Local Files
 #include "dart/common/LocalResourceRetriever.hpp"

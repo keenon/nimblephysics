@@ -6,7 +6,7 @@
 #include <map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"

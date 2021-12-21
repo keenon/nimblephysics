@@ -42,7 +42,7 @@
 
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <assimp/scene.h>
 
 #include "dart/collision/CollisionDetector.hpp"

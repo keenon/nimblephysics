@@ -1,7 +1,7 @@
 #include <algorithm> // std::sort
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <ccd/ccd.h>
 #include <gtest/gtest.h>
 #include <math.h>

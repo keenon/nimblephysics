@@ -5,7 +5,7 @@
 #include <thread>
 #include <mutex>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <iostream>
 #include <fstream>
 

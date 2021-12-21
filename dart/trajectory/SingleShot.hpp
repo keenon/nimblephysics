@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"

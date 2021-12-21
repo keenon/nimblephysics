@@ -4,7 +4,7 @@
 #include <memory>
 #include <thread>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/proto/MPC.grpc.pb.h"
 #include "dart/realtime/MPC.hpp"

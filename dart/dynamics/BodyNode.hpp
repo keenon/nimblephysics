@@ -36,7 +36,7 @@
 #include <string>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <Eigen/StdVector>
 
 #include "dart/common/Deprecated.hpp"

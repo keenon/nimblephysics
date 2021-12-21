@@ -33,7 +33,7 @@
 #ifndef DART_MATH_CONFIGURATIONSPACE_HPP_
 #define DART_MATH_CONFIGURATIONSPACE_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"

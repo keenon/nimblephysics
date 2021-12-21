@@ -36,7 +36,7 @@
 #include <vector>
 #include <string>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/LockableReference.hpp"
 #include "dart/common/Signal.hpp"

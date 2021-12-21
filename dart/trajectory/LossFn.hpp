@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/trajectory/TrajectoryConstants.hpp"

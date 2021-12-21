@@ -36,7 +36,7 @@
 #include <map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/Deprecated.hpp"
 #include "dart/common/Memory.hpp"

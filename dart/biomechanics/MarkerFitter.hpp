@@ -7,7 +7,7 @@
 #include <mutex>
 #include <vector>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 

@@ -33,7 +33,7 @@
 #ifndef DART_MATH_GEOMETRY_HPP_
 #define DART_MATH_GEOMETRY_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/Deprecated.hpp"
 #include "dart/math/Constants.hpp"

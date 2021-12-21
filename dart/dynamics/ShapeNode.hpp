@@ -33,7 +33,7 @@
 #ifndef DART_DYNAMICS_SHAPENODE_HPP_
 #define DART_DYNAMICS_SHAPENODE_HPP_
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/Signal.hpp"
 #include "dart/dynamics/detail/ShapeNode.hpp"

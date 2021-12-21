@@ -36,7 +36,7 @@
 #include <vector>
 #include <map>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/common/Factory.hpp"
 #include "dart/collision/Contact.hpp"

@@ -30,7 +30,7 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <dart/math/MultivariateGaussian.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>

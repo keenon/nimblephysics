@@ -34,7 +34,7 @@
 #define DART_UTILS_FILEINFOC3D_HPP_
 
 #include <vector>
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 
 #include "dart/math/MathTypes.hpp"
 

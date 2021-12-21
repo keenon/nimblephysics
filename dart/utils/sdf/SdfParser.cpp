@@ -38,7 +38,7 @@
 #include <map>
 #include <string>
 
-#include <Eigen/Dense>
+#include "dart/include_eigen.hpp"
 #include <Eigen/StdVector>
 #include <tinyxml2.h>
 
