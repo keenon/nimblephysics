@@ -267,6 +267,13 @@ void World::runLcpConstraintEngine(bool _resetCommand)
 //==============================================================================
 void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
 {
+  dtwarn << "[World::replaceConstraintEngineFn] WARNING: "
+          "GRADIENTS WILL "
+        << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+        << "don't yet support differentiating through `timestep()` if you've "
+        << "called `replaceConstraintEngineFn()` to "
+          "customize the constraint engine function.\n";
+
   mConstraintEngineFn = engineFn;
 }
 
