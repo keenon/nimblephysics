@@ -175,10 +175,10 @@ void World(py::module& m)
             return self->getNumBodyNodes();
           })
       .def(
-          "getBodyNodeIndex",
+          "getBodyNodeByIndex",
           +[](dart::simulation::World* self,
               std::size_t _index) -> dart::dynamics::BodyNode* {
-            return self->getBodyNodeIndex(_index);
+            return self->getBodyNodeByIndex(_index);
           })
       .def(
           "getSimpleFrame",

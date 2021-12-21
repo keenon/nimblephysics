@@ -12,7 +12,7 @@ def dummy_callback():
 #     friction_coefs = []
 #     bodies = []
 #     for i in range(world.getNumBodyNodes()):
-#         body = world.getBodyNodeIndex(i)
+#         body = world.getBodyNodeByIndex(i)
 #         bodies.append(body)
 #         friction_coefs.append(body.getFrictionCoeff())
 #         body.setFrictionCoeff(0.0)
