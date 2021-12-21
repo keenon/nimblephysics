@@ -15,10 +15,10 @@ def main():
 
     def full_frictionless_lcp_engine(resetCommand, ignoreFrictionConstraints):
         world.runLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
-        world.runFrictionlessLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
+        world.runFrictionlessLcpConstraintEngine(resetCommand)
 
     def frictionless_full_lcp_engine(resetCommand, ignoreFrictionConstraints):
-        world.runFrictionlessLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
+        world.runFrictionlessLcpConstraintEngine(resetCommand)
         world.runLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
 
     engines = [
