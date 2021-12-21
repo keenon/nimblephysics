@@ -259,6 +259,17 @@ void World(py::module& m)
           },
           ::py::arg("resetCommand"))
       .def(
+          "integratePositions",
+          +[](dart::simulation::World* self, Eigen::VectorXs initialVelocity)
+              -> void { return self->integratePositions(initialVelocity); },
+          ::py::arg("initialVelocity"))
+      .def(
+          "integrateVelocitiesFromImpulses",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->integrateVelocitiesFromImpulses(_resetCommand);
+          },
+          ::py::arg("resetCommand"))
+      .def(
           "setTime",
           +[](dart::simulation::World* self, s_t _time) -> void {
             return self->setTime(_time);
@@ -314,9 +325,8 @@ void World(py::module& m)
           })
       .def(
           "getMasses",
-          +[](dart::simulation::World* self) -> Eigen::VectorXs {
-            return self->getMasses();
-          })
+          +[](dart::simulation::World* self)
+              -> Eigen::VectorXs { return self->getMasses(); })
       .def(
           "getControlForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
