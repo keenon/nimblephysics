@@ -495,9 +495,6 @@ public:
   /// Integrate positions.
   void integratePositions(Eigen::VectorXs initialVelocity);
 
-  /// Integrate positions.
-  void integratePositions(Eigen::VectorXs initialVelocity);
-
   /// Set current time
   void setTime(s_t _time);
 
