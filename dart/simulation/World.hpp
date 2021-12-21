@@ -484,7 +484,7 @@ public:
   void runConstraintEngine(bool _resetCommand);
 
   /// The default constraint engine which runs an LCP.
-  void lcpConstraintEngine(simulation::World* world, bool _resetCommand);
+  void lcpConstraintEngine(bool _resetCommand);
 
   /// Replace the default constraint engine with a custom one.
   void replaceConstraintEngine(const constraintEngine& engine);

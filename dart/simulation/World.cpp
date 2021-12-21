@@ -260,7 +260,7 @@ void World::runConstraintEngine(bool _resetCommand)
 //==============================================================================
 void World::lcpConstraintEngine(simulation::World* world, bool _resetCommand)
 {
-  mConstraintSolver->solve(world);
+  mConstraintSolver->solve();
   integrateVelocitiesFromImpulses(_resetCommand);
 }
 
