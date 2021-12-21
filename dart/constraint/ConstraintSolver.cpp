@@ -88,8 +88,9 @@ ConstraintSolver::ConstraintSolver()
                 // gradients
     mContactClippingDepth(
         0.03), // Default to clipping only after fairly deep penetration
-    mEnforceContactAndJointAndCustomConstraints(
-        [this]() { return lcpSolveCallback(); })
+    mEnforceContactAndJointAndCustomConstraintsFn([this]() {
+      return enforceContactAndJointAndCustomConstraintsWithLcp();
+    })
 {
 }
 
@@ -374,21 +375,25 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 //==============================================================================
 void ConstraintSolver::solve()
 {
-  mEnforceContactAndJointAndCustomConstraints();
+  mEnforceContactAndJointAndCustomConstraintsFn();
 }
 
 //==============================================================================
-void ConstraintSolver::replaceSolveCallback(const solveCallback& f)
+void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
+    const enforceContactAndJointAndCustomConstraintsFnType& f)
 {
-  dtwarn << "[ConstraintSolver::replaceSolveCallback] WARNING: GRADIENTS WILL "
+  dtwarn << "[ConstraintSolver::"
+            "replaceEnforceContactAndJointAndCustomConstraintsFn] WARNING: "
+            "GRADIENTS WILL "
          << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
          << "don't yet support differentiating through `timestep()` if you've "
-         << "called `replaceSolveCallback()` to customize the solve function.";
-  mEnforceContactAndJointAndCustomConstraints = f;
+         << "called `replaceEnforceContactAndJointAndCustomConstraintsFn()` to "
+            "customize the solve function.";
+  mEnforceContactAndJointAndCustomConstraintsFn = f;
 }
 
 //==============================================================================
-void ConstraintSolver::lcpSolveCallback()
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
 {
   for (auto& skeleton : mSkeletons)
   {

@@ -62,7 +62,8 @@ namespace constraint {
 class ConstraintSolver
 {
 public:
-  using solveCallback = std::function<void(void)>;
+  using enforceContactAndJointAndCustomConstraintsFnType
+      = std::function<void(void)>;
 
   /// Constructor
   ///
@@ -188,11 +189,12 @@ public:
   /// Solve constraint impulses and apply them to the skeletons
   void solve();
 
-  /// Solve callback function that uses LCP.
-  void lcpSolveCallback();
+  /// Enforce contact, joint, and custom constraints using LCP.
+  void enforceContactAndJointAndCustomConstraintsWithLcp();
 
   /// Replace the default solve callback function.
-  void replaceSolveCallback(const solveCallback& f);
+  void replaceEnforceContactAndJointAndCustomConstraintsFn(
+      const enforceContactAndJointAndCustomConstraintsFnType& f);
 
   /// Update constraints
   void updateConstraints();
@@ -352,8 +354,10 @@ protected:
   /// impossibly deep inter-penetration during multiple shooting optimization.
   s_t mContactClippingDepth;
 
-  /// Solve constraints callback function.
-  solveCallback mEnforceContactAndJointAndCustomConstraints;
+  /// Function that we will call during solve() to enforce contact, joint, and
+  /// custom constraints.
+  enforceContactAndJointAndCustomConstraintsFnType
+      mEnforceContactAndJointAndCustomConstraintsFn;
 };
 
 } // namespace constraint

@@ -201,13 +201,14 @@ void ConstraintSolver(py::module& m)
           "solve",
           +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
       .def(
-          "lcpSolveCallback",
+          "enforceContactAndJointAndCustomConstraintsWithLcp",
           +[](dart::constraint::ConstraintSolver* self) {
-            self->lcpSolveCallback();
+            self->enforceContactAndJointAndCustomConstraintsWithLcp();
           })
       .def(
-          "replaceSolveCallback",
-          &dart::constraint::ConstraintSolver::replaceSolveCallback);
+          "replaceEnforceContactAndJointAndCustomConstraintsFn",
+          &dart::constraint::ConstraintSolver::
+              replaceEnforceContactAndJointAndCustomConstraintsFn);
 }
 
 } // namespace python

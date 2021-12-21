@@ -33,12 +33,12 @@ def main():
     callbacks = [
         None,  # Use default LCP, don't replace
         dummy_callback,  # Replace with dummy function
-        solver.lcpSolveCallback,  # Replace with the same function as default
+        solver.enforceContactAndJointAndCustomConstraintsWithLcp,  # Replace with the same function as default
         # frictionless_lcp_callback,
     ]
     for callback in callbacks:
         if callback is not None:
-            solver.replaceSolveCallback(callback)
+            solver.replaceEnforceContactAndJointAndCustomConstraintsFn(callback)
             print(callback.__name__)
         else:
             print("None")
