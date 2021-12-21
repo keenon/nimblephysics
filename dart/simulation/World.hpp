@@ -487,7 +487,7 @@ public:
   void runLcpConstraintEngine(bool _resetCommand);
 
   /// Replace the default constraint engine with a custom one.
-  void replaceConstraintEngine(const constraintEngineFnType& engine);
+  void replaceConstraintEngineFn(const constraintEngineFnType& engineFn);
 
   /// Integrate velocities given impulses.
   void integrateVelocitiesFromImpulses(bool _resetCommand = true);
