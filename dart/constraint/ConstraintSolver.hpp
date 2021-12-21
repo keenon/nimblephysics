@@ -187,7 +187,7 @@ public:
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
-  void solve(bool ignoreFrictionConstraints = false);
+  void runEnforceContactAndJointAndCustomConstraintsFn(bool ignoreFrictionConstraints = false);
 
   /// Enforce contact, joint, and custom constraints using LCP.
   void enforceContactAndJointAndCustomConstraintsWithLcp(bool ignoreFrictionConstraints = false);

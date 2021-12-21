@@ -373,7 +373,7 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve(bool ignoreFrictionConstraints)
+void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn(bool ignoreFrictionConstraints)
 {
   mEnforceContactAndJointAndCustomConstraintsFn(ignoreFrictionConstraints);
 }

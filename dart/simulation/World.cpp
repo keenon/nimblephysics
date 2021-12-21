@@ -260,7 +260,7 @@ void World::runConstraintEngine(bool _resetCommand, bool ignoreFrictionConstrain
 //==============================================================================
 void World::runLcpConstraintEngine(bool _resetCommand, bool ignoreFrictionConstraints)
 {
-  mConstraintSolver->solve(ignoreFrictionConstraints);
+  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn(ignoreFrictionConstraints);
   integrateVelocitiesFromImpulses(_resetCommand);
 }
 

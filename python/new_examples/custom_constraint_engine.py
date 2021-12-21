@@ -7,24 +7,6 @@ def runDummyConstraintEngine(reset):
     pass
 
 
-# def frictionless_lcp_callback():
-#     # Backup and remove friction.
-#     friction_coefs = []
-#     bodies = []
-#     for i in range(world.getNumBodyNodes()):
-#         body = world.getBodyNodeIndex(i)
-#         bodies.append(body)
-#         friction_coefs.append(body.getFrictionCoeff())
-#         body.setFrictionCoeff(0.0)
-
-#     # Frictionless LCP
-#     lcp_callback()
-
-#     # Restore friction.
-#     for friction_coef, body in zip(friction_coefs, bodies):
-#         body.setFrictionCoeff(friction_coef)
-
-
 def main():
     world = nimble.loadWorld("../../data/skel/test/colliding_cube.skel")
     state = torch.tensor(world.getState())

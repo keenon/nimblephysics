@@ -198,8 +198,8 @@ void ConstraintSolver(py::module& m)
             self->solveConstrainedGroups();
           })
       .def(
-          "solve",
-          +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
+          "runEnforceContactAndJointAndCustomConstraintsFn",
+          +[](dart::constraint::ConstraintSolver* self) { self->runEnforceContactAndJointAndCustomConstraintsFn(); })
       .def(
           "enforceContactAndJointAndCustomConstraintsWithLcp",
           +[](dart::constraint::ConstraintSolver* self) {
