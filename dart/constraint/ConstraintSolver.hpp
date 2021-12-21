@@ -62,7 +62,7 @@ namespace constraint {
 class ConstraintSolver
 {
 public:
-  using solveCallback = std::function<void(simulation::World* world)>;
+  using solveCallback = std::function<void(void)>;
 
   /// Constructor
   ///
@@ -186,10 +186,10 @@ public:
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
-  void solve(simulation::World* world);
+  void solve();
 
   /// Solve callback function that uses LCP.
-  void lcpSolveCallback(simulation::World* world);
+  void lcpSolveCallback();
 
   /// Replace the default solve callback function.
   void replaceSolveCallback(const solveCallback& f);
@@ -201,12 +201,10 @@ public:
   void buildConstrainedGroups();
 
   /// Solve constrained groups
-  void solveConstrainedGroups(simulation::World* world);
+  void solveConstrainedGroups();
 
   // Solve for constraint impulses to apply to each constraint in group.
-  virtual std::vector<s_t*> solveConstrainedGroup(
-      ConstrainedGroup& group, simulation::World* world)
-      = 0;
+  virtual std::vector<s_t*> solveConstrainedGroup(ConstrainedGroup& group) = 0;
 
   /// Apply constraint impulses to each constraint.
   void applyConstraintImpulses(
@@ -232,6 +230,19 @@ public:
   void setPenetrationCorrectionEnabled(bool enable);
 
   bool getPenetrationCorrectionEnabled();
+
+  /// We add this value to the diagonal entries of A, ONLY IF our initial LCP
+  /// solution fails, to help prevent A from being low-rank. This both increases
+  /// the stability of the forward LCP solution, and it also helps prevent cases
+  /// where a low-rank A means that the least-squares stabilization of A has
+  /// illegal negative force values. This corresponds to slightly softening the
+  /// hard contact constraint.
+  ///
+  /// This needs to be a fairly large value (compared to normal CFM), like 1e-3,
+  /// to prevent numerical accuracy issues during the backprop computations. We
+  /// don't use this on most timesteps, so a relatively large CFM constant
+  /// shouldn't affect simulation accuracy.
+  void setFallbackConstraintForceMixingConstant(s_t constant);
 
   /// This gets the cached LCP solution, which is useful to be able to get/set
   /// because it can effect the forward solutions of physics problems because of
@@ -322,6 +333,19 @@ protected:
 
   /// True if we want to enable artificial penetration correction forces
   bool mPenetrationCorrectionEnabled;
+
+  /// We add this value to the diagonal entries of A, ONLY IF our initial LCP
+  /// solution fails, to help prevent A from being low-rank. This both increases
+  /// the stability of the forward LCP solution, and it also helps prevent cases
+  /// where a low-rank A means that the least-squares stabilization of A has
+  /// illegal negative force values. This corresponds to slightly softening the
+  /// hard contact constraint.
+  ///
+  /// This needs to be a fairly large value (compared to normal CFM), like 1e-3,
+  /// to prevent numerical accuracy issues during the backprop computations. We
+  /// don't use this on most timesteps, so a relatively large CFM constant
+  /// shouldn't affect simulation accuracy.
+  s_t mFallbackConstraintForceMixingConstant;
 
   /// Contacts whose penetrationDepth is deeper than this depth will be ignored.
   /// This is a simple solution to avoid extremely nasty situations with

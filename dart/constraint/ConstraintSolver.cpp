@@ -88,8 +88,7 @@ ConstraintSolver::ConstraintSolver()
                 // gradients
     mContactClippingDepth(
         0.03), // Default to clipping only after fairly deep penetration
-    mSolveCallback(
-        [this](simulation::World* world) { return lcpSolveCallback(world); })
+    mSolveCallback([this]() { return lcpSolveCallback(); })
 {
 }
 
@@ -441,6 +440,12 @@ void ConstraintSolver::setPenetrationCorrectionEnabled(bool enable)
 bool ConstraintSolver::getPenetrationCorrectionEnabled()
 {
   return mPenetrationCorrectionEnabled;
+}
+
+//==============================================================================
+void ConstraintSolver::setFallbackConstraintForceMixingConstant(s_t constant)
+{
+  mFallbackConstraintForceMixingConstant = constant;
 }
 
 //==============================================================================

@@ -53,10 +53,12 @@ ConstrainedGroupGradientMatrices::ConstrainedGroupGradientMatrices(
 
       // Only add this skeleton to our list if it's not already present
 
-      if (std::find(mSkeletonNames.begin(), mSkeletonNames.end(), skel->getName())
+      if (std::find(
+              mSkeletonNames.begin(), mSkeletonNames.end(), skel->getName())
           == mSkeletonNames.end())
       {
         mSkeletonNames.push_back(skel->getName());
+        mSkeletons.push_back(skel);
         mSkeletonOffset[skel->getName()] = mNumDOFs;
         mNumDOFs += skel->getNumDofs();
         skeletons.push_back(skel);
@@ -752,7 +754,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
             mConstraints[j], mConstraintIndices[j], mX(j));
     mDifferentiableConstraints.push_back(constraint);
 
-    mAllConstraintMatrix.col(j) = constraint->getConstraintForces(mSkeletonNames);
+    mAllConstraintMatrix.col(j) = constraint->getConstraintForces(mSkeletons);
 
     if (mContactConstraintMappings(j) == neural::ConstraintMapping::CLAMPING)
     {
@@ -787,7 +789,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
 
       mUpperBoundConstraints.push_back(constraint);
       mUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
-          = constraint->getConstraintForces(mSkeletonNames);
+          = constraint->getConstraintForces(mSkeletons);
       mMassedUpperBoundConstraintMatrix.col(mUpperBoundIndex[j])
           = mMassedImpulseTests[j];
     }
@@ -2246,8 +2248,8 @@ std::size_t ConstrainedGroupGradientMatrices::getNumConstraintDim() const
 }
 
 //==============================================================================
-const std::vector<std::string>& ConstrainedGroupGradientMatrices::getSkeletonNames()
-    const
+const std::vector<std::string>&
+ConstrainedGroupGradientMatrices::getSkeletonNames() const
 {
   return mSkeletonNames;
 }

@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
@@ -107,8 +108,7 @@ public:
   /// cleaned up by this method and made exact. To faccilitate that use case,
   /// this method returns true if it's found a valid solution, whether it
   /// changed anything or not, and false if the solution is invalid.
-  bool opportunisticallyStandardizeResults(
-      simulation::World* world, Eigen::VectorXs& mX);
+  bool opportunisticallyStandardizeResults(Eigen::VectorXs& mX);
 
   /// This returns true if the proposed mX is consistent with our recorded LCP
   /// construction
@@ -122,7 +122,6 @@ public:
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
   void constructMatrices(
-      simulation::World* world,
       Eigen::VectorXi overrideClasses = Eigen::VectorXi::Zero(0));
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
@@ -539,6 +538,10 @@ public:
 
   /// These are the names of skeletons that are covered by this constraint group
   std::vector<std::string> mSkeletonNames;
+
+  /// The list of skeletons that are covered by this constraint group. They
+  /// correspond to the skeleton names in mSkeletonNames.
+  std::vector<dart::dynamics::SkeletonPtr> mSkeletons;
 
   /// For each index in the original force vector, this either points to an
   /// index in the clamping vector, or it contains -1 to indicate the index was

@@ -224,9 +224,9 @@ void BackpropSnapshot::backprop(
     // Set up next timestep loss as a map of the real values
 
     std::size_t cursor = 0;
-    for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
+    for (std::size_t j = 0; j < group->getSkeletonNames().size(); j++)
     {
-      SkeletonPtr skel = world->getSkeleton(group->getSkeletons()[j]);
+      SkeletonPtr skel = world->getSkeleton(group->getSkeletonNames()[j]);
       std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
 
@@ -256,9 +256,9 @@ void BackpropSnapshot::backprop(
     // Read the values back out of the group backprop
 
     cursor = 0;
-    for (std::size_t j = 0; j < group->getSkeletons().size(); j++)
+    for (std::size_t j = 0; j < group->getSkeletonNames().size(); j++)
     {
-      SkeletonPtr skel = world->getSkeleton(group->getSkeletons()[j]);
+      SkeletonPtr skel = world->getSkeleton(group->getSkeletonNames()[j]);
       std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
       std::size_t dofs = skel->getNumDofs();
 
@@ -1669,12 +1669,14 @@ bool BackpropSnapshot::hasBounces()
 }
 
 //==============================================================================
-/// Returns true if we had to deliberately ignore friction on any of our sub-groups in order to solve.
+/// Returns true if we had to deliberately ignore friction on any of our
+/// sub-groups in order to solve.
 bool BackpropSnapshot::getDeliberatelyIgnoreFriction()
 {
   for (auto gradientMatrices : mGradientMatrices)
   {
-    if (gradientMatrices->mDeliberatelyIgnoreFriction) return true;
+    if (gradientMatrices->mDeliberatelyIgnoreFriction)
+      return true;
   }
   return false;
 }
@@ -4243,11 +4245,11 @@ Eigen::MatrixXs BackpropSnapshot::assembleMatrix(
 
     // shuffle the clamps into the main matrix
     std::size_t dofCursorGroup = 0;
-    for (std::size_t k = 0; k < mGradientMatrices[i]->getSkeletons().size();
+    for (std::size_t k = 0; k < mGradientMatrices[i]->getSkeletonNames().size();
          k++)
     {
       SkeletonPtr skel
-          = world->getSkeleton(mGradientMatrices[i]->getSkeletons()[k]);
+          = world->getSkeleton(mGradientMatrices[i]->getSkeletonNames()[k]);
       // This maps to the row in the world matrix
       std::size_t dofCursorWorld = mSkeletonOffset[skel->getName()];
 
@@ -4394,7 +4396,7 @@ Vec BackpropSnapshot::assembleVector(VectorToAssemble whichVector)
       const Vec& vec
           = getVectorToAssemble<Vec>(mGradientMatrices[i], whichVector);
       int groupCursor = 0;
-      for (auto skelName : mGradientMatrices[i]->getSkeletons())
+      for (auto skelName : mGradientMatrices[i]->getSkeletonNames())
       {
         int dofs = mSkeletonDofs[skelName];
         int worldOffset = mSkeletonOffset[skelName];

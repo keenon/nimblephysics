@@ -538,7 +538,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   // leads to numerical instability during the backwards pass.
   if (!success)
   {
-    cfm = mFallbackConstraintForceMixingConstant();
+    cfm = mFallbackConstraintForceMixingConstant;
     // Apply the constraint force mixing
     mABackup.diagonal()
         += Eigen::VectorXs::Ones(mABackup.diagonal().size()) * cfm;
