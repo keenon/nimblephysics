@@ -57,8 +57,7 @@ public:
       const std::shared_ptr<constraint::ConstraintBase>& constraint);
 
   /// This mocks registering a constaint. Useful for testing.
-  void mockRegisterConstraint(
-      s_t restitutionCoeff, s_t penetrationHackVel);
+  void mockRegisterConstraint(s_t restitutionCoeff, s_t penetrationHackVel);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
@@ -176,13 +175,16 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix where damping of each joint has been considered
+  /// This result the diagonal matrix where damping of each joint has been
+  /// considered
   Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix(vector) where spring stiffness of each joint has been considered
+  /// This result the diagonal matrix(vector) where spring stiffness of each
+  /// joint has been considered
   Eigen::VectorXs getSpringStiffVector(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix(vector) where rest position of spring lives
+  /// This result the diagonal matrix(vector) where rest position of spring
+  /// lives
   Eigen::VectorXs getRestPositions(simulation::WorldPtr world);
 
   /// This result is the current velocity of dofs involved in current group
@@ -410,7 +412,7 @@ public:
 
   std::size_t getNumConstraintDim() const;
 
-  const std::vector<std::string>& getSkeletons() const;
+  const std::vector<std::string>& getSkeletonNames() const;
 
   const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getDifferentiableConstraints() const;
@@ -536,7 +538,7 @@ public:
   Eigen::VectorXs mPreLCPVelocities;
 
   /// These are the names of skeletons that are covered by this constraint group
-  std::vector<std::string> mSkeletons;
+  std::vector<std::string> mSkeletonNames;
 
   /// For each index in the original force vector, this either points to an
   /// index in the clamping vector, or it contains -1 to indicate the index was

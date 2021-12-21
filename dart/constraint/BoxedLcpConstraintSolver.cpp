@@ -350,7 +350,7 @@ LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 
 //==============================================================================
 std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
-    LcpInputs lcpInputs, ConstrainedGroup& group, simulation::World* world)
+    LcpInputs lcpInputs, ConstrainedGroup& group)
 {
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
@@ -445,7 +445,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
         aGradientBackup,
         cfm,
         false);
-    grads->constructMatrices(world);
+    grads->constructMatrices();
     success = grads->areResultsStandardized();
     // If this worked, we don't need to reconstruct our constraint matrices,
     // since the ones we just made already work by construction
@@ -538,7 +538,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   // leads to numerical instability during the backwards pass.
   if (!success)
   {
-    cfm = world->getFallbackConstraintForceMixingConstant();
+    cfm = mFallbackConstraintForceMixingConstant();
     // Apply the constraint force mixing
     mABackup.diagonal()
         += Eigen::VectorXs::Ones(mABackup.diagonal().size()) * cfm;
@@ -727,7 +727,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
         aGradientBackup,
         cfm,
         hadToIgnoreFrictionToSolve);
-    group.getGradientConstraintMatrices()->constructMatrices(world);
+    group.getGradientConstraintMatrices()->constructMatrices();
     if (group.getGradientConstraintMatrices()->areResultsStandardized())
     {
       mX = group.getGradientConstraintMatrices()
@@ -790,10 +790,10 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
 
 //==============================================================================
 std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
-    ConstrainedGroup& group, simulation::World* world)
+    ConstrainedGroup& group)
 {
   LcpInputs lcpInputs = buildLcpInputs(group);
-  return solveLcp(lcpInputs, group, world);
+  return solveLcp(lcpInputs, group);
 }
 
 //==============================================================================

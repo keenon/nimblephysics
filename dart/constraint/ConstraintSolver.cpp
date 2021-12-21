@@ -372,9 +372,9 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve(simulation::World* world)
+void ConstraintSolver::solve()
 {
-  mSolveCallback(world);
+  mSolveCallback();
 }
 
 //==============================================================================
@@ -388,7 +388,7 @@ void ConstraintSolver::replaceSolveCallback(const solveCallback& f)
 }
 
 //==============================================================================
-void ConstraintSolver::lcpSolveCallback(simulation::World* world)
+void ConstraintSolver::lcpSolveCallback()
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -405,7 +405,7 @@ void ConstraintSolver::lcpSolveCallback(simulation::World* world)
   buildConstrainedGroups();
 
   // Solve constrained groups
-  solveConstrainedGroups(world);
+  solveConstrainedGroups();
 }
 
 //==============================================================================
@@ -782,7 +782,7 @@ void ConstraintSolver::buildConstrainedGroups()
 }
 
 //==============================================================================
-void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
+void ConstraintSolver::solveConstrainedGroups()
 {
   for (auto& constraintGroup : mConstrainedGroups)
   {
@@ -793,7 +793,7 @@ void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
     if (0u == n)
       continue;
 
-    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup, world);
+    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup);
     applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }
 }
