@@ -564,7 +564,7 @@ void testTwoBlocks(
   // Test the classic formulation
 
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve(world.get());
+  world->getConstraintSolver()->solve();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));
