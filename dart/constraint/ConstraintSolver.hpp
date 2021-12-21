@@ -63,7 +63,7 @@ class ConstraintSolver
 {
 public:
   using enforceContactAndJointAndCustomConstraintsFnType
-      = std::function<void(void)>;
+      = std::function<void(bool)>;
 
   /// Constructor
   ///
@@ -187,17 +187,17 @@ public:
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
-  void solve();
+  void solve(bool ignoreFrictionConstraints = false);
 
   /// Enforce contact, joint, and custom constraints using LCP.
-  void enforceContactAndJointAndCustomConstraintsWithLcp();
+  void enforceContactAndJointAndCustomConstraintsWithLcp(bool ignoreFrictionConstraints = false);
 
   /// Replace the default solve callback function.
   void replaceEnforceContactAndJointAndCustomConstraintsFn(
       const enforceContactAndJointAndCustomConstraintsFnType& f);
 
   /// Update constraints
-  void updateConstraints();
+  void updateConstraints(bool ignoreFrictionConstraints = false);
 
   /// Build constrained groupsContact
   void buildConstrainedGroups();

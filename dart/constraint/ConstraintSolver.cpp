@@ -88,8 +88,8 @@ ConstraintSolver::ConstraintSolver()
                 // gradients
     mContactClippingDepth(
         0.03), // Default to clipping only after fairly deep penetration
-    mEnforceContactAndJointAndCustomConstraintsFn([this]() {
-      return enforceContactAndJointAndCustomConstraintsWithLcp();
+    mEnforceContactAndJointAndCustomConstraintsFn([this](bool ignoreFrictionConstraints) {
+      return enforceContactAndJointAndCustomConstraintsWithLcp(ignoreFrictionConstraints);
     })
 {
 }
@@ -373,9 +373,9 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn(bool frictionless)
+void ConstraintSolver::solve(bool ignoreFrictionConstraints)
 {
-  mEnforceContactAndJointAndCustomConstraintsFn(frictionless);
+  mEnforceContactAndJointAndCustomConstraintsFn(ignoreFrictionConstraints);
 }
 
 //==============================================================================
@@ -393,7 +393,7 @@ void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
 }
 
 //==============================================================================
-void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp(bool frictionless)
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp(bool ignoreFrictionConstraints)
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -404,7 +404,7 @@ void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp(bool fr
   }
 
   // Update constraints and collect active constraints
-  updateConstraints(frictionless);
+  updateConstraints(ignoreFrictionConstraints);
 
   // Build constrained groups
   buildConstrainedGroups();
@@ -539,7 +539,7 @@ bool ConstraintSolver::checkAndAddConstraint(
 }
 
 //==============================================================================
-void ConstraintSolver::updateConstraints(bool frictionless)
+void ConstraintSolver::updateConstraints(bool ignoreFrictionConstraints)
 {
   // Clear previous active constraint list
   mActiveConstraints.clear();
@@ -608,7 +608,7 @@ void ConstraintSolver::updateConstraints(bool frictionless)
     else
     {
       mContactConstraints.push_back(std::make_shared<ContactConstraint>(
-          contact, mTimeStep, mPenetrationCorrectionEnabled));
+          contact, mTimeStep, mPenetrationCorrectionEnabled, ignoreFrictionConstraints));
     }
   }
 
