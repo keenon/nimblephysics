@@ -194,19 +194,16 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "solveConstrainedGroups",
-          +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) {
-            self->solveConstrainedGroups(world);
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->solveConstrainedGroups();
           })
       .def(
           "solve",
-          +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) { self->solve(world); })
+          +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
       .def(
           "lcpSolveCallback",
-          +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) {
-            self->lcpSolveCallback(world);
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->lcpSolveCallback();
           })
       .def(
           "replaceSolveCallback",
