@@ -133,6 +133,15 @@ void Geometry(py::module& m)
       ::py::arg("S"));
 
   m.def(
+      "dAdInvT",
+      +[](const Eigen::Isometry3s& T, 
+          const Eigen::Vector6s& F) -> Eigen::Vector6s {
+        return dart::math::dAdInvT(T, F);
+      },
+      ::py::arg("T"),
+      ::py::arg("F"));
+
+  m.def(
       "rightMultiplyInFreeJointSpace",
       +[](const Eigen::Matrix3s& R,
           const Eigen::Vector3s& p,
