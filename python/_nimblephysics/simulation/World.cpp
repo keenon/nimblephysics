@@ -298,9 +298,9 @@ void World(py::module& m)
             return self->runConstraintEngine(_resetCommand);
           })
       .def(
-          "lcpConstraintEngine",
+          "runLcpConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
-            return self->lcpConstraintEngine(self, _resetCommand);
+            return self->runLcpConstraintEngine(self, _resetCommand);
           })
       .def(
           "replaceConstraintEngine",

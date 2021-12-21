@@ -7,7 +7,7 @@ def dummy_callback():
     pass
 
 def lcp_callback(reset_command):
-    world.lcpConstraintEngine(reset_command)
+    world.runLcpConstraintEngine(reset_command)
 
 # def frictionless_lcp_callback():
 #     # Backup and remove friction.
@@ -30,7 +30,7 @@ def dummy_callback(world: nimble.simulation.World, reset: bool):
     pass
 
 def lcp_callback(world: nimble.simulation.World, reset: bool):
-    world.lcpConstraintEngine(reset)
+    world.runLcpConstraintEngine(reset)
 
 def frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
     # Backup and remove friction.
@@ -43,7 +43,7 @@ def frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
         body.setFrictionCoeff(0.0)
 
     # Frictionless LCP
-    world.lcpConstraintEngine(reset)
+    world.runLcpConstraintEngine(reset)
 
 
 def full_frictionless_lcp_callback(world: nimble.simulation.World, reset: bool):
@@ -59,11 +59,11 @@ def main():
 
     # Try the default arg
     world.integrateVelocitiesFromImpulses()
-    callbacks = [None, dummy_callback, world.lcpConstraintEngine, lcp_callback, frictionless_lcp_callback]
+    callbacks = [None, dummy_callback, world.runLcpConstraintEngine, lcp_callback, frictionless_lcp_callback]
     callbacks = [
         None, 
         dummy_callback, 
-        world.lcpConstraintEngine, 
+        world.runLcpConstraintEngine, 
         lcp_callback,
         frictionless_lcp_callback, 
         full_frictionless_lcp_callback,

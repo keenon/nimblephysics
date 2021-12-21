@@ -89,7 +89,7 @@ World::World(const std::string& _name)
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false),
     mConstraintEngine([this](simulation::World* world, bool _resetCommand) {
-      return lcpConstraintEngine(world, _resetCommand);
+      return runLcpConstraintEngine(world, _resetCommand);
     })
 {
   mIndices.push_back(0);
@@ -258,7 +258,7 @@ void World::runConstraintEngine(bool _resetCommand)
 }
 
 //==============================================================================
-void World::lcpConstraintEngine(simulation::World* world, bool _resetCommand)
+void World::runLcpConstraintEngine(simulation::World* world, bool _resetCommand)
 {
   mConstraintSolver->solve();
   integrateVelocitiesFromImpulses(_resetCommand);
