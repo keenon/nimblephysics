@@ -121,6 +121,10 @@ ContactConstraint::ContactConstraint(
       // Update frictional direction
       updateFirstFrictionalDirection();
     }
+    else
+    {
+      mIsFrictionOn = false;
+    }
   }
 
   assert(mBodyNodeA->getSkeleton());
