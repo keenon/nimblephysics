@@ -164,9 +164,7 @@ public:
   std::size_t getNumSkeletons() const;
 
   /// Add a skeleton to this world
-  std::string addSkeleton(
-      const dynamics::SkeletonPtr& _skeleton
-    );
+  std::string addSkeleton(const dynamics::SkeletonPtr& _skeleton);
 
   /// Remove a skeleton from this world
   void removeSkeleton(const dynamics::SkeletonPtr& _skeleton);
@@ -248,7 +246,7 @@ public:
   /// single vector
   Eigen::VectorXs getMasses();
 
-  //Eigen::VectorXs getLinkMasses();
+  // Eigen::VectorXs getLinkMasses();
 
   size_t getLinkMassesDims();
 
@@ -355,7 +353,7 @@ public:
   void setLinkMassIndex(s_t mass, size_t index);
 
   void setLinkCOMs(Eigen::VectorXs coms);
-  
+
   void setLinkMOIs(Eigen::VectorXs mois);
 
   void setLinkMUs(Eigen::VectorXs mus);

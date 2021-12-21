@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/NeuralConstants.hpp"
 #include "dart/neural/NeuralUtils.hpp"
@@ -57,8 +58,7 @@ public:
       const std::shared_ptr<constraint::ConstraintBase>& constraint);
 
   /// This mocks registering a constaint. Useful for testing.
-  void mockRegisterConstraint(
-      s_t restitutionCoeff, s_t penetrationHackVel);
+  void mockRegisterConstraint(s_t restitutionCoeff, s_t penetrationHackVel);
 
   /// This gets called during the setup of the ConstrainedGroupGradientMatrices
   /// at each constraint's dimension. It gets called _after_ the system has
@@ -108,8 +108,7 @@ public:
   /// cleaned up by this method and made exact. To faccilitate that use case,
   /// this method returns true if it's found a valid solution, whether it
   /// changed anything or not, and false if the solution is invalid.
-  bool opportunisticallyStandardizeResults(
-      simulation::World* world, Eigen::VectorXs& mX);
+  bool opportunisticallyStandardizeResults(Eigen::VectorXs& mX);
 
   /// This returns true if the proposed mX is consistent with our recorded LCP
   /// construction
@@ -123,7 +122,6 @@ public:
   /// be called once, and after this is called you cannot call
   /// measureConstraintImpulse() again!
   void constructMatrices(
-      simulation::World* world,
       Eigen::VectorXi overrideClasses = Eigen::VectorXi::Zero(0));
 
   /// This computes and returns the whole vel-vel jacobian for this group. For
@@ -176,13 +174,16 @@ public:
   /// concatenation of the skeleton inverse mass matrices.
   Eigen::MatrixXs getInvMassMatrix(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix where damping of each joint has been considered
+  /// This result the diagonal matrix where damping of each joint has been
+  /// considered
   Eigen::VectorXs getDampingVector(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix(vector) where spring stiffness of each joint has been considered
+  /// This result the diagonal matrix(vector) where spring stiffness of each
+  /// joint has been considered
   Eigen::VectorXs getSpringStiffVector(simulation::WorldPtr world);
 
-  /// This result the diagonal matrix(vector) where rest position of spring lives
+  /// This result the diagonal matrix(vector) where rest position of spring
+  /// lives
   Eigen::VectorXs getRestPositions(simulation::WorldPtr world);
 
   /// This result is the current velocity of dofs involved in current group
@@ -410,7 +411,7 @@ public:
 
   std::size_t getNumConstraintDim() const;
 
-  const std::vector<std::string>& getSkeletons() const;
+  const std::vector<std::string>& getSkeletonNames() const;
 
   const std::vector<std::shared_ptr<DifferentiableContactConstraint>>&
   getDifferentiableConstraints() const;
@@ -536,7 +537,11 @@ public:
   Eigen::VectorXs mPreLCPVelocities;
 
   /// These are the names of skeletons that are covered by this constraint group
-  std::vector<std::string> mSkeletons;
+  std::vector<std::string> mSkeletonNames;
+
+  /// The list of skeletons that are covered by this constraint group. They
+  /// correspond to the skeleton names in mSkeletonNames.
+  std::vector<dart::dynamics::SkeletonPtr> mSkeletons;
 
   /// For each index in the original force vector, this either points to an
   /// index in the clamping vector, or it contains -1 to indicate the index was
