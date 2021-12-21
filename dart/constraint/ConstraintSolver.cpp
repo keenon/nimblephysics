@@ -88,8 +88,8 @@ ConstraintSolver::ConstraintSolver()
                 // gradients
     mContactClippingDepth(
         0.03), // Default to clipping only after fairly deep penetration
-    mEnforceContactAndJointAndCustomConstraintsFn([this](bool ignoreFrictionConstraints) {
-      return enforceContactAndJointAndCustomConstraintsWithLcp(ignoreFrictionConstraints);
+    mEnforceContactAndJointAndCustomConstraintsFn([this]() {
+      return enforceContactAndJointAndCustomConstraintsWithLcp();
     })
 {
 }
@@ -373,9 +373,9 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn(bool ignoreFrictionConstraints)
+void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn()
 {
-  mEnforceContactAndJointAndCustomConstraintsFn(ignoreFrictionConstraints);
+  mEnforceContactAndJointAndCustomConstraintsFn();
 }
 
 //==============================================================================
@@ -390,6 +390,12 @@ void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
          << "called `replaceEnforceContactAndJointAndCustomConstraintsFn()` to "
             "customize the solve function.";
   mEnforceContactAndJointAndCustomConstraintsFn = f;
+}
+
+//==============================================================================
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp()
+{
+  enforceContactAndJointAndCustomConstraintsWithLcp(true);
 }
 
 //==============================================================================

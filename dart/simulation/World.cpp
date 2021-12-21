@@ -88,8 +88,8 @@ World::World(const std::string& _name)
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false),
-    mConstraintEngineFn([this](bool _resetCommand, bool ignoreFrictionConstraints) {
-      return runLcpConstraintEngine(_resetCommand, ignoreFrictionConstraints);
+    mConstraintEngineFn([this](bool _resetCommand) {
+      return runLcpConstraintEngine(_resetCommand);
     })
 {
   mIndices.push_back(0);
@@ -252,22 +252,28 @@ void World::step(bool _resetCommand)
 }
 
 //==============================================================================
-void World::runConstraintEngine(bool _resetCommand, bool ignoreFrictionConstraints)
+void World::runConstraintEngine(bool _resetCommand)
 {
-  mConstraintEngineFn(_resetCommand, ignoreFrictionConstraints);
+  mConstraintEngineFn(_resetCommand);
 }
 
 //==============================================================================
-void World::runLcpConstraintEngine(bool _resetCommand, bool ignoreFrictionConstraints)
+void World::runLcpConstraintEngine(bool _resetCommand)
 {
-  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn(ignoreFrictionConstraints);
+  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn();
   integrateVelocitiesFromImpulses(_resetCommand);
 }
 
 //==============================================================================
 void World::runFrictionlessLcpConstraintEngine(bool _resetCommand)
 {
-  runLcpConstraintEngine(_resetCommand, true);
+  // Replace with frictionless version of enforce constraints function.
+  mConstraintSolver->replaceEnforceContactAndJointAndCustomConstraintsFn(
+    [this]() {
+      return mConstraintSolver->enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp();
+    });
+  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn();
+  integrateVelocitiesFromImpulses(_resetCommand);
 }
 
 //==============================================================================

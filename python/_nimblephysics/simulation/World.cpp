@@ -294,18 +294,16 @@ void World(py::module& m)
           ::py::return_value_policy::reference_internal)
       .def(
           "runConstraintEngine",
-          +[](dart::simulation::World* self, bool _resetCommand, bool ignoreFrictionConstraints) -> void {
-            return self->runConstraintEngine(_resetCommand, ignoreFrictionConstraints);
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runConstraintEngine(_resetCommand);
           },
-          ::py::arg("resetCommand"),
-          ::py::arg("ignoreFrictionConstraints") = false)
+          ::py::arg("resetCommand"))
       .def(
           "runLcpConstraintEngine",
-          +[](dart::simulation::World* self, bool _resetCommand, bool ignoreFrictionConstraints) -> void {
-            return self->runLcpConstraintEngine(_resetCommand, ignoreFrictionConstraints);
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runLcpConstraintEngine(_resetCommand);
           },
-          ::py::arg("resetCommand"),
-          ::py::arg("ignoreFrictionConstraints") = false)
+          ::py::arg("resetCommand"))
       .def(
           "runFrictionlessLcpConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {

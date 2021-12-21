@@ -93,7 +93,7 @@ public:
   using NameChangedSignal = common::Signal<void(
       const std::string& _oldName, const std::string& _newName)>;
 
-  using constraintEngineFnType = std::function<void(bool, bool)>;
+  using constraintEngineFnType = std::function<void(bool)>;
 
   /// Creates World as shared_ptr
   template <typename... Args>
@@ -481,10 +481,10 @@ public:
 
   /// Run the constraint engine which solves for constraint impulses and
   /// integrates velocities given these constraint impulses.
-  void runConstraintEngine(bool _resetCommand, bool ignoreFrictionConstraints = false);
+  void runConstraintEngine(bool _resetCommand);
 
   /// The default constraint engine which runs an LCP.
-  void runLcpConstraintEngine(bool _resetCommand, bool ignoreFrictionConstraints = false);
+  void runLcpConstraintEngine(bool _resetCommand);
 
   /// A constraint engine that runs a frictionless LCP.
   void runFrictionlessLcpConstraintEngine(bool _resetCommand);
