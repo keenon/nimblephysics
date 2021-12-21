@@ -41,7 +41,7 @@
 
 using namespace dart;
 
-TEST(ConstraintSolver, SIMPLE)
+std::shared_ptr<simulation::World> loadWorldAndIntegrateNonConstraintForces()
 {
   // Load a world where a cube is colliding with the ground.
   std::shared_ptr<simulation::World> world
@@ -59,9 +59,17 @@ TEST(ConstraintSolver, SIMPLE)
   skel->integrateVelocities(world->getTimeStep());
   // 0, 0, 0, 0, -0.00981, 0
   EXPECT_TRUE(box->getRelativeSpatialVelocity()[4] < 0);
+  return world;
+}
+
+TEST(ConstraintSolver, Simple)
+{
+  auto world = loadWorldAndIntegrateNonConstraintForces();
+  auto skel = world->getSkeleton("box skeleton");
+  auto box = skel->getBodyNode("box");
+  auto solver = world->getConstraintSolver();
 
   // Collision detection.
-  auto solver = world->getConstraintSolver();
   solver->updateConstraints();
   solver->buildConstrainedGroups();
   EXPECT_TRUE(solver->getLastCollisionResult().getNumContacts() > 0);
@@ -79,5 +87,26 @@ TEST(ConstraintSolver, SIMPLE)
   // velocity after integration.
   EXPECT_TRUE(skel->isImpulseApplied());
   skel->computeImpulseForwardDynamics();
+  EXPECT_TRUE(box->getRelativeSpatialVelocity()[4] >= 0);
+}
+
+TEST(ConstraintSolver, ReplaceConstraintEngineWithFrictionlessLcp)
+{
+  auto world = loadWorldAndIntegrateNonConstraintForces();
+  auto skel = world->getSkeleton("box skeleton");
+  auto box = skel->getBodyNode("box");
+  auto solver = world->getConstraintSolver();
+
+  world->replaceConstraintEngineFn([world](bool _resetCommand) {
+      return world->runFrictionlessLcpConstraintEngine(_resetCommand);
+    });
+  world->runConstraintEngine(false);
+
+  // Collision detection.
+  EXPECT_TRUE(solver->getLastCollisionResult().getNumContacts() > 0);
+  EXPECT_TRUE(solver->getNumConstrainedGroups() > 0);
+
+  // Integrate velocities from solved impulses. Should have non-negative normal
+  // velocity after integration.
   EXPECT_TRUE(box->getRelativeSpatialVelocity()[4] >= 0);
 }
