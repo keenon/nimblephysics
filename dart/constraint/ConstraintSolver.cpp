@@ -380,6 +380,10 @@ void ConstraintSolver::solve(simulation::World* world)
 //==============================================================================
 void ConstraintSolver::replaceSolveCallback(const solveCallback& f)
 {
+  dtwarn << "[ConstraintSolver::replaceSolveCallback] WARNING: GRADIENTS WILL "
+         << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+         << "don't yet support differentiating through `timestep()` if you've "
+         << "called `replaceSolveCallback()` to customize the solve function.";
   mSolveCallback = f;
 }
 
