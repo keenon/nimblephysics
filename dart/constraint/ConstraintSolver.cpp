@@ -88,7 +88,8 @@ ConstraintSolver::ConstraintSolver()
                 // gradients
     mContactClippingDepth(
         0.03), // Default to clipping only after fairly deep penetration
-    mSolveCallback([this]() { return lcpSolveCallback(); })
+    mEnforceContactAndJointAndCustomConstraints(
+        [this]() { return lcpSolveCallback(); })
 {
 }
 
@@ -373,7 +374,7 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 //==============================================================================
 void ConstraintSolver::solve()
 {
-  mSolveCallback();
+  mEnforceContactAndJointAndCustomConstraints();
 }
 
 //==============================================================================
@@ -383,7 +384,7 @@ void ConstraintSolver::replaceSolveCallback(const solveCallback& f)
          << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
          << "don't yet support differentiating through `timestep()` if you've "
          << "called `replaceSolveCallback()` to customize the solve function.";
-  mSolveCallback = f;
+  mEnforceContactAndJointAndCustomConstraints = f;
 }
 
 //==============================================================================

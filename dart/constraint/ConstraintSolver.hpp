@@ -353,7 +353,7 @@ protected:
   s_t mContactClippingDepth;
 
   /// Solve constraints callback function.
-  solveCallback mSolveCallback;
+  solveCallback mEnforceContactAndJointAndCustomConstraints;
 };
 
 } // namespace constraint
