@@ -3,7 +3,7 @@ import nimblephysics as nimble
 import torch
 
 
-def runDummyConstraintEngine(resetCommand, ignoreFrictionConstraints):
+def runDummyConstraintEngine(resetCommand):
     pass
 
 
@@ -13,13 +13,13 @@ def main():
     action = torch.zeros((world.getNumDofs()))
     solver = world.getConstraintSolver()
 
-    def full_frictionless_lcp_engine(resetCommand, ignoreFrictionConstraints):
-        world.runLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
+    def full_frictionless_lcp_engine(resetCommand):
+        world.runLcpConstraintEngine(resetCommand)
         world.runFrictionlessLcpConstraintEngine(resetCommand)
 
-    def frictionless_full_lcp_engine(resetCommand, ignoreFrictionConstraints):
+    def frictionless_full_lcp_engine(resetCommand):
         world.runFrictionlessLcpConstraintEngine(resetCommand)
-        world.runLcpConstraintEngine(resetCommand, ignoreFrictionConstraints)
+        world.runLcpConstraintEngine(resetCommand)
 
     engines = [
         None,  # Use default (don't replace)

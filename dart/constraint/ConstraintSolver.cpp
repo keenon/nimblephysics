@@ -388,7 +388,7 @@ void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
          << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
          << "don't yet support differentiating through `timestep()` if you've "
          << "called `replaceEnforceContactAndJointAndCustomConstraintsFn()` to "
-            "customize the solve function.";
+            "customize the solve function.\n";
   mEnforceContactAndJointAndCustomConstraintsFn = f;
 }
 
