@@ -373,9 +373,9 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve()
+void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn(bool frictionless)
 {
-  mEnforceContactAndJointAndCustomConstraintsFn();
+  mEnforceContactAndJointAndCustomConstraintsFn(frictionless);
 }
 
 //==============================================================================
@@ -393,7 +393,7 @@ void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
 }
 
 //==============================================================================
-void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp(bool frictionless)
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -404,7 +404,7 @@ void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
   }
 
   // Update constraints and collect active constraints
-  updateConstraints();
+  updateConstraints(frictionless);
 
   // Build constrained groups
   buildConstrainedGroups();
@@ -539,7 +539,7 @@ bool ConstraintSolver::checkAndAddConstraint(
 }
 
 //==============================================================================
-void ConstraintSolver::updateConstraints()
+void ConstraintSolver::updateConstraints(bool frictionless)
 {
   // Clear previous active constraint list
   mActiveConstraints.clear();

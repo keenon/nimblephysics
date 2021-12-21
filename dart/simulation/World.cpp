@@ -252,16 +252,22 @@ void World::step(bool _resetCommand)
 }
 
 //==============================================================================
-void World::runConstraintEngine(bool _resetCommand)
+void World::runConstraintEngine(bool _resetCommand, bool frictionless)
 {
-  mConstraintEngineFn(_resetCommand);
+  mConstraintEngineFn(_resetCommand, frictionless);
 }
 
 //==============================================================================
-void World::runLcpConstraintEngine(bool _resetCommand)
+void World::runLcpConstraintEngine(bool _resetCommand, bool frictionless)
 {
-  mConstraintSolver->solve();
+  mConstraintSolver->solve(frictionless);
   integrateVelocitiesFromImpulses(_resetCommand);
+}
+
+//==============================================================================
+void World::runFrictionlessLcpConstraintEngine(bool _resetCommand)
+{
+  runLcpConstraintEngine(_resetCommand, true);
 }
 
 //==============================================================================

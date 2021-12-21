@@ -66,7 +66,8 @@ s_t ContactConstraint::mConstraintForceMixing = DART_CFM;
 ContactConstraint::ContactConstraint(
     collision::Contact& contact,
     s_t timeStep,
-    bool penetrationCorrectionEnabled)
+    bool penetrationCorrectionEnabled,
+    bool ignoreFrictionConstraints)
   : ConstraintBase(),
     mTimeStep(timeStep),
     mBodyNodeA(const_cast<dynamics::ShapeFrame*>(
@@ -102,21 +103,24 @@ ContactConstraint::ContactConstraint(
   //----------------------------------------------
   // Friction
   //----------------------------------------------
-  // TODO(JS): Assume the frictional coefficient can be changed during
-  //           simulation steps.
-  // Update mFrictionalCoff
-  mFrictionCoeff = std::min(
-      mBodyNodeA->getFrictionCoeff(), mBodyNodeB->getFrictionCoeff());
-  if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
+  if (ignoreFrictionConstraints)
   {
-    mIsFrictionOn = true;
-
-    // Update frictional direction
-    updateFirstFrictionalDirection();
+    mIsFrictionOn = false;
   }
   else
   {
-    mIsFrictionOn = false;
+    // TODO(JS): Assume the frictional coefficient can be changed during
+    //           simulation steps.
+    // Update mFrictionalCoff
+    mFrictionCoeff = std::min(
+        mBodyNodeA->getFrictionCoeff(), mBodyNodeB->getFrictionCoeff());
+    if (mFrictionCoeff > DART_FRICTION_COEFF_THRESHOLD)
+    {
+      mIsFrictionOn = true;
+
+      // Update frictional direction
+      updateFirstFrictionalDirection();
+    }
   }
 
   assert(mBodyNodeA->getSkeleton());
