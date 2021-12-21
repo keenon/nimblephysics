@@ -244,7 +244,7 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
-  runConstraintEngine(_resetCommand);
+  runRegisteredConstraintEngine(_resetCommand);
   integratePositions(initialVelocity);
 
   mTime += mTimeStep;
@@ -252,7 +252,7 @@ void World::step(bool _resetCommand)
 }
 
 //==============================================================================
-void World::runConstraintEngine(bool _resetCommand)
+void World::runRegisteredConstraintEngine(bool _resetCommand)
 {
   mConstraintEngineFn(_resetCommand);
 }

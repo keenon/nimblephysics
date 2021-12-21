@@ -481,7 +481,7 @@ public:
 
   /// Run the constraint engine which solves for constraint impulses and
   /// integrates velocities given these constraint impulses.
-  void runConstraintEngine(bool _resetCommand);
+  void runRegisteredConstraintEngine(bool _resetCommand);
 
   /// The default constraint engine which runs an LCP.
   void runLcpConstraintEngine(bool _resetCommand);

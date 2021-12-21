@@ -100,7 +100,7 @@ TEST(ConstraintSolver, ReplaceConstraintEngineWithFrictionlessLcp)
   world->replaceConstraintEngineFn([world](bool _resetCommand) {
       return world->runFrictionlessLcpConstraintEngine(_resetCommand);
     });
-  world->runConstraintEngine(false);
+  world->runRegisteredConstraintEngine(false);
 
   // Collision detection.
   EXPECT_TRUE(solver->getLastCollisionResult().getNumContacts() > 0);
