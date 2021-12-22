@@ -474,7 +474,14 @@ public:
   /// command after simulation step.
   void step(bool _resetCommand = true);
 
+  /// Integrate non-constraint forces.
   void integrateVelocities();
+
+  /// Integrate velocities given impulses.
+  void integrateVelocitiesFromImpulses(bool _resetCommand = true);
+
+  /// Integrate positions.
+  void integratePositions(Eigen::VectorXs initialVelocity);
 
   /// Set current time
   void setTime(s_t _time);
