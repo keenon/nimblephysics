@@ -88,7 +88,7 @@ World::World(const std::string& _name)
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false),
-    mConstraintEngineFn([this](bool _resetCommand) {
+    mRegisteredConstraintEngine([this](bool _resetCommand) {
       return runLcpConstraintEngine(_resetCommand);
     })
 {
@@ -244,7 +244,7 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
-  runConstraintEngine(_resetCommand);
+  runRegisteredConstraintEngine(_resetCommand);
   integratePositions(initialVelocity);
 
   mTime += mTimeStep;
@@ -252,15 +252,27 @@ void World::step(bool _resetCommand)
 }
 
 //==============================================================================
-void World::runConstraintEngine(bool _resetCommand)
+void World::runRegisteredConstraintEngine(bool _resetCommand)
 {
-  mConstraintEngineFn(_resetCommand);
+  mRegisteredConstraintEngine(_resetCommand);
 }
 
 //==============================================================================
 void World::runLcpConstraintEngine(bool _resetCommand)
 {
-  mConstraintSolver->solve();
+  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn();
+  integrateVelocitiesFromImpulses(_resetCommand);
+}
+
+//==============================================================================
+void World::runFrictionlessLcpConstraintEngine(bool _resetCommand)
+{
+  // Replace with frictionless version of enforce constraints function.
+  mConstraintSolver->replaceEnforceContactAndJointAndCustomConstraintsFn(
+    [this]() {
+      return mConstraintSolver->enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp();
+    });
+  mConstraintSolver->runEnforceContactAndJointAndCustomConstraintsFn();
   integrateVelocitiesFromImpulses(_resetCommand);
 }
 
@@ -274,7 +286,7 @@ void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
         << "called `replaceConstraintEngineFn()` to "
           "customize the constraint engine function.\n";
 
-  mConstraintEngineFn = engineFn;
+  mRegisteredConstraintEngine = engineFn;
 }
 
 //==============================================================================

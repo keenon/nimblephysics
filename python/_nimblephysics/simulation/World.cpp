@@ -293,15 +293,23 @@ void World(py::module& m)
           },
           ::py::return_value_policy::reference_internal)
       .def(
-          "runConstraintEngine",
+          "runRegisteredConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
-            return self->runConstraintEngine(_resetCommand);
-          })
+            return self->runRegisteredConstraintEngine(_resetCommand);
+          },
+          ::py::arg("resetCommand") = true)
       .def(
           "runLcpConstraintEngine",
           +[](dart::simulation::World* self, bool _resetCommand) -> void {
             return self->runLcpConstraintEngine(_resetCommand);
-          })
+          },
+          ::py::arg("resetCommand") = true)
+      .def(
+          "runFrictionlessLcpConstraintEngine",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runFrictionlessLcpConstraintEngine(_resetCommand);
+          },
+          ::py::arg("resetCommand") = true)
       .def(
           "replaceConstraintEngineFn",
           &dart::simulation::World::replaceConstraintEngineFn)

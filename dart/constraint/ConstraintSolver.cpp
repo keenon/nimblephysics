@@ -373,7 +373,7 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve()
+void ConstraintSolver::runEnforceContactAndJointAndCustomConstraintsFn()
 {
   mEnforceContactAndJointAndCustomConstraintsFn();
 }
@@ -388,12 +388,18 @@ void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
          << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
          << "don't yet support differentiating through `timestep()` if you've "
          << "called `replaceEnforceContactAndJointAndCustomConstraintsFn()` to "
-            "customize the solve function.";
+            "customize the solve function.\n";
   mEnforceContactAndJointAndCustomConstraintsFn = f;
 }
 
 //==============================================================================
-void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp()
+{
+  enforceContactAndJointAndCustomConstraintsWithLcp(true);
+}
+
+//==============================================================================
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp(bool ignoreFrictionConstraints)
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -404,7 +410,7 @@ void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
   }
 
   // Update constraints and collect active constraints
-  updateConstraints();
+  updateConstraints(ignoreFrictionConstraints);
 
   // Build constrained groups
   buildConstrainedGroups();
@@ -539,7 +545,7 @@ bool ConstraintSolver::checkAndAddConstraint(
 }
 
 //==============================================================================
-void ConstraintSolver::updateConstraints()
+void ConstraintSolver::updateConstraints(bool ignoreFrictionConstraints)
 {
   // Clear previous active constraint list
   mActiveConstraints.clear();
@@ -608,7 +614,7 @@ void ConstraintSolver::updateConstraints()
     else
     {
       mContactConstraints.push_back(std::make_shared<ContactConstraint>(
-          contact, mTimeStep, mPenetrationCorrectionEnabled));
+          contact, mTimeStep, mPenetrationCorrectionEnabled, ignoreFrictionConstraints));
     }
   }
 

@@ -144,7 +144,7 @@ bool verifyClassicClampingConstraintMatrix(
   // Populate the constraint matrices, without taking a time step or integrating
   // velocities
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve();
+  world->getConstraintSolver()->runEnforceContactAndJointAndCustomConstraintsFn();
 
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
