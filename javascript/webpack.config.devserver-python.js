@@ -46,7 +46,7 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: path.join(__dirname, "src", "index.html"),
-      excludeChunks: ['embedded', 'live']
+      excludeChunks: ['embedded', 'embedded_dev']
     })
   ],
   devServer: {

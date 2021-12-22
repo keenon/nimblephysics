@@ -72,7 +72,7 @@ public:
   void renderSkeleton(
       const std::shared_ptr<dynamics::Skeleton>& skel,
       const std::string& prefix = "skel",
-      Eigen::Vector3s overrideColor = -1 * Eigen::Vector3s::Ones());
+      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones());
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
@@ -110,7 +110,7 @@ public:
       const Eigen::Vector3s& size,
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -119,7 +119,7 @@ public:
       std::string key,
       s_t radius,
       const Eigen::Vector3s& pos,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -130,7 +130,7 @@ public:
       s_t height,
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -138,7 +138,7 @@ public:
   void createLine(
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
-      const Eigen::Vector3s& color = Eigen::Vector3s(1.0, 0.5, 0.5));
+      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0));
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -153,7 +153,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -166,7 +166,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -178,7 +178,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -200,8 +200,8 @@ public:
   Eigen::Vector3s getObjectRotation(const std::string& key);
 
   /// This returns the color of an object, if we've got it. Otherwise it
-  /// returns Vector3s::Zero().
-  Eigen::Vector3s getObjectColor(const std::string& key);
+  /// returns Vector4s::Zero().
+  Eigen::Vector4s getObjectColor(const std::string& key);
 
   /// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
   /// radius] for a sphere, and [radius, radius, height] for a capsule. Returns
@@ -216,7 +216,7 @@ public:
   void setObjectRotation(const std::string& key, const Eigen::Vector3s& euler);
 
   /// This changes an object (e.g. box, sphere, line) color
-  void setObjectColor(const std::string& key, const Eigen::Vector3s& color);
+  void setObjectColor(const std::string& key, const Eigen::Vector4s& color);
 
   /// This changes an object (e.g. box, sphere, mesh) size. Has no effect on
   /// lines.
@@ -330,7 +330,7 @@ protected:
     Eigen::Vector3s size;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -340,7 +340,7 @@ protected:
     std::string key;
     s_t radius;
     Eigen::Vector3s pos;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -353,7 +353,7 @@ protected:
     s_t height;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -362,7 +362,7 @@ protected:
   {
     std::string key;
     std::vector<Eigen::Vector3s> points;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
   };
   std::unordered_map<std::string, Line> mLines;
 
@@ -378,7 +378,7 @@ protected:
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
     Eigen::Vector3s scale;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };

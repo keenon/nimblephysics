@@ -87,7 +87,10 @@ World::World(const std::string& _name)
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
-    mSlowDebugResultsAgainstFD(false)
+    mSlowDebugResultsAgainstFD(false),
+    mConstraintEngineFn([this](bool _resetCommand) {
+      return runLcpConstraintEngine(_resetCommand);
+    })
 {
   mIndices.push_back(0);
 
@@ -241,8 +244,42 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
-  mConstraintSolver->solve();
+  runConstraintEngine(_resetCommand);
+  integratePositions(initialVelocity);
 
+  mTime += mTimeStep;
+  mFrame++;
+}
+
+//==============================================================================
+void World::runConstraintEngine(bool _resetCommand)
+{
+  mConstraintEngineFn(_resetCommand);
+}
+
+//==============================================================================
+void World::runLcpConstraintEngine(bool _resetCommand)
+{
+  mConstraintSolver->solve();
+  integrateVelocitiesFromImpulses(_resetCommand);
+}
+
+//==============================================================================
+void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
+{
+  dtwarn << "[World::replaceConstraintEngineFn] WARNING: "
+          "GRADIENTS WILL "
+        << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+        << "don't yet support differentiating through `timestep()` if you've "
+        << "called `replaceConstraintEngineFn()` to "
+          "customize the constraint engine function.\n";
+
+  mConstraintEngineFn = engineFn;
+}
+
+//==============================================================================
+void World::integrateVelocitiesFromImpulses(bool _resetCommand)
+{
   // Compute velocity changes given constraint impulses
   for (auto& skel : mSkeletons)
   {
@@ -255,12 +292,6 @@ void World::step(bool _resetCommand)
       skel->setImpulseApplied(false);
     }
 
-    // <Nimble>: This is the original way integration happened, right after
-    // velocity updates
-    if (!mParallelVelocityAndPositionUpdates)
-      skel->integratePositions(mTimeStep);
-    // </Nimble>
-
     if (_resetCommand)
     {
       skel->clearInternalForces();
@@ -268,26 +299,35 @@ void World::step(bool _resetCommand)
       skel->resetCommands();
     }
   }
+}
 
-  // <Nimble>: This is an easier way to compute gradients for. We update p_t+1
-  // using v_t, instead of v_t+1
-  if (mParallelVelocityAndPositionUpdates)
+//==============================================================================
+void World::integratePositions(Eigen::VectorXs initialVelocity)
+{
+  int cursor = 0;
+  for (auto& skel : mSkeletons)
   {
-    int cursor = 0;
-    for (auto& skel : mSkeletons)
+    if (mParallelVelocityAndPositionUpdates)
     {
+      // <Nimble>: This is an easier way to compute gradients for. We update
+      // p_t+1 using v_t, instead of v_t+1
       int dofs = skel->getNumDofs();
       skel->setPositions(skel->integratePositionsExplicit(
           skel->getPositions(),
           initialVelocity.segment(cursor, dofs),
           mTimeStep));
       cursor += dofs;
+      // </Nimble>: Integrate positions before velocity changes, instead of
+      // after
+    }
+    else
+    {
+      // <Nimble>: This is the original way integration happened, right after
+      // velocity updates
+      skel->integratePositions(mTimeStep);
+      // </Nimble>
     }
   }
-  // </Nimble>: Integrate positions before velocity changes, instead of after
-
-  mTime += mTimeStep;
-  mFrame++;
 }
 
 //==============================================================================

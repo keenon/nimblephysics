@@ -30,3 +30,10 @@ next_state = timestep(world, current_state, control_forces)
 Nimble started life as a fork of the popular DART physics engine, with analytical gradients and a PyTorch binding. We've worked hard to maintain as much backwards compatability as we can, so many simulations that worked in DART should translate directly to Nimble.
 
 Check out our [website](http://www.nimblephysics.org) for more information.
+
+### Installing on Arm64 Macs
+
+We don't yet publish Arm64 binaries to PyPI from our CI system, so you may not be able to `pip3 install nimblephysics` from a new Arm64 Mac. We will endeavor to manually push binaries occassionally, but until GitHub Actions supports using Arm64 Mac runners, the solution is to clone this repo, then run
+- `ci/mac/install_dependencies.sh`
+- `ci/mac/manually_build_arm64_wheels.sh`
+That will install the dependencies you need, and then build and install the Python package. Please create Issues if you run into problems, and we'll do our best to fix them.
