@@ -730,7 +730,7 @@ std::vector<dynamics::BodyNode*> World::getAllBodyNodes()
   return nodes;
 }
 
-dynamics::BodyNode* World::getBodyNodeIndex(size_t index)
+dynamics::BodyNode* World::getBodyNodeByIndex(size_t index)
 {
   std::vector<dynamics::BodyNode*> nodes = getAllBodyNodes();
   assert(index < nodes.size());
