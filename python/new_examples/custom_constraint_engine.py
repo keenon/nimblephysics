@@ -3,7 +3,7 @@ import nimblephysics as nimble
 import torch
 
 
-def dummy_callback():
+def runDummyConstraintEngine(reset_command):
     pass
 
 
@@ -31,19 +31,15 @@ def main():
     action = torch.zeros((world.getNumDofs()))
     solver = world.getConstraintSolver()
 
-    # Try the default arg
-    world.integrateVelocitiesFromImpulses()
-
-    callbacks = [
-        None,  # Use default LCP, don't replace
-        dummy_callback,  # Replace with dummy function
-        solver.enforceContactAndJointAndCustomConstraintsWithLcp,  # Replace with the same function as default
-        # frictionless_lcp_callback,
+    engines = [
+        None,  # Use default (don't replace)
+        runDummyConstraintEngine,  # Replace with dummy engine
+        world.runLcpConstraintEngine,  # Replace with LCP engine (same as default)
     ]
-    for callback in callbacks:
-        if callback is not None:
-            solver.replaceEnforceContactAndJointAndCustomConstraintsFn(callback)
-            print(callback.__name__)
+    for engine in engines:
+        if engine is not None:
+            world.replaceConstraintEngineFn(engine)
+            print(engine.__name__)
         else:
             print("None")
         new_state = nimble.timestep(world, state, action)

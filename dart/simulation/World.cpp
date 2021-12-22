@@ -87,7 +87,10 @@ World::World(const std::string& _name)
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
     mUseFDOverride(false),
-    mSlowDebugResultsAgainstFD(false)
+    mSlowDebugResultsAgainstFD(false),
+    mConstraintEngineFn([this](bool _resetCommand) {
+      return runLcpConstraintEngine(_resetCommand);
+    })
 {
   mIndices.push_back(0);
 
@@ -241,12 +244,37 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setContactClippingDepth(mContactClippingDepth);
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
-  mConstraintSolver->solve();
-  integrateVelocitiesFromImpulses(_resetCommand);
+  runConstraintEngine(_resetCommand);
   integratePositions(initialVelocity);
 
   mTime += mTimeStep;
   mFrame++;
+}
+
+//==============================================================================
+void World::runConstraintEngine(bool _resetCommand)
+{
+  mConstraintEngineFn(_resetCommand);
+}
+
+//==============================================================================
+void World::runLcpConstraintEngine(bool _resetCommand)
+{
+  mConstraintSolver->solve();
+  integrateVelocitiesFromImpulses(_resetCommand);
+}
+
+//==============================================================================
+void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
+{
+  dtwarn << "[World::replaceConstraintEngineFn] WARNING: "
+          "GRADIENTS WILL "
+        << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+        << "don't yet support differentiating through `timestep()` if you've "
+        << "called `replaceConstraintEngineFn()` to "
+          "customize the constraint engine function.\n";
+
+  mConstraintEngineFn = engineFn;
 }
 
 //==============================================================================
