@@ -856,9 +856,14 @@ public:
   // This get particular moment of inertia of a body node
   Eigen::Vector6s getLinkMOIIndex(size_t index);
 
+  Eigen::Matrix3s getMOIMatrix(Eigen::Vector6s moi_vector);
+
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
+
+  // This returns a matrix of A_k as describe in Karen's paper
+  Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
   // Sets the upper limits of all the joints from a single vector
   void setControlForceUpperLimits(Eigen::VectorXs limits);

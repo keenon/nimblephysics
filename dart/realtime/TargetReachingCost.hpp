@@ -69,6 +69,10 @@ public:
 
   void setTimeStep(s_t timestep);
 
+  void setSSIDNodeIndex(std::vector<size_t> ssid_index);
+
+  void enableSSIDLoss(s_t weight);
+
   s_t computeLoss(const trajectory::TrajectoryRollout* rollout);
 
   // Compute Loss and Gradient
@@ -107,6 +111,15 @@ protected:
   int mActionDim;
 
   s_t dt = 1.0;
+
+  // SSID Heuristic
+  bool mUseSSIDHeuristic = false;
+
+  s_t mSSIDHeuristicWeight;
+
+  std::vector<size_t> mSSIDNodeIndex;
+
+  std::vector<std::vector<Eigen::MatrixXs>> mAks;
 
 };
 

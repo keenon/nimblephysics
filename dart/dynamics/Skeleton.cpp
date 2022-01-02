@@ -3128,6 +3128,19 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
   return inertias;
 }
 
+// TODO: Check The Sign of MOI
+Eigen::Matrix3s Skeleton::getMOIMatrix(Eigen::Vector6s moi_vector)
+{
+  Eigen::Matrix3s MOI = moi_vector.segment(0,3).asDiagonal();
+  MOI(1,0) = moi_vector(3);
+  MOI(0,1) = moi_vector(3);
+  MOI(2,0) = moi_vector(4);
+  MOI(0,2) = moi_vector(4);
+  MOI(2,1) = moi_vector(5);
+  MOI(1,2) = moi_vector(5);
+  return MOI;
+}
+
 Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
 {
   Eigen::Vector6s inertia = Eigen::Vector6s::Zero();
@@ -3150,6 +3163,17 @@ Eigen::VectorXs Skeleton::getLinkMasses()
     masses(i) = getBodyNode(i)->getMass();
   }
   return masses;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::getLinkAkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols());
+  Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
+  Eigen::MatrixXs I = getMOIMatrix(getLinkMOIIndex(index));
+  Eigen::MatrixXs A_k = Jv.transpose() * Jv + Jw.transpose() * I * Jw;
+  return A_k;
 }
 
 //==============================================================================

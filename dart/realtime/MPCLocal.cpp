@@ -247,9 +247,11 @@ void MPCLocal::optimizePlan(long startTime)
         mProblem->getRolloutCache(worldClone)->getControlForcesConst());
 
     log->end();
-
-    std::cout << PerformanceLog::finalize()["MPCLocal loop"]->prettyPrint()
+    if(!mSilent)
+    {
+      std::cout << PerformanceLog::finalize()["MPCLocal loop"]->prettyPrint()
               << std::endl;
+    }
   }
   else
   {
@@ -527,7 +529,7 @@ void MPCLocal::setParameterChange(Eigen::VectorXs params)
   }
   else
   {
-    assert(params.size() == pre_parameter.size());
+    assert(params.size() == mPre_parameter.size());
     if((params-mPre_parameter).norm()>0.001)
     {
       mVarchange = true;

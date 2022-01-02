@@ -884,6 +884,7 @@ const Eigen::MatrixXs& BackpropSnapshot::getContactFreeVelVelJacobian(
 }
 
 //==============================================================================
+/*
 const Eigen::MatrixXs& BackpropSnapshot::getContactReducedVelVelJacobian(
   WorldPtr world, Eigen::VectorXs index, PerformanceLog* perfLog)
 {
@@ -964,7 +965,7 @@ const Eigen::MatrixXs& BackpropSnapshot::getContactReducedVelVelJacobian(
 #endif
   return mCachedVelVel;
 }
-
+*/
 //==============================================================================
 const Eigen::MatrixXs& BackpropSnapshot::getPosVelJacobian(
     WorldPtr world, PerformanceLog* perfLog)

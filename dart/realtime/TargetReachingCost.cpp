@@ -125,12 +125,33 @@ void TargetReachingCost::setTimeStep(s_t timestep)
   dt = timestep;
 }
 
+/// Must be set
+void TargetReachingCost::setSSIDNodeIndex(std::vector<size_t> ssid_index)
+{
+  mSSIDNodeIndex = ssid_index;
+  for(int i = 0; i < ssid_index.size(); i++)
+  {
+    mAks.push_back(std::vector<Eigen::MatrixXs>());
+  }
+}
+
+void TargetReachingCost::enableSSIDLoss(s_t weight)
+{
+  mUseSSIDHeuristic = true;
+  mSSIDHeuristicWeight = weight;
+}
+
 // For the Velocity we can use loss or not use
 s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
 {
   s_t loss = 0;
   int steps = rollout->getPosesConst().cols();
   // Compute Running State and Loss from target reaching
+  Eigen::VectorXs init_state = mWorld->getState();
+  for(int i = 0; i < mAks.size(); i++)
+  {
+    mAks[i].clear();
+  }
   for(int i = 0; i < steps - 1; i++)
   {
     Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
@@ -141,7 +162,18 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
 
     loss += (mRunningStateWeight.asDiagonal() * ((state - mTarget).cwiseAbs2())).sum() * dt;
     loss += (mRunningActionWeight.asDiagonal() * (action.cwiseAbs2())).sum() * dt;
+    if(mUseSSIDHeuristic && i >= 1)
+    {
+      mWorld->setState(state);
+      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
+      {
+        Eigen::MatrixXs Ak = mWorld->getSkeleton(0)->getLinkAkMatrixIndex(mSSIDNodeIndex[j]);
+        mAks[j].push_back(Ak);
+        loss += mSSIDHeuristicWeight * (Ak * (rollout->getVelsConst().col(i) - rollout->getVelsConst().col(i-1))).cwiseAbs2().sum() * dt;
+      }
+    }
   }
+  mWorld->setState(init_state);
   // std::cout<< "None Final Loss: " << loss << std::endl;
   // Add Final State Error
   Eigen::VectorXs finalState = Eigen::VectorXs::Zero(mStateDim);
@@ -166,6 +198,15 @@ void TargetReachingCost::computeGradX(const TrajectoryRollout* rollout, Eigen::R
     state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i);
 
     grads.col(i) = 2*mRunningStateWeight.asDiagonal() * (state - mTarget) * dt;
+    if(mUseSSIDHeuristic && i >= 1)
+    {
+      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
+      {
+        Eigen::VectorXs new_grad = 2 * mSSIDHeuristicWeight * (mAks[j][i-1].transpose() * mAks[j][i-1]) * (rollout->getVelsConst().col(i) - rollout->getVelsConst().col(i-1)) * dt;
+        // std::cout << new_grad.cols() << " " << grads.block((int)(mStateDim/2), i, (int)(mStateDim/2), 1) << std::endl;
+        grads.block((int)(mStateDim/2), i, (int)(mStateDim/2), 1) += new_grad;
+      }
+    }
   }
   // Compute Grad for final state
   Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
@@ -219,6 +260,14 @@ void TargetReachingCost::computeHessXX(
   for(int i = 0; i < steps - 1; i++)
   {
     hess_xx = 2*mRunningStateWeight.asDiagonal() * dt;
+    if(mUseSSIDHeuristic && i >= 1)
+    {
+      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
+      {
+        hess_xx.block((int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2))
+           += mSSIDHeuristicWeight * mAks[j][i-1].transpose() * mAks[j][i-1] * dt;
+      }
+    }
     hess.push_back(hess_xx);
   }
   Eigen::MatrixXs final_hess_xx = 2*mFinalStateWeight.asDiagonal();

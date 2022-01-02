@@ -38,7 +38,7 @@ x = np.linspace(start=args.lower,stop=args.upper,num=200)
 os.makedirs(f'images/{args.exp_name}',exist_ok=True)
 for i in range(np_data.shape[0]):
     plt.clf()
-    plt.plot(x,np_data[i][::-1])
+    plt.plot(x,np_data[i])
     plt.axvline(x=float(solutions[i]),color='red')
     plt.xlabel(args.xlabel)
     plt.ylabel('loss')

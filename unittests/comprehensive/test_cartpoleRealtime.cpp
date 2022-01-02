@@ -287,8 +287,8 @@ void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t nois
 {
   ssid->registerLock();
   Eigen::VectorXs control_force = realtimeWorld->getControlForces();
-  Eigen::VectorXs force_eps = rand_normal(control_force.size(), 0, noise_scale, random_gen);
-  ssid->registerControls(now, control_force + force_eps);
+  //Eigen::VectorXs force_eps = rand_normal(control_force.size(), 0, noise_scale, random_gen);
+  ssid->registerControls(now, control_force);
 
   Eigen::VectorXs position = realtimeWorld->getPositions();
   Eigen::VectorXs position_eps = rand_normal(position.size(), 0, noise_scale, random_gen);
@@ -546,8 +546,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   WorldPtr world = createWorld(1.0/100);
 
   // Initialize Hyperparameters
-  // std::mt19937 rand_gen = initializeRandom();
-  // s_t noise_stddev = 0.01;
+  std::mt19937 rand_gen = initializeRandom();
+  s_t noise_stddev = 0.01;
 
   // planning parameters
   int steps = 300;
@@ -556,7 +556,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   // SSID Parameters
   s_t scale = 1.0;
-  int inferenceSteps = 20;
+  int inferenceSteps = 10;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
   s_t goalX = 1.0;
@@ -615,14 +615,16 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
   SSID ssid = SSID(ssidWorld, 
-                   getSSIDPosLoss(), 
+                   getSSIDVelPosLoss(), 
                    inferenceHistoryMillis, 
                    sensorDims,
                    inferenceSteps,
                    scale);
   
   std::mutex lock;
+  std::mutex param_lock;
   ssid.attachMutex(lock);
+  ssid.attachParamMutex(param_lock);
   
   ssid.setInitialPosEstimator(
       [](Eigen::MatrixXs sensors, long) {
@@ -634,6 +636,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       return sensors.col(0);
     });
 
+  Eigen::Vector2i index;
+  index(0) = 0;
+  index(1) = 1;
+  ssid.setSSIDIndex(index);
+
   world->clearTunableMassThisInstance();
   MPCLocal mpcLocal = MPCLocal(world, 
                                std::make_shared<LossFn>(loss, lossGrad), 
@@ -644,7 +651,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
   
-  bool init_flag = true;
   ssid.registerInferListener([&](long time,
                                  Eigen::VectorXs pos,
                                  Eigen::VectorXs vel,
@@ -653,20 +659,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     mpcLocal.recordGroundTruthState(time, pos, vel, mass);
     // If we need to do SSID with multiple node this detection need to work with vector
     mpcLocal.setParameterChange(mass);
-    if(!init_flag)
-    {
-      s_t old_mass_0 = world->getLinkMassIndex(0);
-      world->setLinkMassIndex(0.9*old_mass_0+0.1*mass(0),0);
-      s_t old_mass_1 = world->getLinkMassIndex(1);
-      world->setLinkMassIndex(0.9*old_mass_1+0.1*mass(1),1);
-    }
-    else
-    {
-      world->setLinkMassIndex(mass(0), 0);
-      world->setLinkMassIndex(mass(1), 1);
-      init_flag = false;
-    }
-    
+    world->setLinkMassIndex(mass(0), 0);
+    world->setLinkMassIndex(mass(1), 1);
   });
   
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = world->clone();
@@ -743,8 +737,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       realtimeUnderlyingWorld->setLinkMassIndex(masses(1), 1);
     }
     
-    recordObs(now, &ssid, realtimeUnderlyingWorld);
-    // recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_stddev, rand_gen);
+    //recordObs(now, &ssid, realtimeUnderlyingWorld);
+    recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_stddev, rand_gen);
     realtimeUnderlyingWorld->step();
     id_masses(0) = world->getLinkMassIndex(0);
     id_masses(1) = world->getLinkMassIndex(1);
@@ -776,6 +770,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     ticker.start();
     mpcLocal.start();
     ssid.start();
+    ssid.startSlow();
   });
   server.registerShutdownListener([&]() { mpcLocal.stop(); });
   server.serve(8070);

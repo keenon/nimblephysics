@@ -24,12 +24,19 @@ SSID::SSID(
     int steps,
     s_t scale)
   : mRunning(false),
+    mRunningSlow(false),
+    mParamChanged(true),
+    mResultFromSlowIsReady(false),
     mWorld(world),
+    // wrt mass should be safe
+    mWorldSlow(world->clone()),
     mLoss(loss),
     mPlanningHistoryMillis(planningHistoryMillis),
+    mPlanningHistoryMillisSlow(planningHistoryMillis * 20),
     mSensorDims(sensorDims),
     mControlLog(VectorLog(world->getNumDofs())),
     mPlanningSteps(steps),
+    mPlanningStepsSlow(steps * 20),
     mScale(scale)
 {
   for(int i=0;i<mSensorDims.size();i++)
@@ -57,6 +64,18 @@ SSID::SSID(
   ipoptOptimizer->setLBFGSHistoryLength(5);
   ipoptOptimizer->setSilenceOutput(true);
   mOptimizer = ipoptOptimizer;
+
+  std::shared_ptr<IPOptOptimizer> ipoptOptimizerSlow
+    = std::make_shared<IPOptOptimizer>();
+  ipoptOptimizerSlow->setCheckDerivatives(false);
+  ipoptOptimizerSlow->setSuppressOutput(true);
+  ipoptOptimizerSlow->setTolerance(1e-30);
+  ipoptOptimizerSlow->setIterationLimit(200);
+  ipoptOptimizerSlow->setRecordFullDebugInfo(false);
+  ipoptOptimizerSlow->setRecordIterations(false);
+  ipoptOptimizerSlow->setLBFGSHistoryLength(5);
+  ipoptOptimizerSlow->setSilenceOutput(true);
+  mOptimizerSlow = ipoptOptimizerSlow;
 }
 
 /// This updates the loss function that we're going to move in real time to
@@ -75,10 +94,20 @@ void SSID::setOptimizer(std::shared_ptr<trajectory::Optimizer> optimizer)
   mOptimizer = optimizer;
 }
 
+void SSID::setSlowOptimizer(std::shared_ptr<trajectory::Optimizer> optimizer)
+{
+  mOptimizerSlow = optimizer;
+}
+
 /// This returns the current optimizer that MPC is using
 std::shared_ptr<trajectory::Optimizer> SSID::getOptimizer()
 {
   return mOptimizer;
+}
+
+std::shared_ptr<trajectory::Optimizer> SSID::getSlowOptimizer()
+{
+  return mOptimizerSlow;
 }
 
 /// This sets the problem that MPC will use. This will override the default
@@ -86,6 +115,11 @@ std::shared_ptr<trajectory::Optimizer> SSID::getOptimizer()
 void SSID::setProblem(std::shared_ptr<trajectory::Problem> problem)
 {
   mProblem = problem;
+}
+
+void SSID::setSlowProblem(std::shared_ptr<trajectory::Problem> problem)
+{
+  mProblemSlow = problem;
 }
 
 /// This registers a function that can be used to estimate the initial state
@@ -139,7 +173,17 @@ void SSID::start()
   if (mRunning)
     return;
   mRunning = true;
+  std::cout << "Start Fast Thread!" << std::endl;
   mOptimizationThread = std::thread(&SSID::optimizationThreadLoop, this);
+}
+
+void SSID::startSlow()
+{
+  if(mRunningSlow)
+    return;
+  mRunningSlow = true;
+  std::cout << "Start Slow Thread" << std::endl;
+  mOptimizationThreadSlow = std::thread(&SSID::slowOptimizationThreadLoop, this);
 }
 
 /// This stops our main thread, waits for it to finish, and then returns
@@ -151,12 +195,19 @@ void SSID::stop()
   mOptimizationThread.join();
 }
 
+void SSID::stopSlow()
+{
+  if(!mRunningSlow)
+    return;
+  mRunningSlow = false;
+  mOptimizationThreadSlow.join();
+
+}
+
 /// This runs inference to find mutable values, starting at `startTime`
 void SSID::runInference(long startTime)
 {
-  // registerLock();
   long startComputeWallTime = timeSinceEpochMillis();
-
   int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
@@ -164,15 +215,10 @@ void SSID::runInference(long startTime)
   if (!mProblem)
   {
     std::shared_ptr<SingleShot> singleshot
-        = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
-    //multishot->setParallelOperationsEnabled(true);
+        = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, true);
     mProblem = singleshot;
   }
-  //std::cout<<"Problem Created"<<std::endl;
-  // Every turn, we need to pin all the forces
   registerLock();
-  //Eigen::MatrixXs forceHistory = mControlLog.getValues(
-  //    startTime - mPlanningHistoryMillis, steps, millisPerStep);
   Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
     startTime, steps+1);
   for (int i = 0; i < steps; i++)
@@ -200,15 +246,72 @@ void SSID::runInference(long startTime)
   Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
   Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
   // Here the masses should be the concatenation of all registered mass nodes
-  Eigen::VectorXs mass = mWorld->getMasses();
-
+  // Eigen::VectorXs mass = mWorld->getMasses();
+  paramMutexLock();
+  Eigen::VectorXs mass = mParam_Solution;
+  paramMutexUnlock();
+  mValue = getTrajConditionNumbers(poseHistory, velHistory);
+  
   for (auto listener : mInferListeners)
   {
     listener(startTime, pos, vel, mass, computeDurationWallTime);
   }
 }
 
-Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int samples)
+void SSID::runSlowInference(long startTime)
+{
+  long startComputeWallTime = timeSinceEpochMillis();
+  int millisPerStep = static_cast<int>(ceil(mScale*mWorldSlow->getTimeStep() * 1000.0));
+  int steps = static_cast<int>(
+      ceil(static_cast<s_t>(mPlanningHistoryMillisSlow) / millisPerStep));
+
+  if (!mProblemSlow)
+  {
+    std::shared_ptr<SingleShot> singleshot
+        = std::make_shared<SingleShot>(mWorldSlow, *mLoss.get(), steps, true);
+    mProblemSlow = singleshot;
+    // Perhaps need multishot problem but let's see
+  }
+  registerLock();
+  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
+    startTime, steps+1);
+  for (int i = 0; i < steps; i++)
+  {
+    mProblemSlow->pinForce(i, forceHistory.col(i));
+  }
+
+  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
+  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
+  registerUnlock();
+  mProblemSlow->setMetadata("forces", forceHistory);
+  mProblemSlow->setMetadata("sensors", poseHistory);
+  mProblemSlow->setMetadata("velocities",velHistory);
+  mProblemSlow->setStartPos(mInitialPosEstimator(poseHistory, startTime));
+  // TODO: Set initial velocity
+  mProblemSlow->setStartVel(mInitialVelEstimator(velHistory, startTime));
+  // Then actually run the optimization
+  mSolutionSlow = mOptimizerSlow->optimize(mProblemSlow.get());
+
+  long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
+
+  const trajectory::TrajectoryRollout* cache
+      = mProblemSlow->getRolloutCache(mWorldSlow);
+
+  Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
+  Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
+  // Here the masses should be the concatenation of all registered mass nodes
+  Eigen::VectorXs mass = mWorldSlow->getMasses();
+
+  // TODO: Listeners may be different
+  for (auto listener : mInferListenersSlow)
+  {
+    listener(startTime, pos, vel, mass, computeDurationWallTime);
+  }
+}
+
+// Run plotting function should be idenpotent
+// Here it only support 1 body node plotting, but that make sense
+std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(long startTime, s_t upper, s_t lower,int samples)
 {
   int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
@@ -262,8 +365,11 @@ Eigen::VectorXs SSID::runPlotting(long startTime, s_t upper, s_t lower,int sampl
     s_t loss = mProblem->getLoss(mWorld);
     losses(0) = loss;
   }
-  
-  return losses;
+
+  std::pair<Eigen::VectorXs, Eigen::MatrixXs> result;
+  result.first = losses;
+  result.second = poseHistory;
+  return result;
 }
 
 
@@ -360,6 +466,17 @@ void SSID::registerInferListener(
   mInferListeners.push_back(inferListener);
 }
 
+void SSID::updateFastThreadBuffer(Eigen::VectorXs new_solution, Eigen::VectorXs new_value)
+{
+  mPrev_solutions.push_back(new_solution);
+  mPrev_values.push_back(new_value);
+  if(mPrev_solutions.size() > mPrev_Length)
+  {
+    mPrev_solutions.erase(mPrev_solutions.begin());
+    mPrev_values.erase(mPrev_values.begin());
+  }
+}
+
 /// This is the function for the optimization thread to run when we're live
 void SSID::optimizationThreadLoop()
 {
@@ -370,31 +487,189 @@ void SSID::optimizationThreadLoop()
   sigaddset(&sigset, SIGINT);
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-  /*
-  while (mRunning)
+  while(mRunning)
   {
     long startTime = timeSinceEpochMillis();
-    if (mControlLog.availableHistoryBefore(startTime) > mPlanningHistoryMillis)
+    if(mControlLog.availableStepsBefore(startTime)>mPlanningSteps+1)
     {
+      
+      paramMutexLock();
+      if(mInitialize)
+      {
+        mParam_Solution = mWorld->getMasses();
+      }
+      mWorld->setMasses(mParam_Solution);
+      paramMutexUnlock();
       runInference(startTime);
-      std::cout<<"Gap Time:"<<startTime - init_time<<std::endl;
+      // Update mPrev_result buffer
+      updateFastThreadBuffer(mWorld->getMasses(), mValue);
+      if(mResultFromSlowIsReady)
+      {
+        if(detectChangeParams())
+        {
+          mParamChanged = true;
+          paramMutexLock();
+          mParam_Solution = estimateSolution();
+          paramMutexUnlock();
+        }
+      }
+      // Update the mParam_Solution with current solution
+      if(mParamChanged==true || mResultFromSlowIsReady==false)
+      {
+        // Estimate the result by weighted average
+        paramMutexLock();
+        std::cout << "Param Changed Use Fast Result!" << mPrev_solutions[mPrev_solutions.size()-1](0) 
+                  <<" " << mPrev_solutions[mPrev_solutions.size()-1](1) << std::endl;
+        Eigen::VectorXs conf = estimateConfidence();
+        std::cout << "Confidence :" << conf(0) << " " << conf(1) << std::endl;
+        if(!mInitialize)
+        {
+          
+          mParam_Solution = estimateSolution();
+          //std::cout <<"Weight: "<< mValue << std::endl;
+        }
+        else
+        {
+          mParam_Solution = mPrev_solutions[mPrev_solutions.size()-1];
+        }
+        paramMutexUnlock();
+      }
+      if(mInitialize)
+      {
+        mInitialize = false;
+      }
     }
   }
-  */
- while(mRunning)
- {
-   long startTime = timeSinceEpochMillis();
-   if(mControlLog.availableStepsBefore(startTime)>mPlanningSteps+1)
-   {
-     runInference(startTime);
-   }
- }
+}
+
+void SSID::slowOptimizationThreadLoop()
+{
+  sigset_t sigset;
+  sigemptyset(&sigset);
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGTERM);
+  pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+  while (mRunningSlow)
+  {
+    long startTime = timeSinceEpochMillis();
+    // Need to be sensitive to change
+    if(mParamChanged)
+    {
+      // std::cout << "Slow Thread is Running" << std::endl;
+      registerLock();
+      mResultFromSlowIsReady = false;
+      mParamChanged = false;
+      mControlLog.discardBefore(startTime);
+      for(int i = 0; i < mSensorLogs.size(); i++)
+      {
+        mSensorLogs[i].discardBefore(startTime);
+      }
+      registerUnlock();
+    }
+    if(mControlLog.availableStepsBefore(startTime) > mPlanningStepsSlow+1 && !mResultFromSlowIsReady)
+    {
+      // TODO: Implement inference for slow thread
+      // Which ideally need to solve a separate optimization problem with different settings
+      // It may be need to receive some flags from other thread
+      runSlowInference(startTime);
+      // Assume runSlowInference Given long enough trajectory can definitely solve the trajectory
+      paramMutexLock();
+      mParam_Solution = mWorldSlow->getMasses();
+      mParam_Slow = mWorldSlow->getMasses();
+      std::cout << "Result From Slow Thread: "
+                << mParam_Solution(0) << " " << mParam_Solution(1) << std::endl;
+      paramMutexUnlock();
+      mParamChanged = false;
+      mResultFromSlowIsReady = true;
+    }
+    
+  }
+}
+
+/// The Change of Parameter should be handled independently for each degree of freedom
+bool SSID::detectChangeParams()
+{
+  Eigen::VectorXs mean_params = estimateSolution();
+  Eigen::VectorXs confidence = estimateConfidence();
+  paramMutexLock();
+  if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
+    confidence.minCoeff() > mConfidence_thresh)
+  {
+    paramMutexUnlock();
+    return true;
+  }
+  paramMutexUnlock();
+  return false;
+}
+
+/// The condition number is with respect to a particular node
+s_t SSID::getTrajConditionNumberIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+{
+  size_t steps = poses.cols();
+  s_t cond = 0;
+  s_t dt = mWorld->getTimeStep();
+  Eigen::VectorXs init_pose = mWorld->getPositions();
+  Eigen::VectorXs init_vel = mWorld->getVelocities();
+  for(int i = 1; i < steps; i++)
+  {
+    mWorld->setPositions(poses.col(i));
+    mWorld->setVelocities(vels.col(i));
+    Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
+    Eigen::MatrixXs Ak = mWorld->getSkeleton(mRobotSkelIndex)->getLinkAkMatrixIndex(index);
+    cond += (Ak * acc).norm();
+  }
+  mWorld->setPositions(init_pose);
+  mWorld->setVelocities(init_vel);
+  return cond;
+}
+
+Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::MatrixXs vels)
+{
+  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mSSIDNodeIndices.size());
+  for(int i = 0; i < mSSIDNodeIndices.size(); i++)
+  {
+    conds(i) = getTrajConditionNumberIndex(poses, vels, mSSIDNodeIndices(i));
+  }
+  return conds;
 }
 
 void SSID::attachMutex(std::mutex &mutex_lock)
 {
   mRegisterMutex = &mutex_lock;
   mLockRegistered = true;
+}
+
+void SSID::attachParamMutex(std::mutex &mutex_lock)
+{
+  mParamMutex = &mutex_lock;
+  mParamLockRegistered = true;
+}
+
+Eigen::VectorXs SSID::estimateSolution()
+{
+  Eigen::VectorXs solution = Eigen::VectorXs::Zero(mParam_Solution.size());
+  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mParam_Solution.size());
+  for(int i = 0; i < mPrev_values.size(); i++)
+  {
+    solution += mPrev_solutions[i].cwiseProduct(mPrev_values[i]);
+    totalValue += mPrev_values[i];
+  }
+  solution = solution.cwiseProduct(totalValue.cwiseInverse());
+  return solution;
+}
+
+Eigen::VectorXs SSID::estimateConfidence()
+{
+  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mParam_Solution.size());
+  for(int i = 0; i < mPrev_values.size(); i++)
+  {
+    totalValue += mPrev_values[i];
+  }
+  for(int j = 0; j < mParam_Solution.size(); j++)
+  {
+    totalValue(j) = tanh(totalValue(j)/mTemperature);
+  }
+  return totalValue;
 }
 
 void SSID::registerLock()
@@ -411,6 +686,44 @@ void SSID::registerUnlock()
   {
     mRegisterMutex->unlock();
   }
+}
+
+void SSID::paramMutexLock()
+{
+  if(mParamLockRegistered)
+    mParamMutex->lock();
+}
+
+void SSID::paramMutexUnlock()
+{
+  if(mParamLockRegistered)
+    mParamMutex->unlock();
+}
+
+void SSID::setBufferLength(int length)
+{
+  mPrev_Length = length;
+}
+
+void SSID::setSSIDIndex(Eigen::VectorXi indices)
+{
+  mSSIDNodeIndices = indices;
+}
+
+void SSID::setTemperature(s_t temp)
+{
+  mTemperature = temp;
+}
+
+s_t SSID::getTemperature()
+{
+  return mTemperature;
+}
+
+void SSID::setThreshs(s_t param_change, s_t conf)
+{
+  mParam_change_thresh = param_change;
+  mConfidence_thresh = conf;
 }
 
 } // namespace realtime

@@ -870,6 +870,7 @@ void iLQRLocal::getTrajectory(simulation::WorldPtr world,
     lqrBuffer->Unew[i] = (lqrBuffer->Unew[i] + mAlpha * lqrBuffer->k[i]
                          + lqrBuffer->K[i] * (lqrBuffer->Xnew[i] - lqrBuffer->X[i])).cwiseMin(mActionBound).cwiseMax(-mActionBound);
     // Record state and action on rollout
+    // TODO: Need to make this robot skeleton
     rollout->getPoses().col(i) = world->getPositions();
     rollout->getVels().col(i) = world->getVelocities();
     actions.col(i) = lqrBuffer->Unew[i];
@@ -1274,7 +1275,7 @@ void iLQRLocal::setParameterChange(Eigen::VectorXs params)
   }
   else
   {
-    assert(params.size() == pre_parameter.size());
+    assert(params.size() == mPre_parameter.size());
     if((params-mPre_parameter).norm()>0.001)
     {
       mVarchange = true;
