@@ -17,8 +17,13 @@ class BulletRenderer:
         self._p = bc.BulletClient(connection_mode=pybullet.DIRECT)
         self.camera: BulletCamera = BulletCamera(self._p)
 
+        skel_names: List[str] = []
+        for skel_id in range(world.getNumSkeletons()):
+            skel = world.getSkeleton(skel_id)
+            skel_names.append(skel.getName())
+
         self.bulletBodyDict = {}
-        for path in urdf_paths:
+        for name, path in zip(skel_names, urdf_paths):
             # Currently, we assume a single rigid body (not articulated) per
             # URDF file that is either free (6 DoFs) or fixed (0 DoFs).
             # For fixed bodies:
@@ -33,18 +38,23 @@ class BulletRenderer:
             #   It seems that loading such a URDF in Nimble is treated as a
             #   body attached to the world link via a free joint as well.
             bodyId: int = self._p.loadURDF(path)
-            bodyName: str = self._p.getBodyInfo(bodyUniqueId=bodyId)[1].decode("UTF-8")
-            self.bulletBodyDict[bodyName] = bodyId
+            # bodyName: str = self._p.getBodyInfo(bodyUniqueId=bodyId)[1].decode("UTF-8")
+            self.bulletBodyDict[name] = bodyId
 
-    def renderStates(self, states: List[torch.Tensor], save_dir: Optional[str] = None):
+    def renderStates(
+        self,
+        states: List[torch.Tensor],
+        saveDir: Optional[str] = None,
+        frameSkip: Optional[int] = 5,
+    ):
         images = []
-        for state in states:
+        for state in states[::frameSkip]:
             self.setState(state)
             image = self.camera.renderState()
             images.append(image)
 
-        if save_dir is not None:
-            self.camera.saveImages(images, save_dir)
+        if saveDir is not None:
+            self.camera.saveImages(images, saveDir)
         return images
 
     def setState(self, state: torch.Tensor):
@@ -54,13 +64,15 @@ class BulletRenderer:
             # For now, only fixed or free joints are supported.
             if skel.getNumDofs() > 0:
                 assert skel.getNumDofs() == 6
-                q = state[cursor : cursor + skel.getNumDofs()]
+                skel_state_size = skel.getNumDofs() * 2
+                skel_state = state[cursor : cursor + skel_state_size]  # [2D]
+                q = skel_state[: skel.getNumDofs()]  # [D]
                 self._p.resetBasePositionAndOrientation(
                     bodyUniqueId=self.bulletBodyDict[skel.getName()],
                     posObj=q[3:],
                     ornObj=Rotation.from_rotvec(q[:3]).as_quat(),
                 )
-                cursor += skel.getNumDofs()
+                cursor += skel_state_size
 
 
 class BulletCamera:
@@ -98,13 +110,15 @@ class BulletCamera:
         )[2]
         return image
 
-    def saveImages(self, images: List[np.ndarray], save_dir: str):
-        save_dir = os.path.join(os.getcwd(), save_dir)
-        os.makedirs(save_dir, exist_ok=True)
+    def saveImages(self, images: List[np.ndarray], saveDir: str):
+        saveDir = os.path.join(os.getcwd(), saveDir)
+        os.makedirs(saveDir, exist_ok=True)
         for i, image in enumerate(images):
-            path = os.path.join(save_dir, f"{i:05}.png")
-            print(f"saved to: {path}")
+            path = os.path.join(saveDir, f"{i:05}.png")
             imageio.imwrite(path, image)
+        gif_path = os.path.join(saveDir, "video.gif")
+        imageio.mimsave(gif_path, images, fps=30)
+        print(f"Saved images and gif to: {saveDir}")
 
     def setViewMatrixParams(
         self,
