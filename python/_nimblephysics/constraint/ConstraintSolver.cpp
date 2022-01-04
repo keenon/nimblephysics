@@ -172,9 +172,10 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "updateConstraints",
-          +[](dart::constraint::ConstraintSolver* self) {
-            self->updateConstraints();
-          })
+          +[](dart::constraint::ConstraintSolver* self, bool ignoreFrictionConstraints) {
+            self->updateConstraints(ignoreFrictionConstraints);
+          },
+          ::py::arg("ignoreFrictionConstraints") = false)
       .def(
           "getConstraints",
           +[](dart::constraint::ConstraintSolver* self)
@@ -198,12 +199,20 @@ void ConstraintSolver(py::module& m)
             self->solveConstrainedGroups();
           })
       .def(
-          "solve",
-          +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
+          "runEnforceContactAndJointAndCustomConstraintsFn",
+          +[](dart::constraint::ConstraintSolver* self) { 
+            self->runEnforceContactAndJointAndCustomConstraintsFn(); 
+          })
       .def(
           "enforceContactAndJointAndCustomConstraintsWithLcp",
+          +[](dart::constraint::ConstraintSolver* self, bool ignoreFrictionConstraints) {
+            self->enforceContactAndJointAndCustomConstraintsWithLcp(ignoreFrictionConstraints);
+          },
+          ::py::arg("ignoreFrictionConstraints") = false)
+      .def(
+          "enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp",
           +[](dart::constraint::ConstraintSolver* self) {
-            self->enforceContactAndJointAndCustomConstraintsWithLcp();
+            self->enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp();
           })
       .def(
           "replaceEnforceContactAndJointAndCustomConstraintsFn",

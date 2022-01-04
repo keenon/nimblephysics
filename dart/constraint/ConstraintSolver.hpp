@@ -187,17 +187,20 @@ public:
   LCPSolver* getLCPSolver() const;
 
   /// Solve constraint impulses and apply them to the skeletons
-  void solve();
+  void runEnforceContactAndJointAndCustomConstraintsFn();
 
   /// Enforce contact, joint, and custom constraints using LCP.
-  void enforceContactAndJointAndCustomConstraintsWithLcp();
+  void enforceContactAndJointAndCustomConstraintsWithLcp(bool ignoreFrictionConstraints = false);
+
+  /// Enforce contact, joint, and custom constraints using frictionless LCP.
+  void enforceContactAndJointAndCustomConstraintsWithFrictionlessLcp();
 
   /// Replace the default solve callback function.
   void replaceEnforceContactAndJointAndCustomConstraintsFn(
       const enforceContactAndJointAndCustomConstraintsFnType& f);
 
   /// Update constraints
-  void updateConstraints();
+  void updateConstraints(bool ignoreFrictionConstraints = false);
 
   /// Build constrained groupsContact
   void buildConstrainedGroups();

@@ -3,26 +3,8 @@ import nimblephysics as nimble
 import torch
 
 
-def runDummyConstraintEngine(reset_command):
+def runDummyConstraintEngine(resetCommand):
     pass
-
-
-# def frictionless_lcp_callback():
-#     # Backup and remove friction.
-#     friction_coefs = []
-#     bodies = []
-#     for i in range(world.getNumBodyNodes()):
-#         body = world.getBodyNodeByIndex(i)
-#         bodies.append(body)
-#         friction_coefs.append(body.getFrictionCoeff())
-#         body.setFrictionCoeff(0.0)
-
-#     # Frictionless LCP
-#     lcp_callback()
-
-#     # Restore friction.
-#     for friction_coef, body in zip(friction_coefs, bodies):
-#         body.setFrictionCoeff(friction_coef)
 
 
 def main():
@@ -31,10 +13,20 @@ def main():
     action = torch.zeros((world.getNumDofs()))
     solver = world.getConstraintSolver()
 
+    def full_frictionless_lcp_engine(resetCommand):
+        world.runLcpConstraintEngine(resetCommand)
+        world.runFrictionlessLcpConstraintEngine(resetCommand)
+
+    def frictionless_full_lcp_engine(resetCommand):
+        world.runFrictionlessLcpConstraintEngine(resetCommand)
+        world.runLcpConstraintEngine(resetCommand)
+
     engines = [
         None,  # Use default (don't replace)
         runDummyConstraintEngine,  # Replace with dummy engine
         world.runLcpConstraintEngine,  # Replace with LCP engine (same as default)
+        full_frictionless_lcp_engine,  # LCP + FrictionlessLCP
+        frictionless_full_lcp_engine,  # FrictionlessLCP + LCP
     ]
     for engine in engines:
         if engine is not None:

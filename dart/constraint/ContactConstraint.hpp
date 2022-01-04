@@ -54,7 +54,8 @@ public:
   ContactConstraint(
       collision::Contact& contact,
       s_t timeStep,
-      bool penetrationCorrectionEnabled);
+      bool penetrationCorrectionEnabled,
+      bool ignoreFrictionConstraints);
 
   /// Destructor
   ~ContactConstraint() override = default;

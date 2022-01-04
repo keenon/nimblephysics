@@ -481,10 +481,13 @@ public:
 
   /// Run the constraint engine which solves for constraint impulses and
   /// integrates velocities given these constraint impulses.
-  void runConstraintEngine(bool _resetCommand);
+  void runRegisteredConstraintEngine(bool _resetCommand = true);
 
   /// The default constraint engine which runs an LCP.
-  void runLcpConstraintEngine(bool _resetCommand);
+  void runLcpConstraintEngine(bool _resetCommand = true);
+
+  /// A constraint engine that runs a frictionless LCP.
+  void runFrictionlessLcpConstraintEngine(bool _resetCommand = true);
 
   /// Replace the default constraint engine with a custom one.
   void replaceConstraintEngineFn(const constraintEngineFnType& engineFn);
@@ -714,7 +717,7 @@ protected:
 
   /// Constraint engine which solves for constraint impulses and integrates
   /// velocities according to the given impulses.
-  constraintEngineFnType mConstraintEngineFn;
+  constraintEngineFnType mRegisteredConstraintEngine;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about
