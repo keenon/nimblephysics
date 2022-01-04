@@ -64,6 +64,13 @@ void BoxedLcpConstraintSolver(py::module& m)
           +[](const dart::constraint::BoxedLcpConstraintSolver* self)
               -> dart::constraint::ConstBoxedLcpSolverPtr {
             return self->getBoxedLcpSolver();
+          })
+      .def(
+          "buildLcpInputs",
+          +[](dart::constraint::BoxedLcpConstraintSolver* self,
+              dart::constraint::ConstrainedGroup& group)
+              -> dart::constraint::LcpInputs {
+            return self->buildLcpInputs(group);
           });
 }
 
