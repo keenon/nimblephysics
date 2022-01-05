@@ -41,15 +41,14 @@ namespace python {
 void LcpInputs(py::module& m)
 {
   ::py::class_<dart::constraint::LcpInputs>(m, "LcpInputs")
-      .def(::py::init<>())
       .def_readwrite("mA", &dart::constraint::LcpInputs::mA)
-      .def_readwrite("mX", &dart::collision::Contact::mX)
-      .def_readwrite("mB", &dart::collision::Contact::mB)
-      .def_readwrite("mW", &dart::collision::Contact::mW)
-      .def_readwrite("mLo", &dart::collision::Contact::mLo)
-      .def_readwrite("mHi", &dart::collision::Contact::mHi)
-      .def_readwrite("mFIndex", &dart::collision::Contact::mFIndex)
-      .def_readwrite("mOffset", &dart::collision::Contact::mOffset);
+      .def_readwrite("mX", &dart::constraint::LcpInputs::mX)
+      .def_readwrite("mB", &dart::constraint::LcpInputs::mB)
+      .def_readwrite("mW", &dart::constraint::LcpInputs::mW)
+      .def_readwrite("mLo", &dart::constraint::LcpInputs::mLo)
+      .def_readwrite("mHi", &dart::constraint::LcpInputs::mHi)
+      .def_readwrite("mFIndex", &dart::constraint::LcpInputs::mFIndex)
+      .def_readwrite("mOffset", &dart::constraint::LcpInputs::mOffset);
 }
 
 } // namespace python
