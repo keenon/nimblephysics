@@ -810,20 +810,20 @@ void ConstraintSolver::solveConstrainedGroups()
     if (0u == n)
       continue;
 
-    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup);
+    Eigen::MatrixXs impulses = solveConstrainedGroup(constraintGroup);
     applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }
 }
 
 //==============================================================================
 void ConstraintSolver::applyConstraintImpulses(
-    std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses)
+    std::vector<ConstraintBasePtr> constraints, Eigen::MatrixXs impulses)
 {
   const std::size_t numConstraints = constraints.size();
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
     const ConstraintBasePtr& constraint = constraints[i];
-    constraint->applyImpulse(impulses[i]);
+    constraint->applyImpulse(impulses.row(i));
     constraint->excite();
   }
 }

@@ -209,11 +209,11 @@ public:
   void solveConstrainedGroups();
 
   // Solve for constraint impulses to apply to each constraint in group.
-  virtual std::vector<s_t*> solveConstrainedGroup(ConstrainedGroup& group) = 0;
+  virtual Eigen::MatrixXs solveConstrainedGroup(ConstrainedGroup& group) = 0;
 
   /// Apply constraint impulses to each constraint.
   void applyConstraintImpulses(
-      std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses);
+      std::vector<ConstraintBasePtr> constraints, Eigen::MatrixXs impulses);
 
   /// Get constrained groups.
   const std::vector<ConstrainedGroup>& getConstrainedGroups() const;

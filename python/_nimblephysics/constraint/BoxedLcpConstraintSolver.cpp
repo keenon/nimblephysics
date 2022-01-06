@@ -77,7 +77,7 @@ void BoxedLcpConstraintSolver(py::module& m)
           "solveLcp",
           +[](dart::constraint::BoxedLcpConstraintSolver* self,
               dart::constraint::LcpInputs lcpInputs,
-              dart::constraint::ConstrainedGroup& group) -> std::vector<s_t*> {
+              dart::constraint::ConstrainedGroup& group) -> Eigen::MatrixXs {
             return self->solveLcp(lcpInputs, group);
           });
 }
