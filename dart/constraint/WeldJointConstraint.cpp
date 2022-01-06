@@ -32,10 +32,9 @@
 
 #include "dart/constraint/WeldJointConstraint.hpp"
 
-#include "dart/external/odelcpsolver/lcp.h"
-
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/external/odelcpsolver/lcp.h"
 
 namespace dart {
 namespace constraint {
@@ -59,11 +58,11 @@ WeldJointConstraint::WeldJointConstraint(dynamics::BodyNode* _body)
 }
 
 //==============================================================================
-WeldJointConstraint::WeldJointConstraint(dynamics::BodyNode* _body1,
-                                         dynamics::BodyNode* _body2)
+WeldJointConstraint::WeldJointConstraint(
+    dynamics::BodyNode* _body1, dynamics::BodyNode* _body2)
   : JointConstraint(_body1, _body2),
-    mRelativeTransform(_body2->getTransform().inverse()
-                       * _body1->getTransform()),
+    mRelativeTransform(
+        _body2->getTransform().inverse() * _body1->getTransform()),
     mViolation(Eigen::Vector6s::Zero()),
     mJacobian1(Eigen::Matrix6s::Identity()),
     mAppliedImpulseIndex(0)
@@ -108,18 +107,17 @@ void WeldJointConstraint::update()
   // Update Jacobian for body2
   if (mBodyNode2)
   {
-    Eigen::Isometry3s T12 = mBodyNode1->getTransform().inverse()
-                            * mBodyNode2->getTransform();
+    Eigen::Isometry3s T12
+        = mBodyNode1->getTransform().inverse() * mBodyNode2->getTransform();
     mJacobian2 = math::AdTJac(T12, mJacobian1);
   }
 
   // Update position constraint error
   if (mBodyNode2)
   {
-    const Eigen::Isometry3s& violationT
-        = mRelativeTransform.inverse()
-          * mBodyNode2->getTransform().inverse()
-          * mBodyNode1->getTransform();
+    const Eigen::Isometry3s& violationT = mRelativeTransform.inverse()
+                                          * mBodyNode2->getTransform().inverse()
+                                          * mBodyNode1->getTransform();
 
     mViolation = math::logMap(violationT);
   }
@@ -206,13 +204,15 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
         if (mBodyNode2->isReactive())
         {
           mBodyNode1->getSkeleton()->updateBiasImpulse(
-                mBodyNode1, mJacobian1.row(_index),
-                mBodyNode2, -mJacobian2.row(_index));
+              mBodyNode1,
+              mJacobian1.row(_index),
+              mBodyNode2,
+              -mJacobian2.row(_index));
         }
         else
         {
           mBodyNode1->getSkeleton()->updateBiasImpulse(
-                mBodyNode1, mJacobian1.row(_index));
+              mBodyNode1, mJacobian1.row(_index));
         }
       }
       else
@@ -220,7 +220,7 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
         if (mBodyNode2->isReactive())
         {
           mBodyNode2->getSkeleton()->updateBiasImpulse(
-                mBodyNode2, -mJacobian2.row(_index));
+              mBodyNode2, -mJacobian2.row(_index));
         }
         else
         {
@@ -237,7 +237,7 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
       {
         mBodyNode1->getSkeleton()->clearConstraintImpulses();
         mBodyNode1->getSkeleton()->updateBiasImpulse(
-              mBodyNode1, mJacobian1.row(_index));
+            mBodyNode1, mJacobian1.row(_index));
         mBodyNode1->getSkeleton()->updateVelocityChange();
       }
 
@@ -245,7 +245,7 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
       {
         mBodyNode2->getSkeleton()->clearConstraintImpulses();
         mBodyNode2->getSkeleton()->updateBiasImpulse(
-              mBodyNode2, -mJacobian2.row(_index));
+            mBodyNode2, -mJacobian2.row(_index));
         mBodyNode2->getSkeleton()->updateVelocityChange();
       }
     }
@@ -256,7 +256,7 @@ void WeldJointConstraint::applyUnitImpulse(std::size_t _index)
 
     mBodyNode1->getSkeleton()->clearConstraintImpulses();
     mBodyNode1->getSkeleton()->updateBiasImpulse(
-          mBodyNode1, mJacobian1.row(_index));
+        mBodyNode1, mJacobian1.row(_index));
     mBodyNode1->getSkeleton()->updateVelocityChange();
   }
 
@@ -270,14 +270,12 @@ void WeldJointConstraint::getVelocityChange(s_t* _vel, bool _withCfm)
   assert(isActive());
 
   Eigen::Vector6s velChange = Eigen::Vector6s::Zero();
-  if (mBodyNode1->getSkeleton()->isImpulseApplied()
-      && mBodyNode1->isReactive())
+  if (mBodyNode1->getSkeleton()->isImpulseApplied() && mBodyNode1->isReactive())
   {
     velChange += mBodyNode1->getBodyVelocityChange();
   }
 
-  if (mBodyNode2
-      && mBodyNode2->getSkeleton()->isImpulseApplied()
+  if (mBodyNode2 && mBodyNode2->getSkeleton()->isImpulseApplied()
       && mBodyNode2->isReactive())
   {
     velChange -= mJacobian2 * mBodyNode2->getBodyVelocityChange();
@@ -290,8 +288,8 @@ void WeldJointConstraint::getVelocityChange(s_t* _vel, bool _withCfm)
   // varaible in ODE
   if (_withCfm)
   {
-    _vel[mAppliedImpulseIndex] += _vel[mAppliedImpulseIndex]
-                                  * mConstraintForceMixing;
+    _vel[mAppliedImpulseIndex]
+        += _vel[mAppliedImpulseIndex] * mConstraintForceMixing;
   }
 }
 
@@ -322,7 +320,7 @@ void WeldJointConstraint::unexcite()
 }
 
 //==============================================================================
-void WeldJointConstraint::applyImpulse(s_t* _lambda)
+void WeldJointConstraint::applyImpulse(Eigen::VectorXs _lambda)
 {
   mOldX[0] = _lambda[0];
   mOldX[1] = _lambda[1];
@@ -332,12 +330,7 @@ void WeldJointConstraint::applyImpulse(s_t* _lambda)
   mOldX[5] = _lambda[5];
 
   Eigen::Vector6s imp;
-  imp << _lambda[0],
-         _lambda[1],
-         _lambda[2],
-         _lambda[3],
-         _lambda[4],
-         _lambda[5];
+  imp << _lambda[0], _lambda[1], _lambda[2], _lambda[3], _lambda[4], _lambda[5];
 
   mBodyNode1->addConstraintImpulse(imp);
 

@@ -40,7 +40,7 @@ namespace dart {
 namespace dynamics {
 class BodyNode;
 class Joint;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
@@ -95,7 +95,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(s_t* _lambda) override;
+  void applyImpulse(Eigen::VectorXs _lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -137,8 +137,7 @@ private:
   static s_t mConstraintForceMixing;
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_JOINTCOULOMBFRICTIONCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_JOINTCOULOMBFRICTIONCONSTRAINT_HPP_
