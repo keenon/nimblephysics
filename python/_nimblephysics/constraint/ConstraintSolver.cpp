@@ -209,7 +209,7 @@ void ConstraintSolver(py::module& m)
           "applyConstraintImpulses",
           +[](dart::constraint::ConstraintSolver* self,
               std::vector<dart::constraint::ConstraintBasePtr> constraints,
-              Eigen::VectorXs impulses) {
+              Eigen::MatrixXs impulses) {
             self->applyConstraintImpulses(constraints, impulses);
           })
       .def(
