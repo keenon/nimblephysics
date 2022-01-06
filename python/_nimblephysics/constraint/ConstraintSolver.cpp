@@ -198,6 +198,13 @@ void ConstraintSolver(py::module& m)
             self->solveConstrainedGroups();
           })
       .def(
+          "applyConstraintImpulses",
+          +[](dart::constraint::ConstraintSolver* self,
+              std::vector<dart::constraint::ConstraintBasePtr> constraints,
+              std::vector<s_t*> impulses) {
+            self->applyConstraintImpulses(constraints, impulses);
+          })
+      .def(
           "solve",
           +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
       .def(
