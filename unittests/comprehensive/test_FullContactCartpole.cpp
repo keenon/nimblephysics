@@ -212,6 +212,48 @@ WorldPtr createWorld(s_t timestep)
   armPair.first->setTransformFromChildBodyNode(armOffset);
 
   world->addSkeleton(cartpole);
+  // Add Left Plane
+  SkeletonPtr leftPlaneSkel = Skeleton::create("leftplane");
+  std::pair<PrismaticJoint*, BodyNode*> leftPair
+    = leftPlaneSkel->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  leftPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
+  leftPair.first->setSpringStiffness(0, 5.0);
+  leftPair.first->setDampingCoefficient(0, 0.4);
+  leftPair.first->setRestPosition(0, 0);
+  leftPair.first->setControlForceUpperLimit(0, 0);
+  leftPair.first->setControlForceLowerLimit(0, 0);
+  std::shared_ptr<BoxShape> leftShapeBox(
+    new BoxShape(Eigen::Vector3s(0.1, 2.0, 3.0)));
+  ShapeNode* leftShape
+    = leftPair.second->createShapeNodeWith<VisualAspect>(leftShapeBox);
+  ShapeNode* leftShapeCollision
+    = leftPair.second->createShapeNodeWith<CollisionAspect>(leftShapeBox);
+  leftShape->getVisualAspect()->setColor(Eigen::Vector3s(0.6, 0.6, 0.6));
+  Eigen::Isometry3s leftOffset = Eigen::Isometry3s(2.5, 1.5, 0);
+  leftPair.first->setTransformFromParentBodyNode(leftOffset);
+  
+  SkeletonPtr rightPlaneSkel = Skeleton::create("rightplane");
+  std::pair<PrismaticJoint*, BodyNode*> rightPair
+    = rightPlaneSkel->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
+  rightPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
+  rightPair.first->setSpringStiffness(0, 5.0);
+  rightPair.first->setDampingCoefficient(0, 0.4);
+  rightPair.first->setRestPosition(0, 0);
+  rightPair.first->setControlForceUpperLimit(0, 0);
+  rightPair.first->setControlForceLowerLimit(0, 0);
+  std::shared_ptr<BoxShape> rightShapeBox(
+    new BoxShape(Eigen::Vector3s(0.1, 2.0, 3.0)));
+  ShapeNode* rightShape
+    = rightPair.second->createShapeNodeWith<VisualAspect>(rightShapeBox);
+  ShapeNode* rightShapeCollision
+    = rightPair.second->createShapeNodeWith<CollisionAspect>(rightShapeBox);
+  rightShape->getVisualAspect()->setColor(Eigen::Vector3s(0.6, 0.6, 0.6));
+  Eigen::Isometry3s rightOffset = Eigen::Isometry3s(2.5, -1.5, 0);
+  rightPair.first->setTransformFromParentBodyNode(rightOffset);
+  
+  world->addSkeleton(leftPlaneSkel);
+  world->addSkeleton(rightPlaneSkel);
+
   cartpole->setControlForceUpperLimit(0, 15);
   cartpole->setControlForceLowerLimit(0, -15);
   cartpole->setControlForceUpperLimit(1, 0);
@@ -288,8 +330,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   // For SSID
   s_t scale = 1.0;
-  size_t ssid_index = 0;
-  size_t ssid_index2 = 1;
+  size_t ssid_index = 1;
+  size_t ssid_index2 = 2; // Left plane
   int inferenceSteps = 20;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
@@ -307,7 +349,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     Eigen::VectorXs::Ones(1) * 0.2);
 
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
-  std::vector<size_t> ssid_idx{0,1};
+  std::vector<size_t> ssid_idx{1,2};
 
   SSID ssid = SSID(ssidWorld,
                    getSSIDPosLoss(),
@@ -319,7 +361,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::mutex param_lock;
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
-  ssid.setSSIDIndex(Eigen::Vector2i(0, 1));  
+  ssid.setSSIDIndex(Eigen::Vector2i(1, 2));  
 
   ssid.setInitialPosEstimator(
     [](Eigen::MatrixXs sensors, long)
@@ -335,14 +377,16 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   world->clearTunableMassThisInstance();
   world->removeDofFromActionSpace(1);
+  world->removeDofFromActionSpace(2);
+  world->removeDofFromActionSpace(3);
   // Create Goal
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
+  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 4);
   Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Zero(1);
-  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * 2);
+  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * 4);
   finalStateWeight(0) = 10.0;
   finalStateWeight(1) = 50.0;
-  finalStateWeight(2) = 10.0;
-  finalStateWeight(3) = 10.0;
+  finalStateWeight(4) = 10.0;
+  finalStateWeight(5) = 10.0;
   runningActionWeight(0) = 0.01;
 
   std::shared_ptr<TargetReachingCost> costFn
@@ -354,7 +398,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   costFn->setSSIDNodeIndex(ssid_idx);
   costFn->enableSSIDLoss(0.01);
   costFn->setTimeStep(world->getTimeStep());
-  Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
+  Eigen::VectorXs goal = Eigen::VectorXs::Zero(8);
   goal(0) = 0.5;
   costFn->setTarget(goal);
   std::cout << "Before MPC Local Initialization" << std::endl;

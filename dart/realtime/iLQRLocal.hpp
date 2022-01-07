@@ -12,6 +12,7 @@
 #include "dart/realtime/ObservationLog.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/realtime/TargetReachingCost.hpp"
+#include "dart/realtime/MappedTargetReachingCost.hpp"
 #include "dart/simulation/SmartPointer.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 
@@ -111,10 +112,15 @@ class iLQRLocal final : public MPC
 public:
   iLQRLocal(
       std::shared_ptr<simulation::World> world,
-      std::shared_ptr<TargetReachingCost> costFn,
       size_t nControls,
       int planningHorizonMillis,
       s_t scale);
+
+  /// This set cost function and corresponding loss function
+  void setCostFn(std::shared_ptr<TargetReachingCost> costFn);
+
+  /// This set mapped function and corresponding loss function
+  void setMappedCostFn(std::shared_ptr<MappedTargetReachingCost> costFn);
 
   /// This sets the optimizer for trajectory optimization
   void setOptimizer(std::shared_ptr<trajectory::Optimizer> optimizer);
@@ -275,8 +281,8 @@ protected:
     int mMillisInAdvanceToPlan;
     long mLastOptimizedTime;
     // Cost function instance
-    std::shared_ptr<TargetReachingCost> mCostFn;
-    
+    std::shared_ptr<TargetReachingCost> mCostFn = nullptr;
+    std::shared_ptr<MappedTargetReachingCost> mMappedCostFn = nullptr;
 
     RealTimeControlBuffer mBuffer;
     LQRBuffer mlqrBuffer;

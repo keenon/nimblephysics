@@ -188,29 +188,19 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
 
 WorldPtr createWorld(s_t timestep)
 {
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, 0, -9.81));
-  std::shared_ptr<dynamics::Skeleton> xmate3p 
-    = dart::utils::UniversalLoader::loadSkeleton(
-        world.get(), 
-        "/workspaces/nimblephysics/data/urdf/xmate3p/xmate3p.urdf");
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+    "dart://sample/skel/inverted_double_pendulum.skel");
   world->setTimeStep(timestep);
-  for(int i = 0; i < xmate3p->getNumDofs(); i++)
+  world->removeDofFromActionSpace(1);
+  world->removeDofFromActionSpace(2);
+  SkeletonPtr skel = world->getSkeleton(0);
+  for(int i = 0; i < skel->getNumBodyNodes(); i++)
   {
-    xmate3p->getJoint(i)->setDampingCoefficient(0, 0.01);
-    // xmate3p->getJoint(i)->setPositionUpperLimit(0, 120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLowerLimit(0, -120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLimitEnforced(true);
-  }
-  for(int i = 0; i < xmate3p->getNumBodyNodes(); i++)
-  {
-    // xmate3p->getBodyNode(i)->removeAllShapeNodes();
-    for( dart::dynamics::ShapeNode* shapenode :xmate3p->getBodyNode(i)->getShapeNodes())
+    for( dart::dynamics::ShapeNode* shapenode :skel->getBodyNode(i)->getShapeNodes())
     {
       // Collision handling may crash current iLQR
       shapenode->removeCollisionAspect();
     }
-    
   }
   return world;
 }
@@ -284,7 +274,7 @@ void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t nois
 #ifdef iLQR_MPC_TEST
 TEST(REALTIME, CARTPOLE_MPC_MASS)
 {
-  WorldPtr world = createWorld(2.0 / 1000);
+  WorldPtr world = createWorld(1.0 / 100);
 
   // Initialize Hyper Parameters
   // TODO: Need to find out
@@ -293,13 +283,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   int planningHorizonMillis = steps * millisPerTimestep;
 
   // For add noise in measurement
-  std::mt19937 rand_gen = initializeRandom();
-  s_t noise_scale = 0.01;
+  // std::mt19937 rand_gen = initializeRandom();
+  // s_t noise_scale = 0.01;
 
   // For SSID
   s_t scale = 1.0;
-  size_t ssid_index = 5;
-  size_t ssid_index2 = 6;
+  size_t ssid_index = 1;
+  size_t ssid_index2 = 2;
   int inferenceSteps = 10;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
@@ -351,17 +341,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   // Create Goal
   int dofs = 3;
   Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * dofs);
-  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(dofs) * 0.1;
-  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Ones(2 * dofs) * 100.0;
-
-  runningStateWeight.segment(0, dofs) = Eigen::VectorXs::Ones(dofs) * 0.01;
-  finalStateWeight.segment(dofs, dofs) *= 0.5;
-  finalStateWeight(2) *= 5;
+  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.01;
+  Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * dofs);
+  finalStateWeight << 10.0, 50, 10, 10, 10 ,10;
 
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = cloneWorld(world,true);
 
-  clearShapeNodes(world);
-  
   std::shared_ptr<TargetReachingCost> costFn
     = std::make_shared<TargetReachingCost>(runningStateWeight,
                                            runningActionWeight, 
@@ -372,21 +357,20 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   // costFn->enableSSIDLoss(0.01);
   costFn->setTimeStep(world->getTimeStep());
   Eigen::Vector6s goal;
-  goal << 30.0 / 180.0 * 3.1415, 30.0 / 180.0 * 3.1415, 60.0 / 180.0 * 3.1415, 0, 0, 0;
-  
+  goal << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
   costFn->setTarget(goal);
   std::cout << "Goal: " << goal << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
-    world, dofs, planningHorizonMillis, 1.0);
+    world, 1, planningHorizonMillis, 1.0);
   mpcLocal.setCostFn(costFn);
   mpcLocal.setSilent(true);
   mpcLocal.setMaxIterations(5);
   mpcLocal.setPatience(1);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
-  mpcLocal.setActionBound(100.0);
-  mpcLocal.setAlpha(1);
+  mpcLocal.setActionBound(40.0);
+  mpcLocal.setAlpha(1.0);
 
   ssid.registerInferListener([&](long,
                                  Eigen::VectorXs,
@@ -425,14 +409,14 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   masses(0) = world->getLinkMassIndex(ssid_index);
   // masses(1) = 0;
   masses(1) = world->getLinkMassIndex(ssid_index2);
-  Eigen::Vector2s id_masses(1.0, 1.0);
+  Eigen::Vector2s id_masses(0.5, 0.5);
 
-  realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-  realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
-  ssidWorld->setLinkMassIndex(id_masses(0), ssid_index);
-  ssidWorld->setLinkMassIndex(id_masses(1), ssid_index2);
-  world->setLinkMassIndex(id_masses(0), ssid_index);
-  world->setLinkMassIndex(id_masses(1), ssid_index2);
+  // realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
+  // realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+  // ssidWorld->setLinkMassIndex(id_masses(0), ssid_index);
+  // ssidWorld->setLinkMassIndex(id_masses(1), ssid_index2);
+  // world->setLinkMassIndex(id_masses(0), ssid_index);
+  // world->setLinkMassIndex(id_masses(1), ssid_index2);
   // Preload visualization
   bool renderIsReady = false;
   ticker.registerTickListener([&](long now) {
@@ -452,8 +436,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     // TODO: Currently the forces are almost zero need to figure out why
     // std::cout <<"Force:\n" << mpcforces << std::endl;
     //Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
-    Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
-    realtimeUnderlyingWorld->setControlForces(mpcforces + force_eps);
+    // Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
+    realtimeUnderlyingWorld->setControlForces(mpcforces);
     if (server.getKeysDown().count("a"))
     {
       Eigen::VectorXs perturbedForces
@@ -490,15 +474,16 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     else if(server.getKeysDown().count("s"))
     {
       renderIsReady = true;
-      ssid.start();
-      ssid.startSlow();
-      // mpcLocal.setPredictUsingFeedback(true);
+      //ssid.start();
+      //ssid.startSlow();
+      mpcLocal.setPredictUsingFeedback(true);
       mpcLocal.ilqrstart();
     }
     // recordObs(now, &ssid, realtimeUnderlyingWorld);
     if(renderIsReady)
     {
-      recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
+      // recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
+      recordObs(now, &ssid, realtimeUnderlyingWorld);
       realtimeUnderlyingWorld->step();
     }
     id_masses(0) = world->getLinkMassIndex(ssid_index);
@@ -519,7 +504,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
                         "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))+" "+
                         "Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
                         Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(400,400));
+                        Eigen::Vector2i(200,200));
       // server.createText(key,
       //                   "Current Masses: "+std::to_string(id_masses(0))+" "+"Real Masses: " + std::to_string(masses(0)),
       //                   Eigen::Vector2i(100, 100),
@@ -535,6 +520,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       [&](long ,
           const trajectory::TrajectoryRollout* rollout,
           long ) {
+        // std::cout << "Reached Here!" << std::endl;
         server.renderTrajectoryLines(world, rollout->getPosesConst());
       });
   

@@ -193,7 +193,7 @@ protected:
   Eigen::VectorXs mParam_Slow;
   s_t mParam_change_thresh = 0.2;
   s_t mConfidence_thresh = 0.5;
-  s_t mTemperature = 8.0;
+  s_t mTemperature = 15.0;
   size_t mRobotSkelIndex = 0;
   Eigen::VectorXi mSSIDNodeIndices;
   Eigen::VectorXs mValue;

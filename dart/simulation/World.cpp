@@ -1138,6 +1138,23 @@ Eigen::Vector6s World::getLinkMOIIndex(size_t index)
   return mSkeletons[skeleton_id]->getLinkMOIIndex(index-probe);
 }
 
+Eigen::MatrixXs World::getLinkAkMatrixIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    {
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkAkMatrixIndex(index-probe);
+}
+
 //==============================================================================
 Eigen::VectorXs World::getPositions()
 {

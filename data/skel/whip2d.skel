@@ -12,7 +12,7 @@
             <body name="cart">
                 <transformation>0 0 0 0 0 0</transformation>
                 <inertia>
-                    <mass>1.0</mass>
+                    <mass>2.00</mass>
                     <offset>0.0 0 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -36,7 +36,7 @@
             <body name="pole">
                 <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>0.5</mass>
+                    <mass>1.5</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -60,7 +60,7 @@
             <body name="pole2">
                 <transformation>0.0 0.3 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>0.5</mass>
+                    <mass>1.0</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -81,31 +81,29 @@
                 </collision_shape>
             </body>
 
-            <body name="weight">
-                <transformation>0.0 0.62 0.0 0.0 0.0 0.0</transformation>
+            <body name="pole3">
+                <transformation>0.0 0.6 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
                     <mass>1.0</mass>
-                    <offset>0.0 0.0 0.0</offset>
+                    <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
-                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                    <transformation>0.0 0.15 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
                         <box>
-                            <size>0.08 0.04 0.08</size>
+                            <size>0.02 0.3 0.02</size>
                         </box>
                     </geometry>
-                    <color>0.2 0.7 0.7</color>
                 </visualization_shape>
                 <collision_shape>
-                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                    <transformation>0.0 0.15 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
                         <box>
-                            <size> 0.08 0.04 0.08 </size>
+                            <size>0.02 0.3 0.02</size>
                         </box>
                     </geometry>
                 </collision_shape>
-            </body> 
-
+            </body>
 
             <!-- JOINT: Root -->
             <joint type="prismatic" name="j_cart">
@@ -126,9 +124,10 @@
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
                           <damping>0.2</damping>
+                          <spring_stiffness>10.0</spring_stiffness>
                       </dynamics>
                 </axis>
-                <init_pos>3.1415</init_pos>
+                <init_pos>0</init_pos>
                 <init_vel>0</init_vel>
             </joint>
 
@@ -139,19 +138,27 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.4</damping>
-                          <spring_stiffness>3.0</spring_stiffness>
+                          <damping>0.2</damping>
+                          <spring_stiffness>10.0</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>
                 <init_vel>0</init_vel>
             </joint>
-
-            <joint type="weld" name="j_con">
+            <joint type="revolute" name="j_pole3">
                 <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <parent>pole2</parent>
-                <child>weight</child>
-            </joint> 
+                <child>pole3</child>
+                <axis>
+                    <xyz>0.0 0.0 1.0</xyz>
+                    <dynamics>
+                          <damping>0.2</damping>
+                          <spring_stiffness>10.0</spring_stiffness>
+                      </dynamics>
+                </axis>
+                <init_pos>0</init_pos>
+                <init_vel>0</init_vel>
+            </joint>
 
         </skeleton>
 

@@ -188,24 +188,15 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
 
 WorldPtr createWorld(s_t timestep)
 {
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, 0, -9.81));
-  std::shared_ptr<dynamics::Skeleton> xmate3p 
-    = dart::utils::UniversalLoader::loadSkeleton(
-        world.get(), 
-        "/workspaces/nimblephysics/data/urdf/xmate3p/xmate3p.urdf");
+  std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
+    "dart://sample/skel/half_cheetah.skel");
   world->setTimeStep(timestep);
-  for(int i = 0; i < xmate3p->getNumDofs(); i++)
-  {
-    xmate3p->getJoint(i)->setDampingCoefficient(0, 0.01);
-    // xmate3p->getJoint(i)->setPositionUpperLimit(0, 120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLowerLimit(0, -120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLimitEnforced(true);
-  }
-  for(int i = 0; i < xmate3p->getNumBodyNodes(); i++)
+
+  SkeletonPtr skel = world->getSkeleton(0);
+  for(int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     // xmate3p->getBodyNode(i)->removeAllShapeNodes();
-    for( dart::dynamics::ShapeNode* shapenode :xmate3p->getBodyNode(i)->getShapeNodes())
+    for( dart::dynamics::ShapeNode* shapenode :skel->getBodyNode(i)->getShapeNodes())
     {
       // Collision handling may crash current iLQR
       shapenode->removeCollisionAspect();
@@ -378,8 +369,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   costFn->setTarget(goal);
   std::cout << "Goal: " << goal << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
-    world, dofs, planningHorizonMillis, 1.0);
-  mpcLocal.setCostFn(costFn);
+    world, costFn, dofs, planningHorizonMillis, 1.0);
   mpcLocal.setSilent(true);
   mpcLocal.setMaxIterations(5);
   mpcLocal.setPatience(1);

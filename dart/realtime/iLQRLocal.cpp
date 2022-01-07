@@ -226,29 +226,30 @@ bool LQRBuffer::validateXnew()
   return true;
 }
 
+/// Non-continuous X is caused by inaccurate ssid.
 bool LQRBuffer::detectXContinuity()
 {
   s_t err = 0;
+  bool flag = true;
   for(size_t i = 0; i < X.size()-1; i++)
   {
-    err = (X[i+1] - X[i]).norm();
-    if(err > 0.5)
+    err = (X[i+1] - X[i]).lpNorm<Eigen::Infinity>();
+    if(err > 1.0)
     {
-      return false;
+      std::cout << "State: \n" << X[i+1] << "\n" << X[i] << "\n" << i << std::endl; 
+      flag = false;
     }
   }
-  return true;
+  return flag;
 }
 
 iLQRLocal::iLQRLocal(
     std::shared_ptr<simulation::World> world,
-    std::shared_ptr<TargetReachingCost> costFn,
     size_t nControls,
     int planningHorizonMillis,
     s_t scale)
   : mRunning(false),
     mWorld(world),
-    mLoss(costFn->getLossFn()),
     mObservationLog(
         timeSinceEpochMillis(),
         world->getPositions(),
@@ -268,8 +269,8 @@ iLQRLocal::iLQRLocal(
     mBuffer(RealTimeControlBuffer(nControls, mSteps, mMillisPerStep, world->getNumDofs() * 2)),
     mSilent(false),
     // Below are iLQR related information
-    mAlpha_reset_value(1.0),
-    mAlpha(1.0),
+    mAlpha_reset_value(0.2),
+    mAlpha(0.2),
     mAlpha_opt(1.0),
     mPatience_reset_value(8),
     mPatience(8),
@@ -280,7 +281,6 @@ iLQRLocal::iLQRLocal(
     mMU_reset_value(100.*1e-6),
     mCost(std::numeric_limits<s_t>::max()),
     mlqrBuffer(LQRBuffer(mSteps, world->getNumDofs(), nControls, Extrapolate_Method::ZERO)),
-    mCostFn(costFn),
     mLast_U(Eigen::VectorXs::Zero(nControls)),
     mActionDim(nControls),
     mStateDim(world->getNumDofs() * 2),
@@ -288,6 +288,18 @@ iLQRLocal::iLQRLocal(
 {
 }
 
+/// Set Cost function
+void iLQRLocal::setCostFn(std::shared_ptr<TargetReachingCost> costFn)
+{
+  mCostFn = costFn;
+  mLoss = mCostFn->getLossFn();
+}
+
+void iLQRLocal::setMappedCostFn(std::shared_ptr<MappedTargetReachingCost> costFn)
+{
+  mMappedCostFn = costFn;
+  mLoss = mMappedCostFn->getLossFn();
+}
 
 /// This sets the optimizer that iLQRLocal will use. This will override the
 /// default optimizer. This should be called before start().
@@ -682,14 +694,22 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
 
     // Require states be stored in rollout
     // Assume loss except the final loss are multiplied by dt
-    Lx       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
-    Lu       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
-    Lxx      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
-    Luu      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
-    Lux      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
-    
-    
-    
+    if(mCostFn!=nullptr)
+    {
+      Lx       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
+      Lu       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
+      Lxx      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
+      Luu      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
+      Lux      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
+    }
+    else
+    {
+      Lx       = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
+      Lu       = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
+      Lxx      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
+      Luu      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
+      Lux      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
+    }
 
     // Sanity Check
     if(!mlqrBuffer.validateXnew())

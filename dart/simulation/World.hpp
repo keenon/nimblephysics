@@ -307,6 +307,8 @@ public:
 
   Eigen::Vector3s getLinkBetaIndex(size_t index);
 
+  Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
+
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();

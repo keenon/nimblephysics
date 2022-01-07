@@ -167,7 +167,7 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
       mWorld->setState(state);
       for(int j = 0; j < mSSIDNodeIndex.size(); j++)
       {
-        Eigen::MatrixXs Ak = mWorld->getSkeleton(0)->getLinkAkMatrixIndex(mSSIDNodeIndex[j]);
+        Eigen::MatrixXs Ak = mWorld->getLinkAkMatrixIndex(mSSIDNodeIndex[j]);
         mAks[j].push_back(Ak);
         loss += mSSIDHeuristicWeight * (Ak * (rollout->getVelsConst().col(i) - rollout->getVelsConst().col(i-1))).cwiseAbs2().sum() * dt;
       }
