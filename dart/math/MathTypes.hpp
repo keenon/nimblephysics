@@ -67,6 +67,7 @@ using std::sin;
 //------------------------------------------------------------------------------
 namespace Eigen {
 
+using Vector9s = Matrix<s_t, 9, 1>;
 using Vector6s = Matrix<s_t, 6, 1>;
 using Matrix6s = Matrix<s_t, 6, 6>;
 
