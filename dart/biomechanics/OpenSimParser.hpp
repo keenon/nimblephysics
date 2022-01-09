@@ -66,6 +66,26 @@ public:
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// This creates an XML configuration file, which you can pass to the OpenSim
+  /// scaling tool to rescale a skeleton
+  static void saveOsimScalingXMLFile(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      double massKg,
+      double heightM,
+      const std::string& osimInputPath,
+      const std::string& osimOutputPath,
+      const std::string& scalingInstructionsOutputPath);
+
+  /// Read an *.osim file, move the markers to new locations, and write it out
+  /// to a new *.osim file
+  static void moveOsimMarkers(
+      const common::Uri& uri,
+      const std::map<std::string, Eigen::Vector3s>& bodyScales,
+      const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+          markerOffsets,
+      const std::string& outputPath,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
   /// This grabs the marker trajectories from a TRC file
   static OpenSimTRC loadTRC(
       const common::Uri& uri,
@@ -77,6 +97,13 @@ public:
       const common::Uri& uri,
       int downsampleByFactor = 1,
       const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// This saves the *.mot file from a motion for the skeleton
+  static void saveMot(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const Eigen::MatrixXs& poses);
 
   /// This grabs the GRF forces from a *.mot file
   static OpenSimGRF loadGRF(

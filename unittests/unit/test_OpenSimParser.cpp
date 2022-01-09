@@ -13,7 +13,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v3)
@@ -259,5 +259,63 @@ TEST(OpenSimParser, DELP_1990)
 
   server.blockWhileServing();
   */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, SCALING)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+
+  OpenSimParser::saveOsimScalingXMLFile(
+      standard.skeleton,
+      68.0,
+      1.8,
+      "Rajagopal2015.osim",
+      "Rajagopal2015_rescaled.osim",
+      "../../../data/osim/Rajagopal2015/ScalingInstructions.xml");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MOVE_OUTPUT_MARKERS)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::map<std::string, Eigen::Vector3s> bodyScales;
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>> markerOffsets;
+  for (std::pair<
+           const std::string,
+           std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& pair :
+       standard.markersMap)
+  {
+    markerOffsets[pair.first] = std::make_pair<std::string, Eigen::Vector3s>(
+        std::string(pair.second.first->getName()),
+        Eigen::Vector3s(pair.second.second));
+  }
+
+  OpenSimParser::moveOsimMarkers(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      bodyScales,
+      markerOffsets,
+      "../../../data/osim/Rajagopal2015/Rajagopal2015_markersMoved.osim");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, SAVE_MOT)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      standard.skeleton, "dart://sample/osim/LaiArnoldSubject6/walking1.mot");
+
+  OpenSimParser::saveMot(
+      standard.skeleton,
+      "../../../data/osim/LaiArnoldSubject6/recovered.mot",
+      mot.timestamps,
+      mot.poses);
 }
 #endif
