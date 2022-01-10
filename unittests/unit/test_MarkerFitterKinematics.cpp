@@ -2555,7 +2555,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
 {
   OpenSimFile standard
@@ -2773,7 +2773,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
       subsetTimesteps,
       finalKinematicInit.jointCenters);
 }
-// #endif
+#endif
 
 // #ifdef FULL_EVAL
 #ifdef ALL_TESTS
