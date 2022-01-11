@@ -68,6 +68,11 @@ void BoxedLcpConstraintSolver(py::module& m)
             return self->getBoxedLcpSolver();
           })
       .def(
+          "makeHyperAccurateAndVerySlow",
+          +[](const dart::constraint::BoxedLcpConstraintSolver* self) {
+            return self->makeHyperAccurateAndVerySlow();
+          })
+      .def(
           "buildLcpInputs",
           +[](dart::constraint::BoxedLcpConstraintSolver* self,
               dart::constraint::ConstrainedGroup& group)

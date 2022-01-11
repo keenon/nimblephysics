@@ -1,6 +1,5 @@
 from nimblephysics_libs._nimblephysics import *
 from .timestep import timestep
-from .bullet_renderer import BulletRenderer
 from .get_height import get_height
 from .get_lowest_point import get_lowest_point
 from .get_anthropometric_log_pdf import get_anthropometric_log_pdf
@@ -11,5 +10,9 @@ from .mapping import map_to_pos, map_to_vel
 from .loader import loadWorld, absPath
 from .models import *
 from .marker_mocap import *
+
+# This requires additional dependencies on `imageio` and `pybullet`, and
+# can be imported separately as `from nimblephysics.bullet_rendered import BulletRenderer`
+# from .bullet_renderer import BulletRenderer
 
 __doc__ = "Python bindings from Nimble"
