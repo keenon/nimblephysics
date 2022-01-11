@@ -57,7 +57,7 @@ void GUIStateMachine(py::module& m)
           ::py::arg("size") = Eigen::Vector3s::Ones(),
           ::py::arg("pos") = Eigen::Vector3s::Zero(),
           ::py::arg("euler") = Eigen::Vector3s::Zero(),
-          ::py::arg("color") = Eigen::Vector4s::Ones() * 0.5,
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
@@ -66,7 +66,7 @@ void GUIStateMachine(py::module& m)
           ::py::arg("key"),
           ::py::arg("radius") = 0.5,
           ::py::arg("pos") = Eigen::Vector3s::Zero(),
-          ::py::arg("color") = Eigen::Vector4s::Ones() * 0.5,
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
@@ -74,7 +74,7 @@ void GUIStateMachine(py::module& m)
           &dart::server::GUIStateMachine::createLine,
           ::py::arg("key"),
           ::py::arg("points"),
-          ::py::arg("color") = Eigen::Vector4s::Ones() * 0.5)
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0))
       .def(
           "createMeshFromShape",
           &dart::server::GUIStateMachine::createMeshFromShape,
@@ -83,7 +83,7 @@ void GUIStateMachine(py::module& m)
           ::py::arg("pos") = Eigen::Vector3s::Zero(),
           ::py::arg("euler") = Eigen::Vector3s::Zero(),
           ::py::arg("scale") = Eigen::Vector3s::Ones(),
-          ::py::arg("color") = Eigen::Vector4s::Ones() * 0.5,
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
