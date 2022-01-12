@@ -67,6 +67,17 @@ void BoxedLcpConstraintSolver(py::module& m)
             return self->getBoxedLcpSolver();
           })
       .def(
+          "getSecondaryBoxedLcpSolver",
+          +[](const dart::constraint::BoxedLcpConstraintSolver* self)
+              -> dart::constraint::ConstBoxedLcpSolverPtr {
+            return self->getSecondaryBoxedLcpSolver();
+          })
+      .def(
+          "makeHyperAccurateAndVerySlow",
+          +[](dart::constraint::BoxedLcpConstraintSolver* self) {
+            return self->makeHyperAccurateAndVerySlow();
+          })
+      .def(
           "buildLcpInputs",
           +[](dart::constraint::BoxedLcpConstraintSolver* self,
               dart::constraint::ConstrainedGroup& group)
