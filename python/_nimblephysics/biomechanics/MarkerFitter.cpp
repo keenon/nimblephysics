@@ -209,6 +209,11 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setIterationLimit,
           ::py::arg("iters"))
       .def(
+          "setAnthropometricPrior",
+          &dart::biomechanics::MarkerFitter::setAnthropometricPrior,
+          ::py::arg("prior"),
+          ::py::arg("weight") = 0.001)
+      .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))

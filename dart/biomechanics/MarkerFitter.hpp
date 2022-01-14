@@ -11,6 +11,7 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -103,6 +104,7 @@ struct MarkerInitialization
       updatedMarkerMap;
 
   std::vector<dynamics::Joint*> joints;
+  Eigen::VectorXs jointWeights;
   Eigen::MatrixXs jointCenters;
 };
 
@@ -134,6 +136,11 @@ public:
   Eigen::VectorXs getGradient();
 
   Eigen::VectorXs finiteDifferenceGradient();
+
+  /// This writes the solution back to the output matrix reference passed in
+  /// during initialization. This also returns a loss we achieved, which can be
+  /// used as a confidence for downstream tasks.
+  s_t saveSolutionBackToInitialization();
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -217,8 +224,6 @@ public:
       Ipopt::Index* _iRow,
       Ipopt::Index* _jCol,
       Ipopt::Number* _values) override;
-
-  void saveSolutionBackToInitialization();
 
   /// \brief This method is called when the algorithm is complete so the TNLP
   ///        can store/write the solution
@@ -492,6 +497,11 @@ public:
   /// Sets the maximum number of iterations for IPOPT
   void setIterationLimit(int limit);
 
+  /// This sets an anthropometric prior which is used by the default loss. If
+  /// you've called `setCustomLossAndGrad` then this has no effect.
+  void setAnthropometricPrior(
+      std::shared_ptr<biomechanics::Anthropometrics> prior, s_t weight = 0.001);
+
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
       std::function<s_t(MarkerFitterState*)> customLossAndGrad);
@@ -690,6 +700,11 @@ protected:
   std::function<s_t(MarkerFitterState*)> mLossAndGrad;
   std::map<std::string, std::function<s_t(MarkerFitterState*)>>
       mZeroConstraints;
+
+  /// This is an optional prior to use when computing default loss, which can
+  /// add its log-PDF to standard loss
+  std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
+  s_t mAnthropometricWeight;
 
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;

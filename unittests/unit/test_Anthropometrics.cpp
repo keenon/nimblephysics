@@ -26,7 +26,7 @@ using namespace biomechanics;
 
 // #define ALL_TESTS
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(ANTHROPOMETRICS, LOAD)
 {
   Anthropometrics result = Anthropometrics::loadFromFile(
@@ -99,16 +99,17 @@ TEST(ANTHROPOMETRICS, LOAD)
     EXPECT_TRUE(equals(grad, grad_fd, 5e-9));
   }
 }
-// #endif
+#endif
 
-#ifdef BLOCKING_GUI_TEST
+// #ifdef BLOCKING_GUI_TEST
 // #ifdef ALL_TESTS
 TEST(ANTHROPOMETRICS, GUI)
 {
-  Anthropometrics result = Anthropometrics::loadFromFile(
-      "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
 
-  std::vector<std::string> cols = result.getMetricNames();
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Age");
   cols.push_back("Weightlbs");
   cols.push_back("Heightin");
@@ -131,15 +132,16 @@ TEST(ANTHROPOMETRICS, GUI)
   std::cout << "New mu: " << std::endl << gauss->getMu() << std::endl;
   std::cout << "New cov: " << std::endl << gauss->getCov() << std::endl;
 
-  result.setDistribution(gauss);
+  anthropometrics->setDistribution(gauss);
 
   OpenSimFile file = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+      "dart://sample/osim/LaiArnoldSubject5/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
   std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   skel->autogroupSymmetricSuffixes();
   skel->setScaleGroupUniformScaling(skel->getBodyNode("hand_r"));
 
-  s_t logProb = result.getLogProbability(skel);
+  s_t logProb = anthropometrics->getLogPDF(skel);
   std::cout << "Log prob: " << logProb << std::endl;
 
   Eigen::VectorXs originalGroupScales = skel->getGroupScales();
@@ -148,10 +150,10 @@ TEST(ANTHROPOMETRICS, GUI)
       = std::make_shared<server::GUIWebsocketServer>();
   server->serve(8070);
   server->renderSkeleton(skel);
-  result.debugToGUI(server, skel);
+  anthropometrics->debugToGUI(server, skel);
 
   Eigen::VectorXs mu = gauss->getMu();
-  Eigen::VectorXs x = gauss->convertFromMap(result.measure(skel));
+  Eigen::VectorXs x = gauss->convertFromMap(anthropometrics->measure(skel));
   Eigen::MatrixXs compare = Eigen::MatrixXs(mu.size(), 3);
   compare.col(0) = x;
   compare.col(1) = mu;
@@ -160,26 +162,32 @@ TEST(ANTHROPOMETRICS, GUI)
 
   realtime::Ticker ticker = realtime::Ticker(0.01);
 
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    skel->getBodyNode(i)->setScaleLowerBound(Eigen::Vector3s::Ones() * 0.001);
+    skel->getBodyNode(i)->setScaleUpperBound(Eigen::Vector3s::Ones() * 50.0);
+  }
+
   Eigen::VectorXs scales = originalGroupScales;
   int step = 0;
   ticker.registerTickListener([&](long) {
     step++;
-    scales += 1e-4 * result.getGradientOfLogProbWrtGroupScales(skel);
-    skel->setGroupScales(scales, true);
-    s_t newLogProb = result.getLogProbability(skel);
+    scales += 1e-4 * anthropometrics->getGradientOfLogPDFWrtGroupScales(skel);
+    skel->setGroupScales(scales, false);
+    s_t newLogProb = anthropometrics->getLogPDF(skel);
     std::cout << "Step " << step << ": " << newLogProb << std::endl;
 
     if (step % 10 == 0)
     {
       server->renderSkeleton(skel);
-      result.debugToGUI(server, skel);
+      anthropometrics->debugToGUI(server, skel);
     }
 
     if (step > 300)
     {
       step = 0;
       scales = originalGroupScales;
-      std::map<std::string, s_t> measurements = result.measure(skel);
+      std::map<std::string, s_t> measurements = anthropometrics->measure(skel);
       for (auto pair : measurements)
       {
         std::cout << pair.first << ": " << pair.second
@@ -188,7 +196,7 @@ TEST(ANTHROPOMETRICS, GUI)
       }
 
       Eigen::VectorXs mu = gauss->getMu();
-      Eigen::VectorXs x = gauss->convertFromMap(result.measure(skel));
+      Eigen::VectorXs x = gauss->convertFromMap(anthropometrics->measure(skel));
       Eigen::MatrixXs compare = Eigen::MatrixXs(mu.size(), 3);
       compare.col(0) = x;
       compare.col(1) = mu;
@@ -203,4 +211,4 @@ TEST(ANTHROPOMETRICS, GUI)
   server->blockWhileServing();
 }
 // #endif
-#endif
+// #endif

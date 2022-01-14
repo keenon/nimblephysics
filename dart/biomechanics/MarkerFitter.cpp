@@ -408,7 +408,9 @@ MarkerFitter::MarkerFitter(
     mDisableLinesearch(false),
     mInitialIKSatisfactoryLoss(0.003),
     mInitialIKMaxRestarts(100),
-    mMaxMarkerOffset(0.2)
+    mMaxMarkerOffset(0.2),
+    mAnthropometrics(nullptr),
+    mAnthropometricWeight(0.001)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
   int offset = 0;
@@ -440,11 +442,25 @@ MarkerFitter::MarkerFitter(
   }
 
   // Default to a least-squares loss over just the marker errors
-  mLossAndGrad = [](MarkerFitterState* state) {
+  mLossAndGrad = [this](MarkerFitterState* state) {
     s_t loss = state->markerErrorsAtTimesteps.squaredNorm()
                + state->jointErrorsAtTimesteps.squaredNorm();
     state->markerErrorsAtTimestepsGrad = 2 * state->markerErrorsAtTimesteps;
     state->jointErrorsAtTimestepsGrad = 2 * state->jointErrorsAtTimesteps;
+
+    if (this->mAnthropometrics)
+    {
+      Eigen::VectorXs oldBodyScales = this->mSkeleton->getBodyScales();
+      this->mSkeleton->setBodyScales(state->bodyScales);
+      loss -= this->mAnthropometrics->getLogPDF(this->mSkeleton)
+              * this->mAnthropometricWeight;
+      state->bodyScalesGrad
+          = this->mAnthropometrics->getGradientOfLogPDFWrtBodyScales(
+                this->mSkeleton)
+            * (-1 * this->mAnthropometricWeight);
+      this->mSkeleton->setBodyScales(oldBodyScales);
+    }
+
     return loss;
   };
 }
@@ -893,6 +909,7 @@ MarkerInitialization MarkerFitter::getInitialization(
 
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
+  result.jointWeights = params.jointWeights;
 
   return result;
 }
@@ -1420,6 +1437,8 @@ void MarkerFitter::findJointCenters(
   }
   initialization.jointCenters = Eigen::MatrixXs::Zero(
       initialization.joints.size() * 3, markerObservations.size());
+  initialization.jointWeights
+      = Eigen::VectorXs::Ones(initialization.joints.size());
 
   /*
   // 2. Actually compute the joint centers (single threaded)
@@ -1465,7 +1484,15 @@ void MarkerFitter::findJointCenters(
   }
   for (int i = 0; i < futures.size(); i++)
   {
-    futures[i].get()->saveSolutionBackToInitialization();
+    s_t loss = futures[i].get()->saveSolutionBackToInitialization();
+    // We want to map low loss (0.005 ish) to 1.0, and we want to map increasing
+    // loss to a decreasing weight
+    initialization.jointWeights(i) = 0.005 / loss;
+    // We cap the weight at 1.0
+    if (initialization.jointWeights(i) > 1.0)
+    {
+      initialization.jointWeights(i) = 1.0;
+    }
     std::cout << "Finished computing joint center for " << i << "/"
               << initialization.joints.size() << ": \""
               << initialization.joints[i]->getName() << "\"" << std::endl;
@@ -1804,6 +1831,16 @@ void MarkerFitter::setMaxMarkerOffset(s_t offset)
 void MarkerFitter::setIterationLimit(int limit)
 {
   mIterationLimit = limit;
+}
+
+//==============================================================================
+/// This sets an anthropometric prior which is used by the default loss. If
+/// you've called `setCustomLossAndGrad` then this has no effect.
+void MarkerFitter::setAnthropometricPrior(
+    std::shared_ptr<biomechanics::Anthropometrics> prior, s_t weight)
+{
+  mAnthropometrics = prior;
+  mAnthropometricWeight = weight;
 }
 
 //==============================================================================
@@ -2974,12 +3011,13 @@ bool SphereFitJointCenterProblem::eval_h(
   return true;
 }
 
-void SphereFitJointCenterProblem::saveSolutionBackToInitialization()
+s_t SphereFitJointCenterProblem::saveSolutionBackToInitialization()
 {
   for (int i = 0; i < mNumTimesteps; i++)
   {
     mOut.col(i) = mCenterPoints.segment<3>(i * 3);
   }
+  return getLoss();
 }
 
 //==============================================================================
