@@ -1546,111 +1546,6 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
 }
 
 //==============================================================================
-/// This finds the trajectory for a single specified joint center over time
-void MarkerFitter::findJointCenterLBFGS(
-    int joint,
-    MarkerInitialization& initialization,
-    const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        markerObservations)
-{
-  // Create an instance of the IpoptApplication
-  //
-  // We are using the factory, since this allows us to compile this
-  // example with an Ipopt Windows DLL
-  SmartPtr<Ipopt::IpoptApplication> app = IpoptApplicationFactory();
-
-  // Change some options
-  // Note: The following choices are only examples, they might not be
-  //       suitable for your optimization problem.
-  app->Options()->SetNumericValue("tol", static_cast<double>(1e-5));
-  app->Options()->SetStringValue(
-      "linear_solver",
-      "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
-
-  app->Options()->SetStringValue(
-      "hessian_approximation", "limited-memory"); // limited-memory, exacty
-
-  /*
-  app->Options()->SetStringValue(
-      "scaling_method", "none"); // none, gradient-based
-  */
-
-  app->Options()->SetIntegerValue("max_iter", 300);
-
-  // Disable LBFGS history
-  app->Options()->SetIntegerValue("limited_memory_max_history", 12);
-
-  // Just for debugging
-  if (mCheckDerivatives)
-  {
-    app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
-    app->Options()->SetStringValue("derivative_test", "first-order");
-    app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
-  }
-
-  if (mPrintFrequency > 0)
-  {
-    app->Options()->SetIntegerValue("print_frequency_iter", mPrintFrequency);
-  }
-  else
-  {
-    app->Options()->SetIntegerValue(
-        "print_frequency_iter", std::numeric_limits<int>::infinity());
-  }
-  if (mSilenceOutput)
-  {
-    app->Options()->SetIntegerValue("print_level", 0);
-  }
-  if (mDisableLinesearch)
-  {
-    app->Options()->SetIntegerValue("max_soc", 0);
-    app->Options()->SetStringValue("accept_every_trial_step", "yes");
-  }
-  app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
-
-  // Initialize the IpoptApplication and process the options
-  Ipopt::ApplicationReturnStatus status;
-  status = app->Initialize();
-  if (status != Solve_Succeeded)
-  {
-    std::cout << std::endl
-              << std::endl
-              << "*** Error during initialization!" << std::endl;
-    return;
-  }
-
-  // This will automatically free the problem object when finished,
-  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
-  // If you try to leave `problem` on the stack, you'll get invalid free
-  // exceptions when IPOpt attempts to free it.
-  SphereFitJointCenterProblem* problem = new SphereFitJointCenterProblem(
-      this,
-      markerObservations,
-      initialization.poses,
-      initialization.joints[joint],
-      initialization.jointCenters.block(
-          joint * 3, 0, 3, markerObservations.size()));
-  SmartPtr<SphereFitJointCenterProblem> problemPtr(problem);
-  status = app->OptimizeTNLP(problemPtr);
-
-  if (status == Solve_Succeeded)
-  {
-    // Retrieve some statistics about the solve
-    Index iter_count = app->Statistics()->IterationCount();
-    std::cout << std::endl
-              << std::endl
-              << "*** The problem solved in " << iter_count << " iterations!"
-              << std::endl;
-
-    Number final_obj = app->Statistics()->FinalObjective();
-    std::cout << std::endl
-              << std::endl
-              << "*** The final value of the objective function is "
-              << final_obj << '.' << std::endl;
-  }
-}
-
-//==============================================================================
 /// This lets us pick a subset of the marker observations, to cap the size of
 /// the optimization problem.
 std::vector<std::map<std::string, Eigen::Vector3s>> MarkerFitter::pickSubset(
@@ -2479,7 +2374,7 @@ void MarkerFitter::setCheckDerivatives(bool checkDerivatives)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // The SphereFitJointCenterProblem, which maps the sphere-fitting joint-center
-// problem onto a format that IPOpt can work with.
+// problem onto a differentiable format.
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //==============================================================================
@@ -2492,8 +2387,6 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     Eigen::Ref<Eigen::MatrixXs> out)
   : mFitter(fitter),
     mMarkerObservations(markerObservations),
-    mIkPoses(ikPoses),
-    mJoint(joint),
     mOut(out),
     mSmoothingLoss(
         0.1) // just to tie break when there's nothing better available
@@ -2567,23 +2460,6 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
       mRadii(j) /= numRadiiObservations(j);
     }
   }
-
-  // 3. Work out the thread splits
-
-  int numThreads = 4;
-  int sizeOfThreadSplits = mNumTimesteps / numThreads;
-  int lastThreadSplit = mNumTimesteps - (sizeOfThreadSplits * (numThreads - 1));
-
-  int cursor = 0;
-  for (int i = 0; i < numThreads; i++)
-  {
-    int sizeOfThread
-        = (i == numThreads - 1) ? lastThreadSplit : sizeOfThreadSplits;
-
-    mThreadSplits.emplace_back(cursor, cursor + sizeOfThread);
-    cursor += sizeOfThread;
-  }
-  assert(cursor == mNumTimesteps);
 }
 
 //==============================================================================
@@ -2633,48 +2509,6 @@ s_t SphereFitJointCenterProblem::getLoss()
 {
   s_t loss = 0.0;
 
-  /*
-  std::vector<std::future<s_t>> futures;
-  for (int i = 0; i < mThreadSplits.size(); i++)
-  {
-    int threadNum = i;
-    futures.push_back(std::async([this, threadNum] {
-      s_t loss = 0.0;
-
-      int threadStart = this->mThreadSplits[threadNum].first;
-      int threadEndExclusive = this->mThreadSplits[threadNum].second;
-      for (int i = threadStart; i < threadEndExclusive; i++)
-      {
-        if (i > 0)
-        {
-          loss += mSmoothingLoss
-                  * (mCenterPoints.segment<3>(i * 3)
-                     - mCenterPoints.segment<3>((i - 1) * 3))
-                        .squaredNorm();
-        }
-        for (int j = 0; j < mActiveMarkers.size(); j++)
-        {
-          if (mMarkerObserved(j, i))
-          {
-            s_t diff = mRadii(j) * mRadii(j)
-                       - (mCenterPoints.segment<3>(i * 3)
-                          - mMarkerPositions.block<3, 1>(j * 3, i))
-                             .squaredNorm();
-            loss += diff * diff;
-          }
-        }
-      }
-
-      return loss;
-    }));
-  }
-
-  for (int i = 0; i < futures.size(); i++)
-  {
-    loss += futures[i].get();
-  }
-  */
-
   for (int i = 0; i < mNumTimesteps; i++)
   {
     if (i > 0)
@@ -2705,58 +2539,6 @@ Eigen::VectorXs SphereFitJointCenterProblem::getGradient()
 {
   Eigen::VectorXs grad
       = Eigen::VectorXs::Zero(mRadii.size() + mCenterPoints.size());
-
-  /*
-  std::vector<std::future<Eigen::VectorXs>> futures;
-  for (int i = 0; i < mThreadSplits.size(); i++)
-  {
-    int threadNum = i;
-    futures.push_back(std::async([this, threadNum] {
-      Eigen::VectorXs grad
-          = Eigen::VectorXs::Zero(mRadii.size() + mCenterPoints.size());
-
-      int threadStart = this->mThreadSplits[threadNum].first;
-      int threadEndExclusive = this->mThreadSplits[threadNum].second;
-      for (int i = threadStart; i < threadEndExclusive; i++)
-      {
-        if (i > 0)
-        {
-          grad.segment<3>(mRadii.size() + i * 3)
-              += 2 * mSmoothingLoss
-                 * (mCenterPoints.segment<3>(i * 3)
-                    - mCenterPoints.segment<3>((i - 1) * 3));
-          grad.segment<3>(mRadii.size() + (i - 1) * 3)
-              -= 2 * mSmoothingLoss
-                 * (mCenterPoints.segment<3>(i * 3)
-                    - mCenterPoints.segment<3>((i - 1) * 3));
-        }
-        for (int j = 0; j < mActiveMarkers.size(); j++)
-        {
-          if (mMarkerObserved(j, i))
-          {
-            s_t diff = mRadii(j) * mRadii(j)
-                       - (mCenterPoints.segment<3>(i * 3)
-                          - mMarkerPositions.block<3, 1>(j * 3, i))
-                             .squaredNorm();
-            grad(j) += (2 * diff) * (2 * mRadii(j));
-            grad.segment<3>(mRadii.size() + i * 3)
-                += (2 * diff)
-                   * (-2
-                      * (mCenterPoints.segment<3>(i * 3)
-                         - mMarkerPositions.block<3, 1>(j * 3, i)));
-          }
-        }
-      }
-
-      return grad;
-    }));
-  }
-
-  for (int i = 0; i < futures.size(); i++)
-  {
-    grad += futures[i].get();
-  }
-  */
 
   for (int i = 0; i < mNumTimesteps; i++)
   {
@@ -2817,200 +2599,7 @@ Eigen::VectorXs SphereFitJointCenterProblem::finiteDifferenceGradient()
   return grad;
 }
 
-//------------------------- Ipopt::TNLP --------------------------------------
 //==============================================================================
-/// \brief Method to return some info about the nlp
-bool SphereFitJointCenterProblem::get_nlp_info(
-    Ipopt::Index& n,
-    Ipopt::Index& m,
-    Ipopt::Index& nnz_jac_g,
-    Ipopt::Index& nnz_h_lag,
-    Ipopt::TNLP::IndexStyleEnum& index_style)
-{
-  // Set the number of decision variables
-  n = getProblemDim();
-
-  // Set the total number of constraints
-  m = 0;
-
-  // Set the number of entries in the constraint Jacobian
-  nnz_jac_g = 0;
-
-  // Set the number of entries in the Hessian
-  nnz_h_lag = n * n;
-
-  // use the C style indexing (0-based)
-  index_style = Ipopt::TNLP::C_STYLE;
-
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return the bounds for my problem
-bool SphereFitJointCenterProblem::get_bounds_info(
-    Ipopt::Index n,
-    Ipopt::Number* x_l,
-    Ipopt::Number* x_u,
-    Ipopt::Index m,
-    Ipopt::Number* g_l,
-    Ipopt::Number* g_u)
-{
-  (void)m;
-  (void)g_l;
-  (void)g_u;
-  // Lower and upper bounds on X
-  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
-  upperBounds.setConstant(std::numeric_limits<double>::infinity());
-  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
-  lowerBounds.setConstant(-1 * std::numeric_limits<double>::infinity());
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return the starting point for the algorithm
-bool SphereFitJointCenterProblem::get_starting_point(
-    Ipopt::Index n,
-    bool init_x,
-    Ipopt::Number* _x,
-    bool init_z,
-    Ipopt::Number* z_L,
-    Ipopt::Number* z_U,
-    Ipopt::Index m,
-    bool init_lambda,
-    Ipopt::Number* lambda)
-{
-  // Here, we assume we only have starting values for x
-  (void)init_x;
-  assert(init_x == true);
-  (void)init_z;
-  assert(init_z == false);
-  (void)init_lambda;
-  assert(init_lambda == false);
-  // We don't set the lagrange multipliers
-  (void)z_L;
-  (void)z_U;
-  (void)m;
-  (void)lambda;
-
-  if (init_x)
-  {
-    Eigen::Map<Eigen::VectorXd> x(_x, n);
-    x = flatten();
-  }
-
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return the objective value
-bool SphereFitJointCenterProblem::eval_f(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Number& _obj_value)
-{
-  if (_new_x)
-  {
-    Eigen::Map<const Eigen::VectorXd> x(_x, _n);
-    unflatten(x);
-  }
-  _obj_value = getLoss();
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return the gradient of the objective
-bool SphereFitJointCenterProblem::eval_grad_f(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Number* _grad_f)
-{
-  if (_new_x)
-  {
-    Eigen::Map<const Eigen::VectorXd> x(_x, _n);
-    unflatten(x);
-  }
-  Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
-  grad = getGradient();
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return the constraint residuals
-bool SphereFitJointCenterProblem::eval_g(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Index _m,
-    Ipopt::Number* _g)
-{
-  (void)_n;
-  (void)_x;
-  (void)_new_x;
-  (void)_m;
-  (void)_g;
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return:
-///        1) The structure of the jacobian (if "values" is nullptr)
-///        2) The values of the jacobian (if "values" is not nullptr)
-bool SphereFitJointCenterProblem::eval_jac_g(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Index _m,
-    Ipopt::Index _nele_jac,
-    Ipopt::Index* _iRow,
-    Ipopt::Index* _jCol,
-    Ipopt::Number* _values)
-{
-  (void)_n;
-  (void)_x;
-  (void)_new_x;
-  (void)_m;
-  (void)_nele_jac;
-  (void)_iRow;
-  (void)_jCol;
-  (void)_values;
-  return true;
-}
-
-//==============================================================================
-/// \brief Method to return:
-///        1) The structure of the hessian of the lagrangian (if "values" is
-///           nullptr)
-///        2) The values of the hessian of the lagrangian (if "values" is not
-///           nullptr)
-bool SphereFitJointCenterProblem::eval_h(
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    bool _new_x,
-    Ipopt::Number _obj_factor,
-    Ipopt::Index _m,
-    const Ipopt::Number* _lambda,
-    bool _new_lambda,
-    Ipopt::Index _nele_hess,
-    Ipopt::Index* _iRow,
-    Ipopt::Index* _jCol,
-    Ipopt::Number* _values)
-{
-  (void)_n;
-  (void)_x;
-  (void)_new_x;
-  (void)_obj_factor;
-  (void)_m;
-  (void)_lambda;
-  (void)_new_lambda;
-  (void)_nele_hess;
-  (void)_iRow;
-  (void)_jCol;
-  (void)_values;
-  return true;
-}
-
 s_t SphereFitJointCenterProblem::saveSolutionBackToInitialization()
 {
   for (int i = 0; i < mNumTimesteps; i++)
@@ -3020,70 +2609,351 @@ s_t SphereFitJointCenterProblem::saveSolutionBackToInitialization()
   return getLoss();
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// The CylinderFitJointAxisProblem, which maps the sphere-fitting joint-center
+// problem onto a differentiable format.
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
 //==============================================================================
-/// \brief This method is called when the algorithm is complete so the TNLP
-///        can store/write the solution
-void SphereFitJointCenterProblem::finalize_solution(
-    Ipopt::SolverReturn _status,
-    Ipopt::Index _n,
-    const Ipopt::Number* _x,
-    const Ipopt::Number* _z_L,
-    const Ipopt::Number* _z_U,
-    Ipopt::Index _m,
-    const Ipopt::Number* _g,
-    const Ipopt::Number* _lambda,
-    Ipopt::Number _obj_value,
-    const Ipopt::IpoptData* _ip_data,
-    Ipopt::IpoptCalculatedQuantities* _ip_cq)
+CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
+    MarkerFitter* fitter,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    Eigen::MatrixXs ikPoses,
+    dynamics::Joint* joint,
+    Eigen::Ref<Eigen::MatrixXs> out)
+  : mFitter(fitter),
+    mMarkerObservations(markerObservations),
+    mOut(out),
+    /*
+    mSmoothingCenterLoss(
+        0.1), // just to tie break when there's nothing better available
+    mSmoothingAxisLoss(0.1)
+    */
+    mSmoothingCenterLoss(0),
+    mSmoothingAxisLoss(0)
 {
-  (void)_status;
-  (void)_n;
-  (void)_x;
-  (void)_z_L;
-  (void)_z_U;
-  (void)_m;
-  (void)_g;
-  (void)_lambda;
-  (void)_obj_value;
-  (void)_ip_data;
-  (void)_ip_cq;
+  // 1. Figure out which markers are on BodyNode's adjacent to the joint
 
-  Eigen::Map<const Eigen::VectorXd> x(_x, _n);
-  unflatten(x);
+  for (auto pair : fitter->mMarkerMap)
+  {
+    if (pair.second.first->getName() == joint->getParentBodyNode()->getName()
+        || pair.second.first->getName() == joint->getChildBodyNode()->getName())
+    {
+      mActiveMarkers.push_back(pair.first);
+    }
+  }
 
-  saveSolutionBackToInitialization();
+  // 1.1. If there aren't enough markers, throw a warning and return
+
+  if (mActiveMarkers.size() < 3)
+  {
+    std::cout << "WARNING! Trying to instantiate a "
+                 "SphereFitJointCenterProblem, but only have "
+              << mActiveMarkers.size()
+              << " markers on BodyNode's adjacent to chosen Joint \""
+              << joint->getName() << "\"" << std::endl;
+    return;
+  }
+
+  // 2. Go through and initialize the problem
+
+  mNumTimesteps = markerObservations.size();
+
+  mMarkerPositions
+      = Eigen::MatrixXs::Zero(mActiveMarkers.size() * 3, mNumTimesteps);
+  mMarkerObserved = Eigen::MatrixXi::Zero(mActiveMarkers.size(), mNumTimesteps);
+  mRadii = Eigen::VectorXs::Zero(mActiveMarkers.size());
+  mAxisLines = Eigen::VectorXs::Zero(6 * mNumTimesteps);
+
+  Eigen::VectorXi numRadiiObservations
+      = Eigen::VectorXi::Zero(mActiveMarkers.size());
+
+  Eigen::VectorXs originalPosition = mFitter->mSkeleton->getPositions();
+  std::vector<dynamics::Joint*> jointVec;
+  jointVec.push_back(joint);
+
+  for (int i = 0; i < mNumTimesteps; i++)
+  {
+    mFitter->mSkeleton->setPositions(ikPoses.col(i));
+
+    // Find the center points
+    mAxisLines.segment<3>(i * 6)
+        = mFitter->mSkeleton->getJointWorldPositions(jointVec);
+
+    // Find the axis by the angle being formed by this joint
+    Eigen::Vector3s angleAxis
+        = math::logMap(joint->getRelativeTransform().linear());
+
+    if (angleAxis.norm() == 0)
+    {
+      // Default to the previous axis, if the current axis is 0
+      if (i == 0)
+      {
+        mAxisLines.segment<3>(i * 6 + 3).setZero();
+      }
+      else
+      {
+        mAxisLines.segment<3>(i * 6 + 3)
+            = mAxisLines.segment<3>((i - 1) * 6 + 3);
+      }
+    }
+    else
+    {
+      mAxisLines.segment<3>(i * 6 + 3) = angleAxis.normalized();
+    }
+
+    for (int j = 0; j < mActiveMarkers.size(); j++)
+    {
+      std::string name = mActiveMarkers[j];
+      if (mMarkerObservations[i].count(name) > 0)
+      {
+        mMarkerPositions.block<3, 1>(j * 3, i) = mMarkerObservations[i][name];
+        mMarkerObserved(j, i) = 1;
+        Eigen::Vector3s diff
+            = mAxisLines.segment<3>(i * 6) - mMarkerObservations[i][name];
+        // The radius is our distance to the cylinder at the nearest point
+        mRadii(j) += (diff
+                      - (diff.dot(mAxisLines.segment<3>(i * 6 + 3))
+                         * mAxisLines.segment<3>(i * 6 + 3)))
+                         .norm();
+        numRadiiObservations(j)++;
+      }
+    }
+  }
+
+  mFitter->mSkeleton->setPositions(originalPosition);
+
+  for (int j = 0; j < mActiveMarkers.size(); j++)
+  {
+    if (numRadiiObservations(j) > 0)
+    {
+      mRadii(j) /= numRadiiObservations(j);
+    }
+  }
 }
 
 //==============================================================================
-bool SphereFitJointCenterProblem::intermediate_callback(
-    Ipopt::AlgorithmMode mode,
-    Ipopt::Index iter,
-    Ipopt::Number obj_value,
-    Ipopt::Number inf_pr,
-    Ipopt::Number inf_du,
-    Ipopt::Number mu,
-    Ipopt::Number d_norm,
-    Ipopt::Number regularization_size,
-    Ipopt::Number alpha_du,
-    Ipopt::Number alpha_pr,
-    Ipopt::Index ls_trials,
-    const Ipopt::IpoptData* ip_data,
-    Ipopt::IpoptCalculatedQuantities* ip_cq)
+bool CylinderFitJointAxisProblem::canFitJoint(
+    MarkerFitter* fitter, dynamics::Joint* joint)
 {
-  (void)mode;
-  (void)iter;
-  (void)obj_value;
-  (void)inf_pr;
-  (void)inf_du;
-  (void)mu;
-  (void)d_norm;
-  (void)regularization_size;
-  (void)alpha_du;
-  (void)alpha_pr;
-  (void)ls_trials;
-  (void)ip_data;
-  (void)ip_cq;
-  return true;
+  int numActive = 0;
+  for (auto pair : fitter->mMarkerMap)
+  {
+    if (joint->getParentBodyNode()
+        && (pair.second.first->getName()
+                == joint->getParentBodyNode()->getName()
+            || pair.second.first->getName()
+                   == joint->getChildBodyNode()->getName()))
+    {
+      numActive++;
+    }
+  }
+  return numActive >= 2;
+}
+
+//==============================================================================
+int CylinderFitJointAxisProblem::getProblemDim()
+{
+  return mRadii.size() + mAxisLines.size();
+}
+
+//==============================================================================
+Eigen::VectorXs CylinderFitJointAxisProblem::flatten()
+{
+  Eigen::VectorXs flat
+      = Eigen::VectorXs::Zero(mRadii.size() + mAxisLines.size());
+  flat.segment(0, mRadii.size()) = mRadii;
+  flat.segment(mRadii.size(), mAxisLines.size()) = mAxisLines;
+  return flat;
+}
+
+//==============================================================================
+void CylinderFitJointAxisProblem::unflatten(Eigen::VectorXs x)
+{
+  mRadii = x.segment(0, mRadii.size());
+  mAxisLines = x.segment(mRadii.size(), mAxisLines.size());
+  // Ensure all the axis directions are normalized
+  for (int i = 0; i < mNumTimesteps; i++)
+  {
+    // mAxisLines.segment<3>(i * 6 + 3).normalize();
+  }
+}
+
+//==============================================================================
+s_t CylinderFitJointAxisProblem::getLoss()
+{
+  s_t loss = 0.0;
+
+  for (int i = 0; i < mNumTimesteps; i++)
+  {
+    if (i > 0)
+    {
+      loss += mSmoothingCenterLoss
+              * (mAxisLines.segment<3>(i * 6)
+                 - mAxisLines.segment<3>((i - 1) * 6))
+                    .squaredNorm();
+      loss += mSmoothingAxisLoss
+              * (mAxisLines.segment<3>(i * 6 + 3)
+                 - mAxisLines.segment<3>((i - 1) * 6 + 3))
+                    .squaredNorm();
+    }
+    for (int j = 0; j < mActiveMarkers.size(); j++)
+    {
+      if (mMarkerObserved(j, i))
+      {
+        Eigen::Vector3s center = mAxisLines.segment<3>(i * 6);
+        Eigen::Vector3s axis = mAxisLines.segment<3>(i * 6 + 3);
+        Eigen::Vector3s jointToCenter
+            = (center - mMarkerPositions.block<3, 1>(j * 3, i));
+        s_t diff = mRadii(j) * mRadii(j)
+                   - (jointToCenter - (jointToCenter.dot(axis) * axis))
+                         .squaredNorm();
+
+        /*
+        (void)axis;
+        s_t dist
+            = (jointToCenter - (jointToCenter.dot(axis) * axis)).squaredNorm();
+        s_t dist2 = (jointToCenter - jointToCenter.dot(axis) * axis)
+                        .dot(jointToCenter - jointToCenter.dot(axis) * axis);
+        s_t dist3
+            = jointToCenter.dot(jointToCenter)
+              - 2 * jointToCenter.transpose() * jointToCenter.dot(axis) * axis
+              + (axis.transpose()
+                 * (axis.transpose() * jointToCenter * jointToCenter.transpose()
+                    * axis)
+                 * axis);
+        s_t dist4 = jointToCenter.dot(jointToCenter)
+                    - 2 * jointToCenter.dot(axis) * jointToCenter.dot(axis)
+                    + (axis.transpose() * jointToCenter
+                       * jointToCenter.transpose() * axis)
+                          * axis.transpose() * axis;
+        (void)dist;
+        (void)dist2;
+        (void)dist2;
+        (void)dist3;
+        (void)dist4;
+        assert(dist == dist2);
+        assert(dist == dist3);
+        assert(dist == dist4);
+
+        if (abs(dist - dist2) > 1e-14)
+        {
+          std::cout << "dist != dist2: " << dist << " != " << dist2
+                    << std::endl;
+          exit(1);
+        }
+        if (abs(dist - dist3) > 1e-14)
+        {
+          std::cout << "dist != dist3: " << dist << " != " << dist3
+                    << std::endl;
+          exit(1);
+        }
+        if (abs(dist - dist4) > 1e-14)
+        {
+          std::cout << "dist != dist4: " << dist << " != " << dist4
+                    << std::endl;
+          exit(1);
+        }
+        */
+
+        // loss += dist4 * dist4;
+        loss += diff * diff;
+        // loss += -2 * jointToCenter.dot(axis) * jointToCenter.dot(axis);
+      }
+    }
+  }
+
+  return loss;
+}
+
+//==============================================================================
+Eigen::VectorXs CylinderFitJointAxisProblem::getGradient()
+{
+  Eigen::VectorXs grad
+      = Eigen::VectorXs::Zero(mRadii.size() + mAxisLines.size());
+
+  for (int i = 0; i < mNumTimesteps; i++)
+  {
+    if (i > 0)
+    {
+      grad.segment<3>(mRadii.size() + i * 6)
+          += 2 * mSmoothingCenterLoss
+             * (mAxisLines.segment<3>(i * 6)
+                - mAxisLines.segment<3>((i - 1) * 6));
+      grad.segment<3>(mRadii.size() + (i - 1) * 6 + 3)
+          -= 2 * mSmoothingAxisLoss
+             * (mAxisLines.segment<3>(i * 6 + 3)
+                - mAxisLines.segment<3>((i - 1) * 6 + 3));
+    }
+    for (int j = 0; j < mActiveMarkers.size(); j++)
+    {
+      if (mMarkerObserved(j, i))
+      {
+        Eigen::Vector3s center = mAxisLines.segment<3>(i * 6);
+        Eigen::Vector3s axis = mAxisLines.segment<3>(i * 6 + 3);
+        Eigen::Vector3s jointToCenter
+            = (center - mMarkerPositions.block<3, 1>(j * 3, i));
+        s_t diff = mRadii(j) * mRadii(j)
+                   - (jointToCenter - (jointToCenter.dot(axis) * axis))
+                         .squaredNorm();
+        (void)diff;
+        grad(j) += (2 * diff) * (2 * mRadii(j));
+
+        // Gradient wrt the axis center
+        grad.segment<3>(mRadii.size() + i * 6)
+            += (2 * diff) * -2
+               * (jointToCenter
+                  - (axis * axis.transpose())
+                        * (jointToCenter.dot(axis) * axis));
+        // Gradient wrt the axis
+        grad.segment<3>(mRadii.size() + i * 6 + 3)
+            += 2 * diff * -1
+               * (-4 * jointToCenter.dot(axis) * jointToCenter
+                  + (2 * jointToCenter * jointToCenter.dot(axis)
+                         * axis.dot(axis)
+                     + 2 * axis.dot(jointToCenter * jointToCenter.dot(axis))
+                           * axis));
+      }
+    }
+  }
+
+  return grad;
+}
+
+//==============================================================================
+Eigen::VectorXs CylinderFitJointAxisProblem::finiteDifferenceGradient()
+{
+  Eigen::VectorXs x = flatten();
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
+
+  const s_t EPS = 1e-7;
+  for (int i = 0; i < x.size(); i++)
+  {
+    Eigen::VectorXs perturbed = x;
+    perturbed(i) += EPS;
+    unflatten(perturbed);
+    s_t plus = getLoss();
+    perturbed = x;
+    perturbed(i) -= EPS;
+    unflatten(perturbed);
+    s_t minus = getLoss();
+
+    grad(i) = (plus - minus) / (2 * EPS);
+  }
+  unflatten(x);
+
+  return grad;
+}
+
+//==============================================================================
+s_t CylinderFitJointAxisProblem::saveSolutionBackToInitialization()
+{
+  for (int i = 0; i < mNumTimesteps; i++)
+  {
+    mOut.col(i) = mAxisLines.segment<6>(i * 6);
+  }
+  return getLoss();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -2177,6 +2177,90 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
 }
 #endif
 
+// #ifdef ALL_TESTS
+TEST(MarkerFitter, AXIS_FIT_GRAD)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  // Get the gold data scales in `config`
+  OpenSimFile moddedBase = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
+  standard.markersMap = convertedMarkers;
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+  Eigen::MatrixXs poses = mot.poses;
+  (void)poses;
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  // subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init
+      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  Eigen::MatrixXs out;
+  CylinderFitJointAxisProblem cylinderProblem(
+      &fitter,
+      subsetTimesteps,
+      init.poses,
+      standard.skeleton->getJoint("walker_knee_r"),
+      out);
+
+  Eigen::VectorXs analytical = cylinderProblem.getGradient();
+  Eigen::VectorXs bruteForce = cylinderProblem.finiteDifferenceGradient();
+
+  if (!equals(analytical, bruteForce, 1e-8))
+  {
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 4);
+    compare.col(0) = cylinderProblem.flatten();
+    compare.col(1) = analytical;
+    compare.col(2) = bruteForce;
+    compare.col(3) = analytical - bruteForce;
+    std::cout << "Error on CylinderFitJointAxisProblem grad " << std::endl
+              << "X - Analytical - FD - Diff:" << std::endl
+              << compare << std::endl;
+    EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+  }
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+  // fitter.findJointCenters(init, subsetTimesteps);
+}
+// #endif
+
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK)
 {
