@@ -32,6 +32,7 @@ struct BilevelFitResult
   Eigen::VectorXs groupScales;
   std::vector<Eigen::VectorXs> poses;
   Eigen::MatrixXs posesMatrix;
+  std::vector<int> sampleIndices;
   std::map<std::string, Eigen::Vector3s> markerOffsets;
 
   Eigen::VectorXs rawMarkerOffsets;
@@ -52,6 +53,8 @@ struct MarkerFitterState
   // The current state
   std::vector<std::string> bodyNames;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyScales;
+  Eigen::VectorXs jointWeights;
+  Eigen::VectorXs axisWeights;
 
   std::vector<std::string> markerOrder;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsets;
@@ -59,6 +62,7 @@ struct MarkerFitterState
   Eigen::MatrixXs posesAtTimesteps;
   std::vector<std::string> jointOrder;
   Eigen::MatrixXs jointErrorsAtTimesteps;
+  Eigen::MatrixXs axisErrorsAtTimesteps;
 
   // The gradient of the current state, which is not always used, but can help
   // shuttling information back and forth from friendly PyTorch APIs.
@@ -67,6 +71,7 @@ struct MarkerFitterState
   Eigen::MatrixXs markerErrorsAtTimestepsGrad;
   Eigen::MatrixXs posesAtTimestepsGrad;
   Eigen::MatrixXs jointErrorsAtTimestepsGrad;
+  Eigen::MatrixXs axisErrorsAtTimestepsGrad;
 
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
@@ -74,6 +79,9 @@ struct MarkerFitterState
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
+      Eigen::VectorXs jointWeights,
+      Eigen::MatrixXs jointAxis,
+      Eigen::VectorXs axisWeights,
       MarkerFitter* fitter);
 
   /// This returns a single flat vector representing this whole problem state
@@ -88,6 +96,7 @@ protected:
   std::shared_ptr<dynamics::Skeleton> skeleton;
   std::vector<dynamics::Joint*> joints;
   Eigen::MatrixXs jointCenters;
+  Eigen::MatrixXs jointAxis;
   MarkerFitter* fitter;
 };
 
@@ -98,14 +107,20 @@ protected:
 struct MarkerInitialization
 {
   Eigen::MatrixXs poses;
+  Eigen::VectorXs
+      poseScores; // These are the loss values for IK at each timestep
   Eigen::VectorXs groupScales;
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       updatedMarkerMap;
 
   std::vector<dynamics::Joint*> joints;
+  Eigen::VectorXs jointLoss;
   Eigen::VectorXs jointWeights;
   Eigen::MatrixXs jointCenters;
+  Eigen::VectorXs axisWeights;
+  Eigen::VectorXs axisLoss;
+  Eigen::MatrixXs jointAxis;
 };
 
 /**
@@ -156,6 +171,7 @@ public:
   Eigen::MatrixXi mMarkerObserved;
   Eigen::VectorXs mRadii;
   Eigen::VectorXs mCenterPoints;
+  std::string mJointName;
 };
 
 /**
@@ -171,6 +187,7 @@ public:
           markerObservations,
       Eigen::MatrixXs ikPoses,
       dynamics::Joint* joint,
+      Eigen::MatrixXs centers,
       Eigen::Ref<Eigen::MatrixXs> out);
 
   static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
@@ -196,6 +213,7 @@ protected:
   MarkerFitter* mFitter;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
   Eigen::Ref<Eigen::MatrixXs> mOut;
+  s_t mKeepCenterLoss;
   s_t mSmoothingCenterLoss;
   s_t mSmoothingAxisLoss;
 
@@ -205,10 +223,13 @@ public:
   std::vector<std::string> mActiveMarkers;
 
   int mNumTimesteps;
+  Eigen::MatrixXs mJointCenters;
   Eigen::MatrixXs mMarkerPositions;
   Eigen::MatrixXi mMarkerObserved;
-  Eigen::VectorXs mRadii;
+  Eigen::VectorXs mPerpendicularRadii;
+  Eigen::VectorXs mParallelRadii;
   Eigen::VectorXs mAxisLines;
+  std::string mJointName;
 };
 
 /**
@@ -221,6 +242,10 @@ struct InitialMarkerFitParams
   std::vector<dynamics::Joint*> joints;
   Eigen::MatrixXs jointCenters;
   Eigen::VectorXs jointWeights;
+
+  Eigen::MatrixXs jointAxis;
+  Eigen::VectorXs axisWeights;
+
   int numBlocks;
   Eigen::MatrixXs initPoses;
 
@@ -238,6 +263,8 @@ struct InitialMarkerFitParams
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
       Eigen::VectorXs jointWeights);
+  InitialMarkerFitParams& setJointAxisAndWeights(
+      Eigen::MatrixXs jointAxis, Eigen::VectorXs axisWeights);
   InitialMarkerFitParams& setNumBlocks(int numBlocks);
   InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
   InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
@@ -281,6 +308,25 @@ public:
           markerObservations,
       InitialMarkerFitParams params);
 
+  /// This computes the IK diff for joint positions, given a bunch of weighted
+  /// joint centers and also a bunch of weighted joint axis.
+  static void computeJointIKDiff(
+      Eigen::Ref<Eigen::VectorXs> diff,
+      Eigen::VectorXs& jointPoses,
+      Eigen::VectorXs& jointCenters,
+      Eigen::VectorXs& jointWeights,
+      Eigen::VectorXs& jointAxis,
+      Eigen::VectorXs& axisWeights);
+
+  /// This takes a Jacobian of joint world positions (with respect to anything),
+  /// and rescales and reshapes to reflect the weights on joint and axis losses,
+  /// as well as the direction for axis losses.
+  static void rescaleIKJacobianForWeightsAndAxis(
+      Eigen::Ref<Eigen::MatrixXs> jac,
+      Eigen::VectorXs& jointWeights,
+      Eigen::VectorXs& jointAxis,
+      Eigen::VectorXs& axisWeights);
+
   /// This scales the skeleton and IK fits to the marker observations. It
   /// returns a pair, with (pose, group scales) from the fit.
   static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
@@ -292,6 +338,8 @@ public:
       std::vector<dynamics::Joint*> joints,
       Eigen::VectorXs jointCenters,
       Eigen::VectorXs jointWeights,
+      Eigen::VectorXs jointAxis,
+      Eigen::VectorXs axisWeights,
       bool dontScale = false);
 
   /// Pipeline step 1, 3, and 5:
@@ -306,7 +354,11 @@ public:
       std::vector<dynamics::Joint*> joints,
       std::vector<Eigen::VectorXs> jointCenters,
       Eigen::VectorXs jointWeights,
-      Eigen::Ref<Eigen::MatrixXs> result);
+      std::vector<Eigen::VectorXs> jointAxis,
+      Eigen::VectorXs axisWeights,
+      Eigen::Ref<Eigen::MatrixXs> result,
+      Eigen::Ref<Eigen::VectorXs> resultScores,
+      bool backwards = false);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 2: Find joint centers
@@ -326,6 +378,23 @@ public:
       bool logSteps = false);
 
   ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 3: Find joint axis
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// This solves a bunch of optimization problems, one per joint, to find and
+  /// track the joint centers over time. It puts the results back into
+  /// `initialization`
+  void findAllJointAxis(
+      MarkerInitialization& initialization,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This finds the trajectory for a single specified joint axis over time
+  std::shared_ptr<CylinderFitJointAxisProblem> findJointAxis(
+      std::shared_ptr<CylinderFitJointAxisProblem> problem,
+      bool logSteps = false);
+
+  ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 4: Jointly scale+fit+marker offsets, with joint centers as
   // part of the loss term
   ///////////////////////////////////////////////////////////////////////////
@@ -339,7 +408,22 @@ public:
       int numSamples);
 
   ///////////////////////////////////////////////////////////////////////////
-  // Pipeline step 5: Run through and do a linear initialization of masses based
+  // Pipeline step 5: Complete the intermittent pose information of the
+  // BilevelFitResult by running IK to extend each section.
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// The bilevel optimization only picks a subset of poses to fine tune. This
+  /// method takes those poses as a starting point, and extends each pose
+  /// forward and backwards (half the distance to the next pose to fine tune)
+  /// with IK.
+  MarkerInitialization completeBilevelResult(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      std::shared_ptr<BilevelFitResult> result,
+      InitialMarkerFitParams params);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 6: Run through and do a linear initialization of masses based
   // on link masses.
   ///////////////////////////////////////////////////////////////////////////
 
@@ -844,6 +928,9 @@ protected:
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerMapObservations;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
   Eigen::MatrixXs mJointCenters;
+  Eigen::VectorXs mJointWeights;
+  Eigen::MatrixXs mJointAxis;
+  Eigen::VectorXs mAxisWeights;
   std::vector<int> mSampleIndices;
   MarkerInitialization& mInitialization;
   Eigen::VectorXs mObservationWeights;

@@ -1067,7 +1067,9 @@ void debugTrajectoryAndMarkersToGUI(
     Eigen::MatrixXs poses,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
     Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0),
-    Eigen::VectorXs jointWeights = Eigen::VectorXs::Ones(0))
+    Eigen::VectorXs jointWeights = Eigen::VectorXs::Ones(0),
+    Eigen::MatrixXs jointAxis = Eigen::MatrixXs::Zero(0, 0),
+    Eigen::VectorXs axisWeights = Eigen::VectorXs::Ones(0))
 {
   server::GUIWebsocketServer server;
   server.serve(8070);
@@ -1076,11 +1078,28 @@ void debugTrajectoryAndMarkersToGUI(
   int numJoints = jointCenters.rows() / 3;
   for (int i = 0; i < numJoints; i++)
   {
-    server.createSphere(
-        "joint_center_" + std::to_string(i),
-        0.02 * (1.0 / jointWeights(i)),
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector4s(0, 0, 1, jointWeights(i)));
+    if (jointWeights(i) > 0)
+    {
+      server.createSphere(
+          "joint_center_" + std::to_string(i),
+          0.02 * (1.0 / jointWeights(i)),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 0, 1, jointWeights(i)));
+    }
+  }
+  int numAxis = jointAxis.rows() / 6;
+  for (int i = 0; i < numAxis; i++)
+  {
+    if (axisWeights(i) > 0)
+    {
+      server.createCapsule(
+          "joint_axis_" + std::to_string(i),
+          0.01 * (1.0 / axisWeights(i)),
+          0.1,
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 1, 0, axisWeights(i)));
+    }
   }
 
   int timestep = 0;
@@ -1111,9 +1130,40 @@ void debugTrajectoryAndMarkersToGUI(
 
     for (int i = 0; i < numJoints; i++)
     {
-      server.setObjectPosition(
-          "joint_center_" + std::to_string(i),
-          jointCenters.block<3, 1>(i * 3, timestep));
+      if (jointWeights(i) > 0)
+      {
+        server.setObjectPosition(
+            "joint_center_" + std::to_string(i),
+            jointCenters.block<3, 1>(i * 3, timestep));
+      }
+    }
+    for (int i = 0; i < numAxis; i++)
+    {
+      if (axisWeights(i) > 0)
+      {
+        // Render an axis line
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(jointAxis.block<3, 1>(i * 6, timestep));
+        points.push_back(
+            jointAxis.block<3, 1>(i * 6, timestep)
+            + (jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
+        server.createLine(
+            "joint_axis_line_" + std::to_string(i),
+            points,
+            Eigen::Vector4s(0, 1, 0, 1));
+
+        // Render an axis capsule
+        server.setObjectPosition(
+            "joint_axis_" + std::to_string(i),
+            jointAxis.block<3, 1>(i * 6, timestep));
+        Eigen::Vector3s dir = jointAxis.block<3, 1>(i * 6 + 3, timestep);
+        Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
+        R.col(2) = dir;
+        R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
+        R.col(0) = R.col(1).cross(R.col(2));
+        server.setObjectRotation(
+            "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
+      }
     }
 
     timestep++;
@@ -2177,7 +2227,7 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, AXIS_FIT_GRAD)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2212,8 +2262,8 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
 
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.05);
-  fitter.setInitialIKMaxRestarts(50);
-  fitter.setIterationLimit(100);
+  fitter.setInitialIKMaxRestarts(1);
+  fitter.setIterationLimit(10);
 
   // Set all the triads to be tracking markers, instead of anatomical
   fitter.setTriadsToTracking();
@@ -2236,12 +2286,13 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
       subsetTimesteps,
       init.poses,
       standard.skeleton->getJoint("walker_knee_r"),
+      Eigen::MatrixXs::Random(3, init.poses.cols()),
       out);
 
   Eigen::VectorXs analytical = cylinderProblem.getGradient();
   Eigen::VectorXs bruteForce = cylinderProblem.finiteDifferenceGradient();
 
-  if (!equals(analytical, bruteForce, 1e-8))
+  if (!equals(analytical, bruteForce, 5e-8) || true)
   {
     Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 4);
     compare.col(0) = cylinderProblem.flatten();
@@ -2251,15 +2302,15 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
     std::cout << "Error on CylinderFitJointAxisProblem grad " << std::endl
               << "X - Analytical - FD - Diff:" << std::endl
               << compare << std::endl;
-    EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+    EXPECT_TRUE(equals(analytical, bruteForce, 5e-8));
   }
 
   // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
-  // fitter.findJointCenters(init, subsetTimesteps);
+  // fitter.findAllJointAxis(init, subsetTimesteps);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK)
@@ -2664,7 +2715,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2712,12 +2763,15 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
       "LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim");
   OpenSimMot mot = OpenSimParser::loadMot(
       scaled.skeleton, "dart://sample/osim/LaiArnoldSubject5/DJ1.mot");
+
   Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
   IKErrorReport goldReport(
-      scaled.skeleton,
-      scaled.markersMap,
-      goldPoses,
-      markerTrajectories.markerTimesteps);
+      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
 
   // Create a marker fitter
 
@@ -2761,7 +2815,9 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
+
   fitter.findJointCenters(init, subsetTimesteps);
+  fitter.findAllJointAxis(init, subsetTimesteps);
 
   // Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = fitter.getInitialization(
@@ -2769,6 +2825,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
               init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses));
 
   for (auto pair : reinit.updatedMarkerMap)
@@ -2858,16 +2915,18 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
   // Bilevel optimization
-  fitter.setIterationLimit(400);
+  fitter.setIterationLimit(200);
   std::shared_ptr<BilevelFitResult> bilevelFit
       = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
 
   // Fine-tune IK and re-fit all the points
-  MarkerInitialization finalKinematicInit = fitter.getInitialization(
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
       subsetTimesteps,
+      bilevelFit,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
               reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
           .setInitPoses(reinit.poses)
           .setDontRescaleBodies(true)
           .setGroupScales(bilevelFit->groupScales)
@@ -2910,9 +2969,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
       finalKinematicInit.poses,
       subsetTimesteps,
       finalKinematicInit.jointCenters,
-      finalKinematicInit.jointWeights);
+      finalKinematicInit.jointWeights,
+      finalKinematicInit.jointAxis,
+      finalKinematicInit.axisWeights);
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
