@@ -422,6 +422,20 @@ public:
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
 
+  /// This sets the minimum joint variance allowed before
+  /// computeJointConfidences() will cut off a joint as having too low variance
+  void setMinJointVarianceCutoff(s_t cutoff);
+
+  /// This sets the value used to compute sphere fit weights
+  void setMinSphereFitScore(s_t score);
+
+  /// This sets the value used to compute axis fit weights
+  void setMinAxisFitScore(s_t score);
+
+  /// If set to true, we print the pair observation counts and data for
+  /// computing joint variability.
+  void setDebugJointVariability(bool debug);
+
   /// This returns a score summarizing how much the markers attached to this
   /// joint move relative to one another.
   s_t computeJointVariability(
@@ -758,6 +772,11 @@ protected:
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;
   s_t mMaxMarkerOffset;
+  // Parameters for joint weighting
+  s_t mMinVarianceCutoff;
+  s_t mMinSphereFitScore;
+  s_t mMinAxisFitScore;
+  bool mDebugJointVariability;
 
   // These are IPOPT settings
   double mTolerance;
@@ -970,6 +989,11 @@ protected:
   MarkerInitialization& mInitialization;
   Eigen::VectorXs mObservationWeights;
   std::shared_ptr<BilevelFitResult>& mOutResult;
+
+  int mBestObjectiveValueIteration;
+  s_t mBestObjectiveValue;
+  Eigen::VectorXs mLastX;
+  Eigen::VectorXs mBestObjectiveValueState;
 
   // Thread state
 

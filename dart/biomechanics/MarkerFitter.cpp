@@ -460,7 +460,11 @@ MarkerFitter::MarkerFitter(
     mInitialIKMaxRestarts(100),
     mMaxMarkerOffset(0.2),
     mAnthropometrics(nullptr),
-    mAnthropometricWeight(0.001)
+    mAnthropometricWeight(0.001),
+    mMinVarianceCutoff(3.0),
+    mMinSphereFitScore(3e-5),
+    mMinAxisFitScore(6e-5),
+    mDebugJointVariability(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
   int offset = 0;
@@ -564,8 +568,9 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 
   // 5. Fine-tune IK and re-fit all the points
   mSkeleton->setGroupScales(bilevelFit->groupScales);
-  MarkerInitialization finalKinematicInit = getInitialization(
+  MarkerInitialization finalKinematicInit = completeBilevelResult(
       markerObservations,
+      bilevelFit,
       InitialMarkerFitParams(params)
           .setJointCentersAndWeights(
               init.joints, init.jointCenters, init.jointWeights)
@@ -594,7 +599,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       server.createSphere(
           "joint_center_" + std::to_string(i),
-          0.01 * (1.0 / init.jointWeights(i)),
+          0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
           Eigen::Vector4s(0, 0, 1, init.jointWeights(i)));
     }
@@ -606,7 +611,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       server.createCapsule(
           "joint_axis_" + std::to_string(i),
-          0.003 * (1.0 / init.axisWeights(i)),
+          0.003 * std::min(3.0, (1.0 / init.axisWeights(i))),
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
@@ -705,7 +710,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       server.createSphere(
           "joint_center_" + std::to_string(i),
-          0.01 * (1.0 / init.jointWeights(i)),
+          0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
           Eigen::Vector4s(0, 0, 1, init.jointWeights(i)));
     }
@@ -717,7 +722,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       server.createCapsule(
           "joint_axis_" + std::to_string(i),
-          0.003 * (1.0 / init.axisWeights(i)),
+          0.003 * std::min(3.0, (1.0 / init.axisWeights(i))),
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
@@ -941,6 +946,10 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
       mSkeleton->getNumDofs(), markerObservations.size());
   result.poseScores = Eigen::VectorXs::Zero(markerObservations.size());
 
+  std::cout << "Completing bilevel fit result using IK on the timesteps "
+               "between our sampled indices..."
+            << std::endl;
+
   std::vector<std::future<void>> blockFitFutures;
 
   // 2. Do a forward pass starting at each sample index and guessing forward to
@@ -1144,6 +1153,8 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
       // solution->markerOffsets[name]);
     }
   }
+
+  std::cout << "Done completing bilevel fit!" << std::endl;
 
   return result;
 }
@@ -2159,7 +2170,7 @@ void MarkerFitter::findJointCenters(
   for (int i = 0; i < futures.size(); i++)
   {
     s_t loss = futures[i].get()->saveSolutionBackToInitialization();
-    initialization.jointLoss(i) = loss;
+    initialization.jointLoss(i) = loss / markerObservations.size();
     std::cout << "Finished computing joint center for " << i << "/"
               << initialization.joints.size() << ": \""
               << initialization.joints[i]->getName() << "\"" << std::endl;
@@ -2178,7 +2189,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   Eigen::VectorXs x = problem->flatten();
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 20000; i++)
+  for (int i = 0; i < 10000; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     Eigen::VectorXs newX = x - grad * lr;
@@ -2207,7 +2218,8 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
     }
   }
   std::cout << "Sphere-fitting \"" << problemPtr->mJointName << "\""
-            << ": initial loss=" << initialLoss << ", final loss=" << loss
+            << ": initial loss=" << (initialLoss / problemPtr->mNumTimesteps)
+            << ", final loss=" << (loss / problemPtr->mNumTimesteps)
             << std::endl;
   return problemPtr;
 }
@@ -2275,7 +2287,7 @@ void MarkerFitter::findAllJointAxis(
   for (int i = 0; i < futures.size(); i++)
   {
     s_t loss = futures[i].get()->saveSolutionBackToInitialization();
-    initialization.axisLoss(i) = loss;
+    initialization.axisLoss(i) = loss / markerObservations.size();
 
     std::cout << "Finished computing joint axis for " << i << "/"
               << initialization.joints.size() << ": \""
@@ -2295,7 +2307,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
   Eigen::VectorXs x = problem->flatten();
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 50000; i++)
+  for (int i = 0; i < 10000; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     x = problem->flatten();
@@ -2325,7 +2337,8 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
     }
   }
   std::cout << "Cylinder fitting \"" << problemPtr->mJointName << "\""
-            << ": initial loss=" << initialLoss << ", final loss=" << loss
+            << ": initial loss=" << (initialLoss / problemPtr->mNumTimesteps)
+            << ", final loss=" << (loss / problemPtr->mNumTimesteps)
             << std::endl;
   return problemPtr;
 }
@@ -2349,13 +2362,13 @@ void MarkerFitter::computeJointConfidences(
     // that don't move relative to each other. Likewise, pretty much any center
     // could fit the points, by just changing the relative radii of each marker.
     // So don't pass along a joint axis, and put joint center at low weight.
-    if (variability < 3.0)
+    if (variability < mMinVarianceCutoff)
     {
       initialization.axisWeights(i) = 0;
       // We want to map low loss (0.005 ish) to 0.1, and we want to map
       // increasing loss to a decreasing weight
       initialization.jointWeights(i)
-          = 0.1 * (0.005 / initialization.jointLoss(i));
+          = 0.1 * (mMinSphereFitScore / initialization.jointLoss(i));
       // We cap the weight at 0.1
       if (initialization.jointWeights(i) > 0.1)
       {
@@ -2373,9 +2386,10 @@ void MarkerFitter::computeJointConfidences(
     }
     else
     {
-      // We want to map low loss (0.005 ish) to 1.0, and we want to map
+      // We want to map low loss (0.01 ish) to 1.0, and we want to map
       // increasing loss to a decreasing weight
-      initialization.jointWeights(i) = 0.005 / initialization.jointLoss(i);
+      initialization.jointWeights(i)
+          = mMinSphereFitScore / initialization.jointLoss(i);
       // We cap the weight at 1.0
       if (initialization.jointWeights(i) > 1.0)
       {
@@ -2384,7 +2398,8 @@ void MarkerFitter::computeJointConfidences(
 
       // We want to map low loss (0.001 ish) to 1.0, and we want to map
       // increasing loss to a decreasing weight
-      initialization.axisWeights(i) = 0.001 / initialization.axisLoss(i);
+      initialization.axisWeights(i)
+          = mMinAxisFitScore / initialization.axisLoss(i);
       // We cap the weight at 1.0
       if (initialization.axisWeights(i) > 1.0)
       {
@@ -2411,6 +2426,36 @@ void MarkerFitter::computeJointConfidences(
                 << std::endl;
     }
   }
+}
+
+//==============================================================================
+/// This sets the minimum joint variance allowed before
+/// computeJointConfidences() will cut off a joint as having too low variance
+void MarkerFitter::setMinJointVarianceCutoff(s_t cutoff)
+{
+  mMinVarianceCutoff = cutoff;
+}
+
+//==============================================================================
+/// This sets the value used to compute sphere fit weights
+void MarkerFitter::setMinSphereFitScore(s_t score)
+{
+  mMinSphereFitScore = score;
+}
+
+//==============================================================================
+/// This sets the value used to compute axis fit weights
+void MarkerFitter::setMinAxisFitScore(s_t score)
+{
+  mMinAxisFitScore = score;
+}
+
+//==============================================================================
+/// If set to true, we print the pair observation counts and data for
+/// computing joint variability.
+void MarkerFitter::setDebugJointVariability(bool debug)
+{
+  mDebugJointVariability = debug;
 }
 
 //==============================================================================
@@ -2489,6 +2534,18 @@ s_t MarkerFitter::computeJointVariability(
   }
 
   pairVariance.cwiseQuotient(pairObservationCounts);
+
+  if (mDebugJointVariability)
+  {
+    std::cout << "Computing joint variability for \"" << joint->getName()
+              << "\"" << std::endl
+              << "Pair means: " << std::endl
+              << pairMeans << std::endl
+              << "Pair observation counts: " << std::endl
+              << pairObservationCounts << std::endl
+              << "Pair variance: " << std::endl
+              << pairVariance << std::endl;
+  }
 
   // 3. Go through and compute the sum normalized RMSE
 
@@ -3998,7 +4055,10 @@ BilevelFitProblem::BilevelFitProblem(
     MarkerInitialization& initialization,
     int numSamples,
     std::shared_ptr<BilevelFitResult>& outResult)
-  : mFitter(fitter), mOutResult(outResult), mInitialization(initialization)
+  : mFitter(fitter),
+    mOutResult(outResult),
+    mInitialization(initialization),
+    mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Select the random indices we'll be using for this problem
   if (numSamples >= markerObservations.size())
@@ -4165,6 +4225,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
 /// problem state: [groupSizes, markerOffsets, q_0, ..., q_N]
 s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 {
+  mLastX = x;
   MarkerFitterState state(
       x,
       mMarkerMapObservations,
@@ -4182,6 +4243,7 @@ s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 /// the problem state: [groupSizes, markerOffsets, q_0, ..., q_N]
 Eigen::VectorXs BilevelFitProblem::getGradient(Eigen::VectorXs x)
 {
+  mLastX = x;
   MarkerFitterState state(
       x,
       mMarkerMapObservations,
@@ -4838,7 +4900,11 @@ void BilevelFitProblem::finalize_solution(
   (void)_obj_value;
   (void)_ip_data;
   (void)_ip_cq;
-  Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+  // Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+  std::cout << "Recovering state with best loss: iteration "
+            << mBestObjectiveValueIteration << " with " << mBestObjectiveValue
+            << std::endl;
+  Eigen::VectorXs x = mBestObjectiveValueState;
 
   int groupScaleDim = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDim = mFitter->mMarkers.size() * 3;
@@ -4886,6 +4952,14 @@ bool BilevelFitProblem::intermediate_callback(
   (void)ls_trials;
   (void)ip_data;
   (void)ip_cq;
+
+  if (obj_value < mBestObjectiveValue)
+  {
+    mBestObjectiveValueIteration = iter;
+    mBestObjectiveValue = obj_value;
+    mBestObjectiveValueState = mLastX;
+  }
+
   return true;
 }
 

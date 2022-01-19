@@ -248,6 +248,22 @@ void MarkerFitter(py::module& m)
           ::py::arg("markerObservations"),
           ::py::arg("params"))
       .def(
+          "setMinJointVarianceCutoff",
+          &dart::biomechanics::MarkerFitter::setMinJointVarianceCutoff,
+          ::py::arg("cutoff"))
+      .def(
+          "setMinSphereFitScore",
+          &dart::biomechanics::MarkerFitter::setMinSphereFitScore,
+          ::py::arg("score"))
+      .def(
+          "setMinAxisFitScore",
+          &dart::biomechanics::MarkerFitter::setMinAxisFitScore,
+          ::py::arg("score"))
+      .def(
+          "setDebugJointVariability",
+          &dart::biomechanics::MarkerFitter::setDebugJointVariability,
+          ::py::arg("debug"))
+      .def(
           "debugTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
           ::py::arg("init"),
