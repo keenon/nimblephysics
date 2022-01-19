@@ -26,7 +26,7 @@ SSID::SSID(
   : mRunning(false),
     mRunningSlow(false),
     mParamChanged(true),
-    mResultFromSlowIsReady(false),
+    mSteadySolutionFound(false),
     mWorld(world),
     // wrt mass should be safe
     mWorldSlow(world->clone()),
@@ -37,7 +37,14 @@ SSID::SSID(
     mControlLog(VectorLog(world->getNumDofs())),
     mPlanningSteps(steps),
     mPlanningStepsSlow(steps * 20),
-    mScale(scale)
+    mScale(scale),
+    mMassDim(world->getMassDims()),
+    mDampingDim(world->getDampingDims()),
+    mSpringDim(world->getSpringDims()),
+    mParam_Solution(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
+    mValue(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
+    mCumValue(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
+    mTemperature(Eigen::VectorXs::Ones(mMassDim+mDampingDim+mSpringDim))
 {
   for(int i=0;i<mSensorDims.size();i++)
   {
@@ -57,8 +64,8 @@ SSID::SSID(
       = std::make_shared<IPOptOptimizer>();
   ipoptOptimizer->setCheckDerivatives(false);
   ipoptOptimizer->setSuppressOutput(true);
-  ipoptOptimizer->setTolerance(1e-30);
-  ipoptOptimizer->setIterationLimit(100);
+  ipoptOptimizer->setTolerance(1e-20);
+  ipoptOptimizer->setIterationLimit(20);
   ipoptOptimizer->setRecordFullDebugInfo(false);
   ipoptOptimizer->setRecordIterations(false);
   ipoptOptimizer->setLBFGSHistoryLength(5);
@@ -69,8 +76,8 @@ SSID::SSID(
     = std::make_shared<IPOptOptimizer>();
   ipoptOptimizerSlow->setCheckDerivatives(false);
   ipoptOptimizerSlow->setSuppressOutput(true);
-  ipoptOptimizerSlow->setTolerance(1e-30);
-  ipoptOptimizerSlow->setIterationLimit(200);
+  ipoptOptimizerSlow->setTolerance(1e-15);
+  ipoptOptimizerSlow->setIterationLimit(50);
   ipoptOptimizerSlow->setRecordFullDebugInfo(false);
   ipoptOptimizerSlow->setRecordIterations(false);
   ipoptOptimizerSlow->setLBFGSHistoryLength(5);
@@ -233,7 +240,6 @@ void SSID::runInference(long startTime)
   mProblem->setMetadata("sensors", poseHistory);
   mProblem->setMetadata("velocities",velHistory);
   mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
-  // TODO: Set initial velocity
   mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
   // Then actually run the optimization
   mSolution = mOptimizer->optimize(mProblem.get());
@@ -246,15 +252,14 @@ void SSID::runInference(long startTime)
   Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
   Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
   // Here the masses should be the concatenation of all registered mass nodes
-  // Eigen::VectorXs mass = mWorld->getMasses();
   paramMutexLock();
-  Eigen::VectorXs mass = mParam_Solution;
+  Eigen::VectorXs param = mParam_Solution;
   paramMutexUnlock();
-  mValue = getTrajConditionNumbers(poseHistory, velHistory);
+  mValue = getTrajConditionNumbers(poseHistory, velHistory); // Should allow different value for each dofs should be identified independently
   
   for (auto listener : mInferListeners)
   {
-    listener(startTime, pos, vel, mass, computeDurationWallTime);
+    listener(startTime, pos, vel, param, computeDurationWallTime); 
   }
 }
 
@@ -287,7 +292,6 @@ void SSID::runSlowInference(long startTime)
   mProblemSlow->setMetadata("sensors", poseHistory);
   mProblemSlow->setMetadata("velocities",velHistory);
   mProblemSlow->setStartPos(mInitialPosEstimator(poseHistory, startTime));
-  // TODO: Set initial velocity
   mProblemSlow->setStartVel(mInitialVelEstimator(velHistory, startTime));
   // Then actually run the optimization
   mSolutionSlow = mOptimizerSlow->optimize(mProblemSlow.get());
@@ -301,6 +305,8 @@ void SSID::runSlowInference(long startTime)
   Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
   // Here the masses should be the concatenation of all registered mass nodes
   Eigen::VectorXs mass = mWorldSlow->getMasses();
+  Eigen::VectorXs damp = mWorldSlow->getDampings();
+  Eigen::VectorXs spring = mWorldSlow->getSprings();
 
   // TODO: Listeners may be different
   for (auto listener : mInferListenersSlow)
@@ -496,41 +502,93 @@ void SSID::optimizationThreadLoop()
       paramMutexLock();
       if(mInitialize)
       {
-        mParam_Solution = mWorld->getMasses();
+        mParam_Solution.segment(0, mMassDim) = mWorld->getMasses();
+        mParam_Solution.segment(mMassDim, mDampingDim) = mWorld->getDampings();
+        mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim) = mWorld->getSprings();
       }
-      mWorld->setMasses(mParam_Solution);
+      mWorld->setMasses(mParam_Solution.segment(0, mMassDim));
+      mWorld->setDampings(mParam_Solution.segment(mMassDim, mDampingDim));
+      mWorld->setSprings(mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim));
+
       paramMutexUnlock();
       runInference(startTime);
       // Update mPrev_result buffer
-      updateFastThreadBuffer(mWorld->getMasses(), mValue);
-      if(mResultFromSlowIsReady)
+      Eigen::VectorXs new_solution = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+      new_solution.segment(0, mMassDim) = mWorld->getMasses();
+      new_solution.segment(mMassDim, mDampingDim) = mWorld->getDampings();
+      new_solution.segment(mMassDim + mDampingDim, mSpringDim) = mWorld->getSprings();
+      
+      if(!mUseSmoothing)
       {
-        if(detectChangeParams())
+        mParam_Solution = new_solution;
+        //std::cout << "New Solution: " << new_solution(0) << new_solution(1) << std::endl;
+        continue;
+      }
+      // We have a stable solution, then detect changes
+      if(mSteadySolutionFound && mUseConfidence)
+      {
+        if(detectChangeParams()) // Cmp with previous believed solution TODO: May be need isolated debug
         {
           mParamChanged = true;
+          mSteadySolutionFound = false;
           paramMutexLock();
-          mParam_Solution = estimateSolution();
+          // Flush all the solutions in the buffer
+          if(mUseConfidence)
+          {
+            mControlLog.discardBefore(startTime);
+            for(int i = 0; i < mSensorLogs.size(); i++)
+            {
+              mSensorLogs[i].discardBefore(startTime);
+            }
+            mPrev_solutions.clear();
+            mPrev_values.clear();
+            mCumValue = Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim);
+          }
+          mInitialize = true;
           paramMutexUnlock();
         }
       }
-      // Update the mParam_Solution with current solution
-      if(mParamChanged==true || mResultFromSlowIsReady==false)
+      updateFastThreadBuffer(new_solution, mValue);
+      // We don't have a stable solution, we hope to find one
+      if(mParamChanged==true || mSteadySolutionFound==false)
       {
         // Estimate the result by weighted average
         paramMutexLock();
         std::cout << "Param Changed Use Fast Result!" << mPrev_solutions[mPrev_solutions.size()-1](0) 
                   <<" " << mPrev_solutions[mPrev_solutions.size()-1](1) << std::endl;
-        Eigen::VectorXs conf = estimateConfidence();
-        std::cout << "Confidence :" << conf(0) << " " << conf(1) << std::endl;
         if(!mInitialize)
         {
+          // Sliding weighted average 
+          // TODO: Think about ablation
+          Eigen::VectorXs conf = computeConfidenceFromValue(mValue);
+          std::cout << "Confidence: " << conf(0) <<" "<< conf(1) << std::endl;
+          Eigen::VectorXs prev_solution = mParam_Solution;
+          if(mUseConfidence)
+          {
+            if(conf.mean()>mConfidence_thresh)
+            {
+              mParam_Solution = (mValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(new_solution) 
+                              + (mCumValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(mParam_Solution);
+              mCumValue += mValue;
+            }
+            // TODO: Use delta value to determine the stability
+            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < 0.5*mParam_change_thresh)
+            {
+              mSteadySolutionFound = true;
+            }
+          }
           
-          mParam_Solution = estimateSolution();
-          //std::cout <<"Weight: "<< mValue << std::endl;
+          if(!mUseConfidence)
+          {
+            mParam_Solution = estimateSolution();
+          }
+          // How to determine a stable solution has been found
+          // May be if we reject the low confidence result we don't need steady solution, in that case we need to define confidence
+          // of a particular solution, need to rescale the confidence
         }
         else
         {
-          mParam_Solution = mPrev_solutions[mPrev_solutions.size()-1];
+          mParam_Solution = new_solution;
         }
         paramMutexUnlock();
       }
@@ -557,7 +615,7 @@ void SSID::slowOptimizationThreadLoop()
     {
       // std::cout << "Slow Thread is Running" << std::endl;
       registerLock();
-      mResultFromSlowIsReady = false;
+      mSteadySolutionFound = false;
       mParamChanged = false;
       mControlLog.discardBefore(startTime);
       for(int i = 0; i < mSensorLogs.size(); i++)
@@ -566,7 +624,7 @@ void SSID::slowOptimizationThreadLoop()
       }
       registerUnlock();
     }
-    if(mControlLog.availableStepsBefore(startTime) > mPlanningStepsSlow+1 && !mResultFromSlowIsReady)
+    if(mControlLog.availableStepsBefore(startTime) > mPlanningStepsSlow+1 && !mSteadySolutionFound)
     {
       // TODO: Implement inference for slow thread
       // Which ideally need to solve a separate optimization problem with different settings
@@ -574,26 +632,34 @@ void SSID::slowOptimizationThreadLoop()
       runSlowInference(startTime);
       // Assume runSlowInference Given long enough trajectory can definitely solve the trajectory
       paramMutexLock();
-      mParam_Solution = mWorldSlow->getMasses();
-      mParam_Slow = mWorldSlow->getMasses();
+      mParam_Solution.segment(0, mMassDim) = mWorldSlow->getMasses();
+      mParam_Solution.segment(mMassDim, mDampingDim) = mWorldSlow->getDampings();
+      mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim) = mWorldSlow->getSprings();
+
+      // mParam_Slow.segment(0, mMassDim) = mWorldSlow->getMasses();
+      // mParam_Slow.segment(mMassDim, mDampingDim) = mWorldSlow->getDampings();
+      // mParam_Slow.segment(mMassDim+mDampingDim, mSpringDim) = mWorldSlow->getSprings();
       std::cout << "Result From Slow Thread: "
-                << mParam_Solution(0) << " " << mParam_Solution(1) << std::endl;
+                << mParam_Solution << std::endl;
       paramMutexUnlock();
       mParamChanged = false;
-      mResultFromSlowIsReady = true;
+      mSteadySolutionFound = true;
     }
     
   }
 }
 
 /// The Change of Parameter should be handled independently for each degree of freedom
+/// For simplicity it is a global function right now
 bool SSID::detectChangeParams()
 {
   Eigen::VectorXs mean_params = estimateSolution();
   Eigen::VectorXs confidence = estimateConfidence();
+  std::cout << "Confidence: " << confidence(0) << " " << confidence(1) << std::endl;
+  std::cout << "Solutions: " << mean_params(0) << " " << mean_params(1) << std::endl;
   paramMutexLock();
   if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
-    confidence.minCoeff() > mConfidence_thresh)
+    (confidence.mean() > mConfidence_thresh|| !mUseConfidence))
   {
     paramMutexUnlock();
     return true;
@@ -603,7 +669,7 @@ bool SSID::detectChangeParams()
 }
 
 /// The condition number is with respect to a particular node
-s_t SSID::getTrajConditionNumberIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+s_t SSID::getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
 {
   size_t steps = poses.cols();
   s_t cond = 0;
@@ -615,20 +681,68 @@ s_t SSID::getTrajConditionNumberIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vel
     mWorld->setPositions(poses.col(i));
     mWorld->setVelocities(vels.col(i));
     Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
+    //Eigen::VectorXs acc = Eigen::VectorXs::Ones(vels.rows()) * dt / dt;
     Eigen::MatrixXs Ak = mWorld->getSkeleton(mRobotSkelIndex)->getLinkAkMatrixIndex(index);
-    cond += (Ak * acc).norm();
+    Eigen::MatrixXs Jvk = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJvkMatrixIndex(index);
+    cond += (Ak * acc + Jvk.transpose() * mWorld->getGravity()).norm();
   }
   mWorld->setPositions(init_pose);
   mWorld->setVelocities(init_vel);
-  return cond;
+  return cond/steps;
 }
 
+// Should implement condition number of trajectory
+s_t SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+{
+  return getTrajConditionNumberOfMassIndex(poses, vels, index);
+}
+
+/// Here index represent joint index
+s_t SSID::getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t index)
+{
+  size_t steps = vels.cols();
+  s_t cond = 0;
+  for(int i = 0; i < steps; i++)
+  {
+    cond += vels(index, i);
+  }
+  return cond/steps;
+}
+
+s_t SSID::getTrajConditionNumberOfSpringIndex(Eigen::MatrixXs poses, size_t index)
+{
+  size_t steps = poses.cols();
+  s_t cond = 0;
+  for(int i = 0; i < steps; i++)
+  {
+    cond += abs(poses(index, i) - mWorld->getRestPositionIndex(index));
+  }
+  return cond/steps;
+}
+
+/// TODO: This function need huge modifications to adapt to different type of system parameters
 Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::MatrixXs vels)
 {
-  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mSSIDNodeIndices.size());
-  for(int i = 0; i < mSSIDNodeIndices.size(); i++)
+  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mMassDim + mDampingDim+mSpringDim);
+  int cur = 0;
+  for(int i = 0; i < mSSIDMassNodeIndices.size(); i++)
   {
-    conds(i) = getTrajConditionNumberIndex(poses, vels, mSSIDNodeIndices(i));
+    conds(i) = getTrajConditionNumberOfMassIndex(poses, vels, mSSIDMassNodeIndices(i));
+  }
+  cur += mSSIDMassNodeIndices.size();
+  for(int i = 0; i < mSSIDCOMNodeIndices.size(); i++)
+  {
+    conds(i+cur) = getTrajConditionNumberOfCOMIndex(poses, vels, mSSIDCOMNodeIndices(i));
+  }
+  cur += mSSIDCOMNodeIndices.size();
+  for(int i = 0; i < mSSIDDampingJointIndices.size(); i++)
+  {
+    conds(i+cur) = getTrajConditionNumberOfDampingIndex(vels, mSSIDDampingJointIndices(i));
+  }
+  cur += mSSIDDampingJointIndices.size();
+  for(int i = 0; i < mSSIDSpringJointIndices.size(); i++)
+  {
+    conds(i+cur) = getTrajConditionNumberOfSpringIndex(poses, mSSIDSpringJointIndices(i));
   }
   return conds;
 }
@@ -645,31 +759,57 @@ void SSID::attachParamMutex(std::mutex &mutex_lock)
   mParamLockRegistered = true;
 }
 
+
+// This will use previous solutions to detect the change
 Eigen::VectorXs SSID::estimateSolution()
 {
-  Eigen::VectorXs solution = Eigen::VectorXs::Zero(mParam_Solution.size());
-  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mParam_Solution.size());
+  Eigen::VectorXs solution = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  Eigen::VectorXs uniformValue = Eigen::VectorXs::Ones(mMassDim + mDampingDim + mSpringDim);
+  //Eigen::VectorXs totalConfidence = estimateConfidence();
+
   for(int i = 0; i < mPrev_values.size(); i++)
   {
-    solution += mPrev_solutions[i].cwiseProduct(mPrev_values[i]);
-    totalValue += mPrev_values[i];
+    if(mUseHeuristicWeight)
+    {
+      solution += mPrev_solutions[i].cwiseProduct(mPrev_values[i]);
+      totalValue += mPrev_values[i];
+    }
+    else
+    {
+      solution += mPrev_solutions[i].cwiseProduct(uniformValue);
+      totalValue += uniformValue;
+    }
   }
   solution = solution.cwiseProduct(totalValue.cwiseInverse());
+  // if(totalConfidence.minCoeff() > mConfidence_thresh && mUseConfidence && findStable)
+  // {
+  //   mSteadySolutionFound = true;
+  //   mParamChanged = false;
+  //   std::cout << "Steady Solution Found!!" << std::endl;
+  // }
   return solution;
 }
 
+// Here confidence should be not related to trajectory length since it is a relative value
 Eigen::VectorXs SSID::estimateConfidence()
 {
-  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mParam_Solution.size());
+  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
   for(int i = 0; i < mPrev_values.size(); i++)
   {
     totalValue += mPrev_values[i];
   }
-  for(int j = 0; j < mParam_Solution.size(); j++)
+  return computeConfidenceFromValue(totalValue/mPrev_values.size());
+}
+
+Eigen::VectorXs SSID::computeConfidenceFromValue(Eigen::VectorXs value)
+{
+  Eigen::VectorXs confidence = Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim);
+  for(int i = 0; i < mMassDim+mDampingDim+mSpringDim; i++)
   {
-    totalValue(j) = tanh(totalValue(j)/mTemperature);
+    confidence(i) = tanh(value(i)/mTemperature(i));
   }
-  return totalValue;
+  return confidence;
 }
 
 void SSID::registerLock()
@@ -705,17 +845,33 @@ void SSID::setBufferLength(int length)
   mPrev_Length = length;
 }
 
-void SSID::setSSIDIndex(Eigen::VectorXi indices)
+void SSID::setSSIDMassIndex(Eigen::VectorXi indices)
 {
-  mSSIDNodeIndices = indices;
+  mSSIDMassNodeIndices = indices;
 }
 
-void SSID::setTemperature(s_t temp)
+void SSID::setSSIDCOMIndex(Eigen::VectorXi indices)
 {
+  mSSIDCOMNodeIndices = indices;
+}
+
+void SSID::setSSIDDampIndex(Eigen::VectorXi indices)
+{
+  mSSIDDampingJointIndices = indices;
+}
+
+void SSID::setSSIDSpringIndex(Eigen::VectorXi indices)
+{
+  mSSIDSpringJointIndices = indices;
+}
+
+void SSID::setTemperature(Eigen::VectorXs temp)
+{
+  assert(temp.size() == mMassDim+mDampingDim+mSpringDim);
   mTemperature = temp;
 }
 
-s_t SSID::getTemperature()
+Eigen::VectorXs SSID::getTemperature()
 {
   return mTemperature;
 }
@@ -724,6 +880,21 @@ void SSID::setThreshs(s_t param_change, s_t conf)
 {
   mParam_change_thresh = param_change;
   mConfidence_thresh = conf;
+}
+
+void SSID::useConfidence()
+{
+  mUseConfidence = true;
+}
+
+void SSID::useHeuristicWeight()
+{
+  mUseHeuristicWeight = true;
+}
+
+void SSID::useSmoothing()
+{
+  mUseSmoothing = true;
 }
 
 } // namespace realtime

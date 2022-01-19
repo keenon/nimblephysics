@@ -329,7 +329,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   Eigen::VectorXi index;
   index = Eigen::VectorXi::Zero(1);
   index(0) = ssid_index;
-  ssid.setSSIDIndex(index);  
+  ssid.setSSIDMassIndex(index);
 
   ssid.setInitialPosEstimator(
     [](Eigen::MatrixXs sensors, long)
@@ -486,7 +486,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       renderIsReady = true;
       //ssid.start();
       //ssid.startSlow();
-      mpcLocal.setPredictUsingFeedback(true);
+      mpcLocal.setPredictUsingFeedback(false);
       mpcLocal.ilqrstart();
     }
     // recordObs(now, &ssid, realtimeUnderlyingWorld);

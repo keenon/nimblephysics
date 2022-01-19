@@ -145,7 +145,7 @@ int Problem::getFlatProblemDim(std::shared_ptr<simulation::World> world) const
 int Problem::getFlatStaticProblemDim(
     std::shared_ptr<simulation::World> world) const
 {
-  return world->getMassDims();
+  return world->getMassDims() + world->getDampingDims() + world->getSpringDims();
 }
 
 //==============================================================================
@@ -174,6 +174,8 @@ void Problem::flatten(
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMasses();
+  flatStatic.segment(world->getMassDims(), world->getDampingDims()) = world->getDampings();
+  flatStatic.segment(world->getMassDims()+world->getDampingDims(), world->getSpringDims()) = world->getSprings();
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -218,6 +220,8 @@ void Problem::unflatten(
 #endif
 
   world->setMasses(flatStatic.segment(0, world->getMassDims()));
+  world->setDampings(flatStatic.segment(world->getMassDims(), world->getDampingDims()));
+  world->setSprings(flatStatic.segment(world->getMassDims() + world->getDampingDims(), world->getSpringDims()));
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -297,6 +301,8 @@ void Problem::getUpperBounds(
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMassUpperLimits();
+  flatStatic.segment(world->getMassDims(), world->getDampingDims()) = world->getDampingUpperLimits();
+  flatStatic.segment(world->getMassDims()+world->getDampingDims(), world->getSpringDims()) = world->getSpringUpperLimits();
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -326,6 +332,9 @@ void Problem::getLowerBounds(
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMassLowerLimits();
+  // std::cout << "Lower Limit: " << world->getMassLowerLimits() << std::endl;
+  flatStatic.segment(world->getMassDims(), world->getDampingDims()) = world->getDampingLowerLimits();
+  flatStatic.segment(world->getMassDims() + world->getDampingDims(), world->getSpringDims()) = world->getSpringLowerLimits();
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -355,6 +364,8 @@ void Problem::getInitialGuess(
 #endif
 
   flatStatic.segment(0, world->getMassDims()) = world->getMasses();
+  flatStatic.segment(world->getMassDims(), world->getDampingDims()) = world->getDampings();
+  flatStatic.segment(world->getMassDims() + world->getDampingDims(), world->getSpringDims()) = world->getSprings();
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -845,6 +856,8 @@ void Problem::initializeStaticGradient(
 #endif
 
   gradStatic.segment(0, world->getMassDims()).setZero();
+  gradStatic.segment(world->getMassDims(), world->getDampingDims()).setZero();
+  gradStatic.segment(world->getMassDims() + world->getDampingDims(), world->getSpringDims()).setZero();
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -872,6 +885,8 @@ void Problem::accumulateStaticGradient(
 #endif
 
   gradStatic.segment(0, world->getMassDims()) += thisTimestep.lossWrtMass;
+  gradStatic.segment(world->getMassDims(), world->getDampingDims()) += thisTimestep.lossWrtDamping;
+  gradStatic.segment(world->getMassDims()+world->getDampingDims(), world->getSpringDims()) += thisTimestep.lossWrtSpring;
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -925,16 +940,40 @@ void Problem::accumulateStaticJacobianOfFinalState(
     thisLog = log->startRun("Problem.accumulateStaticJacobianOfFinalState");
   }
 #endif
-
+  // TODO: Eric This is a bit tricky, need to check dimensions
   jacStatic.block(
       0, 0, thisTimestep.massPos.rows(), thisTimestep.massPos.cols())
       += thisTimestep.massPos;
   jacStatic.block(
-      thisTimestep.massPos.rows(),
+      thisTimestep.massPos.rows(), 
+      0,
+      thisTimestep.dampPos.rows(), 
+      thisTimestep.dampPos.cols())
+      += thisTimestep.dampPos;
+  jacStatic.block(
+      thisTimestep.massPos.rows() + thisTimestep.dampPos.rows(),
+      0,
+      thisTimestep.springPos.rows(),
+      thisTimestep.springPos.cols())
+      += thisTimestep.springPos;
+  jacStatic.block(
+      thisTimestep.massPos.rows() + thisTimestep.dampPos.rows() + thisTimestep.springPos.rows(),
       0,
       thisTimestep.massVel.rows(),
       thisTimestep.massVel.cols())
       += thisTimestep.massVel;
+  jacStatic.block(
+      thisTimestep.massPos.rows()+thisTimestep.dampPos.rows()+thisTimestep.springPos.rows()+thisTimestep.massVel.rows(),
+      0,
+      thisTimestep.dampVel.rows(),
+      thisTimestep.dampVel.cols())
+      += thisTimestep.dampVel;
+  jacStatic.block(
+      thisTimestep.massPos.rows()+thisTimestep.dampPos.rows()+thisTimestep.springPos.rows()+thisTimestep.massVel.rows()+thisTimestep.dampVel.rows(),
+      0,
+      thisTimestep.springVel.rows(),
+      thisTimestep.springVel.cols())
+      += thisTimestep.springVel;
 
 #ifdef LOG_PERFORMANCE_PROBLEM
   if (thisLog != nullptr)
@@ -1109,6 +1148,16 @@ int Problem::getNumSteps()
 int Problem::getMassDims()
 {
   return mWorld->getMassDims();
+}
+
+int Problem::getDampingDims()
+{
+  return mWorld->getDampingDims();
+}
+
+int Problem::getSpringDims()
+{
+  return mWorld->getSpringDims();
 }
 
 //==============================================================================

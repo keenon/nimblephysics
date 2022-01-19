@@ -134,6 +134,8 @@ void TrajectoryRollout::serialize(proto::TrajectoryRollout& proto) const
         (*proto.mutable_force())[mapping], getControlForcesConst(mapping));
   }
   proto::serializeVector(*proto.mutable_mass(), getMassesConst());
+  proto::serializeVector(*proto.mutable_damping(), getDampingsConst());
+  proto::serializeVector(*proto.mutable_spring(), getSpringsConst());
   for (auto pair : getMetadataMap())
   {
     proto::serializeMatrix(
@@ -162,6 +164,8 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
     force[pair.first] = proto::deserializeMatrix(pair.second);
   }
   Eigen::VectorXs mass = proto::deserializeVector(proto.mass());
+  Eigen::VectorXs damping = proto::deserializeVector(proto.damping());
+  Eigen::VectorXs spring = proto::deserializeVector(proto.spring());
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
   for (auto pair : proto.metadata())
   {
@@ -169,7 +173,7 @@ TrajectoryRolloutReal TrajectoryRollout::deserialize(
   }
 
   TrajectoryRolloutReal recovered
-      = TrajectoryRolloutReal(pos, vel, force, mass, metadata);
+      = TrajectoryRolloutReal(pos, vel, force, mass, damping, spring, metadata);
   return recovered;
 }
 
@@ -209,9 +213,11 @@ TrajectoryRolloutReal TrajectoryRollout::fromForces(
   std::unordered_map<std::string, Eigen::MatrixXs> force;
   force["identity"] = forceMatrix;
   Eigen::VectorXs mass = world->getMasses();
+  Eigen::VectorXs damping = world->getDampings();
+  Eigen::VectorXs spring = world->getSprings();
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
-  return TrajectoryRolloutReal(pos, vel, force, mass, metadata);
+  return TrajectoryRolloutReal(pos, vel, force, mass, damping, spring, metadata);
 }
 
 //==============================================================================
@@ -238,9 +244,11 @@ TrajectoryRolloutReal TrajectoryRollout::fromPoses(
   std::unordered_map<std::string, Eigen::MatrixXs> force;
   force["identity"] = forceMatrix;
   Eigen::VectorXs mass = world->getMasses();
+  Eigen::VectorXs damping = world->getDampings();
+  Eigen::VectorXs spring = world->getSprings();
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
-  return TrajectoryRolloutReal(pos, vel, force, mass, metadata);
+  return TrajectoryRolloutReal(pos, vel, force, mass, damping, spring, metadata);
 }
 
 //==============================================================================
@@ -249,6 +257,8 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
         mappings,
     int steps,
     int massDim,
+    int dampingDim,
+    int springDim,
     const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
   : mMetadata(metadata)
 {
@@ -261,6 +271,8 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
     mMappings.push_back(pair.first);
   }
   mMasses = Eigen::VectorXs::Zero(massDim);
+  mDampings = Eigen::VectorXs::Zero(dampingDim);
+  mSprings = Eigen::VectorXs::Zero(springDim);
 }
 
 //==============================================================================
@@ -269,6 +281,8 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(Problem* shot)
       shot->getMappings(),
       shot->getNumSteps(),
       shot->getMassDims(),
+      shot->getDampingDims(),
+      shot->getSpringDims(),
       shot->getMetadataMap())
 {
 }
@@ -280,8 +294,12 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(
     const std::unordered_map<std::string, Eigen::MatrixXs> vel,
     const std::unordered_map<std::string, Eigen::MatrixXs> force,
     const Eigen::VectorXs mass,
+    const Eigen::VectorXs damping,
+    const Eigen::VectorXs spring,
     const std::unordered_map<std::string, Eigen::MatrixXs> metadata)
-  : mMasses(mass)
+  : mMasses(mass),
+    mDampings(damping),
+    mSprings(spring)
 {
   for (auto pair : pos)
   {
@@ -317,6 +335,8 @@ TrajectoryRolloutReal::TrajectoryRolloutReal(const TrajectoryRollout* copy)
     mForces[key] = copy->getControlForcesConst(key);
   }
   mMasses = copy->getMassesConst();
+  mDampings = copy->getDampingsConst();
+  mSprings = copy->getSpringsConst();
   mMetadata = copy->getMetadataMap();
 }
 
@@ -348,6 +368,18 @@ Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutReal::getMasses()
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutReal::getDampings()
+{
+  return mDampings;
+}
+
+//==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutReal::getSprings()
+{
+  return mSprings;
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutReal::getPosesConst(
     const std::string& mapping) const
 {
@@ -373,6 +405,20 @@ const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutReal::getMassesConst()
     const
 {
   return mMasses;
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutReal::getDampingsConst()
+    const
+{
+  return mDampings;
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutReal::getSpringsConst()
+    const
+{
+  return mSprings;
 }
 
 //==============================================================================
@@ -450,6 +496,18 @@ Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutRef::getMasses()
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutRef::getDampings()
+{
+  return mToSlice->getDampings();
+}
+
+//==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutRef::getSprings()
+{
+  return mToSlice->getSprings();
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXs> TrajectoryRolloutRef::getPosesConst(
     const std::string& mapping) const
 {
@@ -478,6 +536,20 @@ const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutRef::getMassesConst()
     const
 {
   return mToSlice->getMassesConst();
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutRef::getDampingsConst()
+    const
+{
+  return mToSlice->getDampingsConst();
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs> TrajectoryRolloutRef::getSpringsConst()
+    const
+{
+  return mToSlice->getSpringsConst();
 }
 
 //==============================================================================
@@ -546,6 +618,20 @@ Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutConstRef::getMasses()
 }
 
 //==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutConstRef::getDampings()
+{
+  assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
+//==============================================================================
+Eigen::Ref<Eigen::VectorXs> TrajectoryRolloutConstRef::getSprings()
+{
+  assert(false && "It should be impossible to get a mutable reference from a TrajectorRolloutConstRef");
+  throw std::runtime_error{"Execution should never reach this point"};
+}
+
+//==============================================================================
 const Eigen::Ref<const Eigen::MatrixXs>
 TrajectoryRolloutConstRef::getPosesConst(const std::string& mapping) const
 {
@@ -574,6 +660,20 @@ const Eigen::Ref<const Eigen::VectorXs>
 TrajectoryRolloutConstRef::getMassesConst() const
 {
   return mToSlice->getMassesConst();
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs>
+TrajectoryRolloutConstRef::getDampingsConst() const
+{
+  return mToSlice->getDampingsConst();
+}
+
+//==============================================================================
+const Eigen::Ref<const Eigen::VectorXs>
+TrajectoryRolloutConstRef::getSpringsConst() const
+{
+  return mToSlice->getSpringsConst();
 }
 
 //==============================================================================

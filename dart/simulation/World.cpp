@@ -56,6 +56,8 @@
 #include "dart/neural/NeuralUtils.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/neural/WithRespectToDamping.hpp"
+#include "dart/neural/WithRespectToSpring.hpp"
 #include "dart/server/RawJsonUtils.hpp"
 
 namespace dart {
@@ -86,6 +88,8 @@ World::World(const std::string& _name)
     mContactClippingDepth(0.03),
     mPenetrationCorrectionEnabled(false),
     mWrtMass(std::make_shared<neural::WithRespectToMass>()),
+    mWrtDamping(std::make_shared<neural::WithRespectToDamping>()),
+    mWrtSpring(std::make_shared<neural::WithRespectToSpring>()),
     mUseFDOverride(false),
     mSlowDebugResultsAgainstFD(false)
 {
@@ -123,6 +127,8 @@ WorldPtr World::clone() const
 
   // Copy the WithRespectToMass pointer, so we have the same object
   worldClone->mWrtMass = mWrtMass;
+  worldClone->mWrtDamping = mWrtDamping;
+  worldClone->mWrtSpring = mWrtSpring;
 
   auto cd = getConstraintSolver()->getCollisionDetector();
   worldClone->getConstraintSolver()->setCollisionDetector(
@@ -353,6 +359,18 @@ s_t World::getContactClippingDepth()
 std::shared_ptr<neural::WithRespectToMass> World::getWrtMass()
 {
   return mWrtMass;
+}
+
+//==============================================================================
+std::shared_ptr<neural::WithRespectToDamping> World::getWrtDamping()
+{
+  return mWrtDamping;
+}
+
+//==============================================================================
+std::shared_ptr<neural::WithRespectToSpring> World::getWrtSpring()
+{
+  return mWrtSpring;
 }
 
 //==============================================================================
@@ -696,6 +714,28 @@ dynamics::BodyNode* World::getBodyNodeIndex(size_t index)
   return nodes[index];
 }
 
+dynamics::Joint* World::getJointIndex(size_t index)
+{
+  size_t cur = 0;
+  size_t skeleton_id = 0;
+  for(int i = 0; i < mSkeletons.size();i++)
+  {
+    cur += mSkeletons[i]->getNumJoints();
+    if(cur > index)
+    {
+      cur -= mSkeletons[i]->getNumJoints();
+      skeleton_id = i;
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getJoint(index - cur);
+}
+
+s_t World::getRestPositionIndex(size_t index)
+{
+  return getDofs()[index]->getRestPosition();
+}
+
 //==============================================================================
 std::size_t World::getNumSkeletons() const
 {
@@ -975,11 +1015,31 @@ std::size_t World::getMassDims()
   return mWrtMass->dim(this);
 }
 
+std::size_t World::getDampingDims()
+{
+  return mWrtDamping->dim(this);
+}
+
+std::size_t World::getSpringDims()
+{
+  return mWrtSpring->dim(this);
+}
+
 //==============================================================================
 /// This will prevent mass from being tuned
 void World::clearTunableMassThisInstance()
 {
   mWrtMass = std::make_shared<neural::WithRespectToMass>();
+}
+
+void World::clearTunableDampingThisInstance()
+{
+  mWrtDamping = std::make_shared<neural::WithRespectToDamping>();
+}
+
+void World::clearTunableSpringThisInstance()
+{
+  mWrtSpring = std::make_shared<neural::WithRespectToSpring>();
 }
 
 //==============================================================================
@@ -992,6 +1052,28 @@ void World::tuneMass(
     Eigen::VectorXs lowerBound)
 {
   mWrtMass->registerNode(node, type, upperBound, lowerBound);
+}
+
+/// This registers that we'd like to keep track of this Joint's damping or spring in
+/// a specific way in differentiation
+void World::tuneDamping(
+    dynamics::Joint* joint,
+    neural::WrtDampingJointEntryType type,
+    Eigen::VectorXi dofs_index,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound)
+{
+  mWrtDamping->registerJoint(joint, type, dofs_index, upperBound, lowerBound);
+}
+
+void World::tuneSpring(
+  dynamics::Joint* joint,
+  neural::WrtSpringJointEntryType type,
+  Eigen::VectorXi dofs_index,
+  Eigen::VectorXs upperBound,
+  Eigen::VectorXs lowerBound)
+{
+  mWrtSpring->registerJoint(joint, type, dofs_index, upperBound, lowerBound);
 }
 
 //==============================================================================
@@ -1009,6 +1091,26 @@ std::size_t World::getNumBodyNodes()
 Eigen::VectorXs World::getMasses()
 {
   return mWrtMass->get(this);
+}
+
+Eigen::VectorXs World::getDampings()
+{
+  return mWrtDamping->get(this);
+}
+
+Eigen::VectorXs World::getSprings()
+{
+  return mWrtSpring->get(this);
+}
+
+Eigen::VectorXi World::getDampingDofsMapping()
+{
+  return mWrtDamping->getDofsMapping(this);
+}
+
+Eigen::VectorXi World::getSpringDofsMapping()
+{
+  return mWrtSpring->getDofsMapping(this);
 }
 
 size_t World::getLinkMassesDims()
@@ -1153,6 +1255,52 @@ Eigen::MatrixXs World::getLinkAkMatrixIndex(size_t index)
     }
   }
   return mSkeletons[skeleton_id]->getLinkAkMatrixIndex(index-probe);
+}
+
+Eigen::VectorXs World::getJointDampingCoeffs()
+{
+  Eigen::VectorXs damp_coeffs = Eigen::VectorXs::Zero(getNumDofs());
+  size_t cur = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t mdim = mSkeletons[i]->getNumDofs();
+    damp_coeffs.segment(cur, mdim) = mSkeletons[i]->getDampingCoeffVector();
+    cur += mdim;
+  }
+  return damp_coeffs;
+}
+
+Eigen::VectorXs World::getJointDampingCoeffIndex(size_t index)
+{
+  Eigen::VectorXs damp_coeff = Eigen::VectorXs::Zero(getJointIndex(index)->getNumDofs());
+  for(int i = 0; i < damp_coeff.size(); i++)
+  {
+    damp_coeff(i) = getJointIndex(index)->getDampingCoefficient(i);
+  }
+  return damp_coeff;
+}
+
+Eigen::VectorXs World::getJointSpringStiffs()
+{
+  Eigen::VectorXs spring_stiffs = Eigen::VectorXs::Zero(getNumDofs());
+  size_t cur = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t mdim = mSkeletons[i]->getNumDofs();
+    spring_stiffs.segment(cur, mdim) = mSkeletons[i]->getSpringStiffVector();
+    cur += mdim;
+  }
+  return spring_stiffs;
+}
+
+Eigen::VectorXs World::getJointSpringStiffIndex(size_t index)
+{
+  Eigen::VectorXs spring_stiff = Eigen::VectorXs::Zero(getJointIndex(index)->getNumDofs());
+  for(int i = 0; i < spring_stiff.size(); i++)
+  {
+    spring_stiff(i) = getJointIndex(index)->getSpringStiffness(i);
+  }
+  return spring_stiff;
 }
 
 //==============================================================================
@@ -1312,6 +1460,29 @@ Eigen::VectorXs World::getMassLowerLimits()
 }
 
 //==============================================================================
+Eigen::VectorXs World::getDampingUpperLimits()
+{
+  return mWrtDamping->upperBound(this);
+}
+
+Eigen::VectorXs World::getDampingLowerLimits()
+{
+  return mWrtDamping->lowerBound(this);
+}
+
+//==============================================================================
+Eigen::VectorXs World::getSpringUpperLimits()
+{
+  return mWrtSpring->upperBound(this);
+}
+
+Eigen::VectorXs World::getSpringLowerLimits()
+{
+  return mWrtSpring->lowerBound(this);
+}
+
+
+//==============================================================================
 void World::setPositions(Eigen::VectorXs position)
 {
   std::size_t cursor = 0;
@@ -1438,6 +1609,16 @@ void World::setMasses(Eigen::VectorXs masses)
   mWrtMass->set(this, masses);
 }
 
+void World::setDampings(Eigen::VectorXs dampings)
+{
+  mWrtDamping->set(this, dampings);
+}
+
+void World::setSprings(Eigen::VectorXs springs)
+{
+  mWrtSpring->set(this, springs);
+}
+
 void World::setLinkMasses(Eigen::VectorXs masses)
 {
   assert(masses.size()==getLinkMassesDims());
@@ -1447,6 +1628,48 @@ void World::setLinkMasses(Eigen::VectorXs masses)
     size_t mdim = mSkeletons[i]->getLinkMassesDims();
     mSkeletons[i]->setLinkMasses(masses.segment(cur,mdim));
     cur += mdim;
+  }
+}
+
+void World::setJointDampingCoeffs(Eigen::VectorXs damp_coeffs)
+{
+  assert(damp_coeffs.size() == getNumDofs());
+  size_t cur = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t mdim = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setDampingCoeffVector(damp_coeffs.segment(cur, mdim));
+    cur += mdim;
+  }
+}
+
+void World::setJointDampingCoeffIndex(Eigen::VectorXs damp_coeff, size_t index)
+{
+  assert(damp_coeff.size() == getJointIndex(index)->getNumDofs());
+  for(int i = 0; i < damp_coeff.size(); i++)
+  {
+    getJointIndex(index)->setDampingCoefficient(i, damp_coeff(i));
+  }
+}
+
+void World::setJointSpringStiffs(Eigen::VectorXs spring_stiffs)
+{
+  assert(spring_stiffs.size() == getNumDofs());
+  size_t cur = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t mdim = mSkeletons[i]->getNumDofs();
+    mSkeletons[i]->setSpringStiffVector(spring_stiffs.segment(cur, mdim));
+    cur += mdim;
+  }
+}
+
+void World::setJointSpringStiffIndex(Eigen::VectorXs spring_stiff, size_t index)
+{
+  assert(spring_stiff.size() == getJointIndex(index)->getNumDofs());
+  for(int i = 0; i < spring_stiff.size(); i++)
+  {
+    getJointIndex(index)->setSpringStiffness(i, spring_stiff(i));
   }
 }
 

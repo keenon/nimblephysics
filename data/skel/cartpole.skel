@@ -2,123 +2,119 @@
 <skel version="1.0">
     <world name="world 1">
         <physics>
-            <time_step>0.02</time_step>
+            <time_step>0.01</time_step>
             <gravity>0 -9.81 0</gravity>
-            <collision_detector>dart</collision_detector>
+            <collision_detector>bullet</collision_detector>
         </physics>
-        
-        <skeleton name="rail">
-            <mobile>false</mobile>
-            <body name="ground">
-                <transformation>0 0 0 0 1.57 0.0</transformation>
-                <visualization_shape>
-                    <transformation>0 0 0 0 0 0</transformation>
-                    <geometry>
-                        <capsule>
-                            <height>2.0</height>
-                            <radius>0.02</radius>
-                        </capsule>
-                    </geometry>
-                    <color>0.3 0.3 0.7 1</color>
-                </visualization_shape>
-            </body>
-            <joint type="free" name="joint 1">
-                <parent>world</parent>
-                <child>ground</child>
-            </joint>
-        </skeleton>
 
-        <skeleton name="cartpole">
-            <transformation>0 0.0 0 0 0 0</transformation>
+        <skeleton name="pendulum">
+            <transformation>0 -0.35 0 0 0 0</transformation>
             <body name="cart">
-                <transformation>0.0 0 0 0 0 0</transformation>
+                <transformation>0 0 0 0 0 0</transformation>
                 <inertia>
-                    <mass>9.42477796</mass>
+                    <mass>1.0</mass>
                     <offset>0.0 0 0.0</offset>
                 </inertia>
                 <visualization_shape>
-                    <transformation>0.0 0 0.0 0 1.57 0</transformation>
+                    <transformation>0.0 0 0.0 0 0 0</transformation>
                     <geometry>
-                        <capsule>
-                            <height>0.2</height>
-                            <radius>0.1</radius>
-                        </capsule>
+                        <box>
+                            <size>0.5 0.1 0.1</size>
+                        </box>
                     </geometry>
                 </visualization_shape>
                 <collision_shape>
-                    <transformation>0.0 0 0.0 0 1.57 0</transformation>
+                    <transformation>0.0 0 0.0 0 0 0</transformation>
                     <geometry>
-                        <capsule>
-                            <height>0.2</height>
-                            <radius>0.1</radius>
-                        </capsule>
+                        <box>
+                            <size>0.2 0.05 0.05</size>
+                        </box>
                     </geometry>
                 </collision_shape>
             </body>
 
             <body name="pole">
-                <transformation>0.0 0.0 0.0 0 0.0 0.0</transformation>
+                <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>4.8953899</mass>
-                    <offset>0.0 0.3 0.0</offset>
+                    <mass>1.0</mass>
+                    <offset>0.0 0.5 0.0</offset>
                 </inertia>
                 <visualization_shape>
-                    <transformation>0.0 0.3 0.0 1.57 0.0 0.0</transformation>
+                    <transformation>0.0 0.5 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
-                        <capsule>
-                            <height>0.6</height>
-                            <radius>0.049</radius>
-                        </capsule>
+                        <box>
+                            <size>0.02 1.0 0.02</size>
+                        </box>
                     </geometry>
                 </visualization_shape>
                 <collision_shape>
-                    <transformation>0.0 0.3 0.0 1.57 0.0 0.0</transformation>
+                    <transformation>0.0 0.5 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
-                        <capsule>
-                            <height>0.6</height>
-                            <radius>0.049</radius>
-                        </capsule>
+                        <box>
+                            <size>0.02 1.0 0.02</size>
+                        </box>
                     </geometry>
                 </collision_shape>
             </body>
 
-            <!-- JOINT: Pelvis -->
+            <body name="weight">
+                <transformation>0.0 1.02 0.0 0.0 0.0 0.0</transformation>
+                <inertia>
+                    <mass>0.1</mass>
+                    <offset>0.0 0.0 0.0</offset>
+                </inertia>
+                <visualization_shape>
+                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                    <geometry>
+                        <box>
+                            <size>0.08 0.04 0.08</size>
+                        </box>
+                    </geometry>
+                    <color>0.2 0.7 0.7</color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                    <geometry>
+                        <box>
+                            <size> 0.08 0.04 0.08 </size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+            </body> 
+
+
+            <!-- JOINT: Root -->
             <joint type="prismatic" name="j_cart">
                 <parent>world</parent>
                 <child>cart</child>
-                <axis>
-                      <xyz>1.0 0.0 0.0</xyz>
-                      <limit>
-                          <lower>-1</lower>
-                          <upper>1</upper>
-                      </limit>
-                      <dynamics>
-                          <damping>1.0</damping>
-                      </dynamics>
-                </axis>
+		 <axis>
+			<xyz>1.0 0.0 0.0</xyz>
+		 </axis>
                 <init_pos>0</init_pos>
                 <init_vel>0</init_vel>
             </joint>
 
             <joint type="revolute" name="j_pole">
+                <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <parent>cart</parent>
                 <child>pole</child>
                 <axis>
-                      <xyz>0.0 0.0 -1.0</xyz>
-                      <limit>
-                          <lower>-1.57</lower>
-                          <upper>1.57</upper>
-                      </limit>
-                      <dynamics>
-                          <damping>1.0</damping>
+                    <xyz>0.0 0.0 1.0</xyz>
+                    <dynamics>
+                          <damping>0.1</damping>
                       </dynamics>
                 </axis>
-                <init_pos>0</init_pos>
+                <init_pos>3.1415</init_pos>
                 <init_vel>0</init_vel>
             </joint>
+
+            <joint type="weld" name="j_con">
+                <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                <parent>pole</parent>
+                <child>weight</child>
+            </joint> 
 
         </skeleton>
 
     </world>
 </skel>
-

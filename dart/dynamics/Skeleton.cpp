@@ -3172,8 +3172,15 @@ Eigen::MatrixXs Skeleton::getLinkAkMatrixIndex(size_t index)
   Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols());
   Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
   Eigen::MatrixXs I = getMOIMatrix(getLinkMOIIndex(index));
-  Eigen::MatrixXs A_k = Jv.transpose() * Jv + Jw.transpose() * I * Jw;
+  Eigen::MatrixXs A_k = Jv.transpose() * Jv + Jw.transpose() * (I/getBodyNode(index)->getMass()) * Jw;
   return A_k;
+}
+
+Eigen::MatrixXs Skeleton::getLinkJvkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols()); // 3 * N matrix
+  return Jv;
 }
 
 //==============================================================================
@@ -7252,6 +7259,16 @@ Eigen::VectorXs Skeleton::getDampingCoeffVector()
   return damp_coeffs;
 }
 
+void Skeleton::setDampingCoeffVector(Eigen::VectorXs damp_coeffs)
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  for(int i = 0; i < nDofs; i++)
+  {
+    dofs[i]->setDampingCoefficient(damp_coeffs(i));
+  }
+}
+
 Eigen::VectorXs Skeleton::getDampingForce()
 {
   Eigen::VectorXs velocities = getVelocities();
@@ -7271,6 +7288,16 @@ Eigen::VectorXs Skeleton::getSpringStiffVector()
     spring_stiffs(i) = dofs[i]->getSpringStiffness();
   }
   return spring_stiffs;
+}
+
+void Skeleton::setSpringStiffVector(Eigen::VectorXs spring_stiffs)
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  for(int i = 0; i < nDofs; i++)
+  {
+    dofs[i]->setSpringStiffness(spring_stiffs(i));
+  }
 }
 
 Eigen::VectorXs Skeleton::getRestPositions()

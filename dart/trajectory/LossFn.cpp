@@ -109,6 +109,31 @@ s_t LossFn::getLossAndGradient(
 
       gradWrtRollout->getMasses()(i) = (lossPos - lossNeg) / (2 * EPS);
     }
+    for(int i = 0; i < rolloutCopy.getDampings().size(); i++)
+    {
+      rolloutCopy.getDampings()(i) += EPS;
+      s_t lossPos = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getDampings()(i) -= EPS;
+
+      rolloutCopy.getDampings()(i) -= EPS;
+      s_t lossNeg = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getDampings()(i) += EPS;
+
+      gradWrtRollout->getDampings()(i) = (lossPos - lossNeg) / (2 * EPS);
+    }
+    for(int i = 0; i < rolloutCopy.getSprings().size(); i++)
+    {
+      rolloutCopy.getSprings()(i) += EPS;
+      s_t lossPos = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getSprings()(i) -= EPS;
+
+      rolloutCopy.getSprings()(i) -= EPS;
+      s_t lossNeg = mLoss.value()(&rolloutCopy);
+      rolloutCopy.getSprings()(i) += EPS;
+
+      gradWrtRollout->getSprings()(i) = (lossPos - lossNeg) / (2 * EPS);
+    }
+
 
     for (std::string key : rolloutCopy.getMappings())
     {

@@ -59,9 +59,10 @@
 #include "stdio.h"
 
 // #define COM_SSID
-#define MASS_SSID
+// #define MASS_SSID
 // #define MASS_PLOT
-#define WITH_NOISE
+#define DAMP_SSID
+// #define WITH_NOISE
 
 using namespace dart;
 using namespace math;
@@ -1123,5 +1124,97 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
     solutionMat.row(i) = solutions[i];
   }
   ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/raw_data/Solutions.csv",solutionMat);
+}
+#endif
+
+#ifdef DAMP_SSID
+TEST(REALTIME, CARTPOLE_SSID)
+{
+  ////////////////////////////////////////////////////////////
+  // Create a cartpole example
+  ////////////////////////////////////////////////////////////
+
+  // World
+  WorldPtr world = createWorld(1.0/100);
+  #ifdef WITH_NOISE
+  std::mt19937 random_gen = initializeRandom();
+  s_t noise_scale = 0.01;
+  #endif
+  
+  std::cout << "A_k Matrix of cartpole\n"
+            << world->getSkeleton(0)->getLinkAkMatrixIndex(1)
+            << std::endl;
+  Eigen::VectorXi dofs_index = Eigen::VectorXi::Zero(1);
+  dofs_index(0) = 1;
+
+  world->tuneSpring(
+      world->getJointIndex(1),
+      WrtSpringJointEntryType::SPRING,
+      dofs_index,
+      Eigen::VectorXs::Ones(1) * 2.0,
+      Eigen::VectorXs::Ones(1) * 0.01);
+
+  std::shared_ptr<LossFn> lossFn = getSSIDPosLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelLoss();
+  //std::shared_ptr<LossFn> lossFn = getSSIDVelPosLoss();
+
+  // 300 timesteps
+  s_t scale = 1.0;
+  int millisPerTimestep = world->getTimeStep() * 1000;
+  int steps = 200;
+  int inferenceHistoryMillis = steps * millisPerTimestep;
+  // int advanceSteps = 70;
+  Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
+  sensorDims(0) = world->getNumDofs();
+  sensorDims(1) = world->getNumDofs();
+  SSID ssid = SSID(world, 
+                   lossFn, 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   steps,
+                   scale);
+  ssid.setInitialPosEstimator(
+      [](Eigen::MatrixXs sensors, long /* timestamp */) {
+        return sensors.col(0);
+      });
+  
+  ssid.setInitialVelEstimator(
+    [](Eigen::MatrixXs sensors, long)
+    {
+      return sensors.col(0);
+    }
+  );
+  Eigen::Vector1s realdamp(0.3);
+  world->setJointSpringStiffIndex(realdamp, 1);
+  Eigen::Vector1s init_damp(0.1);
+  for (int i = 0; i < 500; i++)
+  {
+    long time = i * millisPerTimestep;
+    Eigen::VectorXs forces = Eigen::VectorXs::Ones(world->getNumDofs());
+    #ifdef WITH_NOISE
+    // Eigen::VectorXs forces_eps = rand_normal(forces.size(), 0, 0.01, random_gen);
+    Eigen::VectorXs forces_eps = Eigen::VectorXs::Zero(forces.size());
+    world->setControlForces(forces + forces_eps);
+    #else
+    world->setControlForces(forces);
+    #endif
+
+    #ifndef WITH_NOISE
+    recordObs(time, &ssid, world);
+    #else
+    recordObsWithNoise(time, &ssid, world, noise_scale, random_gen);
+    #endif
+    world->step();
+    
+    if(i%5==0 && i >= steps+10)
+    {
+      world->setJointSpringStiffIndex(init_damp, 1);
+      ssid.runInference(time);
+      init_damp = world->getJointSpringStiffIndex(1);
+      std::cout << "Recovered mass after iteration "<<i<<": "
+                << init_damp << std::endl;
+      world->setJointSpringStiffIndex(realdamp, 1);
+    }
+  }
 }
 #endif

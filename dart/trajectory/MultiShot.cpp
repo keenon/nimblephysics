@@ -989,6 +989,8 @@ void MultiShot::getStates(
   }
   assert(cursor == mSteps);
   rollout->getMasses() = world->getMasses();
+  rollout->getDampings() = world->getDampings();
+  rollout->getSprings() = world->getSprings();
   for (auto pair : mMetadata)
   {
     rollout->setMetadata(pair.first, pair.second);
@@ -1299,7 +1301,9 @@ void MultiShot::backpropGradientWrt(
   // Don't s_t-count direct gradients wrt mass, so subtract out duplicates
   // here. We've added mShots.size() copies of the direct masses grad, so
   // subtract out mShots.size() - 1, leaving exactly 1 copy.
-  gradStatic -= gradWrtRollout->getMassesConst() * (mShots.size() - 1);
+  gradStatic.segment(0, getMassDims()) -= gradWrtRollout->getMassesConst() * (mShots.size() - 1);
+  gradStatic.segment(getMassDims(), getDampingDims()) -= gradWrtRollout->getDampingsConst() * (mShots.size() - 1);
+  gradStatic.segment(getMassDims()+getDampingDims(), getSpringDims()) -= gradWrtRollout->getSpringsConst() * (mShots.size() - 1);
 
 #ifdef LOG_PERFORMANCE_MULTI_SHOT
   if (thisLog != nullptr)

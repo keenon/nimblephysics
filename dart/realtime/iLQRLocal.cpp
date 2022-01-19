@@ -236,11 +236,19 @@ bool LQRBuffer::detectXContinuity()
     err = (X[i+1] - X[i]).lpNorm<Eigen::Infinity>();
     if(err > 1.0)
     {
-      std::cout << "State: \n" << X[i+1] << "\n" << X[i] << "\n" << i << std::endl; 
+      if(mVerbose)
+      {
+        std::cout << "State: \n" << X[i+1] << "\n" << X[i] << "\n" << i << std::endl;
+      }  
       flag = false;
     }
   }
   return flag;
+}
+
+void LQRBuffer::setVerbose(bool verbose)
+{
+  mVerbose = verbose;
 }
 
 iLQRLocal::iLQRLocal(
@@ -284,7 +292,7 @@ iLQRLocal::iLQRLocal(
     mLast_U(Eigen::VectorXs::Zero(nControls)),
     mActionDim(nControls),
     mStateDim(world->getNumDofs() * 2),
-    mRollout(createRollout(mSteps, world->getNumDofs(), world->getMassDims()))
+    mRollout(createRollout(mSteps, world->getNumDofs(), world->getMassDims(), world->getDampingDims(), world->getSpringDims()))
 {
 }
 
@@ -686,7 +694,7 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
     mlqrBuffer.Xnew[0].segment(world->getNumDofs(), world->getNumDofs()) = vel;
 
     // Rollout Trajectory
-    TrajectoryRolloutReal rollout = createRollout(mSteps, world->getNumDofs(), world->getMassDims());
+    TrajectoryRolloutReal rollout = createRollout(mSteps, world->getNumDofs(), world->getMassDims(), world->getDampingDims(), world->getSpringDims());
     s_t loss = 0;
 
     // Executing the trajectory according to control law
@@ -1035,7 +1043,7 @@ s_t iLQRLocal::getMU()
   return mMU;
 }
 
-TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t mass_dim)
+TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t mass_dim, size_t damping_dim, size_t spring_dim)
 {
   Eigen::MatrixXs pos = Eigen::MatrixXs::Zero(dofs, steps+1);
   std::unordered_map<std::string, Eigen::MatrixXs> pos_map;
@@ -1047,8 +1055,10 @@ TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t
   std::unordered_map<std::string, Eigen::MatrixXs> force_map;
   force_map.emplace("identity", forces);
   Eigen::VectorXs mass = Eigen::VectorXs::Zero(mass_dim);
+  Eigen::VectorXs damping = Eigen::VectorXs::Zero(damping_dim);
+  Eigen::VectorXs spring = Eigen::VectorXs::Zero(spring_dim);
   std::unordered_map<std::string, Eigen::MatrixXs> meta;
-  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(pos_map, vel_map, force_map, mass, meta);
+  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(pos_map, vel_map, force_map, mass, damping, spring, meta);
   return rollout;
 }
 

@@ -82,6 +82,19 @@ const Eigen::MatrixXs& MappedBackpropSnapshot::getMassVelJacobian(
 }
 
 //==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getDampingVelJacobian(
+    std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getDampingVelJacobian(world, perfLog);
+}
+
+//==============================================================================
+const Eigen::MatrixXs& MappedBackpropSnapshot::getSpringVelJacobian(
+  std::shared_ptr<simulation::World> world, PerformanceLog* perfLog)
+{
+  return mBackpropSnapshot->getSpringVelJacobian(world, perfLog);
+}
+//==============================================================================
 Eigen::MatrixXs MappedBackpropSnapshot::getPosMappedPosJacobian(
     std::shared_ptr<simulation::World> world,
     const std::string& mapAfter,

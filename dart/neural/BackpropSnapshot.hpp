@@ -107,6 +107,18 @@ public:
   const Eigen::MatrixXs& getMassVelJacobian(
       simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
 
+  /// This computes and returns the whole damping coeffient-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getDampingVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
+  /// This computes and returns the whole spring stiffness-vel jacobian. For backprop, you
+  /// don't actually need this matrix, you can compute backprop directly. This
+  /// is here if you want access to the full Jacobian for some reason.
+  const Eigen::MatrixXs& getSpringVelJacobian(
+      simulation::WorldPtr world, PerformanceLog* perfLog = nullptr);
+
   /// This computes and returns the whole pos-pos jacobian. For backprop, you
   /// don't actually need this matrix, you can compute backprop directly. This
   /// is here if you want access to the full Jacobian for some reason.
@@ -799,6 +811,10 @@ private:
   Eigen::MatrixXs mCachedPosC;
   bool mCachedVelCDirty;
   Eigen::MatrixXs mCachedVelC;
+  bool mCachedDampingVelDirty;
+  Eigen::MatrixXs mCachedDampingVel;
+  bool mCachedSpringVelDirty;
+  Eigen::MatrixXs mCachedSpringVel;
 
   Eigen::VectorXs scratch(simulation::WorldPtr world);
 

@@ -24,6 +24,7 @@
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/TrajectoryRollout.hpp"
+#include "dart/utils/UniversalLoader.hpp"
 
 #include "TestHelpers.hpp"
 #include "stdio.h"
@@ -182,46 +183,12 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-
 WorldPtr createWorld(s_t timestep)
 {
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
-  SkeletonPtr cartpole = Skeleton::create("cartpole");
-  // Create Cart
-  std::pair<PrismaticJoint*, BodyNode*> sledPair
-    = cartpole->createJointAndBodyNodePair<PrismaticJoint>(nullptr);
-  sledPair.first->setAxis(Eigen::Vector3s(1, 0, 0));
-  std::shared_ptr<BoxShape> sledShapeBox(
-      new BoxShape(Eigen::Vector3s(0.5, 0.1, 0.1)));
-  ShapeNode* sledShape
-    = sledPair.second->createShapeNodeWith<VisualAspect>(sledShapeBox);
-  sledShape->getVisualAspect()->setColor(Eigen::Vector3s(0.5, 0.5, 0.5));
+  WorldPtr world = dart::utils::UniversalLoader::loadWorld("dart://sample/skel/cartpole.skel");
+  world->setState(Eigen::Vector4s(0, 30.0 / 180 * 3.14, 0, 0));
+  world->removeDofFromActionSpace(1);
   
-  // Create Pole
-  std::pair<RevoluteJoint*, BodyNode*> armPair
-    = cartpole->createJointAndBodyNodePair<RevoluteJoint>(sledPair.second);
-  armPair.first->setAxis(Eigen::Vector3s(0, 0, 1));
-  std::shared_ptr<BoxShape> armShapeBox(
-      new BoxShape(Eigen::Vector3s(0.1, 1.0, 0.1)));
-  ShapeNode* armShape
-    = armPair.second->createShapeNodeWith<VisualAspect>(armShapeBox);
-  armShape->getVisualAspect()->setColor(Eigen::Vector3s(0.7, 0.7, 0.7));
-  Eigen::Isometry3s armOffset = Eigen::Isometry3s::Identity();
-  armOffset.translation() = Eigen::Vector3s(0, -0.5, 0);
-  armPair.first->setTransformFromChildBodyNode(armOffset);
-
-  world->addSkeleton(cartpole);
-  cartpole->setControlForceUpperLimit(0, 15);
-  cartpole->setControlForceLowerLimit(0, -15);
-  cartpole->setControlForceUpperLimit(1, 0);
-  cartpole->setControlForceLowerLimit(1, 0);
-  cartpole->setVelocityUpperLimit(0, 1000);
-  cartpole->setVelocityLowerLimit(0, -1000);
-  cartpole->setPositionUpperLimit(0, 10);
-  cartpole->setPositionLowerLimit(0, -10);
-  cartpole->setPosition(0, 0);
-  cartpole->setPosition(1, 3.1415);
   world->setTimeStep(timestep);
   
   return world;
@@ -244,6 +211,16 @@ Eigen::VectorXs rand_normal(size_t length, s_t mean, s_t stddev, std::mt19937 ra
     result(i) += (s_t)(dist(random_gen));
   }
   return result;
+}
+
+std::vector<s_t> convert2stdvec(Eigen::VectorXs vec)
+{
+  std::vector<s_t> stdvec;
+  for(int i = 0; i < vec.size(); i++)
+  {
+    stdvec.push_back(vec(i));
+  }
+  return stdvec;
 }
 
 void recordObs(size_t now, SSID* ssid, WorldPtr realtimeWorld)
@@ -272,13 +249,25 @@ void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t nois
   ssid->registerUnlock();
 }
 
+Eigen::MatrixXs std2eigen(std::vector<Eigen::VectorXs> record)
+{
+  size_t num_record = record.size();
+  Eigen::MatrixXs eigen_record = Eigen::MatrixXs::Zero(num_record, record[0].size());
+  std::cout << "Size: " << eigen_record.cols() << " " << eigen_record.rows() << std::endl; 
+  for(int i = 0; i < num_record; i++)
+  {
+    eigen_record.row(i) = record[i];
+  }
+  return eigen_record;
+}
+
 #ifdef iLQR_MPC_TEST
 TEST(REALTIME, CARTPOLE_MPC_MASS)
 {
   WorldPtr world = createWorld(1.0 / 100);
 
   // Initialize Hyper Parameters
-  int steps = 200;
+  int steps = 100;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = steps * millisPerTimestep;
 
@@ -290,7 +279,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   s_t scale = 1.0;
   size_t ssid_index = 0;
   size_t ssid_index2 = 1;
-  int inferenceSteps = 20;
+  int inferenceSteps = 5;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
@@ -319,7 +308,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::mutex param_lock;
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
-  ssid.setSSIDIndex(Eigen::Vector2i(0, 1));  
+  ssid.setSSIDMassIndex(Eigen::Vector2i(0, 1)); 
+  // ssid.useConfidence();
+  ssid.useHeuristicWeight();
+  ssid.useSmoothing();
+  ssid.setTemperature(Eigen::Vector2s(0.05,15));
+  
 
   ssid.setInitialPosEstimator(
     [](Eigen::MatrixXs sensors, long)
@@ -334,7 +328,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     });
 
   world->clearTunableMassThisInstance();
-  world->removeDofFromActionSpace(1);
   // Create Goal
   Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
   Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Zero(1);
@@ -352,20 +345,21 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
                                            world);
 
   costFn->setSSIDNodeIndex(ssid_idx);
-  costFn->enableSSIDLoss(0.01);
+  // costFn->enableSSIDLoss(0.01);
   costFn->setTimeStep(world->getTimeStep());
   Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
   goal(0) = 0.5;
   costFn->setTarget(goal);
   std::cout << "Before MPC Local Initialization" << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
-    world, costFn, 1, planningHorizonMillis, 1.0);
+    world, 1, planningHorizonMillis, 1.0);
+  mpcLocal.setCostFn(costFn);
 
   std::cout << "mpcLocal Created Successfully" << std::endl;
 
   mpcLocal.setSilent(true);
   mpcLocal.setMaxIterations(5);
-  mpcLocal.setPatience(1);
+  mpcLocal.setPatience(3);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
   mpcLocal.setActionBound(20.0);
@@ -404,7 +398,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
                       Eigen::Vector3s(1.0, 0.0, 0.0));
   server.registerDragListener("goal", [&](Eigen::Vector3s dragTo){
     goal(0) = dragTo(0);
-    dragTo(1) = 1.0;
+    dragTo(1) = 0.3;
     dragTo(2) = 0.0;
     costFn->setTarget(goal);
     server.setObjectPosition("goal", dragTo);
@@ -414,15 +408,15 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   Ticker ticker = Ticker(scale * realtimeUnderlyingWorld->getTimeStep());
 
-  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
+  auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton(0)
                             ->getBodyNodes()[0]
                             ->getShapeNodesWith<VisualAspect>()[0]
                             ->getVisualAspect();
   Eigen::Vector3s originalColor = sledBodyVisual->getColor();
   long total_steps = 0;
 
-  Eigen::Vector2s masses(2.0, 1.5);
-  Eigen::Vector2s id_masses(1.0, 1.0);
+  Eigen::Vector2s masses(1.0, 0.5);
+  Eigen::Vector2s id_masses(1.5, 1.0);
 
   realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
   realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
@@ -431,6 +425,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   world->setLinkMassIndex(id_masses(0), ssid_index);
   world->setLinkMassIndex(id_masses(1), ssid_index2);
 
+  int cnt = 0;
+  int filecnt = 0;
+  bool renderIsReady = false;
+  bool record = false;
+  std::vector<Eigen::VectorXs> real_record;
+  std::vector<Eigen::VectorXs> id_record; 
   ticker.registerTickListener([&](long now) {
     // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
     Eigen::VectorXs mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
@@ -449,7 +449,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
       sledBodyVisual->setColor(Eigen::Vector3s(1, 0, 0));
     }
-    else if (server.getKeysDown().count("e"))
+    else if (server.getKeysDown().count("d"))
     {
       Eigen::VectorXs perturbedForces
           = realtimeUnderlyingWorld->getControlForces();
@@ -461,7 +461,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     {
       sledBodyVisual->setColor(originalColor);
     }
-    if (server.getKeysDown().count(","))
+    if (server.getKeysDown().count(",") || cnt == 150)
     {
       // Increase mass
       masses(0) = 3.0;
@@ -469,7 +469,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
       realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
     }
-    else if (server.getKeysDown().count("o"))
+    else if (server.getKeysDown().count("o") || cnt == 600)
     {
       // Decrease mass
       masses(0) = 1.0;
@@ -477,27 +477,68 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
       realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
     }
+    else if(server.getKeysDown().count("s"))
+    {
+      renderIsReady = true;
+      record = true;
+      ssid.start();
+      //ssid.startSlow(); // Which should be useless
+      mpcLocal.setPredictUsingFeedback(false);
+      mpcLocal.ilqrstart();
+    }
+    else if(server.getKeysDown().count("r"))
+    {
+      record = true;
+    }
+    else if(server.getKeysDown().count("p") || cnt == 940)
+    {
+      if(record)
+      {
+        Eigen::MatrixXs real_params = std2eigen(real_record);
+        Eigen::MatrixXs sysid_params = std2eigen(id_record);
+        std::cout << "Converted!" << std::endl;
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_naive_real_"+std::to_string(filecnt)+".csv", real_params);
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_naive_identified_"+std::to_string(filecnt)+".csv", sysid_params);
+        filecnt ++;
+      }
+      record = false;
+    }
     // recordObs(now, &ssid, realtimeUnderlyingWorld);
-    recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
-    realtimeUnderlyingWorld->step();
+    if(renderIsReady)
+    {
+      recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
+      realtimeUnderlyingWorld->step();
+      cnt++;
+    }
     id_masses(0) = world->getLinkMassIndex(ssid_index);
     id_masses(1) = world->getLinkMassIndex(ssid_index2);
-    mpcLocal.recordGroundTruthState(
+    if(renderIsReady)
+    {
+      mpcLocal.recordGroundTruthState(
         now,
         realtimeUnderlyingWorld->getPositions(),
         realtimeUnderlyingWorld->getVelocities(),
         realtimeUnderlyingWorld->getMasses());
-
+    }
+  
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
       server.createText(key,
-                        "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1)),
+                        "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))
+                        +"Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
                         Eigen::Vector2i(100,100),
                         Eigen::Vector2i(200,200));
+      if(record && renderIsReady)
+      {
+        id_record.push_back(id_masses);
+        real_record.push_back(masses);
+      }
       total_steps = 0;
     }
     total_steps ++;
+    
+    
   });
 
   // Should only work when trajectory opt
@@ -511,11 +552,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   
   server.registerConnectionListener([&](){
     ticker.start();
-    // mpcLocal.start();
-    ssid.start();
-    ssid.startSlow();
-    mpcLocal.setPredictUsingFeedback(true);
-    mpcLocal.ilqrstart();
   });
   server.registerShutdownListener([&]() {mpcLocal.stop(); });
   server.serve(8070);

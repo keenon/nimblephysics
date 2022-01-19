@@ -42,6 +42,8 @@ public:
       const std::string& mapping = "identity")
       = 0;
   virtual Eigen::Ref<Eigen::VectorXs> getMasses() = 0;
+  virtual Eigen::Ref<Eigen::VectorXs> getDampings() = 0;
+  virtual Eigen::Ref<Eigen::VectorXs> getSprings() = 0;
 
   virtual const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const = 0;
@@ -50,6 +52,8 @@ public:
   virtual const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const = 0;
   virtual const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const = 0;
+  virtual const Eigen::Ref<const Eigen::VectorXs> getDampingsConst() const = 0;
+  virtual const Eigen::Ref<const Eigen::VectorXs> getSpringsConst() const = 0;
 
   virtual const std::unordered_map<std::string, Eigen::MatrixXs>&
   getMetadataMap() const = 0;
@@ -100,6 +104,8 @@ public:
           mappings,
       int steps,
       int massDim,
+      int dampDim,
+      int springDim,
       const std::unordered_map<std::string, Eigen::MatrixXs> metadata);
 
   /// Create a fresh trajector rollout for a shot
@@ -114,6 +120,8 @@ public:
       const std::unordered_map<std::string, Eigen::MatrixXs> vel,
       const std::unordered_map<std::string, Eigen::MatrixXs> force,
       const Eigen::VectorXs mass,
+      const Eigen::VectorXs damping,
+      const Eigen::VectorXs spring,
       const std::unordered_map<std::string, Eigen::MatrixXs> metadata);
 
   const std::vector<std::string>& getMappings() const override;
@@ -124,6 +132,8 @@ public:
   Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
+  Eigen::Ref<Eigen::VectorXs> getDampings() override;
+  Eigen::Ref<Eigen::VectorXs> getSprings() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
@@ -131,6 +141,8 @@ public:
   const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getDampingsConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getSpringsConst() const override;
 
   virtual const std::unordered_map<std::string, Eigen::MatrixXs>&
   getMetadataMap() const override;
@@ -143,6 +155,8 @@ protected:
   std::unordered_map<std::string, Eigen::MatrixXs> mVels;
   std::unordered_map<std::string, Eigen::MatrixXs> mForces;
   Eigen::VectorXs mMasses;
+  Eigen::VectorXs mDampings;
+  Eigen::VectorXs mSprings;
   std::unordered_map<std::string, Eigen::MatrixXs> mMetadata;
   std::vector<std::string> mMappings;
 };
@@ -161,6 +175,8 @@ public:
   Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
+  Eigen::Ref<Eigen::VectorXs> getDampings() override;
+  Eigen::Ref<Eigen::VectorXs> getSprings() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
@@ -168,6 +184,8 @@ public:
   const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getDampingsConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getSpringsConst() const override;
 
   virtual const std::unordered_map<std::string, Eigen::MatrixXs>&
   getMetadataMap() const override;
@@ -196,6 +214,8 @@ public:
   Eigen::Ref<Eigen::MatrixXs> getControlForces(
       const std::string& mapping = "identity") override;
   Eigen::Ref<Eigen::VectorXs> getMasses() override;
+  Eigen::Ref<Eigen::VectorXs> getDampings() override;
+  Eigen::Ref<Eigen::VectorXs> getSprings() override;
   const Eigen::Ref<const Eigen::MatrixXs> getPosesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::MatrixXs> getVelsConst(
@@ -203,6 +223,8 @@ public:
   const Eigen::Ref<const Eigen::MatrixXs> getControlForcesConst(
       const std::string& mapping = "identity") const override;
   const Eigen::Ref<const Eigen::VectorXs> getMassesConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getDampingsConst() const override;
+  const Eigen::Ref<const Eigen::VectorXs> getSpringsConst() const override;
 
   virtual const std::unordered_map<std::string, Eigen::MatrixXs>&
   getMetadataMap() const override;

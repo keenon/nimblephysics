@@ -94,13 +94,25 @@ public:
   void registerControls(long now, Eigen::VectorXs controls);
 
   /// This determine the condition number of trajectory to a node
-  s_t getTrajConditionNumberIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
+  s_t getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
+
+  s_t getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
+
+  s_t getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t index);
+
+  s_t getTrajConditionNumberOfSpringIndex(Eigen::MatrixXs poses, size_t index);
 
   /// This determine the condition number of trajectory to all id node
   Eigen::VectorXs getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::MatrixXs vels);
 
   /// This set the index of param
-  void setSSIDIndex(Eigen::VectorXi indices);
+  void setSSIDMassIndex(Eigen::VectorXi indices);
+
+  void setSSIDCOMIndex(Eigen::VectorXi indices);
+
+  void setSSIDDampIndex(Eigen::VectorXi indices);
+
+  void setSSIDSpringIndex(Eigen::VectorXi indices);
 
   /// This starts our main thread and begins running optimizations
   void start();
@@ -145,9 +157,9 @@ public:
 
   void setBufferLength(int length);
 
-  void setTemperature(s_t temp);
+  void setTemperature(Eigen::VectorXs temp);
 
-  s_t getTemperature();
+  Eigen::VectorXs getTemperature();
 
   // This is a big question
   // We assume that the current solution is common among two thread
@@ -161,7 +173,15 @@ public:
 
   Eigen::VectorXs estimateConfidence();
 
+  Eigen::VectorXs computeConfidenceFromValue(Eigen::VectorXs value);
+
   void setThreshs(s_t param_change, s_t conf);
+
+  void useConfidence();
+
+  void useHeuristicWeight();
+
+  void useSmoothing();
 
 protected:
   /// This is the function for the optimization thread to run when we're live
@@ -184,25 +204,36 @@ protected:
   int mPlanningStepsSlow;
 
   s_t mScale;
+  // For dimension of different  system parameters
+  size_t mMassDim;
+  size_t mDampingDim;
+  size_t mSpringDim;
   
   // For fast thread
-  int mPrev_Length = 10;
+  int mPrev_Length = 5;
   std::vector<Eigen::VectorXs> mPrev_solutions;
   std::vector<Eigen::VectorXs> mPrev_values;
   Eigen::VectorXs mParam_Solution;
-  Eigen::VectorXs mParam_Slow;
+  Eigen::VectorXs mParam_Steady;
   s_t mParam_change_thresh = 0.2;
-  s_t mConfidence_thresh = 0.5;
-  s_t mTemperature = 15.0;
+  s_t mConfidence_thresh = 0.2;
+  Eigen::VectorXs mTemperature;
   size_t mRobotSkelIndex = 0;
-  Eigen::VectorXi mSSIDNodeIndices;
+  Eigen::VectorXi mSSIDMassNodeIndices;
+  Eigen::VectorXi mSSIDCOMNodeIndices;
+  Eigen::VectorXi mSSIDDampingJointIndices;
+  Eigen::VectorXi mSSIDSpringJointIndices;
   Eigen::VectorXs mValue;
+  Eigen::VectorXs mCumValue;
 
   // Some Flags for control indication
-  bool mResultFromSlowIsReady;
+  bool mSteadySolutionFound;
   bool mParamChanged;
   bool mInitialize = true;
   bool mSlowInit = true;
+  bool mUseConfidence = false;
+  bool mUseHeuristicWeight = false;
+  bool mUseSmoothing = false;
 
   // Vector Logs for control
   Eigen::VectorXs mSensorDims;
@@ -222,7 +253,7 @@ protected:
   std::mutex* mParamMutex;
   bool mLockRegistered = false;
   bool mParamLockRegistered = false;
-  Eigen::VectorXs mParameters;
+  Eigen::VectorXs mParameters; // TODO : Should involve both mass and damping
 
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(

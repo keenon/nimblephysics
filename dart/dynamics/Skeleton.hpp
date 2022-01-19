@@ -865,6 +865,8 @@ public:
   // This returns a matrix of A_k as describe in Karen's paper
   Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
+  Eigen::MatrixXs getLinkJvkMatrixIndex(size_t index);
+
   // Sets the upper limits of all the joints from a single vector
   void setControlForceUpperLimits(Eigen::VectorXs limits);
 
@@ -1864,12 +1866,18 @@ public:
   
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
+
+  // Set Damping Coeff Vector
+  void setDampingCoeffVector(Eigen::VectorXs damp_coeffs);
   
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
   //Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
+
+  //set spring coefficinets
+  void setSpringStiffVector(Eigen::VectorXs spring_stiffs);
 
   //Get rest positions
   Eigen::VectorXs getRestPositions();

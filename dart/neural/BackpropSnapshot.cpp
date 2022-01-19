@@ -13,6 +13,8 @@
 #include "dart/neural/DifferentiableContactConstraint.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/neural/WithRespectToDamping.hpp"
+#include "dart/neural/WithRespectToSpring.hpp"
 #include "dart/simulation/World.hpp"
 
 // Make production builds happy with asserts
@@ -109,6 +111,8 @@ BackpropSnapshot::BackpropSnapshot(
   mCachedForceVelDirty = true;
   mCachedContactFreeForceVelDirty = true;
   mCachedMassVelDirty = true;
+  mCachedDampingVelDirty = true;
+  mCachedSpringVelDirty = true;
   mCachedVelCDirty = true;
   mCachedPosCDirty = true;
 
@@ -157,6 +161,8 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtVelocity = Eigen::VectorXs::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtTorque = Eigen::VectorXs::Zero(mNumDOFs);
   thisTimestepLoss.lossWrtMass = Eigen::VectorXs::Zero(world->getMassDims());
+  thisTimestepLoss.lossWrtDamping = Eigen::VectorXs::Zero(world->getDampingDims());
+  thisTimestepLoss.lossWrtSpring = Eigen::VectorXs::Zero(world->getSpringDims());
 
   // TODO(opt): remove me, as soon as it's faster to construct the Jacobians
   // using ConstrainedGroups directly. Currently it's redundant to construct
@@ -171,6 +177,8 @@ void BackpropSnapshot::backprop(
     const Eigen::MatrixXs& forceVel
         = getControlForceVelJacobian(world, thisLog);
     const Eigen::MatrixXs& massVel = getMassVelJacobian(world, thisLog);
+    const Eigen::MatrixXs& dampVel = getDampingVelJacobian(world, thisLog);
+    const Eigen::MatrixXs& springVel = getSpringVelJacobian(world, thisLog);
 
     thisTimestepLoss.lossWrtPosition
         = posPos.transpose() * nextTimestepLoss.lossWrtPosition
@@ -182,6 +190,12 @@ void BackpropSnapshot::backprop(
         = forceVel.transpose() * nextTimestepLoss.lossWrtVelocity;
     thisTimestepLoss.lossWrtMass
         = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+    
+    thisTimestepLoss.lossWrtDamping
+        = dampVel.transpose() * nextTimestepLoss.lossWrtVelocity;
+
+    thisTimestepLoss.lossWrtSpring
+        = springVel.transpose() * nextTimestepLoss.lossWrtVelocity;
 
     clipLossGradientsToBounds(
         world,
@@ -212,6 +226,9 @@ void BackpropSnapshot::backprop(
   thisTimestepLoss.lossWrtMass
       = massVel.transpose() * nextTimestepLoss.lossWrtVelocity;
 
+  const Eigen::MatrixXs& dampVel = getDampingVelJacobian(world, thisLog);
+  thisTimestepLoss.lossWrtDamping
+      = dampVel.transpose() * nextTimestepLoss.lossWrtVelocity;
   // Actually run the backprop
 
   std::unordered_map<std::string, bool> skeletonsVisited;
@@ -429,6 +446,7 @@ LossGradientHighLevelAPI BackpropSnapshot::backpropState(
     grad.lossWrtAction(i) = thisTimestepLoss.lossWrtTorque(actionMapping[i]);
   }
   grad.lossWrtMass = thisTimestepLoss.lossWrtMass;
+  grad.lossWrtDamping = thisTimestepLoss.lossWrtDamping;
   return grad;
 }
 
@@ -702,6 +720,132 @@ const Eigen::MatrixXs& BackpropSnapshot::getMassVelJacobian(
 #endif
   return mCachedMassVel;
 }
+
+
+//==============================================================================
+/// This computes and returns the whole damping-vel jacobian. For backprop, you
+/// don't actually need this matrix, you can compute backprop directly. This
+/// is here if you want access to the full Jacobian for some reason.
+const Eigen::MatrixXs& BackpropSnapshot::getDampingVelJacobian(
+  simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  #ifndef NDEBUG
+  assert(
+      world->getPositions() == mPreStepPosition
+      && world->getVelocities() == mPreStepVelocity);
+#endif
+
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getDampingVelJacobian");
+  }
+#endif
+
+  if (mCachedDampingVelDirty)
+  {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getDampingVelJacobian#refreshCache");
+    }
+#endif
+
+    // std::cout << "Before Fetch Jacobian" << std::endl;
+    s_t dt = world->getTimeStep();
+    Eigen::MatrixXs full_jac = -dt * getInvMassMatrix(world) * world->getVelocities().asDiagonal();
+    Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(world->getNumDofs(), world->getDampingDims());
+    Eigen::VectorXi dofs_map = world->getDampingDofsMapping();
+    for(size_t i = 0; i < world->getDampingDims(); i++)
+    {
+      jac.col(i) = full_jac.col(dofs_map(i));
+    }
+    mCachedDampingVel = jac;
+    mCachedDampingVelDirty = false;
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
+  }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+  return mCachedDampingVel;
+}
+
+//==============================================================================
+/// This computes and returns the whole damping-vel jacobian. For backprop, you
+/// don't actually need this matrix, you can compute backprop directly. This
+/// is here if you want access to the full Jacobian for some reason.
+const Eigen::MatrixXs& BackpropSnapshot::getSpringVelJacobian(
+  simulation::WorldPtr world, PerformanceLog* perfLog)
+{
+  #ifndef NDEBUG
+  assert(
+      world->getPositions() == mPreStepPosition
+      && world->getVelocities() == mPreStepVelocity);
+#endif
+
+  PerformanceLog* thisLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (perfLog != nullptr)
+  {
+    thisLog = perfLog->startRun("BackpropSnapshot.getSpringVelJacobian");
+  }
+#endif
+
+  if (mCachedSpringVelDirty)
+  {
+    PerformanceLog* refreshLog = nullptr;
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (thisLog != nullptr)
+    {
+      refreshLog = thisLog->startRun(
+          "BackpropSnapshot.getSpringVelJacobian#refreshCache");
+    }
+#endif
+
+    // std::cout << "Before Fetch Jacobian" << std::endl;
+    s_t dt = world->getTimeStep();
+
+    Eigen::MatrixXs full_jac = -dt * getInvMassMatrix(world) * (world->getPositions() 
+                                    - getRestPositions(world) + dt * world->getVelocities()).asDiagonal();
+    Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(world->getNumDofs(),world->getSpringDims());
+    Eigen::VectorXi dofs_map = world->getSpringDofsMapping();
+    for(size_t i = 0; i < world->getSpringDims(); i++)
+    {
+      jac.col(i) = full_jac.col(dofs_map(i));
+    }
+    mCachedSpringVel = jac;
+    mCachedSpringVelDirty = false;
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+    if (refreshLog != nullptr)
+    {
+      refreshLog->end();
+    }
+#endif
+  }
+
+#ifdef LOG_PERFORMANCE_BACKPROP_SNAPSHOT
+  if (thisLog != nullptr)
+  {
+    thisLog->end();
+  }
+#endif
+  return mCachedSpringVel;
+}
+
 
 //==============================================================================
 const Eigen::MatrixXs& BackpropSnapshot::getVelVelJacobian(
@@ -1306,6 +1450,7 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
               << std::endl;
     */
     // snapshot.restore();
+    // std::cout << "Reach Force" << std::endl;
     return Minv
            * ((A_c_ub_E * dF_c)
               + (dt
@@ -1314,10 +1459,10 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
   }
 
   Eigen::MatrixXs dC = getJacobianOfC(world, wrt);
-
   if (wrt == WithRespectTo::VELOCITY)
   {
     // snapshot.restore();
+    // std::cout << "Reach Velocity" << std::endl;
     return Eigen::MatrixXs::Identity(world->getNumDofs(), world->getNumDofs())
            + Minv * (A_c_ub_E * dF_c - dt * dC);
   }
@@ -1326,12 +1471,14 @@ Eigen::MatrixXs BackpropSnapshot::getVelJacobianWrt(
     Eigen::MatrixXs dA_c = getJacobianOfClampingConstraints(world, f_c);
     Eigen::MatrixXs dA_ubE = getJacobianOfUpperBoundConstraints(world, E * f_c);
     // snapshot.restore();
+    // std::cout << "Reach Position" << std::endl;
     return dM + Minv * (A_c_ub_E * dF_c + dA_c + dA_ubE - dt * dC)
            - Minv * dt * spring_stiffs.asDiagonal();
   }
   else
   {
     // snapshot.restore();
+    // std::cout << "Reach Mass" << std::endl;
     return dM + Minv * (A_c_ub_E * dF_c - dt * dC);
   }
 
@@ -3162,7 +3309,7 @@ Eigen::MatrixXs BackpropSnapshot::getJacobianOfConstraintForce(
       = Q.completeOrthogonalDecomposition();
 
   Eigen::MatrixXs dB = getJacobianOfLCPOffsetClampingSubset(world, wrt);
-
+  // TODO: Eric should include damping coeff and spring
   if (wrt == WithRespectTo::VELOCITY || wrt == WithRespectTo::FORCE)
   {
     // dQ_b is 0, so don't compute it

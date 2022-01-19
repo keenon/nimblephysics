@@ -77,12 +77,15 @@ public:
 
   bool detectXContinuity();
 
+  void setVerbose(bool verbose);
+
 
   // Parameters
   size_t nsteps;
   size_t control_dim;
   size_t state_dim;
-  Extrapolate_Method ext; 
+  Extrapolate_Method ext;
+  bool mVerbose = false;
 
   // system related
   std::vector<Eigen::VectorXs> X;
@@ -250,7 +253,7 @@ public:
 
   s_t getCurrentCost();
 
-  trajectory::TrajectoryRolloutReal createRollout(size_t steps, size_t dofs, size_t mass_dim);
+  trajectory::TrajectoryRolloutReal createRollout(size_t steps, size_t dofs, size_t mass_dim, size_t damping_dim , size_t spring_dim);
 
   void setActionBound(s_t actionBound);
 
