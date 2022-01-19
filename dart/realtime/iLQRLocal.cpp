@@ -251,6 +251,11 @@ void LQRBuffer::setVerbose(bool verbose)
   mVerbose = verbose;
 }
 
+bool LQRBuffer::getVerbose()
+{
+  return mVerbose;
+}
+
 iLQRLocal::iLQRLocal(
     std::shared_ptr<simulation::World> world,
     size_t nControls,
@@ -979,7 +984,7 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
   {
     // Update the mBuffer according to current time
     bool flag = mlqrBuffer.detectXContinuity();
-    if(!flag)
+    if(!flag && mlqrBuffer.getVerbose())
     {
       std::cout << "=====================" << std::endl;
       std::cout << "X is not Continuous!!" << std::endl;

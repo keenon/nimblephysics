@@ -572,7 +572,7 @@ void SSID::optimizationThreadLoop()
               mCumValue += mValue;
             }
             // TODO: Use delta value to determine the stability
-            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < 0.5*mParam_change_thresh)
+            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh)
             {
               mSteadySolutionFound = true;
             }
@@ -658,7 +658,7 @@ bool SSID::detectChangeParams()
   std::cout << "Confidence: " << confidence(0) << " " << confidence(1) << std::endl;
   std::cout << "Solutions: " << mean_params(0) << " " << mean_params(1) << std::endl;
   paramMutexLock();
-  if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
+  if((mean_params - mParam_Solution).cwiseAbs().mean() > mParam_change_thresh &&
     (confidence.mean() > mConfidence_thresh|| !mUseConfidence))
   {
     paramMutexUnlock();
@@ -704,7 +704,7 @@ s_t SSID::getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t inde
   s_t cond = 0;
   for(int i = 0; i < steps; i++)
   {
-    cond += vels(index, i);
+    cond += abs(vels(index, i));
   }
   return cond/steps;
 }

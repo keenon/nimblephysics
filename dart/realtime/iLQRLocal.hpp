@@ -79,6 +79,8 @@ public:
 
   void setVerbose(bool verbose);
 
+  bool getVerbose();
+
 
   // Parameters
   size_t nsteps;

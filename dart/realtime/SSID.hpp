@@ -215,8 +215,8 @@ protected:
   std::vector<Eigen::VectorXs> mPrev_values;
   Eigen::VectorXs mParam_Solution;
   Eigen::VectorXs mParam_Steady;
-  s_t mParam_change_thresh = 0.2;
-  s_t mConfidence_thresh = 0.2;
+  s_t mParam_change_thresh = 0.05;
+  s_t mConfidence_thresh = 0.5;
   Eigen::VectorXs mTemperature;
   size_t mRobotSkelIndex = 0;
   Eigen::VectorXi mSSIDMassNodeIndices;
