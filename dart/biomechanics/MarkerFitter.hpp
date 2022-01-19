@@ -115,6 +115,7 @@ struct MarkerInitialization
       updatedMarkerMap;
 
   std::vector<dynamics::Joint*> joints;
+  Eigen::VectorXs jointMarkerVariability;
   Eigen::VectorXs jointLoss;
   Eigen::VectorXs jointWeights;
   Eigen::MatrixXs jointCenters;
@@ -295,6 +296,21 @@ public:
           markerObservations,
       InitialMarkerFitParams params = InitialMarkerFitParams());
 
+  /// This runs a server to display the detailed trajectory information, along
+  /// with fit data
+  void debugTrajectoryAndMarkersToGUI(
+      MarkerInitialization init,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This saves a GUI state machine log to display detailed trajectory
+  /// information
+  void saveTrajectoryAndMarkersToGUI(
+      std::string path,
+      MarkerInitialization init,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerTrajectories);
+
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 1 and 3: (Re)Initialize scaling+IK
   ///////////////////////////////////////////////////////////////////////////
@@ -393,6 +409,25 @@ public:
   std::shared_ptr<CylinderFitJointAxisProblem> findJointAxis(
       std::shared_ptr<CylinderFitJointAxisProblem> problem,
       bool logSteps = false);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 3.5: Weight the joint centers + joint axis
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// This computes several metrics, including the variation in the marker
+  /// movement for each joint, which then go into computing how much weight we
+  /// should put on each joint center / joint axis.
+  void computeJointConfidences(
+      MarkerInitialization& initialization,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This returns a score summarizing how much the markers attached to this
+  /// joint move relative to one another.
+  s_t computeJointVariability(
+      dynamics::Joint* joint,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 4: Jointly scale+fit+marker offsets, with joint centers as

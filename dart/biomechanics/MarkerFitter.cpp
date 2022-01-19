@@ -8,6 +8,9 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/realtime/Ticker.hpp"
+#include "dart/server/GUIRecording.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
 
@@ -544,6 +547,7 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
   // 2. Find the joint centers
   findJointCenters(init, markerObservations);
   findAllJointAxis(init, markerObservations);
+  computeJointConfidences(init, markerObservations);
 
   // 3. Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = getInitialization(
@@ -571,6 +575,223 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
           .setGroupScales(bilevelFit->groupScales)
           .setMarkerOffsets(bilevelFit->markerOffsets));
   return finalKinematicInit;
+}
+
+//==============================================================================
+void MarkerFitter::debugTrajectoryAndMarkersToGUI(
+    MarkerInitialization init,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderSkeleton(mSkeleton);
+
+  int numJoints = init.jointCenters.rows() / 3;
+  for (int i = 0; i < numJoints; i++)
+  {
+    if (init.jointWeights(i) > 0)
+    {
+      server.createSphere(
+          "joint_center_" + std::to_string(i),
+          0.01 * (1.0 / init.jointWeights(i)),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 0, 1, init.jointWeights(i)));
+    }
+  }
+  int numAxis = init.jointAxis.rows() / 6;
+  for (int i = 0; i < numAxis; i++)
+  {
+    if (init.axisWeights(i) > 0)
+    {
+      server.createCapsule(
+          "joint_axis_" + std::to_string(i),
+          0.003 * (1.0 / init.axisWeights(i)),
+          0.1,
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 1, 0, init.axisWeights(i)));
+    }
+  }
+
+  int timestep = 0;
+  realtime::Ticker ticker(1.0 / 50);
+  ticker.registerTickListener([&](long) {
+    mSkeleton->setPositions(init.poses.col(timestep));
+    server.renderSkeleton(mSkeleton);
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPositions
+        = markerObservations[timestep];
+    server.deleteObjectsByPrefix("marker_error_");
+    for (auto pair : markerWorldPositions)
+    {
+      if (init.updatedMarkerMap.count(pair.first) > 0)
+      {
+        Eigen::Vector3s worldObserved = pair.second;
+        Eigen::Vector3s worldInferred
+            = init.updatedMarkerMap[pair.first].first->getWorldTransform()
+              * (init.updatedMarkerMap[pair.first].second.cwiseProduct(
+                  init.updatedMarkerMap[pair.first].first->getScale()));
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(worldObserved);
+        points.push_back(worldInferred);
+        server.createLine(
+            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
+      }
+    }
+
+    for (int i = 0; i < numJoints; i++)
+    {
+      if (init.jointWeights(i) > 0)
+      {
+        server.setObjectPosition(
+            "joint_center_" + std::to_string(i),
+            init.jointCenters.block<3, 1>(i * 3, timestep));
+      }
+    }
+    for (int i = 0; i < numAxis; i++)
+    {
+      if (init.axisWeights(i) > 0)
+      {
+        // Render an axis line
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(init.jointAxis.block<3, 1>(i * 6, timestep));
+        points.push_back(
+            init.jointAxis.block<3, 1>(i * 6, timestep)
+            + (init.jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
+        server.createLine(
+            "joint_axis_line_" + std::to_string(i),
+            points,
+            Eigen::Vector4s(0, 1, 0, 1));
+
+        // Render an axis capsule
+        server.setObjectPosition(
+            "joint_axis_" + std::to_string(i),
+            init.jointAxis.block<3, 1>(i * 6, timestep));
+        Eigen::Vector3s dir = init.jointAxis.block<3, 1>(i * 6 + 3, timestep);
+        Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
+        R.col(2) = dir;
+        R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
+        R.col(0) = R.col(1).cross(R.col(2));
+        server.setObjectRotation(
+            "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
+      }
+    }
+
+    timestep++;
+    if (timestep >= init.poses.cols())
+    {
+      timestep = 0;
+    }
+  });
+  server.registerConnectionListener([&]() { ticker.start(); });
+  server.blockWhileServing();
+}
+
+//==============================================================================
+void MarkerFitter::saveTrajectoryAndMarkersToGUI(
+    std::string path,
+    MarkerInitialization init,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  server::GUIRecording server;
+  server.renderSkeleton(mSkeleton);
+
+  int numJoints = init.jointCenters.rows() / 3;
+  for (int i = 0; i < numJoints; i++)
+  {
+    if (init.jointWeights(i) > 0)
+    {
+      server.createSphere(
+          "joint_center_" + std::to_string(i),
+          0.01 * (1.0 / init.jointWeights(i)),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 0, 1, init.jointWeights(i)));
+    }
+  }
+  int numAxis = init.jointAxis.rows() / 6;
+  for (int i = 0; i < numAxis; i++)
+  {
+    if (init.axisWeights(i) > 0)
+    {
+      server.createCapsule(
+          "joint_axis_" + std::to_string(i),
+          0.003 * (1.0 / init.axisWeights(i)),
+          0.1,
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(0, 1, 0, init.axisWeights(i)));
+    }
+  }
+
+  for (int timestep = 0; timestep < init.poses.cols(); timestep++)
+  {
+    mSkeleton->setPositions(init.poses.col(timestep));
+    server.renderSkeleton(mSkeleton);
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPositions
+        = markerObservations[timestep];
+    server.deleteObjectsByPrefix("marker_error_");
+    for (auto pair : markerWorldPositions)
+    {
+      if (init.updatedMarkerMap.count(pair.first) > 0)
+      {
+        Eigen::Vector3s worldObserved = pair.second;
+        Eigen::Vector3s worldInferred
+            = init.updatedMarkerMap[pair.first].first->getWorldTransform()
+              * (init.updatedMarkerMap[pair.first].second.cwiseProduct(
+                  init.updatedMarkerMap[pair.first].first->getScale()));
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(worldObserved);
+        points.push_back(worldInferred);
+        server.createLine(
+            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
+      }
+    }
+
+    for (int i = 0; i < numJoints; i++)
+    {
+      if (init.jointWeights(i) > 0)
+      {
+        server.setObjectPosition(
+            "joint_center_" + std::to_string(i),
+            init.jointCenters.block<3, 1>(i * 3, timestep));
+      }
+    }
+    for (int i = 0; i < numAxis; i++)
+    {
+      if (init.axisWeights(i) > 0)
+      {
+        // Render an axis line
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(init.jointAxis.block<3, 1>(i * 6, timestep));
+        points.push_back(
+            init.jointAxis.block<3, 1>(i * 6, timestep)
+            + (init.jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
+        server.createLine(
+            "joint_axis_line_" + std::to_string(i),
+            points,
+            Eigen::Vector4s(0, 1, 0, 1));
+
+        // Render an axis capsule
+        server.setObjectPosition(
+            "joint_axis_" + std::to_string(i),
+            init.jointAxis.block<3, 1>(i * 6, timestep));
+        Eigen::Vector3s dir = init.jointAxis.block<3, 1>(i * 6 + 3, timestep);
+        Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
+        R.col(2) = dir;
+        R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
+        R.col(0) = R.col(1).cross(R.col(2));
+        server.setObjectRotation(
+            "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
+      }
+    }
+
+    server.saveFrame();
+  }
+
+  server.writeFramesJson(path);
 }
 
 //==============================================================================
@@ -1939,14 +2160,6 @@ void MarkerFitter::findJointCenters(
   {
     s_t loss = futures[i].get()->saveSolutionBackToInitialization();
     initialization.jointLoss(i) = loss;
-    // We want to map low loss (0.005 ish) to 1.0, and we want to map increasing
-    // loss to a decreasing weight
-    initialization.jointWeights(i) = 0.005 / loss;
-    // We cap the weight at 1.0
-    if (initialization.jointWeights(i) > 1.0)
-    {
-      initialization.jointWeights(i) = 1.0;
-    }
     std::cout << "Finished computing joint center for " << i << "/"
               << initialization.joints.size() << ": \""
               << initialization.joints[i]->getName() << "\"" << std::endl;
@@ -2064,26 +2277,6 @@ void MarkerFitter::findAllJointAxis(
     s_t loss = futures[i].get()->saveSolutionBackToInitialization();
     initialization.axisLoss(i) = loss;
 
-    // If we get lower loss with an axis than a joint, set the joint weight to 0
-    if (initialization.axisLoss(i) < initialization.jointLoss(i))
-    {
-      initialization.jointWeights(i) = 0;
-
-      // We want to map low loss (0.001 ish) to 1.0, and we want to map
-      // increasing loss to a decreasing weight
-      initialization.axisWeights(i) = 0.001 / loss;
-      // We cap the weight at 1.0
-      if (initialization.axisWeights(i) > 1.0)
-      {
-        initialization.axisWeights(i) = 1.0;
-      }
-    }
-    // If we get lower loss with a ball joint, then set the axis weight to 0
-    else
-    {
-      initialization.axisWeights(i) = 0;
-    }
-
     std::cout << "Finished computing joint axis for " << i << "/"
               << initialization.joints.size() << ": \""
               << initialization.joints[i]->getName() << "\"" << std::endl;
@@ -2135,6 +2328,183 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
             << ": initial loss=" << initialLoss << ", final loss=" << loss
             << std::endl;
   return problemPtr;
+}
+
+//==============================================================================
+/// This computes several metrics, including the variation in the marker
+/// movement for each joint, which then go into computing how much weight we
+/// should put on each joint center / joint axis.
+void MarkerFitter::computeJointConfidences(
+    MarkerInitialization& initialization,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  for (int i = 0; i < initialization.joints.size(); i++)
+  {
+    s_t variability
+        = computeJointVariability(initialization.joints[i], markerObservations);
+
+    // If we've got small variability, then the joint axis won't be
+    // very accurate, cause pretty much any axis could fit a bunch of points
+    // that don't move relative to each other. Likewise, pretty much any center
+    // could fit the points, by just changing the relative radii of each marker.
+    // So don't pass along a joint axis, and put joint center at low weight.
+    if (variability < 3.0)
+    {
+      initialization.axisWeights(i) = 0;
+      // We want to map low loss (0.005 ish) to 0.1, and we want to map
+      // increasing loss to a decreasing weight
+      initialization.jointWeights(i)
+          = 0.1 * (0.005 / initialization.jointLoss(i));
+      // We cap the weight at 0.1
+      if (initialization.jointWeights(i) > 0.1)
+      {
+        initialization.jointWeights(i) = 0.1;
+      }
+      std::cout << "Joint " << initialization.joints[i]->getName()
+                << " variability " << variability
+                << " -> Too low, we won't include joint axis "
+                   "restrictions on this joint"
+                << "\n\tjoint loss: " << initialization.jointLoss(i)
+                << "\n\tjoint weight: " << initialization.jointWeights(i)
+                << "\n\taxis loss: " << initialization.axisLoss(i)
+                << "\n\taxis weight: " << initialization.axisWeights(i)
+                << std::endl;
+    }
+    else
+    {
+      // We want to map low loss (0.005 ish) to 1.0, and we want to map
+      // increasing loss to a decreasing weight
+      initialization.jointWeights(i) = 0.005 / initialization.jointLoss(i);
+      // We cap the weight at 1.0
+      if (initialization.jointWeights(i) > 1.0)
+      {
+        initialization.jointWeights(i) = 1.0;
+      }
+
+      // We want to map low loss (0.001 ish) to 1.0, and we want to map
+      // increasing loss to a decreasing weight
+      initialization.axisWeights(i) = 0.001 / initialization.axisLoss(i);
+      // We cap the weight at 1.0
+      if (initialization.axisWeights(i) > 1.0)
+      {
+        initialization.axisWeights(i) = 1.0;
+      }
+
+      // The axis fit is a strictly hard problem, so if we get a loss within a
+      // small constant factor of the joint loss, use the axis
+      if (initialization.axisLoss(i) < 2 * initialization.jointLoss(i))
+      {
+        initialization.jointWeights(i) = 0;
+      }
+      // If we get lower loss with a ball joint, then set the axis weight to 0
+      else
+      {
+        initialization.axisWeights(i) = 0;
+      }
+      std::cout << "Joint " << initialization.joints[i]->getName()
+                << " variability " << variability
+                << "\n\tjoint loss: " << initialization.jointLoss(i)
+                << "\n\tjoint weight: " << initialization.jointWeights(i)
+                << "\n\taxis loss: " << initialization.axisLoss(i)
+                << "\n\taxis weight: " << initialization.axisWeights(i)
+                << std::endl;
+    }
+  }
+}
+
+//==============================================================================
+/// This returns a score summarizing how much the markers attached to this
+/// joint move relative to one another.
+s_t MarkerFitter::computeJointVariability(
+    dynamics::Joint* joint,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  std::vector<std::string> markerNames;
+  for (auto pair : mMarkerMap)
+  {
+    if (joint->getParentBodyNode()
+        && (pair.second.first->getName()
+                == joint->getParentBodyNode()->getName()
+            || pair.second.first->getName()
+                   == joint->getChildBodyNode()->getName()))
+    {
+      markerNames.push_back(pair.first);
+    }
+  }
+
+  // 1. Go through and find the mean distances
+
+  Eigen::MatrixXs pairMeans
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  Eigen::MatrixXs pairObservationCounts
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (int i = 0; i < markerNames.size() - 1; i++)
+    {
+      if (markerObservations[t].count(markerNames[i]))
+      {
+        for (int j = i + 1; j < markerNames.size(); j++)
+        {
+          if (markerObservations[t].count(markerNames[j]))
+          {
+            s_t dist = (markerObservations[t].at(markerNames[i])
+                        - markerObservations[t].at(markerNames[j]))
+                           .norm();
+            pairMeans(i, j) += dist;
+            pairObservationCounts(i, j) += 1;
+          }
+        }
+      }
+    }
+  }
+
+  pairMeans = pairMeans.cwiseQuotient(pairObservationCounts);
+
+  // 2. Compute the variance
+
+  Eigen::MatrixXs pairVariance
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (int i = 0; i < markerNames.size() - 1; i++)
+    {
+      if (markerObservations[t].count(markerNames[i]))
+      {
+        for (int j = i + 1; j < markerNames.size(); j++)
+        {
+          if (markerObservations[t].count(markerNames[j]))
+          {
+            s_t dist = (markerObservations[t].at(markerNames[i])
+                        - markerObservations[t].at(markerNames[j]))
+                           .norm();
+            s_t diff = dist - pairMeans(i, j);
+            pairVariance(i, j) += diff * diff;
+          }
+        }
+      }
+    }
+  }
+
+  pairVariance.cwiseQuotient(pairObservationCounts);
+
+  // 3. Go through and compute the sum normalized RMSE
+
+  s_t sum = 0.0;
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    for (int j = 0; j < markerNames.size(); j++)
+    {
+      if (pairObservationCounts(i, j) > 0)
+      {
+        sum += sqrt(pairVariance(i, j)) / pairMeans(i, j);
+      }
+    }
+  }
+
+  return sum;
 }
 
 //==============================================================================
@@ -3221,9 +3591,9 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
     mOut(out),
     mJointName(joint->getName()),
     mJointCenters(centers),
-    mKeepCenterLoss(0.001),
+    mKeepCenterLoss(0.01),
     mSmoothingCenterLoss(0.0),
-    mSmoothingAxisLoss(0.001)
+    mSmoothingAxisLoss(0.01)
 {
   // 1. Figure out which markers are on BodyNode's adjacent to the joint
 

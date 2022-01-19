@@ -1060,182 +1060,6 @@ bool debugFitToGUI(
   return true;
 }
 
-void debugTrajectoryAndMarkersToGUI(
-    std::shared_ptr<dynamics::Skeleton>& skel,
-    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-        markers,
-    Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
-    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0),
-    Eigen::VectorXs jointWeights = Eigen::VectorXs::Ones(0),
-    Eigen::MatrixXs jointAxis = Eigen::MatrixXs::Zero(0, 0),
-    Eigen::VectorXs axisWeights = Eigen::VectorXs::Ones(0))
-{
-  server::GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderSkeleton(skel);
-
-  int numJoints = jointCenters.rows() / 3;
-  for (int i = 0; i < numJoints; i++)
-  {
-    if (jointWeights(i) > 0)
-    {
-      server.createSphere(
-          "joint_center_" + std::to_string(i),
-          0.02 * (1.0 / jointWeights(i)),
-          Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 0, 1, jointWeights(i)));
-    }
-  }
-  int numAxis = jointAxis.rows() / 6;
-  for (int i = 0; i < numAxis; i++)
-  {
-    if (axisWeights(i) > 0)
-    {
-      server.createCapsule(
-          "joint_axis_" + std::to_string(i),
-          0.01 * (1.0 / axisWeights(i)),
-          0.1,
-          Eigen::Vector3s::Zero(),
-          Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 1, 0, axisWeights(i)));
-    }
-  }
-
-  int timestep = 0;
-  Ticker ticker(1.0 / 50);
-  ticker.registerTickListener([&](long) {
-    skel->setPositions(poses.col(timestep));
-    server.renderSkeleton(skel);
-
-    std::map<std::string, Eigen::Vector3s> markerWorldPositions
-        = markerTrajectories[timestep];
-    server.deleteObjectsByPrefix("marker_error_");
-    for (auto pair : markerWorldPositions)
-    {
-      if (markers.count(pair.first) > 0)
-      {
-        Eigen::Vector3s worldObserved = pair.second;
-        Eigen::Vector3s worldInferred
-            = markers[pair.first].first->getWorldTransform()
-              * (markers[pair.first].second.cwiseProduct(
-                  markers[pair.first].first->getScale()));
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(worldObserved);
-        points.push_back(worldInferred);
-        server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
-      }
-    }
-
-    for (int i = 0; i < numJoints; i++)
-    {
-      if (jointWeights(i) > 0)
-      {
-        server.setObjectPosition(
-            "joint_center_" + std::to_string(i),
-            jointCenters.block<3, 1>(i * 3, timestep));
-      }
-    }
-    for (int i = 0; i < numAxis; i++)
-    {
-      if (axisWeights(i) > 0)
-      {
-        // Render an axis line
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(jointAxis.block<3, 1>(i * 6, timestep));
-        points.push_back(
-            jointAxis.block<3, 1>(i * 6, timestep)
-            + (jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
-        server.createLine(
-            "joint_axis_line_" + std::to_string(i),
-            points,
-            Eigen::Vector4s(0, 1, 0, 1));
-
-        // Render an axis capsule
-        server.setObjectPosition(
-            "joint_axis_" + std::to_string(i),
-            jointAxis.block<3, 1>(i * 6, timestep));
-        Eigen::Vector3s dir = jointAxis.block<3, 1>(i * 6 + 3, timestep);
-        Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
-        R.col(2) = dir;
-        R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
-        R.col(0) = R.col(1).cross(R.col(2));
-        server.setObjectRotation(
-            "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
-      }
-    }
-
-    timestep++;
-    if (timestep >= poses.cols())
-    {
-      timestep = 0;
-    }
-  });
-  server.registerConnectionListener([&]() { ticker.start(); });
-  server.blockWhileServing();
-}
-
-void saveTrajectoryAndMarkersToGUI(
-    std::string path,
-    std::shared_ptr<dynamics::Skeleton>& skel,
-    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-        markers,
-    Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
-    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0))
-{
-  server::GUIRecording server;
-  server.renderSkeleton(skel);
-
-  int numJoints = jointCenters.rows() / 3;
-  for (int i = 0; i < numJoints; i++)
-  {
-    server.createSphere(
-        "joint_center_" + std::to_string(i),
-        0.02,
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector4s(0, 0, 1, 1));
-  }
-
-  for (int timestep = 0; timestep < poses.cols(); timestep++)
-  {
-    skel->setPositions(poses.col(timestep));
-    server.renderSkeleton(skel);
-
-    std::map<std::string, Eigen::Vector3s> markerWorldPositions
-        = markerTrajectories[timestep];
-    server.deleteObjectsByPrefix("marker_error_");
-    for (auto pair : markerWorldPositions)
-    {
-      if (markers.count(pair.first) > 0)
-      {
-        Eigen::Vector3s worldObserved = pair.second;
-        Eigen::Vector3s worldInferred
-            = markers[pair.first].first->getWorldTransform()
-              * (markers[pair.first].second.cwiseProduct(
-                  markers[pair.first].first->getScale()));
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(worldObserved);
-        points.push_back(worldInferred);
-        server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
-      }
-    }
-
-    for (int i = 0; i < numJoints; i++)
-    {
-      server.setObjectPosition(
-          "joint_center_" + std::to_string(i),
-          jointCenters.block<3, 1>(i * 3, timestep));
-    }
-
-    server.saveFrame();
-  }
-
-  server.writeFramesJson(path);
-}
-
 #ifdef ALL_TESTS
 TEST(MarkerFitter, ROTATE_IN_BOUNDS)
 {
@@ -2227,7 +2051,7 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, AXIS_FIT_GRAD)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2310,7 +2134,7 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
   // fitter.findJointCenter(0, init, subsetTimesteps);
   // fitter.findAllJointAxis(init, subsetTimesteps);
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK)
@@ -2715,7 +2539,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2818,6 +2642,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
 
   fitter.findJointCenters(init, subsetTimesteps);
   fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
 
   // Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = fitter.getInitialization(
@@ -2915,7 +2740,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
   // Bilevel optimization
-  fitter.setIterationLimit(200);
+  fitter.setIterationLimit(400);
   std::shared_ptr<BilevelFitResult> bilevelFit
       = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
 
@@ -2963,17 +2788,9 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   */
 
   // Target markers
-  debugTrajectoryAndMarkersToGUI(
-      standard.skeleton,
-      finalKinematicInit.updatedMarkerMap,
-      finalKinematicInit.poses,
-      subsetTimesteps,
-      finalKinematicInit.jointCenters,
-      finalKinematicInit.jointWeights,
-      finalKinematicInit.jointAxis,
-      finalKinematicInit.axisWeights);
+  fitter.debugTrajectoryAndMarkersToGUI(finalKinematicInit, subsetTimesteps);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)

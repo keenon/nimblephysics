@@ -247,6 +247,17 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
           ::py::arg("markerObservations"),
           ::py::arg("params"))
+      .def(
+          "debugTrajectoryAndMarkersToGUI",
+          &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
+          ::py::arg("init"),
+          ::py::arg("markerObservations"))
+      .def(
+          "saveTrajectoryAndMarkersToGUI",
+          &dart::biomechanics::MarkerFitter::saveTrajectoryAndMarkersToGUI,
+          ::py::arg("path"),
+          ::py::arg("init"),
+          ::py::arg("markerObservations"))
       .def_static(
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,

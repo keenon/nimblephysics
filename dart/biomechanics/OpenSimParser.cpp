@@ -1157,12 +1157,15 @@ OpenSimScaleAndMarkerOffsets OpenSimParser::getScaleAndMarkerOffsets(
   {
     dynamics::BodyNode* scaledNode = scaledSkeleton.skeleton->getBodyNode(
         standardSkeleton.skeleton->getBodyNode(i)->getName());
-    dynamics::Shape* shape = scaledNode->getShapeNode(0)->getShape().get();
-    if (shape->getType() == dynamics::MeshShape::getStaticType())
+    if (scaledNode->getNumShapeNodes() > 0)
     {
-      dynamics::MeshShape* mesh = static_cast<dynamics::MeshShape*>(shape);
-      Eigen::Vector3s scale = mesh->getScale();
-      config.bodyScales.segment<3>(i * 3) = scale;
+      dynamics::Shape* shape = scaledNode->getShapeNode(0)->getShape().get();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh = static_cast<dynamics::MeshShape*>(shape);
+        Eigen::Vector3s scale = mesh->getScale();
+        config.bodyScales.segment<3>(i * 3) = scale;
+      }
     }
   }
 

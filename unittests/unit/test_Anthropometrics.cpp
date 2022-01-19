@@ -26,12 +26,12 @@ using namespace biomechanics;
 
 // #define ALL_TESTS
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(ANTHROPOMETRICS, LOAD)
 {
-  Anthropometrics result = Anthropometrics::loadFromFile(
+  std::shared_ptr<Anthropometrics> result = Anthropometrics::loadFromFile(
       "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
-  std::vector<std::string> cols = result.getMetricNames();
+  std::vector<std::string> cols = result->getMetricNames();
   cols.push_back("Age");
   cols.push_back("Weightlbs");
   cols.push_back("Heightin");
@@ -42,7 +42,7 @@ TEST(ANTHROPOMETRICS, LOAD)
   std::cout << "Mu: " << std::endl << gauss->getMu() << std::endl;
   std::cout << "Cov: " << std::endl << gauss->getCov() << std::endl;
 
-  result.setDistribution(gauss);
+  result->setDistribution(gauss);
 
   OpenSimFile file = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
@@ -51,24 +51,24 @@ TEST(ANTHROPOMETRICS, LOAD)
   skel->setScaleGroupUniformScaling(skel->getBodyNode("hand_r"));
 
   Eigen::VectorXs mu = gauss->getMu();
-  Eigen::VectorXs x = gauss->convertFromMap(result.measure(skel));
+  Eigen::VectorXs x = gauss->convertFromMap(result->measure(skel));
   Eigen::MatrixXs compare = Eigen::MatrixXs(mu.size(), 3);
   compare.col(0) = x;
   compare.col(1) = mu;
   compare.col(2) = x - mu;
   std::cout << "x - mu - diff" << std::endl << compare << std::endl;
 
-  std::cout << "Initial log PDF: " << result.getLogPDF(skel) << std::endl;
+  std::cout << "Initial log PDF: " << result->getLogPDF(skel) << std::endl;
 
-  std::map<std::string, s_t> measurements = result.measure(skel);
+  std::map<std::string, s_t> measurements = result->measure(skel);
   for (auto pair : measurements)
   {
     std::cout << pair.first << ": " << pair.second << std::endl;
   }
 
-  Eigen::VectorXs grad = result.getGradientOfLogPDFWrtBodyScales(skel);
+  Eigen::VectorXs grad = result->getGradientOfLogPDFWrtBodyScales(skel);
   Eigen::VectorXs grad_fd
-      = result.finiteDifferenceGradientOfLogPDFWrtBodyScales(skel);
+      = result->finiteDifferenceGradientOfLogPDFWrtBodyScales(skel);
 
   if (!equals(grad, grad_fd, 5e-9))
   {
@@ -83,8 +83,8 @@ TEST(ANTHROPOMETRICS, LOAD)
     EXPECT_TRUE(equals(grad, grad_fd, 5e-9));
   }
 
-  grad = result.getGradientOfLogPDFWrtGroupScales(skel);
-  grad_fd = result.finiteDifferenceGradientOfLogPDFWrtGroupScales(skel);
+  grad = result->getGradientOfLogPDFWrtGroupScales(skel);
+  grad_fd = result->finiteDifferenceGradientOfLogPDFWrtGroupScales(skel);
 
   if (!equals(grad, grad_fd, 5e-9))
   {
@@ -99,9 +99,9 @@ TEST(ANTHROPOMETRICS, LOAD)
     EXPECT_TRUE(equals(grad, grad_fd, 5e-9));
   }
 }
-#endif
+// #endif
 
-// #ifdef BLOCKING_GUI_TEST
+#ifdef BLOCKING_GUI_TEST
 // #ifdef ALL_TESTS
 TEST(ANTHROPOMETRICS, GUI)
 {
@@ -211,4 +211,4 @@ TEST(ANTHROPOMETRICS, GUI)
   server->blockWhileServing();
 }
 // #endif
-// #endif
+#endif
