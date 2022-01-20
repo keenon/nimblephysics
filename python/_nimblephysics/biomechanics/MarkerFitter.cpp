@@ -246,7 +246,8 @@ void MarkerFitter(py::module& m)
           "runKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
           ::py::arg("markerObservations"),
-          ::py::arg("params"))
+          ::py::arg("params"),
+          ::py::arg("numSamples") = 20)
       .def(
           "setMinJointVarianceCutoff",
           &dart::biomechanics::MarkerFitter::setMinJointVarianceCutoff,
@@ -266,6 +267,7 @@ void MarkerFitter(py::module& m)
       .def(
           "debugTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
+          ::py::arg("server"),
           ::py::arg("init"),
           ::py::arg("markerObservations"))
       .def(

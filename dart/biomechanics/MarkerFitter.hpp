@@ -294,11 +294,13 @@ public:
   MarkerInitialization runKinematicsPipeline(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      InitialMarkerFitParams params = InitialMarkerFitParams());
+      InitialMarkerFitParams params = InitialMarkerFitParams(),
+      int numSamples = 20);
 
   /// This runs a server to display the detailed trajectory information, along
   /// with fit data
   void debugTrajectoryAndMarkersToGUI(
+      std::shared_ptr<server::GUIWebsocketServer> server,
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);

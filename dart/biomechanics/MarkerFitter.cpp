@@ -542,7 +542,8 @@ MarkerFitter::MarkerFitter(
 MarkerInitialization MarkerFitter::runKinematicsPipeline(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
-    InitialMarkerFitParams params)
+    InitialMarkerFitParams params,
+    int numSamples)
 {
   // 1. Find the initial scaling + IK
   MarkerInitialization init = getInitialization(markerObservations, params);
@@ -564,7 +565,7 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 
   // 4. Run bilevel optimization
   std::shared_ptr<BilevelFitResult> bilevelFit
-      = optimizeBilevel(markerObservations, reinit, 20);
+      = optimizeBilevel(markerObservations, reinit, numSamples);
 
   // 5. Fine-tune IK and re-fit all the points
   mSkeleton->setGroupScales(bilevelFit->groupScales);
@@ -584,20 +585,19 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 
 //==============================================================================
 void MarkerFitter::debugTrajectoryAndMarkersToGUI(
+    std::shared_ptr<server::GUIWebsocketServer> server,
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations)
 {
-  server::GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderSkeleton(mSkeleton);
+  server->renderSkeleton(mSkeleton);
 
   int numJoints = init.jointCenters.rows() / 3;
   for (int i = 0; i < numJoints; i++)
   {
     if (init.jointWeights(i) > 0)
     {
-      server.createSphere(
+      server->createSphere(
           "joint_center_" + std::to_string(i),
           0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
@@ -609,7 +609,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   {
     if (init.axisWeights(i) > 0)
     {
-      server.createCapsule(
+      server->createCapsule(
           "joint_axis_" + std::to_string(i),
           0.003 * std::min(3.0, (1.0 / init.axisWeights(i))),
           0.1,
@@ -620,14 +620,15 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   }
 
   int timestep = 0;
-  realtime::Ticker ticker(1.0 / 50);
-  ticker.registerTickListener([&](long) {
+  std::shared_ptr<realtime::Ticker> ticker
+      = std::make_shared<realtime::Ticker>(1.0 / 50);
+  ticker->registerTickListener([&](long) {
     mSkeleton->setPositions(init.poses.col(timestep));
-    server.renderSkeleton(mSkeleton);
+    server->renderSkeleton(mSkeleton);
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerObservations[timestep];
-    server.deleteObjectsByPrefix("marker_error_");
+    server->deleteObjectsByPrefix("marker_error_");
     for (auto pair : markerWorldPositions)
     {
       if (init.updatedMarkerMap.count(pair.first) > 0)
@@ -640,7 +641,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
-        server.createLine(
+        server->createLine(
             "marker_error_" + pair.first, points, Eigen::Vector4s(1, 0, 0, 1));
       }
     }
@@ -649,7 +650,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       if (init.jointWeights(i) > 0)
       {
-        server.setObjectPosition(
+        server->setObjectPosition(
             "joint_center_" + std::to_string(i),
             init.jointCenters.block<3, 1>(i * 3, timestep));
       }
@@ -664,13 +665,13 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         points.push_back(
             init.jointAxis.block<3, 1>(i * 6, timestep)
             + (init.jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
-        server.createLine(
+        server->createLine(
             "joint_axis_line_" + std::to_string(i),
             points,
             Eigen::Vector4s(0, 1, 0, 1));
 
         // Render an axis capsule
-        server.setObjectPosition(
+        server->setObjectPosition(
             "joint_axis_" + std::to_string(i),
             init.jointAxis.block<3, 1>(i * 6, timestep));
         Eigen::Vector3s dir = init.jointAxis.block<3, 1>(i * 6 + 3, timestep);
@@ -678,7 +679,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         R.col(2) = dir;
         R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
         R.col(0) = R.col(1).cross(R.col(2));
-        server.setObjectRotation(
+        server->setObjectRotation(
             "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
       }
     }
@@ -689,8 +690,10 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       timestep = 0;
     }
   });
-  server.registerConnectionListener([&]() { ticker.start(); });
-  server.blockWhileServing();
+  server->registerConnectionListener([ticker]() { ticker->start(); });
+  // TODO: it'd be nice if this method didn't block forever, but we need to hold
+  // onto a bunch of resources otherwise
+  server->blockWhileServing();
 }
 
 //==============================================================================
@@ -910,6 +913,7 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
   }
 
   result->success = (status == Ipopt::Solve_Succeeded);
+  std::cout << "Number of results: " << result->poses.size() << std::endl;
   result->posesMatrix
       = Eigen::MatrixXs::Zero(result->poses[0].size(), result->poses.size());
   for (int i = 0; i < result->poses.size(); i++)
@@ -1133,6 +1137,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   }
   */
 
+  result.groupScales = params.groupScales;
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
   result.jointWeights = params.jointWeights;
@@ -4917,6 +4922,8 @@ void BilevelFitProblem::finalize_solution(
     mOutResult->markerOffsets[mFitter->mMarkerNames[i]]
         = mOutResult->rawMarkerOffsets.segment<3>(i * 3);
   }
+  std::cout << "Saving " << mMarkerObservations.size() << " results"
+            << std::endl;
   for (int i = 0; i < mMarkerObservations.size(); i++)
   {
     mOutResult->poses.push_back(
@@ -4953,7 +4960,7 @@ bool BilevelFitProblem::intermediate_callback(
   (void)ip_data;
   (void)ip_cq;
 
-  if (obj_value < mBestObjectiveValue)
+  if (obj_value < mBestObjectiveValue && abs(inf_pr) < 1.0)
   {
     mBestObjectiveValueIteration = iter;
     mBestObjectiveValue = obj_value;

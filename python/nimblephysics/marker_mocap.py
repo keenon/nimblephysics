@@ -256,7 +256,7 @@ class MarkerMocap:
                             markerTrcPath: str,
                             handScaledGoldBodyOsim: str,
                             handScaledGoldIKMot: str,
-                            numStepsToFit: int = 3,
+                            numStepsToFit: int = -1,
                             debugToGUI: bool = True) -> nimble.biomechanics.MarkerInitialization:
         """
         This compares the performance of the MarkerMocap system to a manual fit process, and prints a number of stats
@@ -283,19 +283,25 @@ class MarkerMocap:
             scaledOsim.skeleton,
             handScaledGoldIKMotAbs)
 
+        limitTimesteps = 10
+        if numStepsToFit != -1:
+            limitTimesteps = min(10, numStepsToFit)
+
         originalIK: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
             scaledOsim.skeleton, scaledOsim.markersMap, mot.poses, markerTrajectories.markerTimesteps)
         print('Original IK:')
-        originalIK.printReport(limitTimesteps=10)
+        originalIK.printReport(limitTimesteps=limitTimesteps)
 
         goldPoses = mot.poses
         markerObservations: List[Dict[str, np.ndarray]
                                  ] = markerTrajectories.markerTimesteps
+        if numStepsToFit != -1:
+            markerObservations = markerObservations[:numStepsToFit]
 
         print("Optimize the fit")
         self.fitter.setIterationLimit(200)
         result: nimble.biomechanics.MarkerInitialization = self.fitter.runKinematicsPipeline(
-            markerObservations, nimble.biomechanics.InitialMarkerFitParams())
+            markerObservations, nimble.biomechanics.InitialMarkerFitParams(), 150)
         self.skel.setGroupScales(result.groupScales)
         bodyScales: np.ndarray = self.skel.getBodyScales()
 
@@ -326,10 +332,14 @@ class MarkerMocap:
         resultIK: nimble.biomechanics.IKErrorReport = nimble.biomechanics.IKErrorReport(
             self.skel, fitMarkers, result.poses, markerObservations)
         print('Fine tuned IK:')
-        resultIK.printReport(limitTimesteps=10)
+        resultIK.printReport(limitTimesteps=limitTimesteps)
 
         if debugToGUI:
-            self.fitter.debugTrajectoryAndMarkersToGUI(
-                result, markerObservations)
+            world: nimble.simulation.World = nimble.simulation.World()
+            gui: NimbleGUI = NimbleGUI(world)
+            gui.serve(8080)
+            self.fitter.debugTrajectoryAndMarkersToGUI(gui.nativeAPI(),
+                                                       result, markerObservations)
+            gui.blockWhileServing()
 
         return result
