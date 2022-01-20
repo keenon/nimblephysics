@@ -125,6 +125,12 @@ void PgsBoxedLcpSolver(py::module& m)
             self->setOption(option);
           },
           ::py::arg("option"))
+      .def(
+          "getOption",
+          +[](dart::constraint::PgsBoxedLcpSolver* self)
+              -> const dart::constraint::PgsBoxedLcpSolver::Option& {
+            return self->getOption();
+          })
       .def_static(
           "getStaticType",
           +[]() -> const std::string& {
