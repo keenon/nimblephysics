@@ -5,9 +5,9 @@ import ReactDOM from 'react-dom';
 import previewJson from './data/preview.json';
 
 const ReactTestBed = () => {
-  const [show, setShow] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const [show, setShow] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0.0);
 
   let children = [];
@@ -50,7 +50,7 @@ const ReactTestBed = () => {
       loadingProgress,
       recording: loaded ? previewJson : null,
       style: {
-        width: "500px",
+        width: "800px",
         height: "500px"
       },
       key: 'gui'

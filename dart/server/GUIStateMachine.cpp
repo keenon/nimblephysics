@@ -121,6 +121,19 @@ std::string GUIStateMachine::getCurrentStateAsJson()
       json << ",";
     encodeCreatePlot(json, pair.second);
   }
+  for (auto pair : mRichPlots)
+  {
+    if (isFirst)
+      isFirst = false;
+    else
+      json << ",";
+    encodeCreateRichPlot(json, pair.second);
+    for (auto dataPair : pair.second.data)
+    {
+      json << ",";
+      encodeSetRichPlotData(json, pair.second.key, dataPair.second);
+    }
+  }
   for (auto key : mMouseInteractionEnabled)
   {
     if (isFirst)
@@ -1437,6 +1450,108 @@ void GUIStateMachine::setPlotData(
   }
 }
 
+/// This creates a rich plot with axis labels, a title, tickmarks, and
+/// multiple simultaneous lines
+void GUIStateMachine::createRichPlot(
+    const std::string& key,
+    const Eigen::Vector2i& fromTopLeft,
+    const Eigen::Vector2i& size,
+    s_t minX,
+    s_t maxX,
+    s_t minY,
+    s_t maxY,
+    const std::string& title,
+    const std::string& xAxisLabel,
+    const std::string& yAxisLabel)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  RichPlot plot;
+  plot.key = key;
+  plot.fromTopLeft = fromTopLeft;
+  plot.size = size;
+  plot.minX = minX;
+  plot.maxX = maxX;
+  plot.minY = minY;
+  plot.maxY = maxY;
+  plot.title = title;
+  plot.xAxisLabel = xAxisLabel;
+  plot.yAxisLabel = yAxisLabel;
+
+  mRichPlots[key] = plot;
+
+  queueCommand(
+      [&](std::stringstream& json) { encodeCreateRichPlot(json, plot); });
+}
+
+/// This sets a single data stream for a rich plot. `name` should be human
+/// readable and unique. You can overwrite data by using the same `name` with
+/// multiple calls to `setRichPlotData`.
+void GUIStateMachine::setRichPlotData(
+    const std::string& key,
+    const std::string& name,
+    const std::string& color,
+    const std::string& type,
+    const std::vector<s_t>& xs,
+    const std::vector<s_t>& ys)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    RichPlotData data;
+    data.name = name;
+    data.color = color;
+    data.type = type;
+    data.xs = xs;
+    data.ys = ys;
+    mRichPlots[key].data[name] = data;
+
+    queueCommand([this, key, data](std::stringstream& json) {
+      encodeSetRichPlotData(json, key, data);
+    });
+  }
+  else
+  {
+    std::cout << "Tried to setRichPlotData() for a key (" << key
+              << ") that doesn't exist as a RichPlot object. Call "
+                 "createRichPlot() first."
+              << std::endl;
+  }
+}
+
+/// This sets the plot bounds for a rich plot object
+void GUIStateMachine::setRichPlotBounds(
+    const std::string& key, s_t minX, s_t maxX, s_t minY, s_t maxY)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    mRichPlots[key].minX = minX;
+    mRichPlots[key].maxX = maxX;
+    mRichPlots[key].minY = minY;
+    mRichPlots[key].maxY = maxY;
+
+    queueCommand([&](std::stringstream& json) {
+      json << "{ \"type\": \"set_rich_plot_bounds\", \"key\": " << key
+           << "\", \"xs\": ";
+      json << ", \"min_x\": " << numberToJson(minX);
+      json << ", \"max_x\": " << numberToJson(maxX);
+      json << ", \"min_y\": " << numberToJson(minY);
+      json << ", \"max_y\": " << numberToJson(maxY);
+      json << " }";
+    });
+  }
+  else
+  {
+    std::cout << "Tried to setRichPlotBounds() for a key (" << key
+              << ") that doesn't exist as a RichPlot object. Call "
+                 "createRichPlot() first."
+              << std::endl;
+  }
+}
+
 /// This moves a UI element on the screen
 void GUIStateMachine::setUIElementPosition(
     const std::string& key, const Eigen::Vector2i& fromTopLeft)
@@ -1490,6 +1605,10 @@ void GUIStateMachine::setUIElementSize(
   {
     mPlots[key].size = size;
   }
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    mRichPlots[key].size = size;
+  }
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_ui_elem_size\", \"key\": " << key
@@ -1508,6 +1627,7 @@ void GUIStateMachine::deleteUIElement(const std::string& key)
   mButtons.erase(key);
   mSliders.erase(key);
   mPlots.erase(key);
+  mRichPlots.erase(key);
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"delete_ui_elem\", \"key\": \"" << key << "\" }";
@@ -1730,6 +1850,57 @@ void GUIStateMachine::encodeCreatePlot(std::stringstream& json, Plot& plot)
   vecToJson(json, plot.ys);
   json << ", \"plot_type\": \"" << plot.type;
   json << "\" }";
+}
+
+void GUIStateMachine::encodeCreateRichPlot(
+    std::stringstream& json, RichPlot& plot)
+{
+  json << "{ \"type\": \"create_rich_plot\", \"key\": \"" << plot.key
+       << "\", \"from_top_left\": ";
+  vec2iToJson(json, plot.fromTopLeft);
+  json << ", \"size\": ";
+  vec2iToJson(json, plot.size);
+  json << ", \"max_x\": " << numberToJson(plot.maxX);
+  json << ", \"min_x\": " << numberToJson(plot.minX);
+  json << ", \"max_y\": " << numberToJson(plot.maxY);
+  json << ", \"min_y\": " << numberToJson(plot.minY);
+  json << ", \"title\": \"";
+  json << plot.title;
+  json << "\", \"x_axis_label\": \"";
+  json << plot.xAxisLabel;
+  json << "\", \"y_axis_label\": \"";
+  json << plot.yAxisLabel;
+  json << "\" }";
+}
+
+/*
+export type SetRichPlotData = {
+  type: "set_rich_plot_data";
+  key: string;
+  name: string;
+  color: string;
+  xs: number[];
+  ys: number[];
+  plot_type: "line" | "scatter";
+};
+*/
+void GUIStateMachine::encodeSetRichPlotData(
+    std::stringstream& json,
+    const std::string& plotKey,
+    const RichPlotData& data)
+{
+  json << "{ \"type\": \"set_rich_plot_data\", \"key\": \"" << plotKey
+       << "\", \"name\": \"";
+  json << data.name;
+  json << "\", \"color\": \"";
+  json << data.color;
+  json << "\", \"plot_type\": \"";
+  json << data.type;
+  json << "\", \"xs\": ";
+  vecToJson(json, data.xs);
+  json << ", \"ys\": ";
+  vecToJson(json, data.ys);
+  json << "}";
 }
 
 } // namespace server

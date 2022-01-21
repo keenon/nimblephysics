@@ -208,6 +208,36 @@ void GUIStateMachine(py::module& m)
           ::py::arg("minY"),
           ::py::arg("maxY"))
       .def(
+          "createRichPlot",
+          &dart::server::GUIStateMachine::createRichPlot,
+          ::py::arg("key"),
+          ::py::arg("fromTopLeft"),
+          ::py::arg("size"),
+          ::py::arg("minX"),
+          ::py::arg("maxX"),
+          ::py::arg("minY"),
+          ::py::arg("maxY"),
+          ::py::arg("title"),
+          ::py::arg("xAxisLabel"),
+          ::py::arg("yAxisLabel"))
+      .def(
+          "setRichPlotData",
+          &dart::server::GUIStateMachine::setRichPlotData,
+          ::py::arg("key"),
+          ::py::arg("name"),
+          ::py::arg("color"),
+          ::py::arg("plotType"),
+          ::py::arg("xs"),
+          ::py::arg("ys"))
+      .def(
+          "setRichPlotBounds",
+          &dart::server::GUIStateMachine::setRichPlotBounds,
+          ::py::arg("key"),
+          ::py::arg("minX"),
+          ::py::arg("maxX"),
+          ::py::arg("minY"),
+          ::py::arg("maxY"))
+      .def(
           "renderWorld",
           &dart::server::GUIStateMachine::renderWorld,
           ::py::arg("world"),

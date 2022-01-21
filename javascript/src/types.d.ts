@@ -199,6 +199,39 @@ export type SetPlotData = {
   ys: number[];
 };
 
+export type CreateRichPlotCommand = {
+  type: "create_rich_plot";
+  key: string;
+  from_top_left: number[];
+  size: number[];
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+  title: string;
+  x_axis_label: string;
+  y_axis_label: string;
+};
+
+export type SetRichPlotData = {
+  type: "set_rich_plot_data";
+  key: string;
+  name: string;
+  color: string;
+  xs: number[];
+  ys: number[];
+  plot_type: "line" | "scatter";
+};
+
+export type SetRichPlotBounds = {
+  type: "set_rich_plot_bounds";
+  key: string;
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+};
+
 export type Command =
   | CreateBoxCommand
   | CreateSphereCommand

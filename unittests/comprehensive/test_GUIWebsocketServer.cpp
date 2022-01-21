@@ -86,8 +86,8 @@ TEST(REALTIME, GUI_SERVER)
       = urdfLoader.parseSkeleton("dart://sample/urdf/KR5/KR5 sixx R650.urdf");
   */
 
-  world->addSkeleton(ground);
-  world->addSkeleton(atlas);
+  // world->addSkeleton(ground);
+  // world->addSkeleton(atlas);
   // world->addSkeleton(kr5);
 
   // Set initial configuration for Atlas robot
@@ -109,10 +109,56 @@ TEST(REALTIME, GUI_SERVER)
   server.serve(8070);
   server.renderWorld(world);
 
+  server.createRichPlot(
+      "test_rich",
+      Eigen::Vector2i(20, 20),
+      Eigen::Vector2i(300, 300),
+      -5.0,
+      20.0,
+      -5.0,
+      20.0,
+      "Test Plot",
+      "X Axis",
+      "Y Axis");
+
+  std::vector<s_t> xs;
+  std::vector<s_t> y1;
+  std::vector<s_t> y2;
+
+  for (int i = 0; i < 40; i++)
+  {
+    xs.push_back(((double)i / 40) * 25 - 5);
+    y1.push_back(
+        ((double)i / 40) * 25 - 5 + (((double)rand() / RAND_MAX) * 5.0 - 2.5));
+    y2.push_back(
+        ((double)i / 40) * 25 - 5 + (((double)rand() / RAND_MAX) * 5.0 - 2.5));
+  }
+
+  server.setRichPlotData("test_rich", "Series 1", "blue", "line", xs, y1);
+  server.setRichPlotData("test_rich", "Series 2", "green", "line", xs, y2);
+
+  std::vector<s_t> x_now;
+  std::vector<s_t> y_now;
+  x_now.push_back(0);
+  y_now.push_back(-5);
+  x_now.push_back(0);
+  y_now.push_back(25);
+  server.setRichPlotData("test_rich", "Now", "red", "line", x_now, y_now);
+
+  server.setRichPlotBounds("test_rich", -2.5, 20.0, 0, 25.0);
+
   Ticker ticker(world->getTimeStep());
-  ticker.registerTickListener([&](long /* time */) {
+  ticker.registerTickListener([&](long time) {
     world->step();
     server.renderWorld(world);
+
+    std::vector<s_t> x_now;
+    std::vector<s_t> y_now;
+    x_now.push_back(time % 40);
+    y_now.push_back(-5);
+    x_now.push_back(time % 40);
+    y_now.push_back(25);
+    server.setRichPlotData("test_rich", "Now", "red", "line", x_now, y_now);
   });
 
   server.registerConnectionListener([&]() { ticker.start(); });
@@ -211,12 +257,6 @@ TEST(REALTIME, GUI_SERVER)
       [&](long ms) { std::cout << "Tick: " << ms << std::endl; });
   */
 
-  while (server.isServing())
-  {
-    // spin
-    // cartpole->setPosition(0, 0.0);
-    // cartpole->setControlForces(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
-    // cartpole->setPositions(Eigen::VectorXs::Zero(cartpole->getNumDofs()));
-  }
+  server.blockWhileServing();
 }
 #endif

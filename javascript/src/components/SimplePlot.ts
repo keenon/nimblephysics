@@ -1,4 +1,4 @@
-class Plot {
+class SimplePlot {
   type: "plot";
   key: string;
   container: HTMLElement;
@@ -108,4 +108,4 @@ class Plot {
   };
 }
 
-export default Plot;
+export default SimplePlot;

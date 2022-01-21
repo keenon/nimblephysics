@@ -304,6 +304,69 @@ public:
       s_t minY,
       s_t maxY);
 
+  /*
+export type CreateRichPlotCommand = {
+  type: "create_rich_plot";
+  key: string;
+  from_top_left: number[];
+  size: number[];
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+  title: string;
+  x_axis_label: string;
+  y_axis_label: string;
+};
+
+export type SetRichPlotData = {
+  type: "set_rich_plot_data";
+  key: string;
+  name: string;
+  color: string;
+  xs: number[];
+  ys: number[];
+  plot_type: "line" | "scatter";
+};
+
+export type SetRichPlotBounds = {
+  type: "set_rich_plot_bounds";
+  key: string;
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+};
+  */
+  /// This creates a rich plot with axis labels, a title, tickmarks, and
+  /// multiple simultaneous lines
+  void createRichPlot(
+      const std::string& key,
+      const Eigen::Vector2i& fromTopLeft,
+      const Eigen::Vector2i& size,
+      s_t minX,
+      s_t maxX,
+      s_t minY,
+      s_t maxY,
+      const std::string& title,
+      const std::string& xAxisLabel,
+      const std::string& yAxisLabel);
+
+  /// This sets a single data stream for a rich plot. `name` should be human
+  /// readable and unique. You can overwrite data by using the same `name` with
+  /// multiple calls to `setRichPlotData`.
+  void setRichPlotData(
+      const std::string& key,
+      const std::string& name,
+      const std::string& color,
+      const std::string& type,
+      const std::vector<s_t>& xs,
+      const std::vector<s_t>& ys);
+
+  /// This sets a single data stream for a rich plot
+  void setRichPlotBounds(
+      const std::string& key, s_t minX, s_t maxX, s_t minY, s_t maxY);
+
   /// This moves a UI element on the screen
   void setUIElementPosition(
       const std::string& key, const Eigen::Vector2i& fromTopLeft);
@@ -439,6 +502,30 @@ protected:
   };
   std::unordered_map<std::string, Plot> mPlots;
 
+  struct RichPlotData
+  {
+    std::string name;
+    std::string color;
+    std::vector<s_t> ys;
+    std::vector<s_t> xs;
+    std::string type;
+  };
+  struct RichPlot
+  {
+    std::string key;
+    Eigen::Vector2i fromTopLeft;
+    Eigen::Vector2i size;
+    s_t minX;
+    s_t maxX;
+    s_t minY;
+    s_t maxY;
+    std::string title;
+    std::string xAxisLabel;
+    std::string yAxisLabel;
+    std::unordered_map<std::string, RichPlotData> data;
+  };
+  std::unordered_map<std::string, RichPlot> mRichPlots;
+
   void queueCommand(std::function<void(std::stringstream&)> writeCommand);
 
   void encodeCreateBox(std::stringstream& json, Box& box);
@@ -453,6 +540,9 @@ protected:
   void encodeCreateButton(std::stringstream& json, Button& button);
   void encodeCreateSlider(std::stringstream& json, Slider& slider);
   void encodeCreatePlot(std::stringstream& json, Plot& plot);
+  void encodeCreateRichPlot(std::stringstream& json, RichPlot& plot);
+  void encodeSetRichPlotData(
+      std::stringstream& json, const std::string& plotKey, const RichPlotData& data);
 };
 
 } // namespace server
