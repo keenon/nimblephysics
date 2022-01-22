@@ -544,7 +544,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       }
       record = false;
     }
-    // recordObs(now, &ssid, realtimeUnderlyingWorld);
     if(renderIsReady)
     {
       #ifdef USE_NOISE

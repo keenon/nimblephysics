@@ -363,6 +363,10 @@ public:
 
   Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
+  Eigen::VectorXs getLinkDiagIs();
+
+  Eigen::Vector3s getLinkDiagIIndex(size_t index);
+
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
@@ -440,11 +444,15 @@ public:
 
   void setLinkBetas(Eigen::VectorXs betas);
 
+  void setLinkDiagIs(Eigen::VectorXs diag_Is);
+
   void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
 
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
 
   void setLinkMOIIndex(Eigen::Vector6s com, size_t index);
+
+  void setLinkDiagIIndex(Eigen::Vector3s diag_I, size_t index);
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces

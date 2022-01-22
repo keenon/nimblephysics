@@ -143,6 +143,9 @@ WorldPtr World::clone() const
     cloned_skel->setLinkCOMs(mSkeletons[i]->getLinkCOMs());
     cloned_skel->setLinkMOIs(mSkeletons[i]->getLinkMOIs());
     cloned_skel->setLinkBetas(mSkeletons[i]->getLinkBetas());
+    cloned_skel->setLinkDiagIs(mSkeletons[i]->getLinkDiagIs());
+    cloned_skel->setDampingCoeffVector(mSkeletons[i]->getDampingCoeffVector());
+    cloned_skel->setSpringStiffVector(mSkeletons[i]->getSpringStiffVector());
     worldClone->addSkeleton(cloned_skel);
     
   }
@@ -1162,6 +1165,19 @@ Eigen::VectorXs World::getLinkCOMs()
   return coms;
 }
 
+Eigen::VectorXs World::getLinkDiagIs()
+{
+  Eigen::VectorXs diag_Is = Eigen::VectorXs::Zero(3*getLinkMassesDims());
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    Eigen::VectorXs skel_diag_Is = mSkeletons[i]->getLinkDiagIs();
+    diag_Is.segment(cursor,skel_diag_Is.size());
+    cursor += skel_diag_Is.size();
+  }
+  return diag_Is;
+}
+
 Eigen::VectorXs World::getLinkMOIs()
 {
   Eigen::VectorXs mois = Eigen::VectorXs::Zero(6*getLinkMassesDims());
@@ -1221,6 +1237,23 @@ Eigen::Vector3s World::getLinkCOMIndex(size_t index)
     }
   }
   return mSkeletons[skeleton_id]->getLinkCOMIndex(index-probe);
+}
+
+Eigen::Vector3s World::getLinkDiagIIndex(size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  return mSkeletons[skeleton_id]->getLinkDiagIIndex(index-probe);
 }
 
 Eigen::Vector6s World::getLinkMOIIndex(size_t index)
@@ -1743,6 +1776,35 @@ void World::setLinkCOMs(Eigen::VectorXs coms)
   {
     size_t dim = mSkeletons[i]->getLinkMassesDims()*3;
     mSkeletons[i]->setLinkCOMs(coms.segment(cursor,dim));
+    cursor += dim;
+  }
+}
+
+void World::setLinkDiagIIndex(Eigen::Vector3s diag_I, size_t index)
+{
+  size_t probe = 0;
+  size_t skeleton_id = 0;
+  for(size_t i=0;i<mSkeletons.size();i++)
+  {
+    probe += mSkeletons[i]->getNumBodyNodes();
+    if(index < probe)
+    { 
+      skeleton_id = i;
+      probe -= mSkeletons[i]->getNumBodyNodes();
+      break;
+    }
+  }
+  mSkeletons[skeleton_id]->setLinkDiagIIndex(diag_I,index-probe);
+}
+
+void World::setLinkDiagIs(Eigen::VectorXs diag_Is)
+{
+  assert(diag_Is.size() == getLinkMassesDims()*3);
+  size_t cursor = 0;
+  for(size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    size_t dim = mSkeletons[i]->getLinkMassesDims()*3;
+    mSkeletons[i]->setLinkDiagIs(diag_Is.segment(cursor,dim));
     cursor += dim;
   }
 }

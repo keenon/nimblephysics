@@ -96,7 +96,8 @@ public:
   /// This determine the condition number of trajectory to a node
   s_t getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
 
-  s_t getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
+  /// This determine the condition number vector of the diagonal term in the inertia matrix
+  Eigen::Vector3s getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
 
   s_t getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t index);
 
@@ -210,7 +211,7 @@ protected:
   size_t mSpringDim;
   
   // For fast thread
-  int mPrev_Length = 5;
+  int mPrev_Length = 3;
   std::vector<Eigen::VectorXs> mPrev_solutions;
   std::vector<Eigen::VectorXs> mPrev_values;
   Eigen::VectorXs mParam_Solution;

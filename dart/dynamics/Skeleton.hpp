@@ -826,6 +826,8 @@ public:
   /// Returns the size of the getLinkCOMs() vector
   std::size_t getLinkCOMDims();
 
+  std::size_t getLinkDiagIDims();
+
   /// Returns the size of the getLinkMOIs() vector
   std::size_t getLinkMOIDims();
 
@@ -849,6 +851,10 @@ public:
   // This gets particular center-of-mass vectors of a body node
   Eigen::Vector3s getLinkCOMIndex(size_t index);
 
+  Eigen::VectorXs getLinkDiagIs();
+
+  Eigen::Vector3s getLinkDiagIIndex(size_t index);
+
   // This gets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   Eigen::VectorXs getLinkMOIs();
@@ -866,6 +872,8 @@ public:
   Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
   Eigen::MatrixXs getLinkJvkMatrixIndex(size_t index);
+
+  Eigen::MatrixXs getLinkJwkMatrixIndex(size_t index);
 
   // Sets the upper limits of all the joints from a single vector
   void setControlForceUpperLimits(Eigen::VectorXs limits);
@@ -898,6 +906,10 @@ public:
   void setLinkCOMs(Eigen::VectorXs coms);
 
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
+
+  void setLinkDiagIs(Eigen::VectorXs coms);
+
+  void setLinkDiagIIndex(Eigen::Vector3s com, size_t index);
 
   // This sets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together

@@ -31,6 +31,8 @@ int WrtMassBodyNodyEntry::dim()
     return 1;
   if (type == INERTIA_DIAGONAL)
     return 3;
+  if (type == INERTIA_DIAGONAL_NOMASS)
+    return 3;
   if (type == INERTIA_OFF_DIAGONAL)
     return 3;
   if (type == INERTIA_FULL)
@@ -92,6 +94,21 @@ void WrtMassBodyNodyEntry::set(
         value(0), // I_XX
         value(1), // I_YY
         value(2), // I_ZZ
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
+    node->setInertia(newInertia);
+  }
+  else if (type == INERTIA_DIAGONAL_NOMASS)
+  {
+    dynamics::Inertia newInertia(
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
+        value(0)*inertia.getParameter(dynamics::Inertia::Param::MASS), // I_XX
+        value(1)*inertia.getParameter(dynamics::Inertia::Param::MASS), // I_YY
+        value(2)*inertia.getParameter(dynamics::Inertia::Param::MASS), // I_ZZ
         inertia.getParameter(dynamics::Inertia::Param::I_XY),
         inertia.getParameter(dynamics::Inertia::Param::I_XZ),
         inertia.getParameter(dynamics::Inertia::Param::I_YZ));
@@ -164,6 +181,12 @@ void WrtMassBodyNodyEntry::get(
     out(0) = moment(0, 0); // I_XX
     out(1) = moment(1, 1); // I_YY
     out(2) = moment(2, 2); // I_ZZ
+  }
+  if(type == INERTIA_DIAGONAL_NOMASS)
+  {
+    out(0) = moment(0, 0) / node->getMass();
+    out(1) = moment(1, 1) / node->getMass();
+    out(2) = moment(2, 2) / node->getMass();
   }
   else if (type == INERTIA_OFF_DIAGONAL)
   {
