@@ -2702,7 +2702,12 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   finalKinematicsReport.printReport(5);
 
   // Target markers
-  fitter.debugTrajectoryAndMarkersToGUI(finalKinematicInit, subsetTimesteps);
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
 }
 #endif
 
@@ -2867,7 +2872,12 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
   finalKinematicsReport.printReport(5);
 
   // Target markers
-  fitter.debugTrajectoryAndMarkersToGUI(finalKinematicInit, subsetTimesteps);
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
 }
 #endif
 
@@ -3000,7 +3010,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   // Bilevel optimization
   fitter.setIterationLimit(100);
   std::shared_ptr<BilevelFitResult> bilevelFit
-      = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 50);
 
   // Fine-tune IK and re-fit all the points
   MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
@@ -3036,7 +3046,12 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   finalKinematicsReport.printReport(5);
 
   // Target markers
-  fitter.debugTrajectoryAndMarkersToGUI(finalKinematicInit, subsetTimesteps);
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
 }
 #endif
 

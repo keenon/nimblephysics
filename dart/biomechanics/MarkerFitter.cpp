@@ -153,26 +153,36 @@ MarkerFitterState::MarkerFitterState(
 
     Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
     jointErrorsAtTimesteps.col(i) = jointPoses - jointCenters.col(i);
-    for (int j = 0; j < joints.size(); j++)
+    if (jointWeights.size() > 0)
     {
-      jointErrorsAtTimesteps.col(i).segment<3>(j * 3) *= jointWeights(j);
+      for (int j = 0; j < joints.size(); j++)
+      {
+        jointErrorsAtTimesteps.col(i).segment<3>(j * 3) *= jointWeights(j);
+      }
     }
 
     // Compute the axis errors at each timestep
 
-    for (int j = 0; j < joints.size(); j++)
+    if (jointAxis.size() > 0)
     {
-      Eigen::Vector3s jointPos = jointPoses.segment<3>(j * 3);
-      Eigen::Vector3s axisCenter = jointAxis.block<3, 1>(j * 6, i);
-      Eigen::Vector3s axisDir
-          = jointAxis.block<3, 1>(j * 6 + 3, i).normalized();
+      for (int j = 0; j < joints.size(); j++)
+      {
+        Eigen::Vector3s jointPos = jointPoses.segment<3>(j * 3);
+        Eigen::Vector3s axisCenter = jointAxis.block<3, 1>(j * 6, i);
+        Eigen::Vector3s axisDir
+            = jointAxis.block<3, 1>(j * 6 + 3, i).normalized();
 
-      Eigen::Vector3s diff = jointPos - axisCenter;
-      // Subtract out the component of `diff` that's parallel to the axisDir
-      diff -= diff.dot(axisDir) * axisDir;
-      // Now our measured diff is only the distance perpendicular to axisDir (ie
-      // the shortest path to the axis)
-      axisErrorsAtTimesteps.block<3, 1>(j * 3, i) = diff * axisWeights(j);
+        Eigen::Vector3s diff = jointPos - axisCenter;
+        // Subtract out the component of `diff` that's parallel to the axisDir
+        diff -= diff.dot(axisDir) * axisDir;
+        // Now our measured diff is only the distance perpendicular to axisDir
+        // (ie the shortest path to the axis)
+        axisErrorsAtTimesteps.block<3, 1>(j * 3, i) = diff;
+        if (axisWeights.size() > 0)
+        {
+          axisErrorsAtTimesteps.block<3, 1>(j * 3, i) *= axisWeights(j);
+        }
+      }
     }
   }
 
@@ -462,8 +472,10 @@ MarkerFitter::MarkerFitter(
     mAnthropometrics(nullptr),
     mAnthropometricWeight(0.001),
     mMinVarianceCutoff(3.0),
-    mMinSphereFitScore(3e-5),
-    mMinAxisFitScore(6e-5),
+    mMinSphereFitScore(6e-5),
+    mMinAxisFitScore(1.2e-4),
+    mRegularizeTrackingMarkerOffsets(0.05),
+    mRegularizeAnatomicalMarkerOffsets(1.0),
     mDebugJointVariability(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
@@ -497,6 +509,7 @@ MarkerFitter::MarkerFitter(
 
   // Default to a least-squares loss over just the marker errors
   mLossAndGrad = [this](MarkerFitterState* state) {
+    int numTimesteps = state->posesAtTimesteps.cols();
     // 1. Compute loss as a simple squared norm of marker and joint errors
     s_t loss = state->markerErrorsAtTimesteps.squaredNorm()
                + state->jointErrorsAtTimesteps.squaredNorm()
@@ -505,6 +518,20 @@ MarkerFitter::MarkerFitter(
     state->markerErrorsAtTimestepsGrad = 2 * state->markerErrorsAtTimesteps;
     state->jointErrorsAtTimestepsGrad = 2 * state->jointErrorsAtTimesteps;
     state->axisErrorsAtTimestepsGrad = 2 * state->axisErrorsAtTimesteps;
+
+    // Regularize tracking vs anatomical differently
+    state->markerOffsetsGrad = 2 * numTimesteps * state->markerOffsets;
+    for (int i = 0; i < this->mMarkerIsTracking.size(); i++)
+    {
+      s_t multiple
+          = (this->mMarkerIsTracking[i]
+                 ? this->mRegularizeTrackingMarkerOffsets
+                 : this->mRegularizeAnatomicalMarkerOffsets);
+      loss += numTimesteps * state->markerOffsets.col(i).squaredNorm()
+              * multiple;
+      state->markerOffsetsGrad.col(i) *= multiple;
+    }
+
     // 3. If we've got an anthropometrics prior, use it
     if (this->mAnthropometrics)
     {
@@ -2453,6 +2480,22 @@ void MarkerFitter::setMinSphereFitScore(s_t score)
 void MarkerFitter::setMinAxisFitScore(s_t score)
 {
   mMinAxisFitScore = score;
+}
+
+//==============================================================================
+/// This sets the value weight used to regularize tracking marker offsets from
+/// where the model thinks they should be
+void MarkerFitter::setRegularizeTrackingMarkerOffsets(s_t weight)
+{
+  mRegularizeTrackingMarkerOffsets = weight;
+}
+
+//==============================================================================
+/// This sets the value weight used to regularize anatomical marker offsets from
+/// where the model thinks they should be
+void MarkerFitter::setRegularizeAnatomicalMarkerOffsets(s_t weight)
+{
+  mRegularizeAnatomicalMarkerOffsets = weight;
 }
 
 //==============================================================================

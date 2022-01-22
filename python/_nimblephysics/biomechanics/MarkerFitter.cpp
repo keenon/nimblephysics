@@ -261,6 +261,15 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setMinAxisFitScore,
           ::py::arg("score"))
       .def(
+          "setRegularizeAnatomicalMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizeAnatomicalMarkerOffsets,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeTrackingMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::setRegularizeTrackingMarkerOffsets,
+          ::py::arg("weight"))
+      .def(
           "setDebugJointVariability",
           &dart::biomechanics::MarkerFitter::setDebugJointVariability,
           ::py::arg("debug"))

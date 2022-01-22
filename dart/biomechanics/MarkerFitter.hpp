@@ -434,6 +434,14 @@ public:
   /// This sets the value used to compute axis fit weights
   void setMinAxisFitScore(s_t score);
 
+  /// This sets the value weight used to regularize tracking marker offsets from
+  /// where the model thinks they should be
+  void setRegularizeTrackingMarkerOffsets(s_t weight);
+
+  /// This sets the value weight used to regularize anatomical marker offsets
+  /// from where the model thinks they should be
+  void setRegularizeAnatomicalMarkerOffsets(s_t weight);
+
   /// If set to true, we print the pair observation counts and data for
   /// computing joint variability.
   void setDebugJointVariability(bool debug);
@@ -779,6 +787,8 @@ protected:
   s_t mMinSphereFitScore;
   s_t mMinAxisFitScore;
   bool mDebugJointVariability;
+  s_t mRegularizeTrackingMarkerOffsets;
+  s_t mRegularizeAnatomicalMarkerOffsets;
 
   // These are IPOPT settings
   double mTolerance;
