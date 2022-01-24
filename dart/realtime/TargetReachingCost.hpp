@@ -69,7 +69,17 @@ public:
 
   void setTimeStep(s_t timestep);
 
-  void setSSIDNodeIndex(std::vector<size_t> ssid_index);
+  // TODO: Change the name
+  void setSSIDMassNodeIndex(Eigen::VectorXi indices);
+
+  // TODO: Implement it
+  void setSSIDCOMNodeIndex(Eigen::VectorXi indices);
+
+  // void setSSIDMOINodeIndex(Eigen::VectorXi indices);
+
+  void setSSIDDampJointIndex(Eigen::VectorXi indices);
+
+  void setSSIDSpringJointIndex(Eigen::VectorXi indices);
 
   void enableSSIDLoss(s_t weight);
 
@@ -91,6 +101,32 @@ public:
   void computeHessXU(const trajectory::TrajectoryRollout* rollout, std::vector<Eigen::MatrixXs> &hess);
   
 protected:
+
+  // Related to Heuristic Gradient and weight computation
+  s_t computeSSIDMassLoss();
+
+  s_t computeSSIDCOMLoss();
+
+  s_t computeSSIDDampCoeffLoss();
+
+  s_t computeSSIDSpringStiffLoss();
+
+  Eigen::VectorXs computeSSIDMassGrad(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::VectorXs computeSSIDCOMGrad(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::VectorXs computeSSIDDampCoeffGrad(Eigen::VectorXs state);
+
+  Eigen::VectorXs computeSSIDSpringCoeffGrad(Eigen::VectorXs state);
+
+  Eigen::MatrixXs computeSSIDMassHess(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::MatrixXs computeSSIDCOMHess(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::MatrixXs computeSSIDDampCoeffHess(Eigen::VectorXs state);
+
+  Eigen::MatrixXs computeSSIDSpringCoeffHess(Eigen::VectorXs state);
+
   // Internal information
   Eigen::VectorXs mRunningStateWeight;
 
@@ -117,7 +153,13 @@ protected:
 
   s_t mSSIDHeuristicWeight;
 
-  std::vector<size_t> mSSIDNodeIndex;
+  Eigen::VectorXi mass_indices;
+
+  Eigen::VectorXi com_indices;
+
+  Eigen::VectorXi damp_indices;
+
+  Eigen::VectorXi spring_indices;
 
   std::vector<std::vector<Eigen::MatrixXs>> mAks;
 

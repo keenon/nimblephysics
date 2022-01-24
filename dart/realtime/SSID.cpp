@@ -575,7 +575,7 @@ void SSID::optimizationThreadLoop()
               mCumValue += mValue;
             }
             // TODO: Use delta value to determine the stability
-            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <  0.2 * mParam_change_thresh)
+            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
             {
               mSteadySolutionFound = true;
               mParamChanged = false;

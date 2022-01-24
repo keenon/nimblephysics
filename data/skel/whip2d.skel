@@ -3,20 +3,20 @@
     <world name="world 1">
         <physics>
             <time_step>0.01</time_step>
-            <gravity>0 -9.81 0</gravity>
+            <gravity>0 -4.81 0</gravity>
             <collision_detector>bullet</collision_detector>
         </physics>
 
         <skeleton name="pendulum">
             <transformation>0 -0.35 0 0 0 0</transformation>
             <body name="cart">
-                <transformation>0 0 0 0 0 0</transformation>
+                <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>2.00</mass>
-                    <offset>0.0 0 0.0</offset>
+                    <mass>2.0</mass>
+                    <offset>0.0 0.0 0.0</offset>
                 </inertia>
                 <visualization_shape>
-                    <transformation>0.0 0 0.0 0 0 0</transformation>
+                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
                         <box>
                             <size>0.2 0.05 0.05</size>
@@ -24,10 +24,10 @@
                     </geometry>
                 </visualization_shape>
                 <collision_shape>
-                    <transformation>0.0 0 0.0 0 0 0</transformation>
+                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                     <geometry>
                         <box>
-                            <size>0.2 0.05 0.05</size>
+                            <size> 0.2 0.05 0.05</size>
                         </box>
                     </geometry>
                 </collision_shape>
@@ -36,7 +36,7 @@
             <body name="pole">
                 <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>1.5</mass>
+                    <mass>0.5</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -60,7 +60,7 @@
             <body name="pole2">
                 <transformation>0.0 0.3 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>1.0</mass>
+                    <mass>0.25</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -84,7 +84,7 @@
             <body name="pole3">
                 <transformation>0.0 0.6 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>1.0</mass>
+                    <mass>0.3</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -106,16 +106,16 @@
             </body>
 
             <!-- JOINT: Root -->
-            <joint type="prismatic" name="j_cart">
+            <joint type="prismatic" name="cart_rail">
                 <parent>world</parent>
                 <child>cart</child>
-		 <axis>
-			<xyz>1.0 0.0 0.0</xyz>
-		 </axis>
+                <axis>
+                    <xyz>1.0 0.0 0.0</xyz>
+                </axis>
                 <init_pos>0</init_pos>
                 <init_vel>0</init_vel>
             </joint>
-
+            
             <joint type="revolute" name="j_pole">
                 <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <parent>cart</parent>
@@ -123,8 +123,8 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.2</damping>
-                          <spring_stiffness>10.0</spring_stiffness>
+                          <damping>0.05</damping>
+                          <spring_stiffness>8.0</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>
@@ -138,8 +138,8 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.2</damping>
-                          <spring_stiffness>10.0</spring_stiffness>
+                          <damping>0.05</damping>
+                          <spring_stiffness>8.0</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>
@@ -152,8 +152,8 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.2</damping>
-                          <spring_stiffness>10.0</spring_stiffness>
+                          <damping>0.05</damping>
+                          <spring_stiffness>8.0</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>
