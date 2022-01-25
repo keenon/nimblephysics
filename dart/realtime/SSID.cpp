@@ -259,7 +259,7 @@ void SSID::runInference(long startTime)
   
   for (auto listener : mInferListeners)
   {
-    listener(startTime, pos, vel, param, computeDurationWallTime); 
+    listener(startTime, pos, computeConfidenceFromValue(mValue), param, computeDurationWallTime); 
   }
 }
 

@@ -126,18 +126,28 @@ void TargetReachingCost::setTimeStep(s_t timestep)
 }
 
 /// Must be set
-void TargetReachingCost::setSSIDNodeIndex(std::vector<size_t> ssid_index)
+void TargetReachingCost::setSSIDMassNodeIndex(Eigen::VectorXi mass_indices)
 {
-  mSSIDNodeIndex = ssid_index;
-  for(int i = 0; i < ssid_index.size(); i++)
+  mMass_indices = mass_indices;
+  for(int i = 0; i < mass_indices.size(); i++)
   {
     mAks.push_back(std::vector<Eigen::MatrixXs>());
   }
 }
 
+void TargetReachingCost::setSSIDSpringJointIndex(Eigen::VectorXi spring_indices)
+{
+  mSpring_indices = spring_indices;
+}
+
 void TargetReachingCost::enableSSIDLoss(s_t weight)
 {
   mUseSSIDHeuristic = true;
+  mSSIDHeuristicWeight = weight;
+}
+
+void TargetReachingCost::setSSIDHeuristicWeight(s_t weight)
+{
   mSSIDHeuristicWeight = weight;
 }
 
@@ -159,19 +169,23 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
 
     state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(i);
     state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i);
-
+    
     loss += (mRunningStateWeight.asDiagonal() * ((state - mTarget).cwiseAbs2())).sum() * dt;
     loss += (mRunningActionWeight.asDiagonal() * (action.cwiseAbs2())).sum() * dt;
-    if(mUseSSIDHeuristic && i >= 1)
+    if(mUseSSIDHeuristic)
     {
-      mWorld->setState(state);
-      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
-      {
-        Eigen::MatrixXs Ak = mWorld->getLinkAkMatrixIndex(mSSIDNodeIndex[j]);
-        mAks[j].push_back(Ak);
-        loss += mSSIDHeuristicWeight * (Ak * (rollout->getVelsConst().col(i) - rollout->getVelsConst().col(i-1))).cwiseAbs2().sum() * dt;
-      }
+      // if(i>=1)
+      // {
+      //   Eigen::VectorXs prev_state = Eigen::VectorXs::Zero(mStateDim);
+      //   prev_state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(i-1);
+      //   prev_state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i-1);
+      //   loss += computeSSIDMassLoss(state, prev_state);
+      // }
+      // TODO : Add other heuristics
+      loss = (1-mSSIDHeuristicWeight) * loss + mSSIDHeuristicWeight * computeSSIDSpringStiffLoss(state);
+      // std::cout<< "Loss: " << computeSSIDSpringStiffLoss(state) << std::endl;
     }
+    
   }
   mWorld->setState(init_state);
   // std::cout<< "None Final Loss: " << loss << std::endl;
@@ -180,8 +194,7 @@ s_t TargetReachingCost::computeLoss(const TrajectoryRollout* rollout)
   finalState.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(steps - 1);
   finalState.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(steps - 1);
   s_t final_loss = (mFinalStateWeight.asDiagonal() * ((finalState - mTarget).cwiseAbs2())).sum();
-  // std::cout << "Final Loss:\n " << final_loss << std::endl;
-  loss += final_loss;
+  loss += (1 - mSSIDHeuristicWeight) * final_loss;
   return loss;
 }
 
@@ -198,21 +211,25 @@ void TargetReachingCost::computeGradX(const TrajectoryRollout* rollout, Eigen::R
     state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i);
 
     grads.col(i) = 2*mRunningStateWeight.asDiagonal() * (state - mTarget) * dt;
-    if(mUseSSIDHeuristic && i >= 1)
+    if(mUseSSIDHeuristic)
     {
-      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
-      {
-        Eigen::VectorXs new_grad = 2 * mSSIDHeuristicWeight * (mAks[j][i-1].transpose() * mAks[j][i-1]) * (rollout->getVelsConst().col(i) - rollout->getVelsConst().col(i-1)) * dt;
-        // std::cout << new_grad.cols() << " " << grads.block((int)(mStateDim/2), i, (int)(mStateDim/2), 1) << std::endl;
-        grads.block((int)(mStateDim/2), i, (int)(mStateDim/2), 1) += new_grad;
-      }
+      // if(i>= 1)
+      // {
+      //   Eigen::VectorXs prev_state = Eigen::VectorXs::Zero(mStateDim); 
+      //   prev_state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(i-1);
+      //   prev_state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(i-1);
+      //   grads.col(i) += computeSSIDMassGrad(state, prev_state, i);
+      // }
+      grads.col(i) =(1-mSSIDHeuristicWeight)*grads.col(i) + mSSIDHeuristicWeight * computeSSIDSpringStiffGrad(state);
+      // std::cout<< "Grad: " << computeSSIDSpringStiffGrad(state) << std::endl;
+
     }
   }
   // Compute Grad for final state
   Eigen::VectorXs state = Eigen::VectorXs::Zero(mStateDim);
   state.segment(0, (int)(mStateDim/2)) = rollout->getPosesConst().col(steps - 1);
   state.segment((int)(mStateDim/2), (int)(mStateDim/2)) = rollout->getVelsConst().col(steps - 1);
-  grads.col(steps - 1) = 2 * mFinalStateWeight.asDiagonal() * (state - mTarget);
+  grads.col(steps - 1) = (1 - mSSIDHeuristicWeight) * 2 * mFinalStateWeight.asDiagonal() * (state - mTarget);
 }
 
 void TargetReachingCost::computeGradU(const TrajectoryRollout* rollout,
@@ -248,7 +265,6 @@ void TargetReachingCost::computeGradForce(const TrajectoryRollout* rollout,
   }
 }
 
-
 // Compute Hessian of XX which should have length of steps
 // Assume hess is an empty vector
 void TargetReachingCost::computeHessXX(
@@ -260,17 +276,18 @@ void TargetReachingCost::computeHessXX(
   for(int i = 0; i < steps - 1; i++)
   {
     hess_xx = 2*mRunningStateWeight.asDiagonal() * dt;
-    if(mUseSSIDHeuristic && i >= 1)
+    if(mUseSSIDHeuristic)
     {
-      for(int j = 0; j < mSSIDNodeIndex.size(); j++)
-      {
-        hess_xx.block((int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2))
-           += mSSIDHeuristicWeight * mAks[j][i-1].transpose() * mAks[j][i-1] * dt;
-      }
+      // if(i>=1)
+      // {
+      //   hess_xx += computeSSIDMassHess(i);
+      // }
+      hess_xx = hess_xx*(1-mSSIDHeuristicWeight) + mSSIDHeuristicWeight * computeSSIDSpringStiffHess();
+      // std::cout<< "Hess: " << computeSSIDSpringStiffHess() << std::endl;
     }
     hess.push_back(hess_xx);
   }
-  Eigen::MatrixXs final_hess_xx = 2*mFinalStateWeight.asDiagonal();
+  Eigen::MatrixXs final_hess_xx =(1-mSSIDHeuristicWeight) * 2*mFinalStateWeight.asDiagonal();
   hess.push_back(final_hess_xx);
 }
 
@@ -311,6 +328,80 @@ void TargetReachingCost::computeHessUU(
     hess_uu = 2*mRunningActionWeight.asDiagonal() * dt;
     hess.push_back(hess_uu);
   }
+}
+
+s_t TargetReachingCost::computeSSIDMassLoss(Eigen::VectorXs state, Eigen::VectorXs prev_state)
+{
+  s_t loss = 0;
+  int dofs = (int)(state.size() / 2);
+  mWorld->setState(state);
+  for(int j = 0; j < mMass_indices.size(); j++)
+  {
+    Eigen::MatrixXs Ak = mWorld->getLinkAkMatrixIndex(mMass_indices(j));
+    mAks[j].push_back(Ak);
+    loss += (Ak * (state.segment(dofs, dofs) - prev_state.segment(dofs, dofs))).cwiseAbs2().sum() * dt;
+  }
+  
+  return loss;
+}
+
+// TODO: Eric After deadline implement such function on all parameters
+// s_t computeSSIDDampCoeffLoss()
+
+s_t TargetReachingCost::computeSSIDSpringStiffLoss(Eigen::VectorXs state)
+{
+  s_t loss = 0;
+  Eigen::VectorXs err = Eigen::VectorXs::Zero(mSpring_indices.size());
+  for(int j = 0; j < mSpring_indices.size(); j++)
+  {
+    s_t rest_pose = mWorld->getRestPositionIndex(mSpring_indices(j));
+    err(j) = state(mSpring_indices(j)) - rest_pose;
+  }
+  loss -= err.norm();
+  return loss;
+}
+
+Eigen::VectorXs TargetReachingCost::computeSSIDMassGrad(Eigen::VectorXs state, Eigen::VectorXs prev_state, int cur)
+{
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(state.size());
+  int dofs = (int)(state.size() / 2);
+  for(int j = 0; j < mMass_indices.size(); j++)
+  {
+    Eigen::VectorXs new_grad = 2 * (mAks[j][cur-1].transpose() * mAks[j][cur-1]) * (state.segment(dofs, dofs) - prev_state.segment(dofs, dofs)) * dt;
+    grad += new_grad;
+  }
+  return grad;
+}
+
+Eigen::VectorXs TargetReachingCost::computeSSIDSpringStiffGrad(Eigen::VectorXs state)
+{
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(state.size());
+  for(int j = 0; j < mSpring_indices.size(); j++)
+  {
+    grad(mSpring_indices(j)) = 2 * (state(mSpring_indices(j)) - mWorld->getRestPositionIndex(mSpring_indices(j)));
+  }
+  return -grad;
+}
+
+Eigen::MatrixXs TargetReachingCost::computeSSIDMassHess(int cur)
+{
+  Eigen::MatrixXs hess = Eigen::MatrixXs::Zero(mStateDim, mStateDim);
+  for(int j = 0; j < mMass_indices.size(); j++)
+  {
+    hess.block((int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2), (int)(mStateDim/2))
+        +=  mAks[j][cur-1].transpose() * mAks[j][cur-1] * dt;
+  }
+  return hess;
+}
+
+Eigen::MatrixXs TargetReachingCost::computeSSIDSpringStiffHess()
+{
+  Eigen::MatrixXs hess = Eigen::MatrixXs::Zero(mStateDim, mStateDim);
+  for(int j = 0; j < mSpring_indices.size(); j++)
+  {
+    hess(mSpring_indices(j), mSpring_indices(j)) = 1;
+  }
+  return -hess;
 }
 
 }

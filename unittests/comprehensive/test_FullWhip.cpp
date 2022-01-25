@@ -388,7 +388,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   world->clearTunableSpringThisInstance();
   // Create Goal
   int dofs = 4;
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * dofs) * 0.01; // Need it to be as fast as possible
+  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Ones(2 * dofs) * 0.01; // Need it to be as fast as possible
   Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.001;
   Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * dofs);
   // Requires IK which is not implemented
@@ -408,6 +408,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   goal << 2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // Up right pose
 
   costFn->setTarget(goal);
+  // Need to change the coefficient on the fly
+  //costFn->setSSIDSpringJointIndex(Eigen::Vector3i(1, 2, 3));
+  //costFn->enableSSIDLoss(1);
   iLQRLocal mpcLocal = iLQRLocal(
     world, 1, planningHorizonMillis, 1.0);
   
@@ -422,7 +425,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   ssid.registerInferListener([&](long,
                                  Eigen::VectorXs,
-                                 Eigen::VectorXs,
+                                 Eigen::VectorXs confidence,
                                  Eigen::VectorXs spring,
                                  long){
     // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
@@ -430,6 +433,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     world->setJointSpringStiffIndex(spring.segment(0, 1), ssid_index);
     world->setJointSpringStiffIndex(spring.segment(1, 1), ssid_index2);
     world->setJointSpringStiffIndex(spring.segment(2, 1), ssid_index3);
+    // Should interface here to change the weight of the system
+    if(confidence.mean() > 0.2)
+    {
+      costFn->setSSIDHeuristicWeight(0);
+    }
   });
 
 
@@ -546,6 +554,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     {
       record = true;
     }
+    else if(server.getKeysDown().count("f"))
+    {
+      renderIsReady = false;
+      ssid.stop();
+      mpcLocal.ilqrstop();
+    }
     else if(server.getKeysDown().count("p") || cnt == 1000)
     {
       if(record)
@@ -562,17 +576,16 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       record = false;
     }
     
-    // if(renderIsReady)
-    // {
-    //   Eigen::VectorXs pos = realtimeUnderlyingWorld->getPositions();
-    //   s_t err = abs(pos(0) - goal(0));
-    //   if(err < 0.1)
-    //   {
-    //     goal = -goal;
-    //     costFn->setTarget(goal);
-    //     std::cout << "Goal Flipped!" << std::endl;
-    //   }
-    // }
+    if(renderIsReady)
+    {
+      Eigen::VectorXs pos = realtimeUnderlyingWorld->getPositions();
+      s_t err = abs(pos(0) - goal(0));
+      if(err < 0.1)
+      {
+        std::cout << "Goal Reached in: "<< cnt << "Steps" << std::endl;
+        exit(0);
+      }
+    }
     
     if(renderIsReady)
     {
