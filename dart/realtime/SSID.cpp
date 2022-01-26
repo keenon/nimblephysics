@@ -877,6 +877,7 @@ void SSID::setSSIDMassIndex(Eigen::VectorXi indices)
   mSSIDMassNodeIndices = indices;
 }
 
+
 void SSID::setSSIDCOMIndex(Eigen::VectorXi indices)
 {
   mSSIDCOMNodeIndices = indices;
