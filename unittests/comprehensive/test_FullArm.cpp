@@ -198,9 +198,6 @@ WorldPtr createWorld(s_t timestep)
   for(int i = 0; i < xmate3p->getNumDofs(); i++)
   {
     xmate3p->getJoint(i)->setDampingCoefficient(0, 0.01);
-    // xmate3p->getJoint(i)->setPositionUpperLimit(0, 120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLowerLimit(0, -120.0 / 180.0 * 3.1415);
-    // xmate3p->getJoint(i)->setPositionLimitEnforced(true);
   }
   for(int i = 0; i < xmate3p->getNumBodyNodes(); i++)
   {
@@ -329,9 +326,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::shared_ptr<simulation::World> ssidWorld = cloneWorld(world, false);
   ssidWorld->tuneMass(
     world->getBodyNodeIndex(ssid_index),
-    WrtMassBodyNodeEntryType::INERTIA_DIAGONAL_NOMASS,
-    Eigen::Vector3s(0.05, 0.05, 0.021),
-    Eigen::Vector3s(0., 0., 0.021));
+    WrtMassBodyNodeEntryType::INERTIA_COM,
+    Eigen::Vector3s(0.1, 0.1, 0.1),
+    Eigen::Vector3s(0., 0., 0.));
 
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
   std::vector<size_t> ssid_idx{ssid_index};//, ssid_index2};
@@ -348,14 +345,14 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachParamMutex(param_lock);
   ssid.useSmoothing();
   ssid.useHeuristicWeight();
-  ssid.useConfidence();
-  ssid.setTemperature(Eigen::Vector1s(0.5));
+  //ssid.useConfidence();
+  ssid.setTemperature(Eigen::Vector3s(0.5, 0.5, 0.5));
   ssid.setThreshs(0.002, 0.2);
   
   Eigen::VectorXi index;
   index = Eigen::VectorXi::Zero(1);
   index(0) = ssid_index;
-  ssid.setSSIDCOMIndex(index);  
+  ssid.setSSIDCOMIndex(index);
 
   ssid.setInitialPosEstimator(
     [](Eigen::MatrixXs sensors, long)
@@ -419,7 +416,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
                                  long){
     // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
     mpcLocal.setParameterChange(diag_I);
-    world->setLinkDiagIIndex(diag_I, ssid_index);
+    world->setLinkCOMIndex(diag_I, ssid_index);
   });
 
 
@@ -432,13 +429,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   long total_steps = 0;
 
   Eigen::Vector3s diag_Is;
-  diag_Is = world->getLinkDiagIIndex(ssid_index);
+  diag_Is = world->getLinkCOMIndex(ssid_index);
   // masses(1) = 0;
   Eigen::Vector3s id_diag_Is(0.01, 0.02, 0.021);
 
-  realtimeUnderlyingWorld->setLinkDiagIIndex(diag_Is, ssid_index);
-  ssidWorld->setLinkDiagIIndex(id_diag_Is, ssid_index);
-  world->setLinkDiagIIndex(id_diag_Is, ssid_index);
+  realtimeUnderlyingWorld->setLinkCOMIndex(diag_Is, ssid_index);
+  ssidWorld->setLinkCOMIndex(id_diag_Is, ssid_index);
+  world->setLinkCOMIndex(id_diag_Is, ssid_index);
   // Preload visualization
   bool renderIsReady = false;
   int filecnt = 0;
@@ -446,7 +443,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   bool record = false;
   std::vector<Eigen::VectorXs> real_record;
   std::vector<Eigen::VectorXs> id_record;
-  //std::cout << "MOI: " << realtimeUnderlyingWorld->getLinkDiagIIndex(ssid_index) << std::endl;
   ticker.registerTickListener([&](long now) {
     Eigen::VectorXs mpcforces;
     if(renderIsReady)
@@ -480,9 +476,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     else if (server.getKeysDown().count(",") || cnt == 300)
     {
       // Increase mass
-      diag_Is(1) = 0.031;
-      diag_Is(2) = 0.021;
-      realtimeUnderlyingWorld->setLinkDiagIIndex(diag_Is, ssid_index);
+      diag_Is(1) = 0.025;
+      diag_Is(2) = 0.030;
+      realtimeUnderlyingWorld->setLinkCOMIndex(diag_Is, ssid_index);
     }
     else if (server.getKeysDown().count("c") || cnt == 500)
     {
@@ -491,10 +487,10 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     else if (server.getKeysDown().count("o") || cnt == 600)
     {
       // Decrease mass
-      diag_Is(0) = 0.041;
-      diag_Is(1) = 0.041;
-      diag_Is(2) = 0.021;
-      realtimeUnderlyingWorld->setLinkDiagIIndex(diag_Is, ssid_index);
+      diag_Is(0) = 0.050;
+      diag_Is(1) = 0.050;
+      diag_Is(2) = 0.020;
+      realtimeUnderlyingWorld->setLinkCOMIndex(diag_Is, ssid_index);
     }
     else if(server.getKeysDown().count("s"))
     {
@@ -523,7 +519,18 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       }
       record = false;
     }
-    
+    if(renderIsReady)
+    {
+      if((world->getState().segment(0, 3) - goal2.segment(0, 3)).norm() < 0.1)
+      {
+        std::cout << "--------------------------------------------"<< std::endl;
+        std::cout << "--------------------------------------------"<< std::endl;
+        std::cout << "Target Reached in: " << cnt << std::endl;
+        std::cout << "--------------------------------------------"<< std::endl;
+        std::cout << "--------------------------------------------"<< std::endl;
+      }
+    }
+
     if(renderIsReady)
     {
       #ifdef USE_NOISE
@@ -535,7 +542,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       cnt++;
     }
     
-    id_diag_Is = world->getLinkDiagIIndex(ssid_index);
+    id_diag_Is = world->getLinkCOMIndex(ssid_index);
     
     if(renderIsReady)
     {
@@ -549,7 +556,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkDiagIIndex(ssid_index);
+      Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkCOMIndex(ssid_index);
       server.createText(key,
                         "Current MOIs: "+std::to_string(id_diag_Is(0))+" "+std::to_string(id_diag_Is(1))+" "+std::to_string(id_diag_Is(2))+
                         "Real MOIs: "+std::to_string(moi(0))+" "+std::to_string(moi(1))+" "+std::to_string(moi(2)),

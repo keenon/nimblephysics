@@ -96,8 +96,11 @@ public:
   /// This determine the condition number of trajectory to a node
   s_t getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
 
-  /// This determine the condition number vector of the diagonal term in the inertia matrix
+  /// This determine the condition number of center of mass of a body node
   Eigen::Vector3s getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
+
+  /// This determine the condition number vector of the diagonal term in the inertia matrix
+  Eigen::Vector3s getTrajConditionNumberOfMOIIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index);
 
   s_t getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t index);
 
@@ -110,6 +113,8 @@ public:
   void setSSIDMassIndex(Eigen::VectorXi indices);
 
   void setSSIDCOMIndex(Eigen::VectorXi indices);
+
+  void setSSIDMOIIndex(Eigen::VectorXi indices);
 
   void setSSIDDampIndex(Eigen::VectorXi indices);
 
@@ -222,6 +227,7 @@ protected:
   size_t mRobotSkelIndex = 0;
   Eigen::VectorXi mSSIDMassNodeIndices;
   Eigen::VectorXi mSSIDCOMNodeIndices;
+  Eigen::VectorXi mSSIDMOINodeIndices;
   Eigen::VectorXi mSSIDDampingJointIndices;
   Eigen::VectorXi mSSIDSpringJointIndices;
   Eigen::VectorXs mValue;

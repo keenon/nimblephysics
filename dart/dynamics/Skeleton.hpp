@@ -875,6 +875,10 @@ public:
 
   Eigen::MatrixXs getLinkJwkMatrixIndex(size_t index);
 
+  Eigen::Matrix3s getLinkRMatrixIndex(size_t index);
+
+  Eigen::MatrixXs getLinkLocalJwkMatrixIndex(size_t index);
+
   // Sets the upper limits of all the joints from a single vector
   void setControlForceUpperLimits(Eigen::VectorXs limits);
 

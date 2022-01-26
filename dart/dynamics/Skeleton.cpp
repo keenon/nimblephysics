@@ -3199,7 +3199,7 @@ Eigen::VectorXs Skeleton::getLinkMasses()
 //==============================================================================
 Eigen::MatrixXs Skeleton::getLinkAkMatrixIndex(size_t index)
 {
-  Eigen::MatrixXs J = getJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index)); // TODO: May be problematic
   Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols());
   Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
   Eigen::MatrixXs I = getMOIMatrix(getLinkMOIIndex(index));
@@ -3209,12 +3209,24 @@ Eigen::MatrixXs Skeleton::getLinkAkMatrixIndex(size_t index)
 
 Eigen::MatrixXs Skeleton::getLinkJvkMatrixIndex(size_t index)
 {
-  Eigen::MatrixXs J = getJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index)); // TODO: May be problematic
   Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols()); // 3 * N matrix
   return Jv;
 }
 
 Eigen::MatrixXs Skeleton::getLinkJwkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index));
+  Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
+  return Jw;
+}
+
+Eigen::Matrix3s Skeleton::getLinkRMatrixIndex(size_t index)
+{
+  return getBodyNode(index)->getWorldTransform().linear();
+}
+
+Eigen::MatrixXs Skeleton::getLinkLocalJwkMatrixIndex(size_t index)
 {
   Eigen::MatrixXs J = getJacobian(getBodyNode(index));
   Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());

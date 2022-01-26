@@ -564,7 +564,7 @@ void SSID::optimizationThreadLoop()
           // Sliding weighted average 
           // TODO: Think about ablation
           Eigen::VectorXs conf = computeConfidenceFromValue(mValue);
-          std::cout << "Confidence: \n" << conf << std::endl;
+          std::cout << "Confidence: \n" << conf.mean() << std::endl;
           Eigen::VectorXs prev_solution = mParam_Solution;
           if(mUseConfidence)
           {
@@ -575,7 +575,7 @@ void SSID::optimizationThreadLoop()
               mCumValue += mValue;
             }
             // TODO: Use delta value to determine the stability
-            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <  0.2 * mParam_change_thresh)
+            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <  mParam_change_thresh)
             {
               mSteadySolutionFound = true;
               mParamChanged = false;
@@ -662,8 +662,7 @@ bool SSID::detectChangeParams()
 {
   Eigen::VectorXs mean_params = estimateSolution();
   Eigen::VectorXs confidence = estimateConfidence();
-  std::cout << "Confidence: " << confidence(0) << " " << confidence(1) << " "
-            << "Solutions: " << mean_params(0) << " " << mean_params(1) << std::endl;
+  std::cout << "Confidence: " << confidence.mean() << std::endl;
   paramMutexLock();
   if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
     (confidence.mean() > mConfidence_thresh|| !mUseConfidence))
@@ -698,8 +697,45 @@ s_t SSID::getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::Matrix
   return cond/steps;
 }
 
-// Should implement condition number of trajectory
 Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+{
+  size_t steps = poses.cols();
+  Eigen::Vector3s cond = Eigen::Vector3s::Zero();
+  s_t dt = mWorld->getTimeStep();
+  Eigen::Vector3s init_state = mWorld->getState();
+  mWorld->setPositions(poses.col(0));
+  mWorld->setVelocities(vels.col(0));
+  Eigen::MatrixXs hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
+  Eigen::Matrix3s R = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
+  for(int i = 1; i < steps; i++)
+  {
+    mWorld->setPositions(poses.col(i));
+    mWorld->setVelocities(vels.col(i));
+    Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
+    Eigen::MatrixXs new_R = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
+    Eigen::MatrixXs new_hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
+    Eigen::MatrixXs dR = (new_R - R) / dt;
+    Eigen::MatrixXs d_hat_Jw = (new_hat_Jw - hat_Jw) / dt;
+    R = new_R;
+    hat_Jw = new_hat_Jw;
+    // This should be: 3 x 3 matrix
+    Eigen::MatrixXs S = R * (hat_Jw * acc).asDiagonal()
+                      + dR * (hat_Jw * vels.col(i)).asDiagonal()
+                      + R * (d_hat_Jw * vels.col(i)).asDiagonal();
+    
+    // This should be: N x 3 matrix
+    Eigen::MatrixXs G = hat_Jw.transpose() * (R.transpose() * mWorld->getGravity()).asDiagonal();
+    
+    cond(0) += S.col(0).norm() + G.col(0).norm();
+    cond(1) += S.col(1).norm() + G.col(1).norm();
+    cond(2) += S.col(2).norm() + G.col(2).norm();
+  }
+  mWorld->setState(init_state); // Idempotent
+  return cond / steps;
+}
+
+// Should implement condition number of trajectory
+Eigen::Vector3s SSID::getTrajConditionNumberOfMOIIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
 {
   // Whether is is well conditioned is determined by the average of three diagonal terms
   // Compute Diagonal Matrix:
@@ -720,6 +756,7 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
     cond(1) += Ck.col(1).norm();
     cond(2) += Ck.col(2).norm();
   }
+  mWorld->setState(init_state); // Idempotent
   return cond/steps;
 }
 
@@ -758,7 +795,12 @@ Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::Matr
   }
   for(int i = 0; i < mSSIDCOMNodeIndices.size(); i++)
   {
-    conds.segment(cur, 3) = getTrajConditionNumberOfCOMIndex(poses, vels, mSSIDCOMNodeIndices(i));
+    conds.segment(cur, 3) = getTrajConditionNumberOfMOIIndex(poses, vels, mSSIDCOMNodeIndices(i));
+    cur += 3;
+  }
+  for(int i = 0; i < mSSIDMOINodeIndices.size(); i++)
+  {
+    conds.segment(cur, 3) = getTrajConditionNumberOfMOIIndex(poses, vels, mSSIDMOINodeIndices(i));
     cur += 3;
   }
   for(int i = 0; i < mSSIDDampingJointIndices.size(); i++)
@@ -880,6 +922,11 @@ void SSID::setSSIDMassIndex(Eigen::VectorXi indices)
 void SSID::setSSIDCOMIndex(Eigen::VectorXi indices)
 {
   mSSIDCOMNodeIndices = indices;
+}
+
+void SSID::setSSIDMOIIndex(Eigen::VectorXi indices)
+{
+  mSSIDMOINodeIndices = indices;
 }
 
 void SSID::setSSIDDampIndex(Eigen::VectorXi indices)
