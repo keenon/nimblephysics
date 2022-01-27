@@ -210,7 +210,7 @@ WorldPtr createWorld(s_t timestep)
     
   }
   Eigen::Vector6s init_state;
-  init_state << 130.0 / 180.0 * 3.1415, 90.0 / 180.0 * 3.1415, 70.0 / 180.0 * 3.1415, 0, 0, 0;
+  init_state << 130.0 / 180.0 * 3.1415, 90.0 / 180.0 * 3.1415, 90.0 / 180.0 * 3.1415, 0, 0, 0;
   world->setState(init_state);
   return world;
 }
@@ -327,7 +327,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssidWorld->tuneMass(
     world->getBodyNodeIndex(ssid_index),
     WrtMassBodyNodeEntryType::INERTIA_COM,
-    Eigen::Vector3s(0.1, 0.1, 0.1),
+    Eigen::Vector3s(0.2, 0.2, 0.2),
     Eigen::Vector3s(0., 0., 0.));
 
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
@@ -345,9 +345,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachParamMutex(param_lock);
   ssid.useSmoothing();
   ssid.useHeuristicWeight();
-  //ssid.useConfidence();
-  ssid.setTemperature(Eigen::Vector3s(0.5, 0.5, 0.5));
-  ssid.setThreshs(0.002, 0.2);
+  ssid.useConfidence();
+  ssid.setTemperature(Eigen::Vector3s(0.1, 0.1, 0.1));
+  ssid.setThreshs(0.001, 0.4);
   
   Eigen::VectorXi index;
   index = Eigen::VectorXi::Zero(1);
@@ -396,7 +396,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   goal2 << 0.0/180.0, 0, 0, 0, 0, 0;
   
 
-  costFn->setTarget(goal);
+  costFn->setTarget(goal2);
   std::cout << "Goal: " << goal << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
     world, dofs, planningHorizonMillis, 1.0);
@@ -406,7 +406,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   mpcLocal.setPatience(1);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
-  mpcLocal.setActionBound(40.0);
+  mpcLocal.setActionBound(30.0);
   mpcLocal.setAlpha(1);
 
   ssid.registerInferListener([&](long,
@@ -521,13 +521,15 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     }
     if(renderIsReady)
     {
-      if((world->getState().segment(0, 3) - goal2.segment(0, 3)).norm() < 0.1)
+      s_t err = (realtimeUnderlyingWorld->getState() - goal2).norm();
+      if( err < 0.2)
       {
         std::cout << "--------------------------------------------"<< std::endl;
         std::cout << "--------------------------------------------"<< std::endl;
         std::cout << "Target Reached in: " << cnt << std::endl;
         std::cout << "--------------------------------------------"<< std::endl;
         std::cout << "--------------------------------------------"<< std::endl;
+        
       }
     }
 
@@ -556,12 +558,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkCOMIndex(ssid_index);
-      server.createText(key,
-                        "Current MOIs: "+std::to_string(id_diag_Is(0))+" "+std::to_string(id_diag_Is(1))+" "+std::to_string(id_diag_Is(2))+
-                        "Real MOIs: "+std::to_string(moi(0))+" "+std::to_string(moi(1))+" "+std::to_string(moi(2)),
-                        Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(400,400));
+      //Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkCOMIndex(ssid_index);
+      // server.createText(key,
+      //                   "Current MOIs: "+std::to_string(id_diag_Is(0))+" "+std::to_string(id_diag_Is(1))+" "+std::to_string(id_diag_Is(2))+
+      //                   "Real MOIs: "+std::to_string(moi(0))+" "+std::to_string(moi(1))+" "+std::to_string(moi(2)),
+      //                   Eigen::Vector2i(100,100),
+      //                   Eigen::Vector2i(400,400));
       if(record && renderIsReady)
       {
         id_record.push_back(id_diag_Is);

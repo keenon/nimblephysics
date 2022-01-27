@@ -564,7 +564,7 @@ void SSID::optimizationThreadLoop()
           // Sliding weighted average 
           // TODO: Think about ablation
           Eigen::VectorXs conf = computeConfidenceFromValue(mValue);
-          std::cout << "Confidence: \n" << conf.mean() << std::endl;
+          std::cout << "Confidence: \n" << conf(2) << std::endl;
           Eigen::VectorXs prev_solution = mParam_Solution;
           if(mUseConfidence)
           {
@@ -725,7 +725,8 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
     
     // This should be: N x 3 matrix
     Eigen::MatrixXs G = hat_Jw.transpose() * (R.transpose() * mWorld->getGravity()).asDiagonal();
-    
+    //Eigen::VectorXs G = 
+
     cond(0) += S.col(0).norm() + G.col(0).norm();
     cond(1) += S.col(1).norm() + G.col(1).norm();
     cond(2) += S.col(2).norm() + G.col(2).norm();
