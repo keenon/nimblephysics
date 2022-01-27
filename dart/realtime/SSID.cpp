@@ -575,6 +575,7 @@ void SSID::optimizationThreadLoop()
             if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh)
             {
               mSteadySolutionFound = true;
+              mParamChanged = false;
             }
           }
           

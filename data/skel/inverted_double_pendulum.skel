@@ -12,7 +12,7 @@
             <body name="cart">
                 <transformation>0 0 0 0 0 0</transformation>
                 <inertia>
-                    <mass>1.0</mass>
+                    <mass>2.0</mass>
                     <offset>0.0 0 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -84,7 +84,7 @@
             <body name="weight">
                 <transformation>0.0 0.62 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>1.0</mass>
+                    <mass>0.1</mass>
                     <offset>0.0 0.0 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -111,9 +111,9 @@
             <joint type="prismatic" name="j_cart">
                 <parent>world</parent>
                 <child>cart</child>
-		 <axis>
-			<xyz>1.0 0.0 0.0</xyz>
-		 </axis>
+                <axis>
+                    <xyz>1.0 0.0 0.0</xyz>
+                </axis>
                 <init_pos>0</init_pos>
                 <init_vel>0</init_vel>
             </joint>
@@ -140,7 +140,7 @@
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
                           <damping>0.4</damping>
-                          <spring_stiffness>3.0</spring_stiffness>
+                          <spring_stiffness>0.6</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>

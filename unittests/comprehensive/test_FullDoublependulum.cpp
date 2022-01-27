@@ -307,7 +307,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   // For add noise in measurement
   #ifdef USE_NOISE
   std::mt19937 rand_gen = initializeRandom();
-  s_t noise_scale = 0.005;
+  s_t noise_scale = 0.01;
   #endif
 
   // For SSID
@@ -350,9 +350,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::mutex param_lock;
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
-  //ssid.useHeuristicWeight();
-  //ssid.useSmoothing();
-  //ssid.useConfidence();
+  ssid.useHeuristicWeight();
+  ssid.useSmoothing();
+  ssid.useConfidence();
   // TODO: Need Fine tune
   ssid.setTemperature(Eigen::Vector2s(0.5, 0.5));
   // ssid.setSSIDIndex(Eigen::Vector2i(ssid_index, ssid_index2));
@@ -378,10 +378,10 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   world->clearTunableDampingThisInstance();
   // Create Goal
   int dofs = 3;
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * dofs);
-  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.01;
+  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Ones(2 * dofs) * 0.01;
+  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.001;
   Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * dofs);
-  finalStateWeight << 10.0, 50, 10, 10, 10 ,10;
+  finalStateWeight << 10.0, 50, 50, 10, 10 ,10;
 
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = cloneWorld(world,true);
 
@@ -404,10 +404,10 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   mpcLocal.setCostFn(costFn);
   mpcLocal.setSilent(true);
   mpcLocal.setMaxIterations(5);
-  mpcLocal.setPatience(1);
+  mpcLocal.setPatience(3);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
-  mpcLocal.setActionBound(20.0);
+  mpcLocal.setActionBound(40.0);
   mpcLocal.setAlpha(1.0);
 
   ssid.registerInferListener([&](long,
@@ -547,6 +547,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     // recordObs(now, &ssid, realtimeUnderlyingWorld);
     if(renderIsReady)
     {
+      if((realtimeUnderlyingWorld->getState()-goal).norm() < 0.1)
+      {
+        std::cout << "++++++++++++++++++++++++++++++++" << std::endl;
+        std::cout << "Target Reached in : " << cnt << " steps" << std::endl;
+        std::cout << "++++++++++++++++++++++++++++++++" << std::endl;
+      }
       #ifdef USE_NOISE
       recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
       #else
@@ -569,11 +575,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      server.createText(key,
-                        "Current Params: "+std::to_string(id_params(0))+" "+std::to_string(id_params(1))+" "+
-                        "Real Params: "+std::to_string(params(0))+" "+std::to_string(params(1)),
-                        Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(200,200));
+      // server.createText(key,
+      //                   "Current Params: "+std::to_string(id_params(0))+" "+std::to_string(id_params(1))+" "+
+      //                   "Real Params: "+std::to_string(params(0))+" "+std::to_string(params(1)),
+      //                   Eigen::Vector2i(100,100),
+      //                   Eigen::Vector2i(200,200));
       if(record && renderIsReady)
       {
         id_record.push_back(id_params);
