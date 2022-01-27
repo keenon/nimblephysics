@@ -79,9 +79,12 @@ public:
 
   void setVerbose(bool verbose);
 
+  void setNumSteps(size_t steps);
+
 
   // Parameters
   size_t nsteps;
+  size_t mMaxSteps;
   size_t control_dim;
   size_t state_dim;
   Extrapolate_Method ext;
@@ -259,6 +262,14 @@ public:
 
   void setPredictUsingFeedback(bool feedback_flag);
 
+  void disableAdaptiveTime();
+
+  void disableAdaptiveHorizon();
+
+  void setPlanningHorizon(size_t planningHorizonMillis);
+
+  void setCandidateHorizon(size_t candidateHorizonMillis);
+
 protected:
     void optimizationThreadLoop();
 
@@ -277,8 +288,10 @@ protected:
     bool mRecordIterations;
 
     int mPlanningHorizonMillis;
+    int mPlanningCandidateHorizonMillis;
     int mMillisPerStep;
     int mSteps;
+    int mMaxSteps;
     int mShotLength;
     int mMaxIterations;
     int mMillisInAdvanceToPlan;
@@ -309,6 +322,8 @@ protected:
 
     // Some Flags for iteration
     bool mNaN_Flag = false;
+    bool mAdaptiveTime = true;
+    bool mAdaptiveHorizon = true;
     trajectory::TrajectoryRolloutReal mRollout;
 
 

@@ -141,7 +141,7 @@ public:
   /// This registers a listener to get called when we finish replanning
   void registerInferListener(
       std::function<
-          void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)>
+          void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long, bool)>
           inferListener);
 
   // wrapper for locking the buffer
@@ -257,7 +257,7 @@ protected:
 
   // These are listeners that get called when we finish replanning
   std::vector<std::function<void(
-      long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)> >
+      long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long, bool)>>
       mInferListeners;
 
   // These are listeners that get called when we finish the slow ssid thread

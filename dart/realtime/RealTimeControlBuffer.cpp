@@ -533,6 +533,14 @@ void RealTimeControlBuffer::setControlForcePlan(
     long startAt, long now, Eigen::MatrixXs forces)
 {
   // The solve is too fast that problem is solved before expected time
+  // Pad forces in case forces number of colums is less than steps
+  if(forces.cols() != mNumSteps)
+  {
+    Eigen::MatrixXs padded_forces = Eigen::MatrixXs::Zero(mForceDim, mNumSteps);
+    padded_forces.block(0, 0, mForceDim, forces.cols()) = forces;
+    forces = padded_forces;
+  }
+  
   if (startAt > now)
   {
     long padMillis = startAt - now;
@@ -635,6 +643,15 @@ void RealTimeControlBuffer::setControlLawPlan(long startAt, long now,
 {
   // remove the last state
   states.pop_back();
+  // Pad ks, Ks, states, alphas
+  int size_err = mNumSteps - ks.size();
+  for(int i = 0; i < size_err; i++)
+  {
+    ks.push_back(Eigen::VectorXs::Zero(mForceDim));
+    Ks.push_back(Eigen::MatrixXs::Zero(mForceDim, mStateDim));
+    states.push_back(Eigen::VectorXs::Zero(mStateDim));
+    alphas.push_back(0.0);
+  }
   assert(ks.size() == Ks.size() && states.size() == Ks.size() && Ks.size() == alphas.size());
   if (startAt > now)
   {
