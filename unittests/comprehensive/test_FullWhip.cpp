@@ -196,8 +196,8 @@ WorldPtr createWorld(s_t timestep)
   world->removeDofFromActionSpace(2);
   world->removeDofFromActionSpace(3);
   Eigen::VectorXs init_state = Eigen::VectorXs::Zero(8);
-  // s_t pi = 3.14159;
-  // init_state << 0.0, 30.0/180 * pi, 30.0/180 * pi, 30.0 /180 * pi, 0, 0, 0, 0;
+  s_t pi = 3.14159;
+  init_state << 0.0, 30.0/180 * pi, 30.0/180 * pi, 30.0 /180 * pi, 0, 0, 0, 0;
   world->setState(init_state);
   SkeletonPtr skel = world->getSkeleton(0);
   for(int i = 0; i < skel->getNumBodyNodes(); i++)
@@ -363,8 +363,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachParamMutex(param_lock);
 
   ssid.useSmoothing();
-  ssid.useHeuristicWeight();
-  ssid.useConfidence();
+  //ssid.useHeuristicWeight();
+  //ssid.useConfidence();
   ssid.setTemperature(Eigen::Vector3s(0.1, 0.1, 0.1));
   ssid.setThreshs(0.3, 0.5);
 
@@ -409,8 +409,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   costFn->setTarget(goal);
   // Need to change the coefficient on the fly
-  //costFn->setSSIDSpringJointIndex(Eigen::Vector3i(1, 2, 3));
-  //costFn->enableSSIDLoss(1);
+  // costFn->setSSIDSpringJointIndex(Eigen::Vector3i(1, 2, 3));
+  // costFn->enableSSIDLoss(1);
   iLQRLocal mpcLocal = iLQRLocal(
     world, 1, planningHorizonMillis, 1.0);
   
@@ -526,8 +526,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     {
       // Increase mass
       spring_stiffs(0) = 8.0;
-      spring_stiffs(1) = 8.0;
-      spring_stiffs(2) = 8.0;
+      spring_stiffs(1) = 4.0;
+      spring_stiffs(2) = 2.0;
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(0, 1), ssid_index);
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(1, 1), ssid_index2);
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(2, 1), ssid_index3);
@@ -535,9 +535,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     else if (server.getKeysDown().count("o") || cnt == 600)
     {
       // Decrease mass
-      spring_stiffs(0) = 8.0;
-      spring_stiffs(1) = 8.0;
-      spring_stiffs(2) = 8.0;
+      spring_stiffs(0) = 10.0;
+      spring_stiffs(1) = 3.0;
+      spring_stiffs(2) = 3.0;
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(0, 1), ssid_index);
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(1, 1), ssid_index2);
       realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(2, 1), ssid_index3);
@@ -578,8 +578,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     
     if(renderIsReady)
     {
-      Eigen::VectorXs pos = realtimeUnderlyingWorld->getPositions();
-      s_t err = abs(pos(0) - goal(0));
+      Eigen::VectorXs state = realtimeUnderlyingWorld->getState();
+      s_t err = (state - goal).norm();
       if(err < 0.1)
       {
         std::cout << "Goal Reached in: "<< cnt << "Steps" << std::endl;
@@ -613,11 +613,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      server.createText(key,
-                        "Current Spring: "+std::to_string(id_spring_stiffs(0))+" "+std::to_string(id_spring_stiffs(1))+" "+std::to_string(id_spring_stiffs(2))+
-                        "Real Spring: "+std::to_string(spring_stiffs(0))+" "+std::to_string(spring_stiffs(1))+" "+std::to_string(spring_stiffs(2)),
-                        Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(200,200));
+      // server.createText(key,
+      //                   "Current Spring: "+std::to_string(id_spring_stiffs(0))+" "+std::to_string(id_spring_stiffs(1))+" "+std::to_string(id_spring_stiffs(2))+
+      //                   "Real Spring: "+std::to_string(spring_stiffs(0))+" "+std::to_string(spring_stiffs(1))+" "+std::to_string(spring_stiffs(2)),
+      //                   Eigen::Vector2i(100,100),
+      //                   Eigen::Vector2i(200,200));
       if(record && renderIsReady)
       {
         id_record.push_back(id_spring_stiffs);
