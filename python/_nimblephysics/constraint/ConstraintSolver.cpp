@@ -166,6 +166,11 @@ void ConstraintSolver(py::module& m)
             return self->setPenetrationCorrectionEnabled(enable);
           })
       .def(
+          "getContactClippingDepth",
+          +[](dart::constraint::ConstraintSolver* self) -> s_t {
+            return self->getContactClippingDepth();
+          })
+      .def(
           "setContactClippingDepth",
           +[](dart::constraint::ConstraintSolver* self, s_t depth) -> void {
             return self->setContactClippingDepth(depth);
