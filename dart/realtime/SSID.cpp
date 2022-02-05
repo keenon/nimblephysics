@@ -702,7 +702,7 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
   size_t steps = poses.cols();
   Eigen::Vector3s cond = Eigen::Vector3s::Zero();
   s_t dt = mWorld->getTimeStep();
-  Eigen::Vector3s init_state = mWorld->getState();
+  Eigen::VectorXs init_state = mWorld->getState();
   mWorld->setPositions(poses.col(0));
   mWorld->setVelocities(vels.col(0));
   Eigen::MatrixXs hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
@@ -719,12 +719,12 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
     R = new_R;
     hat_Jw = new_hat_Jw;
     // This should be: 3 x 3 matrix
-    Eigen::MatrixXs S = R * (hat_Jw * acc).asDiagonal()
-                      + dR * (hat_Jw * vels.col(i)).asDiagonal()
-                      + R * (d_hat_Jw * vels.col(i)).asDiagonal();
+    Eigen::MatrixXs S = R * vector2skew(hat_Jw * acc)
+                      + dR * vector2skew(hat_Jw * vels.col(i))
+                      + R * vector2skew(d_hat_Jw * vels.col(i));
     
     // This should be: N x 3 matrix
-    Eigen::MatrixXs G = hat_Jw.transpose() * (R.transpose() * mWorld->getGravity()).asDiagonal();
+    Eigen::MatrixXs G = hat_Jw.transpose() * vector2skew(R.transpose() * mWorld->getGravity());
     //Eigen::VectorXs G = 
 
     cond(0) += S.col(0).norm() + G.col(0).norm();
@@ -796,7 +796,7 @@ Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::Matr
   }
   for(int i = 0; i < mSSIDCOMNodeIndices.size(); i++)
   {
-    conds.segment(cur, 3) = getTrajConditionNumberOfMOIIndex(poses, vels, mSSIDCOMNodeIndices(i));
+    conds.segment(cur, 3) = getTrajConditionNumberOfCOMIndex(poses, vels, mSSIDCOMNodeIndices(i));
     cur += 3;
   }
   for(int i = 0; i < mSSIDMOINodeIndices.size(); i++)
@@ -970,6 +970,18 @@ void SSID::useHeuristicWeight()
 void SSID::useSmoothing()
 {
   mUseSmoothing = true;
+}
+
+Eigen::Matrix3s SSID::vector2skew(Eigen::Vector3s vec)
+{
+  Eigen::Matrix3s skew = Eigen::Matrix3s::Zero();
+  skew(2,1) = vec(0);
+  skew(1,2) = -vec(0);
+  skew(2, 0) = -vec(1);
+  skew(0, 2) = vec(1);
+  skew(1, 0) = vec(2);
+  skew(0, 1) = -vec(2);
+  return skew; 
 }
 
 } // namespace realtime

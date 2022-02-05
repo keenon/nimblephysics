@@ -120,6 +120,8 @@ public:
 
   void setSSIDSpringIndex(Eigen::VectorXi indices);
 
+  Eigen::Matrix3s vector2skew(Eigen::Vector3s vec);
+
   /// This starts our main thread and begins running optimizations
   void start();
 

@@ -346,8 +346,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.useSmoothing();
   ssid.useHeuristicWeight();
   ssid.useConfidence();
-  ssid.setTemperature(Eigen::Vector3s(0.1, 0.1, 0.1));
-  ssid.setThreshs(0.001, 0.4);
+  ssid.setTemperature(Eigen::Vector3s(4, 4, 4));
+  ssid.setThreshs(0.002, 0.5);
   
   Eigen::VectorXi index;
   index = Eigen::VectorXi::Zero(1);
@@ -529,7 +529,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
         std::cout << "Target Reached in: " << cnt << std::endl;
         std::cout << "--------------------------------------------"<< std::endl;
         std::cout << "--------------------------------------------"<< std::endl;
-        
+        exit(0);
       }
     }
 
@@ -558,12 +558,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      //Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkCOMIndex(ssid_index);
-      // server.createText(key,
-      //                   "Current MOIs: "+std::to_string(id_diag_Is(0))+" "+std::to_string(id_diag_Is(1))+" "+std::to_string(id_diag_Is(2))+
-      //                   "Real MOIs: "+std::to_string(moi(0))+" "+std::to_string(moi(1))+" "+std::to_string(moi(2)),
-      //                   Eigen::Vector2i(100,100),
-      //                   Eigen::Vector2i(400,400));
+      Eigen::Vector3s moi = realtimeUnderlyingWorld->getLinkCOMIndex(ssid_index);
+      server.createText(key,
+                        "Current MOIs: "+std::to_string(id_diag_Is(0))+" "+std::to_string(id_diag_Is(1))+" "+std::to_string(id_diag_Is(2))+
+                        "Real MOIs: "+std::to_string(moi(0))+" "+std::to_string(moi(1))+" "+std::to_string(moi(2)),
+                        Eigen::Vector2i(100,100),
+                        Eigen::Vector2i(400,400));
       if(record && renderIsReady)
       {
         id_record.push_back(id_diag_Is);
