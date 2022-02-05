@@ -143,7 +143,6 @@ WorldPtr World::clone() const
     cloned_skel->setLinkCOMs(mSkeletons[i]->getLinkCOMs());
     cloned_skel->setLinkMOIs(mSkeletons[i]->getLinkMOIs());
     cloned_skel->setLinkBetas(mSkeletons[i]->getLinkBetas());
-    cloned_skel->setLinkDiagIs(mSkeletons[i]->getLinkDiagIs());
     cloned_skel->setDampingCoeffVector(mSkeletons[i]->getDampingCoeffVector());
     cloned_skel->setSpringStiffVector(mSkeletons[i]->getSpringStiffVector());
     worldClone->addSkeleton(cloned_skel);

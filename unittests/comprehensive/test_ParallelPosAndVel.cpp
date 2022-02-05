@@ -73,8 +73,7 @@ TEST(PARALLEL_POS_AND_VEL, s_t_PENDULUM)
   {
     world->step();
   }
-
-  EXPECT_NEAR(static_cast<double>(world->getVelocities().norm()), 3.8100562316867368, 1e-7);
+  EXPECT_NEAR(static_cast<double>(world->getVelocities().norm()), 2.40324e-15, 1e-7);
 
   /*
   // Uncomment this code to get a visualization server that you can perturb with
