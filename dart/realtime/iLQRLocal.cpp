@@ -25,6 +25,7 @@ using namespace trajectory;
 
 namespace realtime {
 
+// For initialization the steps size need to be created to the maximum possible steps
 LQRBuffer::LQRBuffer(
   int steps, 
   size_t nDofs, 
@@ -33,6 +34,7 @@ LQRBuffer::LQRBuffer(
 {
   std::cout << "LQRBuffer Initializing ..." <<steps<<" "<<nDofs<<" "<<nControls<< std::endl;
   nsteps = steps;
+  mMaxSteps = steps;
   state_dim = nDofs * 2;
   control_dim = nControls;
   ext = extrapolate;
@@ -92,11 +94,11 @@ void LQRBuffer::updateAlpha(s_t a)
 // Which should have equivalent effectiveness of advancePlan
 void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
 {
-  Eigen::MatrixXs existForce = Eigen::MatrixXs::Zero(control_dim, nsteps);
-  Eigen::MatrixXs existk = Eigen::MatrixXs::Zero(control_dim, nsteps);
-  Eigen::MatrixXs existx = Eigen::MatrixXs::Zero(state_dim, nsteps);
+  Eigen::MatrixXs existForce = Eigen::MatrixXs::Zero(control_dim, mMaxSteps);
+  Eigen::MatrixXs existk = Eigen::MatrixXs::Zero(control_dim, mMaxSteps);
+  Eigen::MatrixXs existx = Eigen::MatrixXs::Zero(state_dim, mMaxSteps);
   std::vector<Eigen::MatrixXs> existK;
-  for(int i = 0; i < nsteps; i++)
+  for(int i = 0; i < mMaxSteps; i++)
   {
     existK.push_back(Eigen::MatrixXs::Zero(control_dim, state_dim));
   }
@@ -256,6 +258,11 @@ bool LQRBuffer::getVerbose()
   return mVerbose;
 }
 
+void LQRBuffer::setNumSteps(size_t steps)
+{
+  nsteps = steps;
+}
+
 iLQRLocal::iLQRLocal(
     std::shared_ptr<simulation::World> world,
     size_t nControls,
@@ -272,13 +279,14 @@ iLQRLocal::iLQRLocal(
     mEnableOptimizationGuards(false),
     mRecordIterations(false),
     mPlanningHorizonMillis(planningHorizonMillis),
+    mPlanningCandidateHorizonMillis(planningHorizonMillis),
     mMillisPerStep(scale*1000 * world->getTimeStep()),
     mSteps((int)ceil((s_t)planningHorizonMillis / mMillisPerStep)),
+    mMaxSteps(mSteps),
     mShotLength(50),
     mMaxIterations(5),
     mMillisInAdvanceToPlan(0),
     mLastOptimizedTime(0L),
-    // mBuffer still use world Dofs ...
     mBuffer(RealTimeControlBuffer(nControls, mSteps, mMillisPerStep, world->getNumDofs() * 2)),
     mSilent(false),
     // Below are iLQR related information
@@ -299,6 +307,20 @@ iLQRLocal::iLQRLocal(
     mStateDim(world->getNumDofs() * 2),
     mRollout(createRollout(mSteps, world->getNumDofs(), world->getMassDims(), world->getDampingDims(), world->getSpringDims()))
 {
+}
+
+/// set planning steps
+void iLQRLocal::setPlanningHorizon(size_t planningHorizonMillis)
+{
+  mSteps = (int)ceil((s_t)planningHorizonMillis / mMillisPerStep);
+  mPlanningHorizonMillis = planningHorizonMillis;
+  mRollout = createRollout(mSteps, mWorld->getNumDofs(), mWorld->getMassDims(), mWorld->getDampingDims(), mWorld->getSpringDims());
+  mlqrBuffer.setNumSteps(mSteps);
+}
+
+void iLQRLocal::setCandidateHorizon(size_t candidateHorizonMillis)
+{
+  mPlanningCandidateHorizonMillis = candidateHorizonMillis;
 }
 
 /// Set Cost function
@@ -410,6 +432,17 @@ void iLQRLocal::setEnableLineSearch(bool enabled)
   mEnableLinesearch = enabled;
 }
 
+
+void iLQRLocal::disableAdaptiveTime()
+{
+  mAdaptiveTime = false;
+}
+
+void iLQRLocal::disableAdaptiveHorizon()
+{
+  mAdaptiveHorizon = false;
+}
+
 /// This enables "guards" on the IPOPT sub-problems. Defaults to false. This
 /// means that every IPOPT sub-problem always returns the best explored
 /// trajectory, even if it subsequently explored other states. This increases
@@ -519,7 +552,7 @@ void iLQRLocal::optimizePlan(long startTime)
 
     // Here mBuffer should have access to mapping of control force
     Eigen::MatrixXs actions = worldClone->mapToActionSpace(mProblem->getRolloutCache(worldClone)->getControlForcesConst());
-
+    // No need to pad here automatically paded inside
     mBuffer.setControlForcePlan(
         startTime,
         timeSinceEpochMillis(),
@@ -620,6 +653,8 @@ void iLQRLocal::adjustPerformance(long lastOptimizeTimeMillis)
   mMillisInAdvanceToPlan = 1.2 * lastOptimizeTimeMillis;
   if (mMillisInAdvanceToPlan > 200)
     mMillisInAdvanceToPlan = 200;
+  if(!mAdaptiveTime)
+    mMillisInAdvanceToPlan = 20; // Which will be problematic when facing the change of parameters
 }
 
 /// This starts our main thread and begins running optimizations
@@ -934,6 +969,13 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
     startTime = mLastOptimizedTime;
   }
   // Get action from mBuffer according to time
+  if(mPlanningCandidateHorizonMillis!=mPlanningHorizonMillis)
+  {
+    setPlanningHorizon(mPlanningCandidateHorizonMillis);
+    std::cout << "<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+    std::cout << "Horizon Changed! " << mPlanningCandidateHorizonMillis <<std::endl;
+    std::cout << "<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+  }
   mCost = std::numeric_limits<s_t>::max();
   mlqrBuffer.readNewActionPlan(startTime, mBuffer);
   

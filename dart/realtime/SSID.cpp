@@ -259,7 +259,11 @@ void SSID::runInference(long startTime)
   
   for (auto listener : mInferListeners)
   {
+<<<<<<< HEAD
     listener(startTime, pos, computeConfidenceFromValue(mValue), param, computeDurationWallTime); 
+=======
+    listener(startTime, pos, vel, param, computeDurationWallTime, mSteadySolutionFound); 
+>>>>>>> ericcsr/ssid_dev
   }
 }
 
@@ -466,7 +470,7 @@ void SSID::saveCSVMatrix(std::string filename, Eigen::MatrixXs matrix)
 /// This registers a listener to get called when we finish replanning
 void SSID::registerInferListener(
     std::function<
-        void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long)>
+        void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long, bool)>
         inferListener)
 {
   mInferListeners.push_back(inferListener);

@@ -309,10 +309,10 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
   ssid.setSSIDMassIndex(Eigen::Vector2i(0, 1)); 
-  ssid.useConfidence();
-  ssid.useHeuristicWeight();
-  ssid.useSmoothing();
-  ssid.setTemperature(Eigen::Vector2s(0.05,15));
+  //ssid.useConfidence();
+  //ssid.useHeuristicWeight();
+  //ssid.useSmoothing();
+  ssid.setTemperature(Eigen::Vector2s(0.5,0.5));
   
 
   ssid.setInitialPosEstimator(
@@ -364,29 +364,27 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   mpcLocal.setEnableOptimizationGuards(true);
   mpcLocal.setActionBound(20.0);
   mpcLocal.setAlpha(1);
+  //mpcLocal.disableAdaptiveTime();
 
-  bool init_flag = true;
+  // bool init_flag = true;
 
   ssid.registerInferListener([&](long,
                                  Eigen::VectorXs,
                                  Eigen::VectorXs,
                                  Eigen::VectorXs mass,
-                                 long){
+                                 long, 
+                                 bool steadyFound){
     // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
-    mpcLocal.setParameterChange(mass);
-    if(!init_flag && false)
+    if(steadyFound)
     {
-      s_t old_mass = world->getLinkMassIndex(ssid_index);
-      world->setLinkMassIndex(0.9 * old_mass + 0.1 * mass(0), ssid_index);
-      s_t old_mass2 = world->getLinkMassIndex(ssid_index2);
-      world->setLinkMassIndex(0.9 * old_mass2 + 0.1 * mass(1), ssid_index2);
+      mpcLocal.setCandidateHorizon(planningHorizonMillis);
     }
     else
     {
-      world->setLinkMassIndex(mass(0), ssid_index);
-      world->setLinkMassIndex(mass(1), ssid_index2);
-      init_flag = false;
+      mpcLocal.setCandidateHorizon((size_t)(1*planningHorizonMillis));
     }
+    world->setLinkMassIndex(mass(0), ssid_index);
+    world->setLinkMassIndex(mass(1), ssid_index2);
   });
 
 
@@ -432,11 +430,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::vector<Eigen::VectorXs> real_record;
   std::vector<Eigen::VectorXs> id_record; 
   ticker.registerTickListener([&](long now) {
-    
-    Eigen::VectorXs mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
-    
-    Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
-    realtimeUnderlyingWorld->setControlForces(mpcforces + force_eps);
+    if(renderIsReady)
+    {
+      Eigen::VectorXs mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
+      Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
+      realtimeUnderlyingWorld->setControlForces(mpcforces + force_eps);
+    }
     if (server.getKeysDown().count("a"))
     {
       Eigen::VectorXs perturbedForces
@@ -502,6 +501,12 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     // recordObs(now, &ssid, realtimeUnderlyingWorld);
     if(renderIsReady)
     {
+      if((realtimeUnderlyingWorld->getState()-goal).norm()<0.2)
+      {
+        std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
+        std::cout << "Target Reached in: " << cnt << " Steps" << std::endl;
+        std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
+      }
       recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
       realtimeUnderlyingWorld->step();
       cnt++;
@@ -520,11 +525,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      server.createText(key,
-                        "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))
-                        +"Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
-                        Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(200,200));
+      // server.createText(key,
+      //                   "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))
+      //                   +"Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
+      //                   Eigen::Vector2i(100,100),
+      //                   Eigen::Vector2i(200,200));
       if(record && renderIsReady)
       {
         id_record.push_back(id_masses);
