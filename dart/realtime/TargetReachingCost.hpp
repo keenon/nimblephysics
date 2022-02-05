@@ -69,9 +69,21 @@ public:
 
   void setTimeStep(s_t timestep);
 
-  void setSSIDNodeIndex(std::vector<size_t> ssid_index);
+  // TODO: Change the name
+  void setSSIDMassNodeIndex(Eigen::VectorXi indices);
+
+  // TODO: Implement it
+  void setSSIDCOMNodeIndex(Eigen::VectorXi indices);
+
+  // void setSSIDMOINodeIndex(Eigen::VectorXi indices);
+
+  void setSSIDDampJointIndex(Eigen::VectorXi indices);
+
+  void setSSIDSpringJointIndex(Eigen::VectorXi indices);
 
   void enableSSIDLoss(s_t weight);
+
+  void setSSIDHeuristicWeight(s_t weight);
 
   s_t computeLoss(const trajectory::TrajectoryRollout* rollout);
 
@@ -91,6 +103,32 @@ public:
   void computeHessXU(const trajectory::TrajectoryRollout* rollout, std::vector<Eigen::MatrixXs> &hess);
   
 protected:
+
+  // Related to Heuristic Gradient and weight computation
+  s_t computeSSIDMassLoss(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  s_t computeSSIDCOMLoss(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  s_t computeSSIDDampCoeffLoss(Eigen::VectorXs state);
+
+  s_t computeSSIDSpringStiffLoss(Eigen::VectorXs state);
+
+  Eigen::VectorXs computeSSIDMassGrad(Eigen::VectorXs state, Eigen::VectorXs prev_state, int cur);
+
+  Eigen::VectorXs computeSSIDCOMGrad(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::VectorXs computeSSIDDampCoeffGrad(Eigen::VectorXs state);
+
+  Eigen::VectorXs computeSSIDSpringStiffGrad(Eigen::VectorXs state);
+
+  Eigen::MatrixXs computeSSIDMassHess(int cur);
+
+  Eigen::MatrixXs computeSSIDCOMHess(Eigen::VectorXs state, Eigen::VectorXs prev_state);
+
+  Eigen::MatrixXs computeSSIDDampCoeffHess(Eigen::VectorXs state);
+
+  Eigen::MatrixXs computeSSIDSpringStiffHess();
+
   // Internal information
   Eigen::VectorXs mRunningStateWeight;
 
@@ -115,9 +153,15 @@ protected:
   // SSID Heuristic
   bool mUseSSIDHeuristic = false;
 
-  s_t mSSIDHeuristicWeight;
+  s_t mSSIDHeuristicWeight = 0;
 
-  std::vector<size_t> mSSIDNodeIndex;
+  Eigen::VectorXi mMass_indices;
+
+  Eigen::VectorXi mCOM_indices;
+
+  Eigen::VectorXi mDamp_indices;
+
+  Eigen::VectorXi mSpring_indices;
 
   std::vector<std::vector<Eigen::MatrixXs>> mAks;
 

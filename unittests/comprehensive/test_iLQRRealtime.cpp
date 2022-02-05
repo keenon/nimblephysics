@@ -186,7 +186,7 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
 WorldPtr createWorld(s_t timestep)
 {
   WorldPtr world = dart::utils::UniversalLoader::loadWorld("dart://sample/skel/cartpole.skel");
-  world->setState(Eigen::Vector4s(0, 30.0 / 180 * 3.14, 0, 0));
+  world->setState(Eigen::Vector4s(0, 170.0 / 180 * 3.14, 0, 0));
   world->removeDofFromActionSpace(1);
   
   world->setTimeStep(timestep);
@@ -309,7 +309,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
   ssid.setSSIDMassIndex(Eigen::Vector2i(0, 1)); 
-  // ssid.useConfidence();
+  ssid.useConfidence();
   ssid.useHeuristicWeight();
   ssid.useSmoothing();
   ssid.setTemperature(Eigen::Vector2s(0.05,15));
@@ -348,7 +348,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   // costFn->enableSSIDLoss(0.01);
   costFn->setTimeStep(world->getTimeStep());
   Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
-  goal(0) = 0.5;
+  goal(0) = 1.0;
   costFn->setTarget(goal);
   std::cout << "Before MPC Local Initialization" << std::endl;
   iLQRLocal mpcLocal = iLQRLocal(
@@ -394,7 +394,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   GUIWebsocketServer server;
 
   server.createSphere("goal", 0.1,
-                      Eigen::Vector3s(goal(0),1.0,0),
+                      Eigen::Vector3s(goal(0), 0.7, 0),
                       Eigen::Vector3s(1.0, 0.0, 0.0));
   server.registerDragListener("goal", [&](Eigen::Vector3s dragTo){
     goal(0) = dragTo(0);
@@ -432,13 +432,9 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::vector<Eigen::VectorXs> real_record;
   std::vector<Eigen::VectorXs> id_record; 
   ticker.registerTickListener([&](long now) {
-    // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
+    
     Eigen::VectorXs mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
-    //std::cout << "MPC Force: \n" << mpcforces 
-    //          << "\nRef forces: \n" << feedback_forces << std::endl;
-    // TODO: Currently the forces are almost zero need to figure out why
-    // std::cout <<"Force:\n" << mpcforces << std::endl;
-    //Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
+    
     Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
     realtimeUnderlyingWorld->setControlForces(mpcforces + force_eps);
     if (server.getKeysDown().count("a"))

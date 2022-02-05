@@ -259,7 +259,7 @@ void SSID::runInference(long startTime)
   
   for (auto listener : mInferListeners)
   {
-    listener(startTime, pos, vel, param, computeDurationWallTime); 
+    listener(startTime, pos, computeConfidenceFromValue(mValue), param, computeDurationWallTime); 
   }
 }
 
@@ -575,7 +575,11 @@ void SSID::optimizationThreadLoop()
               mCumValue += mValue;
             }
             // TODO: Use delta value to determine the stability
+<<<<<<< HEAD
             if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <  mParam_change_thresh)
+=======
+            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
+>>>>>>> elastic_rod
             {
               mSteadySolutionFound = true;
               mParamChanged = false;
@@ -919,6 +923,7 @@ void SSID::setSSIDMassIndex(Eigen::VectorXi indices)
 {
   mSSIDMassNodeIndices = indices;
 }
+
 
 void SSID::setSSIDCOMIndex(Eigen::VectorXi indices)
 {

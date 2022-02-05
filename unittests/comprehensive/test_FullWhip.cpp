@@ -33,6 +33,7 @@
 #include "stdio.h"
 
 #define iLQR_MPC_TEST
+#define USE_NOISE
 
 using namespace dart;
 using namespace math;
@@ -186,7 +187,6 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-
 WorldPtr createWorld(s_t timestep)
 {
   std::shared_ptr<simulation::World> world = dart::utils::UniversalLoader::loadWorld(
@@ -194,6 +194,11 @@ WorldPtr createWorld(s_t timestep)
   world->setTimeStep(timestep);
   world->removeDofFromActionSpace(1);
   world->removeDofFromActionSpace(2);
+  world->removeDofFromActionSpace(3);
+  Eigen::VectorXs init_state = Eigen::VectorXs::Zero(8);
+  s_t pi = 3.14159;
+  init_state << 0.0, 30.0/180 * pi, 30.0/180 * pi, 30.0 /180 * pi, 0, 0, 0, 0;
+  world->setState(init_state);
   SkeletonPtr skel = world->getSkeleton(0);
   for(int i = 0; i < skel->getNumBodyNodes(); i++)
   {
@@ -259,7 +264,6 @@ void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t nois
 {
   ssid->registerLock();
   Eigen::VectorXs control_force = realtimeWorld->getControlForces();
-  // Eigen::VectorXs force_eps = rand_normal(control_force.size(), 0, noise_scale, random_gen);
   ssid->registerControls(now, control_force);
 
   Eigen::VectorXs position = realtimeWorld->getPositions();
@@ -272,6 +276,27 @@ void recordObsWithNoise(size_t now, SSID* ssid, WorldPtr realtimeWorld, s_t nois
   ssid->registerUnlock();
 }
 
+std::vector<s_t> convert2stdvec(Eigen::VectorXs vec)
+{
+  std::vector<s_t> stdvec;
+  for(int i = 0; i < vec.size(); i++)
+  {
+    stdvec.push_back(vec(i));
+  }
+  return stdvec;
+}
+
+Eigen::MatrixXs std2eigen(std::vector<Eigen::VectorXs> record)
+{
+  size_t num_record = record.size();
+  Eigen::MatrixXs eigen_record = Eigen::MatrixXs::Zero(num_record, record[0].size());
+  for(int i = 0 ; i < num_record; i++)
+  {
+    eigen_record.row(i) = record[i];
+  }
+  return eigen_record;
+}
+
 #ifdef iLQR_MPC_TEST
 TEST(REALTIME, CARTPOLE_MPC_MASS)
 {
@@ -279,36 +304,52 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   // Initialize Hyper Parameters
   // TODO: Need to find out
-  int steps = 200;
+  int steps = 300;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int planningHorizonMillis = steps * millisPerTimestep;
 
   // For add noise in measurement
-  // std::mt19937 rand_gen = initializeRandom();
-  // s_t noise_scale = 0.01;
+  #ifdef USE_NOISE
+  std::mt19937 rand_gen = initializeRandom();
+  s_t noise_scale = 0.01;
+  #endif
 
   // For SSID
   s_t scale = 1.0;
-  size_t ssid_index = 2;
-  size_t ssid_index2 = 3;
+  size_t ssid_index = 1;
+  size_t ssid_index2 = 2;
+  size_t ssid_index3 = 3;
   int inferenceSteps = 10;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
   std::shared_ptr<simulation::World> ssidWorld = cloneWorld(world, false);
-  ssidWorld->tuneMass(
-    world->getBodyNodeIndex(ssid_index),
-    WrtMassBodyNodeEntryType::INERTIA_MASS,
-    Eigen::VectorXs::Ones(1) * 5.0,
-    Eigen::VectorXs::Ones(1) * 0.2);
+  Eigen::VectorXi index = Eigen::VectorXi::Ones(1);
 
-  ssidWorld->tuneMass(
-    world->getBodyNodeIndex(ssid_index2),
-    WrtMassBodyNodeEntryType::INERTIA_MASS,
-    Eigen::VectorXs::Ones(1) * 5.0,
-    Eigen::VectorXs::Ones(1) * 0.2);
+  ssidWorld->tuneSpring(
+    world->getJointIndex(ssid_index),
+    WrtSpringJointEntryType::SPRING,
+    index,
+    Eigen::VectorXs::Ones(1) * 15.0,
+    Eigen::VectorXs::Ones(1) * 0.1);
 
+  index(0) = 2;
+  ssidWorld->tuneSpring(
+    world->getJointIndex(ssid_index2),
+    WrtSpringJointEntryType::SPRING,
+    index,
+    Eigen::VectorXs::Ones(1) * 15.0,
+    Eigen::VectorXs::Ones(1) * 0.1);
+  
+
+  index(0) = 3;
+  ssidWorld->tuneSpring(
+    world->getJointIndex(ssid_index3),
+    WrtSpringJointEntryType::SPRING,
+    index,
+    Eigen::VectorXs::Ones(1) * 15.0,
+    Eigen::VectorXs::Ones(1) * 0.1);
+  
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
-  std::vector<size_t> ssid_idx{ssid_index};//, ssid_index2};
 
   SSID ssid = SSID(ssidWorld,
                    getSSIDPosLoss(),
@@ -320,11 +361,17 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   std::mutex param_lock;
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
-  // ssid.setSSIDIndex(Eigen::Vector2i(ssid_index, ssid_index2));
-  Eigen::VectorXi index;
-  index = Eigen::VectorXi::Zero(1);
-  index(0) = ssid_index;
-  ssid.setSSIDIndex(index);  
+
+  ssid.useSmoothing();
+  //ssid.useHeuristicWeight();
+  //ssid.useConfidence();
+  ssid.setTemperature(Eigen::Vector3s(0.1, 0.1, 0.1));
+  ssid.setThreshs(0.3, 0.5);
+
+
+
+  Eigen::Vector3i id_index(ssid_index, ssid_index2, ssid_index3);
+  ssid.setSSIDSpringIndex(id_index);
 
   ssid.setInitialPosEstimator(
     [](Eigen::MatrixXs sensors, long)
@@ -338,42 +385,39 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       return sensors.col(0);
     });
 
-  world->clearTunableMassThisInstance();
+  world->clearTunableSpringThisInstance();
   // Create Goal
-  int dofs = 3;
-  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * dofs);
-  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.01;
+  int dofs = 4;
+  Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Ones(2 * dofs) * 0.01; // Need it to be as fast as possible
+  Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Ones(1) * 0.001;
   Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * dofs);
   // Requires IK which is not implemented
-  finalStateWeight << 10.0, 50, 0, 10, 10 ,0;
+  finalStateWeight << 100, 100, 100, 100, 50, 100, 100, 100;
 
   std::shared_ptr<simulation::World> realtimeUnderlyingWorld = cloneWorld(world,true);
 
-  std::shared_ptr<MappedTargetReachingCost> costFn
-    = std::make_shared<MappedTargetReachingCost>(runningStateWeight,
+  std::shared_ptr<TargetReachingCost> costFn
+    = std::make_shared<TargetReachingCost>(runningStateWeight,
                                            runningActionWeight, 
                                            finalStateWeight,
                                            world);
 
-  costFn->setSSIDNodeIndex(ssid_idx);
-  costFn->setLinkLengths(Eigen::Vector3i(0.3,0.3,0.3));
-  dart::neural::IKMapping mapping(world);
-  mapping.addLinearBodyNode(world->getBodyNodeIndex(4)); // Which is the end effector
-  costFn->setMapping(mapping);
-  // costFn->enableSSIDLoss(0.01);
-  costFn->setTimeStep(world->getTimeStep());
-  Eigen::Vector6s goal;
-  goal << 0.2, 0.2, 0.0, 0.0, 0.0, 0.0;
+  // The objective is the elastic rod vibrate between the two goal
+  //s_t pi = 3.14159265;
+  Eigen::VectorXs goal = Eigen::VectorXs::Zero(2 * dofs);
+  goal << 2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // Up right pose
 
   costFn->setTarget(goal);
-  std::cout << "Goal: " << goal << std::endl;
+  // Need to change the coefficient on the fly
+  // costFn->setSSIDSpringJointIndex(Eigen::Vector3i(1, 2, 3));
+  // costFn->enableSSIDLoss(1);
   iLQRLocal mpcLocal = iLQRLocal(
     world, 1, planningHorizonMillis, 1.0);
   
-  mpcLocal.setMappedCostFn(costFn);
+  mpcLocal.setCostFn(costFn);
   mpcLocal.setSilent(true);
   mpcLocal.setMaxIterations(5);
-  mpcLocal.setPatience(1);
+  mpcLocal.setPatience(3);
   mpcLocal.setEnableLineSearch(false);
   mpcLocal.setEnableOptimizationGuards(true);
   mpcLocal.setActionBound(40.0);
@@ -381,69 +425,85 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   ssid.registerInferListener([&](long,
                                  Eigen::VectorXs,
-                                 Eigen::VectorXs,
-                                 Eigen::VectorXs mass,
+                                 Eigen::VectorXs confidence,
+                                 Eigen::VectorXs spring,
                                  long){
     // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
-    mpcLocal.setParameterChange(mass);
-    world->setLinkMassIndex(mass(0), ssid_index);
-    world->setLinkMassIndex(mass(1), ssid_index2);
+    mpcLocal.setParameterChange(spring);
+    world->setJointSpringStiffIndex(spring.segment(0, 1), ssid_index);
+    world->setJointSpringStiffIndex(spring.segment(1, 1), ssid_index2);
+    world->setJointSpringStiffIndex(spring.segment(2, 1), ssid_index3);
+    // Should interface here to change the weight of the system
+    if(confidence.mean() > 0.2)
+    {
+      costFn->setSSIDHeuristicWeight(0);
+    }
   });
 
 
   
   GUIWebsocketServer server;
 
-  /*
-  server.createSphere("goal", 0.1,
-                      Eigen::Vector3s(goal(0),1.0,0),
+
+  // May need to create the sphere for better visualization
+  
+  server.createSphere("goal1", 0.1,
+                      Eigen::Vector3s(goal(0), 0.0, 0),
                       Eigen::Vector3s(1.0, 0.0, 0.0));
-  server.registerDragListener("goal", [&](Eigen::Vector3s dragTo){
+  server.registerDragListener("goal1", [&](Eigen::Vector3s dragTo){
     goal(0) = dragTo(0);
-    dragTo(1) = 1.0;
+    dragTo(1) = 0.0;
     dragTo(2) = 0.0;
     costFn->setTarget(goal);
-    server.setObjectPosition("goal", dragTo);
+    server.setObjectPosition("goal1", dragTo);
   });
-  */
+  
 
-  std::string key = "mass";
+  std::string key = "spring";
 
   Ticker ticker = Ticker(scale * realtimeUnderlyingWorld->getTimeStep());
   long total_steps = 0;
 
-  Eigen::Vector2s masses;
-  masses(0) = world->getLinkMassIndex(ssid_index);
-  // masses(1) = 0;
-  masses(1) = world->getLinkMassIndex(ssid_index2);
-  Eigen::Vector2s id_masses(0.5, 0.5);
+  Eigen::Vector3s spring_stiffs;
+  spring_stiffs(0) = world->getJointSpringStiffIndex(ssid_index)(0);
+  spring_stiffs(1) = world->getJointSpringStiffIndex(ssid_index2)(0);
+  spring_stiffs(2) = world->getJointSpringStiffIndex(ssid_index3)(0);
+  Eigen::Vector3s id_spring_stiffs(5.0, 3.0, 2.0);
 
-  // realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-  // realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
-  // ssidWorld->setLinkMassIndex(id_masses(0), ssid_index);
-  // ssidWorld->setLinkMassIndex(id_masses(1), ssid_index2);
-  // world->setLinkMassIndex(id_masses(0), ssid_index);
-  // world->setLinkMassIndex(id_masses(1), ssid_index2);
+  realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(0, 1), ssid_index);
+  realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(1, 1), ssid_index2);
+  realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(2, 1), ssid_index3);
+  ssidWorld->setJointSpringStiffIndex(id_spring_stiffs.segment(0, 1), ssid_index);
+  ssidWorld->setJointSpringStiffIndex(id_spring_stiffs.segment(1, 1), ssid_index2);
+  ssidWorld->setJointSpringStiffIndex(id_spring_stiffs.segment(2, 1), ssid_index3);
+  world->setJointSpringStiffIndex(id_spring_stiffs.segment(0, 1), ssid_index);
+  world->setJointSpringStiffIndex(id_spring_stiffs.segment(1, 1), ssid_index2);
+  world->setJointSpringStiffIndex(id_spring_stiffs.segment(2, 1), ssid_index3);
   // Preload visualization
   bool renderIsReady = false;
+  int filecnt = 0;
+  int cnt = 0;
+  bool record = false;
+  std::vector<Eigen::VectorXs> real_record;
+  std::vector<Eigen::VectorXs> id_record;
+
   ticker.registerTickListener([&](long now) {
     // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
     Eigen::VectorXs mpcforces;
     if(renderIsReady)
     {
       mpcforces = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
-      //mpcforces = Eigen::VectorXs::Ones(dofs);
+      #ifdef USE_NOISE
+      Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
+      mpcforces += force_eps;
+      #endif
     }
     else
     {
       mpcforces = Eigen::VectorXs::Zero(dofs);
     }
-    //std::cout << "MPC Force: \n" << mpcforces 
-    //          << "\nRef forces: \n" << feedback_forces << std::endl;
-    // TODO: Currently the forces are almost zero need to figure out why
-    // std::cout <<"Force:\n" << mpcforces << std::endl;
-    //Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
-    // Eigen::VectorXs force_eps = rand_normal(mpcforces.size(), 0, noise_scale, rand_gen);
+    
+
     realtimeUnderlyingWorld->setControlForces(mpcforces);
     if (server.getKeysDown().count("a"))
     {
@@ -462,39 +522,85 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
     }
 
-    if (server.getKeysDown().count(","))
+    if (server.getKeysDown().count(",") || cnt == 300)
     {
       // Increase mass
-      masses(0) = 3.0;
-      masses(1) = 2.5;
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+      spring_stiffs(0) = 8.0;
+      spring_stiffs(1) = 4.0;
+      spring_stiffs(2) = 2.0;
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(0, 1), ssid_index);
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(1, 1), ssid_index2);
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(2, 1), ssid_index3);
     }
-    else if (server.getKeysDown().count("o"))
+    else if (server.getKeysDown().count("o") || cnt == 600)
     {
       // Decrease mass
-      masses(0) = 1.0;
-      masses(1) = 0.5;
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+      spring_stiffs(0) = 10.0;
+      spring_stiffs(1) = 3.0;
+      spring_stiffs(2) = 3.0;
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(0, 1), ssid_index);
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(1, 1), ssid_index2);
+      realtimeUnderlyingWorld->setJointSpringStiffIndex(spring_stiffs.segment(2, 1), ssid_index3);
     }
     else if(server.getKeysDown().count("s"))
     {
       renderIsReady = true;
-      //ssid.start();
-      //ssid.startSlow();
-      mpcLocal.setPredictUsingFeedback(true);
+      record = true;
+      ssid.start();
+      mpcLocal.setPredictUsingFeedback(false);
       mpcLocal.ilqrstart();
     }
-    // recordObs(now, &ssid, realtimeUnderlyingWorld);
+    else if(server.getKeysDown().count("r"))
+    {
+      record = true;
+    }
+    else if(server.getKeysDown().count("f"))
+    {
+      renderIsReady = false;
+      ssid.stop();
+      mpcLocal.ilqrstop();
+    }
+    else if(server.getKeysDown().count("p") || cnt == 1000)
+    {
+      if(record)
+      {
+        Eigen::MatrixXs real_params = std2eigen(real_record);
+        Eigen::MatrixXs sysid_params = std2eigen(id_record);
+        std::cout << "Converted!" << std::endl;
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/elastic_real_"
+                           +std::to_string(filecnt)+".csv", real_params);
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/elastic_identified_"
+                           +std::to_string(filecnt)+".csv", sysid_params);
+        filecnt++;
+      }
+      record = false;
+    }
+    
     if(renderIsReady)
     {
-      // recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
-      recordObs(now, &ssid, realtimeUnderlyingWorld);
-      realtimeUnderlyingWorld->step();
+      Eigen::VectorXs state = realtimeUnderlyingWorld->getState();
+      s_t err = (state - goal).norm();
+      if(err < 0.1)
+      {
+        std::cout << "Goal Reached in: "<< cnt << "Steps" << std::endl;
+        exit(0);
+      }
     }
-    id_masses(0) = world->getLinkMassIndex(ssid_index);
-    id_masses(1) = world->getLinkMassIndex(ssid_index2);
+    
+    if(renderIsReady)
+    {
+      #ifdef USE_NOISE
+      recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
+      #else
+      recordObs(now, &ssid, realtimeUnderlyingWorld);
+      #endif
+      realtimeUnderlyingWorld->step();
+      cnt++;
+    }
+    id_spring_stiffs(0) = world->getJointSpringStiffIndex(ssid_index)(0);
+    id_spring_stiffs(1) = world->getJointSpringStiffIndex(ssid_index2)(0);
+    id_spring_stiffs(2) = world->getJointSpringStiffIndex(ssid_index3)(0);
+    
     if(renderIsReady)
     {
       mpcLocal.recordGroundTruthState(
@@ -507,15 +613,16 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      server.createText(key,
-                        "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))+" "+
-                        "Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
-                        Eigen::Vector2i(100,100),
-                        Eigen::Vector2i(200,200));
       // server.createText(key,
-      //                   "Current Masses: "+std::to_string(id_masses(0))+" "+"Real Masses: " + std::to_string(masses(0)),
-      //                   Eigen::Vector2i(100, 100),
-      //                   Eigen::Vector2i(400, 400));
+      //                   "Current Spring: "+std::to_string(id_spring_stiffs(0))+" "+std::to_string(id_spring_stiffs(1))+" "+std::to_string(id_spring_stiffs(2))+
+      //                   "Real Spring: "+std::to_string(spring_stiffs(0))+" "+std::to_string(spring_stiffs(1))+" "+std::to_string(spring_stiffs(2)),
+      //                   Eigen::Vector2i(100,100),
+      //                   Eigen::Vector2i(200,200));
+      if(record && renderIsReady)
+      {
+        id_record.push_back(id_spring_stiffs);
+        real_record.push_back(spring_stiffs);
+      }
       total_steps = 0;
     }
     total_steps ++;
@@ -527,7 +634,6 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
       [&](long ,
           const trajectory::TrajectoryRollout* rollout,
           long ) {
-        // std::cout << "Reached Here!" << std::endl;
         server.renderTrajectoryLines(world, rollout->getPosesConst());
       });
   
