@@ -390,583 +390,583 @@ BodyNode* createTailSegment(BodyNode* parent, Eigen::Vector3s color)
   return pole;
 }
 
-#ifdef ALL_TESTS
-TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
-{
-  // World
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
-
-  world->setPenetrationCorrectionEnabled(false);
-
-  /////////////////////////////////////////////////////////////////////
-  // Create the skeleton with a single revolute joint
-  /////////////////////////////////////////////////////////////////////
-
-  SkeletonPtr swing = Skeleton::create("swing");
-
-  std::pair<RevoluteJoint*, BodyNode*> poleJointPair
-      = swing->createJointAndBodyNodePair<RevoluteJoint>();
-  RevoluteJoint* poleJoint = poleJointPair.first;
-  BodyNode* pole = poleJointPair.second;
-  poleJoint->setAxis(Eigen::Vector3s::UnitZ());
-
-  std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
-  // ShapeNode* poleShape =
-  pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-  poleJoint->setControlForceUpperLimit(0, 100.0);
-  poleJoint->setControlForceLowerLimit(0, -100.0);
-  poleJoint->setVelocityUpperLimit(0, 100.0);
-  poleJoint->setVelocityLowerLimit(0, -100.0);
-  poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
-  poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
-
-  // We're going to tune the full inertia properties of the swinging object
-  Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(3) * 2.0;
-  Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(3) * -2.0;
-  world->getWrtMass()->registerNode(
-      pole,
-      neural::WrtMassBodyNodeEntryType::INERTIA_COM,
-      upperBounds,
-      lowerBounds);
-
-  Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
-  poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
-  poleJoint->setTransformFromChildBodyNode(poleOffset);
-  poleJoint->setPosition(0, 90 * 3.1415 / 180);
-
-  world->addSkeleton(swing);
-
-  assert(world->getNumDofs() == 1);
-
-  /////////////////////////////////////////////////////////////////////
-  // Define straightforward loss
-  /////////////////////////////////////////////////////////////////////
-
-  int STEPS = 12;
-  int SHOT_LENGTH = 3;
-  int GOAL_STEP = 6;
-  s_t GOAL_AT_STEP = 0.1;
-
-  // Get the GOAL_STEP pose as close to GOAL_AT_STEP
-  TrajectoryLossFn loss
-      = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
-          const Eigen::Ref<const Eigen::MatrixXs> poses
-              = rollout->getPosesConst("identity");
-          s_t poseFive = poses(0, GOAL_STEP);
-          return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
-        };
-
-  // Get the initial pose and final pose as close to each other as possible
-  TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
-    const Eigen::Ref<const Eigen::MatrixXs> poses
-        = rollout->getPosesConst("identity");
-    s_t firstPose = poses(0, 0);
-    s_t lastPose = poses(0, poses.cols() - 1);
-    return (firstPose - lastPose) * (firstPose - lastPose);
-  };
-
-  /////////////////////////////////////////////////////////////////////
-  // Build a trajectory optimization problem
-  /////////////////////////////////////////////////////////////////////
-
-  LossFn lossFn = LossFn(loss);
-
-  LossFn constraintFn = LossFn(loopConstraint);
-  constraintFn.setLowerBound(0);
-  constraintFn.setUpperBound(0);
-
-  WorldPtr worldPar = world->clone();
-
-  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
-  shot.addConstraint(constraintFn);
-
-  MultiShot shotPar(worldPar, lossFn, STEPS, SHOT_LENGTH, true);
-  shotPar.addConstraint(constraintFn);
-  shotPar.setParallelOperationsEnabled(true);
-
-  int n = shot.getFlatProblemDim(world);
-  int constraintDim = shot.getConstraintDim();
-  /*
-  Eigen::VectorXs flat = Eigen::VectorXs::Zero(n);
-  shot.Problem::flatten(world, flat);
-  srand(2);
-  flat += Eigen::VectorXs::Random(n) * 0.01;
-  std::cout << flat << std::endl;
-  shot.Problem::unflatten(world, flat);
-  shotPar.Problem::unflatten(world, flat);
-  */
-
-  /////////////////////////////////////////////////////////////////////
-  // Check Bounds
-  /////////////////////////////////////////////////////////////////////
-
-  if (true)
-  {
-    Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(n);
-    Eigen::VectorXs lowerBound = Eigen::VectorXs::Zero(n);
-    shot.Problem::getUpperBounds(world, upperBound);
-    shot.Problem::getLowerBounds(world, lowerBound);
-
-    Eigen::VectorXs upperBoundPar = Eigen::VectorXs::Zero(n);
-    Eigen::VectorXs lowerBoundPar = Eigen::VectorXs::Zero(n);
-    shotPar.Problem::getUpperBounds(worldPar, upperBoundPar);
-    shotPar.Problem::getLowerBounds(worldPar, lowerBoundPar);
-
-    if (!equals(upperBound, upperBoundPar, 0))
-    {
-      std::cout << "Upper Bounds aren't exactly the same!" << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << upperBound.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << upperBoundPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-
-    if (!equals(lowerBound, lowerBoundPar, 0))
-    {
-      std::cout << "Lower Bounds aren't exactly the same!" << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << lowerBound.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << lowerBoundPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-
-    Eigen::VectorXs constraintUpperBound = Eigen::VectorXs::Zero(constraintDim);
-    Eigen::VectorXs constraintLowerBound = Eigen::VectorXs::Zero(constraintDim);
-    shot.getConstraintUpperBounds(constraintUpperBound);
-    shot.getConstraintLowerBounds(constraintLowerBound);
-
-    Eigen::VectorXs constraintUpperBoundPar
-        = Eigen::VectorXs::Zero(constraintDim);
-    Eigen::VectorXs constraintLowerBoundPar
-        = Eigen::VectorXs::Zero(constraintDim);
-    shotPar.getConstraintUpperBounds(constraintUpperBoundPar);
-    shotPar.getConstraintLowerBounds(constraintLowerBoundPar);
-
-    if (!equals(constraintUpperBound, constraintUpperBoundPar, 0))
-    {
-      std::cout << "Constraint Upper Bounds aren't exactly the same!"
-                << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << constraintUpperBound.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << constraintUpperBoundPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-
-    if (!equals(constraintLowerBound, constraintLowerBoundPar, 0))
-    {
-      std::cout << "Constraint Lower Bounds aren't exactly the same!"
-                << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << constraintLowerBound.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << constraintLowerBoundPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-  }
-
-  /////////////////////////////////////////////////////////////////////
-  // Check Gradients
-  /////////////////////////////////////////////////////////////////////
-
-  if (true)
-  {
-    Eigen::VectorXs grad = Eigen::VectorXs::Zero(n);
-    shot.backpropGradient(world, grad);
-    Eigen::VectorXs gradPar = Eigen::VectorXs::Zero(n);
-    shotPar.backpropGradient(worldPar, gradPar);
-
-    if (!equals(grad, gradPar, 0))
-    {
-      std::cout << "Gradients aren't exactly the same!" << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << grad.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << gradPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-
-    int m = shot.getNumberNonZeroJacobian(world);
-
-    Eigen::VectorXs sparseJac = Eigen::VectorXs::Zero(m);
-    shot.Problem::getSparseJacobian(world, sparseJac);
-    Eigen::VectorXs sparseJacPar = Eigen::VectorXs::Zero(m);
-    shotPar.Problem::getSparseJacobian(worldPar, sparseJacPar);
-
-    if (!equals(sparseJac, sparseJacPar, 0))
-    {
-      std::cout << "Gradients aren't exactly the same!" << std::endl;
-      std::cout << "Serial first segment:" << std::endl
-                << sparseJac.segment(0, 10) << std::endl;
-      std::cout << "Parallel first segment:" << std::endl
-                << sparseJacPar.segment(0, 10) << std::endl;
-      EXPECT_TRUE(false);
-      return;
-    }
-  }
-
-  /////////////////////////////////////////////////////////////////////
-  // Check Jacobians
-  /////////////////////////////////////////////////////////////////////
-
-  if (true)
-  {
-    int dim = shot.getFlatProblemDim(world);
-    int numConstraints = shot.getConstraintDim();
-    std::cout << "numConstraints: " << numConstraints << std::endl;
-
-    Eigen::MatrixXs analyticalJacobian
-        = Eigen::MatrixXs::Zero(numConstraints, dim);
-    shot.Problem::backpropJacobian(world, analyticalJacobian);
-    Eigen::MatrixXs bruteForceJacobian
-        = Eigen::MatrixXs::Zero(numConstraints, dim);
-    shot.finiteDifferenceJacobian(world, bruteForceJacobian);
-    s_t threshold = 1e-8;
-    if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
-    {
-      std::cout << "Jacobians don't match!" << std::endl;
-      // int staticDim = shot.getFlatStaticProblemDim(world);
-      std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
-                << std::endl;
-      std::cout << "Analytical first region: " << std::endl
-                << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
-                << std::endl;
-      std::cout << "Brute force first region: " << std::endl
-                << bruteForceJacobian.block(0, 0, analyticalJacobian.rows(), 10)
-                << std::endl;
-      /*
-      for (int i = 0; i < dim; i++)
-      {
-        Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
-        Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
-        if (!equals(analyticalCol, bruteForceCol, threshold))
-        {
-          std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
-                    << i << ") by " << (analyticalCol - bruteForceCol).norm()
-                    << std::endl;
-          std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
-          std::cout << "Brute Force:" << std::endl << bruteForceCol <<
-      std::endl; std::cout << "Diff:" << std::endl
-                    << (analyticalCol - bruteForceCol) << std::endl;
-        }
-        else
-        {
-          // std::cout << "Match at col " << shot.getFlatDimName(world, i) << "
-      ("
-          // << i
-          //          << ")" << std::endl;
-        }
-      }
-      */
-      EXPECT_TRUE(false);
-      return;
-    }
-
-    EXPECT_TRUE(verifySparseJacobian(world, shot));
-  }
-
-  /////////////////////////////////////////////////////////////////////
-  // Verify flat results
-  /////////////////////////////////////////////////////////////////////
-
-  Eigen::VectorXs preFlat = Eigen::VectorXs::Zero(n);
-  Eigen::VectorXs preFlatPar = Eigen::VectorXs::Zero(n);
-  shot.Problem::flatten(world, preFlat);
-  shotPar.Problem::flatten(world, preFlatPar);
-  if (!equals(preFlat, preFlatPar, 0))
-  {
-    std::cout << "Pre-optimization flattening doesn't match!" << std::endl;
-    std::cout << "Serial pre-flat: " << std::endl << preFlat << std::endl;
-    std::cout << "Parallel pre-flat: " << std::endl << preFlatPar << std::endl;
-    for (int i = 0; i < preFlat.size(); i++)
-    {
-      if (preFlat(i) != preFlatPar(i))
-      {
-        std::cout << "  Mismatch at index " << i << " ("
-                  << shot.getFlatDimName(world, i) << ") by "
-                  << preFlat(i) - preFlatPar(i) << ": " << preFlat(i) << " vs "
-                  << preFlatPar(i) << std::endl;
-      }
-    }
-    EXPECT_TRUE(false);
-    return;
-  }
-
-  /////////////////////////////////////////////////////////////////////
-  // Actually run the optimization
-  /////////////////////////////////////////////////////////////////////
-
-  // Actually do the optimization
-
-  int iterationLimit = 10;
-
-  IPOptOptimizer optimizer = IPOptOptimizer();
-  optimizer.setIterationLimit(iterationLimit);
-  optimizer.setCheckDerivatives(true);
-  optimizer.setRecoverBest(false);
-  // optimizer.setRecordFullDebugInfo(true);
-  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
-
-  std::shared_ptr<Solution> recordPar = optimizer.optimize(&shotPar);
-
-  Eigen::VectorXs endFlat = Eigen::VectorXs::Zero(n);
-  Eigen::VectorXs endFlatPar = Eigen::VectorXs::Zero(n);
-  shot.Problem::flatten(world, endFlat);
-  shotPar.Problem::flatten(worldPar, endFlatPar);
-  if (!equals(endFlat, endFlatPar, 0))
-  {
-    std::cout << "Results after " << iterationLimit << " steps don't match!"
-              << std::endl;
-    for (int i = 0; i < endFlat.size(); i++)
-    {
-      if (endFlat(i) != endFlatPar(i))
-      {
-        std::cout << "  Mismatch at index " << i << " ("
-                  << shot.getFlatDimName(world, i) << ") by "
-                  << endFlat(i) - endFlatPar(i) << ": " << endFlat(i) << " vs "
-                  << endFlatPar(i) << std::endl;
-      }
-    }
-  }
-
-  for (int i = 0; i < record->getXs().size(); i++)
-  {
-    Eigen::VectorXs x0 = record->getXs()[i];
-    Eigen::VectorXs x0Par = recordPar->getXs()[i];
-    if (!equals(x0, x0Par, 0))
-    {
-      std::cout << "Xs at eval " << i << " don't match!" << std::endl;
-      for (int j = 0; j < x0.size(); j++)
-      {
-        if (x0(j) != x0Par(j))
-        {
-          std::cout << "  Mismatch at index " << j << " ("
-                    << shot.getFlatDimName(world, j) << ") by "
-                    << x0(j) - x0Par(j) << ": " << x0(j) << " vs " << x0Par(j)
-                    << std::endl;
-        }
-      }
-    }
-  }
-
-  for (int i = 0; i < record->getLosses().size(); i++)
-  {
-    s_t loss0 = record->getLosses()[i];
-    s_t loss0Par = recordPar->getLosses()[i];
-    if (loss0 != loss0Par)
-    {
-      std::cout << "Losses at eval " << i << " don't match by "
-                << loss0 - loss0Par << std::endl;
-    }
-  }
-
-  for (int i = 0; i < record->getGradients().size(); i++)
-  {
-    Eigen::VectorXs grad0 = record->getGradients()[i];
-    Eigen::VectorXs grad0Par = recordPar->getGradients()[i];
-    if (!equals(grad0, grad0Par, 0))
-    {
-      std::cout << "Gradients at eval " << i << " don't match!" << std::endl;
-      for (int j = 0; j < grad0.size(); j++)
-      {
-        if (grad0(j) != grad0Par(j))
-        {
-          std::cout << "  Mismatch at index " << j << " ("
-                    << shot.getFlatDimName(world, j) << ") by "
-                    << grad0(j) - grad0Par(j) << ": " << grad0(j) << " vs "
-                    << grad0Par(j) << std::endl;
-        }
-      }
-    }
-  }
-
-  for (int i = 0; i < record->getSparseJacobians().size(); i++)
-  {
-    Eigen::VectorXs jac0 = record->getSparseJacobians()[i];
-    Eigen::VectorXs jac0Par = recordPar->getSparseJacobians()[i];
-
-    Eigen::VectorXi jacRows = Eigen::VectorXi::Zero(jac0.size());
-    Eigen::VectorXi jacCols = Eigen::VectorXi::Zero(jac0.size());
-    shot.getJacobianSparsityStructure(world, jacRows, jacCols);
-
-    if (!equals(jac0, jac0Par, 0))
-    {
-      std::cout << "Jacobians at eval " << i << " don't match!" << std::endl;
-      for (int j = 0; j < jac0.size(); j++)
-      {
-        s_t serial = jac0(j);
-        s_t parallel = jac0Par(j);
-        if (serial != parallel)
-        {
-          std::cout << "  Mismatch at " << jacRows(j) << "," << jacCols(j)
-                    << " (" << shot.getFlatDimName(world, jacCols(j)) << ") by "
-                    << serial - parallel << ": " << serial << " vs " << parallel
-                    << std::endl;
-        }
-      }
-    }
-  }
-
-  for (int i = 0; i < record->getConstraintValues().size(); i++)
-  {
-    Eigen::VectorXs con0 = record->getConstraintValues()[i];
-    Eigen::VectorXs con0Par = recordPar->getConstraintValues()[i];
-    if (!equals(con0, con0Par, 0))
-    {
-      std::cout << "Constraints at eval " << i << " don't match!" << std::endl;
-    }
-  }
-
-  // Playback the trajectory
-  TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
-  shot.getStates(world, &withKnots, nullptr, true);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(TRAJECTORY, RECOVER_MASS)
-{
-  // World
-  WorldPtr world = World::create();
-  world->setGravity(Eigen::Vector3s(0, -9.81, 0));
-
-  world->setPenetrationCorrectionEnabled(false);
-
-  /////////////////////////////////////////////////////////////////////
-  // Create the skeleton with a single revolute joint
-  /////////////////////////////////////////////////////////////////////
-
-  SkeletonPtr box = Skeleton::create("box");
-
-  std::pair<PrismaticJoint*, BodyNode*> boxJointPair
-      = box->createJointAndBodyNodePair<PrismaticJoint>();
-  // PrismaticJoint* boxJoint = boxJointPair.first;
-  BodyNode* boxBody = boxJointPair.second;
-
-  std::shared_ptr<BoxShape> shape(
-      new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
-  // ShapeNode* boxShape =
-  boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
-
-  // We're going to tune the full inertia properties of the swinging object
-  Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(1) * 5.0;
-  Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(1) * 0.1;
-  world->getWrtMass()->registerNode(
-      boxBody,
-      neural::WrtMassBodyNodeEntryType::INERTIA_MASS,
-      upperBounds,
-      lowerBounds);
-
-  world->addSkeleton(box);
-
-  assert(world->getNumDofs() == 1);
-
-  /////////////////////////////////////////////////////////////////////
-  // Run one simulation forward to provide the raw material for our loss to try
-  // to recover
-  /////////////////////////////////////////////////////////////////////
-
-  s_t TRUE_MASS = 2.5;
-  int STEPS = 12;
-  int SHOT_LENGTH = 3;
-  // int GOAL_STEP = 6;
-  // s_t GOAL_AT_STEP = 0.1;
-
-  boxBody->setMass(TRUE_MASS);
-  Eigen::VectorXs knownForce = Eigen::VectorXs::Ones(1) * 0.1;
-  world->setPositions(Eigen::VectorXs::Zero(1));
-  world->setVelocities(Eigen::VectorXs::Zero(1));
-  world->setTimeStep(1e-1);
-
-  Eigen::VectorXs originalPoses = Eigen::VectorXs::Zero(STEPS);
-  for (int i = 0; i < STEPS; i++)
-  {
-    world->setControlForces(knownForce);
-    world->step();
-    originalPoses(i) = world->getPositions()[0];
-  }
-
-  // Reset position, scramble mass
-
-  world->setPositions(Eigen::VectorXs::Zero(1));
-  world->setVelocities(Eigen::VectorXs::Zero(1));
-  boxBody->setMass(0.5);
-
-  /////////////////////////////////////////////////////////////////////
-  // Define a loss
-  /////////////////////////////////////////////////////////////////////
-
-  // Get the GOAL_STEP pose as close to GOAL_AT_STEP
-  TrajectoryLossFn loss
-      = [originalPoses, STEPS](const TrajectoryRollout* rollout) {
-          const Eigen::Ref<const Eigen::MatrixXs> poses
-              = rollout->getPosesConst("identity");
-          s_t sum = 0.0;
-          for (int i = 0; i < STEPS; i++)
-          {
-            s_t diff = 1e2 * (poses(0, i) - originalPoses(i));
-            sum += diff * diff;
-          }
-          return sum;
-        };
-
-  /////////////////////////////////////////////////////////////////////
-  // Build a trajectory optimization problem
-  /////////////////////////////////////////////////////////////////////
-
-  LossFn lossFn = LossFn(loss);
-
-  MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, false);
-
-  /////////////////////////////////////////////////////////////////////
-  // Pin the forces
-  /////////////////////////////////////////////////////////////////////
-
-  for (int i = 0; i < STEPS; i++)
-  {
-    shot.pinForce(i, knownForce);
-  }
-
-  /////////////////////////////////////////////////////////////////////
-  // Run optimization
-  /////////////////////////////////////////////////////////////////////
-
-  IPOptOptimizer optimizer = IPOptOptimizer();
-  optimizer.setIterationLimit(50);
-  optimizer.setCheckDerivatives(true);
-  optimizer.setTolerance(1e-9);
-  // optimizer.setRecordFullDebugInfo(true);
-  std::shared_ptr<Solution> record = optimizer.optimize(&shot);
-
-  // We should have recovered the mass
-  s_t error = abs(boxBody->getMass() - TRUE_MASS);
-  if (error > 1e-7)
-  {
-    std::cout << "Recovered mass: " << boxBody->getMass() << std::endl;
-    std::cout << "Error: " << error << std::endl;
-    // Get the trajectory
-    TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
-    shot.getStates(world, &withKnots, nullptr, true);
-    std::cout << "Original: " << std::endl
-              << originalPoses.transpose() << std::endl;
-    std::cout << "Forces: " << std::endl
-              << withKnots.getControlForces("identity") << std::endl;
-    std::cout << "Positions: " << std::endl
-              << withKnots.getPoses("identity") << std::endl;
-
-    EXPECT_TRUE(error < 1e-7);
-  }
-}
-#endif
+// #ifdef ALL_TESTS
+// TEST(TRAJECTORY, TUNE_SIMPLE_MASS)
+// {
+//   // World
+//   WorldPtr world = World::create();
+//   world->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+//   world->setPenetrationCorrectionEnabled(false);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Create the skeleton with a single revolute joint
+//   /////////////////////////////////////////////////////////////////////
+
+//   SkeletonPtr swing = Skeleton::create("swing");
+
+//   std::pair<RevoluteJoint*, BodyNode*> poleJointPair
+//       = swing->createJointAndBodyNodePair<RevoluteJoint>();
+//   RevoluteJoint* poleJoint = poleJointPair.first;
+//   BodyNode* pole = poleJointPair.second;
+//   poleJoint->setAxis(Eigen::Vector3s::UnitZ());
+
+//   std::shared_ptr<BoxShape> shape(
+//       new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
+//   // ShapeNode* poleShape =
+//   pole->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+//   poleJoint->setControlForceUpperLimit(0, 100.0);
+//   poleJoint->setControlForceLowerLimit(0, -100.0);
+//   poleJoint->setVelocityUpperLimit(0, 100.0);
+//   poleJoint->setVelocityLowerLimit(0, -100.0);
+//   poleJoint->setPositionUpperLimit(0, 270 * 3.1415 / 180);
+//   poleJoint->setPositionLowerLimit(0, -270 * 3.1415 / 180);
+
+//   // We're going to tune the full inertia properties of the swinging object
+//   Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(3) * 2.0;
+//   Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(3) * -2.0;
+//   world->getWrtMass()->registerNode(
+//       pole,
+//       neural::WrtMassBodyNodeEntryType::INERTIA_COM,
+//       upperBounds,
+//       lowerBounds);
+
+//   Eigen::Isometry3s poleOffset = Eigen::Isometry3s::Identity();
+//   poleOffset.translation() = Eigen::Vector3s(0, -0.125, 0);
+//   poleJoint->setTransformFromChildBodyNode(poleOffset);
+//   poleJoint->setPosition(0, 90 * 3.1415 / 180);
+
+//   world->addSkeleton(swing);
+
+//   assert(world->getNumDofs() == 1);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Define straightforward loss
+//   /////////////////////////////////////////////////////////////////////
+
+//   int STEPS = 12;
+//   int SHOT_LENGTH = 3;
+//   int GOAL_STEP = 6;
+//   s_t GOAL_AT_STEP = 0.1;
+
+//   // Get the GOAL_STEP pose as close to GOAL_AT_STEP
+//   TrajectoryLossFn loss
+//       = [GOAL_STEP, GOAL_AT_STEP](const TrajectoryRollout* rollout) {
+//           const Eigen::Ref<const Eigen::MatrixXs> poses
+//               = rollout->getPosesConst("identity");
+//           s_t poseFive = poses(0, GOAL_STEP);
+//           return (poseFive - GOAL_AT_STEP) * (poseFive - GOAL_AT_STEP);
+//         };
+
+//   // Get the initial pose and final pose as close to each other as possible
+//   TrajectoryLossFn loopConstraint = [](const TrajectoryRollout* rollout) {
+//     const Eigen::Ref<const Eigen::MatrixXs> poses
+//         = rollout->getPosesConst("identity");
+//     s_t firstPose = poses(0, 0);
+//     s_t lastPose = poses(0, poses.cols() - 1);
+//     return (firstPose - lastPose) * (firstPose - lastPose);
+//   };
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Build a trajectory optimization problem
+//   /////////////////////////////////////////////////////////////////////
+
+//   LossFn lossFn = LossFn(loss);
+
+//   LossFn constraintFn = LossFn(loopConstraint);
+//   constraintFn.setLowerBound(0);
+//   constraintFn.setUpperBound(0);
+
+//   WorldPtr worldPar = world->clone();
+
+//   MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, true);
+//   shot.addConstraint(constraintFn);
+
+//   MultiShot shotPar(worldPar, lossFn, STEPS, SHOT_LENGTH, true);
+//   shotPar.addConstraint(constraintFn);
+//   shotPar.setParallelOperationsEnabled(true);
+
+//   int n = shot.getFlatProblemDim(world);
+//   int constraintDim = shot.getConstraintDim();
+//   /*
+//   Eigen::VectorXs flat = Eigen::VectorXs::Zero(n);
+//   shot.Problem::flatten(world, flat);
+//   srand(2);
+//   flat += Eigen::VectorXs::Random(n) * 0.01;
+//   std::cout << flat << std::endl;
+//   shot.Problem::unflatten(world, flat);
+//   shotPar.Problem::unflatten(world, flat);
+//   */
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Check Bounds
+//   /////////////////////////////////////////////////////////////////////
+
+//   if (true)
+//   {
+//     Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(n);
+//     Eigen::VectorXs lowerBound = Eigen::VectorXs::Zero(n);
+//     shot.Problem::getUpperBounds(world, upperBound);
+//     shot.Problem::getLowerBounds(world, lowerBound);
+
+//     Eigen::VectorXs upperBoundPar = Eigen::VectorXs::Zero(n);
+//     Eigen::VectorXs lowerBoundPar = Eigen::VectorXs::Zero(n);
+//     shotPar.Problem::getUpperBounds(worldPar, upperBoundPar);
+//     shotPar.Problem::getLowerBounds(worldPar, lowerBoundPar);
+
+//     if (!equals(upperBound, upperBoundPar, 0))
+//     {
+//       std::cout << "Upper Bounds aren't exactly the same!" << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << upperBound.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << upperBoundPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+
+//     if (!equals(lowerBound, lowerBoundPar, 0))
+//     {
+//       std::cout << "Lower Bounds aren't exactly the same!" << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << lowerBound.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << lowerBoundPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+
+//     Eigen::VectorXs constraintUpperBound = Eigen::VectorXs::Zero(constraintDim);
+//     Eigen::VectorXs constraintLowerBound = Eigen::VectorXs::Zero(constraintDim);
+//     shot.getConstraintUpperBounds(constraintUpperBound);
+//     shot.getConstraintLowerBounds(constraintLowerBound);
+
+//     Eigen::VectorXs constraintUpperBoundPar
+//         = Eigen::VectorXs::Zero(constraintDim);
+//     Eigen::VectorXs constraintLowerBoundPar
+//         = Eigen::VectorXs::Zero(constraintDim);
+//     shotPar.getConstraintUpperBounds(constraintUpperBoundPar);
+//     shotPar.getConstraintLowerBounds(constraintLowerBoundPar);
+
+//     if (!equals(constraintUpperBound, constraintUpperBoundPar, 0))
+//     {
+//       std::cout << "Constraint Upper Bounds aren't exactly the same!"
+//                 << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << constraintUpperBound.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << constraintUpperBoundPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+
+//     if (!equals(constraintLowerBound, constraintLowerBoundPar, 0))
+//     {
+//       std::cout << "Constraint Lower Bounds aren't exactly the same!"
+//                 << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << constraintLowerBound.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << constraintLowerBoundPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+//   }
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Check Gradients
+//   /////////////////////////////////////////////////////////////////////
+
+//   if (true)
+//   {
+//     Eigen::VectorXs grad = Eigen::VectorXs::Zero(n);
+//     shot.backpropGradient(world, grad);
+//     Eigen::VectorXs gradPar = Eigen::VectorXs::Zero(n);
+//     shotPar.backpropGradient(worldPar, gradPar);
+
+//     if (!equals(grad, gradPar, 0))
+//     {
+//       std::cout << "Gradients aren't exactly the same!" << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << grad.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << gradPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+
+//     int m = shot.getNumberNonZeroJacobian(world);
+
+//     Eigen::VectorXs sparseJac = Eigen::VectorXs::Zero(m);
+//     shot.Problem::getSparseJacobian(world, sparseJac);
+//     Eigen::VectorXs sparseJacPar = Eigen::VectorXs::Zero(m);
+//     shotPar.Problem::getSparseJacobian(worldPar, sparseJacPar);
+
+//     if (!equals(sparseJac, sparseJacPar, 0))
+//     {
+//       std::cout << "Gradients aren't exactly the same!" << std::endl;
+//       std::cout << "Serial first segment:" << std::endl
+//                 << sparseJac.segment(0, 10) << std::endl;
+//       std::cout << "Parallel first segment:" << std::endl
+//                 << sparseJacPar.segment(0, 10) << std::endl;
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+//   }
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Check Jacobians
+//   /////////////////////////////////////////////////////////////////////
+
+//   if (true)
+//   {
+//     int dim = shot.getFlatProblemDim(world);
+//     int numConstraints = shot.getConstraintDim();
+//     std::cout << "numConstraints: " << numConstraints << std::endl;
+
+//     Eigen::MatrixXs analyticalJacobian
+//         = Eigen::MatrixXs::Zero(numConstraints, dim);
+//     shot.Problem::backpropJacobian(world, analyticalJacobian);
+//     Eigen::MatrixXs bruteForceJacobian
+//         = Eigen::MatrixXs::Zero(numConstraints, dim);
+//     shot.finiteDifferenceJacobian(world, bruteForceJacobian);
+//     s_t threshold = 1e-8;
+//     if (!equals(analyticalJacobian, bruteForceJacobian, threshold))
+//     {
+//       std::cout << "Jacobians don't match!" << std::endl;
+//       // int staticDim = shot.getFlatStaticProblemDim(world);
+//       std::cout << "Static region size: " << shot.getFlatStaticProblemDim(world)
+//                 << std::endl;
+//       std::cout << "Analytical first region: " << std::endl
+//                 << analyticalJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+//                 << std::endl;
+//       std::cout << "Brute force first region: " << std::endl
+//                 << bruteForceJacobian.block(0, 0, analyticalJacobian.rows(), 10)
+//                 << std::endl;
+//       /*
+//       for (int i = 0; i < dim; i++)
+//       {
+//         Eigen::VectorXs analyticalCol = analyticalJacobian.col(i);
+//         Eigen::VectorXs bruteForceCol = bruteForceJacobian.col(i);
+//         if (!equals(analyticalCol, bruteForceCol, threshold))
+//         {
+//           std::cout << "ERROR at col " << shot.getFlatDimName(world, i) << " ("
+//                     << i << ") by " << (analyticalCol - bruteForceCol).norm()
+//                     << std::endl;
+//           std::cout << "Analytical:" << std::endl << analyticalCol << std::endl;
+//           std::cout << "Brute Force:" << std::endl << bruteForceCol <<
+//       std::endl; std::cout << "Diff:" << std::endl
+//                     << (analyticalCol - bruteForceCol) << std::endl;
+//         }
+//         else
+//         {
+//           // std::cout << "Match at col " << shot.getFlatDimName(world, i) << "
+//       ("
+//           // << i
+//           //          << ")" << std::endl;
+//         }
+//       }
+//       */
+//       EXPECT_TRUE(false);
+//       return;
+//     }
+
+//     EXPECT_TRUE(verifySparseJacobian(world, shot));
+//   }
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Verify flat results
+//   /////////////////////////////////////////////////////////////////////
+
+//   Eigen::VectorXs preFlat = Eigen::VectorXs::Zero(n);
+//   Eigen::VectorXs preFlatPar = Eigen::VectorXs::Zero(n);
+//   shot.Problem::flatten(world, preFlat);
+//   shotPar.Problem::flatten(world, preFlatPar);
+//   if (!equals(preFlat, preFlatPar, 0))
+//   {
+//     std::cout << "Pre-optimization flattening doesn't match!" << std::endl;
+//     std::cout << "Serial pre-flat: " << std::endl << preFlat << std::endl;
+//     std::cout << "Parallel pre-flat: " << std::endl << preFlatPar << std::endl;
+//     for (int i = 0; i < preFlat.size(); i++)
+//     {
+//       if (preFlat(i) != preFlatPar(i))
+//       {
+//         std::cout << "  Mismatch at index " << i << " ("
+//                   << shot.getFlatDimName(world, i) << ") by "
+//                   << preFlat(i) - preFlatPar(i) << ": " << preFlat(i) << " vs "
+//                   << preFlatPar(i) << std::endl;
+//       }
+//     }
+//     EXPECT_TRUE(false);
+//     return;
+//   }
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Actually run the optimization
+//   /////////////////////////////////////////////////////////////////////
+
+//   // Actually do the optimization
+
+//   int iterationLimit = 10;
+
+//   IPOptOptimizer optimizer = IPOptOptimizer();
+//   optimizer.setIterationLimit(iterationLimit);
+//   optimizer.setCheckDerivatives(true);
+//   optimizer.setRecoverBest(false);
+//   // optimizer.setRecordFullDebugInfo(true);
+//   std::shared_ptr<Solution> record = optimizer.optimize(&shot);
+
+//   std::shared_ptr<Solution> recordPar = optimizer.optimize(&shotPar);
+
+//   Eigen::VectorXs endFlat = Eigen::VectorXs::Zero(n);
+//   Eigen::VectorXs endFlatPar = Eigen::VectorXs::Zero(n);
+//   shot.Problem::flatten(world, endFlat);
+//   shotPar.Problem::flatten(worldPar, endFlatPar);
+//   if (!equals(endFlat, endFlatPar, 0))
+//   {
+//     std::cout << "Results after " << iterationLimit << " steps don't match!"
+//               << std::endl;
+//     for (int i = 0; i < endFlat.size(); i++)
+//     {
+//       if (endFlat(i) != endFlatPar(i))
+//       {
+//         std::cout << "  Mismatch at index " << i << " ("
+//                   << shot.getFlatDimName(world, i) << ") by "
+//                   << endFlat(i) - endFlatPar(i) << ": " << endFlat(i) << " vs "
+//                   << endFlatPar(i) << std::endl;
+//       }
+//     }
+//   }
+
+//   for (int i = 0; i < record->getXs().size(); i++)
+//   {
+//     Eigen::VectorXs x0 = record->getXs()[i];
+//     Eigen::VectorXs x0Par = recordPar->getXs()[i];
+//     if (!equals(x0, x0Par, 0))
+//     {
+//       std::cout << "Xs at eval " << i << " don't match!" << std::endl;
+//       for (int j = 0; j < x0.size(); j++)
+//       {
+//         if (x0(j) != x0Par(j))
+//         {
+//           std::cout << "  Mismatch at index " << j << " ("
+//                     << shot.getFlatDimName(world, j) << ") by "
+//                     << x0(j) - x0Par(j) << ": " << x0(j) << " vs " << x0Par(j)
+//                     << std::endl;
+//         }
+//       }
+//     }
+//   }
+
+//   for (int i = 0; i < record->getLosses().size(); i++)
+//   {
+//     s_t loss0 = record->getLosses()[i];
+//     s_t loss0Par = recordPar->getLosses()[i];
+//     if (loss0 != loss0Par)
+//     {
+//       std::cout << "Losses at eval " << i << " don't match by "
+//                 << loss0 - loss0Par << std::endl;
+//     }
+//   }
+
+//   for (int i = 0; i < record->getGradients().size(); i++)
+//   {
+//     Eigen::VectorXs grad0 = record->getGradients()[i];
+//     Eigen::VectorXs grad0Par = recordPar->getGradients()[i];
+//     if (!equals(grad0, grad0Par, 0))
+//     {
+//       std::cout << "Gradients at eval " << i << " don't match!" << std::endl;
+//       for (int j = 0; j < grad0.size(); j++)
+//       {
+//         if (grad0(j) != grad0Par(j))
+//         {
+//           std::cout << "  Mismatch at index " << j << " ("
+//                     << shot.getFlatDimName(world, j) << ") by "
+//                     << grad0(j) - grad0Par(j) << ": " << grad0(j) << " vs "
+//                     << grad0Par(j) << std::endl;
+//         }
+//       }
+//     }
+//   }
+
+//   for (int i = 0; i < record->getSparseJacobians().size(); i++)
+//   {
+//     Eigen::VectorXs jac0 = record->getSparseJacobians()[i];
+//     Eigen::VectorXs jac0Par = recordPar->getSparseJacobians()[i];
+
+//     Eigen::VectorXi jacRows = Eigen::VectorXi::Zero(jac0.size());
+//     Eigen::VectorXi jacCols = Eigen::VectorXi::Zero(jac0.size());
+//     shot.getJacobianSparsityStructure(world, jacRows, jacCols);
+
+//     if (!equals(jac0, jac0Par, 0))
+//     {
+//       std::cout << "Jacobians at eval " << i << " don't match!" << std::endl;
+//       for (int j = 0; j < jac0.size(); j++)
+//       {
+//         s_t serial = jac0(j);
+//         s_t parallel = jac0Par(j);
+//         if (serial != parallel)
+//         {
+//           std::cout << "  Mismatch at " << jacRows(j) << "," << jacCols(j)
+//                     << " (" << shot.getFlatDimName(world, jacCols(j)) << ") by "
+//                     << serial - parallel << ": " << serial << " vs " << parallel
+//                     << std::endl;
+//         }
+//       }
+//     }
+//   }
+
+//   for (int i = 0; i < record->getConstraintValues().size(); i++)
+//   {
+//     Eigen::VectorXs con0 = record->getConstraintValues()[i];
+//     Eigen::VectorXs con0Par = recordPar->getConstraintValues()[i];
+//     if (!equals(con0, con0Par, 0))
+//     {
+//       std::cout << "Constraints at eval " << i << " don't match!" << std::endl;
+//     }
+//   }
+
+//   // Playback the trajectory
+//   TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+//   shot.getStates(world, &withKnots, nullptr, true);
+// }
+// #endif
+
+// #ifdef ALL_TESTS
+// TEST(TRAJECTORY, RECOVER_MASS)
+// {
+//   // World
+//   WorldPtr world = World::create();
+//   world->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+//   world->setPenetrationCorrectionEnabled(false);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Create the skeleton with a single revolute joint
+//   /////////////////////////////////////////////////////////////////////
+
+//   SkeletonPtr box = Skeleton::create("box");
+
+//   std::pair<PrismaticJoint*, BodyNode*> boxJointPair
+//       = box->createJointAndBodyNodePair<PrismaticJoint>();
+//   // PrismaticJoint* boxJoint = boxJointPair.first;
+//   BodyNode* boxBody = boxJointPair.second;
+
+//   std::shared_ptr<BoxShape> shape(
+//       new BoxShape(Eigen::Vector3s(0.05, 0.25, 0.05)));
+//   // ShapeNode* boxShape =
+//   boxBody->createShapeNodeWith<VisualAspect, CollisionAspect>(shape);
+
+//   // We're going to tune the full inertia properties of the swinging object
+//   Eigen::VectorXs upperBounds = Eigen::VectorXs::Ones(1) * 5.0;
+//   Eigen::VectorXs lowerBounds = Eigen::VectorXs::Ones(1) * 0.1;
+//   world->getWrtMass()->registerNode(
+//       boxBody,
+//       neural::WrtMassBodyNodeEntryType::INERTIA_MASS,
+//       upperBounds,
+//       lowerBounds);
+
+//   world->addSkeleton(box);
+
+//   assert(world->getNumDofs() == 1);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Run one simulation forward to provide the raw material for our loss to try
+//   // to recover
+//   /////////////////////////////////////////////////////////////////////
+
+//   s_t TRUE_MASS = 2.5;
+//   int STEPS = 12;
+//   int SHOT_LENGTH = 3;
+//   // int GOAL_STEP = 6;
+//   // s_t GOAL_AT_STEP = 0.1;
+
+//   boxBody->setMass(TRUE_MASS);
+//   Eigen::VectorXs knownForce = Eigen::VectorXs::Ones(1) * 0.1;
+//   world->setPositions(Eigen::VectorXs::Zero(1));
+//   world->setVelocities(Eigen::VectorXs::Zero(1));
+//   world->setTimeStep(1e-1);
+
+//   Eigen::VectorXs originalPoses = Eigen::VectorXs::Zero(STEPS);
+//   for (int i = 0; i < STEPS; i++)
+//   {
+//     world->setControlForces(knownForce);
+//     world->step();
+//     originalPoses(i) = world->getPositions()[0];
+//   }
+
+//   // Reset position, scramble mass
+
+//   world->setPositions(Eigen::VectorXs::Zero(1));
+//   world->setVelocities(Eigen::VectorXs::Zero(1));
+//   boxBody->setMass(0.5);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Define a loss
+//   /////////////////////////////////////////////////////////////////////
+
+//   // Get the GOAL_STEP pose as close to GOAL_AT_STEP
+//   TrajectoryLossFn loss
+//       = [originalPoses, STEPS](const TrajectoryRollout* rollout) {
+//           const Eigen::Ref<const Eigen::MatrixXs> poses
+//               = rollout->getPosesConst("identity");
+//           s_t sum = 0.0;
+//           for (int i = 0; i < STEPS; i++)
+//           {
+//             s_t diff = 1e2 * (poses(0, i) - originalPoses(i));
+//             sum += diff * diff;
+//           }
+//           return sum;
+//         };
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Build a trajectory optimization problem
+//   /////////////////////////////////////////////////////////////////////
+
+//   LossFn lossFn = LossFn(loss);
+
+//   MultiShot shot(world, lossFn, STEPS, SHOT_LENGTH, false);
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Pin the forces
+//   /////////////////////////////////////////////////////////////////////
+
+//   for (int i = 0; i < STEPS; i++)
+//   {
+//     shot.pinForce(i, knownForce);
+//   }
+
+//   /////////////////////////////////////////////////////////////////////
+//   // Run optimization
+//   /////////////////////////////////////////////////////////////////////
+
+//   IPOptOptimizer optimizer = IPOptOptimizer();
+//   optimizer.setIterationLimit(50);
+//   optimizer.setCheckDerivatives(true);
+//   optimizer.setTolerance(1e-9);
+//   // optimizer.setRecordFullDebugInfo(true);
+//   std::shared_ptr<Solution> record = optimizer.optimize(&shot);
+
+//   // We should have recovered the mass
+//   s_t error = abs(boxBody->getMass() - TRUE_MASS);
+//   if (error > 1e-7)
+//   {
+//     std::cout << "Recovered mass: " << boxBody->getMass() << std::endl;
+//     std::cout << "Error: " << error << std::endl;
+//     // Get the trajectory
+//     TrajectoryRolloutReal withKnots = TrajectoryRolloutReal(&shot);
+//     shot.getStates(world, &withKnots, nullptr, true);
+//     std::cout << "Original: " << std::endl
+//               << originalPoses.transpose() << std::endl;
+//     std::cout << "Forces: " << std::endl
+//               << withKnots.getControlForces("identity") << std::endl;
+//     std::cout << "Positions: " << std::endl
+//               << withKnots.getPoses("identity") << std::endl;
+
+//     EXPECT_TRUE(error < 1e-7);
+//   }
+// }
+// #endif
 
 #ifdef ALL_TESTS
 TEST(TRAJECTORY, CONSTRAINED_CYCLE)

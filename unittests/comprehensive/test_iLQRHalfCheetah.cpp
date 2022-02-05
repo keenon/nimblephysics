@@ -30,7 +30,7 @@
 #include "stdio.h"
 
 //#define iLQR_TEST
-#define iLQR_MPC_TEST
+//#define iLQR_MPC_TEST
 
 using namespace dart;
 using namespace math;

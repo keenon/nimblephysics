@@ -55,9 +55,9 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
-#define COM_SSID
-#define MASS_SSID
+//#define ALL_TESTS
+//#define COM_SSID
+//#define MASS_SSID
 
 using namespace dart;
 using namespace math;
@@ -1292,6 +1292,7 @@ TEST(REALTIME, CARTPOLE_MU_PLOT)
 }
 #endif
 
+#ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_COM_PLOT)
 {
   ////////////////////////////////////////////////////////////
@@ -1451,3 +1452,4 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
   }
   ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/raw_data/Solutions.csv",solutionMat);
 }
+#endif

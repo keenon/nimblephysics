@@ -28,7 +28,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define iLQR_MPC_TEST
+//#define iLQR_MPC_TEST
 
 using namespace dart;
 using namespace math;
@@ -182,7 +182,7 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
   return std::make_shared<LossFn>(loss, lossGrad);
 }
 
-
+#ifdef iLQR_MPC_TEST
 WorldPtr createWorld(s_t timestep)
 {
   WorldPtr world = World::create();
@@ -268,6 +268,7 @@ WorldPtr createWorld(s_t timestep)
   
   return world;
 }
+#endif
 
 std::mt19937 initializeRandom()
 {

@@ -57,7 +57,7 @@
 #include "stdio.h"
 
 //#define COM_SSID
-#define MASS_SSID
+//#define MASS_SSID
 
 using namespace dart;
 using namespace math;

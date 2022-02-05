@@ -26,7 +26,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define iLQR_TEST
+//#define iLQR_TEST
 
 using namespace dart;
 using namespace math;

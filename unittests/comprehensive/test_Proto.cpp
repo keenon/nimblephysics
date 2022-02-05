@@ -107,6 +107,8 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   std::unordered_map<std::string, Eigen::MatrixXs> vel;
   std::unordered_map<std::string, Eigen::MatrixXs> force;
   Eigen::VectorXs mass = Eigen::VectorXs::Random(dofs);
+  Eigen::VectorXs spring = Eigen::VectorXs::Random(dofs);
+  Eigen::VectorXs damping = Eigen::VectorXs::Random(dofs);
   std::unordered_map<std::string, Eigen::MatrixXs> metadata;
 
   pos["identity"] = Eigen::MatrixXs::Random(dofs, steps);
@@ -121,7 +123,7 @@ TEST(PROTO, SERIALIZE_ROLLOUT)
   metadata["3"] = Eigen::MatrixXs::Random(dofs, steps);
 
   TrajectoryRolloutReal rollout
-      = TrajectoryRolloutReal(pos, vel, force, mass, metadata);
+      = TrajectoryRolloutReal(pos, vel, force, mass, damping, spring, metadata);
 
   proto::TrajectoryRollout proto;
   rollout.serialize(proto);
