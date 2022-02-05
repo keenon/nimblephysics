@@ -92,6 +92,14 @@ struct Contact
   /// Contact normal vector from bodyNode2 to bodyNode1 w.r.t. the world frame
   Eigen::Vector3s normal;
 
+  /// Contact tangent vector 1 from bodyNode2 to bodyNode1 w.r.t. the world
+  /// frame
+  Eigen::Vector3s tangent1;
+
+  /// Contact tangent vector 2 from bodyNode2 to bodyNode1 w.r.t. the world
+  /// frame
+  Eigen::Vector3s tangent2;
+
   /// Contact force acting on bodyNode1 w.r.t. the world frame
   ///
   /// The contact force acting on bodyNode2 is -force, which is the opposite

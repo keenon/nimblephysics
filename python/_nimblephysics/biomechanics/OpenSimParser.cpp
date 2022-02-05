@@ -95,6 +95,44 @@ void OpenSimParser(py::module& m)
       ::py::arg("path"));
 
   sm.def(
+      "saveOsimScalingXMLFile",
+      +[](std::shared_ptr<dynamics::Skeleton> skel,
+          double massKg,
+          double heightM,
+          const std::string& osimInputPath,
+          const std::string& osimOutputPath,
+          const std::string& scalingInstructionsOutputPath) {
+        return dart::biomechanics::OpenSimParser::saveOsimScalingXMLFile(
+            skel,
+            massKg,
+            heightM,
+            osimInputPath,
+            osimOutputPath,
+            scalingInstructionsOutputPath);
+      },
+      ::py::arg("skel"),
+      ::py::arg("massKg"),
+      ::py::arg("heightM"),
+      ::py::arg("osimInputPath"),
+      ::py::arg("osimOutputPath"),
+      ::py::arg("scalingInstructionsOutputPath"));
+
+  sm.def(
+      "moveOsimMarkers",
+      +[](const common::Uri& uri,
+          const std::map<std::string, Eigen::Vector3s>& bodyScales,
+          const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+              markerOffsets,
+          const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::moveOsimMarkers(
+            uri, bodyScales, markerOffsets, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("bodyScales"),
+      ::py::arg("markerOffsets"),
+      ::py::arg("outputPath"));
+
+  sm.def(
       "loadTRC",
       +[](const std::string& path) {
         return dart::biomechanics::OpenSimParser::loadTRC(path);
@@ -108,6 +146,20 @@ void OpenSimParser(py::module& m)
       },
       ::py::arg("skel"),
       ::py::arg("path"));
+
+  sm.def(
+      "saveMot",
+      +[](std::shared_ptr<dynamics::Skeleton> skel,
+          const std::string& path,
+          const std::vector<double>& timestamps,
+          const Eigen::MatrixXs& poses) {
+        return dart::biomechanics::OpenSimParser::saveMot(
+            skel, path, timestamps, poses);
+      },
+      ::py::arg("skel"),
+      ::py::arg("path"),
+      ::py::arg("timestamps"),
+      ::py::arg("poses"));
 
   sm.def(
       "getScaleAndMarkerOffsets",

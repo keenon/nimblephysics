@@ -10,7 +10,10 @@
 #include <unordered_set>
 #include <vector>
 
+#ifdef HAVE_PERF_UTILS
 #include <PerfUtils/Cycles.h>
+#endif
+
 #include <assert.h>
 
 namespace dart {
@@ -51,7 +54,12 @@ int PerformanceLog::mapStringToIndex(const char* c_str)
 //==============================================================================
 inline uint64_t getClock()
 {
+#ifdef HAVE_PERF_UTILS
   return PerfUtils::Cycles::rdtsc();
+#else
+  std::cout << "Trying to use PerformanceLog::getClock() on an unsupported architecture!" << std::endl;
+  return 0;
+#endif
 }
 
 //==============================================================================

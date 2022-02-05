@@ -392,8 +392,8 @@ void testSphereStack()
   /*
   std::shared_ptr<neural::BackpropSnapshot> snapshot =
   neural::forwardPass(world, true); Eigen::MatrixXs forceVel =
-  snapshot->getControlForceVelJacobian(world); std::cout << "force-vel" << std::endl <<
-  forceVel << std::endl; Eigen::MatrixXs velVel =
+  snapshot->getControlForceVelJacobian(world); std::cout << "force-vel" <<
+  std::endl << forceVel << std::endl; Eigen::MatrixXs velVel =
   snapshot->getVelVelJacobian(world); std::cout << "vel-vel" << std::endl <<
   velVel << std::endl; Eigen::MatrixXs A_c =
   snapshot->getClampingConstraintMatrix(world); std::cout << "A_c" << std::endl
@@ -564,7 +564,7 @@ void testTwoBlocks(
   // Test the classic formulation
 
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve(world.get());
+  world->getConstraintSolver()->solve();
 
   EXPECT_TRUE(verifyVelGradients(world, worldVel));
   EXPECT_TRUE(verifyAnalyticalBackprop(world));

@@ -320,7 +320,7 @@ TEST(REALTIME, HALF_CHEETAH_PLOT)
   size_t mass_idx = 10;
 
   world->tuneMass(
-      world->getBodyNodeIndex(mass_idx),
+      world->getBodyNodeByIndex(mass_idx),
       WrtMassBodyNodeEntryType::INERTIA_MASS,
       Eigen::VectorXs::Ones(1) * 5.0,
       Eigen::VectorXs::Ones(1) * 0.2);
@@ -600,7 +600,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   
   // Need to get a body node which is useful for SSID
   ssidWorld->tuneMass(
-    world->getBodyNodeIndex(mass_idx),
+    world->getBodyNodeByIndex(mass_idx),
     WrtMassBodyNodeEntryType::INERTIA_MASS,
     Eigen::VectorXs::Ones(1) * 5.0,
     Eigen::VectorXs::Ones(1) * 0.2);

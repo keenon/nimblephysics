@@ -112,6 +112,11 @@ public:
   Eigen::VectorXs getConstraintForces(
       simulation::World* world, std::vector<std::string> skelNames);
 
+  /// This analytically computes a column of the A_c matrix for a set of
+  /// skeletons.
+  Eigen::VectorXs getConstraintForces(
+      std::vector<std::shared_ptr<dynamics::Skeleton>> skels);
+
   /// This analytically computes a column of the A_c matrix, for this contact
   /// constraint, across the whole world by concatenating the result for each
   /// skeleton together into a single vector.

@@ -9,15 +9,28 @@
 message(STATUS "Dart finding gRPC")
 
 if(APPLE)
-  # set(OPENSSL_ROOT_DIR /usr/local/Cellar/openssl@1.1/1.1.1d/)
-  message(STATUS "Setting root dir for OpenSSL")
-  set(OPENSSL_ROOT_DIR /usr/local/opt/openssl)
+  # x86_64 macs
+  if(EXISTS "/usr/local/opt/openssl")
+    # set(OPENSSL_ROOT_DIR /usr/local/Cellar/openssl@1.1/1.1.1d/)
+    message(STATUS "Setting root dir for OpenSSL")
+    set(OPENSSL_ROOT_DIR /usr/local/opt/openssl)
 
-  find_package(OpenSSL REQUIRED)
-  include_directories(/usr/local/Cellar/openssl@1.1/1.1.1d/include)
-  list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libssl.dylib)
-  list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libcrypto.dylib)
-  message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
+    find_package(OpenSSL REQUIRED)
+    include_directories(/usr/local/Cellar/openssl@1.1/1.1.1d/include)
+    list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libssl.dylib)
+    list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libcrypto.dylib)
+    message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
+  # ARM64 macs
+  elseif(EXISTS "/opt/homebrew/Cellar/openssl@1.1/")
+    message(STATUS "Setting root dir for OpenSSL")
+    set(OPENSSL_ROOT_DIR /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1)
+
+    find_package(OpenSSL REQUIRED)
+    include_directories(/opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/include)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/lib/libssl.dylib)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/lib/libcrypto.dylib)
+    message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
+  endif()
 endif()
 
 find_package(gRPC CONFIG REQUIRED)

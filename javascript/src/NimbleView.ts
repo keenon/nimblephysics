@@ -4,7 +4,8 @@ import "./style.scss";
 
 import View from "./components/View";
 import Slider from "./components/Slider";
-import Plot from "./components/Plot";
+import SimplePlot from "./components/SimplePlot";
+import RichPlot from "./components/RichPlot";
 import VERSION_NUM from "../../VERSION.txt";
 import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
@@ -45,7 +46,7 @@ class DARTView {
   disposeHandlers: Map<string, () => void>;
   objectType: Map<string, string>;
 
-  uiElements: Map<string, Text | Button | Slider | Plot>;
+  uiElements: Map<string, Text | Button | Slider | SimplePlot | RichPlot>;
 
   dragListeners: ((key: string, pos: number[]) => void)[];
 
@@ -116,11 +117,7 @@ class DARTView {
     this.view = new View(this.scene, this.glContainer);
     this.running = false;
 
-    this.glContainer.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === " ") {
-        e.preventDefault();
-      }
-    });
+    this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
 
     /// Get ready to deal with object dragging
 
@@ -191,6 +188,30 @@ class DARTView {
       NUM_SPHERE_SEGMENTS
     );
   }
+
+  glContainerKeyboardEventListener = (e: KeyboardEvent) => {
+    if (e.key === " ") {
+      e.preventDefault();
+    }
+  };
+
+  /**
+   * This cleans up any resources that the view is using
+   */
+  dispose = () => {
+    this.clear();
+
+    // Clean up leftover callbacks that could cause a leak
+    this.disposeHandlers.clear();
+    this.view.setDragHandler(null);
+    this.glContainer.removeEventListener("keydown", this.glContainerKeyboardEventListener);
+
+    this.scene = null;
+    this.view.dispose();
+    this.view = null;
+    this.glContainer.remove();
+    this.uiContainer.remove();
+  };
 
   /**
    * This reads and handles a command sent from the backend
@@ -265,7 +286,7 @@ class DARTView {
         command.contents
       );
     } else if (command.type === "create_plot") {
-      this.createPlot(
+      this.createSimplePlot(
         command.key,
         command.from_top_left,
         command.size,
@@ -276,6 +297,36 @@ class DARTView {
         command.max_y,
         command.ys,
         command.plot_type
+      );
+    } else if (command.type === "create_rich_plot") {
+      this.createRichPlot(
+        command.key,
+        command.from_top_left,
+        command.size,
+        command.min_x,
+        command.max_x,
+        command.min_y,
+        command.max_y,
+        command.title,
+        command.x_axis_label,
+        command.y_axis_label
+      );
+    } else if (command.type === "set_rich_plot_data") {
+      this.setRichPlotData(
+        command.key,
+        command.name,
+        command.xs,
+        command.ys,
+        command.color,
+        command.plot_type
+      );
+    } else if (command.type === "set_rich_plot_bounds") {
+      this.setRichPlotBounds(
+        command.key,
+        command.min_x,
+        command.max_x,
+        command.min_y,
+        command.max_y,
       );
     } else if (command.type === "set_ui_elem_pos") {
       this.setUIElementPosition(command.key, command.from_top_left);
@@ -376,6 +427,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const geometry = new THREE.BoxBufferGeometry(
       SCALE_FACTOR,
       SCALE_FACTOR,
@@ -421,6 +476,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const mesh = new THREE.Mesh(this.sphereGeometry, material);
     mesh.position.x = pos[0] * SCALE_FACTOR;
     mesh.position.y = pos[1] * SCALE_FACTOR;
@@ -460,6 +519,10 @@ class DARTView {
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
     const NUM_SPHERE_SEGMENTS = 18;
     const geometry = new CapsuleBufferGeometry(
       radius * SCALE_FACTOR,
@@ -617,6 +680,10 @@ class DARTView {
           color: new THREE.Color(color[0], color[1], color[2]),
         });
       }
+      if (color.length > 3 && color[3] < 1.0) {
+        meshMaterial.transparent = true;
+        meshMaterial.opacity = color[3];
+      }
 
       const meshPoints = [];
       const rawUVs = [];
@@ -719,6 +786,15 @@ class DARTView {
   setObjectColor = (key: string, color: number[]) => {
     const obj = this.objects.get(key);
     (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
+    if (color.length > 3) {
+      if (color[3] == 1.0) {
+        (obj as any).material.transparent = false;
+      }
+      else {
+        (obj as any).material.transparent = true;
+        (obj as any).material.opacity = color[3];
+      }
+    }
   };
 
   /**
@@ -865,7 +941,7 @@ class DARTView {
   /**
    * This adds a plot to the GUI. This is visible immediately even if you don't call render()
    */
-  createPlot = (
+  createSimplePlot = (
     key: string,
     from_top_left: number[],
     size: number[],
@@ -883,7 +959,7 @@ class DARTView {
       from_top_left,
       size
     );
-    let plot = new Plot(
+    let plot = new SimplePlot(
       container,
       key,
       from_top_left,
@@ -897,6 +973,91 @@ class DARTView {
       plotType
     );
     this.uiElements.set(key, plot);
+  };
+
+  /**
+   * This adds a plot to the GUI. This is visible immediately even if you don't call render()
+   */
+  createRichPlot = (
+    key: string,
+    from_top_left: number[],
+    size: number[],
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number,
+    title: string,
+    xAxisLabel: string,
+    yAxisLabel: string
+  ) => {
+    this.deleteUIElement(key);
+    let container: HTMLDivElement = this._createUIElementContainer(
+      key,
+      from_top_left,
+      size
+    );
+    let plot = new RichPlot(
+      container,
+      key,
+      from_top_left,
+      size,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      title,
+      xAxisLabel,
+      yAxisLabel
+    );
+    this.uiElements.set(key, plot);
+  };
+
+  /**
+   * This sets one data seriese on a rich plot. If there is no rich plot at "key", then this is a no-op.
+   * 
+   * @param key the key for the rich plot
+   * @param dataName the name for the data series (must be unique)
+   * @param xs the array of x points to plot
+   * @param ys the array of y points to plot
+   * @param color the color of the line to plot
+   * @param plotType the type of plot (line or scatter)
+   */
+  setRichPlotData = (
+    key: string,
+    dataName: string,
+    xs: number[],
+    ys: number[],
+    color: string,
+    plotType: "line" | "scatter"
+  ) => {
+    const element = this.uiElements.get(key);
+    if (element != null && element.type === 'rich_plot') {
+      const richPlot: RichPlot = element as RichPlot;
+      richPlot.setLineData(dataName, xs, ys, color, plotType);
+    }
+  };
+
+  /**
+   * This sets the bounds for a rich plot. If there is no rich plot at "key", then this is a no-op.
+   * 
+   * @param key 
+   * @param minX 
+   * @param maxX 
+   * @param minY 
+   * @param maxY 
+   */
+  setRichPlotBounds = (
+    key: string,
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number
+  ) => {
+    const element = this.uiElements.get(key);
+    if (element != null && element.type === 'rich_plot') {
+      const richPlot: RichPlot = element as RichPlot;
+      richPlot.setBounds(minX, maxX, minY, maxY);
+    }
   };
 
   /**

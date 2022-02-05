@@ -11,4 +11,8 @@ from .loader import loadWorld, absPath
 from .models import *
 from .marker_mocap import *
 
+# This requires additional dependencies on `imageio` and `pybullet`, and
+# can be imported separately as `from nimblephysics.bullet_rendered import BulletRenderer`
+# from .bullet_renderer import BulletRenderer
+
 __doc__ = "Python bindings from Nimble"

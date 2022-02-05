@@ -268,6 +268,24 @@ Eigen::VectorXs DifferentiableContactConstraint::getConstraintForces(
 
 //==============================================================================
 Eigen::VectorXs DifferentiableContactConstraint::getConstraintForces(
+    std::vector<std::shared_ptr<dynamics::Skeleton>> skels)
+{
+  int totalDofs = 0;
+  for (auto skel : skels)
+    totalDofs += skel->getNumDofs();
+  Eigen::VectorXs taus = Eigen::VectorXs::Zero(totalDofs);
+  int cursor = 0;
+  for (auto skel : skels)
+  {
+    int dofs = skel->getNumDofs();
+    taus.segment(cursor, dofs) = getConstraintForces(skel);
+    cursor += dofs;
+  }
+  return taus;
+}
+
+//==============================================================================
+Eigen::VectorXs DifferentiableContactConstraint::getConstraintForces(
     simulation::World* world, std::vector<std::string> skelNames)
 {
   int totalDofs = 0;
@@ -463,7 +481,7 @@ Eigen::Vector3s DifferentiableContactConstraint::getContactPositionGradient(
   else if (type == SPHERE_TO_PIPE)
   {
     s_t weight = mContact->pipeRadius
-                    / (mContact->sphereRadius + mContact->pipeRadius);
+                 / (mContact->sphereRadius + mContact->pipeRadius);
 
     Eigen::Vector3s rawGrad
         = math::gradientWrtTheta(worldTwist, mContact->sphereCenter, 0.0);
@@ -483,7 +501,7 @@ Eigen::Vector3s DifferentiableContactConstraint::getContactPositionGradient(
         mContact->sphereCenter,
         Eigen::Vector3s::Zero());
     s_t weight = mContact->sphereRadius
-                    / (mContact->sphereRadius + mContact->pipeRadius);
+                 / (mContact->sphereRadius + mContact->pipeRadius);
     return weight * rawGrad;
   }
   else if (type == PIPE_A)
@@ -2055,7 +2073,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
     Eigen::Vector6s worldTwist = getWorldScrewAxisForPosition(skel, dofIndex);
     Eigen::Isometry3s rotation = math::expMap(worldTwist * eps);
     s_t weight = mContact->pipeRadius
-                    / (mContact->sphereRadius + mContact->pipeRadius);
+                 / (mContact->sphereRadius + mContact->pipeRadius);
 
     Eigen::Vector3s posDiff
         = (rotation * mContact->sphereCenter) - mContact->sphereCenter;
@@ -2081,7 +2099,7 @@ DifferentiableContactConstraint::estimatePerturbedContactPosition(
                               - mContact->pipeClosestPoint;
 
     s_t weight = mContact->sphereRadius
-                    / (mContact->sphereRadius + mContact->pipeRadius);
+                 / (mContact->sphereRadius + mContact->pipeRadius);
 
     return contactPos + (weight * posDiff);
   }
@@ -2631,9 +2649,7 @@ EdgeData DifferentiableContactConstraint::getEdges()
 /// when rotated by another screw.
 Eigen::Vector6s
 DifferentiableContactConstraint::estimatePerturbedScrewAxisForPosition(
-    dynamics::DegreeOfFreedom* axis,
-    dynamics::DegreeOfFreedom* rotate,
-    s_t eps)
+    dynamics::DegreeOfFreedom* axis, dynamics::DegreeOfFreedom* rotate, s_t eps)
 {
   Eigen::Vector6s originalAxisWorldTwist = getWorldScrewAxisForPosition(axis);
 
@@ -2683,9 +2699,7 @@ DifferentiableContactConstraint::estimatePerturbedScrewAxisForPosition(
 /// when rotated by another screw.
 Eigen::Vector6s
 DifferentiableContactConstraint::estimatePerturbedScrewAxisForForce(
-    dynamics::DegreeOfFreedom* axis,
-    dynamics::DegreeOfFreedom* rotate,
-    s_t eps)
+    dynamics::DegreeOfFreedom* axis, dynamics::DegreeOfFreedom* rotate, s_t eps)
 {
   Eigen::Vector6s originalAxisWorldTwist = getWorldScrewAxisForForce(axis);
 
@@ -2817,9 +2831,7 @@ DifferentiableContactConstraint::bruteForcePerturbedContactForceDirection(
 /// Just for testing: This perturbs the world position of a skeleton to read a
 /// screw axis will move when rotated by another screw.
 Eigen::Vector6s DifferentiableContactConstraint::bruteForceScrewAxisForPosition(
-    dynamics::DegreeOfFreedom* axis,
-    dynamics::DegreeOfFreedom* rotate,
-    s_t eps)
+    dynamics::DegreeOfFreedom* axis, dynamics::DegreeOfFreedom* rotate, s_t eps)
 {
   s_t originalPos = rotate->getPosition();
   rotate->setPosition(originalPos + eps);
@@ -2835,9 +2847,7 @@ Eigen::Vector6s DifferentiableContactConstraint::bruteForceScrewAxisForPosition(
 /// Just for testing: This perturbs the world position of a skeleton to read a
 /// screw axis will move when rotated by another screw.
 Eigen::Vector6s DifferentiableContactConstraint::bruteForceScrewAxisForForce(
-    dynamics::DegreeOfFreedom* axis,
-    dynamics::DegreeOfFreedom* rotate,
-    s_t eps)
+    dynamics::DegreeOfFreedom* axis, dynamics::DegreeOfFreedom* rotate, s_t eps)
 {
   s_t originalPos = rotate->getPosition();
   rotate->setPosition(originalPos + eps);

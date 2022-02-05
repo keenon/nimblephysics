@@ -129,12 +129,40 @@
   );
 }
 
+.NimbleStandalone-plot-title {
+
+}
+
+$triangle-size: 5px;
+
+.NimbleStandalone-triangle {
+  width: 0; 
+  height: 0; 
+  display: inline-block;
+  margin-left: 5px;
+
+  &.NimbleStandalone-triangle-shown {
+    border-left: $triangle-size solid transparent;
+    border-right: $triangle-size solid transparent;
+    
+    border-top: $triangle-size solid black;
+    margin-bottom: 2px;
+  }
+
+  &.NimbleStandalone-triangle-hidden {
+    border-top: $triangle-size solid transparent;
+    border-bottom: $triangle-size solid transparent;
+    border-left: $triangle-size solid black;
+  }
+}
+
 .DARTWindow {
   background-color: #aaaaaa;
   overscroll-behavior: none;
   margin: 0px;
   /* width: 100vw; */
-  font-family: "Roboto Mono", monospace;
+  /* font-family: "Roboto Mono", monospace; */
+  font-family: "Helvetica", sans-serif;
   position: relative;
 
   .DARTWindow-gl {

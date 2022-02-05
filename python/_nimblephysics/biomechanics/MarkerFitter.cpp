@@ -209,6 +209,11 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setIterationLimit,
           ::py::arg("iters"))
       .def(
+          "setAnthropometricPrior",
+          &dart::biomechanics::MarkerFitter::setAnthropometricPrior,
+          ::py::arg("prior"),
+          ::py::arg("weight") = 0.001)
+      .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))
@@ -241,7 +246,45 @@ void MarkerFitter(py::module& m)
           "runKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
           ::py::arg("markerObservations"),
-          ::py::arg("params"))
+          ::py::arg("params"),
+          ::py::arg("numSamples") = 20)
+      .def(
+          "setMinJointVarianceCutoff",
+          &dart::biomechanics::MarkerFitter::setMinJointVarianceCutoff,
+          ::py::arg("cutoff"))
+      .def(
+          "setMinSphereFitScore",
+          &dart::biomechanics::MarkerFitter::setMinSphereFitScore,
+          ::py::arg("score"))
+      .def(
+          "setMinAxisFitScore",
+          &dart::biomechanics::MarkerFitter::setMinAxisFitScore,
+          ::py::arg("score"))
+      .def(
+          "setRegularizeAnatomicalMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizeAnatomicalMarkerOffsets,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeTrackingMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::setRegularizeTrackingMarkerOffsets,
+          ::py::arg("weight"))
+      .def(
+          "setDebugJointVariability",
+          &dart::biomechanics::MarkerFitter::setDebugJointVariability,
+          ::py::arg("debug"))
+      .def(
+          "debugTrajectoryAndMarkersToGUI",
+          &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
+          ::py::arg("server"),
+          ::py::arg("init"),
+          ::py::arg("markerObservations"))
+      .def(
+          "saveTrajectoryAndMarkersToGUI",
+          &dart::biomechanics::MarkerFitter::saveTrajectoryAndMarkersToGUI,
+          ::py::arg("path"),
+          ::py::arg("init"),
+          ::py::arg("markerObservations"))
       .def_static(
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,

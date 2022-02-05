@@ -1,18 +1,70 @@
 import NimbleStandalone from "./NimbleStandalone";
+import NimbleStandaloneReact from "./NimbleStandaloneReact";
+import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
+import previewJson from './data/preview.json';
 
-// Publish this so that any downstream object can use it
-(document as any).NimbleStandalone = NimbleStandalone;
+const ReactTestBed = () => {
+  const [show, setShow] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0.0);
+
+  let children = [];
+  children.push(React.createElement("button", {
+    onClick: () => {
+      setShow(!show);
+    },
+    key: 'show'
+  }, show ? "Hide" : "Show"));
+
+  if (show) {
+    children.push(React.createElement("button", {
+      onClick: () => {
+        setLoading(!loading);
+      },
+      key: 'loading'
+    }, loading ? "Set Not Loading" : "Set Loading"));
+    children.push(React.createElement("button", {
+      onClick: () => {
+        setLoaded(!loaded);
+      },
+      key: 'loaded'
+    }, loaded ? "Set Not Loaded" : "Set Loaded"));
+    if (loading) {
+      children.push(React.createElement("input", {
+        type: 'range',
+        min: '0',
+        max: '1',
+        value: loadingProgress,
+        step: 'any',
+        onChange: (e: any) => {
+          setLoadingProgress(e.target.value);
+        },
+        key: 'loadingProgress'
+      }));
+    }
+
+    children.push(React.createElement(NimbleStandaloneReact, {
+      loading,
+      loadingProgress,
+      recording: loaded ? previewJson : null,
+      style: {
+        width: "800px",
+        height: "500px"
+      },
+      key: 'gui'
+    }));
+  }
+
+  return React.createElement(
+    "div",
+    {
+    },
+    children
+  );
+};
 
 const container = document.createElement("div");
-container.style.width = "90vw";
-container.style.height = "90vh";
-container.style.marginTop = "5vh";
-container.style.marginLeft = "5vw";
-container.style.border = "1px solid grey";
 document.body.appendChild(container);
-const standalone: NimbleStandalone = new NimbleStandalone(container);
-// Much larger file:
-// https://mocap-processed.s3.us-west-2.amazonaws.com/michael.json
-standalone.loadRecording(
-  "https://mocap-processed.s3.us-west-2.amazonaws.com/laiArnold.json"
-);
+ReactDOM.render(React.createElement(ReactTestBed), container);

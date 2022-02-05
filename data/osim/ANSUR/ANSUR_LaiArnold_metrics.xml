@@ -1,0 +1,145 @@
+<Metrics>
+  <!-- (75) STATURE -->
+  <Metric>
+    <Name>stature</Name>
+    <MarkerA>
+      <BodyNode>torso</BodyNode>
+      <Offset>0.0 0.65 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0.0 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (52) ILIOCRISTALE HEIGHT -->
+  <Metric>
+    <Name>iliocristaleheight</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>-0.08 0.085 0.08</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (27) CROTCH HEIGHT -->
+  <Metric>
+    <Name>crotchheight</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0 -0.12 0.0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (83) TROCHANTERION HEIGHT -->
+  <Metric>
+    <Name>trochanterionheight</Name>
+    <MarkerA>
+      <BodyNode>femur_r</BodyNode>
+      <Offset>-0.02 0.0 0.05</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  
+  <!-- (10) BICRISTAL BREADTH -->
+  <Metric>
+    <Name>bicristalbreadth</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0.0 0.0 -0.13</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0.0 0.0 0.13</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (50) HIP BREADTH -->
+  <!--
+  <Metric>
+    <Name>hipbreadth</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0.00 0.0 -0.16</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0.00 0.0 0.16</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  -->
+  <!-- (88) WAIST DEPTH -->
+  <Metric>
+    <Name>waistdepth</Name>
+    <MarkerA>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>0.10 0.08 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>pelvis</BodyNode>
+      <Offset>-0.12 0.08 0.0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (25) CHEST DEPTH* -->
+  <Metric>
+    <Name>chestdepth</Name>
+    <MarkerA>
+      <BodyNode>torso</BodyNode>
+      <Offset>0.12 0.3 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>torso</BodyNode>
+      <Offset>-0.12 0.3 0.0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (8) BIACROMIAL BREADTH -->
+  <Metric>
+    <Name>biacromialbreadth</Name>
+    <MarkerA>
+      <BodyNode>torso</BodyNode>
+      <Offset>0.0 0.4 0.18</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>torso</BodyNode>
+      <Offset>0.0 0.4 -0.18</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (81) TIBIAL HEIGHT -->
+  <Metric>
+    <Name>tibialheight</Name>
+    <MarkerA>
+      <BodyNode>tibia_r</BodyNode>
+      <Offset>0.0 -0.02 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <BodyNode>calcn_r</BodyNode>
+      <Offset>0.0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+</Metrics>

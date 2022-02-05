@@ -82,6 +82,9 @@ public:
   /// Return number of constraints in this constrained group
   std::size_t getNumConstraints() const;
 
+  /// Return a list of all constraints in this group
+  std::vector<ConstraintBasePtr> getConstraints();
+
   /// Return a constraint
   ConstraintBasePtr getConstraint(std::size_t _index);
 

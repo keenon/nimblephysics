@@ -109,7 +109,7 @@ setup(
     license='MIT',
     package_dir={'': 'python'},
     packages=['nimblephysics'],
-    package_data={'nimblephysics': ['web_gui/*', 'models/*']},
+    package_data={'nimblephysics': ['web_gui/*', 'web_gui/*/*', 'web_gui/*/*/*', 'models/*', 'models/*/*', 'models/*/*/*']},
     ext_package='nimblephysics_libs',
     ext_modules=[CMakeExtension('cmake_example', target='_nimblephysics')],
     install_requires=[

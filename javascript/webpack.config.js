@@ -1,13 +1,19 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+var DeclarationBundlerPlugin = require('declaration-bundler-webpack-plugin');
 
-const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = false;
+/// Set this to "true" to serve the `embedded_dev.ts` entry point from the dev server.
+/// Set this to "false" to serve the `live.ts` entry point from the dev server.
+const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = true;
 
 module.exports = {
   entry: {
     live: "./src/live.ts",
     embedded: "./src/embedded.ts",
-    embedded_dev: "./src/embedded_dev.ts"
+    embedded_dev: "./src/embedded_dev.ts",
+    NimbleStandaloneReact: "./src/NimbleStandaloneReact.ts",
+    NimbleStandalone: "./src/NimbleStandalone.ts",
+    NimbleRemote: "./src/NimbleRemote.ts"
   },
   module: {
     rules: [
@@ -40,12 +46,18 @@ module.exports = {
     path: path.join(__dirname, "dist"),
     publicPath: "/",
     filename: "[name].js",
+    // TODO: we may need to remove these options for the "live" entrypoint
+    library: "[name]",
+    libraryTarget: "umd"
+  },
+  externals: {
+    react: 'commonjs2 react'
   },
   plugins: [
     new HtmlWebpackPlugin({
       template: path.join(__dirname, "src", "index.html"),
       excludeChunks: ['embedded', DEV_SERVER_SERVE_EMBEDDED_DEV_CODE ? 'live' : 'embedded_dev']
-    }),
+    })
   ],
   devServer: {
     contentBase: path.join(__dirname, "dist"),

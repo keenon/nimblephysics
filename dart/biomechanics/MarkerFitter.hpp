@@ -11,6 +11,7 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -31,6 +32,7 @@ struct BilevelFitResult
   Eigen::VectorXs groupScales;
   std::vector<Eigen::VectorXs> poses;
   Eigen::MatrixXs posesMatrix;
+  std::vector<int> sampleIndices;
   std::map<std::string, Eigen::Vector3s> markerOffsets;
 
   Eigen::VectorXs rawMarkerOffsets;
@@ -51,6 +53,8 @@ struct MarkerFitterState
   // The current state
   std::vector<std::string> bodyNames;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyScales;
+  Eigen::VectorXs jointWeights;
+  Eigen::VectorXs axisWeights;
 
   std::vector<std::string> markerOrder;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsets;
@@ -58,6 +62,7 @@ struct MarkerFitterState
   Eigen::MatrixXs posesAtTimesteps;
   std::vector<std::string> jointOrder;
   Eigen::MatrixXs jointErrorsAtTimesteps;
+  Eigen::MatrixXs axisErrorsAtTimesteps;
 
   // The gradient of the current state, which is not always used, but can help
   // shuttling information back and forth from friendly PyTorch APIs.
@@ -66,6 +71,7 @@ struct MarkerFitterState
   Eigen::MatrixXs markerErrorsAtTimestepsGrad;
   Eigen::MatrixXs posesAtTimestepsGrad;
   Eigen::MatrixXs jointErrorsAtTimestepsGrad;
+  Eigen::MatrixXs axisErrorsAtTimestepsGrad;
 
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
@@ -73,6 +79,9 @@ struct MarkerFitterState
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
+      Eigen::VectorXs jointWeights,
+      Eigen::MatrixXs jointAxis,
+      Eigen::VectorXs axisWeights,
       MarkerFitter* fitter);
 
   /// This returns a single flat vector representing this whole problem state
@@ -87,6 +96,7 @@ protected:
   std::shared_ptr<dynamics::Skeleton> skeleton;
   std::vector<dynamics::Joint*> joints;
   Eigen::MatrixXs jointCenters;
+  Eigen::MatrixXs jointAxis;
   MarkerFitter* fitter;
 };
 
@@ -97,20 +107,28 @@ protected:
 struct MarkerInitialization
 {
   Eigen::MatrixXs poses;
+  Eigen::VectorXs
+      poseScores; // These are the loss values for IK at each timestep
   Eigen::VectorXs groupScales;
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       updatedMarkerMap;
 
   std::vector<dynamics::Joint*> joints;
+  Eigen::VectorXs jointMarkerVariability;
+  Eigen::VectorXs jointLoss;
+  Eigen::VectorXs jointWeights;
   Eigen::MatrixXs jointCenters;
+  Eigen::VectorXs axisWeights;
+  Eigen::VectorXs axisLoss;
+  Eigen::MatrixXs jointAxis;
 };
 
 /**
  * This sets up and finds the joint centers using a non-convex sphere-fitting
  * method.
  */
-class SphereFitJointCenterProblem : public Ipopt::TNLP
+class SphereFitJointCenterProblem
 {
 public:
   SphereFitJointCenterProblem(
@@ -135,130 +153,16 @@ public:
 
   Eigen::VectorXs finiteDifferenceGradient();
 
-  //------------------------- Ipopt::TNLP --------------------------------------
-  /// \brief Method to return some info about the nlp
-  bool get_nlp_info(
-      Ipopt::Index& n,
-      Ipopt::Index& m,
-      Ipopt::Index& nnz_jac_g,
-      Ipopt::Index& nnz_h_lag,
-      Ipopt::TNLP::IndexStyleEnum& index_style) override;
-
-  /// \brief Method to return the bounds for my problem
-  bool get_bounds_info(
-      Ipopt::Index n,
-      Ipopt::Number* x_l,
-      Ipopt::Number* x_u,
-      Ipopt::Index m,
-      Ipopt::Number* g_l,
-      Ipopt::Number* g_u) override;
-
-  /// \brief Method to return the starting point for the algorithm
-  bool get_starting_point(
-      Ipopt::Index n,
-      bool init_x,
-      Ipopt::Number* x,
-      bool init_z,
-      Ipopt::Number* z_L,
-      Ipopt::Number* z_U,
-      Ipopt::Index m,
-      bool init_lambda,
-      Ipopt::Number* lambda) override;
-
-  /// \brief Method to return the objective value
-  bool eval_f(
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      bool _new_x,
-      Ipopt::Number& _obj_value) override;
-
-  /// \brief Method to return the gradient of the objective
-  bool eval_grad_f(
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      bool _new_x,
-      Ipopt::Number* _grad_f) override;
-
-  /// \brief Method to return the constraint residuals
-  bool eval_g(
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      bool _new_x,
-      Ipopt::Index _m,
-      Ipopt::Number* _g) override;
-
-  /// \brief Method to return:
-  ///        1) The structure of the jacobian (if "values" is nullptr)
-  ///        2) The values of the jacobian (if "values" is not nullptr)
-  bool eval_jac_g(
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      bool _new_x,
-      Ipopt::Index _m,
-      Ipopt::Index _nele_jac,
-      Ipopt::Index* _iRow,
-      Ipopt::Index* _jCol,
-      Ipopt::Number* _values) override;
-
-  /// \brief Method to return:
-  ///        1) The structure of the hessian of the lagrangian (if "values" is
-  ///           nullptr)
-  ///        2) The values of the hessian of the lagrangian (if "values" is not
-  ///           nullptr)
-  bool eval_h(
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      bool _new_x,
-      Ipopt::Number _obj_factor,
-      Ipopt::Index _m,
-      const Ipopt::Number* _lambda,
-      bool _new_lambda,
-      Ipopt::Index _nele_hess,
-      Ipopt::Index* _iRow,
-      Ipopt::Index* _jCol,
-      Ipopt::Number* _values) override;
-
-  void saveSolutionBackToInitialization();
-
-  /// \brief This method is called when the algorithm is complete so the TNLP
-  ///        can store/write the solution
-  void finalize_solution(
-      Ipopt::SolverReturn _status,
-      Ipopt::Index _n,
-      const Ipopt::Number* _x,
-      const Ipopt::Number* _z_L,
-      const Ipopt::Number* _z_U,
-      Ipopt::Index _m,
-      const Ipopt::Number* _g,
-      const Ipopt::Number* _lambda,
-      Ipopt::Number _obj_value,
-      const Ipopt::IpoptData* _ip_data,
-      Ipopt::IpoptCalculatedQuantities* _ip_cq) override;
-
-  bool intermediate_callback(
-      Ipopt::AlgorithmMode mode,
-      Ipopt::Index iter,
-      Ipopt::Number obj_value,
-      Ipopt::Number inf_pr,
-      Ipopt::Number inf_du,
-      Ipopt::Number mu,
-      Ipopt::Number d_norm,
-      Ipopt::Number regularization_size,
-      Ipopt::Number alpha_du,
-      Ipopt::Number alpha_pr,
-      Ipopt::Index ls_trials,
-      const Ipopt::IpoptData* ip_data,
-      Ipopt::IpoptCalculatedQuantities* ip_cq) override;
+  /// This writes the solution back to the output matrix reference passed in
+  /// during initialization. This also returns a loss we achieved, which can be
+  /// used as a confidence for downstream tasks.
+  s_t saveSolutionBackToInitialization();
 
 protected:
   MarkerFitter* mFitter;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
-  Eigen::MatrixXs mIkPoses;
-  dynamics::Joint* mJoint;
   Eigen::Ref<Eigen::MatrixXs> mOut;
   s_t mSmoothingLoss;
-
-  std::vector<std::pair<int, int>> mThreadSplits;
 
 public:
   std::vector<std::string> mActiveMarkers;
@@ -268,6 +172,65 @@ public:
   Eigen::MatrixXi mMarkerObserved;
   Eigen::VectorXs mRadii;
   Eigen::VectorXs mCenterPoints;
+  std::string mJointName;
+};
+
+/**
+ * This sets up and finds the joint centers using a non-convex sphere-fitting
+ * method.
+ */
+class CylinderFitJointAxisProblem
+{
+public:
+  CylinderFitJointAxisProblem(
+      MarkerFitter* fitter,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      Eigen::MatrixXs ikPoses,
+      dynamics::Joint* joint,
+      Eigen::MatrixXs centers,
+      Eigen::Ref<Eigen::MatrixXs> out);
+
+  static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
+
+  int getProblemDim();
+
+  Eigen::VectorXs flatten();
+
+  void unflatten(Eigen::VectorXs x);
+
+  s_t getLoss();
+
+  Eigen::VectorXs getGradient();
+
+  Eigen::VectorXs finiteDifferenceGradient();
+
+  /// This writes the solution back to the output matrix reference passed in
+  /// during initialization. This also returns a loss we achieved, which can be
+  /// used as a confidence for downstream tasks.
+  s_t saveSolutionBackToInitialization();
+
+protected:
+  MarkerFitter* mFitter;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  Eigen::Ref<Eigen::MatrixXs> mOut;
+  s_t mKeepCenterLoss;
+  s_t mSmoothingCenterLoss;
+  s_t mSmoothingAxisLoss;
+
+  std::vector<std::pair<int, int>> mThreadSplits;
+
+public:
+  std::vector<std::string> mActiveMarkers;
+
+  int mNumTimesteps;
+  Eigen::MatrixXs mJointCenters;
+  Eigen::MatrixXs mMarkerPositions;
+  Eigen::MatrixXi mMarkerObserved;
+  Eigen::VectorXs mPerpendicularRadii;
+  Eigen::VectorXs mParallelRadii;
+  Eigen::VectorXs mAxisLines;
+  std::string mJointName;
 };
 
 /**
@@ -280,6 +243,10 @@ struct InitialMarkerFitParams
   std::vector<dynamics::Joint*> joints;
   Eigen::MatrixXs jointCenters;
   Eigen::VectorXs jointWeights;
+
+  Eigen::MatrixXs jointAxis;
+  Eigen::VectorXs axisWeights;
+
   int numBlocks;
   Eigen::MatrixXs initPoses;
 
@@ -297,6 +264,8 @@ struct InitialMarkerFitParams
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
       Eigen::VectorXs jointWeights);
+  InitialMarkerFitParams& setJointAxisAndWeights(
+      Eigen::MatrixXs jointAxis, Eigen::VectorXs axisWeights);
   InitialMarkerFitParams& setNumBlocks(int numBlocks);
   InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
   InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
@@ -325,7 +294,24 @@ public:
   MarkerInitialization runKinematicsPipeline(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      InitialMarkerFitParams params = InitialMarkerFitParams());
+      InitialMarkerFitParams params = InitialMarkerFitParams(),
+      int numSamples = 20);
+
+  /// This runs a server to display the detailed trajectory information, along
+  /// with fit data
+  void debugTrajectoryAndMarkersToGUI(
+      std::shared_ptr<server::GUIWebsocketServer> server,
+      MarkerInitialization init,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This saves a GUI state machine log to display detailed trajectory
+  /// information
+  void saveTrajectoryAndMarkersToGUI(
+      std::string path,
+      MarkerInitialization init,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerTrajectories);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 1 and 3: (Re)Initialize scaling+IK
@@ -340,6 +326,25 @@ public:
           markerObservations,
       InitialMarkerFitParams params);
 
+  /// This computes the IK diff for joint positions, given a bunch of weighted
+  /// joint centers and also a bunch of weighted joint axis.
+  static void computeJointIKDiff(
+      Eigen::Ref<Eigen::VectorXs> diff,
+      Eigen::VectorXs& jointPoses,
+      Eigen::VectorXs& jointCenters,
+      Eigen::VectorXs& jointWeights,
+      Eigen::VectorXs& jointAxis,
+      Eigen::VectorXs& axisWeights);
+
+  /// This takes a Jacobian of joint world positions (with respect to anything),
+  /// and rescales and reshapes to reflect the weights on joint and axis losses,
+  /// as well as the direction for axis losses.
+  static void rescaleIKJacobianForWeightsAndAxis(
+      Eigen::Ref<Eigen::MatrixXs> jac,
+      Eigen::VectorXs& jointWeights,
+      Eigen::VectorXs& jointAxis,
+      Eigen::VectorXs& axisWeights);
+
   /// This scales the skeleton and IK fits to the marker observations. It
   /// returns a pair, with (pose, group scales) from the fit.
   static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
@@ -351,6 +356,8 @@ public:
       std::vector<dynamics::Joint*> joints,
       Eigen::VectorXs jointCenters,
       Eigen::VectorXs jointWeights,
+      Eigen::VectorXs jointAxis,
+      Eigen::VectorXs axisWeights,
       bool dontScale = false);
 
   /// Pipeline step 1, 3, and 5:
@@ -365,7 +372,11 @@ public:
       std::vector<dynamics::Joint*> joints,
       std::vector<Eigen::VectorXs> jointCenters,
       Eigen::VectorXs jointWeights,
-      Eigen::Ref<Eigen::MatrixXs> result);
+      std::vector<Eigen::VectorXs> jointAxis,
+      Eigen::VectorXs axisWeights,
+      Eigen::Ref<Eigen::MatrixXs> result,
+      Eigen::Ref<Eigen::VectorXs> resultScores,
+      bool backwards = false);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 2: Find joint centers
@@ -384,10 +395,61 @@ public:
       std::shared_ptr<SphereFitJointCenterProblem> problem,
       bool logSteps = false);
 
-  /// This finds the trajectory for a single specified joint center over time
-  void findJointCenterLBFGS(
-      int joint,
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 3: Find joint axis
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// This solves a bunch of optimization problems, one per joint, to find and
+  /// track the joint centers over time. It puts the results back into
+  /// `initialization`
+  void findAllJointAxis(
       MarkerInitialization& initialization,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This finds the trajectory for a single specified joint axis over time
+  std::shared_ptr<CylinderFitJointAxisProblem> findJointAxis(
+      std::shared_ptr<CylinderFitJointAxisProblem> problem,
+      bool logSteps = false);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 3.5: Weight the joint centers + joint axis
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// This computes several metrics, including the variation in the marker
+  /// movement for each joint, which then go into computing how much weight we
+  /// should put on each joint center / joint axis.
+  void computeJointConfidences(
+      MarkerInitialization& initialization,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// This sets the minimum joint variance allowed before
+  /// computeJointConfidences() will cut off a joint as having too low variance
+  void setMinJointVarianceCutoff(s_t cutoff);
+
+  /// This sets the value used to compute sphere fit weights
+  void setMinSphereFitScore(s_t score);
+
+  /// This sets the value used to compute axis fit weights
+  void setMinAxisFitScore(s_t score);
+
+  /// This sets the value weight used to regularize tracking marker offsets from
+  /// where the model thinks they should be
+  void setRegularizeTrackingMarkerOffsets(s_t weight);
+
+  /// This sets the value weight used to regularize anatomical marker offsets
+  /// from where the model thinks they should be
+  void setRegularizeAnatomicalMarkerOffsets(s_t weight);
+
+  /// If set to true, we print the pair observation counts and data for
+  /// computing joint variability.
+  void setDebugJointVariability(bool debug);
+
+  /// This returns a score summarizing how much the markers attached to this
+  /// joint move relative to one another.
+  s_t computeJointVariability(
+      dynamics::Joint* joint,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
 
@@ -405,7 +467,22 @@ public:
       int numSamples);
 
   ///////////////////////////////////////////////////////////////////////////
-  // Pipeline step 5: Run through and do a linear initialization of masses based
+  // Pipeline step 5: Complete the intermittent pose information of the
+  // BilevelFitResult by running IK to extend each section.
+  ///////////////////////////////////////////////////////////////////////////
+
+  /// The bilevel optimization only picks a subset of poses to fine tune. This
+  /// method takes those poses as a starting point, and extends each pose
+  /// forward and backwards (half the distance to the next pose to fine tune)
+  /// with IK.
+  MarkerInitialization completeBilevelResult(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      std::shared_ptr<BilevelFitResult> result,
+      InitialMarkerFitParams params);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Pipeline step 6: Run through and do a linear initialization of masses based
   // on link masses.
   ///////////////////////////////////////////////////////////////////////////
 
@@ -491,6 +568,11 @@ public:
 
   /// Sets the maximum number of iterations for IPOPT
   void setIterationLimit(int limit);
+
+  /// This sets an anthropometric prior which is used by the default loss. If
+  /// you've called `setCustomLossAndGrad` then this has no effect.
+  void setAnthropometricPrior(
+      std::shared_ptr<biomechanics::Anthropometrics> prior, s_t weight = 0.001);
 
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
@@ -670,6 +752,7 @@ public:
 
   friend class BilevelFitProblem;
   friend class SphereFitJointCenterProblem;
+  friend class CylinderFitJointAxisProblem;
   friend struct MarkerFitterState;
 
 protected:
@@ -691,9 +774,21 @@ protected:
   std::map<std::string, std::function<s_t(MarkerFitterState*)>>
       mZeroConstraints;
 
+  /// This is an optional prior to use when computing default loss, which can
+  /// add its log-PDF to standard loss
+  std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
+  s_t mAnthropometricWeight;
+
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;
   s_t mMaxMarkerOffset;
+  // Parameters for joint weighting
+  s_t mMinVarianceCutoff;
+  s_t mMinSphereFitScore;
+  s_t mMinAxisFitScore;
+  bool mDebugJointVariability;
+  s_t mRegularizeTrackingMarkerOffsets;
+  s_t mRegularizeAnatomicalMarkerOffsets;
 
   // These are IPOPT settings
   double mTolerance;
@@ -899,10 +994,18 @@ protected:
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerMapObservations;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
   Eigen::MatrixXs mJointCenters;
+  Eigen::VectorXs mJointWeights;
+  Eigen::MatrixXs mJointAxis;
+  Eigen::VectorXs mAxisWeights;
   std::vector<int> mSampleIndices;
   MarkerInitialization& mInitialization;
   Eigen::VectorXs mObservationWeights;
   std::shared_ptr<BilevelFitResult>& mOutResult;
+
+  int mBestObjectiveValueIteration;
+  s_t mBestObjectiveValue;
+  Eigen::VectorXs mLastX;
+  Eigen::VectorXs mBestObjectiveValueState;
 
   // Thread state
 

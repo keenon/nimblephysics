@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
@@ -796,7 +797,7 @@ bool debugIKInitializationToGUI(
             server.createLine(
                 "marker_error_" + std::to_string(i),
                 line,
-                Eigen::Vector3s::UnitX());
+                Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
           }
 
           return clampedPos;
@@ -990,7 +991,7 @@ bool debugFitToGUI(
             server.createLine(
                 "marker_error_" + std::to_string(i),
                 line,
-                Eigen::Vector3s::UnitX());
+                Eigen::Vector4s(1, 0, 0, 1));
           }
 
           return clampedPos;
@@ -1057,131 +1058,6 @@ bool debugFitToGUI(
   server.blockWhileServing();
 
   return true;
-}
-
-void debugTrajectoryAndMarkersToGUI(
-    std::shared_ptr<dynamics::Skeleton>& skel,
-    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-        markers,
-    Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
-    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0))
-{
-  server::GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderSkeleton(skel);
-
-  int numJoints = jointCenters.rows() / 3;
-  for (int i = 0; i < numJoints; i++)
-  {
-    server.createSphere(
-        "joint_center_" + std::to_string(i),
-        0.02,
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector3s(0, 0, 1));
-  }
-
-  int timestep = 0;
-  Ticker ticker(1.0 / 50);
-  ticker.registerTickListener([&](long) {
-    skel->setPositions(poses.col(timestep));
-    server.renderSkeleton(skel);
-
-    std::map<std::string, Eigen::Vector3s> markerWorldPositions
-        = markerTrajectories[timestep];
-    server.deleteObjectsByPrefix("marker_error_");
-    for (auto pair : markerWorldPositions)
-    {
-      if (markers.count(pair.first) > 0)
-      {
-        Eigen::Vector3s worldObserved = pair.second;
-        Eigen::Vector3s worldInferred
-            = markers[pair.first].first->getWorldTransform()
-              * (markers[pair.first].second.cwiseProduct(
-                  markers[pair.first].first->getScale()));
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(worldObserved);
-        points.push_back(worldInferred);
-        server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
-      }
-    }
-
-    for (int i = 0; i < numJoints; i++)
-    {
-      server.setObjectPosition(
-          "joint_center_" + std::to_string(i),
-          jointCenters.block<3, 1>(i * 3, timestep));
-    }
-
-    timestep++;
-    if (timestep >= poses.cols())
-    {
-      timestep = 0;
-    }
-  });
-  server.registerConnectionListener([&]() { ticker.start(); });
-  server.blockWhileServing();
-}
-
-void saveTrajectoryAndMarkersToGUI(
-    std::string path,
-    std::shared_ptr<dynamics::Skeleton>& skel,
-    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-        markers,
-    Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrajectories,
-    Eigen::MatrixXs jointCenters = Eigen::MatrixXs::Zero(0, 0))
-{
-  server::GUIRecording server;
-  server.renderSkeleton(skel);
-
-  int numJoints = jointCenters.rows() / 3;
-  for (int i = 0; i < numJoints; i++)
-  {
-    server.createSphere(
-        "joint_center_" + std::to_string(i),
-        0.02,
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector3s(0, 0, 1));
-  }
-
-  for (int timestep = 0; timestep < poses.cols(); timestep++)
-  {
-    skel->setPositions(poses.col(timestep));
-    server.renderSkeleton(skel);
-
-    std::map<std::string, Eigen::Vector3s> markerWorldPositions
-        = markerTrajectories[timestep];
-    server.deleteObjectsByPrefix("marker_error_");
-    for (auto pair : markerWorldPositions)
-    {
-      if (markers.count(pair.first) > 0)
-      {
-        Eigen::Vector3s worldObserved = pair.second;
-        Eigen::Vector3s worldInferred
-            = markers[pair.first].first->getWorldTransform()
-              * (markers[pair.first].second.cwiseProduct(
-                  markers[pair.first].first->getScale()));
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(worldObserved);
-        points.push_back(worldInferred);
-        server.createLine(
-            "marker_error_" + pair.first, points, Eigen::Vector3s::UnitX());
-      }
-    }
-
-    for (int i = 0; i < numJoints; i++)
-    {
-      server.setObjectPosition(
-          "joint_center_" + std::to_string(i),
-          jointCenters.block<3, 1>(i * 3, timestep));
-    }
-
-    server.saveFrame();
-  }
-
-  server.writeFramesJson(path);
 }
 
 #ifdef ALL_TESTS
@@ -1870,7 +1746,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1943,7 +1819,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 
   // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
@@ -1982,6 +1858,29 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
     (void)state;
     return 0.0;
   });
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
   srand(42);
 
@@ -2149,6 +2048,91 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
   fitter.findJointCenters(init, subsetTimesteps);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, AXIS_FIT_GRAD)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  // Get the gold data scales in `config`
+  OpenSimFile moddedBase = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  dynamics::MarkerMap convertedMarkers
+      = standard.skeleton->convertMarkerMap(moddedBase.markersMap);
+  standard.markersMap = convertedMarkers;
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+  Eigen::MatrixXs poses = mot.poses;
+  (void)poses;
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(1);
+  fitter.setIterationLimit(10);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  // subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init
+      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  Eigen::MatrixXs out;
+  CylinderFitJointAxisProblem cylinderProblem(
+      &fitter,
+      subsetTimesteps,
+      init.poses,
+      standard.skeleton->getJoint("walker_knee_r"),
+      Eigen::MatrixXs::Random(3, init.poses.cols()),
+      out);
+
+  Eigen::VectorXs analytical = cylinderProblem.getGradient();
+  Eigen::VectorXs bruteForce = cylinderProblem.finiteDifferenceGradient();
+
+  if (!equals(analytical, bruteForce, 5e-8) || true)
+  {
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 4);
+    compare.col(0) = cylinderProblem.flatten();
+    compare.col(1) = analytical;
+    compare.col(2) = bruteForce;
+    compare.col(3) = analytical - bruteForce;
+    std::cout << "Error on CylinderFitJointAxisProblem grad " << std::endl
+              << "X - Analytical - FD - Diff:" << std::endl
+              << compare << std::endl;
+    EXPECT_TRUE(equals(analytical, bruteForce, 5e-8));
+  }
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+  // fitter.findAllJointAxis(init, subsetTimesteps);
 }
 #endif
 
@@ -2552,6 +2536,522 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
       finalKinematicInit.poses,
       subsetTimesteps,
       finalKinematicInit.jointCenters);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/LaiArnoldSubject5/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories
+      = OpenSimParser::loadTRC("dart://sample/osim/LaiArnoldSubject5/DJ1.trc");
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/LaiArnoldSubject5/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton, "dart://sample/osim/LaiArnoldSubject5/DJ1.mot");
+
+  Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  IKErrorReport goldReport(
+      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init
+      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+
+  for (auto pair : init.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport initReport(
+      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+
+  fitter.findJointCenters(init, subsetTimesteps);
+  fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
+
+  // Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = fitter.getInitialization(
+      subsetTimesteps,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses));
+
+  for (auto pair : reinit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport afterJointCentersReport(
+      standard.skeleton,
+      reinit.updatedMarkerMap,
+      reinit.poses,
+      subsetTimesteps);
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Bilevel optimization
+  fitter.setIterationLimit(400);
+  std::shared_ptr<BilevelFitResult> bilevelFit
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
+
+  // Fine-tune IK and re-fit all the points
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
+      subsetTimesteps,
+      bilevelFit,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
+          .setInitPoses(reinit.poses)
+          .setDontRescaleBodies(true)
+          .setGroupScales(bilevelFit->groupScales)
+          .setMarkerOffsets(bilevelFit->markerOffsets));
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps);
+
+  std::cout << "Experts's data error report:" << std::endl;
+  goldReport.printReport(5);
+  std::cout << "Initial error report:" << std::endl;
+  initReport.printReport(5);
+  std::cout << "After joint centers report:" << std::endl;
+  afterJointCentersReport.printReport(5);
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
+{
+  OpenSimFile standard
+      = OpenSimParser::parseOsim("dart://sample/osim/Sprinter/sprinter.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories
+      = OpenSimParser::loadTRC("dart://sample/osim/Sprinter/run0500cms.trc");
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Sprinter/sprinter_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton, "dart://sample/osim/Sprinter/run0500cms.mot");
+
+  Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  IKErrorReport goldReport(
+      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init
+      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+
+  for (auto pair : init.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport initReport(
+      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+
+  fitter.findJointCenters(init, subsetTimesteps);
+  fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
+
+  // Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = fitter.getInitialization(
+      subsetTimesteps,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses));
+
+  for (auto pair : reinit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport afterJointCentersReport(
+      standard.skeleton,
+      reinit.updatedMarkerMap,
+      reinit.poses,
+      subsetTimesteps);
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Bilevel optimization
+  fitter.setIterationLimit(400);
+  std::shared_ptr<BilevelFitResult> bilevelFit
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
+
+  // Fine-tune IK and re-fit all the points
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
+      subsetTimesteps,
+      bilevelFit,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
+          .setInitPoses(reinit.poses)
+          .setDontRescaleBodies(true)
+          .setGroupScales(bilevelFit->groupScales)
+          .setMarkerOffsets(bilevelFit->markerOffsets));
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps);
+
+  std::cout << "Experts's data error report:" << std::endl;
+  goldReport.printReport(5);
+  std::cout << "Initial error report:" << std::endl;
+  initReport.printReport(5);
+  std::cout << "After joint centers report:" << std::endl;
+  afterJointCentersReport.printReport(5);
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+
+  Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  IKErrorReport goldReport(
+      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = markerTrajectories.markerTimesteps;
+
+  MarkerInitialization init
+      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+
+  for (auto pair : init.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport initReport(
+      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+
+  fitter.findJointCenters(init, subsetTimesteps);
+  fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
+
+  // Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = fitter.getInitialization(
+      subsetTimesteps,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses));
+
+  for (auto pair : reinit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport afterJointCentersReport(
+      standard.skeleton,
+      reinit.updatedMarkerMap,
+      reinit.poses,
+      subsetTimesteps);
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 150 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 10) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Bilevel optimization
+  fitter.setIterationLimit(100);
+  std::shared_ptr<BilevelFitResult> bilevelFit
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 50);
+
+  // Fine-tune IK and re-fit all the points
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
+      subsetTimesteps,
+      bilevelFit,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
+          .setInitPoses(reinit.poses)
+          .setDontRescaleBodies(true)
+          .setGroupScales(bilevelFit->groupScales)
+          .setMarkerOffsets(bilevelFit->markerOffsets));
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps);
+
+  std::cout << "Experts's data error report:" << std::endl;
+  goldReport.printReport(5);
+  std::cout << "Initial error report:" << std::endl;
+  initReport.printReport(5);
+  std::cout << "After joint centers report:" << std::endl;
+  afterJointCentersReport.printReport(5);
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, finalKinematicInit, subsetTimesteps);
+  server->blockWhileServing();
 }
 #endif
 

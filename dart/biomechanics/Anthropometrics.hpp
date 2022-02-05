@@ -47,7 +47,7 @@ class Anthropometrics
 public:
   Anthropometrics();
 
-  static Anthropometrics loadFromFile(
+  static std::shared_ptr<Anthropometrics> loadFromFile(
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 

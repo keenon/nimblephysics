@@ -35,6 +35,7 @@
 #include <dart/constraint/ConstrainedGroup.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -193,14 +194,28 @@ void ConstraintSolver(py::module& m)
           })
       .def(
           "solveConstrainedGroups",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->solveConstrainedGroups();
+          })
+      .def(
+          "applyConstraintImpulses",
           +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) {
-            self->solveConstrainedGroups(world);
+              std::vector<dart::constraint::ConstraintBasePtr> constraints,
+              std::vector<s_t*> impulses) {
+            self->applyConstraintImpulses(constraints, impulses);
           })
       .def(
           "solve",
-          +[](dart::constraint::ConstraintSolver* self,
-              dart::simulation::World* world) { self->solve(world); });
+          +[](dart::constraint::ConstraintSolver* self) { self->solve(); })
+      .def(
+          "enforceContactAndJointAndCustomConstraintsWithLcp",
+          +[](dart::constraint::ConstraintSolver* self) {
+            self->enforceContactAndJointAndCustomConstraintsWithLcp();
+          })
+      .def(
+          "replaceEnforceContactAndJointAndCustomConstraintsFn",
+          &dart::constraint::ConstraintSolver::
+              replaceEnforceContactAndJointAndCustomConstraintsFn);
 }
 
 } // namespace python

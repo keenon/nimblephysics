@@ -144,7 +144,7 @@ bool verifyClassicClampingConstraintMatrix(
   // Populate the constraint matrices, without taking a time step or integrating
   // velocities
   world->getConstraintSolver()->setGradientEnabled(true);
-  world->getConstraintSolver()->solve(world.get());
+  world->getConstraintSolver()->solve();
 
   for (std::size_t i = 0; i < world->getNumSkeletons(); i++)
   {
@@ -2366,8 +2366,7 @@ bool verifyRecoveredLCPConstraints(WorldPtr world, VectorXs proposedVelocities)
         << classicPtr->mGradientMatrices[0]->mConstraintForceMixingConstant
         << std::endl;
     std::cout << "Deliberately ignored friction to solve: "
-              << classicPtr->getDeliberatelyIgnoreFriction()
-              << std::endl;
+              << classicPtr->getDeliberatelyIgnoreFriction() << std::endl;
     std::cout << "Error in verifyRecoveredLCPConstraints():" << std::endl;
     std::cout << "analytical X:" << std::endl << X << std::endl;
     std::cout << "real X:" << std::endl << realX << std::endl;
