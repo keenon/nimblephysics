@@ -186,6 +186,18 @@ public:
   /// Solve constraint impulses and apply them to the skeletons
   void solve(simulation::World* world);
 
+  /// Update constraints
+  void updateConstraints();
+
+  /// Build constrained groupsContact
+  void buildConstrainedGroups();
+
+  /// Solve constrained groups
+  void solveConstrainedGroups(simulation::World* world);
+
+  /// Get constrained groups
+  const std::vector<ConstrainedGroup>& getConstrainedGroups() const;
+
   /// Sets this constraint solver using other constraint solver. All the
   /// properties and registered skeletons and constraints will be copied over.
   virtual void setFromOtherConstraintSolver(const ConstraintSolver& other);
@@ -238,15 +250,6 @@ protected:
 
   /// Add constraint if the constraint is not contained in this solver
   bool checkAndAddConstraint(const ConstraintBasePtr& constraint);
-
-  /// Update constraints
-  void updateConstraints();
-
-  /// Build constrained groupsContact
-  void buildConstrainedGroups();
-
-  /// Solve constrained groups
-  void solveConstrainedGroups(simulation::World* world);
 
   /// Return true if at least one of colliding body is soft body
   bool isSoftContact(const collision::Contact& contact) const;

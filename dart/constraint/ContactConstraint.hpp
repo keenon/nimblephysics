@@ -102,6 +102,15 @@ public:
   // Returns body node B
   const dynamics::BodyNode* getBodyNodeB() const;
 
+  /// Get contact Jacobian for bodyNodeA
+  const Eigen::MatrixXs getSpatialNormalA() const;
+
+  /// Get contact Jacobian for bodyNodeB
+  const Eigen::MatrixXs getSpatialNormalB() const;
+
+  /// Check whether friction is on.
+  bool isFrictionOn() const;
+
   //----------------------------------------------------------------------------
   // Friendship
   //----------------------------------------------------------------------------

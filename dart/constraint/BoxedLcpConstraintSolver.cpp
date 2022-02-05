@@ -726,6 +726,21 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->lcpResult
           = mX(mOffset[i]);
+      const_cast<collision::Contact*>(&contactConstraint->getContact())
+          ->spatialNormalA
+          = contactConstraint->getSpatialNormalA();
+      const_cast<collision::Contact*>(&contactConstraint->getContact())
+          ->isFrictionOn
+          = contactConstraint->isFrictionOn();
+      if (contactConstraint->isFrictionOn())
+      {
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->lcpResultTangent1
+            = mX(mOffset[i] + 1);
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->lcpResultTangent2
+            = mX(mOffset[i] + 2);
+      }
     }
     constraint->applyImpulse(mX.data() + mOffset[i]);
     constraint->excite();

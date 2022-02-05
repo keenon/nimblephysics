@@ -153,6 +153,7 @@ ContactConstraint::ContactConstraint(
     // TODO(JS): Assumed that the number of tangent basis is 2.
     const TangentBasisMatrix D = getTangentBasisMatrixODE(ct.normal);
 
+    // Verify that normal and tangent directions are perpendicular.
     assert(abs(ct.normal.dot(D.col(0))) < DART_EPSILON);
     assert(abs(ct.normal.dot(D.col(1))) < DART_EPSILON);
     assert(abs(D.col(0).dot(D.col(1))) < DART_EPSILON);
@@ -226,6 +227,17 @@ ContactConstraint::ContactConstraint(
     mSpatialNormalA.col(0).tail<3>().noalias() = bodyDirectionA;
     mSpatialNormalB.col(0).tail<3>().noalias() = bodyDirectionB;
   }
+}
+
+//==============================================================================
+const Eigen::MatrixXs ContactConstraint::getSpatialNormalA() const
+{
+  return mSpatialNormalA;
+}
+
+const Eigen::MatrixXs ContactConstraint::getSpatialNormalB() const
+{
+  return mSpatialNormalB;
 }
 
 //==============================================================================
@@ -686,6 +698,12 @@ void ContactConstraint::getRelVelocity(s_t* relVel)
 bool ContactConstraint::isActive() const
 {
   return mActive;
+}
+
+//==============================================================================
+bool ContactConstraint::isFrictionOn() const
+{
+  return mIsFrictionOn;
 }
 
 //==============================================================================
