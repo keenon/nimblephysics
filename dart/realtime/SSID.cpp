@@ -259,11 +259,7 @@ void SSID::runInference(long startTime)
   
   for (auto listener : mInferListeners)
   {
-<<<<<<< HEAD
-    listener(startTime, pos, computeConfidenceFromValue(mValue), param, computeDurationWallTime); 
-=======
     listener(startTime, pos, vel, param, computeDurationWallTime, mSteadySolutionFound); 
->>>>>>> ericcsr/ssid_dev
   }
 }
 
@@ -579,11 +575,7 @@ void SSID::optimizationThreadLoop()
               mCumValue += mValue;
             }
             // TODO: Use delta value to determine the stability
-<<<<<<< HEAD
-            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <  mParam_change_thresh)
-=======
             if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
->>>>>>> elastic_rod
             {
               mSteadySolutionFound = true;
               mParamChanged = false;

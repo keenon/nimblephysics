@@ -296,7 +296,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     Eigen::VectorXs::Ones(1) * 0.2);
 
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
-  std::vector<size_t> ssid_idx{0,1};
+  Eigen::Vector2i ssid_idx(0,1);
 
   SSID ssid = SSID(ssidWorld,
                    getSSIDPosLoss(),
@@ -344,7 +344,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
                                            finalStateWeight,
                                            world);
 
-  costFn->setSSIDNodeIndex(ssid_idx);
+  costFn->setSSIDMassNodeIndex(ssid_idx);
   // costFn->enableSSIDLoss(0.01);
   costFn->setTimeStep(world->getTimeStep());
   Eigen::VectorXs goal = Eigen::VectorXs::Zero(4);
