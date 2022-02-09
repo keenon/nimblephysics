@@ -230,11 +230,13 @@ void MarkerFitter(py::module& m)
           "getInitialization",
           &dart::biomechanics::MarkerFitter::getInitialization,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("params") = dart::biomechanics::InitialMarkerFitParams())
       .def(
           "findJointCenters",
           &dart::biomechanics::MarkerFitter::findJointCenters,
           ::py::arg("initializations"),
+          ::py::arg("newClip"),
           ::py::arg("markerObservations"))
       .def(
           "optimizeBilevel",
@@ -243,9 +245,16 @@ void MarkerFitter(py::module& m)
           ::py::arg("initialization"),
           ::py::arg("numSamples"))
       .def(
+          "runMultiTrialKinematicsPipeline",
+          &dart::biomechanics::MarkerFitter::runMultiTrialKinematicsPipeline,
+          ::py::arg("markerTrials"),
+          ::py::arg("params"),
+          ::py::arg("numSamples") = 50)
+      .def(
           "runKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("params"),
           ::py::arg("numSamples") = 20)
       .def(

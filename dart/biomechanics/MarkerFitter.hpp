@@ -137,6 +137,7 @@ public:
           markerObservations,
       Eigen::MatrixXs ikPoses,
       dynamics::Joint* joint,
+      const std::vector<bool>& newClip,
       Eigen::Ref<Eigen::MatrixXs> out);
 
   static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
@@ -173,6 +174,7 @@ public:
   Eigen::VectorXs mRadii;
   Eigen::VectorXs mCenterPoints;
   std::string mJointName;
+  std::vector<bool> mNewClip;
 };
 
 /**
@@ -189,6 +191,7 @@ public:
       Eigen::MatrixXs ikPoses,
       dynamics::Joint* joint,
       Eigen::MatrixXs centers,
+      const std::vector<bool>& newClip,
       Eigen::Ref<Eigen::MatrixXs> out);
 
   static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
@@ -230,6 +233,7 @@ public:
   Eigen::VectorXs mPerpendicularRadii;
   Eigen::VectorXs mParallelRadii;
   Eigen::VectorXs mAxisLines;
+  const std::vector<bool> mNewClip;
   std::string mJointName;
 };
 
@@ -290,10 +294,19 @@ public:
       dynamics::MarkerMap markers);
 
   /// Run the whole pipeline of optimization problems to fit the data as closely
+  /// as we can, working on multiple trials at once
+  std::vector<MarkerInitialization> runMultiTrialKinematicsPipeline(
+      const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
+          markerObservationTrials,
+      InitialMarkerFitParams params = InitialMarkerFitParams(),
+      int numSamples = 20);
+
+  /// Run the whole pipeline of optimization problems to fit the data as closely
   /// as we can
   MarkerInitialization runKinematicsPipeline(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      const std::vector<bool>& newClip,
       InitialMarkerFitParams params = InitialMarkerFitParams(),
       int numSamples = 20);
 
@@ -324,6 +337,7 @@ public:
   MarkerInitialization getInitialization(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      const std::vector<bool>& newClip,
       InitialMarkerFitParams params);
 
   /// This computes the IK diff for joint positions, given a bunch of weighted
@@ -387,6 +401,7 @@ public:
   /// `initialization`
   void findJointCenters(
       MarkerInitialization& initialization,
+      const std::vector<bool>& newClip,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
 
@@ -404,6 +419,7 @@ public:
   /// `initialization`
   void findAllJointAxis(
       MarkerInitialization& initialization,
+      const std::vector<bool>& newClip,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations);
 
@@ -478,6 +494,7 @@ public:
   MarkerInitialization completeBilevelResult(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      const std::vector<bool>& newClip,
       std::shared_ptr<BilevelFitResult> result,
       InitialMarkerFitParams params);
 

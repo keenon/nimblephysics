@@ -4,8 +4,6 @@ var DeclarationBundlerPlugin = require('declaration-bundler-webpack-plugin');
 
 module.exports = {
   entry: {
-    live: "./src/live.ts",
-    embedded: "./src/embedded.ts",
     embedded_dev: "./src/embedded_dev.ts",
     NimbleStandaloneReact: "./src/NimbleStandaloneReact.ts",
     NimbleStandalone: "./src/NimbleStandalone.ts",
@@ -45,8 +43,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: path.join(__dirname, "src", "index.html"),
-      excludeChunks: ['embedded', 'live']
+      template: path.join(__dirname, "src", "index.html")
     })
   ],
   devServer: {

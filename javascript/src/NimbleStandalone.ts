@@ -119,12 +119,6 @@ class NimbleStandalone {
     this.loadingProgressBarBg.className =
       "NimbleStandalone-loading-bar-container-inner-bar-container-bg";
     this.loadingProgressBarContainer.appendChild(this.loadingProgressBarBg);
-
-    // Just for testing:
-    this.view.createRichPlot("test", [100, 100], [300, 200], -5, 20.0, -0.2, 0.2, "Marker error", "Time (s)", "RMSE Error (cm)");
-    this.view.setRichPlotData("test", "Value A", [0, 2, 5, 7, 10], [0.03, .04, .1, .07, .09], "blue", "line");
-    this.view.setRichPlotData("test", "Value B", [0, 2, 5, 7, 10], [.14, .01, .3, .06, .8], "red", "line");
-    this.view.setRichPlotData("test", "Value C", [2, 5, 7, 10, 11], [.14, .01, .3, .06, .8], "green", "line");
   }
 
   /**

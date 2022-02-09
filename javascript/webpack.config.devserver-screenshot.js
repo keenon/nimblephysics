@@ -4,7 +4,7 @@ var DeclarationBundlerPlugin = require('declaration-bundler-webpack-plugin');
 
 module.exports = {
   entry: {
-    live: "./src/live.ts",
+    screenshot: "./src/screenshot.ts",
     NimbleStandaloneReact: "./src/NimbleStandaloneReact.ts",
     NimbleStandalone: "./src/NimbleStandalone.ts",
     NimbleRemote: "./src/NimbleRemote.ts"
