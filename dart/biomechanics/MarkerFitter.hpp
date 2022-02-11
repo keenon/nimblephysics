@@ -258,6 +258,9 @@ struct InitialMarkerFitParams
   Eigen::VectorXs groupScales;
   bool dontRescaleBodies;
 
+  int maxTrialsToUseForMultiTrialScaling;
+  int maxTimestepsToUseForMultiTrialScaling;
+
   InitialMarkerFitParams();
   InitialMarkerFitParams(const InitialMarkerFitParams& other);
   InitialMarkerFitParams& setMarkerWeights(
@@ -276,6 +279,9 @@ struct InitialMarkerFitParams
   InitialMarkerFitParams& setMarkerOffsets(
       std::map<std::string, Eigen::Vector3s> markerOffsets);
   InitialMarkerFitParams& setGroupScales(Eigen::VectorXs groupScales);
+  InitialMarkerFitParams& setMaxTrialsToUseForMultiTrialScaling(int numTrials);
+  InitialMarkerFitParams& setMaxTimestepsToUseForMultiTrialScaling(
+      int numTimesteps);
 };
 
 /**
@@ -308,7 +314,16 @@ public:
           markerObservations,
       const std::vector<bool>& newClip,
       InitialMarkerFitParams params = InitialMarkerFitParams(),
-      int numSamples = 20);
+      int numSamples = 20,
+      bool skipFinalIK = false);
+
+  /// This just runs the IK pipeline steps over the given marker observations,
+  /// assuming we've got a pre-scaled model. This finds the joint centers and
+  /// axis over time, then uses those to run multithreaded IK.
+  MarkerInitialization runPrescaledPipeline(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      InitialMarkerFitParams params = InitialMarkerFitParams());
 
   /// This runs a server to display the detailed trajectory information, along
   /// with fit data

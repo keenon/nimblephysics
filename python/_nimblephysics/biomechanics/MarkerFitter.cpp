@@ -144,6 +144,14 @@ void MarkerFitter(py::module& m)
       .def_readwrite(
           "dontRescaleBodies",
           &dart::biomechanics::InitialMarkerFitParams::dontRescaleBodies)
+      .def_readwrite(
+          "maxTrialsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              maxTrialsToUseForMultiTrialScaling)
+      .def_readwrite(
+          "maxTimestepsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              maxTimestepsToUseForMultiTrialScaling)
       .def(
           "setMarkerWeights",
           &dart::biomechanics::InitialMarkerFitParams::setMarkerWeights,
@@ -173,6 +181,16 @@ void MarkerFitter(py::module& m)
           "setDontRescaleBodies",
           &dart::biomechanics::InitialMarkerFitParams::setDontRescaleBodies,
           ::py::arg("dontRescaleBodies"))
+      .def(
+          "setMaxTrialsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setMaxTrialsToUseForMultiTrialScaling,
+          ::py::arg("numTrials"))
+      .def(
+          "setMaxTimestepsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setMaxTimestepsToUseForMultiTrialScaling,
+          ::py::arg("numTimesteps"))
       .def(
           "setJointCentersAndWeights",
           &dart::biomechanics::InitialMarkerFitParams::
@@ -256,7 +274,13 @@ void MarkerFitter(py::module& m)
           ::py::arg("markerObservations"),
           ::py::arg("newClip"),
           ::py::arg("params"),
-          ::py::arg("numSamples") = 20)
+          ::py::arg("numSamples") = 20,
+          ::py::arg("skipFinalIK") = false)
+      .def(
+          "runPrescaledPipeline",
+          &dart::biomechanics::MarkerFitter::runPrescaledPipeline,
+          ::py::arg("markerObservations"),
+          ::py::arg("params"))
       .def(
           "setMinJointVarianceCutoff",
           &dart::biomechanics::MarkerFitter::setMinJointVarianceCutoff,

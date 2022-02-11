@@ -356,7 +356,10 @@ BilevelFitResult::BilevelFitResult() : success(false){};
 
 //==============================================================================
 InitialMarkerFitParams::InitialMarkerFitParams()
-  : numBlocks(12), dontRescaleBodies(false)
+  : numBlocks(12),
+    dontRescaleBodies(false),
+    maxTrialsToUseForMultiTrialScaling(5),
+    maxTimestepsToUseForMultiTrialScaling(800)
 {
 }
 
@@ -373,7 +376,9 @@ InitialMarkerFitParams::InitialMarkerFitParams(
     initPoses(other.initPoses),
     markerOffsets(other.markerOffsets),
     groupScales(other.groupScales),
-    dontRescaleBodies(other.dontRescaleBodies)
+    dontRescaleBodies(other.dontRescaleBodies),
+    maxTrialsToUseForMultiTrialScaling(other.maxTrialsToUseForMultiTrialScaling),
+    maxTimestepsToUseForMultiTrialScaling(other.maxTimestepsToUseForMultiTrialScaling)
 {
 }
 
@@ -451,6 +456,22 @@ InitialMarkerFitParams& InitialMarkerFitParams::setGroupScales(
     Eigen::VectorXs groupScales)
 {
   this->groupScales = groupScales;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams&
+InitialMarkerFitParams::setMaxTrialsToUseForMultiTrialScaling(int numTrials)
+{
+  this->maxTrialsToUseForMultiTrialScaling = numTrials;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams&
+InitialMarkerFitParams::setMaxTimestepsToUseForMultiTrialScaling(int numTimesteps)
+{
+  this->maxTimestepsToUseForMultiTrialScaling = numTimesteps;
   return *this;
 }
 
@@ -572,12 +593,63 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     InitialMarkerFitParams params,
     int numSamples)
 {
+  /////////////////////////////////////////////////////////////////////////////
+  // We'll subsample the data down here, to avoid having any accidental
+  // performance tanking in the deployed version.
+  /////////////////////////////////////////////////////////////////////////////
+
+  bool downsampled = false;
+  // Sample at most N trials
+  int numTrialsToSample = markerObservationTrials.size();
+  if (numTrialsToSample > params.maxTrialsToUseForMultiTrialScaling)
+  {
+    numTrialsToSample = params.maxTrialsToUseForMultiTrialScaling;
+    downsampled = true;
+  }
+  // Sample at most M timesteps
+  std::vector<int> timestepsPerTrial;
+  for (int i = 0; i < numTrialsToSample; i++)
+  {
+    timestepsPerTrial.push_back(markerObservationTrials[i].size());
+  }
+  int totalTimesteps = 0;
+  for (int i = 0; i < numTrialsToSample; i++)
+  {
+    totalTimesteps += timestepsPerTrial[i];
+  }
+  if (totalTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
+  {
+    downsampled = true;
+    double percentage
+        = (double)params.maxTimestepsToUseForMultiTrialScaling / totalTimesteps;
+    for (int i = 0; i < numTrialsToSample; i++)
+    {
+      timestepsPerTrial[i]
+          = (int)std::floor(percentage * (double)timestepsPerTrial[i]);
+    }
+  }
+
+  if (downsampled)
+  {
+    std::cout << "Downsampling the input for scaling performance!" << std::endl;
+    std::cout << "Sampling " << numTrialsToSample << "/"
+              << markerObservationTrials.size() << std::endl;
+    int total = 0;
+    for (int i = 0; i < numTrialsToSample; i++)
+    {
+      std::cout << "Trial " << i << " sampled " << timestepsPerTrial[i] << "/"
+                << markerObservationTrials[i].size() << std::endl;
+      total += timestepsPerTrial[i];
+    }
+    std::cout << "Total timesteps to use for scaling: " << total << std::endl;
+  }
+
   // 1. Construct a merged dataset
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::vector<bool> newClip;
-  for (int i = 0; i < markerObservationTrials.size(); i++)
+  for (int i = 0; i < numTrialsToSample; i++)
   {
-    for (int j = 0; j < markerObservationTrials[i].size(); j++)
+    for (int j = 0; j < timestepsPerTrial[i]; j++)
     {
       markerObservations.emplace_back(markerObservationTrials[i][j]);
       newClip.push_back(j == 0);
@@ -585,40 +657,68 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
   }
 
   // 2. Run the kinematics pipeline on the merged dataset
-  MarkerInitialization overallInit
-      = runKinematicsPipeline(markerObservations, newClip, params, numSamples);
+  MarkerInitialization overallInit = runKinematicsPipeline(
+      markerObservations, newClip, params, numSamples, downsampled);
 
-  // 3. Separate out the individual trials from the merged data
-  std::vector<MarkerInitialization> separateInits;
-  int cursor = 0;
-  for (int i = 0; i < markerObservationTrials.size(); i++)
+  if (downsampled)
   {
-    int size = markerObservationTrials[i].size();
-    separateInits.emplace_back();
+    std::cout << "Done scaling and computing marker offsets! Now we'll do IK "
+                 "on all the trials."
+              << std::endl;
 
-    separateInits[i].poses
-        = overallInit.poses.block(0, cursor, overallInit.poses.rows(), size);
-    separateInits[i].poseScores = overallInit.poseScores.segment(cursor, size);
-    separateInits[i].groupScales = overallInit.groupScales;
-    separateInits[i].markerOffsets = overallInit.markerOffsets;
-    separateInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
-
-    separateInits[i].joints = overallInit.joints;
-    separateInits[i].jointMarkerVariability
-        = overallInit.jointMarkerVariability;
-    separateInits[i].jointLoss = overallInit.jointLoss;
-    separateInits[i].jointWeights = overallInit.jointWeights;
-    separateInits[i].jointCenters = overallInit.jointCenters.block(
-        0, cursor, overallInit.jointCenters.rows(), size);
-    separateInits[i].axisWeights = overallInit.axisWeights;
-    separateInits[i].axisLoss = overallInit.axisLoss;
-    separateInits[i].jointAxis = overallInit.jointAxis.block(
-        0, cursor, overallInit.jointAxis.rows(), size);
-
-    cursor += size;
+    // 3. Use the scaling from overallInit to do IK on each skeleton
+    std::vector<MarkerInitialization> separateInits;
+    InitialMarkerFitParams params
+        = InitialMarkerFitParams()
+              .setGroupScales(overallInit.groupScales)
+              .setMarkerOffsets(overallInit.markerOffsets)
+              .setDontRescaleBodies(true);
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      std::cout << "## IK on trial " << i << "/"
+                << markerObservationTrials.size() << std::endl;
+      separateInits.push_back(
+          runPrescaledPipeline(markerObservationTrials[i], params));
+    }
+    std::cout << "Finished IKs" << std::endl;
+    return separateInits;
   }
+  else
+  {
+    std::cout << "Recovering output from kinematics pipeline" << std::endl;
 
-  return separateInits;
+    // 3. Separate out the individual trials from the merged data
+    std::vector<MarkerInitialization> separateInits;
+    int cursor = 0;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      int size = markerObservationTrials[i].size();
+      separateInits.emplace_back();
+
+      separateInits[i].poses
+          = overallInit.poses.block(0, cursor, overallInit.poses.rows(), size);
+      separateInits[i].poseScores
+          = overallInit.poseScores.segment(cursor, size);
+      separateInits[i].groupScales = overallInit.groupScales;
+      separateInits[i].markerOffsets = overallInit.markerOffsets;
+      separateInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
+
+      separateInits[i].joints = overallInit.joints;
+      separateInits[i].jointMarkerVariability
+          = overallInit.jointMarkerVariability;
+      separateInits[i].jointLoss = overallInit.jointLoss;
+      separateInits[i].jointWeights = overallInit.jointWeights;
+      separateInits[i].jointCenters = overallInit.jointCenters.block(
+          0, cursor, overallInit.jointCenters.rows(), size);
+      separateInits[i].axisWeights = overallInit.axisWeights;
+      separateInits[i].axisLoss = overallInit.axisLoss;
+      separateInits[i].jointAxis = overallInit.jointAxis.block(
+          0, cursor, overallInit.jointAxis.rows(), size);
+
+      cursor += size;
+    }
+    return separateInits;
+  }
 }
 
 //==============================================================================
@@ -629,7 +729,8 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
         markerObservations,
     const std::vector<bool>& newClip,
     InitialMarkerFitParams params,
-    int numSamples)
+    int numSamples,
+    bool skipFinalIK)
 {
   // 1. Find the initial scaling + IK
   MarkerInitialization init
@@ -657,19 +758,71 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 
   // 5. Fine-tune IK and re-fit all the points
   mSkeleton->setGroupScales(bilevelFit->groupScales);
-  MarkerInitialization finalKinematicInit = completeBilevelResult(
+  if (!skipFinalIK)
+  {
+    MarkerInitialization finalKinematicInit = completeBilevelResult(
+        markerObservations,
+        newClip,
+        bilevelFit,
+        InitialMarkerFitParams(params)
+            .setJointCentersAndWeights(
+                init.joints, init.jointCenters, init.jointWeights)
+            .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+            .setInitPoses(reinit.poses)
+            .setDontRescaleBodies(true)
+            .setGroupScales(bilevelFit->groupScales)
+            .setMarkerOffsets(bilevelFit->markerOffsets));
+    return finalKinematicInit;
+  }
+  else
+  {
+    std::cout << "Skipping completing bilevel IK, because we're operating on a "
+                 "subsampled dataset"
+              << std::endl;
+
+    reinit.groupScales = bilevelFit->groupScales;
+    reinit.markerOffsets = bilevelFit->markerOffsets;
+    return reinit;
+  }
+}
+
+//==============================================================================
+/// This just runs the IK pipeline steps over the given marker observations,
+/// assuming we've got a pre-scaled model. This finds the joint centers and
+/// axis over time, then uses those to run multithreaded IK.
+MarkerInitialization MarkerFitter::runPrescaledPipeline(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    InitialMarkerFitParams params)
+{
+  std::vector<bool> newClip;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    newClip.push_back(false);
+  }
+
+  // 1. Find the initial scaling + IK
+  MarkerInitialization init = getInitialization(
       markerObservations,
       newClip,
-      bilevelFit,
+      InitialMarkerFitParams(params).setDontRescaleBodies(true));
+  mSkeleton->setGroupScales(init.groupScales);
+  // 2. Find the joint centers
+  findJointCenters(init, newClip, markerObservations);
+  findAllJointAxis(init, newClip, markerObservations);
+  computeJointConfidences(init, markerObservations);
+  // 3. Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = getInitialization(
+      markerObservations,
+      newClip,
       InitialMarkerFitParams(params)
           .setJointCentersAndWeights(
               init.joints, init.jointCenters, init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
-          .setInitPoses(reinit.poses)
-          .setDontRescaleBodies(true)
-          .setGroupScales(bilevelFit->groupScales)
-          .setMarkerOffsets(bilevelFit->markerOffsets));
-  return finalKinematicInit;
+          .setInitPoses(init.poses)
+          .setDontRescaleBodies(true));
+
+  return reinit;
 }
 
 //==============================================================================

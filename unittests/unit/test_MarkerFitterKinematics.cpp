@@ -3166,7 +3166,7 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
   standard.skeleton->setGroupScales(inits[0].groupScales);
   for (int i = 0; i < 4; i++)
   {
-    std::cout << "Error report " << i << ":" << std::endl;
+    std::cout << "Manual error report " << i << ":" << std::endl;
     IKErrorReport manualKinematicsReport(
         scaled.skeleton,
         scaled.markersMap,
@@ -3174,7 +3174,7 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
         isDebug ? shorterTrials[i] : markerObservationTrials[i]);
     manualKinematicsReport.printReport(5);
 
-    std::cout << "Error report " << i << ":" << std::endl;
+    std::cout << "Auto error report " << i << ":" << std::endl;
     IKErrorReport finalKinematicsReport(
         standard.skeleton,
         inits[0].updatedMarkerMap,
@@ -3182,6 +3182,16 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
         isDebug ? shorterTrials[i] : markerObservationTrials[i]);
     finalKinematicsReport.printReport(5);
   }
+
+  /*
+for (int i = 0; i < 4; i++)
+{
+  fitter.saveTrajectoryAndMarkersToGUI(
+      "./test" + std::to_string(i) + ".json",
+      inits[i],
+      isDebug ? shorterTrials[i] : markerObservationTrials[i]);
+}
+*/
 
   // Target markers
   std::shared_ptr<server::GUIWebsocketServer> server
