@@ -38,7 +38,7 @@ jobs:
             PYTHON_VERSION_CODE: cp39-cp39
             PYTHON_VERSION_NUMBER: 3.9
             PYTHON: /opt/python/cp39-cp39/bin/python3.9
-            PATH_PATH: /opt/python/cp39-cp39/bin/
+            PYTHON_PATH: /opt/python/cp39-cp39/bin/
             PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
             PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
     steps:
