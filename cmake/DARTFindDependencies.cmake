@@ -22,6 +22,10 @@ dart_check_required_package(EIGEN3 "eigen3")
 dart_find_package(ccd)
 dart_check_required_package(ccd "libccd")
 
+# EZC3D
+dart_find_package(ezc3d)
+dart_check_required_package(ezc3d "ezc3d")
+
 # ASSIMP
 dart_find_package(assimp)
 dart_check_required_package(assimp "assimp")

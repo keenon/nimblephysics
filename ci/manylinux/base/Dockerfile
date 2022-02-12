@@ -288,6 +288,18 @@ RUN tar -xzf mpfrc++-3.6.8.tar.gz && \
     rm -rf mpreal-mpfrc-3.6.8 && \
     rm mpfrc++-3.6.8.tar.gz
 
+# Install ezc3d
+RUN git clone https://github.com/pyomeca/ezc3d.git
+RUN pushd ezc3d && \
+    git checkout Release_1.4.7 && \
+    mkdir build && \
+    pushd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && \
+    make install && \
+    popd && \
+    popd
+RUN rm -rf ezc3d
+
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp
 # RUN rm -rf /usr/local/lib64/libassimp.so

@@ -238,6 +238,18 @@ popd
 popd
 sudo rm -rf benchmark
 
+# Install ezc3d
+git clone https://github.com/pyomeca/ezc3d.git
+pushd ezc3d
+git checkout Release_1.4.7
+mkdir build
+pushd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
+sudo make install
+popd
+popd
+sudo rm -rf ezc3d
+
 # Reset the IDs for our libraries to absolute paths
 sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
 sudo install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib

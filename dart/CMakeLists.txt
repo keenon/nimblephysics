@@ -121,6 +121,7 @@ target_link_libraries(dart
     Eigen3::Eigen
     ccd
     assimp
+    ezc3d
     Boost::boost
     Boost::system
     Boost::filesystem

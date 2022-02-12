@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <ccd/ccd.h>
+#include <ezc3d/ezc3d.h>
 #include <gtest/gtest.h>
 #include <math.h>
 
@@ -46,6 +47,9 @@ TEST(C3D, LOAD)
   double freq;
   std::string file
       = getAbsolutePath("dart://sample/c3d/cmu_dribble_shoot_basketball.c3d");
+
+  ezc3d::c3d data(file);
+  data.print();
 
   bool success
       = utils::loadC3DFile(file.c_str(), pointData, &nFrames, &nMarkers, &freq);
