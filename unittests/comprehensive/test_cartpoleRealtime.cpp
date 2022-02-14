@@ -366,7 +366,7 @@ TEST(REALTIME, CARTPOLE_REALTIME_COM)
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
   
   ssidWorld->tuneMass(
-    world->getBodyNodeIndex(1),
+    world->getBodyNodeByIndex(1),
     WrtMassBodyNodeEntryType::INERTIA_COM_MU,
     Eigen::VectorXs::Ones(1) * 0.5,
     Eigen::VectorXs::Ones(1) * -0.5);
@@ -600,13 +600,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
   ssidWorld->tuneMass(
-    world->getBodyNodeIndex(0),
+    world->getBodyNodeByIndex(0),
     WrtMassBodyNodeEntryType::INERTIA_MASS,
     Eigen::VectorXs::Ones(1) * 5.0,
     Eigen::VectorXs::Ones(1) * 0.2);
 
   ssidWorld->tuneMass(
-    world->getBodyNodeIndex(1),
+    world->getBodyNodeByIndex(1),
     WrtMassBodyNodeEntryType::INERTIA_MASS,
     Eigen::VectorXs::Ones(1) * 5.0,
     Eigen::VectorXs::Ones(1) * 0.2);

@@ -319,7 +319,7 @@ TEST(REALTIME, CARTPOLE_MASS_SSID)
             << std::endl;
 
   world->tuneMass(
-      world->getBodyNodeIndex(1),
+      world->getBodyNodeByIndex(1),
       WrtMassBodyNodeEntryType::INERTIA_MASS,
       Eigen::VectorXs::Ones(1) * 5.0,
       Eigen::VectorXs::Ones(1) * 0.2);
@@ -405,7 +405,7 @@ TEST(REALTIME, CARTPOLE_COM_SSID)
   #endif
 
   world->tuneMass(
-      world->getBodyNodeIndex(1),
+      world->getBodyNodeByIndex(1),
       WrtMassBodyNodeEntryType::INERTIA_COM,
       Eigen::VectorXs::Ones(3) * 0.2,
       Eigen::VectorXs::Ones(3) * -0.2);
@@ -492,7 +492,7 @@ TEST(REALTIME, CARTPOLE_MOI_SSID)
   #endif
 
   world->tuneMass(
-      world->getBodyNodeIndex(1),
+      world->getBodyNodeByIndex(1),
       WrtMassBodyNodeEntryType::INERTIA_DIAGONAL_NOMASS,
       Eigen::VectorXs::Ones(3) * 0.1,
       Eigen::VectorXs::Zero(3));
