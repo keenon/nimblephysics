@@ -187,16 +187,11 @@ void BoxedLcpConstraintSolver::setCachedLCPSolution(Eigen::VectorXs X)
 }
 
 //==============================================================================
-void BoxedLcpConstraintSolver::solveConstrainedGroup(
-    ConstrainedGroup& group, simulation::World* world)
+LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 {
   // Build LCP terms by aggregating them from constraints
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
-
-  // If there is no constraint, then just return.
-  if (0u == n)
-    return;
 
   const int nSkip = dPAD(n); // nSkip = n + (n % 4);
 #ifdef NDEBUG                // release
@@ -205,6 +200,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   mA.setZero(n, nSkip); // rows = n, cols = n + (n % 4)
 #endif
   bool mXResized = mX.size() != n;
+  bool shouldReinitializeMx = mXResized;
   if (mXResized)
   {
     mX.resize(n);
@@ -261,7 +257,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       if (mFIndex[mOffset[i] + j] >= 0)
         mFIndex[mOffset[i] + j] += mOffset[i];
 
-      // Apply impulse for mipulse test
+      // Apply impulse for impulse test
       constraint->applyUnitImpulse(j);
 
       // Fill upper triangle blocks of A matrix
@@ -333,6 +329,41 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
 
   assert(isSymmetric(n, mA.data()));
 
+  // If we just zeroed out the mX vector, let's re-initialize it with a
+  // reasonable guess, since those are often correct.
+  if (shouldReinitializeMx)
+  {
+    mX = LCPUtils::guessSolution(mA.block(0, 0, n, n), mB, mHi, mLo, mFIndex);
+  }
+
+  LcpInputs lcpInputs;
+  lcpInputs.mA = mA;
+  lcpInputs.mX = mX;
+  lcpInputs.mB = mB;
+  lcpInputs.mW = mW;
+  lcpInputs.mLo = mLo;
+  lcpInputs.mHi = mHi;
+  lcpInputs.mFIndex = mFIndex;
+  lcpInputs.mOffset = mOffset;
+  return lcpInputs;
+}
+
+//==============================================================================
+std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
+    LcpInputs lcpInputs, ConstrainedGroup& group)
+{
+  const std::size_t numConstraints = group.getNumConstraints();
+  const std::size_t n = group.getTotalDimension();
+
+  mA = lcpInputs.mA;
+  mX = lcpInputs.mX;
+  mB = lcpInputs.mB;
+  mW = lcpInputs.mW;
+  mLo = lcpInputs.mLo;
+  mHi = lcpInputs.mHi;
+  mFIndex = lcpInputs.mFIndex;
+  mOffset = lcpInputs.mOffset;
+
   // Print LCP formulation
   /*
   dtdbg << "Before solve:" << std::endl;
@@ -388,14 +419,6 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   bool shortCircuitLCP = false;
   bool hadToIgnoreFrictionToSolve = false;
 
-  // If we just zeroed out the mX vector, let's re-initialize it with a
-  // reasonable guess, since those are often correct.
-  if (mXResized)
-  {
-    mX = LCPUtils::guessSolution(aGradientBackup, mB, mHi, mLo, mFIndex);
-    mXBackup = mX;
-  }
-
   // Pre-solve, if we're using gradients. We're going to assume that the
   // initialization mX is from last time step, and then guess that nothing has
   // changed categories. If that's true, then we can get a solution in a single
@@ -422,7 +445,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         aGradientBackup,
         cfm,
         false);
-    grads->constructMatrices(world);
+    grads->constructMatrices();
     success = grads->areResultsStandardized();
     // If this worked, we don't need to reconstruct our constraint matrices,
     // since the ones we just made already work by construction
@@ -515,8 +538,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
   // leads to numerical instability during the backwards pass.
   if (!success)
   {
-    cfm = world->getFallbackConstraintForceMixingConstant();
-    // Apple the constraint force mixing
+    cfm = mFallbackConstraintForceMixingConstant;
+    // Apply the constraint force mixing
     mABackup.diagonal()
         += Eigen::VectorXs::Ones(mABackup.diagonal().size()) * cfm;
     aGradientBackup.diagonal()
@@ -704,7 +727,7 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         aGradientBackup,
         cfm,
         hadToIgnoreFrictionToSolve);
-    group.getGradientConstraintMatrices()->constructMatrices(world);
+    group.getGradientConstraintMatrices()->constructMatrices();
     if (group.getGradientConstraintMatrices()->areResultsStandardized())
     {
       mX = group.getGradientConstraintMatrices()
@@ -712,7 +735,14 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
     }
   }
 
-  // Apply constraint impulses
+  // Initialize the vector of constraint impulses we will eventually return.
+  // Each ith element of the vector will contain a pointer to the constraint
+  // impulse to be applied for the ith constraint.
+  std::vector<s_t*> constraintImpulses;
+
+  // Collect the final solved constraint impulses to apply per constraint.
+  // TODO(mguo): Make impulse magnitudes all have 3 elements regardless of
+  // whether friction exists or not.
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
     const ConstraintBasePtr& constraint = group.getConstraint(i);
@@ -726,6 +756,8 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->lcpResult
           = mX(mOffset[i]);
+      // Similar to storing lcpResult, we're storing a bunch of other useful
+      // contact information users may want related to each contact.
       const_cast<collision::Contact*>(&contactConstraint->getContact())
           ->spatialNormalA
           = contactConstraint->getSpatialNormalA();
@@ -740,11 +772,28 @@ void BoxedLcpConstraintSolver::solveConstrainedGroup(
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent2
             = mX(mOffset[i] + 2);
+        const ContactConstraint::TangentBasisMatrix D
+            = contactConstraint->getTangentBasisMatrixODE(
+                contactConstraint->getContact().normal);
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->tangent1
+            = D.col(0);
+        const_cast<collision::Contact*>(&contactConstraint->getContact())
+            ->tangent2
+            = D.col(1);
       }
     }
-    constraint->applyImpulse(mX.data() + mOffset[i]);
-    constraint->excite();
+    constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
+  return constraintImpulses;
+}
+
+//==============================================================================
+std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
+    ConstrainedGroup& group)
+{
+  LcpInputs lcpInputs = buildLcpInputs(group);
+  return solveLcp(lcpInputs, group);
 }
 
 //==============================================================================

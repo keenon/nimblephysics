@@ -34,7 +34,7 @@ Anthropometrics::Anthropometrics()
 }
 
 //==============================================================================
-Anthropometrics Anthropometrics::loadFromFile(
+std::shared_ptr<Anthropometrics> Anthropometrics::loadFromFile(
     const common::Uri& uri, const common::ResourceRetrieverPtr& retrieverOrNull)
 {
   common::ResourceRetrieverPtr retriever = nullptr;
@@ -52,7 +52,7 @@ Anthropometrics Anthropometrics::loadFromFile(
     retriever = newRetriever;
   }
 
-  Anthropometrics result = Anthropometrics();
+  std::shared_ptr<Anthropometrics> result = std::make_shared<Anthropometrics>();
 
   //--------------------------------------------------------------------------
   // Load xml and create Document
@@ -110,7 +110,7 @@ Anthropometrics Anthropometrics::loadFromFile(
       bodyPose = utils::getValueVectorXs(metricElement, "BodyPose");
     }
 
-    result.addMetric(name, bodyPose, bodyA, offsetA, bodyB, offsetB, axis);
+    result->addMetric(name, bodyPose, bodyA, offsetA, bodyB, offsetB, axis);
 
     metricElement = metricElement->NextSiblingElement("Metric");
   }
@@ -123,9 +123,65 @@ void Anthropometrics::debugToGUI(
     std::shared_ptr<server::GUIWebsocketServer> server,
     std::shared_ptr<dynamics::Skeleton> skel)
 {
+  std::vector<Eigen::Vector3s> colors;
+  colors.push_back(Eigen::Vector3s(255, 0, 0));
+  colors.push_back(Eigen::Vector3s(0, 255, 0));
+  colors.push_back(Eigen::Vector3s(0, 0, 255));
+  colors.push_back(Eigen::Vector3s(255, 255, 0));
+  colors.push_back(Eigen::Vector3s(255, 0, 255));
+  colors.push_back(Eigen::Vector3s(0, 255, 255));
+  colors.push_back(Eigen::Vector3s(127, 64, 64));
+  colors.push_back(Eigen::Vector3s(242, 137, 121));
+  colors.push_back(Eigen::Vector3s(153, 69, 38));
+  colors.push_back(Eigen::Vector3s(242, 97, 0));
+  colors.push_back(Eigen::Vector3s(64, 26, 0));
+  colors.push_back(Eigen::Vector3s(230, 195, 172));
+  colors.push_back(Eigen::Vector3s(140, 91, 35));
+  colors.push_back(Eigen::Vector3s(229, 176, 115));
+  colors.push_back(Eigen::Vector3s(64, 49, 32));
+  colors.push_back(Eigen::Vector3s(255, 204, 0));
+  colors.push_back(Eigen::Vector3s(140, 119, 35));
+  colors.push_back(Eigen::Vector3s(222, 230, 115));
+  colors.push_back(Eigen::Vector3s(170, 255, 0));
+  colors.push_back(Eigen::Vector3s(85, 102, 51));
+  colors.push_back(Eigen::Vector3s(91, 140, 35));
+  colors.push_back(Eigen::Vector3s(206, 242, 182));
+  colors.push_back(Eigen::Vector3s(0, 64, 17));
+  colors.push_back(Eigen::Vector3s(61, 242, 109));
+  colors.push_back(Eigen::Vector3s(54, 217, 163));
+  colors.push_back(Eigen::Vector3s(70, 140, 126));
+  colors.push_back(Eigen::Vector3s(67, 89, 85));
+  colors.push_back(Eigen::Vector3s(128, 247, 255));
+  colors.push_back(Eigen::Vector3s(0, 184, 230));
+  colors.push_back(Eigen::Vector3s(0, 102, 153));
+  colors.push_back(Eigen::Vector3s(0, 43, 64));
+  colors.push_back(Eigen::Vector3s(182, 222, 242));
+  colors.push_back(Eigen::Vector3s(115, 145, 230));
+  colors.push_back(Eigen::Vector3s(105, 115, 140));
+  colors.push_back(Eigen::Vector3s(0, 0, 128));
+  colors.push_back(Eigen::Vector3s(13, 13, 51));
+  colors.push_back(Eigen::Vector3s(85, 61, 242));
+  colors.push_back(Eigen::Vector3s(79, 70, 140));
+  colors.push_back(Eigen::Vector3s(202, 121, 242));
+  colors.push_back(Eigen::Vector3s(75, 57, 77));
+  colors.push_back(Eigen::Vector3s(230, 0, 214));
+  colors.push_back(Eigen::Vector3s(255, 191, 251));
+  colors.push_back(Eigen::Vector3s(128, 32, 96));
+  colors.push_back(Eigen::Vector3s(140, 105, 129));
+  colors.push_back(Eigen::Vector3s(242, 0, 129));
+  colors.push_back(Eigen::Vector3s(64, 0, 26));
+  colors.push_back(Eigen::Vector3s(229, 0, 31));
+  colors.push_back(Eigen::Vector3s(255, 191, 200));
+
   server->deleteObjectsByPrefix("anthro_metric_");
-  for (AnthroMetric& metric : mMetrics)
+  for (int i = 0; i < mMetrics.size(); i++)
   {
+    AnthroMetric& metric = mMetrics.at(i);
+    Eigen::Vector4s color = Eigen::Vector4s(
+        colors[i](0) / 255.0, colors[i](1) / 255.0, colors[i](2) / 255.0, 1.0);
+    Eigen::Vector4s colorTransparent = Eigen::Vector4s(
+        colors[i](0) / 255.0, colors[i](1) / 255.0, colors[i](2) / 255.0, 0.4);
+
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
     markers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
         skel->getBodyNode(metric.bodyA), metric.offsetA));
@@ -135,10 +191,64 @@ void Anthropometrics::debugToGUI(
     Eigen::Vector3s markerA = worldSpace.head<3>();
     Eigen::Vector3s markerB = worldSpace.tail<3>();
 
-    std::vector<Eigen::Vector3s> points;
-    points.push_back(markerA);
-    points.push_back(markerB);
-    server->createLine("anthro_metric_" + metric.name, points);
+    // Create spheres at the endpoints
+    server->createSphere(
+        "anthro_metric_a_" + metric.name, 0.01, markerA, colorTransparent);
+    server->createSphere(
+        "anthro_metric_b_" + metric.name, 0.01, markerB, colorTransparent);
+
+    // Draw lines for each metric
+
+    // If the axis is zero, then this is a raw distance measurement in world
+    // space
+    if (metric.axis == Eigen::Vector3s::Zero())
+    {
+      std::vector<Eigen::Vector3s> points;
+      points.push_back(markerA);
+      points.push_back(markerB);
+      server->createLine("anthro_metric_" + metric.name, points, color);
+    }
+    // If the axis is non-zero, then this is a distance measurement along the
+    // axis.
+    else
+    {
+      Eigen::Vector3s diff = markerA - markerB;
+      Eigen::Vector3s diffAlongAxis = diff.dot(metric.axis) * metric.axis;
+      Eigen::Vector3s diffPerpendicular = diff - diffAlongAxis;
+
+      if (diffPerpendicular.norm() > 0)
+      {
+        Eigen::Matrix3s R = Eigen::Matrix3s::Zero();
+        R.col(0) = diffPerpendicular.normalized();
+        R.col(1) = metric.axis.normalized();
+        R.col(2) = R.col(0).cross(R.col(1));
+
+        Eigen::Vector3s euler = math::matrixToEulerXYZ(R);
+        Eigen::Vector3s size = Eigen::Vector3s(
+            diffPerpendicular.norm(), 0.005, diffPerpendicular.norm());
+        server->createBox(
+            "anthro_metric_top_box_" + metric.name,
+            size,
+            markerA,
+            euler,
+            colorTransparent);
+
+        server->createBox(
+            "anthro_metric_bottom_box_" + metric.name,
+            size,
+            markerB,
+            euler,
+            colorTransparent);
+      }
+
+      // Jump to the middle, then shoot across the perpendicular section
+      std::vector<Eigen::Vector3s> points;
+      points.push_back(markerA);
+      points.push_back(markerA - diffPerpendicular / 2);
+      points.push_back(markerB + diffPerpendicular / 2);
+      points.push_back(markerB);
+      server->createLine("anthro_metric_" + metric.name, points, color);
+    }
   }
 }
 
@@ -217,10 +327,29 @@ void Anthropometrics::setSkelToMetricPose(
     }
     else
     {
+      /*
       std::cout << "WARNING: Anthropometric \"" << metric.name
                 << "\" specifies a BodyPose with size "
                 << metric.bodyPose.size() << ", but skeleton has "
                 << skel->getNumDofs() << " DOFs." << std::endl;
+      */
+
+      // Trim/pad with zeros
+      Eigen::VectorXs padded = Eigen::VectorXs::Zero(skel->getNumDofs());
+      if (padded.size() > metric.bodyPose.size())
+      {
+        padded.segment(0, metric.bodyPose.size()) = metric.bodyPose;
+      }
+      else
+      {
+        padded = metric.bodyPose.segment(0, padded.size());
+      }
+
+      // Now set positions
+      if (skel->getPositions() != padded)
+      {
+        skel->setPositions(padded);
+      }
     }
   }
 }

@@ -1204,7 +1204,7 @@ TEST(REALTIME, CARTPOLE_MU_PLOT)
   s_t lower_bound = -0.5;
 
   world->tuneMass(
-      world->getBodyNodeIndex(1),
+      world->getBodyNodeByIndex(1),
       WrtMassBodyNodeEntryType::INERTIA_COM_MU,
       Eigen::VectorXs::Ones(1) *  upper_bound,
       Eigen::VectorXs::Ones(1) *  lower_bound);
@@ -1355,7 +1355,7 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
   
 
   world->tuneMass(
-      world->getBodyNodeIndex(1),
+      world->getBodyNodeByIndex(1),
       WrtMassBodyNodeEntryType::INERTIA_COM,
       upper_bound,
       lower_bound);

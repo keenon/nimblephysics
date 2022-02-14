@@ -94,12 +94,16 @@ jobs:
         include:
           - python-version: 3.6
             PYTHON_VERSION_CODE: cp36-cp36m
+            MAC_VERSION_TAG: macosx_10_14
           - python-version: 3.7
             PYTHON_VERSION_CODE: cp37-cp37m
+            MAC_VERSION_TAG: macosx_10_14
           - python-version: 3.8
             PYTHON_VERSION_CODE: cp38-cp38
+            MAC_VERSION_TAG: macosx_10_14
           - python-version: 3.9
             PYTHON_VERSION_CODE: cp39-cp39
+            MAC_VERSION_TAG: macosx_10_15
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -128,8 +132,8 @@ jobs:
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:
-          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
-          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_14_x86_64.whl
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-${{ matrix.MAC_VERSION_TAG }}_x86_64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-${{ matrix.MAC_VERSION_TAG }}_x86_64.whl
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest

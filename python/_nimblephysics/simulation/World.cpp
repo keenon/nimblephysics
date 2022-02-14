@@ -37,6 +37,7 @@
 #include <dart/simulation/World.hpp>
 #include <dart/utils/UniversalLoader.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -170,6 +171,17 @@ void World(py::module& m)
           },
           ::py::arg("index"))
       .def(
+          "getNumBodyNodes",
+          +[](dart::simulation::World* self) -> std::size_t {
+            return self->getNumBodyNodes();
+          })
+      .def(
+          "getBodyNodeByIndex",
+          +[](dart::simulation::World* self,
+              std::size_t _index) -> dart::dynamics::BodyNode* {
+            return self->getBodyNodeByIndex(_index);
+          })
+      .def(
           "getSimpleFrame",
           +[](const dart::simulation::World* self,
               std::size_t _index) -> dart::dynamics::SimpleFramePtr {
@@ -248,6 +260,17 @@ void World(py::module& m)
           },
           ::py::arg("resetCommand"))
       .def(
+          "integratePositions",
+          +[](dart::simulation::World* self, Eigen::VectorXs initialVelocity)
+              -> void { return self->integratePositions(initialVelocity); },
+          ::py::arg("initialVelocity"))
+      .def(
+          "integrateVelocitiesFromImpulses",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->integrateVelocitiesFromImpulses(_resetCommand);
+          },
+          ::py::arg("resetCommand") = true)
+      .def(
           "setTime",
           +[](dart::simulation::World* self, s_t _time) -> void {
             return self->setTime(_time);
@@ -269,6 +292,19 @@ void World(py::module& m)
             return self->getConstraintSolver();
           },
           ::py::return_value_policy::reference_internal)
+      .def(
+          "runConstraintEngine",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runConstraintEngine(_resetCommand);
+          })
+      .def(
+          "runLcpConstraintEngine",
+          +[](dart::simulation::World* self, bool _resetCommand) -> void {
+            return self->runLcpConstraintEngine(_resetCommand);
+          })
+      .def(
+          "replaceConstraintEngineFn",
+          &dart::simulation::World::replaceConstraintEngineFn)
       .def(
           "bake",
           +[](dart::simulation::World* self) -> void { return self->bake(); })
@@ -303,9 +339,8 @@ void World(py::module& m)
           })
       .def(
           "getMasses",
-          +[](dart::simulation::World* self) -> Eigen::VectorXs {
-            return self->getMasses();
-          })
+          +[](dart::simulation::World* self)
+              -> Eigen::VectorXs { return self->getMasses(); })
       .def(
           "getControlForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {

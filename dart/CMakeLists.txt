@@ -125,12 +125,17 @@ target_link_libraries(dart
     Boost::system
     Boost::filesystem
     IPOPT::ipopt
-    PerfUtils
     # protobuf::libprotobuf
     # protobuf::libprotobuf-lite
     # protobuf::libprotoc
     gRPC::grpc++
 )
+if (PerfUtils_FOUND)
+target_link_libraries(dart
+  PUBLIC
+    PerfUtils
+)
+endif()
 if (DART_USE_ARBITRARY_PRECISION)
 target_link_libraries(dart
   PUBLIC

@@ -33,6 +33,7 @@
 #ifndef DART_CONSTRAINT_BOXEDLCPCONSTRAINTSOLVER_HPP_
 #define DART_CONSTRAINT_BOXEDLCPCONSTRAINTSOLVER_HPP_
 
+#include "dart/constraint/BoxedLcpSolver.hpp"
 #include "dart/constraint/ConstraintSolver.hpp"
 #include "dart/constraint/SmartPointer.hpp"
 
@@ -112,11 +113,16 @@ public:
   /// our optimistic LCP-stabilization-to-acceptance approach.
   virtual void setCachedLCPSolution(Eigen::VectorXs X) override;
 
-protected:
   // Documentation inherited.
-  void solveConstrainedGroup(
-      ConstrainedGroup& group, simulation::World* world) override;
+  std::vector<s_t*> solveConstrainedGroup(ConstrainedGroup& group) override;
 
+  /// Build the inputs to the LCP from the constraint group.
+  LcpInputs buildLcpInputs(ConstrainedGroup& group);
+
+  /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
+  std::vector<s_t*> solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
+
+protected:
   /// Boxed LCP solver
   BoxedLcpSolverPtr mBoxedLcpSolver;
   // TODO(JS): Hold as unique_ptr because there is no reason to share. Make this
@@ -131,8 +137,7 @@ protected:
   Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mA;
 
   /// Cache data for boxed LCP formulation
-  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      mABackup;
+  Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mABackup;
 
   /// Cache data for boxed LCP formulation
   Eigen::VectorXs mX;
@@ -176,8 +181,7 @@ private:
   bool isSymmetric(std::size_t n, s_t* A);
 
   /// Return true if the diagonla block of matrix is symmetric
-  bool isSymmetric(
-      std::size_t n, s_t* A, std::size_t begin, std::size_t end);
+  bool isSymmetric(std::size_t n, s_t* A, std::size_t begin, std::size_t end);
 
   /// Print debug information
   void print(

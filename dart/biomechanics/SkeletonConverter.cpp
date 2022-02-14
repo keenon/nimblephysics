@@ -434,7 +434,7 @@ void SkeletonConverter::debugToGUI(
     server->createLine(
         "SkeletonConverter_link_line_" + std::to_string(i),
         line,
-        Eigen::Vector3s::UnitX());
+        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
   }
 
   Eigen::VectorXs sourceMarkers = getSourceMarkerWorldPositions();
@@ -449,12 +449,12 @@ void SkeletonConverter::debugToGUI(
     server->createLine(
         "SkeletonConverter_marker_line_" + std::to_string(i),
         line,
-        Eigen::Vector3s::UnitY());
+        Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
     server->createSphere(
         "SkeletonConverter_marker_target_" + std::to_string(i),
         0.01,
         targetPos,
-        Eigen::Vector3s::UnitY());
+        Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
   }
 }
 

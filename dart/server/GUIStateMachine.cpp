@@ -121,6 +121,19 @@ std::string GUIStateMachine::getCurrentStateAsJson()
       json << ",";
     encodeCreatePlot(json, pair.second);
   }
+  for (auto pair : mRichPlots)
+  {
+    if (isFirst)
+      isFirst = false;
+    else
+      json << ",";
+    encodeCreateRichPlot(json, pair.second);
+    for (auto dataPair : pair.second.data)
+    {
+      json << ",";
+      encodeSetRichPlotData(json, pair.second.key, dataPair.second);
+    }
+  }
   for (auto key : mMouseInteractionEnabled)
   {
     if (isFirst)
@@ -184,7 +197,7 @@ void GUIStateMachine::renderWorld(
       createLine(
           prefix + "__contact_" + std::to_string(i) + "_b",
           pointsB,
-          Eigen::Vector3s(0, 1, 0));
+          Eigen::Vector4s(0, 1, 0, 1.0));
     }
   }
 }
@@ -213,9 +226,12 @@ void GUIStateMachine::renderBasis(
   pointsZ.push_back(T * (Eigen::Vector3s::UnitZ() * scale));
 
   deleteObjectsByPrefix(prefix + "__basis_");
-  createLine(prefix + "__basis_unitX", pointsX, Eigen::Vector3s::UnitX());
-  createLine(prefix + "__basis_unitY", pointsY, Eigen::Vector3s::UnitY());
-  createLine(prefix + "__basis_unitZ", pointsZ, Eigen::Vector3s::UnitZ());
+  createLine(
+      prefix + "__basis_unitX", pointsX, Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+  createLine(
+      prefix + "__basis_unitY", pointsY, Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
+  createLine(
+      prefix + "__basis_unitZ", pointsZ, Eigen::Vector4s(0.0, 0.0, 1.0, 1.0));
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -223,11 +239,11 @@ void GUIStateMachine::renderBasis(
 void GUIStateMachine::renderSkeleton(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::string& prefix,
-    Eigen::Vector3s overrideColor)
+    Eigen::Vector4s overrideColor)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  bool useOriginalColor = overrideColor == -1 * Eigen::Vector3s::Ones();
+  bool useOriginalColor = overrideColor == -1 * Eigen::Vector4s::Ones();
 
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
@@ -284,7 +300,7 @@ void GUIStateMachine::renderSkeleton(
                 boxShape->getSize(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -299,7 +315,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 meshShape->getScale(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -311,7 +327,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeName,
                 sphereShape->getRadius(),
                 shapeNode->getWorldTransform().translation(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -325,7 +341,7 @@ void GUIStateMachine::renderSkeleton(
                 capsuleShape->getHeight(),
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -339,7 +355,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeName,
                 sphereShape->getRadii()[0],
                 shapeNode->getWorldTransform().translation(),
-                useOriginalColor ? visual->getColor() : overrideColor,
+                useOriginalColor ? visual->getRGBA() : overrideColor,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -368,8 +384,8 @@ void GUIStateMachine::renderSkeleton(
           Eigen::Vector3s pos = shapeNode->getWorldTransform().translation();
           Eigen::Vector3s euler
               = math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear());
-          Eigen::Vector3s color
-              = useOriginalColor ? visual->getColor() : overrideColor;
+          Eigen::Vector4s color
+              = useOriginalColor ? visual->getRGBA() : overrideColor;
           // std::cout << "Color " << shapeName << ":" << color << std::endl;
           Eigen::Vector3s scale = Eigen::Vector3s::Zero();
           if (shape->getType() == "BoxShape")
@@ -438,7 +454,7 @@ void GUIStateMachine::renderTrajectoryLines(
   assert(positions.rows() == world->getNumDofs());
 
   std::unordered_map<std::string, std::vector<Eigen::Vector3s>> paths;
-  std::unordered_map<std::string, Eigen::Vector3s> colors;
+  std::unordered_map<std::string, Eigen::Vector4s> colors;
 
   neural::RestorableSnapshot snapshot(world);
   for (int t = 0; t < positions.cols(); t++)
@@ -462,7 +478,7 @@ void GUIStateMachine::renderTrajectoryLines(
                           << node->getName() << "_" << k;
           std::string shapeName = shapeNameStream.str();
           paths[shapeName].push_back(node->getWorldTransform().translation());
-          colors[shapeName] = visual->getColor();
+          colors[shapeName] = visual->getRGBA();
         }
       }
     }
@@ -512,11 +528,11 @@ void GUIStateMachine::renderBodyWrench(
   createLine(
       prefix + "_" + body->getName() + "_torque",
       torqueLine,
-      Eigen::Vector3s(0.8, 0.8, 0.8));
+      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0));
   createLine(
       prefix + "_" + body->getName() + "_force",
       forceLine,
-      Eigen::Vector3s(1.0, 0.0, 0.0));
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
 }
 
 /// This renders little velocity lines starting at every vertex in the passed
@@ -535,7 +551,7 @@ void GUIStateMachine::renderMovingBodyNodeVertices(
     createLine(
         prefix + "_" + body->getName() + "_" + std::to_string(i),
         line,
-        Eigen::Vector3s(1.0, 0.0, 0.0));
+        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
   }
 }
 
@@ -573,7 +589,7 @@ void GUIStateMachine::createBox(
     const Eigen::Vector3s& size,
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -598,7 +614,7 @@ void GUIStateMachine::createSphere(
     std::string key,
     s_t radius,
     const Eigen::Vector3s& pos,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -624,7 +640,7 @@ void GUIStateMachine::createCapsule(
     s_t height,
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -649,7 +665,7 @@ void GUIStateMachine::createCapsule(
 void GUIStateMachine::createLine(
     std::string key,
     const std::vector<Eigen::Vector3s>& points,
-    const Eigen::Vector3s& color)
+    const Eigen::Vector4s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -676,7 +692,7 @@ void GUIStateMachine::createMesh(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -711,7 +727,7 @@ void GUIStateMachine::createMeshASSIMP(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -808,7 +824,7 @@ void GUIStateMachine::createMeshFromShape(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
-    const Eigen::Vector3s& color,
+    const Eigen::Vector4s& color,
     bool castShadows,
     bool receiveShadows)
 {
@@ -908,7 +924,7 @@ Eigen::Vector3s GUIStateMachine::getObjectRotation(const std::string& key)
 
 /// This returns the color of an object, if we've got it. Otherwise it returns
 /// Vector3s::Zero().
-Eigen::Vector3s GUIStateMachine::getObjectColor(const std::string& key)
+Eigen::Vector4s GUIStateMachine::getObjectColor(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -922,7 +938,7 @@ Eigen::Vector3s GUIStateMachine::getObjectColor(const std::string& key)
     return mLines[key].color;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].color;
-  return Eigen::Vector3s::Zero();
+  return Eigen::Vector4s::Zero();
 }
 
 /// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
@@ -1000,7 +1016,7 @@ void GUIStateMachine::setObjectRotation(
 
 /// This changes an object (e.g. box, sphere, line) color
 void GUIStateMachine::setObjectColor(
-    const std::string& key, const Eigen::Vector3s& color)
+    const std::string& key, const Eigen::Vector4s& color)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1028,7 +1044,7 @@ void GUIStateMachine::setObjectColor(
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
          << "\", \"color\": ";
-    vec3ToJson(json, color);
+    vec4ToJson(json, color);
     json << "}";
   });
 }
@@ -1434,6 +1450,108 @@ void GUIStateMachine::setPlotData(
   }
 }
 
+/// This creates a rich plot with axis labels, a title, tickmarks, and
+/// multiple simultaneous lines
+void GUIStateMachine::createRichPlot(
+    const std::string& key,
+    const Eigen::Vector2i& fromTopLeft,
+    const Eigen::Vector2i& size,
+    s_t minX,
+    s_t maxX,
+    s_t minY,
+    s_t maxY,
+    const std::string& title,
+    const std::string& xAxisLabel,
+    const std::string& yAxisLabel)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  RichPlot plot;
+  plot.key = key;
+  plot.fromTopLeft = fromTopLeft;
+  plot.size = size;
+  plot.minX = minX;
+  plot.maxX = maxX;
+  plot.minY = minY;
+  plot.maxY = maxY;
+  plot.title = title;
+  plot.xAxisLabel = xAxisLabel;
+  plot.yAxisLabel = yAxisLabel;
+
+  mRichPlots[key] = plot;
+
+  queueCommand(
+      [&](std::stringstream& json) { encodeCreateRichPlot(json, plot); });
+}
+
+/// This sets a single data stream for a rich plot. `name` should be human
+/// readable and unique. You can overwrite data by using the same `name` with
+/// multiple calls to `setRichPlotData`.
+void GUIStateMachine::setRichPlotData(
+    const std::string& key,
+    const std::string& name,
+    const std::string& color,
+    const std::string& type,
+    const std::vector<s_t>& xs,
+    const std::vector<s_t>& ys)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    RichPlotData data;
+    data.name = name;
+    data.color = color;
+    data.type = type;
+    data.xs = xs;
+    data.ys = ys;
+    mRichPlots[key].data[name] = data;
+
+    queueCommand([this, key, data](std::stringstream& json) {
+      encodeSetRichPlotData(json, key, data);
+    });
+  }
+  else
+  {
+    std::cout << "Tried to setRichPlotData() for a key (" << key
+              << ") that doesn't exist as a RichPlot object. Call "
+                 "createRichPlot() first."
+              << std::endl;
+  }
+}
+
+/// This sets the plot bounds for a rich plot object
+void GUIStateMachine::setRichPlotBounds(
+    const std::string& key, s_t minX, s_t maxX, s_t minY, s_t maxY)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    mRichPlots[key].minX = minX;
+    mRichPlots[key].maxX = maxX;
+    mRichPlots[key].minY = minY;
+    mRichPlots[key].maxY = maxY;
+
+    queueCommand([&](std::stringstream& json) {
+      json << "{ \"type\": \"set_rich_plot_bounds\", \"key\": " << key
+           << "\", \"xs\": ";
+      json << ", \"min_x\": " << numberToJson(minX);
+      json << ", \"max_x\": " << numberToJson(maxX);
+      json << ", \"min_y\": " << numberToJson(minY);
+      json << ", \"max_y\": " << numberToJson(maxY);
+      json << " }";
+    });
+  }
+  else
+  {
+    std::cout << "Tried to setRichPlotBounds() for a key (" << key
+              << ") that doesn't exist as a RichPlot object. Call "
+                 "createRichPlot() first."
+              << std::endl;
+  }
+}
+
 /// This moves a UI element on the screen
 void GUIStateMachine::setUIElementPosition(
     const std::string& key, const Eigen::Vector2i& fromTopLeft)
@@ -1487,6 +1605,10 @@ void GUIStateMachine::setUIElementSize(
   {
     mPlots[key].size = size;
   }
+  if (mRichPlots.find(key) != mRichPlots.end())
+  {
+    mRichPlots[key].size = size;
+  }
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"set_ui_elem_size\", \"key\": " << key
@@ -1505,6 +1627,7 @@ void GUIStateMachine::deleteUIElement(const std::string& key)
   mButtons.erase(key);
   mSliders.erase(key);
   mPlots.erase(key);
+  mRichPlots.erase(key);
 
   queueCommand([&](std::stringstream& json) {
     json << "{ \"type\": \"delete_ui_elem\", \"key\": \"" << key << "\" }";
@@ -1534,7 +1657,7 @@ void GUIStateMachine::encodeCreateBox(std::stringstream& json, Box& box)
   json << ", \"euler\": ";
   vec3ToJson(json, box.euler);
   json << ", \"color\": ";
-  vec3ToJson(json, box.color);
+  vec4ToJson(json, box.color);
   json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
   json << "}";
@@ -1548,7 +1671,7 @@ void GUIStateMachine::encodeCreateSphere(
   json << ", \"pos\": ";
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
-  vec3ToJson(json, sphere.color);
+  vec4ToJson(json, sphere.color);
   json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
@@ -1566,7 +1689,7 @@ void GUIStateMachine::encodeCreateCapsule(
   json << ", \"euler\": ";
   vec3ToJson(json, capsule.euler);
   json << ", \"color\": ";
-  vec3ToJson(json, capsule.color);
+  vec4ToJson(json, capsule.color);
   json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (capsule.receiveShadows ? "true" : "false");
@@ -1587,7 +1710,7 @@ void GUIStateMachine::encodeCreateLine(std::stringstream& json, Line& line)
     vec3ToJson(json, point);
   }
   json << "], \"color\": ";
-  vec3ToJson(json, line.color);
+  vec4ToJson(json, line.color);
   json << "}";
 }
 
@@ -1646,7 +1769,7 @@ void GUIStateMachine::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
          << "\", \"start\": " << mesh.textureStartIndices[i] << "}";
   }
   json << "], \"color\": ";
-  vec3ToJson(json, mesh.color);
+  vec4ToJson(json, mesh.color);
   json << ", \"pos\": ";
   vec3ToJson(json, mesh.pos);
   json << ", \"euler\": ";
@@ -1727,6 +1850,57 @@ void GUIStateMachine::encodeCreatePlot(std::stringstream& json, Plot& plot)
   vecToJson(json, plot.ys);
   json << ", \"plot_type\": \"" << plot.type;
   json << "\" }";
+}
+
+void GUIStateMachine::encodeCreateRichPlot(
+    std::stringstream& json, RichPlot& plot)
+{
+  json << "{ \"type\": \"create_rich_plot\", \"key\": \"" << plot.key
+       << "\", \"from_top_left\": ";
+  vec2iToJson(json, plot.fromTopLeft);
+  json << ", \"size\": ";
+  vec2iToJson(json, plot.size);
+  json << ", \"max_x\": " << numberToJson(plot.maxX);
+  json << ", \"min_x\": " << numberToJson(plot.minX);
+  json << ", \"max_y\": " << numberToJson(plot.maxY);
+  json << ", \"min_y\": " << numberToJson(plot.minY);
+  json << ", \"title\": \"";
+  json << plot.title;
+  json << "\", \"x_axis_label\": \"";
+  json << plot.xAxisLabel;
+  json << "\", \"y_axis_label\": \"";
+  json << plot.yAxisLabel;
+  json << "\" }";
+}
+
+/*
+export type SetRichPlotData = {
+  type: "set_rich_plot_data";
+  key: string;
+  name: string;
+  color: string;
+  xs: number[];
+  ys: number[];
+  plot_type: "line" | "scatter";
+};
+*/
+void GUIStateMachine::encodeSetRichPlotData(
+    std::stringstream& json,
+    const std::string& plotKey,
+    const RichPlotData& data)
+{
+  json << "{ \"type\": \"set_rich_plot_data\", \"key\": \"" << plotKey
+       << "\", \"name\": \"";
+  json << data.name;
+  json << "\", \"color\": \"";
+  json << data.color;
+  json << "\", \"plot_type\": \"";
+  json << data.type;
+  json << "\", \"xs\": ";
+  vecToJson(json, data.xs);
+  json << ", \"ys\": ";
+  vecToJson(json, data.ys);
+  json << "}";
 }
 
 } // namespace server

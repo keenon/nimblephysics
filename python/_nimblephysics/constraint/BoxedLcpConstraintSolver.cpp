@@ -34,6 +34,7 @@
 #include <dart/constraint/BoxedLcpSolver.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -64,6 +65,31 @@ void BoxedLcpConstraintSolver(py::module& m)
           +[](const dart::constraint::BoxedLcpConstraintSolver* self)
               -> dart::constraint::ConstBoxedLcpSolverPtr {
             return self->getBoxedLcpSolver();
+          })
+      .def(
+          "getSecondaryBoxedLcpSolver",
+          +[](const dart::constraint::BoxedLcpConstraintSolver* self)
+              -> dart::constraint::ConstBoxedLcpSolverPtr {
+            return self->getSecondaryBoxedLcpSolver();
+          })
+      .def(
+          "makeHyperAccurateAndVerySlow",
+          +[](dart::constraint::BoxedLcpConstraintSolver* self) {
+            return self->makeHyperAccurateAndVerySlow();
+          })
+      .def(
+          "buildLcpInputs",
+          +[](dart::constraint::BoxedLcpConstraintSolver* self,
+              dart::constraint::ConstrainedGroup& group)
+              -> dart::constraint::LcpInputs {
+            return self->buildLcpInputs(group);
+          })
+      .def(
+          "solveLcp",
+          +[](dart::constraint::BoxedLcpConstraintSolver* self,
+              dart::constraint::LcpInputs lcpInputs,
+              dart::constraint::ConstrainedGroup& group) -> std::vector<s_t*> {
+            return self->solveLcp(lcpInputs, group);
           });
 }
 

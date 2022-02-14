@@ -72,7 +72,7 @@ public:
   void renderSkeleton(
       const std::shared_ptr<dynamics::Skeleton>& skel,
       const std::string& prefix = "skel",
-      Eigen::Vector3s overrideColor = -1 * Eigen::Vector3s::Ones());
+      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones());
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
@@ -110,7 +110,7 @@ public:
       const Eigen::Vector3s& size,
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -119,7 +119,7 @@ public:
       std::string key,
       s_t radius,
       const Eigen::Vector3s& pos,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -130,7 +130,7 @@ public:
       s_t height,
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -138,7 +138,7 @@ public:
   void createLine(
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
-      const Eigen::Vector3s& color = Eigen::Vector3s(1.0, 0.5, 0.5));
+      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0));
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -153,7 +153,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -166,7 +166,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -178,7 +178,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
-      const Eigen::Vector3s& color = Eigen::Vector3s(0.5, 0.5, 0.5),
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -200,8 +200,8 @@ public:
   Eigen::Vector3s getObjectRotation(const std::string& key);
 
   /// This returns the color of an object, if we've got it. Otherwise it
-  /// returns Vector3s::Zero().
-  Eigen::Vector3s getObjectColor(const std::string& key);
+  /// returns Vector4s::Zero().
+  Eigen::Vector4s getObjectColor(const std::string& key);
 
   /// This returns the size of a box, scale of a mesh, 3vec of [radius, radius,
   /// radius] for a sphere, and [radius, radius, height] for a capsule. Returns
@@ -216,7 +216,7 @@ public:
   void setObjectRotation(const std::string& key, const Eigen::Vector3s& euler);
 
   /// This changes an object (e.g. box, sphere, line) color
-  void setObjectColor(const std::string& key, const Eigen::Vector3s& color);
+  void setObjectColor(const std::string& key, const Eigen::Vector4s& color);
 
   /// This changes an object (e.g. box, sphere, mesh) size. Has no effect on
   /// lines.
@@ -304,6 +304,69 @@ public:
       s_t minY,
       s_t maxY);
 
+  /*
+export type CreateRichPlotCommand = {
+  type: "create_rich_plot";
+  key: string;
+  from_top_left: number[];
+  size: number[];
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+  title: string;
+  x_axis_label: string;
+  y_axis_label: string;
+};
+
+export type SetRichPlotData = {
+  type: "set_rich_plot_data";
+  key: string;
+  name: string;
+  color: string;
+  xs: number[];
+  ys: number[];
+  plot_type: "line" | "scatter";
+};
+
+export type SetRichPlotBounds = {
+  type: "set_rich_plot_bounds";
+  key: string;
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+};
+  */
+  /// This creates a rich plot with axis labels, a title, tickmarks, and
+  /// multiple simultaneous lines
+  void createRichPlot(
+      const std::string& key,
+      const Eigen::Vector2i& fromTopLeft,
+      const Eigen::Vector2i& size,
+      s_t minX,
+      s_t maxX,
+      s_t minY,
+      s_t maxY,
+      const std::string& title,
+      const std::string& xAxisLabel,
+      const std::string& yAxisLabel);
+
+  /// This sets a single data stream for a rich plot. `name` should be human
+  /// readable and unique. You can overwrite data by using the same `name` with
+  /// multiple calls to `setRichPlotData`.
+  void setRichPlotData(
+      const std::string& key,
+      const std::string& name,
+      const std::string& color,
+      const std::string& type,
+      const std::vector<s_t>& xs,
+      const std::vector<s_t>& ys);
+
+  /// This sets a single data stream for a rich plot
+  void setRichPlotBounds(
+      const std::string& key, s_t minX, s_t maxX, s_t minY, s_t maxY);
+
   /// This moves a UI element on the screen
   void setUIElementPosition(
       const std::string& key, const Eigen::Vector2i& fromTopLeft);
@@ -330,7 +393,7 @@ protected:
     Eigen::Vector3s size;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -340,7 +403,7 @@ protected:
     std::string key;
     s_t radius;
     Eigen::Vector3s pos;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -353,7 +416,7 @@ protected:
     s_t height;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -362,7 +425,7 @@ protected:
   {
     std::string key;
     std::vector<Eigen::Vector3s> points;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
   };
   std::unordered_map<std::string, Line> mLines;
 
@@ -378,7 +441,7 @@ protected:
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
     Eigen::Vector3s scale;
-    Eigen::Vector3s color;
+    Eigen::Vector4s color;
     bool castShadows;
     bool receiveShadows;
   };
@@ -439,6 +502,30 @@ protected:
   };
   std::unordered_map<std::string, Plot> mPlots;
 
+  struct RichPlotData
+  {
+    std::string name;
+    std::string color;
+    std::vector<s_t> ys;
+    std::vector<s_t> xs;
+    std::string type;
+  };
+  struct RichPlot
+  {
+    std::string key;
+    Eigen::Vector2i fromTopLeft;
+    Eigen::Vector2i size;
+    s_t minX;
+    s_t maxX;
+    s_t minY;
+    s_t maxY;
+    std::string title;
+    std::string xAxisLabel;
+    std::string yAxisLabel;
+    std::unordered_map<std::string, RichPlotData> data;
+  };
+  std::unordered_map<std::string, RichPlot> mRichPlots;
+
   void queueCommand(std::function<void(std::stringstream&)> writeCommand);
 
   void encodeCreateBox(std::stringstream& json, Box& box);
@@ -453,6 +540,9 @@ protected:
   void encodeCreateButton(std::stringstream& json, Button& button);
   void encodeCreateSlider(std::stringstream& json, Slider& slider);
   void encodeCreatePlot(std::stringstream& json, Plot& plot);
+  void encodeCreateRichPlot(std::stringstream& json, RichPlot& plot);
+  void encodeSetRichPlotData(
+      std::stringstream& json, const std::string& plotKey, const RichPlotData& data);
 };
 
 } // namespace server

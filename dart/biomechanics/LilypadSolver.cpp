@@ -267,7 +267,7 @@ void LilypadSolver::debugToGUI(
             + (cell.groundUpperBound - cell.groundLowerBound) / 2,
         mTileSize * cell.y - mTileSize / 2);
     Eigen::Vector3s euler = Eigen::Vector3s(0, 0, 0);
-    Eigen::Vector3s color = Eigen::Vector3s(0.5, 0.5, 0.5);
+    Eigen::Vector4s color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0);
 
     server->createBox(
         "lilypad_tile_" + std::to_string(cell.x) + "," + std::to_string(cell.y),

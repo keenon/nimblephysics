@@ -97,6 +97,8 @@ public:
   using NameChangedSignal = common::Signal<void(
       const std::string& _oldName, const std::string& _newName)>;
 
+  using constraintEngineFnType = std::function<void(bool)>;
+
   /// Creates World as shared_ptr
   template <typename... Args>
   static WorldPtr create(Args&&... args);
@@ -162,7 +164,7 @@ public:
   /// Get all the bodies attached to all the skeletons in this world
   std::vector<dynamics::BodyNode*> getAllBodyNodes();
 
-  dynamics::BodyNode* getBodyNodeIndex(size_t index);
+  dynamics::BodyNode* getBodyNodeByIndex(size_t index);
 
   dynamics::Joint* getJointIndex(size_t index);
 
@@ -173,9 +175,7 @@ public:
   std::size_t getNumSkeletons() const;
 
   /// Add a skeleton to this world
-  std::string addSkeleton(
-      const dynamics::SkeletonPtr& _skeleton
-    );
+  std::string addSkeleton(const dynamics::SkeletonPtr& _skeleton);
 
   /// Remove a skeleton from this world
   void removeSkeleton(const dynamics::SkeletonPtr& _skeleton);
@@ -287,6 +287,7 @@ public:
 
   Eigen::VectorXi getSpringDofsMapping();
   //Eigen::VectorXs getLinkMasses();
+
 
   size_t getLinkMassesDims();
 
@@ -435,7 +436,7 @@ public:
   void setLinkMassIndex(s_t mass, size_t index);
 
   void setLinkCOMs(Eigen::VectorXs coms);
-  
+
   void setLinkMOIs(Eigen::VectorXs mois);
 
   void setLinkMUs(Eigen::VectorXs mus);
@@ -573,7 +574,24 @@ public:
   /// command after simulation step.
   void step(bool _resetCommand = true);
 
+  /// Integrate non-constraint forces.
   void integrateVelocities();
+
+  /// Run the constraint engine which solves for constraint impulses and
+  /// integrates velocities given these constraint impulses.
+  void runConstraintEngine(bool _resetCommand);
+
+  /// The default constraint engine which runs an LCP.
+  void runLcpConstraintEngine(bool _resetCommand);
+
+  /// Replace the default constraint engine with a custom one.
+  void replaceConstraintEngineFn(const constraintEngineFnType& engineFn);
+
+  /// Integrate velocities given impulses.
+  void integrateVelocitiesFromImpulses(bool _resetCommand = true);
+
+  /// Integrate positions.
+  void integratePositions(Eigen::VectorXs initialVelocity);
 
   /// Set current time
   void setTime(s_t _time);
@@ -795,6 +813,10 @@ protected:
   /// This holds the unconstrained velocities that we found in the last
   /// timestep, before we solved the LCP for constraints
   Eigen::VectorXs mLastPreConstraintVelocity;
+
+  /// Constraint engine which solves for constraint impulses and integrates
+  /// velocities according to the given impulses.
+  constraintEngineFnType mConstraintEngineFn;
 
   /// True if we want to update p_{t+1} as f(p_t, v_t), rather than the old
   /// f(p_t, v_{t+1}). This makes it much easier to reason about

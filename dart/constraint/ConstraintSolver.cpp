@@ -87,7 +87,10 @@ ConstraintSolver::ConstraintSolver()
         false), // Default to no penetration correction, because it breaks our
                 // gradients
     mContactClippingDepth(
-        0.03) // Default to clipping only after fairly deep penetration
+        0.03), // Default to clipping only after fairly deep penetration
+    mEnforceContactAndJointAndCustomConstraintsFn([this]() {
+      return enforceContactAndJointAndCustomConstraintsWithLcp();
+    })
 {
 }
 
@@ -244,6 +247,12 @@ const std::vector<ConstrainedGroup>& ConstraintSolver::getConstrainedGroups()
 }
 
 //==============================================================================
+std::size_t ConstraintSolver::getNumConstrainedGroups() const
+{
+  return mConstrainedGroups.size();
+}
+
+//==============================================================================
 void ConstraintSolver::clearLastCollisionResult()
 {
   mCollisionResult.clear();
@@ -364,7 +373,27 @@ LCPSolver* ConstraintSolver::getLCPSolver() const
 }
 
 //==============================================================================
-void ConstraintSolver::solve(simulation::World* world)
+void ConstraintSolver::solve()
+{
+  mEnforceContactAndJointAndCustomConstraintsFn();
+}
+
+//==============================================================================
+void ConstraintSolver::replaceEnforceContactAndJointAndCustomConstraintsFn(
+    const enforceContactAndJointAndCustomConstraintsFnType& f)
+{
+  dtwarn << "[ConstraintSolver::"
+            "replaceEnforceContactAndJointAndCustomConstraintsFn] WARNING: "
+            "GRADIENTS WILL "
+         << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+         << "don't yet support differentiating through `timestep()` if you've "
+         << "called `replaceEnforceContactAndJointAndCustomConstraintsFn()` to "
+            "customize the solve function.";
+  mEnforceContactAndJointAndCustomConstraintsFn = f;
+}
+
+//==============================================================================
+void ConstraintSolver::enforceContactAndJointAndCustomConstraintsWithLcp()
 {
   for (auto& skeleton : mSkeletons)
   {
@@ -381,7 +410,7 @@ void ConstraintSolver::solve(simulation::World* world)
   buildConstrainedGroups();
 
   // Solve constrained groups
-  solveConstrainedGroups(world);
+  solveConstrainedGroups();
 }
 
 //==============================================================================
@@ -417,6 +446,12 @@ void ConstraintSolver::setPenetrationCorrectionEnabled(bool enable)
 bool ConstraintSolver::getPenetrationCorrectionEnabled()
 {
   return mPenetrationCorrectionEnabled;
+}
+
+//==============================================================================
+void ConstraintSolver::setFallbackConstraintForceMixingConstant(s_t constant)
+{
+  mFallbackConstraintForceMixingConstant = constant;
 }
 
 //==============================================================================
@@ -758,10 +793,33 @@ void ConstraintSolver::buildConstrainedGroups()
 }
 
 //==============================================================================
-void ConstraintSolver::solveConstrainedGroups(simulation::World* world)
+void ConstraintSolver::solveConstrainedGroups()
 {
   for (auto& constraintGroup : mConstrainedGroups)
-    solveConstrainedGroup(constraintGroup, world);
+  {
+    // Build LCP terms by aggregating them from constraints
+    const std::size_t n = constraintGroup.getTotalDimension();
+
+    // If there are no constraints, then we are done with the group.
+    if (0u == n)
+      continue;
+
+    std::vector<s_t*> impulses = solveConstrainedGroup(constraintGroup);
+    applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
+  }
+}
+
+//==============================================================================
+void ConstraintSolver::applyConstraintImpulses(
+    std::vector<ConstraintBasePtr> constraints, std::vector<s_t*> impulses)
+{
+  const std::size_t numConstraints = constraints.size();
+  for (std::size_t i = 0; i < numConstraints; ++i)
+  {
+    const ConstraintBasePtr& constraint = constraints[i];
+    constraint->applyImpulse(impulses[i]);
+    constraint->excite();
+  }
 }
 
 //==============================================================================

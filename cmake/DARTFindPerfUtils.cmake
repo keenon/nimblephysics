@@ -14,4 +14,5 @@ if(PerfUtils_FOUND AND NOT TARGET PerfUtils)
     INTERFACE_INCLUDE_DIRECTORIES "${PerfUtils_INCLUDE_DIRS}"
     INTERFACE_LINK_LIBRARIES "${PerfUtils_LIBRARIES}"
   )
+  add_compile_definitions(HAVE_PERF_UTILS)
 endif()
