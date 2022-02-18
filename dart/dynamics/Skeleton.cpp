@@ -3159,7 +3159,7 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
   return inertias;
 }
 
-// TODO: Check The Sign of MOI
+//==============================================================================
 Eigen::Matrix3s Skeleton::getMOIMatrix(Eigen::Vector6s moi_vector)
 {
   Eigen::Matrix3s MOI = moi_vector.segment(0,3).asDiagonal();
@@ -3172,6 +3172,7 @@ Eigen::Matrix3s Skeleton::getMOIMatrix(Eigen::Vector6s moi_vector)
   return MOI;
 }
 
+//==============================================================================
 Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
 {
   Eigen::Vector6s inertia = Eigen::Vector6s::Zero();

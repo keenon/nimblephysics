@@ -130,16 +130,16 @@ protected:
   /// This is the B buffer of forces
   Eigen::MatrixXs mBufB;
 
-  // This is the A buffer of k
+  // This is the A buffer of k, which is feed forward gain in iLQR
   Eigen::MatrixXs mkBufA;
   
-  // This is the B buffer of k
+  // This is the B buffer of k, which is feed forward gain in iLQR
   Eigen::MatrixXs mkBufB;
 
-  // This is the A buffer of K
+  // This is the A buffer of K, which is feedback gain in iLQR
   std::vector<Eigen::MatrixXs> mKBufA;
 
-  // This is the B buffer of K
+  // This is the B buffer of K, which is feedback gain in iLQR
   std::vector<Eigen::MatrixXs> mKBufB;
 
   // This is the A buffer of State
@@ -150,10 +150,10 @@ protected:
 
   Eigen::MatrixXs mxBufB;
 
-  // This is the A buffer of Alpha
+  // This is the A buffer of Alpha, which is line search learning rate in iLQR
   Eigen::VectorXs mAlphaBufA;
 
-  // This is the B buffer of Alpha
+  // This is the B buffer of Alpha, , which is line search learning rate in iLQR
   Eigen::VectorXs mAlphaBufB;
 
   /// This is the time when the last buffer was written to

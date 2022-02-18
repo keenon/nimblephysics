@@ -114,6 +114,8 @@ if(TARGET dart-utils)
     target_link_libraries(test_cartpoleRealtime dart-utils-urdf)
     target_link_libraries(test_iLQRRealtime dart-utils)
     target_link_libraries(test_iLQRRealtime dart-utils-urdf)
+    target_link_libraries(test_iLQR dart-utils)
+    target_link_libraries(test_iLQR dart-utils-urdf)
 
     dart_add_test("comprehensive" test_Gradients)
     target_link_libraries(test_Gradients dart-utils-urdf)

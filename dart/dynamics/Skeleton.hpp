@@ -862,21 +862,29 @@ public:
   // This get particular moment of inertia of a body node
   Eigen::Vector6s getLinkMOIIndex(size_t index);
 
+  // This get all body nodes' moment of inertia in a matrix
   Eigen::Matrix3s getMOIMatrix(Eigen::Vector6s moi_vector);
 
   // This returns a vector of all the link masses for all the links in this
   // skeleton concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
 
-  // This returns a matrix of A_k as describe in Karen's paper
+  // This returns a matrix of A_k as describe in paper
+  // https://arxiv.org/pdf/1907.03964.pdf
+  // You can see detailed description of this matrix in the last appendix
+  // section of this paper.
   Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
+  // This returns a jacobian matrix of velocity connect between world and joint coordinate
   Eigen::MatrixXs getLinkJvkMatrixIndex(size_t index);
 
+  // This returns a jacobian matrix of angular velocity connect between world and joint coordinate
   Eigen::MatrixXs getLinkJwkMatrixIndex(size_t index);
 
+  // This returns a rotation matrix of body node wrt to world coordinate
   Eigen::Matrix3s getLinkRMatrixIndex(size_t index);
 
+  // This returns a jacobian matrix of angular velocity connect between world and joint coordiante
   Eigen::MatrixXs getLinkLocalJwkMatrixIndex(size_t index);
 
   // Sets the upper limits of all the joints from a single vector
@@ -905,20 +913,26 @@ public:
 
   void setLinkBetas(Eigen::VectorXs betas);
 
-  // This sets all the inertia center-of-mass vectors for all the links in this
+  // This sets all the COM vectors for all the links in this
   // skeleton concatenated together
   void setLinkCOMs(Eigen::VectorXs coms);
 
+  // This set COM of a particular body node specified by index. 
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
 
-  void setLinkDiagIs(Eigen::VectorXs coms);
+  // This set all the diagonal term of moment of inertias.
+  void setLinkDiagIs(Eigen::VectorXs mois);
 
+  // This set diagonal term of moment of inertia of a particular 
+  // body node specified by index 
   void setLinkDiagIIndex(Eigen::Vector3s com, size_t index);
 
   // This sets all the inertia moment-of-inertia paremeters for all the links in
   // this skeleton concatenated together
   void setLinkMOIs(Eigen::VectorXs mois);
 
+  // This set moment of inertia of a particular body node specified
+  // by index.
   void setLinkMOIIndex(Eigen::Vector6s moi, size_t index);
 
   // This returns a vector of all the link masses for all the links in this
