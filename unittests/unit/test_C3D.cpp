@@ -3,13 +3,15 @@
 
 #include <Eigen/Dense>
 #include <ccd/ccd.h>
-#include <ezc3d/ezc3d.h>
 #include <gtest/gtest.h>
 #include <math.h>
 
+#include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/ResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/C3D.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -20,41 +22,56 @@
 
 using namespace dart;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
-std::string getAbsolutePath(std::string uri)
+TEST(C3D, COMPARE_TO_TRC)
 {
-  const utils::CompositeResourceRetrieverPtr resourceRetriever
-      = std::make_shared<utils::CompositeResourceRetriever>();
-  common::LocalResourceRetrieverPtr localResourceRetriever
-      = std::make_shared<common::LocalResourceRetriever>();
-  resourceRetriever->addSchemaRetriever("file", localResourceRetriever);
-  utils::PackageResourceRetrieverPtr packageRetriever
-      = std::make_shared<utils::PackageResourceRetriever>(
-          localResourceRetriever);
-  resourceRetriever->addSchemaRetriever("package", packageRetriever);
-  resourceRetriever->addSchemaRetriever(
-      "dart", utils::DartResourceRetriever::create());
-  return resourceRetriever->getFilePath(uri);
+  biomechanics::C3D c3d
+      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/JA1Gait35.c3d");
+  biomechanics::OpenSimTRC trc = biomechanics::OpenSimParser::loadTRC(
+      "dart://sample/osim/Sprinter/run0900cms.trc");
+
+  EXPECT_EQ(c3d.markerTimesteps.size(), trc.markerTimesteps.size());
+  for (int i = 0; i < trc.markerTimesteps.size(); i++)
+  {
+    EXPECT_TRUE(c3d.markerTimesteps[i].size() <= trc.markerTimesteps[i].size());
+    for (auto& pair : c3d.markerTimesteps[i])
+    {
+      if (trc.markerTimesteps[i].count(pair.first) == 0)
+      {
+        EXPECT_TRUE(trc.markerTimesteps[i].count(pair.first) > 0);
+        return;
+      }
+
+      Eigen::Vector3s c3dVec = c3d.markerTimesteps[i][pair.first];
+      Eigen::Vector3s trcVec = trc.markerTimesteps[i][pair.first];
+
+      if (!equals(c3dVec, trcVec, 1e-9))
+      {
+        std::cout << "Mismatch on frame " << i << ":" << pair.first
+                  << std::endl;
+        std::cout << "TRC: " << std::endl << trcVec << std::endl;
+        std::cout << "C3D: " << std::endl << c3dVec << std::endl;
+        std::cout << "Diff: " << std::endl << trcVec - c3dVec << std::endl;
+        EXPECT_TRUE(equals(c3dVec, trcVec, 1e-9));
+        return;
+      }
+    }
+  }
 }
 
 #ifdef ALL_TESTS
 TEST(C3D, LOAD)
 {
-  std::vector<std::vector<Eigen::Vector3s>> pointData;
-  int nFrames;
-  int nMarkers;
-  double freq;
-  std::string file
-      = getAbsolutePath("dart://sample/c3d/cmu_dribble_shoot_basketball.c3d");
+  biomechanics::C3D c3d
+      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/JA1Gait35.c3d");
+  // = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/S01DS402.c3d");
+  // = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/S01DB201.c3d");
 
-  ezc3d::c3d data(file);
-  data.print();
-
-  bool success
-      = utils::loadC3DFile(file.c_str(), pointData, &nFrames, &nMarkers, &freq);
-  EXPECT_TRUE(success);
-
-  std::cout << pointData.size() << std::endl;
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderBasis(1.0);
+  biomechanics::C3DLoader::debugToGUI(c3d, server);
 }
 #endif

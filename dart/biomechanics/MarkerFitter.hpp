@@ -12,6 +12,7 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/biomechanics/Anthropometrics.hpp"
+#include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -331,7 +332,8 @@ public:
       std::shared_ptr<server::GUIWebsocketServer> server,
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          markerObservations);
+          markerObservations,
+      C3D* c3d = nullptr);
 
   /// This saves a GUI state machine log to display detailed trajectory
   /// information
@@ -339,7 +341,8 @@ public:
       std::string path,
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          markerTrajectories);
+          markerTrajectories,
+      C3D* c3d = nullptr);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 1 and 3: (Re)Initialize scaling+IK

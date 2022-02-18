@@ -311,13 +311,15 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
           ::py::arg("server"),
           ::py::arg("init"),
-          ::py::arg("markerObservations"))
+          ::py::arg("markerObservations"),
+          ::py::arg("c3d") = nullptr)
       .def(
           "saveTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::saveTrajectoryAndMarkersToGUI,
           ::py::arg("path"),
           ::py::arg("init"),
-          ::py::arg("markerObservations"))
+          ::py::arg("markerObservations"),
+          ::py::arg("c3d") = nullptr)
       .def_static(
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,

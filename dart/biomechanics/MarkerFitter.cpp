@@ -377,8 +377,10 @@ InitialMarkerFitParams::InitialMarkerFitParams(
     markerOffsets(other.markerOffsets),
     groupScales(other.groupScales),
     dontRescaleBodies(other.dontRescaleBodies),
-    maxTrialsToUseForMultiTrialScaling(other.maxTrialsToUseForMultiTrialScaling),
-    maxTimestepsToUseForMultiTrialScaling(other.maxTimestepsToUseForMultiTrialScaling)
+    maxTrialsToUseForMultiTrialScaling(
+        other.maxTrialsToUseForMultiTrialScaling),
+    maxTimestepsToUseForMultiTrialScaling(
+        other.maxTimestepsToUseForMultiTrialScaling)
 {
 }
 
@@ -469,7 +471,8 @@ InitialMarkerFitParams::setMaxTrialsToUseForMultiTrialScaling(int numTrials)
 
 //==============================================================================
 InitialMarkerFitParams&
-InitialMarkerFitParams::setMaxTimestepsToUseForMultiTrialScaling(int numTimesteps)
+InitialMarkerFitParams::setMaxTimestepsToUseForMultiTrialScaling(
+    int numTimesteps)
 {
   this->maxTimestepsToUseForMultiTrialScaling = numTimesteps;
   return *this;
@@ -830,7 +833,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     std::shared_ptr<server::GUIWebsocketServer> server,
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        markerObservations)
+        markerObservations,
+    C3D* c3d)
 {
   server->renderSkeleton(mSkeleton);
 
@@ -861,10 +865,38 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     }
   }
 
-  int timestep = 0;
+  if (c3d != nullptr)
+  {
+    // Render the plates as red rectangles
+    for (int i = 0; i < c3d->forcePlates.size(); i++)
+    {
+      std::vector<Eigen::Vector3s> points;
+      for (int j = 0; j < c3d->forcePlates[i].corners.size(); j++)
+      {
+        points.push_back(c3d->forcePlates[i].corners[j]);
+      }
+      points.push_back(c3d->forcePlates[i].corners[0]);
+
+      server->createLine(
+          "plate_" + std::to_string(i),
+          points,
+          Eigen::Vector4s(1.0, 0., 0., 1.0));
+    }
+  }
+
+  s_t secondsPerTick = 1.0 / 50;
   std::shared_ptr<realtime::Ticker> ticker
-      = std::make_shared<realtime::Ticker>(1.0 / 50);
-  ticker->registerTickListener([&](long) {
+      = std::make_shared<realtime::Ticker>(secondsPerTick);
+  ticker->registerTickListener([c3d,
+                                server,
+                                init,
+                                markerObservations,
+                                numJoints,
+                                numAxis,
+                                secondsPerTick,
+                                this](long t) {
+    long tick = std::round((s_t)t / (secondsPerTick * 1000));
+    int timestep = tick % init.poses.cols();
     mSkeleton->setPositions(init.poses.col(timestep));
     server->renderSkeleton(mSkeleton);
 
@@ -877,9 +909,10 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       {
         Eigen::Vector3s worldObserved = pair.second;
         Eigen::Vector3s worldInferred
-            = init.updatedMarkerMap[pair.first].first->getWorldTransform()
-              * (init.updatedMarkerMap[pair.first].second.cwiseProduct(
-                  init.updatedMarkerMap[pair.first].first->getScale()));
+            = init.updatedMarkerMap.at(pair.first).first->getWorldTransform()
+              * (init.updatedMarkerMap.at(pair.first)
+                     .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
+                                              .first->getScale()));
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
@@ -888,6 +921,26 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       }
     }
 
+    if (c3d != nullptr)
+    {
+      for (int i = 0; i < c3d->forcePlates.size(); i++)
+      {
+        server->deleteObject("force_" + std::to_string(i));
+        if (c3d->forcePlates[i].forces[timestep].squaredNorm() > 0)
+        {
+          std::vector<Eigen::Vector3s> forcePoints;
+          forcePoints.push_back(
+              c3d->forcePlates[i].centersOfPressure[timestep]);
+          forcePoints.push_back(
+              c3d->forcePlates[i].centersOfPressure[timestep]
+              + (c3d->forcePlates[i].forces[timestep] * 0.001));
+          server->createLine(
+              "force_" + std::to_string(i),
+              forcePoints,
+              Eigen::Vector4s(1.0, 0, 0, 1.));
+        }
+      }
+    }
     for (int i = 0; i < numJoints; i++)
     {
       if (init.jointWeights(i) > 0)
@@ -925,17 +978,11 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
             "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
       }
     }
-
-    timestep++;
-    if (timestep >= init.poses.cols())
-    {
-      timestep = 0;
-    }
   });
   server->registerConnectionListener([ticker]() { ticker->start(); });
   // TODO: it'd be nice if this method didn't block forever, but we need to hold
   // onto a bunch of resources otherwise
-  server->blockWhileServing();
+  // server->blockWhileServing();
 }
 
 //==============================================================================
@@ -943,7 +990,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     std::string path,
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        markerObservations)
+        markerObservations,
+    C3D* c3d)
 {
   server::GUIRecording server;
   server.renderSkeleton(mSkeleton);
@@ -975,6 +1023,25 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     }
   }
 
+  if (c3d != nullptr)
+  {
+    // Render the plates as red rectangles
+    for (int i = 0; i < c3d->forcePlates.size(); i++)
+    {
+      std::vector<Eigen::Vector3s> points;
+      for (int j = 0; j < c3d->forcePlates[i].corners.size(); j++)
+      {
+        points.push_back(c3d->forcePlates[i].corners[j]);
+      }
+      points.push_back(c3d->forcePlates[i].corners[0]);
+
+      server.createLine(
+          "plate_" + std::to_string(i),
+          points,
+          Eigen::Vector4s(1.0, 0., 0., 1.0));
+    }
+  }
+
   for (int timestep = 0; timestep < init.poses.cols(); timestep++)
   {
     mSkeleton->setPositions(init.poses.col(timestep));
@@ -1000,6 +1067,26 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       }
     }
 
+    if (c3d != nullptr)
+    {
+      for (int i = 0; i < c3d->forcePlates.size(); i++)
+      {
+        server.deleteObject("force_" + std::to_string(i));
+        if (c3d->forcePlates[i].forces[timestep].squaredNorm() > 0)
+        {
+          std::vector<Eigen::Vector3s> forcePoints;
+          forcePoints.push_back(
+              c3d->forcePlates[i].centersOfPressure[timestep]);
+          forcePoints.push_back(
+              c3d->forcePlates[i].centersOfPressure[timestep]
+              + (c3d->forcePlates[i].forces[timestep] * 0.001));
+          server.createLine(
+              "force_" + std::to_string(i),
+              forcePoints,
+              Eigen::Vector4s(1.0, 0, 0, 1.));
+        }
+      }
+    }
     for (int i = 0; i < numJoints; i++)
     {
       if (init.jointWeights(i) > 0)

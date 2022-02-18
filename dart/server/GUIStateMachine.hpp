@@ -542,7 +542,9 @@ protected:
   void encodeCreatePlot(std::stringstream& json, Plot& plot);
   void encodeCreateRichPlot(std::stringstream& json, RichPlot& plot);
   void encodeSetRichPlotData(
-      std::stringstream& json, const std::string& plotKey, const RichPlotData& data);
+      std::stringstream& json,
+      const std::string& plotKey,
+      const RichPlotData& data);
 };
 
 } // namespace server
