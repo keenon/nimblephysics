@@ -474,6 +474,7 @@ void ForcePlatform::extractData(size_t idx, const ezc3d::c3d& c3d)
             force_raw(j) = data_raw(j);
             moment_raw(j) = data_raw(j + 3);
           }
+          // moment_raw += force_raw.cross(_origin);
         }
         _F[cmp] = _refFrame * force_raw;
         _M[cmp] = _refFrame * moment_raw;
@@ -482,6 +483,7 @@ void ForcePlatform::extractData(size_t idx, const ezc3d::c3d& c3d)
             -moment_raw(1) / force_raw(2), moment_raw(0) / force_raw(2), 0);
         Eigen::Vector3s originNoVertical = _origin;
         originNoVertical(2) = 0.0;
+        // _CoP[cmp] = _refFrame * CoP_raw + _meanCorners;
         _CoP[cmp] = _refFrame * (CoP_raw + originNoVertical) + _meanCorners;
         _Tz[cmp] = _refFrame * (moment_raw - force_raw.cross(-1 * CoP_raw));
         ++cmp;

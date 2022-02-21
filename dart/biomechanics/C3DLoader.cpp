@@ -106,6 +106,10 @@ C3D C3DLoader::loadC3D(const std::string& uri)
         fixed[i] = 'x';
       }
     }
+    if (fixed.find_first_of(":", 0) != std::string::npos)
+    {
+      fixed = fixed.substr(fixed.find_first_of(":") + 1);
+    }
     result.markers.push_back(fixed);
   }
 
@@ -168,6 +172,10 @@ C3D C3DLoader::loadC3D(const std::string& uri)
     }
     forcePlateMomentScaleFactors.push_back(momentScaleFactor);
 
+    std::cout << "forcePlatform forceUnit: " << forcePlatforms[j].forceUnit()
+              << std::endl;
+    std::cout << "forcePlatform momentUnit: " << forcePlatforms[j].momentUnit()
+              << std::endl;
     std::cout << "forcePlatform positionUnit: "
               << forcePlatforms[j].positionUnit() << std::endl;
     std::cout << "forcePlatform origin: " << forcePlatforms[j].origin().x()
