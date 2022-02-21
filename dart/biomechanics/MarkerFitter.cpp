@@ -596,80 +596,143 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     InitialMarkerFitParams params,
     int numSamples)
 {
-  /////////////////////////////////////////////////////////////////////////////
-  // We'll subsample the data down here, to avoid having any accidental
-  // performance tanking in the deployed version.
-  /////////////////////////////////////////////////////////////////////////////
-
-  bool downsampled = false;
-  // Sample at most N trials
-  int numTrialsToSample = markerObservationTrials.size();
-  if (numTrialsToSample > params.maxTrialsToUseForMultiTrialScaling)
+  // 1. Check if we need to downsample the input for performance reasons
+  bool needToDownsample = false;
+  if (markerObservationTrials.size()
+      > params.maxTrialsToUseForMultiTrialScaling)
   {
-    numTrialsToSample = params.maxTrialsToUseForMultiTrialScaling;
-    downsampled = true;
+    needToDownsample = true;
   }
-  // Sample at most M timesteps
-  std::vector<int> timestepsPerTrial;
-  for (int i = 0; i < numTrialsToSample; i++)
+  else
   {
-    timestepsPerTrial.push_back(markerObservationTrials[i].size());
-  }
-  int totalTimesteps = 0;
-  for (int i = 0; i < numTrialsToSample; i++)
-  {
-    totalTimesteps += timestepsPerTrial[i];
-  }
-  if (totalTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
-  {
-    downsampled = true;
-    double percentage
-        = (double)params.maxTimestepsToUseForMultiTrialScaling / totalTimesteps;
-    for (int i = 0; i < numTrialsToSample; i++)
+    int numTimesteps = 0;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      timestepsPerTrial[i]
-          = (int)std::floor(percentage * (double)timestepsPerTrial[i]);
+      numTimesteps += markerObservationTrials[i].size();
+    }
+    if (numTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
+    {
+      needToDownsample = true;
     }
   }
 
-  if (downsampled)
+  // 2. Now we have completely separate codepaths depending on whether we're
+  // downsampling or not
+  if (needToDownsample)
   {
+    // 3. Sort the trials by the amount of joint variability in each one
+
+    // 3.1. First, get the joint inits for all the trials, since we need to be
+    // able to sort clips by joint variability
+    std::vector<MarkerInitialization> jointInits;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      jointInits.push_back(
+          runJointsPipeline(markerObservationTrials[i], params));
+    }
+
+    // 3.2. Sort the trials by the amount of joint variability in each one
+    std::vector<int> orderedByJointVariability;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      orderedByJointVariability.push_back(i);
+    }
+    std::sort(
+        orderedByJointVariability.begin(),
+        orderedByJointVariability.end(),
+        [&](int a, int b) {
+          // Sort by joint marker variability
+          return jointInits[a].jointMarkerVariability.norm()
+                 < jointInits[b].jointMarkerVariability.norm();
+        });
+    std::vector<int> inverseOrderedByJointVariability;
+    inverseOrderedByJointVariability.resize(orderedByJointVariability.size());
+    for (int i = 0; i < orderedByJointVariability.size(); i++)
+    {
+      inverseOrderedByJointVariability[orderedByJointVariability[i]] = i;
+    }
+
+    // 3.3. Debug the sorted trials variability
+    std::cout << "Sorted trials by the variation of markers around the joints:"
+              << std::endl;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      std::cout << std::to_string(i) << ": " << orderedByJointVariability[i]
+                << " variability norm = "
+                << jointInits[orderedByJointVariability[i]]
+                       .jointMarkerVariability.norm()
+                << std::endl;
+    }
+
+    // 4. We'll subsample the data down here, to avoid having any accidental
+    // performance tanking in the deployed version.
+
+    // Sample at most N trials
+    int numTrialsToSample = markerObservationTrials.size();
+    if (numTrialsToSample > params.maxTrialsToUseForMultiTrialScaling)
+    {
+      numTrialsToSample = params.maxTrialsToUseForMultiTrialScaling;
+    }
+    // Sample at most M timesteps
+    std::vector<int> timestepsPerTrial;
+    for (int i = 0; i < numTrialsToSample; i++)
+    {
+      timestepsPerTrial.push_back(
+          markerObservationTrials[orderedByJointVariability[i]].size());
+    }
+    int totalTimesteps = 0;
+    for (int i = 0; i < numTrialsToSample; i++)
+    {
+      totalTimesteps += timestepsPerTrial[i];
+    }
+    if (totalTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
+    {
+      double percentage = (double)params.maxTimestepsToUseForMultiTrialScaling
+                          / totalTimesteps;
+      for (int i = 0; i < numTrialsToSample; i++)
+      {
+        timestepsPerTrial[i]
+            = (int)std::floor(percentage * (double)timestepsPerTrial[i]);
+      }
+    }
+
+    int totalSamples = 0;
     std::cout << "Downsampling the input for scaling performance!" << std::endl;
     std::cout << "Sampling " << numTrialsToSample << "/"
               << markerObservationTrials.size() << std::endl;
-    int total = 0;
     for (int i = 0; i < numTrialsToSample; i++)
     {
-      std::cout << "Trial " << i << " sampled " << timestepsPerTrial[i] << "/"
-                << markerObservationTrials[i].size() << std::endl;
-      total += timestepsPerTrial[i];
+      std::cout << "Trial " << orderedByJointVariability[i] << " sampled "
+                << timestepsPerTrial[i] << "/"
+                << markerObservationTrials[orderedByJointVariability[i]].size()
+                << std::endl;
+      totalSamples += timestepsPerTrial[i];
     }
-    std::cout << "Total timesteps to use for scaling: " << total << std::endl;
-  }
+    std::cout << "Total timesteps to use for scaling: " << totalSamples
+              << std::endl;
 
-  // 1. Construct a merged dataset
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
-  std::vector<bool> newClip;
-  for (int i = 0; i < numTrialsToSample; i++)
-  {
-    for (int j = 0; j < timestepsPerTrial[i]; j++)
+    // 5. Construct a merged dataset, including the merged joint and axis data
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+    std::vector<bool> newClip;
+    for (int i = 0; i < numTrialsToSample; i++)
     {
-      markerObservations.emplace_back(markerObservationTrials[i][j]);
-      newClip.push_back(j == 0);
+      for (int j = 0; j < timestepsPerTrial[i]; j++)
+      {
+        markerObservations.emplace_back(
+            markerObservationTrials[orderedByJointVariability[i]][j]);
+        newClip.push_back(j == 0);
+      }
     }
-  }
 
-  // 2. Run the kinematics pipeline on the merged dataset
-  MarkerInitialization overallInit = runKinematicsPipeline(
-      markerObservations, newClip, params, numSamples, downsampled);
+    // 6. Run the kinematics pipeline on the merged dataset
+    MarkerInitialization overallInit = runKinematicsPipeline(
+        markerObservations, newClip, params, numSamples, true);
 
-  if (downsampled)
-  {
     std::cout << "Done scaling and computing marker offsets! Now we'll do IK "
                  "on all the trials."
               << std::endl;
 
-    // 3. Use the scaling from overallInit to do IK on each skeleton
+    // 7. Use the scaling from overallInit to do IK on each skeleton
     std::vector<MarkerInitialization> separateInits;
     InitialMarkerFitParams params
         = InitialMarkerFitParams()
@@ -680,17 +743,47 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     {
       std::cout << "## IK on trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
-      separateInits.push_back(
-          runPrescaledPipeline(markerObservationTrials[i], params));
+
+      std::vector<bool> newClip;
+      for (int j = 0; j < markerObservationTrials[i].size(); j++)
+        newClip.push_back(false);
+
+      separateInits.push_back(getInitialization(
+          markerObservationTrials[i],
+          newClip,
+          InitialMarkerFitParams(params)
+              .setJointCentersAndWeights(
+                  jointInits[i].joints,
+                  jointInits[i].jointCenters,
+                  jointInits[i].jointWeights)
+              .setJointAxisAndWeights(
+                  jointInits[i].jointAxis, jointInits[i].axisWeights)
+              .setInitPoses(jointInits[i].poses)
+              .setDontRescaleBodies(true)));
     }
     std::cout << "Finished IKs" << std::endl;
     return separateInits;
   }
   else
   {
+    // 3. Construct a merged dataset, including the merged joint and axis data
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+    std::vector<bool> newClip;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      for (int j = 0; j < markerObservationTrials[i].size(); j++)
+      {
+        markerObservations.emplace_back(markerObservationTrials[i][j]);
+        newClip.push_back(j == 0);
+      }
+    }
+    // 4. Run the kinematics pipeline on the merged dataset
+    MarkerInitialization overallInit = runKinematicsPipeline(
+        markerObservations, newClip, params, numSamples, false);
+
     std::cout << "Recovering output from kinematics pipeline" << std::endl;
 
-    // 3. Separate out the individual trials from the merged data
+    // 5. Separate out the individual trials from the merged data
     std::vector<MarkerInitialization> separateInits;
     int cursor = 0;
     for (int i = 0; i < markerObservationTrials.size(); i++)
@@ -790,10 +883,8 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 }
 
 //==============================================================================
-/// This just runs the IK pipeline steps over the given marker observations,
-/// assuming we've got a pre-scaled model. This finds the joint centers and
-/// axis over time, then uses those to run multithreaded IK.
-MarkerInitialization MarkerFitter::runPrescaledPipeline(
+/// This just finds the joint centers and axis over time.
+MarkerInitialization MarkerFitter::runJointsPipeline(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
     InitialMarkerFitParams params)
@@ -814,7 +905,27 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
   findJointCenters(init, newClip, markerObservations);
   findAllJointAxis(init, newClip, markerObservations);
   computeJointConfidences(init, markerObservations);
-  // 3. Re-initialize the problem, but pass in the joint centers we just found
+  return init;
+}
+
+//==============================================================================
+/// This just runs the IK pipeline steps over the given marker observations,
+/// assuming we've got a pre-scaled model. This finds the joint centers and
+/// axis over time, then uses those to run multithreaded IK.
+MarkerInitialization MarkerFitter::runPrescaledPipeline(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    InitialMarkerFitParams params)
+{
+  std::vector<bool> newClip;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    newClip.push_back(false);
+  }
+
+  // 1. Find the initial scaling + IK
+  MarkerInitialization init = runJointsPipeline(markerObservations, params);
+  // 2. Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = getInitialization(
       markerObservations,
       newClip,
@@ -2716,10 +2827,13 @@ void MarkerFitter::computeJointConfidences(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations)
 {
+  initialization.jointMarkerVariability
+      = Eigen::VectorXs::Zero(initialization.joints.size());
   for (int i = 0; i < initialization.joints.size(); i++)
   {
     s_t variability
         = computeJointVariability(initialization.joints[i], markerObservations);
+    initialization.jointMarkerVariability(i) = variability;
 
     // If we've got small variability, then the joint axis won't be
     // very accurate, cause pretty much any axis could fit a bunch of points

@@ -318,6 +318,12 @@ public:
       int numSamples = 20,
       bool skipFinalIK = false);
 
+  /// This just finds the joint centers and axis over time.
+  MarkerInitialization runJointsPipeline(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      InitialMarkerFitParams params = InitialMarkerFitParams());
+
   /// This just runs the IK pipeline steps over the given marker observations,
   /// assuming we've got a pre-scaled model. This finds the joint centers and
   /// axis over time, then uses those to run multithreaded IK.

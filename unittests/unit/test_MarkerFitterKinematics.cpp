@@ -3325,7 +3325,9 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
   std::vector<MarkerInitialization> inits
       = fitter.runMultiTrialKinematicsPipeline(
           isDebug ? shorterTrials : markerObservationTrials,
-          InitialMarkerFitParams(),
+          InitialMarkerFitParams()
+              .setMaxTrialsToUseForMultiTrialScaling(2)
+              .setMaxTimestepsToUseForMultiTrialScaling(200),
           50);
 
   standard.skeleton->setGroupScales(inits[0].groupScales);
