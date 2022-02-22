@@ -58,42 +58,48 @@ public:
       const std::shared_ptr<simulation::World>& world,
       const std::string& prefix = "world",
       bool renderForces = true,
-      bool renderForceMagnitudes = true);
+      bool renderForceMagnitudes = true,
+      const std::string& layer = "");
 
   /// This is a high-level command that creates a basis
   void renderBasis(
       s_t scale = 10.0,
       const std::string& prefix = "basis",
       const Eigen::Vector3s pos = Eigen::Vector3s::Zero(),
-      const Eigen::Vector3s euler = Eigen::Vector3s::Zero());
+      const Eigen::Vector3s euler = Eigen::Vector3s::Zero(),
+      const std::string& layer = "");
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands
   void renderSkeleton(
       const std::shared_ptr<dynamics::Skeleton>& skel,
       const std::string& prefix = "skel",
-      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones());
+      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones(),
+      const std::string& layer = "");
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
   void renderTrajectoryLines(
       std::shared_ptr<simulation::World> world,
       Eigen::MatrixXs positions,
-      std::string prefix = "trajectory");
+      std::string prefix = "trajectory",
+      const std::string& layer = "");
 
   /// This is a high-level command that renders a wrench on a body node
   void renderBodyWrench(
       const dynamics::BodyNode* body,
       Eigen::Vector6s wrench,
       s_t scaleFactor = 0.1,
-      std::string prefix = "wrench");
+      std::string prefix = "wrench",
+      const std::string& layer = "");
 
   /// This renders little velocity lines starting at every vertex in the passed
   /// in body
   void renderMovingBodyNodeVertices(
       const dynamics::BodyNode* body,
       s_t scaleFactor = 0.1,
-      std::string prefix = "vert-vel");
+      std::string prefix = "vert-vel",
+      const std::string& layer = "");
 
   /// This is a high-level command that removes the lines rendering a wrench on
   /// a body node
@@ -111,6 +117,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -120,6 +127,7 @@ public:
       s_t radius,
       const Eigen::Vector3s& pos,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -131,6 +139,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -138,7 +147,8 @@ public:
   void createLine(
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
-      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0));
+      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
+      const std::string& layer = "");
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -154,6 +164,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -167,6 +178,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -179,6 +191,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -243,7 +256,8 @@ public:
       const std::string& key,
       const std::string& contents,
       const Eigen::Vector2i& fromTopLeft,
-      const Eigen::Vector2i& size);
+      const Eigen::Vector2i& size,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setTextContents(const std::string& key, const std::string& newContents);
@@ -255,7 +269,8 @@ public:
       const std::string& label,
       const Eigen::Vector2i& fromTopLeft,
       const Eigen::Vector2i& size,
-      std::function<void()> onClick);
+      std::function<void()> onClick,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setButtonLabel(const std::string& key, const std::string& newLabel);
@@ -270,7 +285,8 @@ public:
       s_t value,
       bool onlyInts,
       bool horizontal,
-      std::function<void(s_t)> onChange);
+      std::function<void(s_t)> onChange,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setSliderValue(const std::string& key, s_t value);
@@ -292,7 +308,8 @@ public:
       const std::vector<s_t>& ys,
       s_t minY,
       s_t maxY,
-      const std::string& type);
+      const std::string& type,
+      const std::string& layer = "");
 
   /// This changes the contents of a plot, along with its display limits
   void setPlotData(
@@ -350,7 +367,8 @@ export type SetRichPlotBounds = {
       s_t maxY,
       const std::string& title,
       const std::string& xAxisLabel,
-      const std::string& yAxisLabel);
+      const std::string& yAxisLabel,
+      const std::string& layer = "");
 
   /// This sets a single data stream for a rich plot. `name` should be human
   /// readable and unique. You can overwrite data by using the same `name` with
@@ -390,6 +408,7 @@ protected:
   struct Box
   {
     std::string key;
+    std::string layer;
     Eigen::Vector3s size;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
@@ -401,6 +420,7 @@ protected:
   struct Sphere
   {
     std::string key;
+    std::string layer;
     s_t radius;
     Eigen::Vector3s pos;
     Eigen::Vector4s color;
@@ -412,6 +432,7 @@ protected:
   struct Capsule
   {
     std::string key;
+    std::string layer;
     s_t radius;
     s_t height;
     Eigen::Vector3s pos;
@@ -424,6 +445,7 @@ protected:
   struct Line
   {
     std::string key;
+    std::string layer;
     std::vector<Eigen::Vector3s> points;
     Eigen::Vector4s color;
   };
@@ -432,6 +454,7 @@ protected:
   struct Mesh
   {
     std::string key;
+    std::string layer;
     std::vector<Eigen::Vector3s> vertices;
     std::vector<Eigen::Vector3s> vertexNormals;
     std::vector<Eigen::Vector3i> faces;
@@ -457,6 +480,7 @@ protected:
   struct Text
   {
     std::string key;
+    std::string layer;
     std::string contents;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
@@ -466,6 +490,7 @@ protected:
   struct Button
   {
     std::string key;
+    std::string layer;
     std::string label;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
@@ -476,6 +501,7 @@ protected:
   struct Slider
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     s_t min;
@@ -490,6 +516,7 @@ protected:
   struct Plot
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     std::vector<s_t> xs;
@@ -513,6 +540,7 @@ protected:
   struct RichPlot
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     s_t minX;

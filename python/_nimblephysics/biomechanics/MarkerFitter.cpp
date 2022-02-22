@@ -312,14 +312,18 @@ void MarkerFitter(py::module& m)
           ::py::arg("server"),
           ::py::arg("init"),
           ::py::arg("markerObservations"),
-          ::py::arg("c3d") = nullptr)
+          ::py::arg("c3d") = nullptr,
+          ::py::arg("goldOsim") = nullptr,
+          ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def(
           "saveTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::saveTrajectoryAndMarkersToGUI,
           ::py::arg("path"),
           ::py::arg("init"),
           ::py::arg("markerObservations"),
-          ::py::arg("c3d") = nullptr)
+          ::py::arg("c3d") = nullptr,
+          ::py::arg("goldOsim") = nullptr,
+          ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def_static(
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,

@@ -3230,10 +3230,15 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
 
   std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps
       = c3d.markerTimesteps;
-  for (auto pair : c3d.markerTimesteps[0])
-  {
-    std::cout << pair.first << ": " << pair.second << std::endl;
-  }
+
+  // Get the gold data
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/welk002/manually_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton, "dart://sample/osim/welk002/manual_ik.mot");
+  Eigen::MatrixXs goldPoses = mot.poses;
+  IKErrorReport goldReport(
+      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
 
   std::vector<bool> newClip;
   for (int i = 0; i < c3d.markerTimesteps.size(); i++)
@@ -3362,6 +3367,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
       finalKinematicInit.poses,
       subsetTimesteps);
 
+  std::cout << "Manual error report:" << std::endl;
+  goldReport.printReport(5);
   std::cout << "Initial error report:" << std::endl;
   initReport.printReport(5);
   std::cout << "After joint centers report:" << std::endl;
@@ -3373,6 +3380,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
   server->serve(8070);
+  // , &scaled, goldPoses
   fitter.debugTrajectoryAndMarkersToGUI(
       server, finalKinematicInit, subsetTimesteps, &c3d);
   server->blockWhileServing();

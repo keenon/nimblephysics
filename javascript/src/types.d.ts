@@ -5,6 +5,7 @@ export type CreateBoxCommand = {
   pos: number[];
   euler: number[];
   color: number[];
+  layer: string;
   cast_shadows: boolean;
   receive_shadows: boolean;
 };
@@ -15,6 +16,7 @@ export type CreateSphereCommand = {
   radius: number;
   pos: number[];
   color: number[];
+  layer: string;
   cast_shadows: boolean;
   receive_shadows: boolean;
 };
@@ -27,6 +29,7 @@ export type CreateCapsuleCommand = {
   pos: number[];
   euler: number[];
   color: number[];
+  layer: string;
   cast_shadows: boolean;
   receive_shadows: boolean;
 };
@@ -36,6 +39,7 @@ export type CreateLineCommand = {
   key: string;
   points: number[][];
   color: number[];
+  layer: string;
 };
 
 export type CreateMeshCommand = {
@@ -50,6 +54,7 @@ export type CreateMeshCommand = {
   euler: number[];
   scale: number[];
   color: number[];
+  layer: string;
   cast_shadows: boolean;
   receive_shadows: boolean;
 };
@@ -105,6 +110,7 @@ export type CreateTextCommand = {
   from_top_left: number[];
   size: number[];
   contents: string;
+  layer: string;
 };
 
 export type CreateButtonCommand = {
@@ -113,6 +119,7 @@ export type CreateButtonCommand = {
   from_top_left: number[];
   size: number[];
   label: string;
+  layer: string;
 };
 
 export type CreateSliderCommand = {
@@ -125,6 +132,7 @@ export type CreateSliderCommand = {
   value: number;
   only_ints: boolean;
   horizontal: boolean;
+  layer: string;
 };
 
 export type CreatePlotCommand = {
@@ -139,6 +147,7 @@ export type CreatePlotCommand = {
   max_y: number;
   ys: number[];
   plot_type: "line" | "scatter";
+  layer: string;
 };
 
 export type SetUIElementPositionCommmand = {
@@ -211,6 +220,7 @@ export type CreateRichPlotCommand = {
   title: string;
   x_axis_label: string;
   y_axis_label: string;
+  layer: string;
 };
 
 export type SetRichPlotData = {

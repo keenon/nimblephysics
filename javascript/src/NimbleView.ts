@@ -32,6 +32,72 @@ type Button = {
   label: string;
 };
 
+class Layer {
+  view: DARTView;
+  shown: boolean;
+  name: string;
+  objects: Set<string>;
+  uiElements: Set<string>;
+
+  constructor(name: string, view: DARTView) {
+    this.name = name;
+    this.view = view;
+    this.objects = new Set();
+    this.uiElements = new Set();
+    this.shown = true;
+
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    row.appendChild(nameCell);
+    nameCell.innerHTML = this.name === '' ? 'Default' : this.name;
+    const checkCell = document.createElement("td");
+    row.appendChild(checkCell);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = true;
+    checkCell.appendChild(checkbox);
+
+    this.view.layersTable.appendChild(row);
+
+    checkbox.onclick = () => {
+      if (!checkbox.checked) {
+        this.hide();
+      }
+      else {
+        this.show();
+      }
+    };
+  }
+
+  addObject = (key: string) => {
+    this.objects.add(key);
+    if (this.shown) {
+      this.view.showObject(key);
+    }
+    else {
+      this.view.hideObject(key);
+    }
+  };
+
+  addUIElement = (key: string) => {
+    this.uiElements.add(key);
+  };
+
+  show = () => {
+    this.shown = true;
+    this.objects.forEach((key) => {
+      this.view.showObject(key);
+    });
+  };
+
+  hide = () => {
+    this.shown = false;
+    this.objects.forEach((key) => {
+      this.view.hideObject(key);
+    });
+  };
+}
+
 class DARTView {
   scene: THREE.Scene;
   container: HTMLElement;
@@ -52,8 +118,11 @@ class DARTView {
 
   sphereGeometry: THREE.SphereBufferGeometry;
 
+  layers: Map<string, Layer>;
+
   connected: boolean;
   notConnectedWarning: HTMLElement;
+  layersTable: HTMLElement;
 
   constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
@@ -72,6 +141,7 @@ class DARTView {
     this.uiElements = new Map();
     this.objectType = new Map();
     this.dragListeners = [];
+    this.layers = new Map();
 
     this.scene = new THREE.Scene();
     // this.scene.background = new THREE.Color(0xf8f8f8);
@@ -179,6 +249,19 @@ class DARTView {
 
     this.uiContainer.appendChild(instructions);
 
+    this.layersTable = document.createElement("table");
+    this.layersTable.className = "GUI_layers";
+    const layersTitleRow = document.createElement("tr");
+    const layersNameTitle = document.createElement("td");
+    layersTitleRow.appendChild(layersNameTitle);
+    layersNameTitle.innerHTML = "Layer";
+    const layersCheckTitle = document.createElement("td");
+    layersTitleRow.appendChild(layersCheckTitle);
+    layersCheckTitle.innerHTML = "Show/Hide";
+    this.layersTable.appendChild(layersTitleRow);
+
+    this.uiContainer.appendChild(this.layersTable);
+
     // Set up the reusable sphere geometry
 
     const NUM_SPHERE_SEGMENTS = 18;
@@ -188,6 +271,15 @@ class DARTView {
       NUM_SPHERE_SEGMENTS
     );
   }
+
+  getLayer = (name: string) => {
+    let layer = this.layers.get(name);
+    if (layer == null) {
+      layer = new Layer(name, this);
+      this.layers.set(name, layer);
+    }
+    return layer;
+  };
 
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
     if (e.key === " ") {
@@ -224,6 +316,7 @@ class DARTView {
         command.pos,
         command.euler,
         command.color,
+        command.layer,
         command.cast_shadows,
         command.receive_shadows
       );
@@ -233,6 +326,7 @@ class DARTView {
         command.radius,
         command.pos,
         command.color,
+        command.layer,
         command.cast_shadows,
         command.receive_shadows
       );
@@ -244,11 +338,12 @@ class DARTView {
         command.pos,
         command.euler,
         command.color,
+        command.layer,
         command.cast_shadows,
         command.receive_shadows
       );
     } else if (command.type === "create_line") {
-      this.createLine(command.key, command.points, command.color);
+      this.createLine(command.key, command.points, command.color, command.layer);
     } else if (command.type === "create_mesh") {
       this.createMesh(
         command.key,
@@ -261,6 +356,7 @@ class DARTView {
         command.euler,
         command.scale,
         command.color,
+        command.layer,
         command.cast_shadows,
         command.receive_shadows
       );
@@ -283,7 +379,8 @@ class DARTView {
         command.key,
         command.from_top_left,
         command.size,
-        command.contents
+        command.contents,
+        command.layer
       );
     } else if (command.type === "create_plot") {
       this.createSimplePlot(
@@ -296,7 +393,8 @@ class DARTView {
         command.min_y,
         command.max_y,
         command.ys,
-        command.plot_type
+        command.plot_type,
+        command.layer
       );
     } else if (command.type === "create_rich_plot") {
       this.createRichPlot(
@@ -309,7 +407,8 @@ class DARTView {
         command.max_y,
         command.title,
         command.x_axis_label,
-        command.y_axis_label
+        command.y_axis_label,
+        command.layer
       );
     } else if (command.type === "set_rich_plot_data") {
       this.setRichPlotData(
@@ -418,6 +517,7 @@ class DARTView {
     pos: number[],
     euler: number[],
     color: number[],
+    layer: string | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -455,6 +555,10 @@ class DARTView {
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
+
+    if (layer != null) {
+      this.getLayer(layer).addObject(key);
+    }
   };
 
   /**
@@ -467,6 +571,7 @@ class DARTView {
     radius: number,
     pos: number[],
     color: number[],
+    layer: string | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -495,6 +600,10 @@ class DARTView {
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
+
+    if (layer != null) {
+      this.getLayer(layer).addObject(key);
+    }
   };
 
   /**
@@ -509,6 +618,7 @@ class DARTView {
     pos: number[],
     euler: number[],
     color: number[],
+    layer: string | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -563,6 +673,10 @@ class DARTView {
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
+
+    if (layer != null) {
+      this.getLayer(layer).addObject(key);
+    }
   };
 
   /**
@@ -570,7 +684,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createLine = (key: string, points: number[][], color: number[]) => {
+  createLine = (key: string, points: number[][], color: number[], layer: string | undefined) => {
     this.objectType.set(key, "line");
     // Try not to recreate geometry. If we already created a line in the past,
     // let's just update its buffers instead of creating fresh ones.
@@ -623,6 +737,10 @@ class DARTView {
 
       this.view.add(path);
     }
+
+    if (layer != null) {
+      this.getLayer(layer).addObject(key);
+    }
   };
 
   /**
@@ -650,6 +768,7 @@ class DARTView {
     euler: number[],
     scale: number[],
     color: number[],
+    layer: string | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -748,6 +867,10 @@ class DARTView {
 
       this.view.add(mesh);
     }
+
+    if (layer != null) {
+      this.getLayer(layer).addObject(key);
+    }
   };
 
   /**
@@ -811,6 +934,31 @@ class DARTView {
   };
 
   /**
+   * This removes an objects from the view, without deleting the reference to the object.
+   * 
+   * @param key 
+   */
+  hideObject = (key: string) => {
+    const obj = this.objects.get(key);
+    if (obj) {
+      this.view.remove(obj);
+    }
+  };
+
+  /**
+   * This shows an object in the view, if there's a reference to the object in maps.
+   * 
+   * @param key 
+   */
+  showObject = (key: string) => {
+    const obj = this.objects.get(key);
+    if (obj) {
+      this.view.remove(obj);
+      this.view.add(obj);
+    }
+  };
+
+  /**
    * Removes an object from the scene, if it exists.
    *
    * @param key The key of the object (box, sphere, line, mesh) to be removed
@@ -855,7 +1003,8 @@ class DARTView {
     key: string,
     from_top_left: number[],
     size: number[],
-    contents: string
+    contents: string,
+    layer: string
   ) => {
     this.deleteUIElement(key);
     let text: Text = {
@@ -878,7 +1027,8 @@ class DARTView {
     from_top_left: number[],
     size: number[],
     label: string,
-    onClick: () => void
+    onClick: () => void,
+    layer: string
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -915,7 +1065,8 @@ class DARTView {
     value: number,
     onlyInts: boolean,
     horizontal: boolean,
-    onChange: (value) => void
+    onChange: (value) => void,
+    layer: string
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -951,7 +1102,8 @@ class DARTView {
     minY: number,
     maxY: number,
     ys: number[],
-    plotType: "line" | "scatter"
+    plotType: "line" | "scatter",
+    layer: string
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -988,7 +1140,8 @@ class DARTView {
     maxY: number,
     title: string,
     xAxisLabel: string,
-    yAxisLabel: string
+    yAxisLabel: string,
+    layer: string
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(

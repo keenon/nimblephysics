@@ -289,4 +289,23 @@ $triangle-size: 5px;
     height: 100%;
     overflow: hidden;
   }
+
+  .GUI_layers {
+    position: absolute;
+    pointer-events: all;
+    cursor: pointer;
+    left: 10px;
+    top: 80px;
+    /* font-family: "Advent Pro", sans-serif; */
+    color: #848484;
+    font-weight: bold;
+    font-size: 16px;
+    border-collapse: collapse;
+  }
+
+  .GUI_layers td {
+    vertical-align: middle;
+    border: 1px solid black;
+    padding: 5px;
+  }
 }

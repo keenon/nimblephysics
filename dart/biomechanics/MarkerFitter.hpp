@@ -13,6 +13,7 @@
 
 #include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -339,7 +340,9 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      C3D* c3d = nullptr);
+      C3D* c3d = nullptr,
+      const OpenSimFile* goldSkeleton = nullptr,
+      const Eigen::MatrixXs goldPoses = Eigen::MatrixXs::Zero(0, 0));
 
   /// This saves a GUI state machine log to display detailed trajectory
   /// information
@@ -348,7 +351,9 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerTrajectories,
-      C3D* c3d = nullptr);
+      C3D* c3d = nullptr,
+      const OpenSimFile* goldSkeleton = nullptr,
+      const Eigen::MatrixXs goldPoses = Eigen::MatrixXs::Zero(0, 0));
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 1 and 3: (Re)Initialize scaling+IK

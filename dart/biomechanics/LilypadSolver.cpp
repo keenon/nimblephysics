@@ -275,6 +275,7 @@ void LilypadSolver::debugToGUI(
         pos,
         euler,
         color,
+        "",
         false,
         true);
   }

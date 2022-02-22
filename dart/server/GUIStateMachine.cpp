@@ -170,13 +170,15 @@ void GUIStateMachine::renderWorld(
     const std::shared_ptr<simulation::World>& world,
     const std::string& prefix,
     bool renderForces,
-    bool renderForceMagnitudes)
+    bool renderForceMagnitudes,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
-    renderSkeleton(world->getSkeletonRef(i), prefix);
+    renderSkeleton(
+        world->getSkeletonRef(i), prefix, Eigen::Vector4s::Ones() * -1, layer);
   }
 
   const collision::CollisionResult& result = world->getLastCollisionResult();
@@ -190,14 +192,19 @@ void GUIStateMachine::renderWorld(
       std::vector<Eigen::Vector3s> points;
       points.push_back(contact.point);
       points.push_back(contact.point + (contact.normal * scale));
-      createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
+      createLine(
+          prefix + "__contact_" + std::to_string(i) + "_a",
+          points,
+          Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
+          layer);
       std::vector<Eigen::Vector3s> pointsB;
       pointsB.push_back(contact.point);
       pointsB.push_back(contact.point - (contact.normal * scale));
       createLine(
           prefix + "__contact_" + std::to_string(i) + "_b",
           pointsB,
-          Eigen::Vector4s(0, 1, 0, 1.0));
+          Eigen::Vector4s(0, 1, 0, 1.0),
+          layer);
     }
   }
 }
@@ -207,7 +214,8 @@ void GUIStateMachine::renderBasis(
     s_t scale,
     const std::string& prefix,
     const Eigen::Vector3s pos,
-    const Eigen::Vector3s euler)
+    const Eigen::Vector3s euler,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -227,11 +235,20 @@ void GUIStateMachine::renderBasis(
 
   deleteObjectsByPrefix(prefix + "__basis_");
   createLine(
-      prefix + "__basis_unitX", pointsX, Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+      prefix + "__basis_unitX",
+      pointsX,
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+      layer);
   createLine(
-      prefix + "__basis_unitY", pointsY, Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
+      prefix + "__basis_unitY",
+      pointsY,
+      Eigen::Vector4s(0.0, 1.0, 0.0, 1.0),
+      layer);
   createLine(
-      prefix + "__basis_unitZ", pointsZ, Eigen::Vector4s(0.0, 0.0, 1.0, 1.0));
+      prefix + "__basis_unitZ",
+      pointsZ,
+      Eigen::Vector4s(0.0, 0.0, 1.0, 1.0),
+      layer);
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -239,7 +256,8 @@ void GUIStateMachine::renderBasis(
 void GUIStateMachine::renderSkeleton(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::string& prefix,
-    Eigen::Vector4s overrideColor)
+    Eigen::Vector4s overrideColor,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -301,6 +319,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -316,6 +335,7 @@ void GUIStateMachine::renderSkeleton(
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 meshShape->getScale(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -328,6 +348,7 @@ void GUIStateMachine::renderSkeleton(
                 sphereShape->getRadius(),
                 shapeNode->getWorldTransform().translation(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -342,6 +363,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -356,6 +378,7 @@ void GUIStateMachine::renderSkeleton(
                 sphereShape->getRadii()[0],
                 shapeNode->getWorldTransform().translation(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -443,7 +466,8 @@ void GUIStateMachine::renderSkeleton(
 void GUIStateMachine::renderTrajectoryLines(
     std::shared_ptr<simulation::World> originalWorld,
     Eigen::MatrixXs positions,
-    std::string prefix)
+    std::string prefix,
+    const std::string& layer)
 {
   // Just clone the world, to avoid contention for the world, since this method
   // can spend a long time setting the world into different states.
@@ -488,7 +512,7 @@ void GUIStateMachine::renderTrajectoryLines(
   for (auto pair : paths)
   {
     // This command will automatically overwrite any lines with the same key
-    createLine(pair.first, pair.second, colors[pair.first]);
+    createLine(pair.first, pair.second, colors[pair.first], layer);
   }
 }
 
@@ -497,7 +521,8 @@ void GUIStateMachine::renderBodyWrench(
     const dynamics::BodyNode* body,
     Eigen::Vector6s wrench,
     s_t scaleFactor,
-    std::string prefix)
+    std::string prefix,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -528,17 +553,22 @@ void GUIStateMachine::renderBodyWrench(
   createLine(
       prefix + "_" + body->getName() + "_torque",
       torqueLine,
-      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0));
+      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0),
+      layer);
   createLine(
       prefix + "_" + body->getName() + "_force",
       forceLine,
-      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+      layer);
 }
 
 /// This renders little velocity lines starting at every vertex in the passed
 /// in body
 void GUIStateMachine::renderMovingBodyNodeVertices(
-    const dynamics::BodyNode* body, s_t scaleFactor, std::string prefix)
+    const dynamics::BodyNode* body,
+    s_t scaleFactor,
+    std::string prefix,
+    const std::string& layer)
 {
   std::vector<dynamics::BodyNode::MovingVertex> verts
       = body->getMovingVerticesInWorldSpace();
@@ -551,7 +581,8 @@ void GUIStateMachine::renderMovingBodyNodeVertices(
     createLine(
         prefix + "_" + body->getName() + "_" + std::to_string(i),
         line,
-        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+        layer);
   }
 }
 
@@ -590,6 +621,7 @@ void GUIStateMachine::createBox(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -601,6 +633,7 @@ void GUIStateMachine::createBox(
   box.pos = pos;
   box.euler = euler;
   box.color = color;
+  box.layer = layer;
   box.castShadows = castShadows;
   box.receiveShadows = receiveShadows;
 
@@ -615,6 +648,7 @@ void GUIStateMachine::createSphere(
     s_t radius,
     const Eigen::Vector3s& pos,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -625,6 +659,7 @@ void GUIStateMachine::createSphere(
   sphere.radius = radius;
   sphere.pos = pos;
   sphere.color = color;
+  sphere.layer = layer;
   sphere.castShadows = castShadows;
   sphere.receiveShadows = receiveShadows;
 
@@ -641,6 +676,7 @@ void GUIStateMachine::createCapsule(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -653,6 +689,7 @@ void GUIStateMachine::createCapsule(
   capsule.pos = pos;
   capsule.euler = euler;
   capsule.color = color;
+  capsule.layer = layer;
   capsule.castShadows = castShadows;
   capsule.receiveShadows = receiveShadows;
 
@@ -665,7 +702,8 @@ void GUIStateMachine::createCapsule(
 void GUIStateMachine::createLine(
     std::string key,
     const std::vector<Eigen::Vector3s>& points,
-    const Eigen::Vector4s& color)
+    const Eigen::Vector4s& color,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -673,6 +711,7 @@ void GUIStateMachine::createLine(
   line.key = key;
   line.points = points;
   line.color = color;
+  line.layer = layer;
 
   queueCommand([this, key](std::stringstream& json) {
     encodeCreateLine(json, mLines[key]);
@@ -693,6 +732,7 @@ void GUIStateMachine::createMesh(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -710,6 +750,7 @@ void GUIStateMachine::createMesh(
   mesh.euler = euler;
   mesh.scale = scale;
   mesh.color = color;
+  mesh.layer = layer;
   mesh.castShadows = castShadows;
   mesh.receiveShadows = receiveShadows;
 
@@ -728,6 +769,7 @@ void GUIStateMachine::createMeshASSIMP(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -814,6 +856,7 @@ void GUIStateMachine::createMeshASSIMP(
       euler,
       scale,
       color,
+      layer,
       castShadows,
       receiveShadows);
 }
@@ -825,6 +868,7 @@ void GUIStateMachine::createMeshFromShape(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -836,6 +880,7 @@ void GUIStateMachine::createMeshFromShape(
       euler,
       scale,
       color,
+      layer,
       castShadows,
       receiveShadows);
 }
@@ -1189,7 +1234,8 @@ void GUIStateMachine::createText(
     const std::string& key,
     const std::string& contents,
     const Eigen::Vector2i& fromTopLeft,
-    const Eigen::Vector2i& size)
+    const Eigen::Vector2i& size,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1198,6 +1244,7 @@ void GUIStateMachine::createText(
   text.contents = contents;
   text.fromTopLeft = fromTopLeft;
   text.size = size;
+  text.layer = layer;
 
   mText[key] = text;
 
@@ -1234,7 +1281,8 @@ void GUIStateMachine::createButton(
     const std::string& label,
     const Eigen::Vector2i& fromTopLeft,
     const Eigen::Vector2i& size,
-    std::function<void()> onClick)
+    std::function<void()> onClick,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1244,6 +1292,7 @@ void GUIStateMachine::createButton(
   button.fromTopLeft = fromTopLeft;
   button.size = size;
   button.onClick = onClick;
+  button.layer = layer;
 
   mButtons[key] = button;
 
@@ -1285,7 +1334,8 @@ void GUIStateMachine::createSlider(
     s_t value,
     bool onlyInts,
     bool horizontal,
-    std::function<void(s_t)> onChange)
+    std::function<void(s_t)> onChange,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1299,6 +1349,7 @@ void GUIStateMachine::createSlider(
   slider.onlyInts = onlyInts;
   slider.horizontal = horizontal;
   slider.onChange = onChange;
+  slider.layer = layer;
 
   mSliders[key] = slider;
 
@@ -1386,7 +1437,8 @@ void GUIStateMachine::createPlot(
     const std::vector<s_t>& ys,
     s_t minY,
     s_t maxY,
-    const std::string& type)
+    const std::string& type,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1401,6 +1453,7 @@ void GUIStateMachine::createPlot(
   plot.minY = minY;
   plot.maxY = maxY;
   plot.type = type;
+  plot.layer = layer;
 
   mPlots[key] = plot;
 
@@ -1462,7 +1515,8 @@ void GUIStateMachine::createRichPlot(
     s_t maxY,
     const std::string& title,
     const std::string& xAxisLabel,
-    const std::string& yAxisLabel)
+    const std::string& yAxisLabel,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1477,6 +1531,7 @@ void GUIStateMachine::createRichPlot(
   plot.title = title;
   plot.xAxisLabel = xAxisLabel;
   plot.yAxisLabel = yAxisLabel;
+  plot.layer = layer;
 
   mRichPlots[key] = plot;
 
@@ -1658,6 +1713,7 @@ void GUIStateMachine::encodeCreateBox(std::stringstream& json, Box& box)
   vec3ToJson(json, box.euler);
   json << ", \"color\": ";
   vec4ToJson(json, box.color);
+  json << ", \"layer\": \"" << box.layer << "\"";
   json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
   json << "}";
@@ -1672,6 +1728,7 @@ void GUIStateMachine::encodeCreateSphere(
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
   vec4ToJson(json, sphere.color);
+  json << ", \"layer\": \"" << sphere.layer << "\"";
   json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
@@ -1690,6 +1747,7 @@ void GUIStateMachine::encodeCreateCapsule(
   vec3ToJson(json, capsule.euler);
   json << ", \"color\": ";
   vec4ToJson(json, capsule.color);
+  json << ", \"layer\": \"" << capsule.layer << "\"";
   json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (capsule.receiveShadows ? "true" : "false");
@@ -1711,6 +1769,7 @@ void GUIStateMachine::encodeCreateLine(std::stringstream& json, Line& line)
   }
   json << "], \"color\": ";
   vec4ToJson(json, line.color);
+  json << ", \"layer\": \"" << line.layer << "\"";
   json << "}";
 }
 
@@ -1776,6 +1835,7 @@ void GUIStateMachine::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
   vec3ToJson(json, mesh.euler);
   json << ", \"scale\": ";
   vec3ToJson(json, mesh.scale);
+  json << ", \"layer\": \"" << mesh.layer << "\"";
   json << ", \"cast_shadows\": " << (mesh.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": " << (mesh.receiveShadows ? "true" : "false");
   json << "}";
@@ -1801,6 +1861,7 @@ void GUIStateMachine::encodeCreateText(std::stringstream& json, Text& text)
   vec2iToJson(json, text.fromTopLeft);
   json << ", \"size\": ";
   vec2iToJson(json, text.size);
+  json << ", \"layer\": \"" << text.layer << "\"";
   json << ", \"contents\": \"" << escapeJson(text.contents);
   json << "\" }";
 }
@@ -1813,6 +1874,7 @@ void GUIStateMachine::encodeCreateButton(
   vec2iToJson(json, button.fromTopLeft);
   json << ", \"size\": ";
   vec2iToJson(json, button.size);
+  json << ", \"layer\": \"" << button.layer << "\"";
   json << ", \"label\": \"" << escapeJson(button.label);
   json << "\" }";
 }
@@ -1828,6 +1890,7 @@ void GUIStateMachine::encodeCreateSlider(
   json << ", \"max\": " << numberToJson(slider.max);
   json << ", \"min\": " << numberToJson(slider.min);
   json << ", \"value\": " << numberToJson(slider.value);
+  json << ", \"layer\": \"" << slider.layer << "\"";
   json << ", \"only_ints\": " << (slider.onlyInts ? "true" : "false");
   json << ", \"horizontal\": " << (slider.horizontal ? "true" : "false");
   json << "}";
@@ -1848,6 +1911,7 @@ void GUIStateMachine::encodeCreatePlot(std::stringstream& json, Plot& plot)
   vecToJson(json, plot.xs);
   json << ", \"ys\": ";
   vecToJson(json, plot.ys);
+  json << ", \"layer\": \"" << plot.layer << "\"";
   json << ", \"plot_type\": \"" << plot.type;
   json << "\" }";
 }
@@ -1864,6 +1928,7 @@ void GUIStateMachine::encodeCreateRichPlot(
   json << ", \"min_x\": " << numberToJson(plot.minX);
   json << ", \"max_y\": " << numberToJson(plot.maxY);
   json << ", \"min_y\": " << numberToJson(plot.minY);
+  json << ", \"layer\": \"" << plot.layer << "\"";
   json << ", \"title\": \"";
   json << plot.title;
   json << "\", \"x_axis_label\": \"";
