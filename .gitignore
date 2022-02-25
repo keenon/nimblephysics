@@ -28,3 +28,7 @@ docs/readthedocs/site
 data/screencap/*
 dist/
 wheelhouse/
+perf_results/
+perf_results/perf.data
+perf_results/tmp.perf
+perf_results/tmp.folded

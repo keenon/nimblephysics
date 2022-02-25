@@ -5062,6 +5062,32 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
 {
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(getNumDofs(), getNumDofs());
 
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> dofJoints;
+  std::vector<Eigen::Vector6s> dofScrews;
+  std::vector<int> dofJointIndices;
+  std::vector<int> dofIndexInJoint;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    dofJoints.push_back(getDof(j)->getJoint());
+    dofIndexInJoint.push_back(getDof(j)->getIndexInJoint());
+    dofScrews.push_back(
+        dofJoints[j]->getWorldAxisScrewForPosition(dofIndexInJoint[j]));
+    dofJointIndices.push_back(getJointIndex(dofJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
+
+  const Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
+
   // The left multiply means we're taking a weighted combination of rows, to get
   // a single row. That's our new vector. Then we're treating that vector as a
   // column vector, and building a Jacobian of how that vector changes as we
@@ -5069,11 +5095,120 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
 
   for (int col = 0; col < getNumDofs(); col++)
   {
-    result.col(col)
-        = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
-              markers, col)
-              .transpose()
-          * leftMultiply;
+    const int index = col;
+
+    // Here's the original version, not optimized
+
+    // result.col(col)
+    //     = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+    //           markers, col)
+    //           .transpose()
+    //       * leftMultiply;
+
+    // It turns out that calling
+    // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints()
+    // in a tight inner loop actually wastes a lot of inefficient index
+    // lookups in Skeleton, so instead we can cache so data outside of the
+    // loop
+
+    Eigen::MatrixXs jac
+        = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+    // Differentiating the whole mess wrt this joint
+    const dynamics::Joint* rootJoint = dofJoints[index];
+    const Eigen::Vector6s rootScrew = dofScrews[index];
+    const int rootJointIndex = dofJointIndices[index];
+
+    for (int j = 0; j < getNumDofs(); j++)
+    {
+      dynamics::Joint* parentJoint = dofJoints[j];
+      const Eigen::Vector6s screw = dofScrews[j];
+      const int parentJointIndex = dofJointIndices[j];
+      for (int i = 0; i < markers.size(); i++)
+      {
+        dynamics::Joint* sourceJoint = markerSourceJoints[i];
+        int sourceJointIndex = markerSourceJointIndices[i];
+
+        /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+        /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+        if (parentMap(parentJointIndex, sourceJointIndex) == 1
+            || sourceJoint == parentJoint)
+        {
+          // The original value in this cell is the following
+
+          /*
+          jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
+              screw, worldMarkers.segment<3>(i * 3), 0.0);
+          */
+
+          // There's a special case if the root is the parent of both the DOF
+          // for this column of the Jac, _and_ of the marker. That means that
+          // all we're doing is rotating (and translating, but that's
+          // irrelevant) the joint-marker system. So all we need is the gradient
+          // of the rotation.
+          if (parentMap(rootJointIndex, parentJointIndex) == 1)
+          {
+            Eigen::Vector3s originalJac = math::gradientWrtTheta(
+                screw, worldMarkers.segment<3>(i * 3), 0.0);
+            jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+                rootScrew.head<3>(), originalJac, 0);
+          }
+          else
+          {
+            // We'll use the sum-product rule, so we need to individually
+            // differentiate both terms (`screw` and `markerPos`) wrt the root
+            // joint's theta term.
+
+            // Make `screwGrad` hold the gradient of the screw with respect to
+            // root
+
+            Eigen::Vector6s screwGrad = Eigen::Vector6s::Zero();
+
+            if (rootJoint == parentJoint)
+            {
+              int axisIndex
+                  = dofIndexInJoint[j]; // getDof(j)->getIndexInJoint();
+              int rotateIndex
+                  = dofIndexInJoint[index]; // getDof(index)->getIndexInJoint();
+              screwGrad = parentJoint->getScrewAxisGradientForPosition(
+                  axisIndex, rotateIndex);
+            }
+            else
+            {
+              // Otherwise rotating the root joint doesn't effect parentJoint's
+              // screw
+              screwGrad.setZero();
+            }
+
+            // `screwGrad` now holds the gradient of the screw with respect to
+            // root.
+
+            // Now we need the marker position's gradient wrt the root axis
+
+            Eigen::Vector3s markerGradWrtRoot = Eigen::Vector3s::Zero();
+
+            if (parentMap(rootJointIndex, sourceJointIndex) == 1
+                || (rootJoint == sourceJoint))
+            {
+              markerGradWrtRoot = math::gradientWrtTheta(
+                  rootScrew, worldMarkers.segment<3>(i * 3), 0.0);
+            }
+
+            // Now we just need to apply the product rule to get the final
+            // result
+
+            Eigen::Vector3s partA = math::gradientWrtTheta(
+                screwGrad, worldMarkers.segment<3>(i * 3), 0.0);
+            Eigen::Vector3s partB = math::gradientWrtThetaPureRotation(
+                screw.head<3>(), markerGradWrtRoot, 0.0);
+
+            jac.block<3, 1>(i * 3, j) = partA + partB;
+          }
+        }
+      }
+    }
+
+    result.col(col) = jac.transpose() * leftMultiply;
   }
 
   return result;
@@ -5223,15 +5358,92 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
   Eigen::MatrixXs scaleJac
       = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
 
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> parentJoints;
+  std::vector<Eigen::Vector6s> screws;
+  std::vector<int> parentJointIndices;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    parentJoints.push_back(getDof(j)->getJoint());
+    screws.push_back(parentJoints[j]->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint()));
+    parentJointIndices.push_back(getJointIndex(parentJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
+
   for (int body = 0; body < getNumBodyNodes(); body++)
   {
+    // We also cache these results in this outer loop to avoid re-creating them
+    // in the inner axis loop
+    const int index = body;
+    dynamics::BodyNode* scaleBody = getBodyNode(index);
+    dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
+    int scaleJointIndex = getJointIndex(scaleJoint);
+
     for (int axis = 0; axis < 3; axis++)
     {
-      result.col(body * 3 + axis)
-          = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
-                markers, body, axis, scaleJac)
-                .transpose()
-            * leftMultiply;
+      // Here's the original version, not optimized
+
+      // result.col(body * 3 + axis)
+      //     = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
+      //           markers, body, axis, scaleJac)
+      //           .transpose()
+      //       * leftMultiply;
+
+      // It turns out that calling
+      // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets()
+      // in a tight inner loop actually wastes a lot of inefficient index
+      // lookups in Skeleton, so instead we can cache so data outside of the
+      // loop
+
+      int markerGradCol = index * 3 + axis;
+
+      Eigen::MatrixXs jac
+          = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+      Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+      const Eigen::MatrixXi& parentMap = getJointParentMap();
+
+      for (int j = 0; j < getNumDofs(); j++)
+      {
+        dynamics::Joint* parentJoint = parentJoints[j];
+        Eigen::Vector6s screw = screws[j];
+        int parentJointIndex = parentJointIndices[j];
+        for (int i = 0; i < markers.size(); i++)
+        {
+          dynamics::Joint* sourceJoint = markerSourceJoints[i];
+          int sourceJointIndex = markerSourceJointIndices[i];
+
+          /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+          /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+          if (parentMap(parentJointIndex, sourceJointIndex) == 1
+              || sourceJoint == parentJoint)
+          {
+            bool isScalingBodyParentOfMarker
+                = (parentMap(scaleJointIndex, sourceJointIndex) == 1
+                   || scaleBody == markers[i].first);
+            bool isScalingBodyParentOfAxisJoint
+                = parentMap(scaleJointIndex, parentJointIndex) == 1;
+            if (isScalingBodyParentOfMarker && !isScalingBodyParentOfAxisJoint)
+            {
+              Eigen::Vector3s markerGrad
+                  = scaleJac.block<3, 1>(i * 3, markerGradCol);
+              jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+                  screw.head<3>(), markerGrad, 0.0);
+            }
+          }
+        }
+      }
+
+      result.col(body * 3 + axis) = jac.transpose() * leftMultiply;
     }
   }
 
@@ -5296,7 +5508,7 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
   int markerGradCol = marker * 3 + axis;
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
-  Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  // Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
   const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   for (int j = 0; j < getNumDofs(); j++)
@@ -5375,15 +5587,77 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
   Eigen::MatrixXs markerJac
       = getMarkerWorldPositionsJacobianWrtMarkerOffsets(markers);
 
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> parentJoints;
+  std::vector<Eigen::Vector6s> screws;
+  std::vector<int> parentJointIndices;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    parentJoints.push_back(getDof(j)->getJoint());
+    screws.push_back(parentJoints[j]->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint()));
+    parentJointIndices.push_back(getJointIndex(parentJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
+
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
+
   for (int marker = 0; marker < markers.size(); marker++)
   {
     for (int axis = 0; axis < 3; axis++)
     {
-      result.col(marker * 3 + axis)
-          = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
-                markers, marker, axis, markerJac)
-                .transpose()
-            * leftMultiply;
+      // Here's the original version, not optimized
+
+      // result.col(marker * 3 + axis)
+      //     =
+      //     getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      //           markers, marker, axis, markerJac)
+      //           .transpose()
+      //       * leftMultiply;
+
+      // It turns out that calling
+      // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets()
+      // in a tight inner loop actually wastes a lot of inefficient index
+      // lookups in Skeleton, so instead we can cache so data outside of the
+      // loop
+
+      int markerGradCol = marker * 3 + axis;
+      Eigen::MatrixXs jac
+          = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+      for (int j = 0; j < getNumDofs(); j++)
+      {
+        dynamics::Joint* parentJoint = parentJoints[j];
+        Eigen::Vector6s screw = screws[j];
+        int parentJointIndex = parentJointIndices[j];
+
+        for (int i = 0; i < markers.size(); i++)
+        {
+          dynamics::Joint* sourceJoint = markerSourceJoints[i];
+          int sourceJointIndex = markerSourceJointIndices[i];
+
+          /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+          /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+          if (parentMap(parentJointIndex, sourceJointIndex) == 1
+              || sourceJoint == parentJoint)
+          {
+            Eigen::Vector3s markerGrad
+                = markerJac.block<3, 1>(i * 3, markerGradCol);
+            jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+                screw.head<3>(), markerGrad, 0.0);
+          }
+        }
+      }
+
+      result.col(marker * 3 + axis) = jac.transpose() * leftMultiply;
     }
   }
 

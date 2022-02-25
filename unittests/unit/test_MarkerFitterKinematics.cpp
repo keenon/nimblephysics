@@ -21,6 +21,8 @@
 
 // #define ALL_TESTS
 
+#define FUNCTIONAL_TESTS
+
 using namespace dart;
 using namespace biomechanics;
 using namespace server;
@@ -1061,7 +1063,7 @@ bool debugFitToGUI(
   return true;
 }
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, ROTATE_IN_BOUNDS)
 {
   /////////////////////////////////////////////////////////////////////
@@ -1614,7 +1616,7 @@ TEST(MarkerFitter, CLAMP_WEIRDNESS_3)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1688,7 +1690,7 @@ TEST(MarkerFitter, DERIVATIVES)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1747,7 +1749,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1822,7 +1824,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -1967,7 +1969,7 @@ TEST(MarkerFitter, INITIALIZATION)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, SPHERE_FIT_GRAD)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2009,16 +2011,15 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
   fitter.setTriadsToTracking();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
-  /*
-  for (int i = 0; i < 10; i++)
+  std::vector<bool> newClip;
+  for (int i = 0; i < markerTrajectories.markerTimesteps.size(); i++)
   {
     subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+    newClip.push_back(false);
   }
-  */
-  subsetTimesteps = markerTrajectories.markerTimesteps;
 
-  MarkerInitialization init
-      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
 
   standard.skeleton->setGroupScales(init.groupScales);
 
@@ -2028,6 +2029,7 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
       subsetTimesteps,
       init.poses,
       standard.skeleton->getJoint("walker_knee_r"),
+      newClip,
       out);
 
   Eigen::VectorXs analytical = sphereProblem.getGradient();
@@ -2048,11 +2050,11 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
   // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
-  fitter.findJointCenters(init, subsetTimesteps);
+  fitter.findJointCenters(init, newClip, subsetTimesteps);
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, AXIS_FIT_GRAD)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -2094,14 +2096,16 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
   fitter.setTriadsToTracking();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  std::vector<bool> newClip;
   for (int i = 0; i < 10; i++)
   {
     subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+    newClip.push_back(false);
   }
   // subsetTimesteps = markerTrajectories.markerTimesteps;
 
-  MarkerInitialization init
-      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
 
   standard.skeleton->setGroupScales(init.groupScales);
 
@@ -2112,6 +2116,7 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
       init.poses,
       standard.skeleton->getJoint("walker_knee_r"),
       Eigen::MatrixXs::Random(3, init.poses.cols()),
+      newClip,
       out);
 
   Eigen::VectorXs analytical = cylinderProblem.getGradient();
@@ -3406,6 +3411,8 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
     assert(pair.second.first != nullptr);
   }
 
+  int numCopiesOfData = 1;
+
   // Get the raw marker trajectory data
   OpenSimTRC traj350
       = OpenSimParser::loadTRC("dart://sample/osim/Sprinter/run0350cms.trc");
@@ -3417,10 +3424,13 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
       = OpenSimParser::loadTRC("dart://sample/osim/Sprinter/run0900cms.trc");
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
-  markerObservationTrials.push_back(traj350.markerTimesteps);
-  markerObservationTrials.push_back(traj500.markerTimesteps);
-  markerObservationTrials.push_back(traj700.markerTimesteps);
-  markerObservationTrials.push_back(traj900.markerTimesteps);
+  for (int i = 0; i < numCopiesOfData; i++)
+  {
+    markerObservationTrials.push_back(traj350.markerTimesteps);
+    markerObservationTrials.push_back(traj500.markerTimesteps);
+    markerObservationTrials.push_back(traj700.markerTimesteps);
+    markerObservationTrials.push_back(traj900.markerTimesteps);
+  }
 
   OpenSimFile scaled = OpenSimParser::parseOsim(
       "dart://sample/osim/Sprinter/sprinter_scaled.osim");
@@ -3433,10 +3443,13 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
   OpenSimMot traj900Mot = OpenSimParser::loadMot(
       scaled.skeleton, "dart://sample/osim/Sprinter/run0900cms.mot");
   std::vector<Eigen::MatrixXs> goldPoses;
-  goldPoses.push_back(traj350Mot.poses);
-  goldPoses.push_back(traj500Mot.poses);
-  goldPoses.push_back(traj700Mot.poses);
-  goldPoses.push_back(traj900Mot.poses);
+  for (int i = 0; i < numCopiesOfData; i++)
+  {
+    goldPoses.push_back(traj350Mot.poses);
+    goldPoses.push_back(traj500Mot.poses);
+    goldPoses.push_back(traj700Mot.poses);
+    goldPoses.push_back(traj900Mot.poses);
+  }
 
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       shorterTrials;
@@ -3459,8 +3472,7 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
 
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.05);
-  fitter.setInitialIKMaxRestarts(isDebug ? 1 : 50);
-  fitter.setIterationLimit(isDebug ? 5 : 100);
+  fitter.setInitialIKMaxRestarts(isDebug ? 1 : 150);
 
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
@@ -3503,7 +3515,7 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
           isDebug ? shorterTrials : markerObservationTrials,
           InitialMarkerFitParams()
               .setMaxTrialsToUseForMultiTrialScaling(2)
-              .setMaxTimestepsToUseForMultiTrialScaling(200),
+              .setMaxTimestepsToUseForMultiTrialScaling(2000),
           50);
 
   standard.skeleton->setGroupScales(inits[0].groupScales);

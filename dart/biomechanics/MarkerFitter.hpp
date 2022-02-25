@@ -527,6 +527,16 @@ public:
       std::shared_ptr<BilevelFitResult> result,
       InitialMarkerFitParams params);
 
+  /// For the multi-trial pipeline, this takes our finished body scales and
+  /// marker offsets, and fine tunes on the IK initialized in the early joint
+  /// centering process.
+  MarkerInitialization fineTuneIK(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      int numBlocks,
+      std::map<std::string, s_t> markerWeights,
+      MarkerInitialization& initialization);
+
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 6: Run through and do a linear initialization of masses based
   // on link masses.

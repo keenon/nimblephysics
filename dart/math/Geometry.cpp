@@ -632,6 +632,7 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
 
   Eigen::MatrixXs original = expMapRot(pos);
 
+  // TODO: maybe we can handle this with dLogMap?
   s_t EPS = 1e-7;
   Eigen::Vector3s perturbed = pos;
   perturbed(_qi) += EPS;
@@ -643,11 +644,35 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
   return (plus - minus) / (2 * EPS);
 }
 
+Eigen::Matrix3s expMapMagGradient(const Eigen::Vector3s& screw)
+{
+  return makeSkewSymmetric(screw);
+}
+
+Eigen::Matrix3s finiteDifferenceExpMapMagGradient(
+    const Eigen::Vector3s& screw, bool useRidders)
+{
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  Eigen::Matrix3s result;
+  math::finiteDifference<Eigen::Matrix3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix3s& perturbed) {
+        perturbed = expMapRot(screw * eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  return result;
+}
+
 Eigen::Vector3s expMapNestedGradient(
     const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
 {
-  // TODO: replace me with an analytical formula
-  return finiteDifferenceExpMapNestedGradient(original, screw);
+  Eigen::MatrixXs R = expMapRot(original);
+  Eigen::MatrixXs dR = makeSkewSymmetric(screw) * R;
+
+  return dLogMap(R, dR);
 }
 
 Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
@@ -697,38 +722,158 @@ Eigen::Vector3s logMap(const Eigen::Matrix3s& _R)
   // v = beta*p + gamma*w + 1 / 2*cross(p, w)
   //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
   //--------------------------------------------------------------------------
-  //  s_t theta =
-  //      std::acos(
-  //        max(
-  //          std::min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0),
-  //          -1.0));
+  s_t theta = std::acos(
+      max(std::min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0), -1.0));
 
-  //  if (theta > constantsd::pi() - DART_EPSILON) {
-  //    s_t delta = 0.5 + 0.125*(constantsd::pi() - theta)*(constantsd::pi()
-  //    - theta);
+  if (theta > constantsd::pi() - DART_EPSILON)
+  {
+    s_t delta
+        = 0.5 + 0.125 * (constantsd::pi() - theta) * (constantsd::pi() - theta);
 
-  //    return Eigen::Vector3s(
-  //          _R(2, 1) > _R(1, 2) ? theta*sqrt(1.0 + (_R(0, 0) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(0, 0) - 1.0)*delta),
-  //          _R(0, 2) > _R(2, 0) ? theta*sqrt(1.0 + (_R(1, 1) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(1, 1) - 1.0)*delta),
-  //          _R(1, 0) > _R(0, 1) ? theta*sqrt(1.0 + (_R(2, 2) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(2, 2) - 1.0)*delta));
-  //  } else {
-  //    s_t alpha = 0.0;
+    return Eigen::Vector3s(
+        _R(2, 1) > _R(1, 2) ? theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta),
+        _R(0, 2) > _R(2, 0) ? theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta),
+        _R(1, 0) > _R(0, 1) ? theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta));
+  }
+  else
+  {
+    s_t alpha = 0.0;
 
-  //    if (theta > DART_EPSILON)
-  //      alpha = 0.5*theta / sin(theta);
-  //    else
-  //      alpha = 0.5 + constantsd::one_div_12()*theta*theta;
+    if (theta > DART_EPSILON)
+      alpha = 0.5 * theta / sin(theta);
+    else
+      alpha = 0.5 + (1.0 / 12.0) * theta * theta;
 
-  //    return Eigen::Vector3s(alpha*(_R(2, 1) - _R(1, 2)),
-  //                           alpha*(_R(0, 2) - _R(2, 0)),
-  //                           alpha*(_R(1, 0) - _R(0, 1)));
-  //  }
+    return Eigen::Vector3s(
+        alpha * (_R(2, 1) - _R(1, 2)),
+        alpha * (_R(0, 2) - _R(2, 0)),
+        alpha * (_R(1, 0) - _R(0, 1)));
+  }
 
-  Eigen::AngleAxis_s aa(_R);
-  return aa.angle() * aa.axis();
+  // Eigen::AngleAxis_s aa(_R);
+  // return aa.angle() * aa.axis();
+}
+
+/// \brief Log mapping
+/// \note This gets the value of d/dt logMap(R), given R and d/dt R
+Eigen::Vector3s dLogMap(const Eigen::Matrix3s& _R, const Eigen::Matrix3s& dR)
+{
+  (void)dR;
+  //--------------------------------------------------------------------------
+  // T = (R, p) = exp([w, v]), t = ||w||
+  // v = beta*p + gamma*w + 1 / 2*cross(p, w)
+  //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
+  //--------------------------------------------------------------------------
+  s_t diagSum = 0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0);
+  s_t d_diagSum = 0.5 * (dR(0, 0) + dR(1, 1) + dR(2, 2));
+  s_t d_theta = 0.0;
+  if (diagSum > 1.0)
+  {
+    diagSum = 1.0;
+    d_theta = 0.0;
+  }
+  else if (diagSum < -1.0)
+  {
+    diagSum = -1.0;
+    d_theta = 0.0;
+  }
+  else
+  {
+    d_theta = -d_diagSum / sqrt(1 - diagSum * diagSum);
+  }
+  s_t theta = std::acos(diagSum);
+
+  if (theta > constantsd::pi() - DART_EPSILON)
+  {
+    s_t delta
+        = 0.5 + 0.125 * (constantsd::pi() - theta) * (constantsd::pi() - theta);
+    s_t d_delta = 0.25 * (constantsd::pi() - theta) * -d_theta;
+
+    // return Eigen::Vector3s(
+    //     _R(2, 1) > _R(1, 2) ? theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta),
+    //     _R(0, 2) > _R(2, 0) ? theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta),
+    //     _R(1, 0) > _R(0, 1) ? theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta));
+
+    s_t elem1 = theta * sqrt(1.0 + delta * _R(0, 0) - delta);
+    (void)elem1;
+    s_t d_elem1 = d_theta * sqrt(1.0 + delta * _R(0, 0) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(0, 0) - delta)
+                        * (d_delta * _R(0, 0) + delta * dR(0, 0) - d_delta);
+    s_t elem2 = theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta);
+    (void)elem2;
+    s_t d_elem2 = d_theta * sqrt(1.0 + delta * _R(1, 1) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(1, 1) - delta)
+                        * (d_delta * _R(1, 1) + delta * dR(1, 1) - d_delta);
+    s_t elem3 = theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta);
+    (void)elem3;
+    s_t d_elem3 = d_theta * sqrt(1.0 + delta * _R(2, 2) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(2, 2) - delta)
+                        * (d_delta * _R(2, 2) + delta * dR(2, 2) - d_delta);
+
+    return Eigen::Vector3s(
+        _R(2, 1) > _R(1, 2) ? d_elem1 : -d_elem1,
+        _R(0, 2) > _R(2, 0) ? d_elem2 : -d_elem2,
+        _R(1, 0) > _R(0, 1) ? d_elem3 : -d_elem3);
+  }
+  else
+  {
+    s_t alpha = 0.0;
+    s_t d_alpha = 0.0;
+
+    if (theta > DART_EPSILON)
+    {
+      alpha = 0.5 * theta / sin(theta);
+      s_t csc = 1.0 / sin(theta);
+      // s_t cot = 1.0 / tan(theta);
+      s_t cot
+          = cos(theta) / sin(theta); // -> alternative form to 1.0 / tan(theta),
+                                     // perhaps more numerically stable
+      d_alpha = 0.5 * (d_theta * csc - theta * cot * csc * d_theta);
+      // d_alpha = 0.5 * d_theta / cos(theta) * theta / sin(d_theta);
+    }
+    else
+    {
+      alpha = 0.5 + (1.0 / 12.0) * theta * theta;
+      d_alpha = (2.0 / 12.0) * theta * d_theta;
+    }
+
+    /*
+    return Eigen::Vector3s(
+        alpha * (_R(2, 1) - _R(1, 2)),
+        alpha * (_R(0, 2) - _R(2, 0)),
+        alpha * (_R(1, 0) - _R(0, 1)));
+    */
+
+    return Eigen::Vector3s(
+        d_alpha * (_R(2, 1) - _R(1, 2)) + alpha * (dR(2, 1) - dR(1, 2)),
+        d_alpha * (_R(0, 2) - _R(2, 0)) + alpha * (dR(0, 2) - dR(2, 0)),
+        d_alpha * (_R(1, 0) - _R(0, 1)) + alpha * (dR(1, 0) - dR(0, 1)));
+  }
+}
+
+Eigen::Vector3s finiteDifferenceDLogMap(
+    const Eigen::Matrix3s& R, const Eigen::Matrix3s& dR, bool useRidders)
+{
+  Eigen::Vector3s result;
+
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        perturbed = logMap(R + dR * eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
 }
 
 Eigen::Vector6s logMap(const Eigen::Isometry3s& _T)

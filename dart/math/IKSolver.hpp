@@ -37,6 +37,13 @@ struct IKConfig
   bool logOutput = false;
 };
 
+struct IKResult
+{
+  s_t loss;
+  Eigen::VectorXs pos;
+  bool clamped;
+};
+
 s_t solveIK(
     Eigen::VectorXs initialPos,
     int targetSize,
@@ -46,6 +53,16 @@ s_t solveIK(
         /*out*/ Eigen::VectorXs& diff,
         /*out*/ Eigen::MatrixXs& jac)> eval,
     std::function<void(/*out*/ Eigen::VectorXs& pos)> getRandomRestart,
+    IKConfig config = IKConfig());
+
+IKResult refineIK(
+    Eigen::VectorXs initialPos,
+    int targetSize,
+    std::function<Eigen::VectorXs(
+        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+    std::function<void(
+        /*out*/ Eigen::VectorXs& diff,
+        /*out*/ Eigen::MatrixXs& jac)> eval,
     IKConfig config = IKConfig());
 
 } // namespace math

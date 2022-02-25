@@ -665,7 +665,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     }
 
     // 4. We'll subsample the data down here, to avoid having any accidental
-    // performance tanking in the deployed version.
+    // performance tanking if people upload 100 trials for one subject
 
     // Sample at most N trials
     int numTrialsToSample = markerObservationTrials.size();
@@ -734,32 +734,19 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
 
     // 7. Use the scaling from overallInit to do IK on each skeleton
     std::vector<MarkerInitialization> separateInits;
-    InitialMarkerFitParams params
-        = InitialMarkerFitParams()
-              .setGroupScales(overallInit.groupScales)
-              .setMarkerOffsets(overallInit.markerOffsets)
-              .setDontRescaleBodies(true);
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
       std::cout << "## IK on trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
 
-      std::vector<bool> newClip;
-      for (int j = 0; j < markerObservationTrials[i].size(); j++)
-        newClip.push_back(false);
+      jointInits[i].markerOffsets = overallInit.markerOffsets;
+      jointInits[i].groupScales = overallInit.groupScales;
 
-      separateInits.push_back(getInitialization(
+      separateInits.push_back(fineTuneIK(
           markerObservationTrials[i],
-          newClip,
-          InitialMarkerFitParams(params)
-              .setJointCentersAndWeights(
-                  jointInits[i].joints,
-                  jointInits[i].jointCenters,
-                  jointInits[i].jointWeights)
-              .setJointAxisAndWeights(
-                  jointInits[i].jointAxis, jointInits[i].axisWeights)
-              .setInitPoses(jointInits[i].poses)
-              .setDontRescaleBodies(true)));
+          params.numBlocks,
+          params.markerWeights,
+          jointInits[i]));
     }
     std::cout << "Finished IKs" << std::endl;
     return separateInits;
@@ -950,7 +937,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     const Eigen::MatrixXs goldPoses)
 {
   server->renderSkeleton(
-      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Automated Skeleton");
+      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
   Eigen::Vector4s goldColor
       = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
   if (goldOsim && goldPoses.size() > 0)
@@ -1026,7 +1013,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     int timestep = tick % init.poses.cols();
     mSkeleton->setPositions(init.poses.col(timestep));
     server->renderSkeleton(
-        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Automated Skeleton");
+        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerObservations[timestep];
@@ -1048,14 +1035,15 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
             "marker_error_" + pair.first,
             points,
             Eigen::Vector4s(1, 0, 0, 1),
-            "Automated Skeleton");
+            "Skeleton");
       }
     }
 
     if (goldOsim && goldPoses.size() > 0)
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
-      server->renderSkeleton(goldOsim->skeleton, "gold_", goldColor, "Gold IK");
+      server->renderSkeleton(
+          goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
 
       for (auto pair : markerWorldPositions)
       {
@@ -1074,7 +1062,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               "gold_marker_error_" + pair.first,
               points,
               Eigen::Vector4s(1, 0, 0, 1),
-              "Gold IK");
+              "Manual Skeleton");
         }
       }
     }
@@ -1157,13 +1145,14 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
 {
   server::GUIRecording server;
   server.renderSkeleton(
-      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Automated Skeleton");
+      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
 
   Eigen::Vector4s goldColor
       = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
   if (goldOsim && goldPoses.size() > 0)
   {
-    server.renderSkeleton(goldOsim->skeleton, "gold_", goldColor, "Gold IK");
+    server.renderSkeleton(
+        goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
   }
 
   int numJoints = init.jointCenters.rows() / 3;
@@ -1219,7 +1208,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   {
     mSkeleton->setPositions(init.poses.col(timestep));
     server.renderSkeleton(
-        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Automated Skeleton");
+        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerObservations[timestep];
@@ -1240,14 +1229,15 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
             "marker_error_" + pair.first,
             points,
             Eigen::Vector4s(1, 0, 0, 1),
-            "Automated Skeleton");
+            "Skeleton");
       }
     }
 
     if (goldOsim && goldPoses.size() > 0)
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
-      server.renderSkeleton(goldOsim->skeleton, "gold_", goldColor, "Gold IK");
+      server.renderSkeleton(
+          goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
 
       for (auto pair : markerWorldPositions)
       {
@@ -1266,7 +1256,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
               "gold_marker_error_" + pair.first,
               points,
               Eigen::Vector4s(1, 0, 0, 1),
-              "Gold IK");
+              "Manual Skeleton");
         }
       }
     }
@@ -1712,6 +1702,158 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   }
 
   std::cout << "Done completing bilevel fit!" << std::endl;
+
+  return result;
+}
+
+//==============================================================================
+/// For the multi-trial pipeline, this takes our finished body scales and
+/// marker offsets, and fine tunes on the IK initialized in the early joint
+/// centering process.
+MarkerInitialization MarkerFitter::fineTuneIK(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    int numBlocks,
+    std::map<std::string, s_t> markerWeights,
+    MarkerInitialization& initialization)
+{
+  MarkerInitialization result(initialization);
+
+  assert(
+      params.jointCenters.cols() == 0
+      || params.jointCenters.cols() == markerObservations.size());
+
+  // 0. Prep configuration variables we'll use for the rest of the algo
+  // Upper bound the number of blocks at the number of observations
+  if (numBlocks > markerObservations.size())
+  {
+    numBlocks = markerObservations.size();
+  }
+  int blockLen = markerObservations.size() / numBlocks;
+  std::vector<std::string> anatomicalMarkerNames;
+  for (int j = 0; j < mMarkerNames.size(); j++)
+  {
+    if (!mMarkerIsTracking[j])
+      anatomicalMarkerNames.push_back(mMarkerNames[j]);
+  }
+
+  // 1. Divide the marker observations into N sequential blocks.
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> blocks;
+  std::vector<Eigen::VectorXs> firstGuessPoses;
+  std::vector<std::vector<Eigen::VectorXs>> jointCenterBlocks;
+  std::vector<std::vector<Eigen::VectorXs>> jointAxisBlocks;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    // This means we've just started a new clip, so we need a new block
+    if (i % blockLen == 0)
+    {
+      blocks.emplace_back();
+      jointCenterBlocks.emplace_back();
+      jointAxisBlocks.emplace_back();
+      assert(
+          initialization.poses.cols() == 0 || i < initialization.poses.cols());
+      if (i < initialization.poses.cols())
+      {
+        firstGuessPoses.emplace_back(initialization.poses.col(i));
+      }
+      else
+      {
+        firstGuessPoses.emplace_back(mSkeleton->getPositions());
+      }
+    }
+    // Append our state to whatever the current block is
+    int mapIndex = blocks[blocks.size() - 1].size();
+    blocks[blocks.size() - 1].emplace_back();
+    for (std::string& marker : anatomicalMarkerNames)
+    {
+      if (markerObservations[i].count(marker) > 0)
+      {
+        assert(markerObservations[i].count(marker));
+        blocks[blocks.size() - 1][mapIndex].emplace(
+            marker, markerObservations[i].at(marker));
+      }
+    }
+    assert(
+        initialization.jointCenters.cols() == 0
+        || initialization.jointCenters.cols() > i);
+    if (initialization.jointCenters.cols() > i)
+    {
+      jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
+          initialization.jointCenters.col(i));
+    }
+    else
+    {
+      assert(initialization.jointCenters.cols() == 0);
+      jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
+          Eigen::VectorXs::Zero(0));
+    }
+    if (initialization.jointAxis.cols() > i)
+    {
+      jointAxisBlocks[jointAxisBlocks.size() - 1].emplace_back(
+          initialization.jointAxis.col(i));
+    }
+    else
+    {
+      jointAxisBlocks[jointAxisBlocks.size() - 1].emplace_back(
+          Eigen::VectorXs::Zero(0));
+    }
+  }
+
+  assert(blocks.size() >= numBlocks);
+  numBlocks = blocks.size();
+
+  std::vector<int> blockStartIndices;
+  std::vector<int> blockSizeIndices;
+  int cursor = 0;
+  for (int i = 0; i < blocks.size(); i++)
+  {
+    blockStartIndices.push_back(cursor);
+    blockSizeIndices.push_back(blocks[i].size());
+    cursor += blocks[i].size();
+  }
+
+  // 3. Average the scalings for each block together
+  assert(params.groupScales.size() > 0);
+  result.groupScales = initialization.groupScales;
+
+  // 4. Go through and run IK on each block
+  result.poses = Eigen::MatrixXs::Zero(
+      mSkeleton->getNumDofs(), markerObservations.size());
+  result.poseScores = Eigen::VectorXs::Zero(markerObservations.size());
+
+  std::vector<std::future<void>> blockFitFutures;
+  for (int i = 0; i < numBlocks; i++)
+  {
+    std::cout << "Starting fit for whole block " << i << "/" << numBlocks
+              << std::endl;
+
+    blockFitFutures.push_back(std::async(
+        &MarkerFitter::fitTrajectory,
+        this,
+        result.groupScales,
+        firstGuessPoses[i],
+        blocks[i],
+        markerWeights,
+        initialization.markerOffsets,
+        initialization.joints,
+        jointCenterBlocks[i],
+        initialization.jointWeights,
+        jointAxisBlocks[i],
+        initialization.axisWeights,
+        result.poses.block(
+            0,
+            blockStartIndices[i],
+            mSkeleton->getNumDofs(),
+            blockSizeIndices[i]),
+        result.poseScores.segment(blockStartIndices[i], blockSizeIndices[i]),
+        false));
+  }
+  for (int i = 0; i < numBlocks; i++)
+  {
+    blockFitFutures[i].get();
+    std::cout << "Finished fit for whole block " << i << "/" << numBlocks
+              << std::endl;
+  }
 
   return result;
 }
@@ -2755,12 +2897,14 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
 
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
+  Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 10000; i++)
+  for (int i = 0; i < 500; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    Eigen::VectorXs newX = x - grad * lr;
+    accum += grad.cwiseProduct(grad);
+    Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
     problem->unflatten(newX);
     s_t newLoss = problem->getLoss();
     if (newLoss < loss)
@@ -2875,13 +3019,17 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
 
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
+
+  Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
+
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 10000; i++)
+  for (int i = 0; i < 500; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
+    accum += grad.cwiseProduct(grad);
     x = problem->flatten();
-    Eigen::VectorXs newX = x - grad * lr;
+    Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
     problem->unflatten(newX);
     s_t newLoss = problem->getLoss();
     if (newLoss < loss)
@@ -4542,23 +4690,24 @@ Eigen::VectorXs CylinderFitJointAxisProblem::getGradient()
                   - mAxisLines.segment<3>((i - 1) * 6 + 3));
       }
     }
-  }
-  for (int i = 0; i < mNumTimesteps; i++)
-  {
+
+    const Eigen::Vector3s center = mAxisLines.segment<3>(i * 6);
+    const Eigen::Vector3s axis = mAxisLines.segment<3>(i * 6 + 3);
+    const s_t axisDotAxis = axis.dot(axis);
     for (int j = 0; j < mActiveMarkers.size(); j++)
     {
       if (mMarkerObserved(j, i))
       {
-        Eigen::Vector3s center = mAxisLines.segment<3>(i * 6);
-        Eigen::Vector3s axis = mAxisLines.segment<3>(i * 6 + 3);
-        Eigen::Vector3s jointToCenter
+        const Eigen::Vector3s jointToCenter
             = (center - mMarkerPositions.block<3, 1>(j * 3, i));
-        s_t diff = mPerpendicularRadii(j) * mPerpendicularRadii(j)
-                   - (jointToCenter - (jointToCenter.dot(axis) * axis))
-                         .squaredNorm();
-        s_t parallelDiff = mParallelRadii(j) * mParallelRadii(j)
-                           - (jointToCenter.dot(axis) * axis).squaredNorm();
-        (void)diff;
+        const s_t jointToCenterDotAxis = jointToCenter.dot(axis);
+        const Eigen::Vector3s jointToCenterAlongAxis
+            = jointToCenterDotAxis * axis;
+        const s_t diff
+            = mPerpendicularRadii(j) * mPerpendicularRadii(j)
+              - (jointToCenter - (jointToCenterAlongAxis)).squaredNorm();
+        const s_t parallelDiff = mParallelRadii(j) * mParallelRadii(j)
+                                 - (jointToCenterAlongAxis).squaredNorm();
         // Gradient wrt perpendicular radii
         grad(j) += (2 * diff) * (2 * mPerpendicularRadii(j));
         // Gradient wrt parallel radii
@@ -4568,39 +4717,40 @@ Eigen::VectorXs CylinderFitJointAxisProblem::getGradient()
         // Gradient wrt the axis center of perpendicular term
         grad.segment<3>(offset + i * 6)
             += (2 * diff) * -2
-               * (jointToCenter
-                  - (axis * axis.transpose())
-                        * (jointToCenter.dot(axis) * axis));
+               * (jointToCenter - axisDotAxis * jointToCenterAlongAxis);
         // Gradient wrt the axis of perpendicular term
         grad.segment<3>(offset + i * 6 + 3)
             += 2 * diff * -1
-               * (-4 * jointToCenter.dot(axis) * jointToCenter
-                  + (2 * jointToCenter * jointToCenter.dot(axis)
-                         * axis.dot(axis)
-                     + 2 * axis.dot(jointToCenter * jointToCenter.dot(axis))
-                           * axis));
+               * ((-4 + 2 * axisDotAxis) * jointToCenterDotAxis * jointToCenter
+                  + 2 * jointToCenterDotAxis * jointToCenterDotAxis * axis);
         // Gradient wrt the axis center of parallel term
         grad.segment<3>(offset + i * 6)
-            += -2 * parallelDiff * 2 * (axis * axis.transpose())
-               * (axis * axis.transpose()) * jointToCenter;
+            += -2 * parallelDiff * 2 * (axisDotAxis * jointToCenterAlongAxis);
         // Gradient wrt the axis of parallel term
         grad.segment<3>(offset + i * 6 + 3)
             += -2 * parallelDiff
-               * (2 * axis * (axis.dot(jointToCenter))
-                      * (axis.dot(jointToCenter))
-                  + axis.dot(axis) * 2 * axis.dot(jointToCenter)
-                        * jointToCenter);
+               * (2 * jointToCenterAlongAxis * jointToCenterDotAxis
+                  + axisDotAxis * 2 * jointToCenterDotAxis * jointToCenter);
       }
     }
+
+    // Keep only the portion of the gradient wrt the normal vector that's
+    // perpendicular to the current normal
+    // Operate on the last timestep gradient, since that's now complete
+    Eigen::Vector3s axisDir
+        = mAxisLines.segment<3>((i - 1) * 6 + 3).normalized();
+    s_t dot = grad.segment<3>(offset + (i - 1) * 6 + 3).dot(axisDir);
+    grad.segment<3>(offset + (i - 1) * 6 + 3) -= axisDir * dot;
   }
+
   // Keep only the portion of the gradient wrt the normal vector that's
   // perpendicular to the current normal
-  for (int i = 0; i < mNumTimesteps; i++)
-  {
-    Eigen::Vector3s axisDir = mAxisLines.segment<3>(i * 6 + 3).normalized();
-    s_t dot = grad.segment<3>(offset + i * 6 + 3).dot(axisDir);
-    grad.segment<3>(offset + i * 6 + 3) -= axisDir * dot;
-  }
+  // Patch the last timestep gradient, since that never gets patched in the
+  // normal loop
+  Eigen::Vector3s axisDir
+      = mAxisLines.segment<3>((mNumTimesteps - 1) * 6 + 3).normalized();
+  s_t dot = grad.segment<3>(offset + (mNumTimesteps - 1) * 6 + 3).dot(axisDir);
+  grad.segment<3>(offset + (mNumTimesteps - 1) * 6 + 3) -= axisDir * dot;
 
   return grad;
 }

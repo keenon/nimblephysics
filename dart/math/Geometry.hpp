@@ -320,6 +320,12 @@ Eigen::Matrix3s expMapJacDeriv(const Eigen::Vector3s& _expmap, int _qi);
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi);
 
+/// \brief computes the gradient of expMapRot(screw * eps) wrt to eps
+Eigen::Matrix3s expMapMagGradient(const Eigen::Vector3s& screw);
+
+Eigen::Matrix3s finiteDifferenceExpMapMagGradient(
+    const Eigen::Vector3s& screw, bool useRidders = true);
+
 /// \brief computes the gradient of logMap(expMapRot(screw * eps) *
 /// expMapRot(original)) wrt to eps
 Eigen::Vector3s expMapNestedGradient(
@@ -334,6 +340,15 @@ Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
 /// \note When @f$|Log(R)| = @pi@f$, Exp(LogR(R) = Exp(-Log(R)).
 /// The implementation returns only the positive one.
 Eigen::Vector3s logMap(const Eigen::Matrix3s& _R);
+
+/// \brief Log mapping
+/// \note This gets the value of d/dt logMap(R), given R and d/dt R
+Eigen::Vector3s dLogMap(const Eigen::Matrix3s& R, const Eigen::Matrix3s& dR);
+
+Eigen::Vector3s finiteDifferenceDLogMap(
+    const Eigen::Matrix3s& R,
+    const Eigen::Matrix3s& dR,
+    bool useRidders = true);
 
 /// \brief Log mapping
 Eigen::Vector6s logMap(const Eigen::Isometry3s& _T);

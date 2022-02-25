@@ -54,7 +54,7 @@ using namespace simulation;
 
 #define LIE_GROUP_OPT_TOL 1e-12
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 /******************************************************************************/
 Eigen::Matrix4s toMatrixForm(const Eigen::Vector6s& v)
