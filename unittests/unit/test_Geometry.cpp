@@ -511,7 +511,7 @@ bool verifyContactPoint(
       edgeBPointGradient,
       edgeBDir,
       edgeBDirGradient);
-  if (!equals(analytical, finiteDiff, 1e-8))
+  if (!equals(analytical, finiteDiff, finiteDiff.norm() * 1e-8))
   {
     std::cout << "Edge-edge contact point derivatives failed!" << std::endl;
     std::cout << "Analytical Gradient:" << std::endl << analytical << std::endl;

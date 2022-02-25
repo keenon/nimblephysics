@@ -1,5 +1,6 @@
-#include "dart/math/FiniteDifference.hpp"
 #include "dart/neural/Mapping.hpp"
+
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/simulation/World.hpp"
 
@@ -27,7 +28,7 @@ void Mapping::equalsOrCrash(
     const std::string& name)
 {
   Eigen::MatrixXs diff = bruteForce - analytical;
-  double eps = 1e-8;
+  double eps = 4e-8;
   if (diff.maxCoeff() > eps || diff.minCoeff() < -eps)
   {
     std::cout << "Mapping Jacobian disagrees on " << name << ": " << std::endl;
@@ -128,18 +129,18 @@ Eigen::MatrixXs Mapping::finiteDifferenceRealPosToMappedPosJac(
 
   s_t eps = useRidders ? 1e-4 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedPos = originalPosWorld;
-      tweakedPos(dof) += eps;
-      world->setPositions(tweakedPos);
-      perturbed = getPositions(world);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPosWorld;
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        perturbed = getPositions(world);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   return result;
 }
@@ -154,18 +155,18 @@ Eigen::MatrixXs Mapping::finiteDifferenceRealVelToMappedPosJac(
 
   s_t eps = useRidders ? 1e-4 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedVel = originalVelWorld;
-      tweakedVel(dof) += eps;
-      world->setVelocities(tweakedVel);
-      perturbed = getPositions(world);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedVel = originalVelWorld;
+        tweakedVel(dof) += eps;
+        world->setVelocities(tweakedVel);
+        perturbed = getPositions(world);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   return result;
 }
@@ -180,18 +181,18 @@ Eigen::MatrixXs Mapping::finiteDifferenceRealVelToMappedVelJac(
 
   s_t eps = useRidders ? 1e-4 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedVel = originalVelWorld;
-      tweakedVel(dof) += eps;
-      world->setVelocities(tweakedVel);
-      perturbed = getVelocities(world);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedVel = originalVelWorld;
+        tweakedVel(dof) += eps;
+        world->setVelocities(tweakedVel);
+        perturbed = getVelocities(world);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   return result;
 }
@@ -206,18 +207,18 @@ Eigen::MatrixXs Mapping::finiteDifferenceRealPosToMappedVelJac(
 
   s_t eps = useRidders ? 1e-4 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      Eigen::VectorXs tweakedPos = originalPosWorld;
-      tweakedPos(dof) += eps;
-      world->setPositions(tweakedPos);
-      perturbed = getVelocities(world);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPosWorld;
+        tweakedPos(dof) += eps;
+        world->setPositions(tweakedPos);
+        perturbed = getVelocities(world);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   snapshot.restore();
   return result;
 }
@@ -239,7 +240,8 @@ Eigen::VectorXs Mapping::getVelocities(std::shared_ptr<simulation::World> world)
 }
 
 //==============================================================================
-Eigen::VectorXs Mapping::getControlForces(std::shared_ptr<simulation::World> world)
+Eigen::VectorXs Mapping::getControlForces(
+    std::shared_ptr<simulation::World> world)
 {
   Eigen::VectorXs forces = Eigen::VectorXs::Zero(getControlForceDim());
   getControlForcesInPlace(world, forces);
