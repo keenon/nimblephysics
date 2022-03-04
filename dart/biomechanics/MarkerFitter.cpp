@@ -643,7 +643,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
         [&](int a, int b) {
           // Sort by joint marker variability
           return jointInits[a].jointMarkerVariability.norm()
-                 < jointInits[b].jointMarkerVariability.norm();
+                 > jointInits[b].jointMarkerVariability.norm();
         });
     std::vector<int> inverseOrderedByJointVariability;
     inverseOrderedByJointVariability.resize(orderedByJointVariability.size());
