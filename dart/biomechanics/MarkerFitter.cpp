@@ -2855,6 +2855,13 @@ void MarkerFitter::findJointCenters(
   }
   */
 
+  if (initialization.poses.hasNaN())
+  {
+    std::cout << "IK initialization in findJointCenters() has NaNs!"
+              << std::endl;
+    exit(1);
+  }
+
   // 2. Actually compute the joint centers (multi threaded)
   std::vector<std::future<std::shared_ptr<SphereFitJointCenterProblem>>>
       futures;
@@ -2898,6 +2905,15 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
   Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
+#ifndef NDEBUG
+  if (x.hasNaN() || accum.hasNaN())
+  {
+    std::cout << "Got a NaN before init!" << std::endl;
+    std::cout << "x.hasNaN(): " << x.hasNaN() << std::endl;
+    std::cout << "accum.hasNaN(): " << accum.hasNaN() << std::endl;
+    exit(1);
+  }
+#endif
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
   for (int i = 0; i < 500; i++)
@@ -2905,6 +2921,17 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
     Eigen::VectorXs grad = problem->getGradient();
     accum += grad.cwiseProduct(grad);
     Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
+#ifndef NDEBUG
+    if (newX.hasNaN())
+    {
+      std::cout << "Got a NaN on iteration " << i << std::endl;
+      std::cout << "x.hasNaN(): " << x.hasNaN() << std::endl;
+      std::cout << "grad.hasNaN(): " << grad.hasNaN() << std::endl;
+      std::cout << "accum.hasNaN(): " << accum.hasNaN() << std::endl;
+      std::cout << "lr: " << lr << std::endl;
+      exit(1);
+    }
+#endif
     problem->unflatten(newX);
     s_t newLoss = problem->getLoss();
     if (newLoss < loss)
@@ -4150,6 +4177,8 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     mSmoothingLoss(
         0.1) // just to tie break when there's nothing better available
 {
+  mNumTimesteps = markerObservations.size();
+
   // 1. Figure out which markers are on BodyNode's adjacent to the joint
 
   for (auto pair : fitter->mMarkerMap)
@@ -4157,7 +4186,17 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     if (pair.second.first->getName() == joint->getParentBodyNode()->getName()
         || pair.second.first->getName() == joint->getChildBodyNode()->getName())
     {
-      mActiveMarkers.push_back(pair.first);
+      // Only add the markers if we see them observed at least once in the
+      // dataset. If it's never observed, then we'll end up having all sorts of
+      // divide by zeros
+      for (int i = 0; i < mNumTimesteps; i++)
+      {
+        if (mMarkerObservations[i].count(pair.first) > 0)
+        {
+          mActiveMarkers.push_back(pair.first);
+          break;
+        }
+      }
     }
   }
 
@@ -4174,8 +4213,6 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
   }
 
   // 2. Go through and initialize the problem
-
-  mNumTimesteps = markerObservations.size();
 
   mMarkerPositions
       = Eigen::MatrixXs::Zero(mActiveMarkers.size() * 3, mNumTimesteps);
@@ -4200,6 +4237,15 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
       std::string name = mActiveMarkers[j];
       if (mMarkerObservations[i].count(name) > 0)
       {
+#ifndef NDEBUG
+        if (mMarkerObservations[i][name].hasNaN())
+        {
+          std::cout << "MARKER NaN DETECTED!! timestep " << i << " name "
+                    << name << ": " << mMarkerObservations[i][name]
+                    << std::endl;
+          exit(1);
+        }
+#endif
         mMarkerPositions.block<3, 1>(j * 3, i) = mMarkerObservations[i][name];
         mMarkerObserved(j, i) = 1;
         mRadii(j)
@@ -4219,6 +4265,18 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
       mRadii(j) /= numRadiiObservations(j);
     }
   }
+
+#ifndef NDEBUG
+  if (mRadii.hasNaN())
+  {
+    std::cout << "mRadii.hasNaN(): " << mRadii.hasNaN() << std::endl;
+    std::cout << "mCenterPoints.hasNaN(): " << mCenterPoints.hasNaN()
+              << std::endl;
+    std::cout << "mRadii: " << mRadii << std::endl;
+    std::cout << "numRadiiObservations: " << numRadiiObservations << std::endl;
+    exit(1);
+  }
+#endif
 }
 
 //==============================================================================
@@ -4399,6 +4457,8 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
     mSmoothingCenterLoss(0.0),
     mSmoothingAxisLoss(0.01)
 {
+  mNumTimesteps = markerObservations.size();
+
   // 1. Figure out which markers are on BodyNode's adjacent to the joint
 
   for (auto pair : fitter->mMarkerMap)
@@ -4406,7 +4466,17 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
     if (pair.second.first->getName() == joint->getParentBodyNode()->getName()
         || pair.second.first->getName() == joint->getChildBodyNode()->getName())
     {
-      mActiveMarkers.push_back(pair.first);
+      // Only add the markers if we see them observed at least once in the
+      // dataset. If it's never observed, then we'll end up having all sorts of
+      // divide by zeros
+      for (int i = 0; i < mNumTimesteps; i++)
+      {
+        if (mMarkerObservations[i].count(pair.first) > 0)
+        {
+          mActiveMarkers.push_back(pair.first);
+          break;
+        }
+      }
     }
   }
 
@@ -4423,8 +4493,6 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
   }
 
   // 2. Go through and initialize the problem
-
-  mNumTimesteps = markerObservations.size();
 
   mMarkerPositions
       = Eigen::MatrixXs::Zero(mActiveMarkers.size() * 3, mNumTimesteps);
@@ -4737,10 +4805,13 @@ Eigen::VectorXs CylinderFitJointAxisProblem::getGradient()
     // Keep only the portion of the gradient wrt the normal vector that's
     // perpendicular to the current normal
     // Operate on the last timestep gradient, since that's now complete
-    Eigen::Vector3s axisDir
-        = mAxisLines.segment<3>((i - 1) * 6 + 3).normalized();
-    s_t dot = grad.segment<3>(offset + (i - 1) * 6 + 3).dot(axisDir);
-    grad.segment<3>(offset + (i - 1) * 6 + 3) -= axisDir * dot;
+    if (i > 0)
+    {
+      Eigen::Vector3s axisDir
+          = mAxisLines.segment<3>((i - 1) * 6 + 3).normalized();
+      s_t dot = grad.segment<3>(offset + (i - 1) * 6 + 3).dot(axisDir);
+      grad.segment<3>(offset + (i - 1) * 6 + 3) -= axisDir * dot;
+    }
   }
 
   // Keep only the portion of the gradient wrt the normal vector that's

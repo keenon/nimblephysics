@@ -244,7 +244,7 @@ C3D C3DLoader::loadC3D(const std::string& uri)
               * mocapDataScaleFactor,
           data.data().frame(t + startFrame).points().point(i).z()
               * mocapDataScaleFactor);
-      if (pt == Eigen::Vector3s::Zero())
+      if (pt == Eigen::Vector3s::Zero() || pt.hasNaN())
       {
         // Don't store points with all zeros, since those are "unobserved"
       }
