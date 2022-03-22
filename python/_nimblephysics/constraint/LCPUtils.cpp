@@ -41,7 +41,7 @@ namespace python {
 
 void LCPUtils(py::module& m)
 {
-  ::py::class_<dart::constraint::LcpInputs>(m, "LCPUtils");
+  ::py::class_<dart::constraint::LCPUtils>(m, "LCPUtils");
 }
 
 } // namespace python
