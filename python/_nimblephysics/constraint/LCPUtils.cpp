@@ -46,7 +46,7 @@ void LCPUtils(py::module& m)
       dart::constraint::LCPUtils,
       std::shared_ptr<dart::constraint::LCPUtils> >(m, "LCPUtils")
       .def(
-          "isLcpSolutionValid",
+          "isLCPSolutionValid",
           +[](dart::constraint::LCPUtils* self,
               const Eigen::MatrixXs& mA,
               const Eigen::VectorXs& mX,
@@ -55,7 +55,7 @@ void LCPUtils(py::module& m)
               const Eigen::VectorXs& mLo,
               const Eigen::VectorXi& mFIndex,
               bool ignoreFrictionIndices) {
-            self->isLcpSolutionValid(
+            self->isLCPSolutionValid(
                 mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
           },
           ::py::arg("A"),
