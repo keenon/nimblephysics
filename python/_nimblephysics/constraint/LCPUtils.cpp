@@ -48,23 +48,23 @@ void LCPUtils(py::module& m)
       .def(
           "isLCPSolutionValid",
           +[](dart::constraint::LCPUtils* self,
-              const Eigen::MatrixXs& mA,
-              const Eigen::VectorXs& mX,
-              const Eigen::VectorXs& mB,
-              const Eigen::VectorXs& mHi,
-              const Eigen::VectorXs& mLo,
-              const Eigen::VectorXi& mFIndex,
-              bool ignoreFrictionIndices) {
-            self->isLCPSolutionValid(
+              Eigen::MatrixXs mA,
+              Eigen::VectorXs mX,
+              Eigen::VectorXs mB,
+              Eigen::VectorXs mHi,
+              Eigen::VectorXs mLo,
+              Eigen::VectorXi mFIndex,
+              bool ignoreFrictionIndices) -> bool {
+            return self->isLCPSolutionValid(
                 mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
           },
-          ::py::arg("A"),
-          ::py::arg("x"),
-          ::py::arg("b"),
-          ::py::arg("hi"),
-          ::py::arg("lo"),
-          ::py::arg("fIndex"),
-          ::py::arg("ignoreFrictionIndices"));
+          ::py::arg("A") = Eigen::MatrixXs::Zero(3, 4),
+          ::py::arg("x") = Eigen::VectorXs::Zero(3),
+          ::py::arg("b") = Eigen::VectorXs::Zero(3),
+          ::py::arg("hi") = Eigen::VectorXs::Zero(3),
+          ::py::arg("lo") = Eigen::VectorXs::Zero(3),
+          ::py::arg("fIndex") = Eigen::VectorXi::Zero(3),
+          ::py::arg("ignoreFrictionIndices") = true);
 }
 
 } // namespace python
