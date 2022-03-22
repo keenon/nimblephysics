@@ -31,6 +31,7 @@
  */
 
 #include <dart/constraint/BoxedLcpSolver.hpp>
+#include <dart/constraint/LCPUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
@@ -41,7 +42,9 @@ namespace python {
 
 void LCPUtils(py::module& m)
 {
-  ::py::class_<dart::constraint::LCPUtils>(m, "LCPUtils");
+  ::py::class_<
+      dart::constraint::LCPUtils,
+      std::shared_ptr<dart::constraint::LCPUtils> >(m, "LCPUtils");
 }
 
 } // namespace python
