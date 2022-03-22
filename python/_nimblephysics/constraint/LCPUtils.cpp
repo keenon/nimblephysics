@@ -44,7 +44,27 @@ void LCPUtils(py::module& m)
 {
   ::py::class_<
       dart::constraint::LCPUtils,
-      std::shared_ptr<dart::constraint::LCPUtils> >(m, "LCPUtils");
+      std::shared_ptr<dart::constraint::LCPUtils> >(m, "LCPUtils")
+      .def(
+          "isLcpSolutionValid",
+          +[](dart::constraint::LCPUtils* self,
+              const Eigen::MatrixXs& mA,
+              const Eigen::VectorXs& mX,
+              const Eigen::VectorXs& mB,
+              const Eigen::VectorXs& mHi,
+              const Eigen::VectorXs& mLo,
+              const Eigen::VectorXi& mFIndex,
+              bool ignoreFrictionIndices) {
+            self->isLcpSolutionValid(
+                mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
+          },
+          ::py::arg("A"),
+          ::py::arg("x"),
+          ::py::arg("b"),
+          ::py::arg("hi"),
+          ::py::arg("lo"),
+          ::py::arg("fIndex"),
+          ::py::arg("ignoreFrictionIndices"));
 }
 
 } // namespace python
