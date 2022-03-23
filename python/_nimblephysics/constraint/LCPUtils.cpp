@@ -42,29 +42,16 @@ namespace python {
 
 void LCPUtils(py::module& m)
 {
-  ::py::class_<
-      dart::constraint::LCPUtils,
-      std::shared_ptr<dart::constraint::LCPUtils> >(m, "LCPUtils")
-      .def(
-          "isLCPSolutionValid",
-          +[](dart::constraint::LCPUtils* self,
-              Eigen::MatrixXs mA,
-              Eigen::VectorXs mX,
-              Eigen::VectorXs mB,
-              Eigen::VectorXs mHi,
-              Eigen::VectorXs mLo,
-              Eigen::VectorXi mFIndex,
-              bool ignoreFrictionIndices) -> bool {
-            return self->isLCPSolutionValid(
-                mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-          },
-          ::py::arg("A") = Eigen::MatrixXs::Zero(3, 4),
-          ::py::arg("x") = Eigen::VectorXs::Zero(3),
-          ::py::arg("b") = Eigen::VectorXs::Zero(3),
-          ::py::arg("hi") = Eigen::VectorXs::Zero(3),
-          ::py::arg("lo") = Eigen::VectorXs::Zero(3),
-          ::py::arg("fIndex") = Eigen::VectorXi::Zero(3),
-          ::py::arg("ignoreFrictionIndices") = true);
+  m.def(
+      "isLCPSolutionValid",
+      &dart::constraint::LCPUtils::isLCPSolutionValid,
+      ::py::arg("mA"),
+      ::py::arg("mX"),
+      ::py::arg("mB"),
+      ::py::arg("mHi"),
+      ::py::arg("mLo"),
+      ::py::arg("mFIndex"),
+      ::py::arg("ignoreFrictionIndices"));
 }
 
 } // namespace python
