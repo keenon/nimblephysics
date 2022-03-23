@@ -30,6 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/constraint/BoxedLcpSolver.hpp>
+#include <dart/constraint/LCPUtils.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,41 +40,18 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void ConstraintBase(py::module& sm);
-void JointConstraint(py::module& sm);
-void JointLimitConstraint(py::module& sm);
-void JointCoulombFrictionConstraint(py::module& sm);
-
-void BoxedLcpSolver(py::module& sm);
-void DantzigBoxedLcpSolver(py::module& sm);
-void PgsBoxedLcpSolver(py::module& sm);
-
-void ConstraintSolver(py::module& sm);
-void BoxedLcpConstraintSolver(py::module& sm);
-void ConstrainedGroup(py::module& sm);
-
-void LcpInputs(py::module& sm);
-void LCPUtils(py::module& sm);
-
-void dart_constraint(py::module& m)
+void LCPUtils(py::module& m)
 {
-  auto sm = m.def_submodule("constraint");
-
-  ConstraintBase(sm);
-  JointConstraint(sm);
-  JointLimitConstraint(sm);
-  JointCoulombFrictionConstraint(sm);
-
-  BoxedLcpSolver(sm);
-  DantzigBoxedLcpSolver(sm);
-  PgsBoxedLcpSolver(sm);
-
-  ConstraintSolver(sm);
-  BoxedLcpConstraintSolver(sm);
-  ConstrainedGroup(sm);
-
-  LcpInputs(sm);
-  LCPUtils(sm);
+  m.def(
+      "isLCPSolutionValid",
+      &dart::constraint::LCPUtils::isLCPSolutionValid,
+      ::py::arg("mA"),
+      ::py::arg("mX"),
+      ::py::arg("mB"),
+      ::py::arg("mHi"),
+      ::py::arg("mLo"),
+      ::py::arg("mFIndex"),
+      ::py::arg("ignoreFrictionIndices"));
 }
 
 } // namespace python
