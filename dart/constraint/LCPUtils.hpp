@@ -10,7 +10,7 @@
 namespace dart {
 namespace constraint {
 
-enum LcpSolutionType
+enum LCPSolutionType
 {
   SUCCESS,
   FAILURE
@@ -30,7 +30,7 @@ public:
       bool ignoreFrictionIndices);
 
   // This determines the type of a solution to an LCP problem.
-  static void getLCPSolutionType();
+  static LCPSolutionType getLCPSolutionType();
 
   /// This applies a simple algorithm to guess the solution to the LCP problem.
   /// It's not guaranteed to be correct, but it often can be if there is no

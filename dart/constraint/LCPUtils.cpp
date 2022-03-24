@@ -83,9 +83,9 @@ bool LCPUtils::isLCPSolutionValid(
 
 //==============================================================================
 /// This checks whether a solution to an LCP problem is valid.
-void LCPUtils::getLCPSolutionType()
+LCPSolutionType LCPUtils::getLCPSolutionType()
 {
-  // Doesn't do anything, yet.
+  return LCPSolutionType::FAILURE;
 }
 
 //==============================================================================
