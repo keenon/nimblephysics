@@ -53,6 +53,10 @@ void LCPUtils(py::module& m)
       ::py::arg("mFIndex"),
       ::py::arg("ignoreFrictionIndices"));
   m.def("getLCPSolutionType", &dart::constraint::LCPUtils::getLCPSolutionType);
+  ::py::enum_<dart::constraint::LCPSolutionType>(m, "LCPSolutionType")
+      .value("SUCCESS", dart::constraint::LCPSolutionType::SUCCESS)
+      .value("FAILURE", dart::constraint::LCPSolutionType::FAILURE)
+      .export_values();
 }
 
 } // namespace python
