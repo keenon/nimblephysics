@@ -42,8 +42,9 @@ namespace constraint {
 
 struct LcpResult
 {
-  // This is the solution to the LCP.
-  std::vector<s_t*> impulses;
+  // This is the solution to the LCP, a matrix of impulses with shape
+  // (numContacts, 3).
+  Eigen::MatrixXs impulses;
 };
 
 class BoxedLcpConstraintSolver : public ConstraintSolver
