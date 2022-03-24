@@ -349,7 +349,7 @@ LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
+Eigen::MatrixXs BoxedLcpConstraintSolver::solveLcp(
     LcpInputs lcpInputs, ConstrainedGroup& group)
 {
   const std::size_t numConstraints = group.getNumConstraints();
@@ -736,9 +736,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   }
 
   // Initialize the vector of constraint impulses we will eventually return.
-  // Each ith element of the vector will contain a pointer to the constraint
-  // impulse to be applied for the ith constraint.
-  std::vector<s_t*> constraintImpulses;
+  Eigen::MatrixXs constraintImpulses = Eigen::MatrixXs::Zero(numConstraints, 3);
 
   // Collect the final solved constraint impulses to apply per constraint.
   // TODO(mguo): Make impulse magnitudes all have 3 elements regardless of
@@ -748,6 +746,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
     const ConstraintBasePtr& constraint = group.getConstraint(i);
     if (constraint->isContactConstraint())
     {
+      s_t* lambda = mX.data() + mOffset[i];
+      constraintImpulses(i, 0) = lambda[0];
       std::shared_ptr<ContactConstraint> contactConstraint
           = std::static_pointer_cast<ContactConstraint>(constraint);
       // getContact() returns a const, which is generally what we want, but in
@@ -766,12 +766,14 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
           = contactConstraint->isFrictionOn();
       if (contactConstraint->isFrictionOn())
       {
+        constraintImpulses(i, 1) = lambda[1];
+        constraintImpulses(i, 2) = lambda[2];
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent1
-            = mX(mOffset[i] + 1);
+            = lambda[1];
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent2
-            = mX(mOffset[i] + 2);
+            = lambda[2];
         const ContactConstraint::TangentBasisMatrix D
             = contactConstraint->getTangentBasisMatrixODE(
                 contactConstraint->getContact().normal);
@@ -783,13 +785,12 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
             = D.col(1);
       }
     }
-    constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
   return constraintImpulses;
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
+Eigen::MatrixXs BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group)
 {
   LcpInputs lcpInputs = buildLcpInputs(group);
