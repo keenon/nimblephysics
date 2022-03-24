@@ -9,7 +9,26 @@ namespace dart {
 namespace constraint {
 
 //==============================================================================
+/// This checks whether a solution to an LCP problem is valid.
 bool LCPUtils::isLCPSolutionValid(
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mX,
+    const Eigen::VectorXs& mB,
+    const Eigen::VectorXs& mHi,
+    const Eigen::VectorXs& mLo,
+    const Eigen::VectorXi& mFIndex,
+    bool ignoreFrictionIndices)
+{
+  LCPSolutionType solutionType = getLCPSolutionType(
+      mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
+  if (solutionType == LCPSolutionType::SUCCESS)
+    return true;
+  return false;
+}
+
+//==============================================================================
+/// This checks whether a solution to an LCP problem is valid.
+LCPSolutionType LCPUtils::getLCPSolutionType(
     const Eigen::MatrixXs& mA,
     const Eigen::VectorXs& mX,
     const Eigen::VectorXs& mB,
@@ -28,7 +47,7 @@ bool LCPUtils::isLCPSolutionValid(
       if (ignoreFrictionIndices)
       {
         if (mX(i) != 0)
-          return false;
+          return LCPSolutionType::FAILURE_IGNORE_FRICTION;
         continue;
       }
       upperLimit *= mX(mFIndex(i));
@@ -55,28 +74,28 @@ bool LCPUtils::isLCPSolutionValid(
     else if (abs(mX(i) - lowerLimit) < tol)
     {
       if (v(i) < -tol)
-        return false;
+        return LCPSolutionType::FAILURE_LOWER_BOUND;
     }
     // If force is at the upper bound, velocity must be <= 0
     else if (abs(mX(i) - upperLimit) < tol)
     {
       if (v(i) > tol)
-        return false;
+        return LCPSolutionType::FAILURE_UPPER_BOUND;
     }
     // If force is within bounds, then velocity must be zero
     else if (mX(i) > lowerLimit && mX(i) < upperLimit)
     {
       if (abs(v(i)) > tol)
-        return false;
+        return LCPSolutionType::FAILURE_WITHIN_BOUNDS;
     }
     // If force is out of bounds, we're always illegal
     else
     {
-      return false;
+      return LCPSolutionType::FAILURE_OUT_OF_BOUNDS;
     }
   }
   // If we make it here, the solution is fine
-  return true;
+  return LCPSolutionType::SUCCESS;
 }
 
 //==============================================================================

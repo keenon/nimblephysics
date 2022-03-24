@@ -30,6 +30,9 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/constraint/BoxedLcpSolver.hpp>
+#include <dart/constraint/LCPUtils.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,41 +40,46 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void ConstraintBase(py::module& sm);
-void JointConstraint(py::module& sm);
-void JointLimitConstraint(py::module& sm);
-void JointCoulombFrictionConstraint(py::module& sm);
-
-void BoxedLcpSolver(py::module& sm);
-void DantzigBoxedLcpSolver(py::module& sm);
-void PgsBoxedLcpSolver(py::module& sm);
-
-void ConstraintSolver(py::module& sm);
-void BoxedLcpConstraintSolver(py::module& sm);
-void ConstrainedGroup(py::module& sm);
-
-void LcpInputs(py::module& sm);
-void LCPUtils(py::module& sm);
-
-void dart_constraint(py::module& m)
+void LCPUtils(py::module& m)
 {
-  auto sm = m.def_submodule("constraint");
-
-  ConstraintBase(sm);
-  JointConstraint(sm);
-  JointLimitConstraint(sm);
-  JointCoulombFrictionConstraint(sm);
-
-  BoxedLcpSolver(sm);
-  DantzigBoxedLcpSolver(sm);
-  PgsBoxedLcpSolver(sm);
-
-  ConstraintSolver(sm);
-  BoxedLcpConstraintSolver(sm);
-  ConstrainedGroup(sm);
-
-  LcpInputs(sm);
-  LCPUtils(sm);
+  m.def(
+      "isLCPSolutionValid",
+      &dart::constraint::LCPUtils::isLCPSolutionValid,
+      ::py::arg("mA"),
+      ::py::arg("mX"),
+      ::py::arg("mB"),
+      ::py::arg("mHi"),
+      ::py::arg("mLo"),
+      ::py::arg("mFIndex"),
+      ::py::arg("ignoreFrictionIndices"));
+  m.def(
+      "getLCPSolutionType",
+      &dart::constraint::LCPUtils::getLCPSolutionType,
+      ::py::arg("mA"),
+      ::py::arg("mX"),
+      ::py::arg("mB"),
+      ::py::arg("mHi"),
+      ::py::arg("mLo"),
+      ::py::arg("mFIndex"),
+      ::py::arg("ignoreFrictionIndices"));
+  ::py::enum_<dart::constraint::LCPSolutionType>(m, "LCPSolutionType")
+      .value("SUCCESS", dart::constraint::LCPSolutionType::SUCCESS)
+      .value(
+          "FAILURE_IGNORE_FRICTION",
+          dart::constraint::LCPSolutionType::FAILURE_IGNORE_FRICTION)
+      .value(
+          "FAILURE_LOWER_BOUND",
+          dart::constraint::LCPSolutionType::FAILURE_LOWER_BOUND)
+      .value(
+          "FAILURE_UPPER_BOUND",
+          dart::constraint::LCPSolutionType::FAILURE_UPPER_BOUND)
+      .value(
+          "FAILURE_WITHIN_BOUNDS",
+          dart::constraint::LCPSolutionType::FAILURE_WITHIN_BOUNDS)
+      .value(
+          "FAILURE_OUT_OF_BOUNDS",
+          dart::constraint::LCPSolutionType::FAILURE_OUT_OF_BOUNDS)
+      .export_values();
 }
 
 } // namespace python
