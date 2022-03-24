@@ -21,65 +21,8 @@ bool LCPUtils::isLCPSolutionValid(
 {
   LCPSolutionType solutionType = getLCPSolutionType(
       mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-  (void)solutionType; // temporarily suppress unused variable warnings
-  Eigen::VectorXs v = mA * mX - mB;
-  for (int i = 0; i < mX.size(); i++)
-  {
-    s_t upperLimit = mHi(i);
-    s_t lowerLimit = mLo(i);
-    if (mFIndex(i) != -1)
-    {
-      if (ignoreFrictionIndices)
-      {
-        if (mX(i) != 0)
-          return false;
-        continue;
-      }
-      upperLimit *= mX(mFIndex(i));
-      lowerLimit *= mX(mFIndex(i));
-    }
-
-    const s_t tol = 1e-5;
-
-    /// Solves constriant impulses for a constrained group. The LCP formulation
-    /// setting that this function solve is A*x = b + w where each x[i], w[i]
-    /// satisfies one of
-    ///   (1) x = lo, w >= 0
-    ///   (2) x = hi, w <= 0
-    ///   (3) lo < x < hi, w = 0
-
-    // If force has a zero bound, and we're at a zero bound (this is common with
-    // friction being upper-bounded by a near-zero normal force) then allow
-    // velocity in either direction.
-    if (abs(lowerLimit) < tol && abs(upperLimit) < tol && abs(mX(i)) < tol)
-    {
-      // This is always allowed
-    }
-    // If force is at the lower bound, velocity must be >= 0
-    else if (abs(mX(i) - lowerLimit) < tol)
-    {
-      if (v(i) < -tol)
-        return false;
-    }
-    // If force is at the upper bound, velocity must be <= 0
-    else if (abs(mX(i) - upperLimit) < tol)
-    {
-      if (v(i) > tol)
-        return false;
-    }
-    // If force is within bounds, then velocity must be zero
-    else if (mX(i) > lowerLimit && mX(i) < upperLimit)
-    {
-      if (abs(v(i)) > tol)
-        return false;
-    }
-    // If force is out of bounds, we're always illegal
-    else
-    {
-      return false;
-    }
-  }
-  // If we make it here, the solution is fine
+  if (solutionType == LCPSolutionType::FAILURE)
+    return false;
   return true;
 }
 
