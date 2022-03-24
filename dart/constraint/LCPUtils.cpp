@@ -21,9 +21,9 @@ bool LCPUtils::isLCPSolutionValid(
 {
   LCPSolutionType solutionType = getLCPSolutionType(
       mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-  if (solutionType == LCPSolutionType::FAILURE)
-    return false;
-  return true;
+  if (solutionType == LCPSolutionType::SUCCESS)
+    return true;
+  return false;
 }
 
 //==============================================================================
@@ -47,7 +47,7 @@ LCPSolutionType LCPUtils::getLCPSolutionType(
       if (ignoreFrictionIndices)
       {
         if (mX(i) != 0)
-          return LCPSolutionType::FAILURE;
+          return LCPSolutionType::FAILURE_IGNORE_FRICTION;
         continue;
       }
       upperLimit *= mX(mFIndex(i));
@@ -74,24 +74,24 @@ LCPSolutionType LCPUtils::getLCPSolutionType(
     else if (abs(mX(i) - lowerLimit) < tol)
     {
       if (v(i) < -tol)
-        return LCPSolutionType::FAILURE;
+        return LCPSolutionType::FAILURE_LOWER_BOUND;
     }
     // If force is at the upper bound, velocity must be <= 0
     else if (abs(mX(i) - upperLimit) < tol)
     {
       if (v(i) > tol)
-        return LCPSolutionType::FAILURE;
+        return LCPSolutionType::FAILURE_UPPER_BOUND;
     }
     // If force is within bounds, then velocity must be zero
     else if (mX(i) > lowerLimit && mX(i) < upperLimit)
     {
       if (abs(v(i)) > tol)
-        return LCPSolutionType::FAILURE;
+        return LCPSolutionType::FAILURE_WITHIN_BOUNDS;
     }
     // If force is out of bounds, we're always illegal
     else
     {
-      return LCPSolutionType::FAILURE;
+      return LCPSolutionType::FAILURE_OUT_OF_BOUNDS;
     }
   }
   // If we make it here, the solution is fine

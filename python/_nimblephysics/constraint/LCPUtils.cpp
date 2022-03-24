@@ -64,7 +64,21 @@ void LCPUtils(py::module& m)
       ::py::arg("ignoreFrictionIndices"));
   ::py::enum_<dart::constraint::LCPSolutionType>(m, "LCPSolutionType")
       .value("SUCCESS", dart::constraint::LCPSolutionType::SUCCESS)
-      .value("FAILURE", dart::constraint::LCPSolutionType::FAILURE)
+      .value(
+          "FAILURE_IGNORE_FRICTION",
+          dart::constraint::LCPSolutionType::FAILURE_IGNORE_FRICTION)
+      .value(
+          "FAILURE_LOWER_BOUND",
+          dart::constraint::LCPSolutionType::FAILURE_LOWER_BOUND)
+      .value(
+          "FAILURE_UPPER_BOUND",
+          dart::constraint::LCPSolutionType::FAILURE_UPPER_BOUND)
+      .value(
+          "FAILURE_WITHIN_BOUNDS",
+          dart::constraint::LCPSolutionType::FAILURE_WITHIN_BOUNDS)
+      .value(
+          "FAILURE_OUT_OF_BOUNDS",
+          dart::constraint::LCPSolutionType::FAILURE_OUT_OF_BOUNDS)
       .export_values();
 }
 
