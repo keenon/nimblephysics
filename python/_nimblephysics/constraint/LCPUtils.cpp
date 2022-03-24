@@ -52,6 +52,7 @@ void LCPUtils(py::module& m)
       ::py::arg("mLo"),
       ::py::arg("mFIndex"),
       ::py::arg("ignoreFrictionIndices"));
+  m.def("getLCPSolutionType", &dart::constraint::LCPUtils::getLCPSolutionType);
 }
 
 } // namespace python
