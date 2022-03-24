@@ -40,6 +40,13 @@
 namespace dart {
 namespace constraint {
 
+struct LcpResult
+{
+  // This is the solution to the LCP, a matrix of impulses with shape
+  // (numContacts, 3).
+  Eigen::MatrixXs impulses;
+};
+
 class BoxedLcpConstraintSolver : public ConstraintSolver
 {
 public:
@@ -120,7 +127,7 @@ public:
   LcpInputs buildLcpInputs(ConstrainedGroup& group);
 
   /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
-  Eigen::MatrixXs solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
+  LcpResult solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
 
 protected:
   /// Boxed LCP solver

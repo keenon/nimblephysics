@@ -349,7 +349,7 @@ LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 }
 
 //==============================================================================
-Eigen::MatrixXs BoxedLcpConstraintSolver::solveLcp(
+LcpResult BoxedLcpConstraintSolver::solveLcp(
     LcpInputs lcpInputs, ConstrainedGroup& group)
 {
   const std::size_t numConstraints = group.getNumConstraints();
@@ -786,7 +786,9 @@ Eigen::MatrixXs BoxedLcpConstraintSolver::solveLcp(
       }
     }
   }
-  return constraintImpulses;
+  LcpResult result;
+  result.impulses = constraintImpulses;
+  return result;
 }
 
 //==============================================================================
@@ -794,7 +796,8 @@ Eigen::MatrixXs BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group)
 {
   LcpInputs lcpInputs = buildLcpInputs(group);
-  return solveLcp(lcpInputs, group);
+  LcpResult result = solveLcp(lcpInputs, group);
+  return result.impulses;
 }
 
 //==============================================================================
