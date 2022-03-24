@@ -10,6 +10,12 @@
 namespace dart {
 namespace constraint {
 
+enum LcpSolutionType
+{
+  SUCCESS,
+  FAILURE
+};
+
 class LCPUtils
 {
 public:
