@@ -349,7 +349,7 @@ LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
+LcpResult BoxedLcpConstraintSolver::solveLcp(
     LcpInputs lcpInputs, ConstrainedGroup& group)
 {
   const std::size_t numConstraints = group.getNumConstraints();
@@ -785,7 +785,9 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
     }
     constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
-  return constraintImpulses;
+  LcpResult result;
+  result.impulses = constraintImpulses;
+  return result;
 }
 
 //==============================================================================
@@ -793,7 +795,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group)
 {
   LcpInputs lcpInputs = buildLcpInputs(group);
-  return solveLcp(lcpInputs, group);
+  LcpResult result = solveLcp(lcpInputs, group);
+  return result.impulses;
 }
 
 //==============================================================================

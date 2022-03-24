@@ -88,9 +88,13 @@ void BoxedLcpConstraintSolver(py::module& m)
           "solveLcp",
           +[](dart::constraint::BoxedLcpConstraintSolver* self,
               dart::constraint::LcpInputs lcpInputs,
-              dart::constraint::ConstrainedGroup& group) -> std::vector<s_t*> {
+              dart::constraint::ConstrainedGroup& group)
+              -> dart::constraint::LcpResult {
             return self->solveLcp(lcpInputs, group);
           });
+  ::py::class_<dart::constraint::LcpResult>(m, "LcpResult")
+      .def(::py::init<>())
+      .def_readwrite("impulses", &constraint::LcpResult::impulses);
 }
 
 } // namespace python

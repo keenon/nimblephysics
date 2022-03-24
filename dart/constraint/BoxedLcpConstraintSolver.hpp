@@ -40,6 +40,12 @@
 namespace dart {
 namespace constraint {
 
+struct LcpResult
+{
+  // This is the solution to the LCP.
+  std::vector<s_t*> impulses;
+};
+
 class BoxedLcpConstraintSolver : public ConstraintSolver
 {
 public:
@@ -120,7 +126,7 @@ public:
   LcpInputs buildLcpInputs(ConstrainedGroup& group);
 
   /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
-  std::vector<s_t*> solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
+  LcpResult solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
 
 protected:
   /// Boxed LCP solver
