@@ -19,7 +19,7 @@ bool LCPUtils::isLCPSolutionValid(
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
-  getLCPSolutionType();
+  getLCPSolutionType(mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
   Eigen::VectorXs v = mA * mX - mB;
   for (int i = 0; i < mX.size(); i++)
   {
@@ -83,8 +83,22 @@ bool LCPUtils::isLCPSolutionValid(
 
 //==============================================================================
 /// This checks whether a solution to an LCP problem is valid.
-LCPSolutionType LCPUtils::getLCPSolutionType()
+LCPSolutionType LCPUtils::getLCPSolutionType(
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mX,
+    const Eigen::VectorXs& mB,
+    const Eigen::VectorXs& mHi,
+    const Eigen::VectorXs& mLo,
+    const Eigen::VectorXi& mFIndex,
+    bool ignoreFrictionIndices)
 {
+  Eigen::MatrixXs mANew = mA;
+  Eigen::VectorXs mXNew = mX;
+  Eigen::VectorXs mBNew = mB;
+  Eigen::VectorXs mHiNew = mHi;
+  Eigen::VectorXs mLoNew = mLo;
+  Eigen::VectorXi mFIndexNew = mFIndex;
+  ignoreFrictionIndices = !ignoreFrictionIndices;
   return LCPSolutionType::FAILURE;
 }
 
