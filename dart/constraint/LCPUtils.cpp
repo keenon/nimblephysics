@@ -9,6 +9,7 @@ namespace dart {
 namespace constraint {
 
 //==============================================================================
+/// This checks whether a solution to an LCP problem is valid.
 bool LCPUtils::isLCPSolutionValid(
     const Eigen::MatrixXs& mA,
     const Eigen::VectorXs& mX,
@@ -18,6 +19,7 @@ bool LCPUtils::isLCPSolutionValid(
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
+  getLCPSolutionType();
   Eigen::VectorXs v = mA * mX - mB;
   for (int i = 0; i < mX.size(); i++)
   {
@@ -77,6 +79,13 @@ bool LCPUtils::isLCPSolutionValid(
   }
   // If we make it here, the solution is fine
   return true;
+}
+
+//==============================================================================
+/// This checks whether a solution to an LCP problem is valid.
+void LCPUtils::getLCPSolutionType()
+{
+  // Doesn't do anything, yet.
 }
 
 //==============================================================================
