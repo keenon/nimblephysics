@@ -76,7 +76,7 @@ void LCPUtils(py::module& m)
       ::py::arg("ignoreFrictionIndices"));
   m.def(
       "computeSlackFromLCPSolution",
-      &dart::constraint::LCPUtils::getLCPSolutionType,
+      &dart::constraint::LCPUtils::computeSlackFromLCPSolution,
       ::py::arg("mA"),
       ::py::arg("mX"),
       ::py::arg("mB"));
