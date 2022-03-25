@@ -54,6 +54,12 @@ public:
       const Eigen::VectorXi& mFIndex,
       bool ignoreFrictionIndices);
 
+  // This computes the slack variable from the LCP solution.
+  static Eigen::VectorXs computeSlackFromLCPSolution(
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mX,
+      const Eigen::VectorXs& mB);
+
   /// This applies a simple algorithm to guess the solution to the LCP problem.
   /// It's not guaranteed to be correct, but it often can be if there is no
   /// sliding friction on this timestep.
