@@ -19,16 +19,21 @@ bool LCPUtils::isLCPSolutionValid(
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
-  LCPSolutionType solutionType = getLCPSolutionType(
+  std::vector<LCPSolutionType> solutionTypes = getLCPSolutionTypes(
       mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-  if (solutionType == LCPSolutionType::SUCCESS)
-    return true;
-  return false;
+
+  for (int i = 0; i < solutionTypes.size(); i++)
+  {
+    LCPSolutionType solutionType = solutionTypes[i];
+    if (solutionType != LCPSolutionType::SUCCESS)
+      return false;
+  }
+  return true;
 }
 
 //==============================================================================
-/// This checks whether a solution to an LCP problem is valid.
-LCPSolutionType LCPUtils::getLCPSolutionType(
+/// This determines the solution types of an LCP problem.
+std::vector<LCPSolutionType> LCPUtils::getLCPSolutionTypes(
     const Eigen::MatrixXs& mA,
     const Eigen::VectorXs& mX,
     const Eigen::VectorXs& mB,
@@ -38,61 +43,87 @@ LCPSolutionType LCPUtils::getLCPSolutionType(
     bool ignoreFrictionIndices)
 {
   Eigen::VectorXs v = mA * mX - mB;
+
+  std::vector<LCPSolutionType> solutionTypes;
+
   for (int i = 0; i < mX.size(); i++)
   {
-    s_t upperLimit = mHi(i);
-    s_t lowerLimit = mLo(i);
-    if (mFIndex(i) != -1)
-    {
-      if (ignoreFrictionIndices)
-      {
-        if (mX(i) != 0)
-          return LCPSolutionType::FAILURE_IGNORE_FRICTION;
-        continue;
-      }
-      upperLimit *= mX(mFIndex(i));
-      lowerLimit *= mX(mFIndex(i));
-    }
+    LCPSolutionType solType = getLCPSolutionType(
+        i, mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
+    solutionTypes.push_back(solType);
 
-    const s_t tol = 1e-5;
+    // if (solType != LCPSolutionType::SUCCESS)
+    // return solType;
+  }
+  return solutionTypes;
+  // return LCPSolutionType::SUCCESS;
+}
 
-    /// Solves constriant impulses for a constrained group. The LCP formulation
-    /// setting that this function solve is A*x = b + w where each x[i], w[i]
-    /// satisfies one of
-    ///   (1) x = lo, w >= 0
-    ///   (2) x = hi, w <= 0
-    ///   (3) lo < x < hi, w = 0
+//==============================================================================
+/// This determines the type of a solution to an LCP problem.
+LCPSolutionType LCPUtils::getLCPSolutionType(
+    int i,
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mX,
+    const Eigen::VectorXs& mB,
+    const Eigen::VectorXs& mHi,
+    const Eigen::VectorXs& mLo,
+    const Eigen::VectorXi& mFIndex,
+    bool ignoreFrictionIndices)
+{
+  Eigen::VectorXs v = mA * mX - mB;
+  s_t upperLimit = mHi(i);
+  s_t lowerLimit = mLo(i);
+  if (mFIndex(i) != -1)
+  {
+    if (ignoreFrictionIndices)
+    {
+      if (mX(i) != 0)
+        return LCPSolutionType::FAILURE_IGNORE_FRICTION;
+      return LCPSolutionType::SUCCESS;
+    }
+    upperLimit *= mX(mFIndex(i));
+    lowerLimit *= mX(mFIndex(i));
+  }
 
-    // If force has a zero bound, and we're at a zero bound (this is common with
-    // friction being upper-bounded by a near-zero normal force) then allow
-    // velocity in either direction.
-    if (abs(lowerLimit) < tol && abs(upperLimit) < tol && abs(mX(i)) < tol)
-    {
-      // This is always allowed
-    }
-    // If force is at the lower bound, velocity must be >= 0
-    else if (abs(mX(i) - lowerLimit) < tol)
-    {
-      if (v(i) < -tol)
-        return LCPSolutionType::FAILURE_LOWER_BOUND;
-    }
-    // If force is at the upper bound, velocity must be <= 0
-    else if (abs(mX(i) - upperLimit) < tol)
-    {
-      if (v(i) > tol)
-        return LCPSolutionType::FAILURE_UPPER_BOUND;
-    }
-    // If force is within bounds, then velocity must be zero
-    else if (mX(i) > lowerLimit && mX(i) < upperLimit)
-    {
-      if (abs(v(i)) > tol)
-        return LCPSolutionType::FAILURE_WITHIN_BOUNDS;
-    }
-    // If force is out of bounds, we're always illegal
-    else
-    {
-      return LCPSolutionType::FAILURE_OUT_OF_BOUNDS;
-    }
+  const s_t tol = 1e-5;
+
+  /// Solves constriant impulses for a constrained group. The LCP formulation
+  /// setting that this function solve is A*x = b + w where each x[i], w[i]
+  /// satisfies one of
+  ///   (1) x = lo, w >= 0
+  ///   (2) x = hi, w <= 0
+  ///   (3) lo < x < hi, w = 0
+
+  // If force has a zero bound, and we're at a zero bound (this is common with
+  // friction being upper-bounded by a near-zero normal force) then allow
+  // velocity in either direction.
+  if (abs(lowerLimit) < tol && abs(upperLimit) < tol && abs(mX(i)) < tol)
+  {
+    // This is always allowed
+  }
+  // If force is at the lower bound, velocity must be >= 0
+  else if (abs(mX(i) - lowerLimit) < tol)
+  {
+    if (v(i) < -tol)
+      return LCPSolutionType::FAILURE_LOWER_BOUND;
+  }
+  // If force is at the upper bound, velocity must be <= 0
+  else if (abs(mX(i) - upperLimit) < tol)
+  {
+    if (v(i) > tol)
+      return LCPSolutionType::FAILURE_UPPER_BOUND;
+  }
+  // If force is within bounds, then velocity must be zero
+  else if (mX(i) > lowerLimit && mX(i) < upperLimit)
+  {
+    if (abs(v(i)) > tol)
+      return LCPSolutionType::FAILURE_WITHIN_BOUNDS;
+  }
+  // If force is out of bounds, we're always illegal
+  else
+  {
+    return LCPSolutionType::FAILURE_OUT_OF_BOUNDS;
   }
   // If we make it here, the solution is fine
   return LCPSolutionType::SUCCESS;

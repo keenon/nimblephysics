@@ -34,6 +34,7 @@
 #include <dart/constraint/LCPUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -53,8 +54,19 @@ void LCPUtils(py::module& m)
       ::py::arg("mFIndex"),
       ::py::arg("ignoreFrictionIndices"));
   m.def(
+      "getLCPSolutionTypes",
+      &dart::constraint::LCPUtils::getLCPSolutionTypes,
+      ::py::arg("mA"),
+      ::py::arg("mX"),
+      ::py::arg("mB"),
+      ::py::arg("mHi"),
+      ::py::arg("mLo"),
+      ::py::arg("mFIndex"),
+      ::py::arg("ignoreFrictionIndices"));
+  m.def(
       "getLCPSolutionType",
       &dart::constraint::LCPUtils::getLCPSolutionType,
+      ::py::arg("i"),
       ::py::arg("mA"),
       ::py::arg("mX"),
       ::py::arg("mB"),
