@@ -51,12 +51,8 @@ std::vector<LCPSolutionType> LCPUtils::getLCPSolutionTypes(
     LCPSolutionType solType = getLCPSolutionType(
         i, mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
     solutionTypes.push_back(solType);
-
-    // if (solType != LCPSolutionType::SUCCESS)
-    // return solType;
   }
   return solutionTypes;
-  // return LCPSolutionType::SUCCESS;
 }
 
 //==============================================================================
@@ -71,7 +67,7 @@ LCPSolutionType LCPUtils::getLCPSolutionType(
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
-  Eigen::VectorXs v = mA * mX - mB;
+  Eigen::VectorXs v = computeSlackFromLCPSolution(mA, mX, mB);
   s_t upperLimit = mHi(i);
   s_t lowerLimit = mLo(i);
   if (mFIndex(i) != -1)
@@ -127,6 +123,16 @@ LCPSolutionType LCPUtils::getLCPSolutionType(
   }
   // If we make it here, the solution is fine
   return LCPSolutionType::SUCCESS;
+}
+
+//==============================================================================
+/// This computes the slack variable from the LCP solution.
+Eigen::VectorXs LCPUtils::computeSlackFromLCPSolution(
+    const Eigen::MatrixXs& mA,
+    const Eigen::VectorXs& mX,
+    const Eigen::VectorXs& mB)
+{
+  return mA * mX - mB;
 }
 
 //==============================================================================
