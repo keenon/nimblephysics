@@ -19,16 +19,21 @@ bool LCPUtils::isLCPSolutionValid(
     const Eigen::VectorXi& mFIndex,
     bool ignoreFrictionIndices)
 {
-  LCPSolutionType solutionType = getLCPSolutionTypes(
+  std::vector<LCPSolutionType> solutionTypes = getLCPSolutionTypes(
       mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-  if (solutionType == LCPSolutionType::SUCCESS)
-    return true;
-  return false;
+
+  for (int i = 0; i < solutionTypes.size(); i++)
+  {
+    LCPSolutionType solutionType = solutionTypes[i];
+    if (solutionType != LCPSolutionType::SUCCESS)
+      return false;
+  }
+  return true;
 }
 
 //==============================================================================
 /// This determines the solution types of an LCP problem.
-LCPSolutionType LCPUtils::getLCPSolutionTypes(
+std::vector<LCPSolutionType> LCPUtils::getLCPSolutionTypes(
     const Eigen::MatrixXs& mA,
     const Eigen::VectorXs& mX,
     const Eigen::VectorXs& mB,
@@ -38,14 +43,20 @@ LCPSolutionType LCPUtils::getLCPSolutionTypes(
     bool ignoreFrictionIndices)
 {
   Eigen::VectorXs v = mA * mX - mB;
+
+  std::vector<LCPSolutionType> solutionTypes;
+
   for (int i = 0; i < mX.size(); i++)
   {
     LCPSolutionType solType = getLCPSolutionType(
         i, mA, mX, mB, mHi, mLo, mFIndex, ignoreFrictionIndices);
-    if (solType != LCPSolutionType::SUCCESS)
-      return solType;
+    solutionTypes.push_back(solType);
+
+    // if (solType != LCPSolutionType::SUCCESS)
+    // return solType;
   }
-  return LCPSolutionType::SUCCESS;
+  return solutionTypes;
+  // return LCPSolutionType::SUCCESS;
 }
 
 //==============================================================================

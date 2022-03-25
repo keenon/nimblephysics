@@ -34,7 +34,7 @@ public:
       bool ignoreFrictionIndices);
 
   // This determines the solution types of an LCP problem.
-  static LCPSolutionType getLCPSolutionTypes(
+  static std::vector<LCPSolutionType> getLCPSolutionTypes(
       const Eigen::MatrixXs& mA,
       const Eigen::VectorXs& mX,
       const Eigen::VectorXs& mB,
