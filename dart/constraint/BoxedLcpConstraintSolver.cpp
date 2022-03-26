@@ -792,6 +792,7 @@ LcpResult BoxedLcpConstraintSolver::solveLcp(
     }
   }
   LcpResult result;
+  result.success = success;
   result.impulses = constraintImpulses;
   result.hadToIgnoreFrictionToSolve = hadToIgnoreFrictionToSolve;
   return result;
