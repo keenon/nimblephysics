@@ -46,6 +46,9 @@ struct LcpResult
   // (numContacts, 3).
   Eigen::MatrixXs impulses;
 
+  // Whether Nimble says that it succeeded at solving the LCP.
+  bool success;
+
   // Whether we fell back to solving a frictionless LCP.
   bool hadToIgnoreFrictionToSolve;
 };

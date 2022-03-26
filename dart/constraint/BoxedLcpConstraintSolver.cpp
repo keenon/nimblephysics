@@ -791,6 +791,7 @@ LcpResult BoxedLcpConstraintSolver::solveLcp(
     constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
   LcpResult result;
+  result.success = success;
   result.impulses = constraintImpulses;
   result.hadToIgnoreFrictionToSolve = hadToIgnoreFrictionToSolve;
   return result;
