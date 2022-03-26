@@ -45,6 +45,9 @@ struct LcpResult
   // This is the solution to the LCP, a matrix of impulses with shape
   // (numContacts, 3).
   Eigen::MatrixXs impulses;
+
+  // Whether we fell back to solving a frictionless LCP.
+  bool hadToIgnoreFrictionToSolve;
 };
 
 class BoxedLcpConstraintSolver : public ConstraintSolver

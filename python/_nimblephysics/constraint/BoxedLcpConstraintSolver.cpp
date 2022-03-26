@@ -95,7 +95,10 @@ void BoxedLcpConstraintSolver(py::module& m)
           });
   ::py::class_<dart::constraint::LcpResult>(m, "LcpResult")
       .def(::py::init<>())
-      .def_readwrite("impulses", &constraint::LcpResult::impulses);
+      .def_readwrite("impulses", &constraint::LcpResult::impulses)
+      .def_readwrite(
+          "hadToIgnoreFrictionToSolve",
+          &constraint::LcpResult::hadToIgnoreFrictionToSolve);
 }
 
 } // namespace python
