@@ -88,10 +88,14 @@ void BoxedLcpConstraintSolver(py::module& m)
           "solveLcp",
           +[](dart::constraint::BoxedLcpConstraintSolver* self,
               dart::constraint::LcpInputs lcpInputs,
-              dart::constraint::ConstrainedGroup& group)
-              -> dart::constraint::LcpResult {
-            return self->solveLcp(lcpInputs, group);
-          });
+              dart::constraint::ConstrainedGroup& group,
+              bool disableFrictionlessFallback) -> dart::constraint::LcpResult {
+            return self->solveLcp(
+                lcpInputs, group, disableFrictionlessFallback);
+          },
+          ::py::arg("lcpInputs"),
+          ::py::arg("group"),
+          ::py::arg("disableFrictionlessFallback") = false);
   ::py::class_<dart::constraint::LcpResult>(m, "LcpResult")
       .def(::py::init<>())
       .def_readwrite("impulses", &constraint::LcpResult::impulses)
