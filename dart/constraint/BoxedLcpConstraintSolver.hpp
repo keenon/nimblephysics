@@ -130,7 +130,10 @@ public:
   LcpInputs buildLcpInputs(ConstrainedGroup& group);
 
   /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
-  LcpResult solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
+  LcpResult solveLcp(
+      LcpInputs lcpInputs,
+      ConstrainedGroup& group,
+      bool disableFrictionlessFallback = false);
 
 protected:
   /// Boxed LCP solver
