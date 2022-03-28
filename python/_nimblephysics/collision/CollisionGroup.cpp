@@ -96,6 +96,12 @@ void CollisionGroup(py::module& m)
             self->removeShapeFramesOf();
           })
       .def(
+          "removeShapeFramesOf",
+          +[](dart::collision::CollisionGroup* self,
+              dart::dynamics::BodyNode* bodyNode) {
+            self->removeShapeFramesOf(bodyNode);
+          })
+      .def(
           "removeAllShapeFrames",
           +[](dart::collision::CollisionGroup* self) {
             self->removeAllShapeFrames();
