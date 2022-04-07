@@ -67,9 +67,9 @@ using std::sin;
 //------------------------------------------------------------------------------
 namespace Eigen {
 
-using Vector9s = Matrix<s_t, 9, 1>;
-using Vector6s = Matrix<s_t, 6, 1>;
-using Matrix6s = Matrix<s_t, 6, 6>;
+// using Vector9s = Matrix<s_t, 9, 1>;
+// using Vector6s = Matrix<s_t, 6, 1>;
+// using Matrix6s = Matrix<s_t, 6, 6>;
 
 typedef Matrix<s_t, Dynamic, Dynamic> MatrixXs;
 typedef Matrix<s_t, Dynamic, 1> VectorXs;
@@ -79,6 +79,7 @@ typedef Matrix<s_t, 3, 1> Vector3s;
 typedef Matrix<s_t, 4, 1> Vector4s;
 typedef Matrix<s_t, 5, 1> Vector5s;
 typedef Matrix<s_t, 6, 1> Vector6s;
+typedef Matrix<s_t, 9, 1> Vector9s;
 typedef Matrix<s_t, 2, 2> Matrix2s;
 typedef Matrix<s_t, 3, 3> Matrix3s;
 typedef Matrix<s_t, 4, 4> Matrix4s;
