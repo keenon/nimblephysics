@@ -7,11 +7,18 @@ IKErrorReport::IKErrorReport(
     std::shared_ptr<dynamics::Skeleton> skel,
     dynamics::MarkerMap markers,
     Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> observations)
+    std::vector<std::map<std::string, Eigen::Vector3s>> observations,
+    std::shared_ptr<Anthropometrics> anthropometrics)
   : averageRootMeanSquaredError(0.0),
     averageSumSquaredError(0.0),
     averageMaxError(0.0)
 {
+  anthroPDF = 0.0;
+  if (anthropometrics)
+  {
+    anthroPDF = anthropometrics->getLogPDF(skel);
+  }
+
   Eigen::VectorXs originalPos = skel->getPositions();
 
   for (int i = 0; i < observations.size(); i++)
@@ -77,8 +84,8 @@ void IKErrorReport::printReport(int limitTimesteps)
   std::cout << "IK Error Report:" << std::endl;
   std::cout << "sum_squared (" << this->averageSumSquaredError
             << " avg) -- RMSE (" << this->averageRootMeanSquaredError
-            << " avg) -- Max (" << this->averageMaxError
-            << " avg):" << std::endl;
+            << " avg) -- Max (" << this->averageMaxError << " avg) -- Anthro ("
+            << this->anthroPDF << "):" << std::endl;
 
   int printTimesteps = this->rootMeanSquaredError.size();
   if (limitTimesteps > 0 && limitTimesteps < printTimesteps)

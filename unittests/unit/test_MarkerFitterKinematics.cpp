@@ -2576,6 +2576,27 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD)
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
 {
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/LaiArnoldSubject5/"
       "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
@@ -2600,12 +2621,18 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
 
   Eigen::MatrixXs goldPoses = mot.poses;
   std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  std::vector<bool> newClip;
   for (int i = 0; i < goldPoses.cols(); i++)
   {
     subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+    newClip.push_back(false);
   }
   IKErrorReport goldReport(
-      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+      scaled.skeleton,
+      scaled.markersMap,
+      goldPoses,
+      subMarkerTimesteps,
+      anthropometrics);
 
   // Create a marker fitter
 
@@ -2633,8 +2660,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   */
   subsetTimesteps = markerTrajectories.markerTimesteps;
 
-  MarkerInitialization init
-      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
 
   for (auto pair : init.updatedMarkerMap)
   {
@@ -2642,7 +2669,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   }
 
   IKErrorReport initReport(
-      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      anthropometrics);
 
   standard.skeleton->setGroupScales(init.groupScales);
 
@@ -2650,13 +2681,14 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
 
-  fitter.findJointCenters(init, subsetTimesteps);
-  fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.findJointCenters(init, newClip, subsetTimesteps);
+  fitter.findAllJointAxis(init, newClip, subsetTimesteps);
   fitter.computeJointConfidences(init, subsetTimesteps);
 
   // Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = fitter.getInitialization(
       subsetTimesteps,
+      newClip,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
               init.joints, init.jointCenters, init.jointWeights)
@@ -2672,28 +2704,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
       standard.skeleton,
       reinit.updatedMarkerMap,
       reinit.poses,
-      subsetTimesteps);
-
-  // Create Anthropometric prior
-  std::shared_ptr<Anthropometrics> anthropometrics
-      = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
-
-  std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
-  std::shared_ptr<MultivariateGaussian> gauss
-      = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
-          cols,
-          0.001); // mm -> m
-
-  std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = 190 * 0.001;
-  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
-
-  gauss = gauss->condition(observedValues);
-  anthropometrics->setDistribution(gauss);
+      subsetTimesteps,
+      anthropometrics);
 
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
@@ -2705,6 +2717,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   // Fine-tune IK and re-fit all the points
   MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
       subsetTimesteps,
+      newClip,
       bilevelFit,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
@@ -2724,7 +2737,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
-      subsetTimesteps);
+      subsetTimesteps,
+      anthropometrics);
 
   std::cout << "Experts's data error report:" << std::endl;
   goldReport.printReport(5);
@@ -3434,6 +3448,27 @@ TEST(MarkerFitter, NAN_C3D_PROBLEMS)
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
 {
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/welk002/unscaled_generic.osim");
   standard.skeleton->autogroupSymmetricSuffixes();
@@ -3458,7 +3493,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
       scaled.skeleton, "dart://sample/osim/welk002/manual_ik.mot");
   Eigen::MatrixXs goldPoses = mot.poses;
   IKErrorReport goldReport(
-      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+      scaled.skeleton,
+      scaled.markersMap,
+      goldPoses,
+      subMarkerTimesteps,
+      anthropometrics);
 
   std::vector<bool> newClip;
   for (int i = 0; i < c3d.markerTimesteps.size(); i++)
@@ -3501,7 +3540,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
   }
 
   IKErrorReport initReport(
-      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      anthropometrics);
 
   standard.skeleton->setGroupScales(init.groupScales);
 
@@ -3532,28 +3575,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
       standard.skeleton,
       reinit.updatedMarkerMap,
       reinit.poses,
-      subsetTimesteps);
-
-  // Create Anthropometric prior
-  std::shared_ptr<Anthropometrics> anthropometrics
-      = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
-
-  std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
-  std::shared_ptr<MultivariateGaussian> gauss
-      = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
-          cols,
-          0.001); // mm -> m
-
-  std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = 190 * 0.001;
-  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
-
-  gauss = gauss->condition(observedValues);
-  anthropometrics->setDistribution(gauss);
+      subsetTimesteps,
+      anthropometrics);
 
   // fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
@@ -3585,7 +3608,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
-      subsetTimesteps);
+      subsetTimesteps,
+      anthropometrics);
 
   std::cout << "Manual error report:" << std::endl;
   goldReport.printReport(5);
@@ -3614,6 +3638,27 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
 #ifndef NDEBUG
   isDebug = true;
 #endif
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
 
   OpenSimFile standard
       = OpenSimParser::parseOsim("dart://sample/osim/Sprinter/sprinter.osim");
@@ -3689,27 +3734,6 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(isDebug ? 1 : 150);
 
-  // Create Anthropometric prior
-  std::shared_ptr<Anthropometrics> anthropometrics
-      = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
-
-  std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
-  std::shared_ptr<MultivariateGaussian> gauss
-      = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
-          cols,
-          0.001); // mm -> m
-
-  std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = 190 * 0.001;
-  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
-
-  gauss = gauss->condition(observedValues);
-  anthropometrics->setDistribution(gauss);
-
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
   // Bilevel optimization
@@ -3741,7 +3765,8 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
         scaled.skeleton,
         scaled.markersMap,
         isDebug ? shorterGoldPoses[i] : goldPoses[i],
-        isDebug ? shorterTrials[i] : markerObservationTrials[i]);
+        isDebug ? shorterTrials[i] : markerObservationTrials[i],
+        anthropometrics);
     manualKinematicsReport.printReport(5);
 
     std::cout << "Auto error report " << i << ":" << std::endl;
@@ -3749,7 +3774,8 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
         standard.skeleton,
         inits[0].updatedMarkerMap,
         inits[i].poses,
-        isDebug ? shorterTrials[i] : markerObservationTrials[i]);
+        isDebug ? shorterTrials[i] : markerObservationTrials[i],
+        anthropometrics);
     finalKinematicsReport.printReport(5);
   }
 
@@ -3776,6 +3802,27 @@ for (int i = 0; i < 4; i++)
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
 {
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 150 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 10) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/"
       "Rajagopal2015_passiveCal_hipAbdMoved.osim");
@@ -3807,7 +3854,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
     subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
   }
   IKErrorReport goldReport(
-      scaled.skeleton, scaled.markersMap, goldPoses, subMarkerTimesteps);
+      scaled.skeleton,
+      scaled.markersMap,
+      goldPoses,
+      subMarkerTimesteps,
+      anthropometrics);
 
   // Create a marker fitter
 
@@ -3834,9 +3885,14 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   }
   */
   subsetTimesteps = markerTrajectories.markerTimesteps;
+  std::vector<bool> newClip;
+  for (int i = 0; i < subsetTimesteps.size(); i++)
+  {
+    newClip.push_back(false);
+  }
 
-  MarkerInitialization init
-      = fitter.getInitialization(subsetTimesteps, InitialMarkerFitParams());
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
 
   for (auto pair : init.updatedMarkerMap)
   {
@@ -3844,7 +3900,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   }
 
   IKErrorReport initReport(
-      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      anthropometrics);
 
   standard.skeleton->setGroupScales(init.groupScales);
 
@@ -3852,13 +3912,14 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
   // fitter.findJointCenter(0, init, subsetTimesteps);
 
-  fitter.findJointCenters(init, subsetTimesteps);
-  fitter.findAllJointAxis(init, subsetTimesteps);
+  fitter.findJointCenters(init, newClip, subsetTimesteps);
+  fitter.findAllJointAxis(init, newClip, subsetTimesteps);
   fitter.computeJointConfidences(init, subsetTimesteps);
 
   // Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = fitter.getInitialization(
       subsetTimesteps,
+      newClip,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
               init.joints, init.jointCenters, init.jointWeights)
@@ -3874,28 +3935,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
       standard.skeleton,
       reinit.updatedMarkerMap,
       reinit.poses,
-      subsetTimesteps);
-
-  // Create Anthropometric prior
-  std::shared_ptr<Anthropometrics> anthropometrics
-      = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
-
-  std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
-  std::shared_ptr<MultivariateGaussian> gauss
-      = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
-          cols,
-          0.001); // mm -> m
-
-  std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = 150 * 0.001;
-  observedValues["Heightin"] = (5 * 12 + 10) * 0.001;
-
-  gauss = gauss->condition(observedValues);
-  anthropometrics->setDistribution(gauss);
+      subsetTimesteps,
+      anthropometrics);
 
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
@@ -3907,6 +3948,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   // Fine-tune IK and re-fit all the points
   MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
       subsetTimesteps,
+      newClip,
       bilevelFit,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
@@ -3926,7 +3968,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
-      subsetTimesteps);
+      subsetTimesteps,
+      anthropometrics);
 
   std::cout << "Experts's data error report:" << std::endl;
   goldReport.printReport(5);
