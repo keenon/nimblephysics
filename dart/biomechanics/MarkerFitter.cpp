@@ -483,24 +483,24 @@ MarkerFitter::MarkerFitter(
     std::shared_ptr<dynamics::Skeleton> skeleton, dynamics::MarkerMap markers)
   : mSkeleton(skeleton),
     mMarkerMap(markers),
+    mAnthropometrics(nullptr),
+    mAnthropometricWeight(0.001),
+    mInitialIKSatisfactoryLoss(0.003),
+    mInitialIKMaxRestarts(100),
+    mMaxMarkerOffset(0.2),
+    mMinVarianceCutoff(3.0),
+    mMinSphereFitScore(6e-5),
+    mMinAxisFitScore(1.2e-4),
+    mDebugJointVariability(false),
+    mRegularizeTrackingMarkerOffsets(0.05),
+    mRegularizeAnatomicalMarkerOffsets(1.0),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
-    mDisableLinesearch(false),
-    mInitialIKSatisfactoryLoss(0.003),
-    mInitialIKMaxRestarts(100),
-    mMaxMarkerOffset(0.2),
-    mAnthropometrics(nullptr),
-    mAnthropometricWeight(0.001),
-    mMinVarianceCutoff(3.0),
-    mMinSphereFitScore(6e-5),
-    mMinAxisFitScore(1.2e-4),
-    mRegularizeTrackingMarkerOffsets(0.05),
-    mRegularizeAnatomicalMarkerOffsets(1.0),
-    mDebugJointVariability(false)
+    mDisableLinesearch(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
   int offset = 0;
@@ -1720,8 +1720,8 @@ MarkerInitialization MarkerFitter::fineTuneIK(
   MarkerInitialization result(initialization);
 
   assert(
-      params.jointCenters.cols() == 0
-      || params.jointCenters.cols() == markerObservations.size());
+      initialization.jointCenters.cols() == 0
+      || initialization.jointCenters.cols() == markerObservations.size());
 
   // 0. Prep configuration variables we'll use for the rest of the algo
   // Upper bound the number of blocks at the number of observations
@@ -1813,7 +1813,7 @@ MarkerInitialization MarkerFitter::fineTuneIK(
   }
 
   // 3. Average the scalings for each block together
-  assert(params.groupScales.size() > 0);
+  assert(initialization.groupScales.size() > 0);
   result.groupScales = initialization.groupScales;
 
   // 4. Go through and run IK on each block

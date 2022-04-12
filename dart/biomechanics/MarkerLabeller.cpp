@@ -58,9 +58,15 @@ void MarkerTrace::appendPoint(int time, Eigen::Vector3s point)
 //==============================================================================
 /// This gives the distance from the last point (or an extrapolation at this
 /// timestep of the last point, of order up to 2)
+///
+/// This always returns 0 if the current trace is empty.
 s_t MarkerTrace::pointToAppendDistance(
     int time, Eigen::Vector3s point, bool extrapolate)
 {
+  if (mPoints.size() == 0)
+  {
+    return 0.0;
+  }
   Eigen::Vector3s& lastPoint = mPoints.at(mPoints.size() - 1);
   if (extrapolate && mPoints.size() > 1)
   {
@@ -104,6 +110,12 @@ std::vector<MarkerTrace> MarkerTrace::createRawTraces(
       activeTraces.erase(activeTraces.begin() + tracesToRemove[j]);
     }
 
+    // Bail early on empty frames
+    if (pointClouds[t].size() == 0)
+    {
+      continue;
+    }
+
     // 2. Compute affinity scores between active traces and points
     Eigen::MatrixXs weights
         = Eigen::MatrixXs(pointClouds[t].size(), activeTraces.size());
@@ -132,7 +144,9 @@ std::vector<MarkerTrace> MarkerTrace::createRawTraces(
       if (map(i) == -1)
       {
         traces.emplace_back(t, pointClouds[t][i]);
+        assert(traces.at(traces.size() - 1).mPoints.size() == 1);
         activeTraces.push_back(&traces.at(traces.size() - 1));
+        assert(activeTraces.at(activeTraces.size() - 1)->mPoints.size() == 1);
       }
       else
       {
