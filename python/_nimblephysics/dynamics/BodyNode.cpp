@@ -1008,6 +1008,12 @@ void BodyNode(py::module& m)
           "removeAllShapeNodes",
           +[](dart::dynamics::BodyNode* self) { self->removeAllShapeNodes(); })
       .def(
+          "getLocalVertices",
+          +[](dart::dynamics::BodyNode* self)
+              -> const std::vector<Eigen::Vector3s> {
+            return self->getLocalVertices();
+          })
+      .def(
           "getNumEndEffectors",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
             return self->getNumEndEffectors();
