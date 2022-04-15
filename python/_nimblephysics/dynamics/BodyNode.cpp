@@ -177,6 +177,8 @@ void BodyNode(py::module& m)
       .def_readwrite("vel", &dart::dynamics::BodyNode::MovingVertex::vel)
       .def_readwrite("accel", &dart::dynamics::BodyNode::MovingVertex::accel)
       .def_readwrite(
+          "bodyNode", &dart::dynamics::BodyNode::MovingVertex::bodyNode)
+      .def_readwrite(
           "timestep", &dart::dynamics::BodyNode::MovingVertex::timestep);
 
   ::py::class_<
