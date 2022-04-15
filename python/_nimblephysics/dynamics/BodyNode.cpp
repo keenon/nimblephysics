@@ -171,6 +171,16 @@ void BodyNode(py::module& m)
           ::py::init<const dart::dynamics::detail::BodyNodeAspectProperties&>(),
           ::py::arg("aspectProperties"));
 
+  ::py::class_<dart::dynamics::BodyNode::MovingVertex>(m, "MovingVertex")
+      .def(::py::init<>())
+      .def_readwrite("pos", &dart::dynamics::BodyNode::MovingVertex::pos)
+      .def_readwrite("vel", &dart::dynamics::BodyNode::MovingVertex::vel)
+      .def_readwrite("accel", &dart::dynamics::BodyNode::MovingVertex::accel)
+      .def_readwrite(
+          "bodyNode", &dart::dynamics::BodyNode::MovingVertex::bodyNode)
+      .def_readwrite(
+          "timestep", &dart::dynamics::BodyNode::MovingVertex::timestep);
+
   ::py::class_<
       dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
       dart::dynamics::JacobianNode,
@@ -1009,10 +1019,17 @@ void BodyNode(py::module& m)
           +[](dart::dynamics::BodyNode* self) { self->removeAllShapeNodes(); })
       .def(
           "getLocalVertices",
-          +[](dart::dynamics::BodyNode* self)
+          +[](const dart::dynamics::BodyNode* self)
               -> const std::vector<Eigen::Vector3s> {
             return self->getLocalVertices();
           })
+      .def(
+          "getMovingVerticesInWorldSpace",
+          +[](const dart::dynamics::BodyNode* self, int timestep)
+              -> std::vector<dart::dynamics::BodyNode::MovingVertex> {
+            return self->getMovingVerticesInWorldSpace(timestep);
+          },
+          ::py::arg("timestep") = -1)
       .def(
           "getNumEndEffectors",
           +[](const dart::dynamics::BodyNode* self) -> std::size_t {
