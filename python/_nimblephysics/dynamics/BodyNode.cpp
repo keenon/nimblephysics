@@ -172,7 +172,18 @@ void BodyNode(py::module& m)
           ::py::arg("aspectProperties"));
 
   ::py::class_<dart::dynamics::BodyNode::MovingVertex>(m, "MovingVertex")
-      .def(::py::init<>())
+      .def(
+          ::py::init<
+              Eigen::Vector3s,
+              Eigen::Vector3s,
+              Eigen::Vector3s,
+              dart::dynamics::BodyNode*,
+              int>(),
+          ::py::arg("pos"),
+          ::py::arg("vel"),
+          ::py::arg("accel"),
+          ::py::arg("bodyNode"),
+          ::py::arg("timestep"))
       .def_readwrite("pos", &dart::dynamics::BodyNode::MovingVertex::pos)
       .def_readwrite("vel", &dart::dynamics::BodyNode::MovingVertex::vel)
       .def_readwrite("accel", &dart::dynamics::BodyNode::MovingVertex::accel)
