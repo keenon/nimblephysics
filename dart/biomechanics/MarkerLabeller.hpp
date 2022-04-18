@@ -5,6 +5,7 @@
 // #include <unordered_map>
 #include <map>
 #include <mutex>
+#include <tuple>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -28,6 +29,7 @@ struct LabelledMarkers
 {
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::map<std::string, std::pair<std::string, Eigen::Vector3s>> markerOffsets;
+  std::vector<std::map<std::string, Eigen::Vector3s>> jointCenterGuesses;
 };
 
 class MarkerTrace
@@ -38,6 +40,7 @@ public:
   std::vector<int> mTimes;
   std::vector<Eigen::Vector3s> mPoints;
   std::vector<std::map<std::string, Eigen::Vector2s>> mJointFingerprints;
+  std::string mMarkerLabel;
 
   /// This is the constructor for when a MarkerTrace is first created, before we
   /// begin adding points to it
@@ -71,6 +74,9 @@ public:
       std::vector<std::map<std::string, Eigen::Vector3s>> jointsOverTime,
       std::map<std::string, std::string> jointParents);
 
+  /// Returns true if these traces overlap in time
+  bool overlap(MarkerTrace& toAppend);
+
   /// This merges two MarkerTrace's together, to create a new trace object
   MarkerTrace concat(MarkerTrace& toAppend);
 
@@ -80,9 +86,9 @@ public:
   /// This returns when this MarkerTrace ends (inclusive)
   int lastTimestep();
 
-  /// This gets the variance of all the joint fingerprints, and returns the
-  /// lowest one. This is used for scoring beam search alternatives.
-  s_t getBestJointFingerprintVariance();
+  /// This gets the mean and variance of all the joint fingerprints.
+  std::map<std::string, std::tuple<Eigen::Vector2s, s_t>>
+  getJointFingerprintStats();
 };
 
 class MarkerLabeller
@@ -96,7 +102,17 @@ public:
   virtual std::map<std::string, std::string> getJointParents() = 0;
 
   LabelledMarkers labelPointClouds(
-      const std::vector<std::vector<Eigen::Vector3s>>& pointClouds);
+      const std::vector<std::vector<Eigen::Vector3s>>& pointClouds,
+      s_t mergeMarkersThreshold = 0.01);
+
+  void setSkeleton(std::shared_ptr<dynamics::Skeleton> skeleton);
+
+  void matchUpJointToSkeletonJoint(
+      std::string jointName, std::string skeletonJointName);
+
+protected:
+  std::shared_ptr<dynamics::Skeleton> mSkeleton;
+  std::map<std::string, std::string> mJointToSkelJointNames;
 };
 
 class MarkerLabellerMock : public MarkerLabeller
