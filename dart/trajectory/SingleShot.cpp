@@ -425,6 +425,10 @@ void SingleShot::backpropJacobianOfFinalState(
     // this last
     const Eigen::MatrixXs& massVel = ptr->getMassVelJacobian(world, thisLog);
 
+    const Eigen::MatrixXs& dampingVel = ptr->getDampingVelJacobian(world, thisLog);
+
+    const Eigen::MatrixXs& springVel = ptr->getSpringVelJacobian(world, thisLog);
+
     // p_end <- f_t = p_end <- v_t+1 * v_t+1 <- f_t
     thisTimestep.forcePos = last.velPos * forceVel;
     // v_end <- f_t = v_end <- v_t+1 * v_t+1 <- f_t
@@ -433,6 +437,15 @@ void SingleShot::backpropJacobianOfFinalState(
     thisTimestep.massPos = last.velPos * massVel;
     // v_end <- m_t = v_end <- v_t+1 * v_t+1 <- m_t
     thisTimestep.massVel = last.velVel * massVel;
+    // v_end <- d_t = v_end <- v_t+1 * v_t+1 <- d_t
+    thisTimestep.dampPos = last.velPos * dampingVel;
+
+    thisTimestep.dampVel = last.velVel * dampingVel;
+
+    thisTimestep.springPos = last.velPos * springVel;
+
+    thisTimestep.springVel = last.velVel * springVel;
+
     // p_end <- v_t = (p_end <- p_t+1 * p_t+1 <- v_t) + (p_end <- v_t+1 * v_t+1
     // <- v_t)
     thisTimestep.velPos = last.posPos * velPos + last.velPos * velVel;
@@ -554,7 +567,9 @@ void SingleShot::backpropGradientWrt(
   Problem::initializeStaticGradient(world, gradStatic, thisLog);
   // Add any gradient we have from the loss wrt mass directly into our gradient,
   // cause we don't need to do any extra processing on that.
-  gradStatic += gradWrtRollout->getMassesConst();
+  gradStatic.segment(0, getMassDims()) += gradWrtRollout->getMassesConst();
+  gradStatic.segment(getMassDims(), getDampingDims()) += gradWrtRollout->getDampingsConst();
+  gradStatic.segment(getMassDims()+getDampingDims(), getSpringDims()) += gradWrtRollout->getSpringsConst();
 
   int staticDims = getFlatStaticProblemDim(world);
   int dynamicDims = getFlatDynamicProblemDim(world);
@@ -588,6 +603,8 @@ void SingleShot::backpropGradientWrt(
       mappedGrad.lossWrtTorque
           = gradWrtRollout->getControlForcesConst(pair.first).col(i);
       mappedGrad.lossWrtMass = gradWrtRollout->getMassesConst();
+      mappedGrad.lossWrtDamping = gradWrtRollout->getDampingsConst();
+      mappedGrad.lossWrtSpring = gradWrtRollout->getSpringsConst();
 
       mappedLosses[pair.first] = mappedGrad;
     }
@@ -720,7 +737,11 @@ void SingleShot::getStates(
     }
   }
   assert(rollout->getMasses().size() == world->getMassDims());
+  assert(rollout->getDampings().size() == world->getDampingDims());
+  assert(rollout->getSprings().size() == world->getSpringDims());
   rollout->getMasses() = world->getMasses();
+  rollout->getDampings() = world->getDampings();
+  rollout->getSprings() = world->getSprings();
   for (auto pair : mMetadata)
   {
     rollout->setMetadata(pair.first, pair.second);
@@ -753,6 +774,8 @@ void SingleShot::setStates(
   mStartVel = rollout->getVelsConst().col(0);
   mForces = rollout->getControlForcesConst();
   world->setMasses(rollout->getMassesConst());
+  world->setDampings(rollout->getDampingsConst());
+  world->setSprings(rollout->getSpringsConst());
 
 #ifdef LOG_PERFORMANCE_SINGLE_SHOT
   if (thisLog != nullptr)

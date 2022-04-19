@@ -2117,12 +2117,13 @@ Eigen::MatrixXs Skeleton::getUnconstrainedVelJacobianWrt(
 
   Eigen::MatrixXs Minv = getInvMassMatrix();
   Eigen::MatrixXs dC = getJacobianOfC(wrt);
+  Eigen::VectorXs spring_stiffs = getSpringStiffVector();
 
   if (wrt == neural::WithRespectTo::POSITION)
   {
     Eigen::MatrixXs dM = getJacobianOfMinv(
         dt * (tau - C - getDampingForce() - getSpringForce()), wrt);
-    return dM - Minv * dt * dC;
+    return dM - Minv * dt * dC - Minv * dt *  spring_stiffs.asDiagonal();
   }
   else
   {
@@ -3028,6 +3029,11 @@ std::size_t Skeleton::getLinkCOMDims()
   return 3 * getNumBodyNodes();
 }
 
+std::size_t Skeleton::getLinkDiagIDims()
+{
+  return 3 * getNumBodyNodes();
+}
+
 //==============================================================================
 std::size_t Skeleton::getLinkMOIDims()
 {
@@ -3109,6 +3115,32 @@ Eigen::Vector3s Skeleton::getLinkCOMIndex(size_t index)
   return mass_center;
 }
 
+Eigen::VectorXs Skeleton::getLinkDiagIs()
+{
+  Eigen::VectorXs diag_Is = Eigen::VectorXs::Zero(getLinkDiagIDims());
+  std::size_t cursor = 0;
+  for(std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia=  getBodyNode(i)->getInertia();
+    s_t mass = getBodyNode(i)->getMass();
+    diag_Is(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_XX) / mass;
+    diag_Is(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_YY) / mass;
+    diag_Is(cursor++) = inertia.getParameter(dynamics::Inertia::Param::I_ZZ) / mass;
+  }
+  return diag_Is;
+}
+
+Eigen::Vector3s Skeleton::getLinkDiagIIndex(size_t index)
+{
+  Eigen::Vector3s diag_I = Eigen::Vector3s::Zero();
+  const Inertia& node_inertia = getBodyNode(index)->getInertia();
+  s_t mass = getBodyNode(index)->getMass();
+  diag_I(0) = node_inertia.getParameter(dynamics::Inertia::Param::I_XX) / mass;
+  diag_I(1) = node_inertia.getParameter(dynamics::Inertia::Param::I_YY) / mass;
+  diag_I(2) = node_inertia.getParameter(dynamics::Inertia::Param::I_ZZ) / mass;
+  return diag_I;
+}
+
 //==============================================================================
 Eigen::VectorXs Skeleton::getLinkMOIs()
 {
@@ -3127,6 +3159,20 @@ Eigen::VectorXs Skeleton::getLinkMOIs()
   return inertias;
 }
 
+//==============================================================================
+Eigen::Matrix3s Skeleton::getMOIMatrix(Eigen::Vector6s moi_vector)
+{
+  Eigen::Matrix3s MOI = moi_vector.segment(0,3).asDiagonal();
+  MOI(1,0) = moi_vector(3);
+  MOI(0,1) = moi_vector(3);
+  MOI(2,0) = moi_vector(4);
+  MOI(0,2) = moi_vector(4);
+  MOI(2,1) = moi_vector(5);
+  MOI(1,2) = moi_vector(5);
+  return MOI;
+}
+
+//==============================================================================
 Eigen::Vector6s Skeleton::getLinkMOIIndex(size_t index)
 {
   Eigen::Vector6s inertia = Eigen::Vector6s::Zero();
@@ -3149,6 +3195,43 @@ Eigen::VectorXs Skeleton::getLinkMasses()
     masses(i) = getBodyNode(i)->getMass();
   }
   return masses;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::getLinkAkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols());
+  Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
+  Eigen::MatrixXs I = getMOIMatrix(getLinkMOIIndex(index));
+  Eigen::MatrixXs A_k = Jv.transpose() * Jv + Jw.transpose() * (I/getBodyNode(index)->getMass()) * Jw;
+  return A_k;
+}
+
+Eigen::MatrixXs Skeleton::getLinkJvkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index)); // TODO: May be problematic
+  Eigen::MatrixXs Jv = J.block(0, 0, 3, J.cols()); // 3 * N matrix
+  return Jv;
+}
+
+Eigen::MatrixXs Skeleton::getLinkJwkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getWorldJacobian(getBodyNode(index));
+  Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
+  return Jw;
+}
+
+Eigen::Matrix3s Skeleton::getLinkRMatrixIndex(size_t index)
+{
+  return getBodyNode(index)->getWorldTransform().linear();
+}
+
+Eigen::MatrixXs Skeleton::getLinkLocalJwkMatrixIndex(size_t index)
+{
+  Eigen::MatrixXs J = getJacobian(getBodyNode(index));
+  Eigen::MatrixXs Jw = J.block(3, 0, 3, J.cols());
+  return Jw;
 }
 
 //==============================================================================
@@ -3286,6 +3369,53 @@ void Skeleton::setLinkCOMIndex(Eigen::Vector3s com, size_t index)
       inertia.getParameter(dynamics::Inertia::Param::I_XX),
       inertia.getParameter(dynamics::Inertia::Param::I_YY),
       inertia.getParameter(dynamics::Inertia::Param::I_ZZ),
+      inertia.getParameter(dynamics::Inertia::Param::I_XY),
+      inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+      inertia.getParameter(dynamics::Inertia::Param::I_YZ));
+  getBodyNode(index)->setInertia(newInertia);
+}
+
+//==============================================================================
+void Skeleton::setLinkDiagIs(Eigen::VectorXs diag_Is)
+{
+  std::size_t cursor = 0;
+  for(std::size_t i = 0; i < getNumBodyNodes(); i++)
+  {
+    const Inertia& inertia = getBodyNode(i)->getInertia();
+    s_t mass = getBodyNode(i)->getMass();
+    s_t I_XX = diag_Is(cursor++) * mass;
+    s_t I_YY = diag_Is(cursor++) * mass;
+    s_t I_ZZ = diag_Is(cursor++) * mass;
+    Inertia newInertia(
+        inertia.getParameter(dynamics::Inertia::Param::MASS),
+        inertia.getParameter(dynamics::Inertia::Param::COM_X),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+        inertia.getParameter(dynamics::Inertia::Param::COM_Z),
+        I_XX,
+        I_YY,
+        I_ZZ,
+        inertia.getParameter(dynamics::Inertia::Param::I_XY),
+        inertia.getParameter(dynamics::Inertia::Param::I_XZ),
+        inertia.getParameter(dynamics::Inertia::Param::I_YZ));
+    getBodyNode(i)->setInertia(newInertia);
+  }
+}
+
+void Skeleton::setLinkDiagIIndex(Eigen::Vector3s diag_I, size_t index)
+{
+  const Inertia& inertia = getBodyNode(index)->getInertia();
+  s_t mass = getBodyNode(index)->getMass();
+  s_t I_XX = diag_I(0) * mass;
+  s_t I_YY = diag_I(1) * mass;
+  s_t I_ZZ = diag_I(2) * mass;
+  Inertia newInertia(
+      inertia.getParameter(dynamics::Inertia::Param::MASS),
+      inertia.getParameter(dynamics::Inertia::Param::COM_X),
+      inertia.getParameter(dynamics::Inertia::Param::COM_Y),
+      inertia.getParameter(dynamics::Inertia::Param::COM_Z),
+      I_XX,
+      I_YY,
+      I_ZZ,
       inertia.getParameter(dynamics::Inertia::Param::I_XY),
       inertia.getParameter(dynamics::Inertia::Param::I_XZ),
       inertia.getParameter(dynamics::Inertia::Param::I_YZ));
@@ -7501,6 +7631,16 @@ Eigen::VectorXs Skeleton::getDampingCoeffVector()
   return damp_coeffs;
 }
 
+void Skeleton::setDampingCoeffVector(Eigen::VectorXs damp_coeffs)
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  for(int i = 0; i < nDofs; i++)
+  {
+    dofs[i]->setDampingCoefficient(damp_coeffs(i));
+  }
+}
+
 Eigen::VectorXs Skeleton::getDampingForce()
 {
   Eigen::VectorXs velocities = getVelocities();
@@ -7520,6 +7660,16 @@ Eigen::VectorXs Skeleton::getSpringStiffVector()
     spring_stiffs(i) = dofs[i]->getSpringStiffness();
   }
   return spring_stiffs;
+}
+
+void Skeleton::setSpringStiffVector(Eigen::VectorXs spring_stiffs)
+{
+  std::vector<dynamics::DegreeOfFreedom*> dofs = getDofs();
+  size_t nDofs = getNumDofs();
+  for(int i = 0; i < nDofs; i++)
+  {
+    dofs[i]->setSpringStiffness(spring_stiffs(i));
+  }
 }
 
 Eigen::VectorXs Skeleton::getRestPositions()

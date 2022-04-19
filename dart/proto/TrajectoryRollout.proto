@@ -10,5 +10,7 @@ message TrajectoryRollout {
   map<string, MatrixXs> vel = 3;
   map<string, MatrixXs> force = 4;
   VectorXs mass = 5;
-  map<string, MatrixXs> metadata = 6;
+  VectorXs damping = 6;
+  VectorXs spring = 7;
+  map<string, MatrixXs> metadata = 8;
 }

@@ -54,6 +54,8 @@
 #include "dart/dynamics/SimpleFrame.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/neural/WithRespectToMass.hpp"
+#include "dart/neural/WithRespectToDamping.hpp"
+#include "dart/neural/WithRespectToSpring.hpp"
 #include "dart/simulation/Recording.hpp"
 #include "dart/simulation/SmartPointer.hpp"
 
@@ -78,6 +80,8 @@ class CollisionResult;
 
 namespace neural {
 class WithRespectToMass;
+class WithRespectToDamping;
+class WithRespectToSpring;
 class BackpropSnapshot;
 } // namespace neural
 
@@ -162,6 +166,11 @@ public:
 
   dynamics::BodyNode* getBodyNodeByIndex(size_t index);
 
+  dynamics::Joint* getJointIndex(size_t index);
+
+  /// Get rest position of a particular dof
+  s_t getRestPositionIndex(size_t index);
+
   /// Get the number of skeletons
   std::size_t getNumSkeletons() const;
 
@@ -214,14 +223,36 @@ public:
   /// Returns the size of the getMasses() vector
   std::size_t getMassDims();
 
+  /// Returns the size of the getDampings() vector
+  std::size_t getDampingDims();
+
+  std::size_t getSpringDims();
+
   /// This will prevent mass from being tuned
   void clearTunableMassThisInstance();
+
+  void clearTunableDampingThisInstance();
+
+  void clearTunableSpringThisInstance();
 
   /// This registers that we'd like to keep track of this BodyNode's mass in a
   /// specified way in differentiation
   void tuneMass(
       dynamics::BodyNode* node,
       neural::WrtMassBodyNodeEntryType type,
+      Eigen::VectorXs upperBound,
+      Eigen::VectorXs lowerBound);
+
+  void tuneDamping(
+      dynamics::Joint* joint,
+      neural::WrtDampingJointEntryType type,
+      Eigen::VectorXi dofs_index,
+      Eigen::VectorXs upperBound,
+      Eigen::VectorXs lowerBound);
+
+  void tuneSpring(dynamics::Joint* joint,
+      neural::WrtSpringJointEntryType type,
+      Eigen::VectorXi dofs_index,
       Eigen::VectorXs upperBound,
       Eigen::VectorXs lowerBound);
 
@@ -248,7 +279,15 @@ public:
   /// single vector
   Eigen::VectorXs getMasses();
 
-  // Eigen::VectorXs getLinkMasses();
+  Eigen::VectorXs getDampings();
+
+  Eigen::VectorXs getSprings();
+
+  Eigen::VectorXi getDampingDofsMapping();
+
+  Eigen::VectorXi getSpringDofsMapping();
+  //Eigen::VectorXs getLinkMasses();
+
 
   size_t getLinkMassesDims();
 
@@ -284,6 +323,22 @@ public:
   // this world
   Eigen::VectorXs getMassLowerLimits();
 
+  // This gives the vector of mass upper limits for all the registered bodies in
+  // this world
+  Eigen::VectorXs getDampingUpperLimits();
+
+  // This gives the vector of mass lower limits for all the registered bodies in
+  // this world
+  Eigen::VectorXs getDampingLowerLimits();
+
+  // This gives the vector of spring coeff lower limits for all the registered bodies in
+  // this world
+  Eigen::VectorXs getSpringLowerLimits();
+
+  // This gives the vector of spring coeff upper limits for all the registered bodies in
+  // this world
+  Eigen::VectorXs getSpringUpperLimits();
+
   // This gets all the inertia matrices for all the links in all the skeletons
   // in the world mapped into a flat vector.
 
@@ -307,11 +362,25 @@ public:
 
   Eigen::Vector3s getLinkBetaIndex(size_t index);
 
+  Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
+
+  Eigen::VectorXs getLinkDiagIs();
+
+  Eigen::Vector3s getLinkDiagIIndex(size_t index);
+
   // This returns a vector of all the link masses for all the skeletons in the
   // world concatenated into a flat vector.
   Eigen::VectorXs getLinkMasses();
 
   s_t getLinkMassIndex(size_t index);
+
+  Eigen::VectorXs getJointDampingCoeffs();
+
+  Eigen::VectorXs getJointDampingCoeffIndex(size_t index);
+
+  Eigen::VectorXs getJointSpringStiffs();
+
+  Eigen::VectorXs getJointSpringStiffIndex(size_t index);
 
   /// Sets the position of all the skeletons in the world from a single
   /// concatenated state vector
@@ -350,6 +419,18 @@ public:
   // This sets all the masses for all the registered bodies in the world
   void setMasses(Eigen::VectorXs masses);
 
+  void setDampings(Eigen::VectorXs dampings);
+
+  void setSprings(Eigen::VectorXs springs);
+
+  void setJointDampingCoeffs(Eigen::VectorXs damp_coeffs);
+
+  void setJointDampingCoeffIndex(Eigen::VectorXs damp_coeff, size_t index);
+
+  void setJointSpringStiffs(Eigen::VectorXs spring_coeffs);
+
+  void setJointSpringStiffIndex(Eigen::VectorXs spring_stiff, size_t index);
+
   void setLinkMasses(Eigen::VectorXs masses);
 
   void setLinkMassIndex(s_t mass, size_t index);
@@ -364,11 +445,15 @@ public:
 
   void setLinkBetas(Eigen::VectorXs betas);
 
+  void setLinkDiagIs(Eigen::VectorXs diag_Is);
+
   void setLinkBetaIndex(Eigen::Vector3s beta, size_t index);
 
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
 
   void setLinkMOIIndex(Eigen::Vector6s com, size_t index);
+
+  void setLinkDiagIIndex(Eigen::Vector3s diag_I, size_t index);
 
   /// This gives the C(pos, vel) vector for all the skeletons in the world,
   /// without accounting for the external forces
@@ -434,8 +519,21 @@ public:
 
   // This returns the Jacobian for state_t -> state_{t+1}.
   Eigen::MatrixXs getStateJacobian();
+
+  Eigen::MatrixXs getContactFreeStateJacobian();
   // This returns the Jacobian for action_t -> state_{t+1}.
   Eigen::MatrixXs getActionJacobian();
+
+  // This function map any forces to actions
+  Eigen::MatrixXs mapToActionSpace(Eigen::MatrixXs forces);
+
+  Eigen::VectorXs mapToActionSpaceVector(Eigen::VectorXs force);
+
+  // This function map any actions to to full dof control forces
+  Eigen::MatrixXs mapToForceSpace(Eigen::MatrixXs actions);
+
+  Eigen::VectorXs mapToForceSpaceVector(Eigen::VectorXs action);
+  Eigen::MatrixXs getContactFreeActionJacobian();
 
   Eigen::MatrixXs finiteDifferenceStateJacobian();
   Eigen::MatrixXs finiteDifferenceActionJacobian();
@@ -593,6 +691,10 @@ public:
   /// This returns the object that we're using to keep track of which objects in
   /// the world need gradients through which kinds of mass.
   std::shared_ptr<neural::WithRespectToMass> getWrtMass();
+
+  std::shared_ptr<neural::WithRespectToDamping> getWrtDamping();
+
+  std::shared_ptr<neural::WithRespectToSpring> getWrtSpring();
 
   /// This returns the world state as a JSON blob that we can render
   std::string toJson();
@@ -753,6 +855,10 @@ protected:
   //--------------------------------------------------------------------------
 
   std::shared_ptr<neural::WithRespectToMass> mWrtMass;
+
+  std::shared_ptr<neural::WithRespectToDamping> mWrtDamping;
+
+  std::shared_ptr<neural::WithRespectToSpring> mWrtSpring; 
 
   //--------------------------------------------------------------------------
   // High-level RL-style API

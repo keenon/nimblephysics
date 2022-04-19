@@ -18,6 +18,10 @@ struct TimestepJacobians
   Eigen::MatrixXs velVel;
   Eigen::MatrixXs forceVel;
   Eigen::MatrixXs massVel;
+  Eigen::MatrixXs dampVel;
+  Eigen::MatrixXs dampPos;
+  Eigen::MatrixXs springVel;
+  Eigen::MatrixXs springPos;
 };
 
 } // namespace trajectory

@@ -55,10 +55,12 @@ void MPCLocal(py::module& m)
           ::py::init<
               std::shared_ptr<dart::simulation::World>,
               std::shared_ptr<dart::trajectory::LossFn>,
-              int>(),
+              int,
+              s_t>(),
           ::py::arg("world"),
           ::py::arg("loss"),
-          ::py::arg("planningHorizonMillis"))
+          ::py::arg("planningHorizonMillis"),
+          ::py::arg("scale"))
       .def("setLoss", &dart::realtime::MPCLocal::setLoss, ::py::arg("loss"))
       .def(
           "setOptimizer",

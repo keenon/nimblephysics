@@ -104,6 +104,12 @@ public:
   const Eigen::MatrixXs& getMassVelJacobian(
       std::shared_ptr<simulation::World> world,
       PerformanceLog* perfLog = nullptr);
+  const Eigen::MatrixXs& getDampingVelJacobian(
+      std::shared_ptr<simulation::World> world,
+      PerformanceLog* perfLog = nullptr);
+  const Eigen::MatrixXs& getSpringVelJacobian(
+      std::shared_ptr<simulation::World> world,
+      PerformanceLog* perfLog = nullptr);
 
   Eigen::MatrixXs getPosMappedPosJacobian(
       std::shared_ptr<simulation::World> world,

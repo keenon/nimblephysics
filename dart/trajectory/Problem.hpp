@@ -263,6 +263,12 @@ public:
   /// Returns the dimension of the mass vector
   int getMassDims();
 
+  /// Returns the dimension of the damping vector
+  int getDampingDims();
+
+  /// Returns the dimension of the spring vector
+  int getSpringDims();
+
   /// This returns the debugging name of a given DOF
   virtual std::string getFlatDimName(
       std::shared_ptr<simulation::World> world, int dim)

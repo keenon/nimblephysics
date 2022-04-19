@@ -3,8 +3,8 @@
     <world name="world 1">
         <physics>
             <time_step>0.01</time_step>
-            <gravity>0 -9.81 0</gravity>
-            <collision_detector>dart</collision_detector>
+            <gravity>0 -4.905 0</gravity>
+            <collision_detector>bullet</collision_detector>
         </physics>
 
         <skeleton name="pendulum">
@@ -12,7 +12,7 @@
             <body name="cart">
                 <transformation>0 0 0 0 0 0</transformation>
                 <inertia>
-                    <mass>0.75</mass>
+                    <mass>1.0</mass>
                     <offset>0.0 0 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -23,12 +23,20 @@
                         </box>
                     </geometry>
                 </visualization_shape>
+                <collision_shape>
+                    <transformation>0.0 0 0.0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>0.2 0.05 0.05</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
             </body>
 
             <body name="pole">
                 <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>0.025</mass>
+                    <mass>0.5</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -39,12 +47,20 @@
                         </box>
                     </geometry>
                 </visualization_shape>
+                <collision_shape>
+                    <transformation>0.0 0.15 0.0 0.0 0.0 0.0</transformation>
+                    <geometry>
+                        <box>
+                            <size>0.02 0.3 0.02</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
             </body>
 
             <body name="pole2">
                 <transformation>0.0 0.3 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>0.025</mass>
+                    <mass>0.5</mass>
                     <offset>0.0 0.15 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -55,12 +71,20 @@
                         </box>
                     </geometry>
                 </visualization_shape>
+                <collision_shape>
+                    <transformation>0.0 0.15 0.0 0.0 0.0 0.0</transformation>
+                    <geometry>
+                        <box>
+                            <size>0.02 0.3 0.02</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
             </body>
 
             <body name="weight">
                 <transformation>0.0 0.62 0.0 0.0 0.0 0.0</transformation>
                 <inertia>
-                    <mass>0.3</mass>
+                    <mass>1.0</mass>
                     <offset>0.0 0.0 0.0</offset>
                 </inertia>
                 <visualization_shape>
@@ -72,6 +96,14 @@
                     </geometry>
                     <color>0.2 0.7 0.7</color>
                 </visualization_shape>
+                <collision_shape>
+                    <transformation>0.0 0.0 0.0 0.0 0.0 0.0</transformation>
+                    <geometry>
+                        <box>
+                            <size> 0.08 0.04 0.08 </size>
+                        </box>
+                    </geometry>
+                </collision_shape>
             </body> 
 
 
@@ -93,10 +125,10 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.1</damping>
+                          <damping>0.2</damping>
                       </dynamics>
                 </axis>
-                <init_pos>0</init_pos>
+                <init_pos>3.1415</init_pos>
                 <init_vel>0</init_vel>
             </joint>
 
@@ -107,7 +139,8 @@
                 <axis>
                     <xyz>0.0 0.0 1.0</xyz>
                     <dynamics>
-                          <damping>0.1</damping>
+                          <damping>0.4</damping>
+                          <spring_stiffness>3.0</spring_stiffness>
                       </dynamics>
                 </axis>
                 <init_pos>0</init_pos>

@@ -26,7 +26,8 @@ namespace realtime {
 MPCLocal::MPCLocal(
     std::shared_ptr<simulation::World> world,
     std::shared_ptr<trajectory::LossFn> loss,
-    int planningHorizonMillis)
+    int planningHorizonMillis,
+    s_t scale)
   : mRunning(false),
     mWorld(world),
     mLoss(loss),
@@ -39,7 +40,7 @@ MPCLocal::MPCLocal(
     mEnableOptimizationGuards(false),
     mRecordIterations(false),
     mPlanningHorizonMillis(planningHorizonMillis),
-    mMillisPerStep(1000 * world->getTimeStep()),
+    mMillisPerStep(scale*1000 * world->getTimeStep()),
     mSteps((int)ceil((s_t)planningHorizonMillis / mMillisPerStep)),
     mShotLength(50),
     mMaxIterations(5),
@@ -199,7 +200,7 @@ void MPCLocal::optimizePlan(long startTime)
 
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     estimateState->end();
-    std::cout<<"Optimization Stage"<<std::endl;
+    //std::cout<<"Optimization Stage"<<std::endl;
     if (!mOptimizer)
     {
       PerformanceLog* createOpt = log->startRun("Create Default IPOPT");
@@ -246,14 +247,16 @@ void MPCLocal::optimizePlan(long startTime)
         mProblem->getRolloutCache(worldClone)->getControlForcesConst());
 
     log->end();
-
-    std::cout << PerformanceLog::finalize()["MPCLocal loop"]->prettyPrint()
+    if(!mSilent)
+    {
+      std::cout << PerformanceLog::finalize()["MPCLocal loop"]->prettyPrint()
               << std::endl;
+    }
   }
   else
   {
     std::shared_ptr<simulation::World> worldClone = mWorld->clone();
-    std::cout<<"Re-optimization stage "<<startTime<<std::endl;
+    //std::cout<<"Re-optimization stage "<<startTime<<std::endl;
     int diff = startTime - mLastOptimizedTime;
     int steps
         = static_cast<int>(floor(static_cast<s_t>(diff) / mMillisPerStep));
@@ -516,31 +519,28 @@ bool MPCLocal::variableChange()
   return mVarchange;
 }
 
-void MPCLocal::setMasschange(s_t mass)
+void MPCLocal::setParameterChange(Eigen::VectorXs params)
 {
-  if(abs(mass-pre_mass)>0.001)
+  if(mInitialized == false)
   {
+    mPre_parameter = params;
+    mInitialized = true;
     mVarchange = true;
   }
-  pre_mass = mass;
+  else
+  {
+    assert(params.size() == mPre_parameter.size());
+    if((params-mPre_parameter).norm()>0.001)
+    {
+      mVarchange = true;
+    }
+    mPre_parameter = params;
+  }
 }
 
-void MPCLocal::setCOMchange(Eigen::Vector3s com)
+void MPCLocal::setReOptThreshold(s_t thresh)
 {
-  if((com-pre_com).norm()>0.001)
-  {
-    mVarchange = true;
-  }
-  pre_com = com;
-}
-
-void MPCLocal::setMUchange(s_t mu)
-{
-  if(abs(mu-pre_mu) > 0.001)
-  {
-    mVarchange = true;
-  }
-  pre_mu = mu;
+  mReOpt_thresh = thresh;
 }
 
 } // namespace realtime

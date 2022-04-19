@@ -55,7 +55,9 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-// #define ALL_TESTS
+//#define ALL_TESTS
+//#define COM_SSID
+//#define MASS_SSID
 
 using namespace dart;
 using namespace math;
@@ -245,7 +247,7 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
 
 
 
-#ifdef ALL_TESTS
+#ifdef COM_SSID
 TEST(REALTIME, CARTPOLE_MPC_COM)
 {
   ////////////////////////////////////////////////////////////
@@ -362,6 +364,7 @@ TEST(REALTIME, CARTPOLE_MPC_COM)
 
   int inferenceSteps = 5;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
+  s_t scale = 1.0;
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
   
   
@@ -374,8 +377,12 @@ TEST(REALTIME, CARTPOLE_MPC_COM)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(
-      ssidWorld, getSSIDVelPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
+  SSID ssid = SSID(ssidWorld, 
+                   getSSIDVelPosLoss(), 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   inferenceSteps,
+                   scale);
   
   std::mutex lock;
   ssid.attachMutex(lock);
@@ -391,8 +398,10 @@ TEST(REALTIME, CARTPOLE_MPC_COM)
     });
 
   world->clearTunableMassThisInstance();
-  MPCLocal mpcLocal = MPCLocal(
-      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
+  MPCLocal mpcLocal = MPCLocal(world, 
+                               std::make_shared<LossFn>(loss, lossGrad), 
+                               planningHorizonMillis,
+                               scale);
   mpcLocal.setSilent(true);
   
   mpcLocal.setMaxIterations(7);
@@ -544,7 +553,7 @@ TEST(REALTIME, CARTPOLE_MPC_COM)
 }
 #endif
 
-#ifdef ALL_TESTS
+#ifdef MASS_SSID
 TEST(REALTIME, CARTPOLE_MPC)
 {
   ////////////////////////////////////////////////////////////
@@ -660,7 +669,7 @@ TEST(REALTIME, CARTPOLE_MPC)
         }
         return sum;
       };
-
+  s_t scale = 1.0;
   int inferenceSteps = 5;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
@@ -675,8 +684,12 @@ TEST(REALTIME, CARTPOLE_MPC)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(
-      ssidWorld, getSSIDPosLoss(), inferenceHistoryMillis, sensorDims,inferenceSteps);
+  SSID ssid = SSID(ssidWorld, 
+                   getSSIDPosLoss(), 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   inferenceSteps,
+                   scale);
   
   std::mutex lock;
   ssid.attachMutex(lock);
@@ -692,8 +705,10 @@ TEST(REALTIME, CARTPOLE_MPC)
     });
 
   world->clearTunableMassThisInstance();
-  MPCLocal mpcLocal = MPCLocal(
-      world, std::make_shared<LossFn>(loss, lossGrad), planningHorizonMillis);
+  MPCLocal mpcLocal = MPCLocal(world, 
+                               std::make_shared<LossFn>(loss, lossGrad), 
+                               planningHorizonMillis,
+                               scale);
   mpcLocal.setSilent(true);
   
   mpcLocal.setMaxIterations(7);
@@ -917,6 +932,7 @@ TEST(REALTIME, CARTPOLE_SSID)
   world->setTimeStep(1.0 / 100);
 
   // 300 timesteps
+  s_t scale = 1.0;
   int steps = 5;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int inferenceHistoryMillis = steps * millisPerTimestep;
@@ -924,7 +940,12 @@ TEST(REALTIME, CARTPOLE_SSID)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  SSID ssid = SSID(world, 
+                   lossFn, 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   steps,
+                   1.0);
   ssid.setInitialPosEstimator(
       [](Eigen::MatrixXs sensors, long /* timestamp */) {
         return sensors.col(0);
@@ -1039,6 +1060,7 @@ TEST(REALTIME, CARTPOLE_PLOT)
   world->setTimeStep(1.0 / 100);
 
   // 300 timesteps
+  s_t scale = 1.0;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int steps = 5;
   int inferenceHistoryMillis = steps * millisPerTimestep;
@@ -1046,7 +1068,12 @@ TEST(REALTIME, CARTPOLE_PLOT)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  SSID ssid = SSID(world, 
+                   lossFn, 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   steps,
+                   scale);
   ssid.setInitialPosEstimator(
       [](Eigen::MatrixXs sensors, long /* timestamp */) {
         return sensors.col(0);
@@ -1193,6 +1220,7 @@ TEST(REALTIME, CARTPOLE_MU_PLOT)
   world->setTimeStep(1.0 / 100);
 
   // 300 timesteps
+  s_t scale = 1.0;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int steps = 5;
   int inferenceHistoryMillis = steps * millisPerTimestep;
@@ -1200,7 +1228,12 @@ TEST(REALTIME, CARTPOLE_MU_PLOT)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  SSID ssid = SSID(world, 
+                   lossFn, 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   steps,
+                   scale);
   ssid.setInitialPosEstimator(
       [](Eigen::MatrixXs sensors, long /* timestamp */) {
         return sensors.col(0);
@@ -1259,6 +1292,7 @@ TEST(REALTIME, CARTPOLE_MU_PLOT)
 }
 #endif
 
+#ifdef ALL_TESTS
 TEST(REALTIME, CARTPOLE_COM_PLOT)
 {
   ////////////////////////////////////////////////////////////
@@ -1337,6 +1371,7 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
   world->setTimeStep(1.0 / 100);
 
   // 300 timesteps
+  s_t scale = 1.0;
   int millisPerTimestep = world->getTimeStep() * 1000;
   int steps = 5;
   int inferenceHistoryMillis = steps * millisPerTimestep;
@@ -1344,7 +1379,12 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
   Eigen::VectorXs sensorDims = Eigen::VectorXs::Zero(2);
   sensorDims(0) = world->getNumDofs();
   sensorDims(1) = world->getNumDofs();
-  SSID ssid = SSID(world, lossFn, inferenceHistoryMillis, sensorDims,steps);
+  SSID ssid = SSID(world, 
+                   lossFn, 
+                   inferenceHistoryMillis, 
+                   sensorDims,
+                   steps,
+                   scale);
   ssid.setInitialPosEstimator(
       [](Eigen::MatrixXs sensors, long /* timestamp */) {
         return sensors.col(0);
@@ -1412,3 +1452,4 @@ TEST(REALTIME, CARTPOLE_COM_PLOT)
   }
   ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/raw_data/Solutions.csv",solutionMat);
 }
+#endif

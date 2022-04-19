@@ -121,6 +121,7 @@ void VectorLog::discardBefore(long time)
     newObservations.push_back(mObservations[i]);
   }
   mObservations = newObservations;
+  mStartTime = time;
 }
 
 } // namespace realtime

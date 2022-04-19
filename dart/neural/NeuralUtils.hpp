@@ -27,6 +27,8 @@ struct LossGradient
   Eigen::VectorXs lossWrtVelocity;
   Eigen::VectorXs lossWrtTorque;
   Eigen::VectorXs lossWrtMass;
+  Eigen::VectorXs lossWrtDamping;
+  Eigen::VectorXs lossWrtSpring;
 };
 
 struct LossGradientHighLevelAPI
@@ -34,6 +36,8 @@ struct LossGradientHighLevelAPI
   Eigen::VectorXs lossWrtState;
   Eigen::VectorXs lossWrtAction;
   Eigen::VectorXs lossWrtMass;
+  Eigen::VectorXs lossWrtDamping;
+  Eigen::VectorXs lossWrtSpring;
 };
 
 // We don't issue a full import here, because we want this file to be safe to
