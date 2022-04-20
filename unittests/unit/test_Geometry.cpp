@@ -765,7 +765,7 @@ bool verifyClosestPoint(
   return true;
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(COLLISION_GEOM, RANDOM_CLOSEST_POINT_GRADIENTS)
 {
   for (int i = 0; i < 700; i++)
@@ -818,7 +818,40 @@ TEST(COLLISION_GEOM, RANDOM_CLOSEST_POINT_GRADIENTS)
       return;
   }
 }
-// #endif
+#endif
+
+#ifdef ALL_TESTS
+TEST(DISTANCE, CLOSEST_POINT_ON_SEGMENT_ON_SEG)
+{
+  Eigen::Vector3s a = Eigen::Vector3s(1, 0, 0);
+  Eigen::Vector3s b = Eigen::Vector3s(-1, 0, 0);
+  Eigen::Vector3s p = Eigen::Vector3s(0, 3, 0);
+  s_t dist = math::distanceToSegment(a, b, p);
+  EXPECT_EQ(dist, 3.0);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DISTANCE, CLOSEST_POINT_ON_SEGMENT_A)
+{
+  Eigen::Vector3s a = Eigen::Vector3s(1, 0, 0);
+  Eigen::Vector3s b = Eigen::Vector3s(-1, 0, 0);
+  Eigen::Vector3s p = Eigen::Vector3s(3, 0, 0);
+  s_t dist = math::distanceToSegment(a, b, p);
+  EXPECT_EQ(dist, 2.0);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DISTANCE, CLOSEST_POINT_ON_SEGMENT_B)
+{
+  Eigen::Vector3s a = Eigen::Vector3s(1, 0, 0);
+  Eigen::Vector3s b = Eigen::Vector3s(-1, 0, 0);
+  Eigen::Vector3s p = Eigen::Vector3s(-3, 0, 0);
+  s_t dist = math::distanceToSegment(a, b, p);
+  EXPECT_EQ(dist, 2.0);
+}
+#endif
 
 /******************************************************************************/
 #ifdef ALL_TESTS

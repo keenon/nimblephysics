@@ -1087,6 +1087,10 @@ public:
   Eigen::VectorXs getJointWorldPositions(
       const std::vector<dynamics::Joint*>& joints) const;
 
+  /// This returns a map with the world positions of each joint, keyed by joint
+  /// name
+  std::map<std::string, Eigen::Vector3s> getJointWorldPositionsMap() const;
+
   /// This returns the concatenated 3-vectors for world angle of each joint's
   /// child space in 3D world space, for the registered joints.
   Eigen::VectorXs getJointWorldAngles(
@@ -1701,16 +1705,16 @@ public:
       const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
-  
+
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
-  math::Jacobian getWorldPositionJacobian(const JacobianNode* _node,
-                                          const Eigen::Vector3s& _localOffset) const;
+  math::Jacobian getWorldPositionJacobian(
+      const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const;
 
   // Documentation inherited
   math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node, 
+      const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       bool useRidders = true);
 
@@ -1856,21 +1860,21 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
-  
+
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
-  
+
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
-  //Get spring coefficients
+  // Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
 
-  //Get rest positions
+  // Get rest positions
   Eigen::VectorXs getRestPositions();
 
-  //Get Spring Forces
-  Eigen::VectorXs getSpringForce(); 
+  // Get Spring Forces
+  Eigen::VectorXs getSpringForce();
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;

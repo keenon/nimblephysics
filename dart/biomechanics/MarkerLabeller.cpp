@@ -1,10 +1,15 @@
 #include "dart/biomechanics/MarkerLabeller.hpp"
 
+#include <iostream>
 #include <limits>
 #include <string>
+#include <utility>
 
 #include "dart/dynamics/Joint.hpp"
+#include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace biomechanics {
@@ -23,13 +28,8 @@ MarkerTrace::MarkerTrace(int time, Eigen::Vector3s firstPoint)
 //==============================================================================
 /// This is the direct constructor
 MarkerTrace::MarkerTrace(
-    std::vector<int> times,
-    std::vector<Eigen::Vector3s> points,
-    std::vector<std::map<std::string, Eigen::Vector2s>> jointFingerprints)
-  : mTimes(times),
-    mPoints(points),
-    mJointFingerprints(jointFingerprints),
-    mMarkerLabel("")
+    std::vector<int> times, std::vector<Eigen::Vector3s> points)
+  : mTimes(times), mPoints(points), mMarkerLabel("")
 {
   mMinTime = INT_MAX;
   mMaxTime = INT_MIN;
@@ -169,50 +169,225 @@ std::vector<MarkerTrace> MarkerTrace::createRawTraces(
 }
 
 //==============================================================================
-/// This will create fingerprints from the joint history
-void MarkerTrace::computeJointFingerprints(
-    std::vector<std::map<std::string, Eigen::Vector3s>> jointsOverTime,
-    std::map<std::string, std::string> jointParents)
+/// Each possible combination of (trace, body) can create a marker. So we can
+/// compute some summary statistics for each body we could assign this trace
+/// to.
+void MarkerTrace::computeBodyMarkerStats(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<Eigen::VectorXs> posesOverTime,
+    std::vector<Eigen::VectorXs> scalesOverTime)
 {
+  // 1. Go through all the timestamps, and compute local coordinates for the
+  // trace in each body.
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> bodyFingerprints;
+  std::vector<std::map<std::string, s_t>> bodyRootDist;
+  std::vector<std::map<std::string, s_t>> bodyClosestPointDist;
   for (int i = 0; i < mPoints.size(); i++)
   {
     Eigen::Vector3s p = mPoints[i];
     int t = mTimes[i];
 
-    assert(t >= 0 && t < jointsOverTime.size());
-    std::map<std::string, Eigen::Vector3s>& jointCenters = jointsOverTime[t];
+    assert(t >= 0 && t < posesOverTime.size());
+    skel->setPositions(posesOverTime[t]);
+    skel->setGroupScales(scalesOverTime[t]);
 
-    mJointFingerprints.emplace_back();
-    for (auto& pair : jointCenters)
+    std::map<std::string, Eigen::Vector3s> jointWorldPositions
+        = skel->getJointWorldPositionsMap();
+
+    bodyFingerprints.emplace_back();
+    bodyRootDist.emplace_back();
+    bodyClosestPointDist.emplace_back();
+
+    for (int b = 0; b < skel->getNumBodyNodes(); b++)
     {
-      // Don't count the root joint, since it has no parent
-      if (jointParents.count(pair.first) == 0)
+      auto* body = skel->getBodyNode(b);
+
+      // Compute local coordinates in the body space for this body
+      bodyFingerprints.at(bodyFingerprints.size() - 1)[body->getName()]
+          = (body->getWorldTransform().inverse() * p)
+                .cwiseQuotient(body->getScale());
+
+      // Compute the distance from the parent joint for this body
+      Eigen::Vector3s parentJointWorldPosition
+          = jointWorldPositions[body->getParentJoint()->getName()];
+      bodyRootDist.at(bodyRootDist.size() - 1)[body->getName()]
+          = (parentJointWorldPosition - p).norm();
+
+      // Compute the polygon defined by all the joints attached to this body
+      if (body->getNumChildJoints() > 0)
       {
-        continue;
+        std::vector<Eigen::Vector3s> corner;
+        corner.push_back(parentJointWorldPosition);
+        for (int j = 0; j < body->getNumChildJoints(); j++)
+        {
+          corner.push_back(
+              jointWorldPositions[body->getChildJoint(j)->getName()]);
+        }
+
+        // Compute the distance to the nearest point on the polygon
+        s_t dist = std::numeric_limits<s_t>::infinity();
+        for (int x = 0; x < corner.size(); x++)
+        {
+          for (int y = x + 1; y < corner.size(); y++)
+          {
+            Eigen::Vector3s start = corner[x];
+            Eigen::Vector3s end = corner[y];
+            s_t d = math::distanceToSegment(start, end, p);
+            if (d < dist)
+            {
+              dist = d;
+            }
+          }
+        }
+        bodyClosestPointDist.at(
+            bodyClosestPointDist.size() - 1)[body->getName()]
+            = dist;
       }
-
-      // compute distance along joint, and distance from joint axis
-
-      std::string parentJointName = jointParents.at(pair.first);
-      std::string bodyName = parentJointName + "::" + pair.first;
-
-      Eigen::Vector3s& parentJoint = jointCenters.at(parentJointName);
-      Eigen::Vector3s& childJoint = pair.second;
-
-      Eigen::Vector3s dir = (childJoint - parentJoint).normalized();
-
-      // This is the distance parallel to the body, along the body
-      s_t x = p.dot(dir) - parentJoint.dot(dir);
-
-      // This is the radial distance to the nearest point on the body line
-      Eigen::Vector3s diff = p - parentJoint;
-      diff -= diff.dot(dir) * dir;
-      s_t r = diff.norm();
-
-      mJointFingerprints.at(mJointFingerprints.size() - 1)[bodyName]
-          = Eigen::Vector2s(x, r);
+      else
+      {
+        // Just default to distance from the root joint
+        bodyClosestPointDist.at(
+            bodyClosestPointDist.size() - 1)[body->getName()]
+            = bodyRootDist.at(bodyRootDist.size() - 1)[body->getName()];
+      }
     }
   }
+
+  std::vector<std::string> bodyNames;
+  for (int b = 0; b < skel->getNumBodyNodes(); b++)
+  {
+    bodyNames.push_back(skel->getBodyNode(b)->getName());
+  }
+
+  // 2. Compute the summary statistics for each body's marker pos
+
+  // 2.1. Compute the center points
+  std::map<std::string, s_t> avgRootJointDist;
+  for (std::string& bodyName : bodyNames)
+  {
+    avgRootJointDist[bodyName] = 0.0;
+    mBodyMarkerOffsets[bodyName] = Eigen::Vector3s::Zero();
+    mBodyClosestPointDistance[bodyName] = 0.0;
+
+    mBodyRootJointDistVariance[bodyName] = 0.0;
+    mBodyMarkerOffsetVariance[bodyName] = 0.0;
+  }
+
+  for (int i = 0; i < bodyFingerprints.size(); i++)
+  {
+    for (std::string& bodyName : bodyNames)
+    {
+      avgRootJointDist[bodyName] += bodyRootDist.at(i).at(bodyName);
+      mBodyMarkerOffsets[bodyName] += bodyFingerprints.at(i).at(bodyName);
+      mBodyClosestPointDistance[bodyName]
+          += bodyClosestPointDist.at(i).at(bodyName);
+    }
+  }
+  for (std::string& bodyName : bodyNames)
+  {
+    avgRootJointDist[bodyName] /= bodyFingerprints.size();
+    mBodyMarkerOffsets[bodyName] /= bodyFingerprints.size();
+    mBodyClosestPointDistance[bodyName] /= bodyFingerprints.size();
+  }
+
+  // 2.2. Compute the squared average distances from the center points
+  for (int i = 0; i < bodyFingerprints.size(); i++)
+  {
+    for (std::string& bodyName : bodyNames)
+    {
+      s_t x = bodyRootDist.at(i).at(bodyName) - avgRootJointDist.at(bodyName);
+      mBodyRootJointDistVariance[bodyName] += x * x;
+      mBodyMarkerOffsetVariance[bodyName]
+          += (bodyFingerprints.at(i).at(bodyName)
+              - mBodyMarkerOffsets.at(bodyName))
+                 .squaredNorm();
+    }
+  }
+
+  // 3. Normalize all the maps
+  s_t maxMarkerOffsetVariance = 0.0;
+  for (auto pair : mBodyMarkerOffsetVariance)
+  {
+    if (pair.second > maxMarkerOffsetVariance)
+    {
+      maxMarkerOffsetVariance = pair.second;
+    }
+  }
+  if (maxMarkerOffsetVariance > 0)
+  {
+    for (std::string body : bodyNames)
+    {
+      mBodyMarkerOffsetVariance[body] /= maxMarkerOffsetVariance;
+    }
+  }
+
+  s_t maxRootDistVariance = 0.0;
+  for (auto pair : mBodyRootJointDistVariance)
+  {
+    if (pair.second > maxRootDistVariance)
+    {
+      maxRootDistVariance = pair.second;
+    }
+  }
+  if (maxRootDistVariance > 0)
+  {
+    for (std::string body : bodyNames)
+    {
+      mBodyRootJointDistVariance[body] /= maxRootDistVariance;
+    }
+  }
+
+  s_t maxClosestPointDist = 0.0;
+  for (auto pair : mBodyClosestPointDistance)
+  {
+    if (pair.second > maxClosestPointDist)
+    {
+      maxClosestPointDist = pair.second;
+    }
+  }
+  if (maxClosestPointDist > 0)
+  {
+    for (std::string body : bodyNames)
+    {
+      mBodyClosestPointDistance[body] /= maxClosestPointDist;
+    }
+  }
+}
+
+//==============================================================================
+/// Each possible combination of (trace, body) can create a marker. This
+/// returns a score for a given body, for how "good" of a marker that body
+/// would create when combined with this trace. Lower is better.
+s_t MarkerTrace::computeBodyMarkerLoss(std::string bodyName)
+{
+  if (mBodyMarkerOffsetVariance.count(bodyName) == 0)
+    return std::numeric_limits<double>::infinity();
+
+  return mBodyMarkerOffsetVariance.at(bodyName)
+         + mBodyRootJointDistVariance.at(bodyName)
+         + mBodyClosestPointDistance.at(bodyName);
+}
+
+//==============================================================================
+/// This finds the best body to pair this trace with (using the stats from
+/// computeBodyMarkerStats()) and returns the best marker
+std::pair<std::string, Eigen::Vector3s> MarkerTrace::getBestMarker()
+{
+  std::pair<std::string, Eigen::Vector3s> marker
+      = std::pair<std::string, Eigen::Vector3s>("", Eigen::Vector3s::Zero());
+  s_t bestLoss = std::numeric_limits<double>::infinity();
+  for (auto& pair : mBodyMarkerOffsets)
+  {
+    std::string bodyName = pair.first;
+    s_t loss = computeBodyMarkerLoss(bodyName);
+    if (loss < bestLoss)
+    {
+      marker = pair;
+      bestLoss = loss;
+    }
+  }
+  return marker;
 }
 
 //==============================================================================
@@ -228,9 +403,6 @@ MarkerTrace MarkerTrace::concat(MarkerTrace& toAppend)
 {
   std::vector<int> times = std::vector<int>(mTimes);
   std::vector<Eigen::Vector3s> points = std::vector<Eigen::Vector3s>(mPoints);
-  std::vector<std::map<std::string, Eigen::Vector2s>> jointFingerprints
-      = std::vector<std::map<std::string, Eigen::Vector2s>>(mJointFingerprints);
-
   for (int t : toAppend.mTimes)
   {
     times.push_back(t);
@@ -239,12 +411,8 @@ MarkerTrace MarkerTrace::concat(MarkerTrace& toAppend)
   {
     points.push_back(p);
   }
-  for (auto& fingerprint : toAppend.mJointFingerprints)
-  {
-    jointFingerprints.push_back(fingerprint);
-  }
 
-  return MarkerTrace(times, points, jointFingerprints);
+  return MarkerTrace(times, points);
 }
 
 //==============================================================================
@@ -262,58 +430,6 @@ int MarkerTrace::lastTimestep()
 }
 
 //==============================================================================
-/// This gets the mean and variance of all the joint fingerprints.
-std::map<std::string, std::tuple<Eigen::Vector2s, s_t>>
-MarkerTrace::getJointFingerprintStats()
-{
-  // 1. Compute the center point for each joint
-  std::map<std::string, int> numSamples;
-  std::map<std::string, Eigen::Vector2s> centerPoint;
-  for (auto& map : mJointFingerprints)
-  {
-    for (auto& pair : map)
-    {
-      if (centerPoint.count(pair.first) == 0)
-      {
-        numSamples[pair.first] = 0;
-        centerPoint[pair.first] = Eigen::Vector2s::Zero();
-      }
-      numSamples[pair.first]++;
-      centerPoint[pair.first] += pair.second;
-    }
-  }
-  for (auto& pair : centerPoint)
-  {
-    centerPoint[pair.first] /= numSamples.at(pair.first);
-  }
-
-  // 2. Compute the squared average distances from the center point for each
-  // joint
-  std::map<std::string, s_t> jointVariance;
-  for (auto& map : mJointFingerprints)
-  {
-    for (auto& pair : map)
-    {
-      if (jointVariance.count(pair.first) == 0)
-      {
-        jointVariance[pair.first] = 0;
-      }
-      jointVariance[pair.first]
-          += (pair.second - centerPoint[pair.first]).squaredNorm();
-    }
-  }
-
-  std::map<std::string, std::tuple<Eigen::Vector2s, s_t>> result;
-  for (auto& pair : centerPoint)
-  {
-    jointVariance[pair.first] /= numSamples.at(pair.first);
-    result[pair.first] = std::tuple<Eigen::Vector2s, s_t>(
-        centerPoint[pair.first], jointVariance.at(pair.first));
-  }
-  return result;
-}
-
-//==============================================================================
 void MarkerLabeller::setSkeleton(std::shared_ptr<dynamics::Skeleton> skeleton)
 {
   mSkeleton = skeleton;
@@ -326,7 +442,6 @@ void MarkerLabeller::matchUpJointToSkeletonJoint(
   mJointToSkelJointNames[jointName] = skeletonJointName;
 }
 
-/*
 //==============================================================================
 LabelledMarkers MarkerLabeller::labelPointClouds(
     const std::vector<std::vector<Eigen::Vector3s>>& pointClouds,
@@ -358,8 +473,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
   // skeleton is
   Eigen::VectorXs initialPos = Eigen::VectorXs::Ones(problemDim);
   initialPos.segment(0, skeletonBallJoints->getNumDofs())
-      = skeletonBallJoints->convertPositionsToBallSpace(
-          skeletonBallJoints->getPositions());
+      = mSkeleton->convertPositionsToBallSpace(mSkeleton->getPositions());
   initialPos.segment(
       skeletonBallJoints->getNumDofs(), skeletonBallJoints->getGroupScaleDim())
       = skeletonBallJoints->getGroupScales();
@@ -378,12 +492,12 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
   }
 
   // 3.5. Perform IK on each timestep
-  for (int i = 0; i < jointCenters.size(); i++)
+  for (int t = 0; t < jointCenters.size(); t++)
   {
     // 3.5.1. Copy this frame's joint center guesses over
     for (int j = 0; j < jointNames.size(); j++)
     {
-      jointCenterVec.segment<3>(j * 3) = jointCenters[i][jointNames[j]];
+      jointCenterVec.segment<3>(j * 3) = jointCenters[t][jointNames[j]];
     }
 
     // 3.5. Actually solve the IK
@@ -391,8 +505,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
         initialPos,
         jointCenterVec.size(),
         // Set positions
-        [&skeletonBallJoints, this](
-            const Eigen::VectorXs pos, bool clamp) {
+        [&skeletonBallJoints, this](const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
               pos.segment(0, skeletonBallJoints->getNumDofs()));
 
@@ -434,254 +547,93 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
         },
         // Compute the Jacobian
         [&skeletonBallJoints, &jointCenterVec, &ballSkelJoints](
-            Eigen::VectorXs& diff,
-            Eigen::MatrixXs& jac)
-{
-  Eigen::VectorXs jointPoses
-      = skeletonBallJoints->getJointWorldPositions(ballSkelJoints);
-  diff = jointCenterVec - jointPoses;
+            Eigen::VectorXs& diff, Eigen::MatrixXs& jac) {
+          Eigen::VectorXs jointPoses
+              = skeletonBallJoints->getJointWorldPositions(ballSkelJoints);
+          diff = jointCenterVec - jointPoses;
 
-  assert(
-      jac.cols()
-      == skeletonBallJoints->getNumDofs()
-             + skeletonBallJoints->getGroupScaleDim());
-  assert(jac.rows() == jointCenterVec.size());
-  jac.setZero();
+          assert(
+              jac.cols()
+              == skeletonBallJoints->getNumDofs()
+                     + skeletonBallJoints->getGroupScaleDim());
+          assert(jac.rows() == jointCenterVec.size());
+          jac.setZero();
 
-  jac.block(0, 0, jointCenterVec.size(), skeletonBallJoints->getNumDofs())
-      = skeletonBallJoints->getJointWorldPositionsJacobianWrtJointPositions(
-          ballSkelJoints);
-  jac.block(
-      0,
-      skeletonBallJoints->getNumDofs(),
-      jointCenterVec.size(),
-      skeletonBallJoints->getGroupScaleDim())
-      = skeletonBallJoints->getJointWorldPositionsJacobianWrtGroupScales(
-          ballSkelJoints);
-},
+          jac.block(
+              0, 0, jointCenterVec.size(), skeletonBallJoints->getNumDofs())
+              = skeletonBallJoints
+                    ->getJointWorldPositionsJacobianWrtJointPositions(
+                        ballSkelJoints);
+          jac.block(
+              0,
+              skeletonBallJoints->getNumDofs(),
+              jointCenterVec.size(),
+              skeletonBallJoints->getGroupScaleDim())
+              = skeletonBallJoints
+                    ->getJointWorldPositionsJacobianWrtGroupScales(
+                        ballSkelJoints);
+        },
         // Generate a random restart position
         [&skeletonBallJoints, &skelJoints, this](Eigen::VectorXs& val) {
-  val.segment(0, skeletonBallJoints->getNumDofs())
-      = mSkeleton->convertPositionsToBallSpace(
-          mSkeleton->getRandomPoseForJoints(skelJoints));
-  val.segment(
-         skeletonBallJoints->getNumDofs(),
-         skeletonBallJoints->getGroupScaleDim())
-      .setConstant(1.0);
+          val.segment(0, skeletonBallJoints->getNumDofs())
+              = mSkeleton->convertPositionsToBallSpace(
+                  mSkeleton->getRandomPoseForJoints(skelJoints));
+          val.segment(
+                 skeletonBallJoints->getNumDofs(),
+                 skeletonBallJoints->getGroupScaleDim())
+              .setConstant(1.0);
         },
         math::IKConfig()
-            .setMaxStepCount(150)
+            .setMaxStepCount(t == 0 ? 150 : 50)
             .setConvergenceThreshold(1e-10)
-            // .setLossLowerBound(1e-8)
-            .setLossLowerBound(0.01)
-            .setMaxRestarts(10)
+            .setLossLowerBound(1e-8)
+            // .setLossLowerBound(0.001)
+            .setMaxRestarts(t == 0 ? 10 : 1)
             .setLogOutput(false));
-std::cout << "Best result: " << result << std::endl;
+    (void)result;
+    // std::cout << "Best result: " << result << std::endl;
 
-poses.push_back(mSkeleton->getPositions());
-scales.push_back(mSkeleton->getGroupScales());
-}
+    poses.push_back(mSkeleton->getPositions());
+    scales.push_back(mSkeleton->getGroupScales());
 
-// 4. Compute fingerprints on each body, based on the results of IK
-for (MarkerTrace& trace : traces)
-{
-  trace.computeJointFingerprints(jointCenters, jointParents);
-}
-
-// 5. Now work through the traces, and create/assign markers for each trace
-
-// Note: These markers are defined in as (x, r): distance along the joint
-// axis, and radial distance from the axis. At this stage we're deliberately
-// leaving the angle of attachment to the joint ambiguous, because we don't
-// yet have enough information to determine that.
-std::map<std::string, std::pair<std::string, Eigen::Vector2s>> markers;
-
-for (MarkerTrace& trace : traces)
-{
-  std::map<std::string, std::tuple<Eigen::Vector2s, s_t>> stats
-      = trace.getJointFingerprintStats();
-
-  // 4.1. Find the best available joint, in terms of minimum variance wrt to
-  // this trace. For now, we'll just always attach to this joint. A more
-  // sophisticated mechanism might look at multiple good joints, and choose
-  // between them somehow.
-  s_t minVariance = std::numeric_limits<s_t>::infinity();
-  std::string minVarianceJoint = "";
-  Eigen::Vector2s minVarianceOffset = Eigen::Vector2s::Zero();
-  for (auto jointStat : stats)
-  {
-    s_t jointVariance = std::get<1>(jointStat.second);
-    if (jointVariance < minVariance)
-    {
-      minVariance = jointVariance;
-      minVarianceJoint = jointStat.first;
-      minVarianceOffset = std::get<0>(jointStat.second);
-    }
+    initialPos.segment(0, skeletonBallJoints->getNumDofs())
+        = mSkeleton->convertPositionsToBallSpace(mSkeleton->getPositions());
+    initialPos.segment(
+        skeletonBallJoints->getNumDofs(),
+        skeletonBallJoints->getGroupScaleDim())
+        = mSkeleton->getGroupScales();
   }
 
-  // 4.2. Check if there's already a marker for this joint and offset, and if
-  // so, if that marker is already assigned during our trace
-  bool foundMarker = false;
-
-  for (auto markerPair : markers)
-  {
-    std::string markerName = markerPair.first;
-    std::string jointName = std::get<0>(markerPair.second);
-    if (jointName == minVarianceJoint)
-    {
-      Eigen::Vector2s offset = std::get<1>(markerPair.second);
-      s_t dist = (offset - minVarianceOffset).norm();
-      if (dist < mergeMarkersThreshold)
-      {
-        // 4.2.1. We've got a hit! Check whether this marker is already
-        // assigned to any traces that overlap this one
-        bool anyOverlap = false;
-        for (MarkerTrace& otherTrace : traces)
-        {
-          if (&trace == &otherTrace)
-            continue;
-          if (otherTrace.mMarkerLabel == markerName
-              && trace.overlap(otherTrace))
-          {
-            anyOverlap = true;
-            break;
-          }
-        }
-
-        // 4.2.2. We're clear to merge this marker in!
-        if (!anyOverlap)
-        {
-          foundMarker = true;
-          trace.mMarkerLabel = markerName;
-          break;
-        }
-      }
-    }
-  }
-
-  if (!foundMarker)
-  {
-    // Create a new marker
-    std::string markerName = std::to_string(markers.size());
-    markers[markerName] = std::tuple<std::string, Eigen::Vector2s>(
-        minVarianceJoint, minVarianceOffset);
-    trace.mMarkerLabel = markerName;
-  }
-}
-
-// 5. Now we can ditch the traces, and reconstruct labeled point clouds
-std::vector<std::map<std::string, Eigen::Vector3s>> labeledPointClouds;
-
-// 5.1. Create all the blank timestep objects we need
-int maxTimestep = 0;
-for (MarkerTrace& trace : traces)
-{
-  if (trace.mMaxTime > maxTimestep)
-  {
-    maxTimestep = trace.mMaxTime;
-  }
-}
-for (int i = 0; i < maxTimestep; i++)
-{
-  labeledPointClouds.emplace_back();
-}
-
-// 5.2. Populate the labeled point clouds
-for (MarkerTrace& trace : traces)
-{
-  for (int i = 0; i < trace.mTimes.size(); i++)
-  {
-    labeledPointClouds[trace.mTimes[i]][trace.mMarkerLabel] = trace.mPoints[i];
-  }
-}
-
-// TODO: add guessed hand and foot 3D orientations
-// (SO3) to the neural network output. That disambiguates the IK problem.
-
-// Maybe we just adapt the MarkerFitter code to take this as an entry point!
-// Joint center guesses
-
-// 6. Optimize joint centers to smooth out joint center trajectories
-// TODO:keenon
-std::vector<std::map<std::string, Eigen::Vector3s>> smoothedJointCenters
-    = jointCenters;
-// 7. Do IK with target skeleton?
-// TODO:keenon
-
-// 8. Find more exact marker offsets by taking an average.
-
-// 9. Run bilevel optimization from MarkerFitter?
-
-result.markerObservations = labeledPointClouds;
-result.markerOffsetsXR = markers;
-result.jointCenterGuesses = jointCenters;
-return result;
-}
-*/
-
-//==============================================================================
-LabelledMarkers MarkerLabeller::labelPointClouds(
-    const std::vector<std::vector<Eigen::Vector3s>>& pointClouds,
-    s_t mergeMarkersThreshold)
-{
-  LabelledMarkers result;
-
-  // 1. Divide the markers into continuous trajectory segments
-  std::vector<MarkerTrace> traces = MarkerTrace::createRawTraces(pointClouds);
-
-  // 2. Get the joint centers
-  std::vector<std::map<std::string, Eigen::Vector3s>> jointCenters
-      = guessJointLocations(pointClouds);
-  std::map<std::string, std::string> jointParents = getJointParents();
-
-  // 3. Compute the local joint fingerprints
+  // 4. Compute fingerprints on each body, based on the results of IK
   for (MarkerTrace& trace : traces)
   {
-    trace.computeJointFingerprints(jointCenters, jointParents);
+    trace.computeBodyMarkerStats(mSkeleton, poses, scales);
   }
 
-  // 4. Now work through the traces, and create/assign markers for each trace
+  // 5. Now work through the traces, and create/assign markers for each trace
+
   // Note: These markers are defined in as (x, r): distance along the joint
   // axis, and radial distance from the axis. At this stage we're deliberately
   // leaving the angle of attachment to the joint ambiguous, because we don't
   // yet have enough information to determine that.
-  std::map<std::string, std::pair<std::string, Eigen::Vector2s>> markers;
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>> markers;
 
   for (MarkerTrace& trace : traces)
   {
-    std::map<std::string, std::tuple<Eigen::Vector2s, s_t>> stats
-        = trace.getJointFingerprintStats();
+    std::pair<std::string, Eigen::Vector3s> bestMarker = trace.getBestMarker();
 
-    // 4.1. Find the best available joint, in terms of minimum variance wrt to
-    // this trace. For now, we'll just always attach to this joint. A more
-    // sophisticated mechanism might look at multiple good joints, and choose
-    // between them somehow.
-    s_t minVariance = std::numeric_limits<s_t>::infinity();
-    std::string minVarianceJoint = "";
-    Eigen::Vector2s minVarianceOffset = Eigen::Vector2s::Zero();
-    for (auto jointStat : stats)
-    {
-      s_t jointVariance = std::get<1>(jointStat.second);
-      if (jointVariance < minVariance)
-      {
-        minVariance = jointVariance;
-        minVarianceJoint = jointStat.first;
-        minVarianceOffset = std::get<0>(jointStat.second);
-      }
-    }
-
-    // 4.2. Check if there's already a marker for this joint and offset, and if
-    // so, if that marker is already assigned during our trace
+    // 4.2. Check if there's already a marker for this body and offset, and
+    // if so, if that marker is already assigned during our trace
     bool foundMarker = false;
 
     for (auto markerPair : markers)
     {
       std::string markerName = markerPair.first;
-      std::string jointName = std::get<0>(markerPair.second);
-      if (jointName == minVarianceJoint)
+      std::string bodyName = markerPair.second.first;
+      if (bodyName == bestMarker.first)
       {
-        Eigen::Vector2s offset = std::get<1>(markerPair.second);
-        s_t dist = (offset - minVarianceOffset).norm();
+        Eigen::Vector3s offset = markerPair.second.second;
+        s_t dist = (offset - bestMarker.second).norm();
         if (dist < mergeMarkersThreshold)
         {
           // 4.2.1. We've got a hit! Check whether this marker is already
@@ -714,8 +666,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
     {
       // Create a new marker
       std::string markerName = std::to_string(markers.size());
-      markers[markerName] = std::tuple<std::string, Eigen::Vector2s>(
-          minVarianceJoint, minVarianceOffset);
+      markers[markerName] = bestMarker;
       trace.mMarkerLabel = markerName;
     }
   }
@@ -732,7 +683,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
       maxTimestep = trace.mMaxTime;
     }
   }
-  for (int i = 0; i < maxTimestep; i++)
+  for (int i = 0; i <= maxTimestep; i++)
   {
     labeledPointClouds.emplace_back();
   }
@@ -747,59 +698,18 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
     }
   }
 
-  // TODO: add guessed hand and foot 3D orientations
-  // (SO3) to the neural network output. That disambiguates the IK problem.
-
-  // Maybe we just adapt the MarkerFitter code to take this as an entry point!
-  // Joint center guesses
-
-  // 6. Optimize joint centers to smooth out joint center trajectories
-  // TODO:keenon
-  std::vector<std::map<std::string, Eigen::Vector3s>> smoothedJointCenters
-      = jointCenters;
-  // 7. Do IK with target skeleton?
-  // TODO:keenon
-
-  // 8. Find more exact marker offsets by taking an average.
-
-  // 9. Run bilevel optimization from MarkerFitter?
-
   result.markerObservations = labeledPointClouds;
-  // result.markerOffsets = markers;
+  result.markerOffsets = markers;
   result.jointCenterGuesses = jointCenters;
+  result.traces = traces;
   return result;
-}
-
-//==============================================================================
-std::vector<std::map<std::string, Eigen::Vector3s>>
-MarkerLabellerMock::guessJointLocations(
-    const std::vector<std::vector<Eigen::Vector3s>>& pointClouds)
-{
-  (void)pointClouds;
-  // This is a mock, so we just return the mocked value
-  return mJointsOverTime;
-}
-
-//==============================================================================
-std::map<std::string, std::string> MarkerLabellerMock::getJointParents()
-{
-  return mJointParents;
-}
-
-//==============================================================================
-void MarkerLabellerMock::setMockJointLocations(
-    std::vector<std::map<std::string, Eigen::Vector3s>> jointsOverTime,
-    std::map<std::string, std::string> jointParents)
-{
-  mJointsOverTime = jointsOverTime;
-  mJointParents = jointParents;
 }
 
 //==============================================================================
 /// This takes in a set of labeled point clouds over time, and runs the
 /// labeller over unlabeled copies of those point clouds, and then scores the
 /// reconstruction accuracy.
-void MarkerLabellerMock::evaluate(
+void MarkerLabeller::evaluate(
     const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
         markerOffsets,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
@@ -822,6 +732,144 @@ void MarkerLabellerMock::evaluate(
 
   // 3. Now score the reconstruction accuracy
 
+  /// The thing we really care about in scoring is for each frame, how accurate
+  /// is the attachment and offset of the marker.
+
+  int totalBodies = 0;
+  int totalCorrectBodies = 0;
+  s_t totalAverageError = 0.0;
+
+  for (MarkerTrace& trace : output.traces)
+  {
+    std::string guessBody = output.markerOffsets[trace.mMarkerLabel].first;
+    Eigen::Vector3s guessOffset
+        = output.markerOffsets[trace.mMarkerLabel].second;
+
+    int correctBody = 0;
+    std::map<std::string, int> correctMarkerCount;
+    s_t averageError = 0.0;
+
+    for (int i = 0; i < trace.mTimes.size(); i++)
+    {
+      int t = trace.mTimes[i];
+      Eigen::Vector3s p = trace.mPoints[i];
+
+      // Find the true label and offset
+      std::string markerName = "";
+      std::string trueBody = "";
+      Eigen::Vector3s trueOffset = Eigen::Vector3s::Zero();
+      bool foundPoint = false;
+      for (auto& pair : labeledPointClouds[t])
+      {
+        if ((pair.second - p).squaredNorm() < 1e-9)
+        {
+          markerName = pair.first;
+          trueBody = markerOffsets.at(pair.first).first;
+          trueOffset = markerOffsets.at(pair.first).second;
+          foundPoint = true;
+          break;
+        }
+      }
+      (void)foundPoint;
+      assert(foundPoint);
+
+      if (trueBody == guessBody)
+      {
+        correctBody++;
+        averageError += (trueOffset - guessOffset).norm();
+      }
+
+      if (correctMarkerCount.count(markerName) == 0)
+      {
+        correctMarkerCount[markerName] = 0;
+      }
+      correctMarkerCount[markerName]++;
+    }
+
+    totalCorrectBodies += correctBody;
+    totalBodies += trace.mTimes.size();
+    totalAverageError += averageError;
+
+    if (correctBody > 0)
+    {
+      averageError /= correctBody;
+    }
+
+    // If the trace is entirely correct
+    if (correctBody == trace.mTimes.size())
+    {
+      std::cout << "CORRECT: " << correctBody << " with error " << averageError
+                << std::endl;
+    }
+    // If the trace is wrong
+    else
+    {
+      // If there's more than one true-body, then this trace shouldn't be a
+      // single trace
+      if (correctMarkerCount.size() > 1)
+      {
+        std::cout << "This trace falsely collapsed multiple marker traces!"
+                  << std::endl;
+        // TODO: more debugging info. This seems like a rare case, so won't type
+        // that out yet.
+      }
+      else if (correctMarkerCount.size() == 0)
+      {
+        // This shouldn't happen, because that would imply that this is an empty
+        // trace
+        assert(false && "No empty traces");
+      }
+      else
+      {
+        std::string correctMarkerName = correctMarkerCount.begin()->first;
+        std::string correctBodyName = markerOffsets.at(correctMarkerName).first;
+
+        std::cout << "Trace picked the wrong body! Correct marker "
+                  << correctMarkerName << " is attached to body "
+                  << correctBodyName << ", but chose " << guessBody
+                  << std::endl;
+        std::cout << "Correct body " << correctBodyName
+                  << " stats:" << std::endl;
+        std::cout << "\tMarker variance: "
+                  << trace.mBodyMarkerOffsetVariance.at(correctBodyName)
+                  << std::endl;
+        std::cout << "\tJoint dist variance: "
+                  << trace.mBodyRootJointDistVariance.at(correctBodyName)
+                  << std::endl;
+        std::cout << "\tClosest point distance: "
+                  << trace.mBodyClosestPointDistance.at(correctBodyName)
+                  << std::endl;
+        std::cout << "\tLoss: " << trace.computeBodyMarkerLoss(correctBodyName)
+                  << std::endl;
+        std::cout << "Incorrect guessed body " << guessBody
+                  << " stats:" << std::endl;
+        std::cout << "\tMarker variance: "
+                  << trace.mBodyMarkerOffsetVariance.at(guessBody) << std::endl;
+        std::cout << "\tJoint dist variance: "
+                  << trace.mBodyRootJointDistVariance.at(guessBody)
+                  << std::endl;
+        std::cout << "\tClosest point distance: "
+                  << trace.mBodyClosestPointDistance.at(guessBody) << std::endl;
+        std::cout << "\tLoss: " << trace.computeBodyMarkerLoss(guessBody)
+                  << std::endl;
+      }
+    }
+  }
+
+  if (totalCorrectBodies > 0)
+  {
+    totalAverageError /= totalCorrectBodies;
+  }
+
+  std::cout << "**************" << std::endl;
+  std::cout << "Body Labelling Accuracy: "
+            << ((s_t)totalCorrectBodies / totalBodies) * 100 << " percent"
+            << std::endl;
+  std::cout << "Of correctly labeled, average offset difference: "
+            << totalAverageError * 100 << " cm" << std::endl;
+  std::cout << "**************" << std::endl;
+
+  /*
   // 3.1. List out the names of the markers we're going to map between
   std::vector<std::string> realMarkerNames;
   std::vector<std::string> reconstructedMarkerNames;
@@ -835,100 +883,135 @@ void MarkerLabellerMock::evaluate(
     reconstructedMarkerNames.push_back(pair.first);
   }
 
-  // 3.2. Let's figure out which reconstructed markers correspond to which
-  // actual markers. There may be different numbers of reconstructed vs actual
-  // markers.
-  std::map<std::string, std::string> reconToReal
-      = math::AssignmentMatcher::assignKeysToKeys(
-          reconstructedMarkerNames,
-          realMarkerNames,
-          [&](std::string reconstructed, std::string real) {
-            const std::string& reconstructedBody
-                = output.markerOffsets.at(reconstructed).first;
-            const std::string& realBody = markerOffsets.at(real).first;
-            if (reconstructedBody != realBody)
-            {
-              return -1 * std::numeric_limits<s_t>::infinity();
-            }
-
-            const Eigen::Vector3s& reconstructedOffset
-                = output.markerOffsets.at(reconstructed).second;
-            const Eigen::Vector3s& realOffset = markerOffsets.at(real).second;
-
-            s_t dist = (reconstructedOffset - realOffset).squaredNorm();
-            return 1.0 / dist;
-          });
-
-  // 3.3. Now we can score how many markers were detected, and how many were not
-  std::cout << "Matched " << reconToReal.size() << " of "
-            << realMarkerNames.size() << " real markers" << std::endl;
-  if (reconstructedMarkerNames.size() > reconToReal.size())
+  if (realMarkerNames.size() == reconstructedMarkerNames.size())
   {
-    std::cout << "Detected "
-              << (reconstructedMarkerNames.size() - reconToReal.size())
-              << " markers which didn't match anything" << std::endl;
-  }
-  s_t avgDist = 0.0;
-  s_t maxDist = 0.0;
-  for (auto& pair : reconToReal)
-  {
-    s_t dist = (output.markerOffsets.at(pair.first).second
-                - markerOffsets.at(pair.second).second)
-                   .norm();
-    avgDist += dist;
-    if (dist > maxDist)
-      maxDist = dist;
-  }
-  avgDist /= reconToReal.size();
-  std::cout << "Average distance between markers: " << avgDist << std::endl;
+    std::map<std::string, std::string> realToRecon
+        = math::AssignmentMatcher::assignKeysToKeys(
+            realMarkerNames,
+            reconstructedMarkerNames,
+            [&](std::string real, std::string reconstructed) {
+              s_t dist = 0.0;
 
-  // 3.4. Now we can go through and check the accuracy of the labels on each
-  // frame.
-  s_t avgAccuracy = 0.0;
-  s_t maxAccuracy = 0.0;
-  s_t minAccuracy = 1.0;
+              for (int t = 0; t < labeledPointClouds.size(); t++)
+              {
+                Eigen::Vector3s reconPoint
+                    = output.markerObservations[t].at(reconstructed);
+                Eigen::Vector3s realPoint = labeledPointClouds[t].at(real);
+                dist += (reconPoint - realPoint).squaredNorm();
+              }
 
-  for (int i = 0; i < labeledPointClouds.size(); i++)
-  {
-    std::map<std::string, Eigen::Vector3s> goldLabels = labeledPointClouds[i];
-    std::map<std::string, Eigen::Vector3s> reconLabels
-        = output.markerObservations[i];
+              if (dist == 0)
+              {
+                return std::numeric_limits<s_t>::max();
+              }
+              return 1.0 / dist;
+            });
 
-    int matches = 0;
-    for (auto& goldPair : goldLabels)
+    std::cout << "Reconstructed an identical number of markers to the ground "
+                 "truth data"
+              << std::endl;
+
+    for (std::string& real : realMarkerNames)
     {
-      for (auto& reconPair : reconLabels)
+      std::string realBody = markerOffsets.at(real).first;
+      Eigen::Vector3s realOffset = markerOffsets.at(real).second;
+
+      std::string reconstructed = realToRecon[real];
+      std::string reconBody = output.markerOffsets.at(reconstructed).first;
+      Eigen::Vector3s reconOffset
+          = output.markerOffsets.at(reconstructed).second;
+
+      std::cout << "Marker \"" << real << "\":" << std::endl;
+      if (realBody == reconBody)
       {
-        // When the 3d points match up precisely, we've found the original point
-        if (goldPair.second == reconPair.second)
+        std::cout << " - Correct body: \"" << realBody
+                  << "\", offset difference: "
+                  << (realOffset - reconOffset).norm() << std::endl;
+      }
+      else
+      {
+        std::cout << " - Real body: \"" << realBody << "\""
+                  << ", reconstructed body: \"" << reconBody << "\""
+                  << std::endl;
+      }
+    }
+  }
+  else
+  {
+    int totalPoints = 0;
+    int matchedBodyPoints = 0;
+    s_t totalOffsetError = 0.0;
+
+    for (int i = 0; i < labeledPointClouds.size(); i++)
+    {
+      for (auto& pair : labeledPointClouds[i])
+      {
+        std::pair<std::string, Eigen::Vector3s> goldMarker
+            = markerOffsets.at(pair.first);
+        Eigen::Vector3s point = pair.second;
+
+        for (auto& reconPair : output.markerObservations[i])
         {
-          // Check whether the labels match
-          if (reconToReal.count(reconPair.first) > 0
-              && reconToReal.at(reconPair.first) == goldPair.first)
+          if ((point - reconPair.second).squaredNorm() < 1e-7)
           {
-            // We match!
-            matches++;
+            std::pair<std::string, Eigen::Vector3s> reconMarker
+                = output.markerOffsets.at(reconPair.first);
+            totalPoints++;
+            if (reconMarker.first == goldMarker.first)
+            {
+              matchedBodyPoints++;
+              totalOffsetError
+                  += (reconMarker.second - goldMarker.second).norm();
+            }
+            break;
           }
         }
       }
     }
 
-    s_t frameAccuracy = matches / goldLabels.size();
-    if (frameAccuracy > maxAccuracy)
-    {
-      maxAccuracy = frameAccuracy;
-    }
-    if (frameAccuracy < minAccuracy)
-    {
-      minAccuracy = frameAccuracy;
-    }
-    avgAccuracy += frameAccuracy;
-  }
-  avgAccuracy /= labeledPointClouds.size();
+    if (matchedBodyPoints > 0)
+      totalOffsetError /= matchedBodyPoints;
+    s_t bodyAccuracy = (s_t)totalPoints / matchedBodyPoints;
 
-  std::cout << "Average label accuracy on " << labeledPointClouds.size()
-            << " frames: " << avgAccuracy << " (min=" << minAccuracy
-            << ",max=" << maxAccuracy << ")" << std::endl;
+    std::cout << "On " << totalPoints << " points, got body right "
+              << (bodyAccuracy * 100) << " percent of the time." << std::endl;
+    std::cout << "On the correctly assigned points, marker offset error was "
+              << totalOffsetError << " on average" << std::endl;
+  }
+  */
+}
+
+//==============================================================================
+NeuralMarkerLabeller::NeuralMarkerLabeller(
+    std::function<std::vector<std::map<std::string, Eigen::Vector3s>>(
+        const std::vector<std::vector<Eigen::Vector3s>>&)> jointCenterPredictor)
+  : mJointCenterPredictor(jointCenterPredictor)
+{
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>
+NeuralMarkerLabeller::guessJointLocations(
+    const std::vector<std::vector<Eigen::Vector3s>>& pointClouds)
+{
+  return mJointCenterPredictor(pointClouds);
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>
+MarkerLabellerMock::guessJointLocations(
+    const std::vector<std::vector<Eigen::Vector3s>>& pointClouds)
+{
+  (void)pointClouds;
+  // This is a mock, so we just return the mocked value
+  return mJointsOverTime;
+}
+
+//==============================================================================
+void MarkerLabellerMock::setMockJointLocations(
+    std::vector<std::map<std::string, Eigen::Vector3s>> jointsOverTime)
+{
+  mJointsOverTime = jointsOverTime;
 }
 
 } // namespace biomechanics

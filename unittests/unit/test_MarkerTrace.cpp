@@ -123,6 +123,7 @@ TEST(LABELLER, MAKE_TRACES_PARALLEL_TRACES)
 }
 #endif
 
+/*
 #ifdef ALL_TESTS
 TEST(LABELLER, COMPUTE_JOINT_FINGERPRINTS)
 {
@@ -270,3 +271,4 @@ TEST(LABELLER, COMPUTE_FINGERPRINTS_VARIANCE)
   traces[0].computeJointFingerprints(jointsOverTime, jointParents);
 }
 #endif
+*/

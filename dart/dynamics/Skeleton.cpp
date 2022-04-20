@@ -4349,6 +4349,23 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
 }
 
 //==============================================================================
+/// This returns a map with the world positions of each joint, keyed by joint
+/// name
+std::map<std::string, Eigen::Vector3s> Skeleton::getJointWorldPositionsMap()
+    const
+{
+  std::map<std::string, Eigen::Vector3s> result;
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    result[getJoint(i)->getName()]
+        = (getJoint(i)->getChildBodyNode()->getWorldTransform()
+           * getJoint(i)->getTransformFromChildBodyNode())
+              .translation();
+  }
+  return result;
+}
+
+//==============================================================================
 /// This returns the concatenated 3-vectors for world angle of each joint's
 /// child space in 3D world space, for the registered joints.
 Eigen::VectorXs Skeleton::getJointWorldAngles(

@@ -135,8 +135,7 @@ Eigen::Ref<Eigen::VectorXs> MultiShot::getPinnedForce(int time)
   assert(false && "Control should never reach this point");
   // Control should never reach this point, but this keeps the compiler from
   // complaining
-  Eigen::VectorXs zero = Eigen::VectorXs::Zero(0);
-  return zero;
+  return mShots[0]->getPinnedForce(time);
 }
 
 //==============================================================================

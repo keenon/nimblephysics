@@ -4079,6 +4079,36 @@ Eigen::Vector3s closestPointOnLineGradient(
          + dRelative * lineDirection;
 }
 
+//==============================================================================
+/// This computes and returns the distance to the closest point on a line
+/// segment
+s_t distanceToSegment(
+    const Eigen::Vector3s& segmentPointA,
+    const Eigen::Vector3s& segmentPointB,
+    const Eigen::Vector3s& goalPoint)
+{
+  // From A to B
+  Eigen::Vector3s dir = (segmentPointB - segmentPointA).normalized();
+
+  s_t onDir = dir.dot(goalPoint);
+  s_t aOnDir = dir.dot(segmentPointA);
+  s_t bOnDir = dir.dot(segmentPointB);
+  assert(aOnDir <= bOnDir);
+  if (onDir < aOnDir)
+  {
+    return (segmentPointA - goalPoint).norm();
+  }
+  else if (onDir > bOnDir)
+  {
+    return (segmentPointB - goalPoint).norm();
+  }
+  else
+  {
+    Eigen::Vector3s closestPoint = segmentPointA + dir * (onDir - aOnDir);
+    return (closestPoint - goalPoint).norm();
+  }
+}
+
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)
 {
 }

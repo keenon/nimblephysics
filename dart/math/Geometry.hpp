@@ -827,6 +827,13 @@ Eigen::Vector3s closestPointOnLineGradient(
     const Eigen::Vector3s& goalPoint,
     const Eigen::Vector3s& goalPointGradient);
 
+/// This computes and returns the distance to the closest point on a line
+/// segment
+s_t distanceToSegment(
+    const Eigen::Vector3s& segmentPointA,
+    const Eigen::Vector3s& segmentPointB,
+    const Eigen::Vector3s& goalPoint);
+
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox
 {
