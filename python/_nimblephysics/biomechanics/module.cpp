@@ -45,6 +45,7 @@ void BatchGaitInverseDynamics(py::module& sm);
 void OpenSimParser(py::module& sm);
 void SkeletonConverter(py::module& sm);
 void MarkerFitter(py::module& sm);
+void MarkerLabeller(py::module& sm);
 void IKErrorReport(py::module& sm);
 void Anthropometrics(py::module& sm);
 void C3DLoader(py::module& sm);
@@ -62,6 +63,7 @@ void dart_biomechanics(py::module& m)
   OpenSimParser(sm);
   SkeletonConverter(sm);
   MarkerFitter(sm);
+  MarkerLabeller(sm);
   IKErrorReport(sm);
   Anthropometrics(sm);
   C3DLoader(sm);

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "dart/dart.hpp"
+#include "dart/math/LinearFunction.hpp"
 
 #include "TestHelpers.hpp"
 
@@ -66,7 +67,7 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
               << customAcc_dp_fd << std::endl;
     std::cout << "Diff: " << std::endl
               << customAcc_dp - customAcc_dp_fd << std::endl;
-    EXPECT_TRUE(equals(customAcc_dp, customAcc_dp_fd, 1e-9));
+    EXPECT_TRUE(equals(customAcc_dp, customAcc_dp_fd, 3e-9));
     return false;
   }
 

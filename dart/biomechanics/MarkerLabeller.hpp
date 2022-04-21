@@ -109,6 +109,8 @@ struct LabelledMarkers
 class MarkerLabeller
 {
 public:
+  virtual ~MarkerLabeller();
+
   virtual std::vector<std::map<std::string, Eigen::Vector3s>>
   guessJointLocations(
       const std::vector<std::vector<Eigen::Vector3s>>& pointClouds)
@@ -147,6 +149,8 @@ public:
           const std::vector<std::vector<Eigen::Vector3s>>&)>
           jointCenterPredictor);
 
+  virtual ~NeuralMarkerLabeller();
+
   virtual std::vector<std::map<std::string, Eigen::Vector3s>>
   guessJointLocations(
       const std::vector<std::vector<Eigen::Vector3s>>& pointClouds);
@@ -160,6 +164,8 @@ protected:
 class MarkerLabellerMock : public MarkerLabeller
 {
 public:
+  virtual ~MarkerLabellerMock();
+
   virtual std::vector<std::map<std::string, Eigen::Vector3s>>
   guessJointLocations(
       const std::vector<std::vector<Eigen::Vector3s>>& pointClouds);

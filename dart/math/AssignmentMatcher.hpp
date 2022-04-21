@@ -1,5 +1,5 @@
-#ifndef MATH_LINEARFN_H_
-#define MATH_LINEARFN_H_
+#ifndef MATH_ASSIGNMENT_MATCHER_H_
+#define MATH_ASSIGNMENT_MATCHER_H_
 
 #include "dart/math/CustomFunction.hpp"
 #include "dart/math/MathTypes.hpp"

@@ -443,6 +443,11 @@ void MarkerLabeller::matchUpJointToSkeletonJoint(
 }
 
 //==============================================================================
+MarkerLabeller::~MarkerLabeller()
+{
+}
+
+//==============================================================================
 LabelledMarkers MarkerLabeller::labelPointClouds(
     const std::vector<std::vector<Eigen::Vector3s>>& pointClouds,
     s_t mergeMarkersThreshold)
@@ -990,11 +995,21 @@ NeuralMarkerLabeller::NeuralMarkerLabeller(
 }
 
 //==============================================================================
+NeuralMarkerLabeller::~NeuralMarkerLabeller()
+{
+}
+
+//==============================================================================
 std::vector<std::map<std::string, Eigen::Vector3s>>
 NeuralMarkerLabeller::guessJointLocations(
     const std::vector<std::vector<Eigen::Vector3s>>& pointClouds)
 {
   return mJointCenterPredictor(pointClouds);
+}
+
+//==============================================================================
+MarkerLabellerMock::~MarkerLabellerMock()
+{
 }
 
 //==============================================================================

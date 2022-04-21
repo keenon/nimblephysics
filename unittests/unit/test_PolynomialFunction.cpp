@@ -81,7 +81,7 @@ TEST(Polynomial, COMPLEX_POLY)
 
   PolynomialFunction poly(coeffs);
 
-  s_t THRESHOLD = 1e-5;
+  s_t THRESHOLD = 3e-5;
 
   for (s_t x = -1.0; x < 1.0; x += 0.027)
   {

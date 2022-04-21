@@ -1104,6 +1104,7 @@ TEST(MarkerFitter, ROTATE_IN_BOUNDS)
   // bounds.
   /////////////////////////////////////////////////////////////////////
 
+  srand(42);
   for (int i = 0; i < 1000; i++)
   {
     Eigen::Vector3s angles = Eigen::Vector3s::Random() * 2 * M_PI;
@@ -1661,6 +1662,8 @@ TEST(MarkerFitter, DERIVATIVES)
   osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
   // osim->autogroupSymmetricSuffixes();
 
+  srand(42);
+
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
@@ -1732,6 +1735,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
+  srand(42);
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
@@ -1795,6 +1799,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD)
   osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
   // osim->autogroupSymmetricSuffixes();
 
+  srand(42);
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
@@ -1867,6 +1872,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
   std::shared_ptr<dynamics::Skeleton> osimBallJoints
       = osim->convertSkeletonToBallJoints();
 
+  srand(42);
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
   markers["0"] = std::make_pair(
@@ -2072,7 +2078,7 @@ TEST(MarkerFitter, SPHERE_FIT_GRAD)
               << bruteForce << std::endl
               << "Diff:" << std::endl
               << analytical - bruteForce << std::endl;
-    EXPECT_TRUE(equals(analytical, bruteForce, 1e-8));
+    EXPECT_TRUE(equals(analytical, bruteForce, 5e-8));
   }
 
   // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
@@ -2137,6 +2143,7 @@ TEST(MarkerFitter, AXIS_FIT_GRAD)
 
   standard.skeleton->setGroupScales(init.groupScales);
 
+  srand(42);
   Eigen::MatrixXs out;
   CylinderFitJointAxisProblem cylinderProblem(
       &fitter,

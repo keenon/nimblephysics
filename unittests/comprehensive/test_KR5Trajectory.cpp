@@ -337,6 +337,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
           gradWrtRollout->getVels().setZero();
           gradWrtRollout->getControlForces().setZero();
 
+          /*
           Eigen::MatrixXs forces = rollout->getVelsConst();
           s_t forcesLoss = 0.0;
           for (int i = 0; i < forces.cols(); i++)
@@ -348,6 +349,7 @@ TEST(KR5_EXAMPLE, FULL_TEST)
               gradWrtRollout->getVels()(j, i) = 2 * forces(j, i) * scaling;
             }
           }
+          */
 
           return ikLoss;
         };
