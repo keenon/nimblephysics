@@ -65,12 +65,15 @@ RUN git clone https://github.com/assimp/assimp.git && \
 # Install LAPACK
 RUN yum install -y lapack-devel
 
+ENV FCFLAGS="-w -fallow-argument-mismatch -O2"
+ENV FFLAGS="-w -fallow-argument-mismatch -O2"
+
 # Install MUMPS
 RUN git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git && \
     pushd ThirdParty-Mumps && \
     ./get.Mumps && \
-    ./configure && \
-    make -j14 && \
+    ./configure --with-precision=double && \
+    make && \
     make install && \
     popd && \
     rm -rf ThirdParty-Mumps

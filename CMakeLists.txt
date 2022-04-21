@@ -7,6 +7,9 @@ else()
   cmake_minimum_required(VERSION 3.5.1)
 endif()
 
+# Build universal binaries on OSX - this needs to be set before the project() command
+# set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
+
 project(dart)
 
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)

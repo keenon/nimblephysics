@@ -81,6 +81,9 @@ sudo make install
 popd
 sudo rm -rf ThirdParty-Mumps
 
+# NOTE: on local arm64 M1 mac, I've had to do the following when I get linker errors during "delocate"
+# ln -s /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.1.dylib /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.dylib 
+
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
