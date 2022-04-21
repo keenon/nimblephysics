@@ -151,6 +151,8 @@ jobs:
           /bin/bash -c '\
           cd /nimblephysics;\
           VER=$(cat ./VERSION.txt);\
+          PATH="${PYTHON_PATH}:${PATH}";\
+          CPATH="${PYTHON_INCLUDE}";\
           echo "VER=$VER";\
           echo "PYTHON=$PYTHON";\
           echo "PYTHON_VERSION_CODE=$PYTHON_VERSION_CODE";\
@@ -158,18 +160,19 @@ jobs:
           echo "PYTHON_LIB=$PYTHON_LIB";\
           echo "PYTHON_VERSION_NUMBER=$PYTHON_VERSION_NUMBER";\
           echo "PYTHON_PATH=$PYTHON_PATH";\
+          echo "PATH=$PATH";\
+          echo "CPATH=$CPATH";\
           ${PYTHON} -m pip install pytest wheel auditwheel;\
           cd /;\
           git clone https://github.com/pybind/pybind11.git;\
           pushd pybind11;\
           mkdir build;\
           pushd build;\
-          echo "Running >PATH=\"${PYTHON_PATH}:${PATH}\" CPATH=\"${PYTHON_INCLUDE}\" cmake .."
-          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" cmake ..;\
-          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" make install -j2;\
+          cmake -DPYTHON_LIBRARY=$PYTHON_LIB -DPYTHON_INCLUDE_DIR=$PYTHON_INCLUDE -DPYTHON_EXECUTABLE=$PYTHON ..;\
+          make install -j4;\
           cd /nimblephysics;\
-          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" ${PYTHON} setup.py sdist bdist_wheel;\
-          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" ${PYTHON} -m auditwheel repair dist/nimblephysics-${VER}-${PYTHON_VERSION_CODE}-linux_aarch64.whl;\
+          ${PYTHON} setup.py sdist bdist_wheel;\
+          ${PYTHON} -m auditwheel repair dist/nimblephysics-${VER}-${PYTHON_VERSION_CODE}-linux_aarch64.whl;\
           '
       - name: Publish artifact
         uses: actions/upload-artifact@v2
