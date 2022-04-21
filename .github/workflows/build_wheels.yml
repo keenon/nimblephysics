@@ -140,7 +140,8 @@ jobs:
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Run docker build
         run: |
-          docker run --rm --tty keenon/diffdart:base_aarch64 /bin/bash -c '\
+          docker run --rm --tty -v $(pwd):/nimblephysics keenon/diffdart:base_aarch64 /bin/bash -c '\
+          cd nimblephysics;\
           VER=$(cat ./VERSION.txt);\
           PYTHON=${{ matrix.PYTHON }};\
           PYTHON_VERSION=${{ matrix.PYTHON_VERSION_CODE }};\
@@ -159,9 +160,6 @@ jobs:
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel;\
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_aarch64.whl;\
           '
-      - name: Copy artifact back
-        run: |
-          docker cp $(docker ps -alq)/wheelhouse .
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:
