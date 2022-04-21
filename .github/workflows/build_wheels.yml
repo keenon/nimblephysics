@@ -140,25 +140,35 @@ jobs:
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Run docker build
         run: |
-          docker run --rm --tty -v $(pwd):/nimblephysics keenon/diffdart:base_aarch64 /bin/bash -c '\
-          cd nimblephysics;\
+          docker run --rm --tty -v $(pwd):/nimblephysics \
+          -e PYTHON=${{ matrix.PYTHON }} \
+          -e PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }} \
+          -e PYTHON_INCLUDE=${{ matrix.PYTHON_INCLUDE }} \
+          -e PYTHON_LIB=${{ matrix.PYTHON_LIB }} \
+          -e PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }} \
+          -e PYTHON_PATH=${{ matrix.PYTHON_PATH }} \
+          keenon/diffdart:base_aarch64 \
+          /bin/bash -c '\
+          cd /nimblephysics;\
           VER=$(cat ./VERSION.txt);\
-          PYTHON=${{ matrix.PYTHON }};\
-          PYTHON_VERSION=${{ matrix.PYTHON_VERSION_CODE }};\
-          PYTHON_INCLUDE=${{ matrix.PYTHON_INCLUDE }};\
-          PYTHON_LIB=${{ matrix.PYTHON_LIB }};\
-          PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }};\
-          echo "VERSION=$VER";\
+          echo "VER=$VER";\
+          echo "PYTHON=$PYTHON";\
+          echo "PYTHON_VERSION_CODE=$PYTHON_VERSION_CODE";\
+          echo "PYTHON_INCLUDE=$PYTHON_INCLUDE";\
+          echo "PYTHON_LIB=$PYTHON_LIB";\
+          echo "PYTHON_VERSION_NUMBER=$PYTHON_VERSION_NUMBER";\
           echo "VERSION=$VER" >> $GITHUB_ENV;\
           ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel;\
+          cd /;\
           git clone https://github.com/pybind/pybind11.git;\
           pushd pybind11;\
           mkdir build;\
           pushd build;\
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..;\
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2;\
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel;\
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_aarch64.whl;\
+          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" cmake ..;\
+          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" make install -j2;\
+          cd /nimblephysics;\
+          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" ${PYTHON} setup.py sdist bdist_wheel;\
+          PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" ${PYTHON} -m auditwheel repair dist/nimblephysics-${VER}-${PYTHON_VERSION_CODE}-linux_aarch64.whl;\
           '
       - name: Publish artifact
         uses: actions/upload-artifact@v2
