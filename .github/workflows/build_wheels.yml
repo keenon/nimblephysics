@@ -157,13 +157,14 @@ jobs:
           echo "PYTHON_INCLUDE=$PYTHON_INCLUDE";\
           echo "PYTHON_LIB=$PYTHON_LIB";\
           echo "PYTHON_VERSION_NUMBER=$PYTHON_VERSION_NUMBER";\
-          echo "VERSION=$VER" >> $GITHUB_ENV;\
-          ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel;\
+          echo "PYTHON_PATH=$PYTHON_PATH";\
+          ${PYTHON} -m pip install pytest wheel auditwheel;\
           cd /;\
           git clone https://github.com/pybind/pybind11.git;\
           pushd pybind11;\
           mkdir build;\
           pushd build;\
+          echo "Running >PATH=\"${PYTHON_PATH}:${PATH}\" CPATH=\"${PYTHON_INCLUDE}\" cmake .."
           PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" cmake ..;\
           PATH="${PYTHON_PATH}:${PATH}" CPATH="${PYTHON_INCLUDE}" make install -j2;\
           cd /nimblephysics;\
