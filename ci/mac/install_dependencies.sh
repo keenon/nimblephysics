@@ -280,8 +280,8 @@ sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libas
 # brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="69"
-ICU4C_FULL_VERSION="69.1"
+ICU4C_MAJOR_VERSION="70"
+ICU4C_FULL_VERSION="70.1"
 if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
       pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 else
