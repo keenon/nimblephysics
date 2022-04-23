@@ -2,8 +2,6 @@ name: Build and Publish Wheels
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 jobs:
   build-linux-x86_64:
     name: Linux Python x86_64 ${{ matrix.python-version }} - Build Wheels
