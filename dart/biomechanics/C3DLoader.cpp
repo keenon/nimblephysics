@@ -3,6 +3,7 @@
 #include <algorithm> // std::sort
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <unordered_map>
 #include <vector>
 
@@ -350,6 +351,32 @@ C3D C3DLoader::loadC3D(const std::string& uri)
       {
         pair.second = R * pair.second;
       }
+    }
+  }
+
+  // These are useful for faster access to the pre-random-order marker data in
+  // certain situations, for example in neural models
+  result.shuffledMarkersMatrix = Eigen::MatrixXs::Zero(
+      result.markers.size(), result.markerTimesteps.size());
+  result.shuffledMarkersMatrixMask = Eigen::MatrixXs::Zero(
+      result.markers.size(), result.markerTimesteps.size());
+
+  std::vector<std::string> markerNames = result.markers;
+  auto rng = std::default_random_engine();
+
+  for (int t = 0; t < result.markerTimesteps.size(); t++)
+  {
+    int counter = 0;
+
+    std::shuffle(std::begin(markerNames), std::end(markerNames), rng);
+
+    for (std::string name : markerNames)
+    {
+      result.shuffledMarkersMatrix.block<3, 1>(counter * 3, t)
+          = result.markerTimesteps[t][name];
+      result.shuffledMarkersMatrixMask.block<3, 1>(counter * 3, t)
+          .setConstant(1.0);
+      counter++;
     }
   }
 

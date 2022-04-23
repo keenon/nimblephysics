@@ -30,6 +30,9 @@ struct C3D
   std::vector<std::string> markers;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
   std::vector<ForcePlate> forcePlates;
+  // These are useful for faster access to the marker data in certain situations
+  Eigen::MatrixXs shuffledMarkersMatrix;
+  Eigen::MatrixXs shuffledMarkersMatrixMask;
 };
 
 class C3DLoader
