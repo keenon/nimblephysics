@@ -357,9 +357,9 @@ C3D C3DLoader::loadC3D(const std::string& uri)
   // These are useful for faster access to the pre-random-order marker data in
   // certain situations, for example in neural models
   result.shuffledMarkersMatrix = Eigen::MatrixXs::Zero(
-      result.markers.size(), result.markerTimesteps.size());
+      result.markers.size() * 3, result.markerTimesteps.size());
   result.shuffledMarkersMatrixMask = Eigen::MatrixXs::Zero(
-      result.markers.size(), result.markerTimesteps.size());
+      result.markers.size() * 3, result.markerTimesteps.size());
 
   std::vector<std::string> markerNames = result.markers;
   auto rng = std::default_random_engine();
@@ -372,11 +372,14 @@ C3D C3DLoader::loadC3D(const std::string& uri)
 
     for (std::string name : markerNames)
     {
-      result.shuffledMarkersMatrix.block<3, 1>(counter * 3, t)
-          = result.markerTimesteps[t][name];
-      result.shuffledMarkersMatrixMask.block<3, 1>(counter * 3, t)
-          .setConstant(1.0);
-      counter++;
+      if (result.markerTimesteps[t].count(name) > 0)
+      {
+        result.shuffledMarkersMatrix.block(counter * 3, t, 3, 1)
+            = result.markerTimesteps[t][name];
+        result.shuffledMarkersMatrixMask.block<3, 1>(counter * 3, t)
+            .setConstant(1.0);
+        counter++;
+      }
     }
   }
 
