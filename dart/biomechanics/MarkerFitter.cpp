@@ -1334,7 +1334,8 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
     MarkerInitialization& initialization,
-    int numSamples)
+    int numSamples,
+    bool applyInnerProblemGradientConstraints)
 {
   // Before using Eigen in a multi-threaded environment, we need to explicitly
   // call this (at least prior to Eigen 3.3)
@@ -1415,7 +1416,12 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
   // If you try to leave `problem` on the stack, you'll get invalid free
   // exceptions when IPOpt attempts to free it.
   BilevelFitProblem* problem = new BilevelFitProblem(
-      this, markerObservations, initialization, numSamples, result);
+      this,
+      markerObservations,
+      initialization,
+      numSamples,
+      applyInnerProblemGradientConstraints,
+      result);
   result->sampleIndices = problem->getSampleIndices();
 
   SmartPtr<BilevelFitProblem> problemPtr(problem);
@@ -4880,10 +4886,12 @@ BilevelFitProblem::BilevelFitProblem(
         markerObservations,
     MarkerInitialization& initialization,
     int numSamples,
+    bool applyInnerProblemGradientConstraints,
     std::shared_ptr<BilevelFitResult>& outResult)
   : mFitter(fitter),
     mOutResult(outResult),
     mInitialization(initialization),
+    mApplyInnerProblemGradientConstraints(applyInnerProblemGradientConstraints),
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Select the random indices we'll be using for this problem
@@ -5123,76 +5131,79 @@ Eigen::VectorXs BilevelFitProblem::getConstraints(Eigen::VectorXs x)
   Eigen::VectorXs ikGrad
       = Eigen::VectorXs::Zero(mFitter->mSkeleton->getNumDofs());
 
-  bool multiThreaded = true;
-  if (multiThreaded)
+  if (mApplyInnerProblemGradientConstraints)
   {
-    std::vector<std::future<Eigen::VectorXs>> futures;
-    for (int k = 0; k < mNumThreads; k++)
+    bool multiThreaded = true;
+    if (multiThreaded)
     {
-      std::vector<int> threadCursors = mPerThreadCursor[k];
-      std::shared_ptr<dynamics::Skeleton> threadSkeleton
-          = mPerThreadSkeletons[k];
-      threadSkeleton->setGroupScales(mFitter->mSkeleton->getGroupScales());
-
-      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-          threadMarkers;
-      for (auto pair : markers)
+      std::vector<std::future<Eigen::VectorXs>> futures;
+      for (int k = 0; k < mNumThreads; k++)
       {
-        threadMarkers.emplace_back(
-            threadSkeleton->getBodyNode(pair.first->getName()), pair.second);
+        std::vector<int> threadCursors = mPerThreadCursor[k];
+        std::shared_ptr<dynamics::Skeleton> threadSkeleton
+            = mPerThreadSkeletons[k];
+        threadSkeleton->setGroupScales(mFitter->mSkeleton->getGroupScales());
+
+        std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+            threadMarkers;
+        for (auto pair : markers)
+        {
+          threadMarkers.emplace_back(
+              threadSkeleton->getBodyNode(pair.first->getName()), pair.second);
+        }
+
+        futures.push_back(
+            std::async([&, threadCursors, threadSkeleton, threadMarkers]() {
+              Eigen::VectorXs ikGradLocal
+                  = Eigen::VectorXs::Zero(threadSkeleton->getNumDofs());
+
+              for (int i : threadCursors)
+              {
+                int offset = scaleGroupDims + markerOffsetDims
+                             + (i * threadSkeleton->getNumDofs());
+                Eigen::VectorXs pose
+                    = x.segment(offset, threadSkeleton->getNumDofs());
+                threadSkeleton->setPositions(pose);
+
+                // Get loss wrt joint positions
+                ikGradLocal += mFitter->getMarkerLossGradientWrtJoints(
+                                   threadSkeleton,
+                                   threadMarkers,
+                                   mFitter->getIKLossGradWrtMarkerError(
+                                       mFitter->getMarkerError(
+                                           threadSkeleton,
+                                           threadMarkers,
+                                           mMarkerObservations[i])))
+                               * mObservationWeights(i);
+              }
+
+              return ikGradLocal;
+            }));
       }
-
-      futures.push_back(
-          std::async([&, threadCursors, threadSkeleton, threadMarkers]() {
-            Eigen::VectorXs ikGradLocal
-                = Eigen::VectorXs::Zero(threadSkeleton->getNumDofs());
-
-            for (int i : threadCursors)
-            {
-              int offset = scaleGroupDims + markerOffsetDims
-                           + (i * threadSkeleton->getNumDofs());
-              Eigen::VectorXs pose
-                  = x.segment(offset, threadSkeleton->getNumDofs());
-              threadSkeleton->setPositions(pose);
-
-              // Get loss wrt joint positions
-              ikGradLocal += mFitter->getMarkerLossGradientWrtJoints(
-                                 threadSkeleton,
-                                 threadMarkers,
-                                 mFitter->getIKLossGradWrtMarkerError(
-                                     mFitter->getMarkerError(
-                                         threadSkeleton,
-                                         threadMarkers,
-                                         mMarkerObservations[i])))
-                             * mObservationWeights(i);
-            }
-
-            return ikGradLocal;
-          }));
+      for (int k = 0; k < mNumThreads; k++)
+      {
+        ikGrad += futures[k].get();
+      }
     }
-    for (int k = 0; k < mNumThreads; k++)
+    else
     {
-      ikGrad += futures[k].get();
-    }
-  }
-  else
-  {
-    for (int i = 0; i < mMarkerObservations.size(); i++)
-    {
-      int offset = scaleGroupDims + markerOffsetDims
-                   + (i * mFitter->mSkeleton->getNumDofs());
-      Eigen::VectorXs pose
-          = x.segment(offset, mFitter->mSkeleton->getNumDofs());
-      mFitter->mSkeleton->setPositions(pose);
+      for (int i = 0; i < mMarkerObservations.size(); i++)
+      {
+        int offset = scaleGroupDims + markerOffsetDims
+                     + (i * mFitter->mSkeleton->getNumDofs());
+        Eigen::VectorXs pose
+            = x.segment(offset, mFitter->mSkeleton->getNumDofs());
+        mFitter->mSkeleton->setPositions(pose);
 
-      // Get loss wrt joint positions
-      ikGrad
-          += mFitter->getMarkerLossGradientWrtJoints(
-                 mFitter->mSkeleton,
-                 markers,
-                 mFitter->getIKLossGradWrtMarkerError(mFitter->getMarkerError(
-                     mFitter->mSkeleton, markers, mMarkerObservations[i])))
-             * mObservationWeights(i);
+        // Get loss wrt joint positions
+        ikGrad
+            += mFitter->getMarkerLossGradientWrtJoints(
+                   mFitter->mSkeleton,
+                   markers,
+                   mFitter->getIKLossGradWrtMarkerError(mFitter->getMarkerError(
+                       mFitter->mSkeleton, markers, mMarkerObservations[i])))
+               * mObservationWeights(i);
+      }
     }
   }
 
@@ -5245,118 +5256,127 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
       = mFitter->setConfiguration(
           mFitter->mSkeleton, firstPose, groupScales, markerOffsets);
 
-  bool multiThreaded = true;
-  if (multiThreaded)
+  if (mApplyInnerProblemGradientConstraints)
   {
-    std::vector<std::future<Eigen::MatrixXs>> futures;
-    for (int k = 0; k < mNumThreads; k++)
+    bool multiThreaded = true;
+    if (multiThreaded)
     {
-      std::vector<int> threadCursors = mPerThreadCursor[k];
-      std::shared_ptr<dynamics::Skeleton> threadSkeleton
-          = mPerThreadSkeletons[k];
-      threadSkeleton->setGroupScales(mFitter->mSkeleton->getGroupScales());
-
-      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-          threadMarkers;
-      for (auto pair : markers)
+      std::vector<std::future<Eigen::MatrixXs>> futures;
+      for (int k = 0; k < mNumThreads; k++)
       {
-        threadMarkers.emplace_back(
-            threadSkeleton->getBodyNode(pair.first->getName()), pair.second);
-      }
+        std::vector<int> threadCursors = mPerThreadCursor[k];
+        std::shared_ptr<dynamics::Skeleton> threadSkeleton
+            = mPerThreadSkeletons[k];
+        threadSkeleton->setGroupScales(mFitter->mSkeleton->getGroupScales());
 
-      futures.push_back(std::async([&,
-                                    threadCursors,
-                                    threadSkeleton,
-                                    threadMarkers]() {
-        Eigen::MatrixXs markersAndScalesLocalJac = Eigen::MatrixXs::Zero(
-            threadSkeleton->getNumDofs(), scaleGroupDims + markerOffsetDims);
-
-        for (int i : threadCursors)
+        std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+            threadMarkers;
+        for (auto pair : markers)
         {
-          int offset = scaleGroupDims + markerOffsetDims
-                       + (i * threadSkeleton->getNumDofs());
-          Eigen::VectorXs pose
-              = x.segment(offset, threadSkeleton->getNumDofs());
-          threadSkeleton->setPositions(pose);
-
-          Eigen::VectorXs markerError = mFitter->getMarkerError(
-              threadSkeleton, threadMarkers, mMarkerObservations[i]);
-          std::vector<int> sparsityMap
-              = mFitter->getSparsityMap(threadMarkers, mMarkerObservations[i]);
-
-          // Get loss wrt joint positions
-          jac.block(
-              0,
-              offset,
-              threadSkeleton->getNumDofs(),
-              threadSkeleton->getNumDofs())
-              = mFitter->getIKLossGradientWrtJointsJacobianWrtJoints(
-                    threadSkeleton, threadMarkers, markerError, sparsityMap)
-                * mObservationWeights(i);
-
-          // Acculumulate loss wrt the global scale groups
-          markersAndScalesLocalJac.block(
-              0, 0, threadSkeleton->getNumDofs(), scaleGroupDims)
-              += mFitter->getIKLossGradientWrtJointsJacobianWrtGroupScales(
-                     threadSkeleton, threadMarkers, markerError, sparsityMap)
-                 * mObservationWeights(i);
-          // Acculumulate loss wrt the global marker offsets
-          markersAndScalesLocalJac.block(
-              0, scaleGroupDims, threadSkeleton->getNumDofs(), markerOffsetDims)
-              += mFitter->getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
-                     threadSkeleton, threadMarkers, markerError, sparsityMap)
-                 * mObservationWeights(i);
+          threadMarkers.emplace_back(
+              threadSkeleton->getBodyNode(pair.first->getName()), pair.second);
         }
 
-        return markersAndScalesLocalJac;
-      }));
+        futures.push_back(std::async([&,
+                                      threadCursors,
+                                      threadSkeleton,
+                                      threadMarkers]() {
+          Eigen::MatrixXs markersAndScalesLocalJac = Eigen::MatrixXs::Zero(
+              threadSkeleton->getNumDofs(), scaleGroupDims + markerOffsetDims);
+
+          for (int i : threadCursors)
+          {
+            int offset = scaleGroupDims + markerOffsetDims
+                         + (i * threadSkeleton->getNumDofs());
+            Eigen::VectorXs pose
+                = x.segment(offset, threadSkeleton->getNumDofs());
+            threadSkeleton->setPositions(pose);
+
+            Eigen::VectorXs markerError = mFitter->getMarkerError(
+                threadSkeleton, threadMarkers, mMarkerObservations[i]);
+            std::vector<int> sparsityMap = mFitter->getSparsityMap(
+                threadMarkers, mMarkerObservations[i]);
+
+            // Get loss wrt joint positions
+            jac.block(
+                0,
+                offset,
+                threadSkeleton->getNumDofs(),
+                threadSkeleton->getNumDofs())
+                = mFitter->getIKLossGradientWrtJointsJacobianWrtJoints(
+                      threadSkeleton, threadMarkers, markerError, sparsityMap)
+                  * mObservationWeights(i);
+
+            // Acculumulate loss wrt the global scale groups
+            markersAndScalesLocalJac.block(
+                0, 0, threadSkeleton->getNumDofs(), scaleGroupDims)
+                += mFitter->getIKLossGradientWrtJointsJacobianWrtGroupScales(
+                       threadSkeleton, threadMarkers, markerError, sparsityMap)
+                   * mObservationWeights(i);
+            // Acculumulate loss wrt the global marker offsets
+            markersAndScalesLocalJac.block(
+                0,
+                scaleGroupDims,
+                threadSkeleton->getNumDofs(),
+                markerOffsetDims)
+                += mFitter->getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
+                       threadSkeleton, threadMarkers, markerError, sparsityMap)
+                   * mObservationWeights(i);
+          }
+
+          return markersAndScalesLocalJac;
+        }));
+      }
+      for (int k = 0; k < mNumThreads; k++)
+      {
+        jac.block(
+            0,
+            0,
+            mFitter->mSkeleton->getNumDofs(),
+            scaleGroupDims + markerOffsetDims)
+            += futures[k].get();
+      }
     }
-    for (int k = 0; k < mNumThreads; k++)
+    else
     {
-      jac.block(
-          0,
-          0,
-          mFitter->mSkeleton->getNumDofs(),
-          scaleGroupDims + markerOffsetDims)
-          += futures[k].get();
-    }
-  }
-  else
-  {
-    for (int i = 0; i < mMarkerObservations.size(); i++)
-    {
-      int offset = scaleGroupDims + markerOffsetDims
-                   + (i * mFitter->mSkeleton->getNumDofs());
-      Eigen::VectorXs pose
-          = x.segment(offset, mFitter->mSkeleton->getNumDofs());
-      mFitter->mSkeleton->setPositions(pose);
+      for (int i = 0; i < mMarkerObservations.size(); i++)
+      {
+        int offset = scaleGroupDims + markerOffsetDims
+                     + (i * mFitter->mSkeleton->getNumDofs());
+        Eigen::VectorXs pose
+            = x.segment(offset, mFitter->mSkeleton->getNumDofs());
+        mFitter->mSkeleton->setPositions(pose);
 
-      Eigen::VectorXs markerError = mFitter->getMarkerError(
-          mFitter->mSkeleton, markers, mMarkerObservations[i]);
-      std::vector<int> sparsityMap
-          = mFitter->getSparsityMap(markers, mMarkerObservations[i]);
+        Eigen::VectorXs markerError = mFitter->getMarkerError(
+            mFitter->mSkeleton, markers, mMarkerObservations[i]);
+        std::vector<int> sparsityMap
+            = mFitter->getSparsityMap(markers, mMarkerObservations[i]);
 
-      // Get loss wrt joint positions
-      jac.block(
-          0,
-          offset,
-          mFitter->mSkeleton->getNumDofs(),
-          mFitter->mSkeleton->getNumDofs())
-          = mFitter->getIKLossGradientWrtJointsJacobianWrtJoints(
-                mFitter->mSkeleton, markers, markerError, sparsityMap)
-            * mObservationWeights(i);
+        // Get loss wrt joint positions
+        jac.block(
+            0,
+            offset,
+            mFitter->mSkeleton->getNumDofs(),
+            mFitter->mSkeleton->getNumDofs())
+            = mFitter->getIKLossGradientWrtJointsJacobianWrtJoints(
+                  mFitter->mSkeleton, markers, markerError, sparsityMap)
+              * mObservationWeights(i);
 
-      // Acculumulate loss wrt the global scale groups
-      jac.block(0, 0, mFitter->mSkeleton->getNumDofs(), scaleGroupDims)
-          += mFitter->getIKLossGradientWrtJointsJacobianWrtGroupScales(
-                 mFitter->mSkeleton, markers, markerError, sparsityMap)
-             * mObservationWeights(i);
-      // Acculumulate loss wrt the global marker offsets
-      jac.block(
-          0, scaleGroupDims, mFitter->mSkeleton->getNumDofs(), markerOffsetDims)
-          += mFitter->getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
-                 mFitter->mSkeleton, markers, markerError, sparsityMap)
-             * mObservationWeights(i);
+        // Acculumulate loss wrt the global scale groups
+        jac.block(0, 0, mFitter->mSkeleton->getNumDofs(), scaleGroupDims)
+            += mFitter->getIKLossGradientWrtJointsJacobianWrtGroupScales(
+                   mFitter->mSkeleton, markers, markerError, sparsityMap)
+               * mObservationWeights(i);
+        // Acculumulate loss wrt the global marker offsets
+        jac.block(
+            0,
+            scaleGroupDims,
+            mFitter->mSkeleton->getNumDofs(),
+            markerOffsetDims)
+            += mFitter->getIKLossGradientWrtJointsJacobianWrtMarkerOffsets(
+                   mFitter->mSkeleton, markers, markerError, sparsityMap)
+               * mObservationWeights(i);
+      }
     }
   }
 

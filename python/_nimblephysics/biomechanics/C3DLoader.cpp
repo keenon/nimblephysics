@@ -49,7 +49,13 @@ void C3DLoader(py::module& m)
       .def_readwrite("markers", &dart::biomechanics::C3D::markers)
       .def_readwrite(
           "markerTimesteps", &dart::biomechanics::C3D::markerTimesteps)
-      .def_readwrite("forcePlates", &dart::biomechanics::C3D::forcePlates);
+      .def_readwrite("forcePlates", &dart::biomechanics::C3D::forcePlates)
+      .def_readwrite(
+          "shuffledMarkersMatrix",
+          &dart::biomechanics::C3D::shuffledMarkersMatrix)
+      .def_readwrite(
+          "shuffledMarkersMatrixMask",
+          &dart::biomechanics::C3D::shuffledMarkersMatrixMask);
 
   ::py::class_<dart::biomechanics::ForcePlate>(m, "ForcePlate")
       .def_readwrite(

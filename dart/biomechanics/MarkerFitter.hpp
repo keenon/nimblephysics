@@ -509,7 +509,8 @@ public:
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
       MarkerInitialization& initialization,
-      int numSamples);
+      int numSamples,
+      bool applyInnerProblemGradientConstraints = true);
 
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 5: Complete the intermittent pose information of the
@@ -876,6 +877,7 @@ public:
           markerObservations,
       MarkerInitialization& initialization,
       int numSamples,
+      bool applyInnerProblemGradientConstraints,
       std::shared_ptr<BilevelFitResult>& outResult);
 
   ~BilevelFitProblem();
@@ -1055,6 +1057,7 @@ protected:
   Eigen::VectorXs mAxisWeights;
   std::vector<int> mSampleIndices;
   MarkerInitialization& mInitialization;
+  bool mApplyInnerProblemGradientConstraints;
   Eigen::VectorXs mObservationWeights;
   std::shared_ptr<BilevelFitResult>& mOutResult;
 

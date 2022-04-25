@@ -261,7 +261,8 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::optimizeBilevel,
           ::py::arg("markerObservations"),
           ::py::arg("initialization"),
-          ::py::arg("numSamples"))
+          ::py::arg("numSamples"),
+          ::py::arg("applyInnerProblemGradientConstraints") = true)
       .def(
           "runMultiTrialKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runMultiTrialKinematicsPipeline,
