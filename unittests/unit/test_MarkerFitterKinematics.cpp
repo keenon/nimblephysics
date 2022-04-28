@@ -1,4 +1,9 @@
+#include <cstdio>
+#include <utility>
+
 #include <gtest/gtest.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/C3DLoader.hpp"
@@ -3824,7 +3829,7 @@ for (int i = 0; i < 4; i++)
 #endif
 
 #ifdef ALL_TESTS
-TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
+TEST(MarkerFitter, MONOLEVEL_VS_BILEVEL)
 {
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
@@ -4035,6 +4040,455 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   monolevelFinalKinematicsReport.printReport(5);
   std::cout << "Bilevel Final kinematic fit report:" << std::endl;
   finalKinematicsReport.printReport(5);
+}
+#endif
+
+#ifdef OPENSIM_TESTS
+TEST(MarkerFitter, SIMPLE_SCALING_TEST)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  Eigen::Vector3s scaling = Eigen::Vector3s::Random().cwiseAbs();
+  for (int i = 0; i < standard.skeleton->getNumBodyNodes(); i++)
+  {
+    standard.skeleton->getBodyNode(i)->setScaleUpperBound(scaling);
+    standard.skeleton->getBodyNode(i)->setScale(scaling);
+  }
+
+  std::vector<std::string> markerNames;
+  for (auto& pair : standard.markersMap)
+  {
+    markerNames.push_back(pair.first);
+  }
+  for (std::string marker : markerNames)
+  {
+    standard.markersMap[marker].second = Eigen::Vector3s::Ones();
+  }
+
+  OpenSimMot mot = OpenSimParser::loadMot(
+      standard.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/S01DN603_ik.mot");
+  OpenSimParser::saveMot(
+      standard.skeleton,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/in_rad.mot",
+      mot.timestamps,
+      mot.poses);
+  OpenSimParser::saveBodyLocationsMot(
+      standard.skeleton,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/body_world.mot",
+      mot.timestamps,
+      mot.poses);
+  OpenSimParser::saveMarkerLocationsMot(
+      standard.skeleton,
+      standard.markersMap,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/marker_world.mot",
+      mot.timestamps,
+      mot.poses);
+
+  /// Save out the scaling file
+
+  OpenSimParser::saveOsimScalingXMLFile(
+      standard.skeleton,
+      10.0,
+      1.3,
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim",
+      "rescaled.osim",
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/scaling_instructions.xml");
+
+  std::cout << "Run:" << std::endl;
+  std::cout << "cd "
+               "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+               "Rajagopal2015_v3_scaled/"
+            << std::endl;
+  std::cout << "opensim-cmd run-tool "
+               "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+               "Rajagopal2015_v3_scaled/scaling_instructions.xml"
+            << std::endl;
+  /*
+  chdir(
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/");
+  execl(
+      "opensim-cmd",
+      "run-tool",
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/scaling_instructions.xml");
+  */
+
+  /// Modify the current rescaled OpenSim file by moving the markers around
+
+  std::map<std::string, Eigen::Vector3s> bodyScalesMap;
+  for (int i = 0; i < standard.skeleton->getNumBodyNodes(); i++)
+  {
+    bodyScalesMap[standard.skeleton->getBodyNode(i)->getName()]
+        = standard.skeleton->getBodyNode(i)->getScale();
+  }
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>>
+      markerOffsetsMap;
+  for (std::string& markerName : markerNames)
+  {
+    markerOffsetsMap[markerName] = std::make_pair(
+        standard.markersMap[markerName].first->getName(),
+        standard.markersMap[markerName].second);
+  }
+
+  standard.skeleton->getBodyScales();
+
+  OpenSimParser::moveOsimMarkers(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/rescaled.osim",
+      bodyScalesMap,
+      markerOffsetsMap,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/moved_markers.osim");
+
+  OpenSimFile recovered = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/rescaled.osim");
+
+  recovered.skeleton->setPositions(standard.skeleton->getPositions());
+
+  MarkerMap recoveredMarkers;
+  for (auto& pair : standard.markersMap)
+  {
+    recoveredMarkers[pair.first] = std::make_pair(
+        recovered.skeleton->getBodyNode(pair.second.first->getName()),
+        pair.second.second);
+  }
+  std::map<std::string, Eigen::Vector3s> standardMap
+      = standard.skeleton->getJointWorldPositionsMap();
+  std::map<std::string, Eigen::Vector3s> recoveredMap
+      = recovered.skeleton->getJointWorldPositionsMap();
+
+  for (auto& pair : standardMap)
+  {
+    Eigen::Vector3s recoveredVec = recoveredMap[pair.first];
+    Eigen::Vector3s diff = pair.second - recoveredVec;
+    s_t dist = diff.norm();
+    std::cout << "Joint " << pair.first << " dist: " << dist << std::endl;
+  }
+
+  /*
+// Target markers
+std::shared_ptr<server::GUIWebsocketServer> server
+    = std::make_shared<server::GUIWebsocketServer>();
+server->serve(8070);
+server->renderSkeleton(standard.skeleton);
+server->renderSkeleton(
+    recovered.skeleton, "recovered", Eigen::Vector4s(1, 0, 0, 1));
+server->blockWhileServing();
+*/
+}
+#endif
+
+#ifdef OPENSIM_TESTS
+TEST(MarkerFitter, OPENSIM_COMPAT_TEST_1)
+{
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 150 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 10) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603.trc");
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMot(
+      scaled.skeleton,
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_ik.mot");
+
+  Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    subMarkerTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  IKErrorReport goldReport(
+      scaled.skeleton,
+      scaled.markersMap,
+      goldPoses,
+      subMarkerTimesteps,
+      anthropometrics);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(100);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = markerTrajectories.markerTimesteps;
+  std::vector<bool> newClip;
+  for (int i = 0; i < subsetTimesteps.size(); i++)
+  {
+    newClip.push_back(false);
+  }
+
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
+
+  for (auto pair : init.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport initReport(
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+
+  fitter.findJointCenters(init, newClip, subsetTimesteps);
+  fitter.findAllJointAxis(init, newClip, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
+
+  // Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = fitter.getInitialization(
+      subsetTimesteps,
+      newClip,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses));
+
+  for (auto pair : reinit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport afterJointCentersReport(
+      standard.skeleton,
+      reinit.updatedMarkerMap,
+      reinit.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Bilevel optimization
+  fitter.setIterationLimit(100);
+  std::shared_ptr<BilevelFitResult> bilevelFit
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 50);
+
+  // Fine-tune IK and re-fit all the points
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
+      subsetTimesteps,
+      newClip,
+      bilevelFit,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
+          .setInitPoses(reinit.poses)
+          .setDontRescaleBodies(true)
+          .setGroupScales(bilevelFit->groupScales)
+          .setMarkerOffsets(bilevelFit->markerOffsets));
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  std::cout << "Experts's data error report:" << std::endl;
+  goldReport.printReport(5);
+  std::cout << "Initial error report:" << std::endl;
+  initReport.printReport(5);
+  std::cout << "After joint centers report:" << std::endl;
+  afterJointCentersReport.printReport(5);
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  ////////////////////////////////////////////////////////////
+  // Write out the OSIM file along with our verification data
+  ////////////////////////////////////////////////////////////
+
+  std::vector<std::string> markerNames;
+  for (auto& pair : standard.markersMap)
+  {
+    markerNames.push_back(pair.first);
+  }
+  for (std::string marker : markerNames)
+  {
+    standard.markersMap[marker].second = Eigen::Vector3s::Ones();
+  }
+
+  OpenSimParser::saveMot(
+      standard.skeleton,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/in_rad.mot",
+      mot.timestamps,
+      finalKinematicInit.poses);
+  OpenSimParser::saveBodyLocationsMot(
+      standard.skeleton,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/body_world.mot",
+      mot.timestamps,
+      finalKinematicInit.poses);
+  OpenSimParser::saveMarkerLocationsMot(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/marker_world.mot",
+      mot.timestamps,
+      finalKinematicInit.poses);
+
+  /// Save out the scaling file
+
+  OpenSimParser::saveOsimScalingXMLFile(
+      standard.skeleton,
+      10.0,
+      1.3,
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim",
+      "rescaled.osim",
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/scaling_instructions.xml");
+
+  std::cout << "Run:" << std::endl;
+  std::cout << "cd "
+               "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+               "Rajagopal2015_v3_scaled/"
+            << std::endl;
+  std::cout << "opensim-cmd run-tool "
+               "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+               "Rajagopal2015_v3_scaled/scaling_instructions.xml"
+            << std::endl;
+  // Wait for user input
+  std::cout << "Press enter when finished: " << std::endl;
+  getchar();
+  /*
+  chdir(
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/");
+  execl(
+      "opensim-cmd",
+      "run-tool",
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/scaling_instructions.xml");
+  */
+
+  /// Modify the current rescaled OpenSim file by moving the markers around
+
+  std::cout << "Moving the markers" << std::endl;
+
+  std::map<std::string, Eigen::Vector3s> bodyScalesMap;
+  for (int i = 0; i < standard.skeleton->getNumBodyNodes(); i++)
+  {
+    bodyScalesMap[standard.skeleton->getBodyNode(i)->getName()]
+        = standard.skeleton->getBodyNode(i)->getScale();
+  }
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>>
+      markerOffsetsMap;
+  for (std::string& markerName : markerNames)
+  {
+    markerOffsetsMap[markerName] = std::make_pair(
+        finalKinematicInit.updatedMarkerMap[markerName].first->getName(),
+        finalKinematicInit.updatedMarkerMap[markerName].second);
+  }
+
+  standard.skeleton->getBodyScales();
+
+  OpenSimParser::moveOsimMarkers(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/rescaled.osim",
+      bodyScalesMap,
+      markerOffsetsMap,
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Rajagopal2015_v3_scaled/moved_markers.osim");
+
+  std::cout << "Markers moved, and written out to moved_markers.osim"
+            << std::endl;
+
+  /*
+// Target markers
+std::shared_ptr<server::GUIWebsocketServer> server
+    = std::make_shared<server::GUIWebsocketServer>();
+server->serve(8070);
+server->renderSkeleton(standard.skeleton);
+server->renderSkeleton(
+    recovered.skeleton, "recovered", Eigen::Vector4s(1, 0, 0, 1));
+server->blockWhileServing();
+*/
+}
+#endif
+
+#ifdef OPENSIM_TESTS
+TEST(MarkerFitter, FULL_PIPELINE_TEST)
+{
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+
+  auto c3d = C3DLoader::loadC3D("dart://sample/osim/Test_Output/JA1Gait35.c3d");
+  OpenSimParser::saveTRC(
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Test_Output/JA1Gait35.trc",
+      c3d.timestamps,
+      c3d.markerTimesteps);
 }
 #endif
 

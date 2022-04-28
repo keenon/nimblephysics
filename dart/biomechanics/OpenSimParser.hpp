@@ -6,6 +6,7 @@
 
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/XmlHelpers.hpp"
@@ -91,6 +92,13 @@ public:
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// This saves the *.trc file from a motion for the skeleton
+  static void saveTRC(
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerTimesteps);
+
   /// This grabs the joint angles from a *.mot file
   static OpenSimMot loadMot(
       std::shared_ptr<dynamics::Skeleton> skel,
@@ -101,6 +109,23 @@ public:
   /// This saves the *.mot file from a motion for the skeleton
   static void saveMot(
       std::shared_ptr<dynamics::Skeleton> skel,
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const Eigen::MatrixXs& poses);
+
+  /// This saves the *.mot file with 3 columns for each body. This is
+  /// basically only used for verifying consistency between Nimble and OpenSim.
+  static void saveBodyLocationsMot(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const Eigen::MatrixXs& poses);
+
+  /// This saves the *.mot file with 3 columns for each marker. This is
+  /// basically only used for verifying consistency between Nimble and OpenSim.
+  static void saveMarkerLocationsMot(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const dynamics::MarkerMap& markers,
       const std::string& outputPath,
       const std::vector<double>& timestamps,
       const Eigen::MatrixXs& poses);

@@ -140,6 +140,19 @@ void OpenSimParser(py::module& m)
       ::py::arg("path"));
 
   sm.def(
+      "saveTRC",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<std::map<std::string, Eigen::Vector3s>>&
+              markerTimesteps) {
+        return dart::biomechanics::OpenSimParser::saveTRC(
+            outputPath, timestamps, markerTimesteps);
+      },
+      ::py::arg("path"),
+      ::py::arg("timestamps"),
+      ::py::arg("markerTimestamps"));
+
+  sm.def(
       "loadMot",
       +[](std::shared_ptr<dynamics::Skeleton> skel, const std::string& path) {
         return dart::biomechanics::OpenSimParser::loadMot(skel, path);

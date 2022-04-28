@@ -1,8 +1,11 @@
 #include "dart/biomechanics/OpenSimParser.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "dart/common/Uri.hpp"
@@ -13,6 +16,7 @@
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/TranslationalJoint.hpp"
 #include "dart/dynamics/TranslationalJoint2D.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
@@ -434,6 +438,7 @@ void OpenSimParser::moveOsimMarkers(
     const std::string& outputPath,
     const common::ResourceRetrieverPtr& nullOrRetriever)
 {
+  (void)bodyScales;
   const common::ResourceRetrieverPtr retriever
       = ensureRetriever(nullOrRetriever);
 
@@ -650,6 +655,74 @@ OpenSimTRC OpenSimParser::loadTRC(
   return result;
 }
 
+// clang-format off
+/*
+PathFileType	4	(X/Y/Z)	/Volumes/Michael/Balance Metric/Balance Metric Pilot/Vicon Processed Data/S01DN6/../../OpenSim/S01DN6/Marker_data/S01DN603.trc
+DataRate	CameraRate	NumFrames	NumMarkers	Units	OrigDataRate	OrigDataStartFrame	OrigNumFrames
+100.000000	100.000000	3681	52	mm	100.000000	0	3681
+Frame#	Time	RASI			LASI			RPSI			LPSI			RLKN			RMKN			RTH1			RTH2			RTH3			LLKN			LMKN			LTH1			LTH2			LTH3			LLAK			LMAK			LSH1			LSH2			LSH3			LTOE			LMT5			LCAL			RLAK			RMAK			RSH1			RSH2			RSH3			RTOE			RMT5			RCAL			RSHL			LSHL			CLAV			C7			RLEL			RASH			RPSH			RUA1			RUA2			RUA3			RULN			RRAD			RFA			LLEL			LASH			LPSH			LUA1			LUA2			LUA3			LULN			LRAD			LFA			
+		X1	Y1	Z1	X2	Y2	Z2	X3	Y3	Z3	X4	Y4	Z4	X5	Y5	Z5	X6	Y6	Z6	X7	Y7	Z7	X8	Y8	Z8	X9	Y9	Z9	X10	Y10	Z10	X11	Y11	Z11	X12	Y12	Z12	X13	Y13	Z13	X14	Y14	Z14	X15	Y15	Z15	X16	Y16	Z16	X17	Y17	Z17	X18	Y18	Z18	X19	Y19	Z19	X20	Y20	Z20	X21	Y21	Z21	X22	Y22	Z22	X23	Y23	Z23	X24	Y24	Z24	X25	Y25	Z25	X26	Y26	Z26	X27	Y27	Z27	X28	Y28	Z28	X29	Y29	Z29	X30	Y30	Z30	X31	Y31	Z31	X32	Y32	Z32	X33	Y33	Z33	X34	Y34	Z34	X35	Y35	Z35	X36	Y36	Z36	X37	Y37	Z37	X38	Y38	Z38	X39	Y39	Z39	X40	Y40	Z40	X41	Y41	Z41	X42	Y42	Z42	X43	Y43	Z43	X44	Y44	Z44	X45	Y45	Z45	X46	Y46	Z46	X47	Y47	Z47	X48	Y48	Z48	X49	Y49	Z49	X50	Y50	Z50	X51	Y51	Z51	X52	Y52	Z52	
+
+1	0	679.8120727539062	1002.085083007813	-995.9971923828124	420.5277099609375	1007.553588867188	-1011.751403808594	605.3575439453125	1015.321166992188	-803.5368041992186	445.6817016601562	1016.545532226562	-815.5397949218749	734.9002685546875	547.1029663085938	-877.1836547851562	607.6942138671875	516.8250732421875	-874.6161499023438	734.4181518554688	777.7933349609376	-963.7550048828125	743.39208984375	781.5364990234375	-884.7509155273438	729.3284301757812	698.0943603515626	-968.7823486328125	371.3560791015625	550.8246459960938	-877.82958984375	483.412353515625	520.704833984375	-893.31591796875	351.0415649414062	784.4949340820312	-880.312255859375	362.41796875	696.0311889648439	-963.1719360351562	355.9143981933594	699.4909057617188	-878.6652221679688	353.6072692871094	78.65764617919928	-816.2015380859375	434.0369567871094	74.43429565429693	-846.0233154296875	357.4876708984375	303.4053344726563	-787.0587158203125	355.6858520507812	297.6666564941407	-872.4854736328125	358.7340393066406	218.1407775878907	-776.3829345703125	351.4863586425781	36.82650756835943	-962.2296142578125	306.8850708007812	21.91055488586431	-916.4121704101562	402.5976257324219	31.77148628234868	-757.2083740234375	760.8834838867188	77.23938751220709	-814.3300170898438	678.1585083007812	70.47503662109381	-824.1223754882812	753.8941650390625	313.1148681640626	-878.5075073242188	762.740234375	233.6301879882813	-788.2710571289062	739.5429077148438	230.6612243652344	-873.1398315429688	749.739990234375	37.7818107604981	-953.46728515625	804.1757202148438	17.91181945800787	-911.0529174804688	723.5494995117188	28.47524642944341	-743.7086181640625	715.7427978515625	1492.004638671875	-871.6303100585936	362.2188110351562	1489.388427734375	-898.5730590820311	543.41015625	1439.690063476562	-996.8657226562499	538.708740234375	1514.868896484375	-842.0878906249999	1040.762329101562	1378.688720703125	-845.5075073242186	738.3087158203125	1422.356811523438	-947.8111572265624	721.3455810546875	1442.70947265625	-802.1453247070311	852.66650390625	1427.635620117188	-901.6832885742186	940.7133178710938	1413.813110351562	-830.8558959960936	935.8841552734375	1407.561157226562	-908.6595458984374	1058.98046875	1395.446533203125	-1129.428100585938	995.7217407226562	1385.29345703125	-1127.363403320312	991.9557495117188	1394.415161132812	-1007.243103027344	55.15938186645508	1380.868286132812	-828.5310058593749	346.5594787597656	1429.554809570312	-959.1314697265624	367.15185546875	1443.79638671875	-819.9207153320311	257.5729064941406	1414.4267578125	-806.1875610351561	235.8312835693359	1444.634399414062	-884.1889038085936	174.8842315673828	1384.784912109375	-797.9143066406249	-1.636113405227661	1385.105346679688	-1108.021362304688	55.1119384765625	1366.475219726562	-1120.221923828125	73.18951416015625	1379.125854492188	-1003.793395996094	
+2	0.01	679.7892456054688	1002.118530273438	-996.0073242187499	420.5177307128906	1007.567749023438	-1011.757263183594	605.3228759765625	1015.312622070312	-803.5576171874999	445.6553955078125	1016.576293945312	-815.5219116210936	734.8585815429688	547.1071166992188	-877.3190307617188	607.898193359375	516.6675415039062	-875.0960693359375	734.3909301757812	777.8029174804689	-963.7960815429688	743.3662719726562	781.5385131835938	-884.7935791015625	729.322265625	698.1297607421876	-968.8185424804688	371.35595703125	550.8648071289062	-877.8683471679688	483.401611328125	520.7337646484375	-893.4196166992188	351.0072631835938	784.5162353515625	-880.3706665039062	362.4089660644531	696.0507812500001	-963.2354125976562	355.8748779296875	699.521728515625	-878.7264404296875	353.5990600585938	78.69834136962896	-816.1893310546875	434.0178527832031	74.46508789062506	-846.0328369140625	357.4574584960938	303.4641723632813	-787.0787963867188	355.6640319824219	297.7083740234376	-872.52783203125	358.7194213867188	218.1809387207032	-776.3993530273438	351.4712829589844	36.86539077758795	-962.2379760742188	306.8740844726562	21.94730377197271	-916.4033203125	402.5932312011719	31.79903030395512	-757.2274169921875	760.8512573242188	77.26872253417974	-814.3527221679688	678.1286010742188	70.52541351318365	-824.1339721679688	753.8585205078125	313.1050415039063	-878.5496215820312	762.7291259765625	233.6574249267579	-788.3436279296875	739.5399780273438	230.6400451660157	-873.1807861328125	749.72216796875	37.81101608276373	-953.4923095703125	804.1530151367188	17.93189811706549	-911.0638427734375	723.5054321289062	28.56663322448735	-743.6469116210938	715.6266479492188	1492.030639648438	-871.6072387695311	362.1220703125	1489.401489257812	-898.5961303710936	543.3572387695312	1439.704833984375	-996.8660278320311	538.6014404296875	1514.878662109375	-842.0782470703124	1040.680786132812	1378.760131835938	-845.4357299804686	738.2379760742188	1422.38427734375	-947.7607421874999	721.2595825195312	1442.717041015625	-802.1060791015624	852.5690307617188	1427.677734375	-901.6367187499999	940.6114501953125	1413.876220703125	-830.7924194335936	935.7893676757812	1407.611083984375	-908.5748901367186	1058.856811523438	1395.48291015625	-1129.349853515625	995.5992431640625	1385.28857421875	-1127.292114257812	991.8384399414062	1394.438720703125	-1007.162231445312	55.05607604980469	1380.807373046875	-828.6679077148436	346.4953308105469	1429.560180664062	-959.1687011718749	367.0283508300781	1443.803833007812	-819.9612426757811	257.4390563964844	1414.393920898438	-806.2971191406249	235.7202606201172	1444.59912109375	-884.2778930664061	174.7428131103516	1384.960327148438	-797.8155517578124	-1.639191508293152	1384.988525390625	-1108.180541992188	55.12150192260742	1366.379272460938	-1120.3564453125	73.15041351318359	1379.052734375	-1003.909301757812	
+*/
+// clang-format on
+
+//==============================================================================
+/// This saves the *.trc file from a motion for the skeleton
+void OpenSimParser::saveTRC(
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& markerTimesteps)
+{
+  std::vector<std::string> markerNames;
+  for (auto& pair : markerTimesteps[0])
+  {
+    markerNames.push_back(pair.first);
+  }
+
+  std::ofstream trcFile;
+  trcFile.open(outputPath);
+  trcFile << "PathFileType\t4\t(X/Y/Z)\t" << outputPath << "\n";
+  trcFile << "DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate"
+             "\tOrigDataStartFrame\tOrigNumFrames\n";
+  double rate = 1.0 / (timestamps[1] - timestamps[0]);
+  trcFile << rate << "\t" << rate << "\t" << markerTimesteps.size() << "\t"
+          << markerTimesteps[0].size() << "\tm\t" << rate << "\t0\t"
+          << markerTimesteps.size() << "\n";
+
+  trcFile << "Frame#\tTime";
+  for (std::string name : markerNames)
+  {
+    trcFile << "\t" << name << "\t\t";
+  }
+  trcFile << "\n";
+
+  trcFile << "\t";
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    trcFile << "\tX" << (i + 1) << "\tY" << (i + 1) << "\tZ" << (i + 1);
+  }
+  trcFile << "\n\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    trcFile << (t + 1) << "\t";
+    trcFile << timestamps[t];
+    for (int i = 0; i < markerNames.size(); i++)
+    {
+      // We default to meters internally
+      Eigen::Vector3s p = markerTimesteps[t].count(markerNames[i]) > 0
+                              ? markerTimesteps[t].at(markerNames[i])
+                              : Eigen::Vector3s::Ones() * NAN;
+      trcFile << "\t" << p(0) << "\t" << p(1) << "\t" << p(2);
+    }
+    trcFile << "\n";
+  }
+
+  trcFile.close();
+}
+
 //==============================================================================
 /// This grabs the joint angles from a *.mot file
 OpenSimMot OpenSimParser::loadMot(
@@ -852,6 +925,116 @@ void OpenSimParser::saveMot(
     for (int i = 0; i < skel->getNumDofs(); i++)
     {
       motFile << "\t" << poses(i, t);
+    }
+    motFile << "\n";
+  }
+
+  motFile.close();
+}
+
+//==============================================================================
+/// This saves the *.mot file with 3 columns for each body. This is
+/// basically only used for verifying consistency between Nimble and OpenSim.
+void OpenSimParser::saveBodyLocationsMot(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const Eigen::MatrixXs& poses)
+{
+  std::ofstream motFile;
+  motFile.open(outputPath);
+  motFile << "Coordinates\n";
+  motFile << "version=1\n";
+  motFile << "nRows=" << timestamps.size() << "\n";
+  motFile << "nColumns=" << (skel->getNumBodyNodes() * 3) + 1 << "\n";
+  motFile << "inDegrees=no\n";
+  motFile << "\n";
+  motFile << "Units are S.I. units (second, meters, Newtons, ...)\n";
+  motFile
+      << "If the header above contains a line with 'inDegrees', this indicates "
+         "whether rotational values are in degrees (yes) or radians (no).\n";
+  motFile << "\n";
+  motFile << "endheader\n";
+
+  motFile << "time";
+
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    std::string bodyName = skel->getBodyNode(i)->getName();
+
+    motFile << "\t" << bodyName << "_x\t" << bodyName << "_y\t" << bodyName
+            << "_z";
+  }
+  motFile << "\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    motFile << timestamps[t];
+    skel->setPositions(poses.col(t));
+
+    for (int i = 0; i < skel->getNumBodyNodes(); i++)
+    {
+      Eigen::Vector3s bodyPos
+          = skel->getBodyNode(i)->getWorldTransform().translation();
+      motFile << "\t" << bodyPos(0) << "\t" << bodyPos(1) << "\t" << bodyPos(2);
+    }
+    motFile << "\n";
+  }
+
+  motFile.close();
+}
+
+//==============================================================================
+/// This saves the *.mot file with 3 columns for each marker. This is
+/// basically only used for verifying consistency between Nimble and OpenSim.
+void OpenSimParser::saveMarkerLocationsMot(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const dynamics::MarkerMap& markers,
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const Eigen::MatrixXs& poses)
+{
+  std::ofstream motFile;
+  motFile.open(outputPath);
+  motFile << "Coordinates\n";
+  motFile << "version=1\n";
+  motFile << "nRows=" << timestamps.size() << "\n";
+  motFile << "nColumns=" << (markers.size() * 3) + 1 << "\n";
+  motFile << "inDegrees=no\n";
+  motFile << "\n";
+  motFile << "Units are S.I. units (second, meters, Newtons, ...)\n";
+  motFile
+      << "If the header above contains a line with 'inDegrees', this indicates "
+         "whether rotational values are in degrees (yes) or radians (no).\n";
+  motFile << "\n";
+  motFile << "endheader\n";
+
+  motFile << "time";
+
+  std::vector<std::string> markerNames;
+  for (auto& pair : markers)
+  {
+    std::string markerName = pair.first;
+    markerNames.push_back(markerName);
+
+    motFile << "\t" << markerName << "_x\t" << markerName << "_y\t"
+            << markerName << "_z";
+  }
+  motFile << "\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    motFile << timestamps[t];
+    skel->setPositions(poses.col(t));
+    std::map<std::string, Eigen::Vector3s> markerPoses
+        = skel->getMarkerMapWorldPositions(markers);
+
+    for (int i = 0; i < markerNames.size(); i++)
+    {
+      std::string markerName = markerNames[i];
+      Eigen::Vector3s markerPos = markerPoses[markerName];
+      motFile << "\t" << markerPos(0) << "\t" << markerPos(1) << "\t"
+              << markerPos(2);
     }
     motFile << "\n";
   }
