@@ -2910,7 +2910,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
 
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
-  Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
+  Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 1.0;
 #ifndef NDEBUG
   if (x.hasNaN() || accum.hasNaN())
   {
@@ -2925,8 +2925,8 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   for (int i = 0; i < 500; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    accum += grad.cwiseProduct(grad);
-    Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
+    Eigen::VectorXs newAccum = accum + grad.cwiseProduct(grad);
+    Eigen::VectorXs newX = x - grad.cwiseQuotient(newAccum) * lr;
 #ifndef NDEBUG
     if (newX.hasNaN())
     {
@@ -2944,6 +2944,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
     {
       loss = newLoss;
       x = newX;
+      accum = newAccum;
       if (logSteps)
       {
         std::cout << "[lr=" << lr << "] " << i << ": " << newLoss << std::endl;
@@ -4181,7 +4182,7 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     mJointName(joint->getName()),
     mNewClip(newClip),
     mSmoothingLoss(
-        0.1) // just to tie break when there's nothing better available
+        0.01) // 0.1 // just to tie break when there's nothing better available
 {
   mNumTimesteps = markerObservations.size();
 

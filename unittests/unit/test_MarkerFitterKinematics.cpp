@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <string>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -4680,6 +4681,271 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   fitter.debugTrajectoryAndMarkersToGUI(
       server, finalKinematicInit, subsetTimesteps);
   server->blockWhileServing();
+}
+#endif
+
+void evaluateOnSyntheticData(
+    std::string standardModelPath,
+    std::string standardModelAnthropometrics,
+    std::string scaledModelPath,
+    std::string motPath)
+{
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(standardModelAnthropometrics);
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 150 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 10) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      standardModelPath); // Rajagopal2015_passiveCal_hipAbdMoved.osim
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  OpenSimFile scaled = OpenSimParser::parseOsim(scaledModelPath);
+  OpenSimMot mot = OpenSimParser::loadMot(scaled.skeleton, motPath);
+
+  Eigen::MatrixXs goldPoses = mot.poses;
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    scaled.skeleton->setPositions(goldPoses.col(i));
+    subMarkerTimesteps.push_back(
+        scaled.skeleton->getMarkerMapWorldPositions(scaled.markersMap));
+  }
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(500);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  fitter.setTriadsToTracking();
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
+  /*
+  for (int i = 0; i < 10; i++)
+  {
+    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
+  }
+  */
+  subsetTimesteps = subMarkerTimesteps;
+  std::vector<bool> newClip;
+  for (int i = 0; i < subsetTimesteps.size(); i++)
+  {
+    newClip.push_back(false);
+  }
+
+  MarkerInitialization init = fitter.getInitialization(
+      subsetTimesteps, newClip, InitialMarkerFitParams());
+
+  for (auto pair : init.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport initReport(
+      standard.skeleton,
+      init.updatedMarkerMap,
+      init.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  standard.skeleton->setGroupScales(init.groupScales);
+
+  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
+  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
+  // fitter.findJointCenter(0, init, subsetTimesteps);
+
+  fitter.findJointCenters(init, newClip, subsetTimesteps);
+  fitter.findAllJointAxis(init, newClip, subsetTimesteps);
+  fitter.computeJointConfidences(init, subsetTimesteps);
+
+  for (int i = 0; i < init.joints.size(); i++)
+  {
+    s_t diff = 0.0;
+    for (int t = 0; t < goldPoses.cols(); t++)
+    {
+      scaled.skeleton->setPositions(goldPoses.col(t));
+
+      Eigen::Vector3s jointCenter = init.jointCenters.block<3, 1>(i * 3, t);
+      Eigen::Vector3s goldJointCenter
+          = scaled.skeleton
+                ->getJointWorldPositionsMap()[init.joints[i]->getName()];
+      diff += (jointCenter - goldJointCenter).norm();
+    }
+    diff /= goldPoses.cols();
+    std::cout << "Joint " << init.joints[i]->getName() << " avg error: " << diff
+              << "m" << std::endl;
+  }
+
+  // Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = fitter.getInitialization(
+      subsetTimesteps,
+      newClip,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              init.joints, init.jointCenters, init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses));
+
+  for (auto pair : reinit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport afterJointCentersReport(
+      standard.skeleton,
+      reinit.updatedMarkerMap,
+      reinit.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  // fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Bilevel optimization
+  std::shared_ptr<BilevelFitResult> bilevelFit
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 200);
+
+  // Fine-tune IK and re-fit all the points
+  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
+      subsetTimesteps,
+      newClip,
+      bilevelFit,
+      InitialMarkerFitParams()
+          .setJointCentersAndWeights(
+              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
+          .setInitPoses(reinit.poses)
+          .setDontRescaleBodies(true)
+          .setGroupScales(bilevelFit->groupScales)
+          .setMarkerOffsets(bilevelFit->markerOffsets));
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      subsetTimesteps,
+      anthropometrics);
+
+  std::cout << "Initial error report:" << std::endl;
+  initReport.printReport(5);
+  std::cout << "After joint centers report:" << std::endl;
+  afterJointCentersReport.printReport(5);
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  s_t avgDiff = 0.0;
+  for (int i = 0; i < goldPoses.cols(); i++)
+  {
+    Eigen::VectorXs goldPose = goldPoses.col(i);
+    Eigen::VectorXs guessPose = finalKinematicInit.poses.col(i);
+    avgDiff += (goldPose - guessPose).norm();
+    if (i % 100 == 0)
+    {
+      std::cout << "**** Frame " << i << std::endl;
+      for (int j = 0; j < standard.skeleton->getNumDofs(); j++)
+      {
+        std::cout << standard.skeleton->getDof(j)->getName() << ": "
+                  << goldPose(j) << ", recovered " << guessPose(j) << std::endl;
+      }
+    }
+  }
+  avgDiff /= goldPoses.cols() * standard.skeleton->getNumDofs();
+  std::cout << "Average joint error (rad): " << avgDiff << std::endl;
+  std::cout << "Average joint error (deg): " << (avgDiff / M_PI) * 180
+            << std::endl;
+
+  /*
+// Target markers
+std::shared_ptr<server::GUIWebsocketServer> server
+    = std::make_shared<server::GUIWebsocketServer>();
+server->serve(8070);
+fitter.debugTrajectoryAndMarkersToGUI(
+    server, finalKinematicInit, subsetTimesteps);
+server->blockWhileServing();
+*/
+}
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_CALIBRATION)
+{
+  evaluateOnSyntheticData(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "Rajagopal2015_passiveCal_hipAbdMoved.osim",
+      "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml",
+      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim",
+      "dart://sample/osim/Rajagopal2015_v3_scaled/S01DN603_ik.mot");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_SPRINTING)
+{
+  evaluateOnSyntheticData(
+      "dart://sample/osim/Sprinter/sprinter.osim",
+      "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml",
+      "dart://sample/osim/Sprinter/sprinter_scaled.osim",
+      "dart://sample/osim/Sprinter/run0500cms.mot");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_DJ2)
+{
+  evaluateOnSyntheticData(
+      "dart://sample/osim/LaiArnoldSubject5/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim",
+      "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml",
+      "dart://sample/osim/LaiArnoldSubject5/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim",
+      "dart://sample/osim/LaiArnoldSubject5/DJ2.mot");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_WALK)
+{
+  evaluateOnSyntheticData(
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim",
+      "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml",
+      "dart://sample/osim/LaiArnoldSubject6/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim",
+      "dart://sample/osim/LaiArnoldSubject6/walking1.mot");
 }
 #endif
 
