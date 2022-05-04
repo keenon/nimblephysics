@@ -71,12 +71,44 @@ public:
   /// This creates an XML configuration file, which you can pass to the OpenSim
   /// scaling tool to rescale a skeleton
   static void saveOsimScalingXMLFile(
+      const std::string& subjectName,
       std::shared_ptr<dynamics::Skeleton> skel,
       double massKg,
       double heightM,
       const std::string& osimInputPath,
       const std::string& osimOutputPath,
       const std::string& scalingInstructionsOutputPath);
+
+  /// This creates an XML configuration file, which you can pass to the OpenSim
+  /// IK tool to recreate / validate the results of IK created from this tool
+  static void saveOsimInverseKinematicsXMLFile(
+      const std::string& subjectName,
+      std::vector<std::string> markerNames,
+      const std::string& osimInputModelPath,
+      const std::string& osimInputTrcPath,
+      const std::string& osimOutputMotPath,
+      const std::string& ikInstructionsOutputPath);
+
+  /// This creates an XML configuration file, which you can pass to the OpenSim
+  /// ID tool to recreate / validate the results of ID created from this tool
+  static void saveOsimInverseDynamicsForcesXMLFile(
+      const std::string& subjectName,
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const Eigen::MatrixXs& poses,
+      const std::vector<biomechanics::ForcePlate> forcePlates,
+      const std::string& grfForcesPath,
+      const std::string& forcesOutputPath);
+
+  /// This creates an XML configuration file, which you can pass to the OpenSim
+  /// ID tool to recreate / validate the results of ID created from this tool
+  static void saveOsimInverseDynamicsXMLFile(
+      const std::string& subjectName,
+      const std::string& osimInputModelPath,
+      const std::string& osimInputMotPath,
+      const std::string& osimForcesXmlPath,
+      const std::string& osimOutputStoPath,
+      const std::string& osimOutputBodyForcesStoPath,
+      const std::string& idInstructionsOutputPath);
 
   /// Read an *.osim file, move the markers to new locations, and write it out
   /// to a new *.osim file

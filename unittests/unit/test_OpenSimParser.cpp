@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
@@ -269,6 +270,7 @@ TEST(OpenSimParser, SCALING)
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
 
   OpenSimParser::saveOsimScalingXMLFile(
+      "Rajagopal2015",
       standard.skeleton,
       68.0,
       1.8,
@@ -343,3 +345,54 @@ TEST(OpenSimParser, SAVE_MOT)
       mot.poses);
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, SAVE_IK_FILE)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/JA1GaitResults/rescaled.osim");
+
+  std::vector<std::string> markerNames;
+  for (auto& pair : standard.markersMap)
+  {
+    markerNames.push_back(pair.first);
+  }
+
+  OpenSimParser::saveOsimInverseKinematicsXMLFile(
+      "JA1Gait35",
+      markerNames,
+      "rescaled.osim",
+      "JA1Gait35.trc",
+      "JA1Gait35_ik_by_opensim.mot",
+      "../../../data/osim/JA1GaitResults/JA1Gait35_ik_setup.xml");
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(OpenSimParser, SAVE_ID_FILE)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/JA1GaitResults/rescaled.osim");
+  auto c3d
+      = C3DLoader::loadC3D("dart://sample/osim/JA1GaitResults/original.c3d");
+  auto mot = OpenSimParser::loadMot(
+      standard.skeleton, "dart://sample/osim/JA1GaitResults/JA1Gait35_ik.mot");
+
+  OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+      "JA1Gait35",
+      standard.skeleton,
+      mot.poses,
+      c3d.forcePlates,
+      "JA1Gait35_grf.mot",
+      "../../../data/osim/JA1GaitResults/JA1Gait35_external_forces.xml");
+
+  OpenSimParser::saveOsimInverseDynamicsXMLFile(
+      "JA1Gait35",
+      "rescaled.osim",
+      "JA1Gait35_ik.mot",
+      "JA1Gait35_external_forces.xml",
+      "JA1Gait35_id_output.sto",
+      "JA1Gait35_id_body_forces.sto",
+      "../../../data/osim/JA1GaitResults/JA1Gait35_id_setup.xml");
+}
+// #endif

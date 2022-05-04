@@ -3,12 +3,14 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "dart/common/Uri.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
@@ -245,6 +247,7 @@ OpenSimFile OpenSimParser::parseOsim(
 /// You can use this with the command: "opensim-cmd run-tool
 /// ScalingInstructions.xml" to rescale an OpenSim model
 void OpenSimParser::saveOsimScalingXMLFile(
+    const std::string& subjectName,
     std::shared_ptr<dynamics::Skeleton> skel,
     double massKg,
     double heightM,
@@ -321,7 +324,7 @@ void OpenSimParser::saveOsimScalingXMLFile(
   xmlDoc.InsertFirstChild(openSimRoot);
 
   XMLElement* scaleToolRoot = xmlDoc.NewElement("ScaleTool");
-  scaleToolRoot->SetAttribute("name", "TODO-subject-name");
+  scaleToolRoot->SetAttribute("name", subjectName.c_str());
   openSimRoot->InsertEndChild(scaleToolRoot);
 
   XMLElement* mass = xmlDoc.NewElement("mass");
@@ -425,6 +428,373 @@ void OpenSimParser::saveOsimScalingXMLFile(
   modelScaler->InsertEndChild(outputScaleFile);
 
   xmlDoc.SaveFile(scalingInstructionsOutputPath.c_str());
+}
+
+//==============================================================================
+/// This creates an XML configuration file, which you can pass to the OpenSim
+/// IK tool to recreate / validate the results of IK created from this tool
+void OpenSimParser::saveOsimInverseKinematicsXMLFile(
+    const std::string& subjectName,
+    std::vector<std::string> markerNames,
+    const std::string& osimInputModelPath,
+    const std::string& osimInputTrcPath,
+    const std::string& osimOutputMotPath,
+    const std::string& ikInstructionsOutputPath)
+{
+  using namespace tinyxml2;
+
+  // clang-format off
+  /**
+
+  Here's an example file:
+
+  <OpenSimDocument Version="30000">
+    <InverseKinemtaticsTool name="subject01">
+        <!--Name of the .osim file used to construct a model.-->
+        <model_file>subject01_simbody.osim</model_file>
+        <!--Specify which optimizer to use (ipopt or cfsqp or jacobian).-->
+        <!--Task set used to specify IK weights.-->
+        <IKTaskSet name="gait2354_IK">
+            <objects>
+                <!-- Markers -->
+                <IKMarkerTask name="Sternum"> <weight>1</weight> </IKMarkerTask>
+                <IKMarkerTask name="R.Acromium"> <weight>0.5</weight></IKMarkerTask>
+                <IKMarkerTask name="L.Acromium"> <weight> 0.5 </weight></IKMarkerTask>
+                <IKMarkerTask name="Top.Head"> <weight> 0.1 </weight> </IKMarkerTask>
+                <!-- . . additional <IKMarkerTask> tags cut for brevity . . -->
+ 
+                <!-- Coordinates -->
+                <IKCoordinateTask name="subtalar_angle_r"> <value> 0 </value></IKCoordinateTask>
+                <IKCoordinateTask name="mtp_angle_r"> <value> 0 </value></IKCoordinateTask>
+                <IKCoordinateTask name="subtalar_angle_l"> <value> 0 </value></IKCoordinateTask>
+                <IKCoordinateTask name="mtp_angle_l"> <value> 0 </value></IKCoordinateTask>
+         </objects>
+        </IKTaskSet>
+        <!--Parameters for solving the IK problem for each trial. Each trial
+        should get a seperate SimmIKTril block.-->
+        <!--TRC file (.trc) containing the time history of experimental marker
+                    positions.-->
+        <marker_file>subject01_walk1.trc</marker_file>
+        <!--Name of file containing the joint angles used to set the initial
+                    configuration of the model -->
+        <coordinate_file></coordinate_file>
+        <!--Time range over which the IK problem is solved.-->
+        <time_range>0.4 1.60</time_range>
+        <!--Name of the motion file (.mot) to which the results should be written.-->
+        <output_motion_file>subject01_walk1_ik.mot</output_motion_file>
+        <!--A positive scalar that is used to weight the importance of satisfying 
+            constraints.A weighting of 'Infinity' or if it is unassigned results in 
+            the constraints being strictly enforced.-->
+        <constraint_weight>20.0</constraint_weight>
+        <!--The accuracy of the solution in absolute terms. I.e. the number of significant
+            digits to which the solution can be trusted.-->
+        <accuracy>1e-5</accuracy>
+    </InverseKinemtaticsTool>
+  </OpenSimDocument>
+
+  */
+  // clang-format on
+
+  XMLDocument xmlDoc;
+  XMLElement* openSimRoot = xmlDoc.NewElement("OpenSimDocument");
+  openSimRoot->SetAttribute("Version", "40000");
+  xmlDoc.InsertFirstChild(openSimRoot);
+
+  XMLElement* toolRoot = xmlDoc.NewElement("InverseKinematicsTool");
+  toolRoot->SetAttribute("name", subjectName.c_str());
+  openSimRoot->InsertEndChild(toolRoot);
+
+  XMLElement* modelFile = xmlDoc.NewElement("model_file");
+  modelFile->SetText(osimInputModelPath.c_str());
+  toolRoot->InsertEndChild(modelFile);
+
+  XMLElement* taskSet = xmlDoc.NewElement("IKTaskSet");
+  taskSet->SetAttribute("name", "IK_tasks");
+  toolRoot->InsertEndChild(taskSet);
+  XMLElement* taskList = xmlDoc.NewElement("objects");
+  taskSet->InsertEndChild(taskList);
+  for (std::string& markerName : markerNames)
+  {
+    XMLElement* markerNode = xmlDoc.NewElement("IKMarkerTask");
+    markerNode->SetAttribute("name", markerName.c_str());
+    taskList->InsertEndChild(markerNode);
+    XMLElement* markerWeight = xmlDoc.NewElement("weight");
+    markerWeight->SetText("1.0");
+    markerNode->InsertEndChild(markerWeight);
+    XMLElement* markerApply = xmlDoc.NewElement("apply");
+    markerApply->SetText("true");
+    markerNode->InsertEndChild(markerApply);
+  }
+
+  XMLElement* markerFile = xmlDoc.NewElement("marker_file");
+  markerFile->SetText(osimInputTrcPath.c_str());
+  toolRoot->InsertEndChild(markerFile);
+
+  XMLElement* outputMotionFile = xmlDoc.NewElement("output_motion_file");
+  outputMotionFile->SetText(osimOutputMotPath.c_str());
+  toolRoot->InsertEndChild(outputMotionFile);
+
+  XMLElement* accuracy = xmlDoc.NewElement("accuracy");
+  accuracy->SetText("1e-5");
+  toolRoot->InsertEndChild(accuracy);
+
+  XMLElement* reportErrors = xmlDoc.NewElement("report_errors");
+  reportErrors->SetText("true");
+  toolRoot->InsertEndChild(reportErrors);
+
+  xmlDoc.SaveFile(ikInstructionsOutputPath.c_str());
+}
+
+//==============================================================================
+/// This creates an XML configuration file, which you can pass to the OpenSim
+/// ID tool to recreate / validate the results of ID created from this tool
+void OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+    const std::string& subjectName,
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const Eigen::MatrixXs& poses,
+    const std::vector<biomechanics::ForcePlate> forcePlates,
+    const std::string& grfForcesPath,
+    const std::string& forcesOutputPath)
+{
+  using namespace tinyxml2;
+
+  // 1. First we need to figure out which bones are the feet -- default to
+  // calcaneous bones
+
+  std::vector<std::string> footBodyNames;
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    std::string bodyName = skel->getBodyNode(i)->getName();
+    if (bodyName.find("calcn") != std::string::npos)
+    {
+      footBodyNames.push_back(bodyName);
+    }
+  }
+
+  // 2. Next we need to figure out which force plates measure which foot. This
+  // is done pretty heuristically, by just choosing the foot that gets closest
+  // to that force plate throughout the whole trajectory.
+
+  std::vector<int> closestBodyToForcePlate;
+  std::vector<s_t> closestBodyToForcePlateDistance;
+
+  for (int j = 0; j < forcePlates.size(); j++)
+  {
+    closestBodyToForcePlate.push_back(0);
+    closestBodyToForcePlateDistance.push_back(
+        std::numeric_limits<double>::infinity());
+  }
+
+  Eigen::VectorXs originalPos = skel->getPositions();
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    skel->setPositions(poses.col(t));
+
+    for (int i = 0; i < footBodyNames.size(); i++)
+    {
+      dynamics::BodyNode* body = skel->getBodyNode(footBodyNames[i]);
+      Eigen::Vector3s pos = body->getWorldTransform().translation();
+      for (int j = 0; j < forcePlates.size(); j++)
+      {
+        s_t sumDist = 0.0;
+        for (Eigen::Vector3s corner : forcePlates[j].corners)
+        {
+          sumDist += (pos - corner).squaredNorm();
+        }
+
+        if (sumDist < closestBodyToForcePlateDistance[j])
+        {
+          closestBodyToForcePlateDistance[j] = sumDist;
+          closestBodyToForcePlate[j] = i;
+        }
+      }
+    }
+  }
+  skel->setPositions(originalPos);
+
+  // 3. Finally, we can write out the XML file
+
+  // clang-format off
+  /**
+
+  Here's an example file:
+
+  <OpenSimDocument Version="40000">
+    <ExternalLoads name="DJ1">
+      <objects>
+        <ExternalForce name="RightGRF">
+          <!--Name of the body the force is applied to.-->
+          <applied_to_body>calcn_r</applied_to_body>
+          <!--Name of the body the force is expressed in (default is ground).-->
+          <force_expressed_in_body>ground</force_expressed_in_body>
+          <!--Name of the body the point is expressed in (default is ground).-->
+          <point_expressed_in_body>ground</point_expressed_in_body>
+          <!--Identifier (string) to locate the force to be applied in the data source.-->
+          <force_identifier>R_ground_force_v</force_identifier>
+          <!--Identifier (string) to locate the point to be applied in the data source.-->
+          <point_identifier>R_ground_force_p</point_identifier>
+          <!--Identifier (string) to locate the torque to be applied in the data source.-->
+          <torque_identifier>R_ground_torque_</torque_identifier>
+        </ExternalForce>
+        <ExternalForce name="LeftGRF">
+          <!--Name of the body the force is applied to.-->
+          <applied_to_body>calcn_l</applied_to_body>
+          <!--Name of the body the force is expressed in (default is ground).-->
+          <force_expressed_in_body>ground</force_expressed_in_body>
+          <!--Name of the body the point is expressed in (default is ground).-->
+          <point_expressed_in_body>ground</point_expressed_in_body>
+          <!--Identifier (string) to locate the force to be applied in the data source.-->
+          <force_identifier>L_ground_force_v</force_identifier>
+          <!--Identifier (string) to locate the point to be applied in the data source.-->
+          <point_identifier>L_ground_force_p</point_identifier>
+          <!--Identifier (string) to locate the torque to be applied in the data source.-->
+          <torque_identifier>L_ground_torque_</torque_identifier>
+        </ExternalForce>
+      </objects>
+      <groups />
+      <!--Storage file (.sto) containing (3) components of force and/or torque and point of application.Note: this file overrides the data source specified by the individual external forces if specified.-->
+      <datafile>DJ1_forces.mot</datafile>
+    </ExternalLoads>
+  </OpenSimDocument>
+
+  */
+  // clang-format on
+
+  XMLDocument xmlDoc;
+  XMLElement* openSimRoot = xmlDoc.NewElement("OpenSimDocument");
+  openSimRoot->SetAttribute("Version", "40000");
+  xmlDoc.InsertFirstChild(openSimRoot);
+
+  XMLElement* toolRoot = xmlDoc.NewElement("ExternalLoads");
+  toolRoot->SetAttribute("name", subjectName.c_str());
+  openSimRoot->InsertEndChild(toolRoot);
+
+  XMLElement* loadsList = xmlDoc.NewElement("objects");
+  toolRoot->InsertEndChild(loadsList);
+
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    XMLElement* forceNode = xmlDoc.NewElement("ExternalForce");
+    std::string plateNumber = std::to_string(i + 1);
+    forceNode->SetAttribute("name", ("ForcePlate" + plateNumber).c_str());
+    loadsList->InsertEndChild(forceNode);
+
+    XMLElement* appliedToBody = xmlDoc.NewElement("applied_to_body");
+    appliedToBody->SetText(footBodyNames[closestBodyToForcePlate[i]].c_str());
+    forceNode->InsertEndChild(appliedToBody);
+
+    XMLElement* forceExpressedInBody
+        = xmlDoc.NewElement("force_expressed_in_body");
+    forceExpressedInBody->SetText("ground");
+    forceNode->InsertEndChild(forceExpressedInBody);
+
+    XMLElement* pointExpressedInBody
+        = xmlDoc.NewElement("point_expressed_in_body");
+    pointExpressedInBody->SetText("ground");
+    forceNode->InsertEndChild(pointExpressedInBody);
+
+    XMLElement* forceIdentifier = xmlDoc.NewElement("force_identifier");
+    forceIdentifier->SetText(("ground_force_" + plateNumber + "_v").c_str());
+    forceNode->InsertEndChild(forceIdentifier);
+
+    XMLElement* pointIdentifier = xmlDoc.NewElement("point_identifier");
+    pointIdentifier->SetText(("ground_force_" + plateNumber + "_p").c_str());
+    forceNode->InsertEndChild(pointIdentifier);
+
+    XMLElement* torqueIdentifier = xmlDoc.NewElement("torque_identifier");
+    torqueIdentifier->SetText(("ground_force_" + plateNumber + "_m").c_str());
+    forceNode->InsertEndChild(torqueIdentifier);
+  }
+
+  XMLElement* grfFile = xmlDoc.NewElement("datafile");
+  grfFile->SetText(grfForcesPath.c_str());
+  toolRoot->InsertEndChild(grfFile);
+
+  xmlDoc.SaveFile(forcesOutputPath.c_str());
+}
+
+//==============================================================================
+/// This creates an XML configuration file, which you can pass to the OpenSim
+/// ID tool to recreate / validate the results of ID created from this tool
+void OpenSimParser::saveOsimInverseDynamicsXMLFile(
+    const std::string& subjectName,
+    const std::string& osimInputModelPath,
+    const std::string& osimInputMotPath,
+    const std::string& osimForcesXmlPath,
+    const std::string& osimOutputStoPath,
+    const std::string& osimOutputBodyForcesStoPath,
+    const std::string& idInstructionsOutputPath)
+{
+  using namespace tinyxml2;
+
+  // clang-format off
+  /**
+
+  Here's an example file:
+
+  <OpenSimDocument Version="40000">
+    <InverseDynamicsTool name="DJ1">
+      <!--Name of the .osim file used to construct a model.-->
+      <model_file>LaiArnoldModified2017_poly_withArms_weldHand\LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim</model_file>
+      <!--List of forces by individual or grouping name (e.g. All, actuators, muscles, ...) to be excluded when computing model dynamics. 'All' also excludes external loads added via 'external_loads_file'.-->
+      <forces_to_exclude> Muscles</forces_to_exclude>
+      <!--XML file (.xml) containing the external loads applied to the model as a set of ExternalForce(s).-->
+      <external_loads_file>Setup_EL_DJ1.xml</external_loads_file>
+      <!--The name of the file containing coordinate data. Can be a motion (.mot) or a states (.sto) file.-->
+      <coordinates_file>ik.mot</coordinates_file>
+      <!--Low-pass cut-off frequency for filtering the coordinates_file data (currently does not apply to states_file or speeds_file). A negative value results in no filtering. The default value is -1.0, so no filtering.-->
+      <lowpass_cutoff_frequency_for_coordinates>30</lowpass_cutoff_frequency_for_coordinates>
+      <!--Name of the storage file (.sto) to which the generalized forces are written.-->
+      <output_gen_force_file>DJ1.sto</output_gen_force_file>
+      <!--List of joints (keyword All, for all joints) to report body forces acting at the joint frame expressed in ground.-->
+      <joints_to_report_body_forces />
+      <!--Name of the storage file (.sto) to which the body forces at specified joints are written.-->
+      <output_body_forces_file>body_forces_at_joints.sto</output_body_forces_file>
+    </InverseDynamicsTool>
+  </OpenSimDocument>
+
+  */
+  // clang-format on
+
+  XMLDocument xmlDoc;
+  XMLElement* openSimRoot = xmlDoc.NewElement("OpenSimDocument");
+  openSimRoot->SetAttribute("Version", "40000");
+  xmlDoc.InsertFirstChild(openSimRoot);
+
+  XMLElement* toolRoot = xmlDoc.NewElement("InverseDynamicsTool");
+  toolRoot->SetAttribute("name", subjectName.c_str());
+  openSimRoot->InsertEndChild(toolRoot);
+
+  XMLElement* modelFile = xmlDoc.NewElement("model_file");
+  modelFile->SetText(osimInputModelPath.c_str());
+  toolRoot->InsertEndChild(modelFile);
+
+  XMLElement* forcesToExclude = xmlDoc.NewElement("forces_to_exclude");
+  forcesToExclude->SetText("Muscles");
+  toolRoot->InsertEndChild(forcesToExclude);
+
+  XMLElement* externalLoadsFile = xmlDoc.NewElement("external_loads_file");
+  externalLoadsFile->SetText(osimForcesXmlPath.c_str());
+  toolRoot->InsertEndChild(externalLoadsFile);
+
+  XMLElement* inputMotionFile = xmlDoc.NewElement("coordinates_file");
+  inputMotionFile->SetText(osimInputMotPath.c_str());
+  toolRoot->InsertEndChild(inputMotionFile);
+
+  XMLElement* outputForceFile = xmlDoc.NewElement("output_gen_force_file");
+  outputForceFile->SetText(osimOutputStoPath.c_str());
+  toolRoot->InsertEndChild(outputForceFile);
+
+  XMLElement* jointsToReportBodyForces
+      = xmlDoc.NewElement("joints_to_report_body_forces");
+  toolRoot->InsertEndChild(jointsToReportBodyForces);
+
+  XMLElement* outputBodyForcesFile
+      = xmlDoc.NewElement("output_body_forces_file");
+  outputBodyForcesFile->SetText(osimOutputBodyForcesStoPath.c_str());
+  toolRoot->InsertEndChild(outputBodyForcesFile);
+
+  xmlDoc.SaveFile(idInstructionsOutputPath.c_str());
 }
 
 //==============================================================================
