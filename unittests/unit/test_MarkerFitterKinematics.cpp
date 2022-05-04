@@ -4478,21 +4478,6 @@ server->blockWhileServing();
 }
 #endif
 
-#ifdef OPENSIM_TESTS
-TEST(MarkerFitter, FULL_PIPELINE_TEST)
-{
-  OpenSimFile scaled = OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
-
-  auto c3d = C3DLoader::loadC3D("dart://sample/osim/Test_Output/JA1Gait35.c3d");
-  OpenSimParser::saveTRC(
-      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
-      "Test_Output/JA1Gait35.trc",
-      c3d.timestamps,
-      c3d.markerTimesteps);
-}
-#endif
-
 #ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
 {

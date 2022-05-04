@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 
+#include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -112,6 +113,13 @@ public:
       const std::string& outputPath,
       const std::vector<double>& timestamps,
       const Eigen::MatrixXs& poses);
+
+  /// This saves the *.mot file for the ground reaction forces we've read from
+  /// a C3D file
+  static void saveGRFMot(
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const std::vector<biomechanics::ForcePlate> forcePlates);
 
   /// This saves the *.mot file with 3 columns for each body. This is
   /// basically only used for verifying consistency between Nimble and OpenSim.

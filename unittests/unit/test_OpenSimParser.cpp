@@ -279,6 +279,30 @@ TEST(OpenSimParser, SCALING)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, SAVE_TRC)
+{
+  auto c3d = C3DLoader::loadC3D("dart://sample/osim/Test_Output/JA1Gait35.c3d");
+  OpenSimParser::saveTRC(
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Test_Output/JA1Gait35.trc",
+      c3d.timestamps,
+      c3d.markerTimesteps);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, SAVE_GRF)
+{
+  auto c3d = C3DLoader::loadC3D("dart://sample/osim/Test_Output/JA1Gait35.c3d");
+  OpenSimParser::saveGRFMot(
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
+      "Test_Output/JA1Gait35_grf.mot",
+      c3d.timestamps,
+      c3d.forcePlates);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, MOVE_OUTPUT_MARKERS)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(

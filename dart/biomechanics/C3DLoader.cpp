@@ -53,6 +53,7 @@ C3D C3DLoader::loadC3D(const std::string& uri)
   ezc3d::c3d data(fullPath);
 
   double frameRate = data.header().frameRate();
+  std::cout << "Framerate: " << frameRate << std::endl;
   int numFrames = data.header().nbFrames();
   int analogFramesPerFrame = data.header().nbAnalogByFrame();
 

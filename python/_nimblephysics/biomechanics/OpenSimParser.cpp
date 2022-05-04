@@ -175,6 +175,18 @@ void OpenSimParser(py::module& m)
       ::py::arg("poses"));
 
   sm.def(
+      "saveGRFMot",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<biomechanics::ForcePlate> forcePlates) {
+        return dart::biomechanics::OpenSimParser::saveGRFMot(
+            outputPath, timestamps, forcePlates);
+      },
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("forcePlates"));
+
+  sm.def(
       "getScaleAndMarkerOffsets",
       &dart::biomechanics::OpenSimParser::getScaleAndMarkerOffsets,
       ::py::arg("standardSkeleton"),

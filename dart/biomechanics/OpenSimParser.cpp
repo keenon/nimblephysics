@@ -933,6 +933,79 @@ void OpenSimParser::saveMot(
 }
 
 //==============================================================================
+double zeroIfNan(double n)
+{
+  if (isnan(n))
+  {
+    return 0.0;
+  }
+  return n;
+}
+
+//==============================================================================
+/// This saves the *.mot file for the ground reaction forces we've read from
+/// a C3D file
+void OpenSimParser::saveGRFMot(
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const std::vector<biomechanics::ForcePlate> forcePlates)
+{
+  std::ofstream motFile;
+  motFile.open(outputPath);
+  motFile << "nColumns=" << (9 * forcePlates.size()) + 1 << "\n";
+  motFile << "nRows=" << timestamps.size() << "\n";
+  motFile << "DataType=double\n";
+  motFile << "version=3\n";
+  motFile << "OpenSimVersion=4.1\n";
+  motFile << "endheader\n";
+
+  motFile << "time";
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    std::string num = std::to_string(i + 1);
+    motFile << "\t"
+            << "ground_force_" + num + "_vx";
+    motFile << "\t"
+            << "ground_force_" + num + "_vy";
+    motFile << "\t"
+            << "ground_force_" + num + "_vz";
+    motFile << "\t"
+            << "ground_force_" + num + "_px";
+    motFile << "\t"
+            << "ground_force_" + num + "_py";
+    motFile << "\t"
+            << "ground_force_" + num + "_pz";
+    motFile << "\t"
+            << "ground_force_" + num + "_mx";
+    motFile << "\t"
+            << "ground_force_" + num + "_my";
+    motFile << "\t"
+            << "ground_force_" + num + "_mz";
+  }
+  motFile << "\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    motFile << timestamps[t];
+    for (int i = 0; i < forcePlates.size(); i++)
+    {
+      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](0));
+      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](1));
+      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](2));
+      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](0));
+      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](1));
+      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](2));
+      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](0));
+      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](1));
+      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](2));
+    }
+    motFile << "\n";
+  }
+
+  motFile.close();
+}
+
+//==============================================================================
 /// This saves the *.mot file with 3 columns for each body. This is
 /// basically only used for verifying consistency between Nimble and OpenSim.
 void OpenSimParser::saveBodyLocationsMot(
