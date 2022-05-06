@@ -494,6 +494,8 @@ MarkerFitter::MarkerFitter(
     mDebugJointVariability(false),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(1.0),
+    mRegularizeIndividualBodyScales(0.2),
+    mRegularizeAllBodyScales(0.2),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
@@ -581,6 +583,60 @@ MarkerFitter::MarkerFitter(
       }
       // 3.4. Reset
       this->mSkeleton->setBodyScales(oldBodyScales);
+    }
+    else
+    {
+      state->bodyScalesGrad.setZero();
+    }
+
+    // 4. Regularize the body sizes to try to be even in every direction
+    for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
+    {
+      Eigen::Vector3s scales = state->bodyScales.col(i);
+      s_t avgScale = (scales(0) + scales(1) + scales(2)) / 3;
+      Eigen::Vector3s diffVec = scales - (Eigen::Vector3s::Ones() * avgScale);
+      loss += diffVec.squaredNorm() * mRegularizeIndividualBodyScales;
+
+      s_t gradScale = (2.0 / 3) * mRegularizeIndividualBodyScales;
+      state->bodyScalesGrad(0, i)
+          += gradScale * (2 * scales(0) - scales(1) - scales(2));
+      state->bodyScalesGrad(1, i)
+          += gradScale * (2 * scales(1) - scales(0) - scales(2));
+      state->bodyScalesGrad(2, i)
+          += gradScale * (2 * scales(2) - scales(0) - scales(1));
+    }
+
+    // 5. Regularize all the body scales, to try to make them all match the
+    // average
+    Eigen::Vector3s avgScale = Eigen::Vector3s::Zero();
+    for (int i = 0; i < state->bodyScales.cols(); i++)
+    {
+      avgScale += state->bodyScales.col(i);
+    }
+    s_t k = state->bodyScales.cols();
+    avgScale /= k;
+
+    // avg = (sum)/K
+    // d/dx = (K-1)*2 / (K^2) * (K*x - sum)
+    // d/dx = (K-1)*2 / (K) * (x - avg)
+
+    // 2*(k-1)/(k*k) * (kx - x - q - y - z)
+    // 2*(k-1)/k * (x - (x + q + y + z)/k)
+    // 2*(k-1)/k*(x - avg)
+
+    // s_t gradScale = (k - 1.0) * 2.0 / k;
+    for (int i = 0; i < state->bodyScales.cols(); i++)
+    {
+      Eigen::Vector3s diff = state->bodyScales.col(i) - avgScale;
+      loss += diff.squaredNorm();
+
+      // state->bodyScalesGrad.col(i) += 2.0 * ((k - 1) / k) * diff;
+      // state->bodyScalesGrad.col(i) += 2.0 * diff;
+      state->bodyScalesGrad.col(i) += 2.0 * diff;
+      /*
+      state->bodyScalesGrad.col(i)
+          += gradScale * (state->bodyScales.col(i) - avgScale);
+      */
     }
 
     return loss;
@@ -2828,7 +2884,8 @@ void MarkerFitter::findJointCenters(
   initialization.joints.clear();
   for (int i = 0; i < mSkeleton->getNumJoints(); i++)
   {
-    if (SphereFitJointCenterProblem::canFitJoint(this, mSkeleton->getJoint(i)))
+    if (SphereFitJointCenterProblem::canFitJoint(
+            this, mSkeleton->getJoint(i), markerObservations))
     {
       initialization.joints.push_back(mSkeleton->getJoint(i));
     }
@@ -3219,6 +3276,24 @@ void MarkerFitter::setRegularizeTrackingMarkerOffsets(s_t weight)
 void MarkerFitter::setRegularizeAnatomicalMarkerOffsets(s_t weight)
 {
   mRegularizeAnatomicalMarkerOffsets = weight;
+}
+
+//==============================================================================
+/// This sets the value weight used to regularize body scales, to penalize
+/// scalings that result in bodies that are very different along the 3 axis,
+/// like bones that become "fat" in order to not pay a marker regularization
+/// penalty, despite having the correct length.
+void MarkerFitter::setRegularizeIndividualBodyScales(s_t weight)
+{
+  mRegularizeIndividualBodyScales = weight;
+}
+
+//==============================================================================
+/// This tries to make all bones in the body have the same scale, punishing
+/// outliers.
+void MarkerFitter::setRegularizeAllBodyScales(s_t weight)
+{
+  mRegularizeAllBodyScales = weight;
 }
 
 //==============================================================================
@@ -4288,7 +4363,10 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
 
 //==============================================================================
 bool SphereFitJointCenterProblem::canFitJoint(
-    MarkerFitter* fitter, dynamics::Joint* joint)
+    MarkerFitter* fitter,
+    dynamics::Joint* joint,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
 {
   int numActive = 0;
   for (auto pair : fitter->mMarkerMap)
@@ -4299,7 +4377,17 @@ bool SphereFitJointCenterProblem::canFitJoint(
             || pair.second.first->getName()
                    == joint->getChildBodyNode()->getName()))
     {
-      numActive++;
+      // Only add the markers if we see them observed at least once in the
+      // dataset. If it's never observed, then we'll end up having all sorts of
+      // divide by zeros
+      for (int i = 0; i < markerObservations.size(); i++)
+      {
+        if (markerObservations[i].count(pair.first) > 0)
+        {
+          numActive++;
+          break;
+        }
+      }
     }
   }
   return numActive >= 3;

@@ -142,7 +142,11 @@ public:
       const std::vector<bool>& newClip,
       Eigen::Ref<Eigen::MatrixXs> out);
 
-  static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
+  static bool canFitJoint(
+      MarkerFitter* fitter,
+      dynamics::Joint* joint,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
 
   int getProblemDim();
 
@@ -486,6 +490,16 @@ public:
   /// This sets the value weight used to regularize anatomical marker offsets
   /// from where the model thinks they should be
   void setRegularizeAnatomicalMarkerOffsets(s_t weight);
+
+  /// This sets the value weight used to regularize body scales, to penalize
+  /// scalings that result in bodies that are very different along the 3 axis,
+  /// like bones that become "fat" in order to not pay a marker regularization
+  /// penalty, despite having the correct length.
+  void setRegularizeIndividualBodyScales(s_t weight);
+
+  /// This tries to make all bones in the body have the same scale, punishing
+  /// outliers.
+  void setRegularizeAllBodyScales(s_t weight);
 
   /// If set to true, we print the pair observation counts and data for
   /// computing joint variability.
@@ -846,6 +860,8 @@ protected:
   bool mDebugJointVariability;
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
+  s_t mRegularizeIndividualBodyScales;
+  s_t mRegularizeAllBodyScales;
 
   // These are IPOPT settings
   double mTolerance;
