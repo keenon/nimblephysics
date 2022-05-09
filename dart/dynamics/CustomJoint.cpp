@@ -1,18 +1,27 @@
 #include "dart/dynamics/CustomJoint.hpp"
 
 #include <memory>
+#include <string>
 
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/LinearFunction.hpp"
+#include "dart/math/MathTypes.hpp"
+
+#define PointDefine typename math::RealVectorSpace<Dimension>::Point;
+#define JacMatrixDefine                                                        \
+  typename math::RealVectorSpace<Dimension>::JacobianMatrix
 
 namespace dart {
 namespace dynamics {
 
-CustomJoint::CustomJoint(const Properties& props)
-  : GenericJoint(props),
+template <std::size_t Dimension>
+CustomJoint<Dimension>::CustomJoint(
+    const detail::GenericJointProperties<math::RealVectorSpace<Dimension>>&
+        props)
+  : GenericJoint<math::RealVectorSpace<Dimension>>(props),
     mAxisOrder(EulerJoint::AxisOrder::XYZ),
     mFlipAxisMap(Eigen::Vector3s::Ones())
 {
@@ -20,68 +29,237 @@ CustomJoint::CustomJoint(const Properties& props)
   for (int i = 0; i < 6; i++)
   {
     mFunctions.push_back(std::make_shared<math::ConstantFunction>(0));
+    mFunctionDrivenByDof.push_back(0);
   }
 }
 
 //==============================================================================
 /// This sets a custom function to map our single input degree of freedom to
 /// the wrapped Euler joint's degree of freedom and index i
-void CustomJoint::setCustomFunction(
-    std::size_t i, std::shared_ptr<math::CustomFunction> fn)
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::setCustomFunction(
+    std::size_t i, std::shared_ptr<math::CustomFunction> fn, int drivenByDof)
 {
   mFunctions[i] = fn;
-  notifyPositionUpdated();
+  mFunctionDrivenByDof[i] = drivenByDof;
+  this->notifyPositionUpdated();
 }
 
 //==============================================================================
-std::shared_ptr<math::CustomFunction> CustomJoint::getCustomFunction(
+template <std::size_t Dimension>
+std::shared_ptr<math::CustomFunction> CustomJoint<Dimension>::getCustomFunction(
     std::size_t i)
 {
   return mFunctions[i];
 }
 
 //==============================================================================
+template <std::size_t Dimension>
+int CustomJoint<Dimension>::getCustomFunctionDrivenByDof(std::size_t i)
+{
+  return mFunctionDrivenByDof[i];
+}
+
+//==============================================================================
 /// This gets the Jacobian of the mapping functions. That is, for every
 /// epsilon change in x, how does each custom function change?
-Eigen::Vector6s CustomJoint::getCustomFunctionGradientAt(s_t x) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::getCustomFunctionGradientAt(
+    const Eigen::VectorXs& x) const
 {
-  Eigen::Vector6s df = Eigen::Vector6s::Zero();
+  math::Jacobian df = math::Jacobian::Zero(6, Dimension);
   for (int i = 0; i < 6; i++)
   {
-    df(i) = mFunctions[i]->calcDerivative(1, x);
+    int drivenByDof = mFunctionDrivenByDof[i];
+    df(i, drivenByDof) = mFunctions[i]->calcDerivative(1, x(drivenByDof));
   }
   return df;
 }
 
 //==============================================================================
-Eigen::Vector6s CustomJoint::finiteDifferenceCustomFunctionGradientAt(
-    s_t x, bool useRidders) const
+/// This gets the time derivative of the Jacobian of the mapping functions.
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::getCustomFunctionGradientAtTimeDeriv(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
-  Eigen::Vector6s result;
+  math::Jacobian dfdt = math::Jacobian::Zero(6, Dimension);
+  for (int i = 0; i < 6; i++)
+  {
+    int drivenByDof = mFunctionDrivenByDof[i];
+    dfdt(i, drivenByDof)
+        = mFunctions[i]->calcDerivative(2, x(drivenByDof)) * dx(drivenByDof);
+  }
+  return dfdt;
+}
 
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::finiteDifferenceCustomFunctionGradientAtTimeDeriv(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
+{
+  math::Jacobian result = math::Jacobian::Zero(6, this->getNumDofs());
+
+  bool useRidders = true;
   s_t eps = useRidders ? 1e-3 : 1e-7;
-  math::finiteDifference<Eigen::Vector6s>(
+  math::finiteDifference<math::Jacobian>(
       [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ s_t& perturbed) {
-        perturbed = mFunctions[dof]->calcValue(x + eps);
+          /*out*/ math::Jacobian& perturbed) {
+        Eigen::VectorXs tweaked = x + eps * dx;
+        perturbed = getCustomFunctionGradientAt(tweaked);
         return true;
       },
       result,
       eps,
       useRidders);
 
-  return result;
+  return math::Jacobian(result);
+}
+
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::finiteDifferenceCustomFunctionGradientAt(
+    const Eigen::VectorXs& x, bool useRidders) const
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(6, this->getNumDofs());
+
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedPoint = x;
+        perturbedPoint(dof) += eps;
+        perturbed = getCustomFunctionPositions(perturbedPoint);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return math::Jacobian(result);
+}
+
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getCustomFunctionGradientAtTimeDerivPosDeriv(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx,
+    int index) const
+{
+  math::Jacobian dfdt = math::Jacobian::Zero(6, Dimension);
+  for (int i = 0; i < 6; i++)
+  {
+    int drivenByDof = mFunctionDrivenByDof[i];
+    if (drivenByDof == index)
+    {
+      dfdt(i, drivenByDof)
+          = mFunctions[i]->calcDerivative(2, x(drivenByDof)) * ddx(drivenByDof)
+            + mFunctions[i]->calcDerivative(3, x(drivenByDof))
+                  * dx(drivenByDof);
+    }
+  }
+  return dfdt;
+}
+
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceCustomFunctionGradientAtTimeDerivPosDeriv(
+        const Eigen::VectorXs& x,
+        const Eigen::VectorXs& dx,
+        const Eigen::VectorXs& ddx,
+        int index) const
+{
+  math::Jacobian result = math::Jacobian::Zero(6, this->getNumDofs());
+  (void)ddx;
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<math::Jacobian>(
+      [&](/* in*/ s_t eps,
+          /*out*/ math::Jacobian& perturbed) {
+        Eigen::VectorXs tweaked = x;
+        tweaked(index) += eps;
+        perturbed = getCustomFunctionGradientAtTimeDeriv(tweaked, dx);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return math::Jacobian(result);
+}
+
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getCustomFunctionGradientAtTimeDerivVelDeriv(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx,
+    int index) const
+{
+  (void)dx;
+  (void)ddx;
+  math::Jacobian dfdt = math::Jacobian::Zero(6, Dimension);
+  for (int i = 0; i < 6; i++)
+  {
+    int drivenByDof = mFunctionDrivenByDof[i];
+    if (drivenByDof == index)
+    {
+      dfdt(i, drivenByDof) = mFunctions[i]->calcDerivative(2, x(drivenByDof));
+      /*
+      dfdt(i, drivenByDof)
+          = mFunctions[i]->calcDerivative(2, x(drivenByDof)) * dx(drivenByDof);
+          */
+    }
+  }
+  return dfdt;
+}
+
+//==============================================================================
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceCustomFunctionGradientAtTimeDerivVelDeriv(
+        const Eigen::VectorXs& x,
+        const Eigen::VectorXs& dx,
+        const Eigen::VectorXs& ddx,
+        int index) const
+{
+  math::Jacobian result = math::Jacobian::Zero(6, this->getNumDofs());
+  (void)ddx;
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<math::Jacobian>(
+      [&](/* in*/ s_t eps,
+          /*out*/ math::Jacobian& perturbed) {
+        Eigen::VectorXs tweaked = dx;
+        tweaked(index) += eps;
+        perturbed = getCustomFunctionGradientAtTimeDeriv(x, tweaked);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return math::Jacobian(result);
 }
 
 //==============================================================================
 /// This gets the array of 2nd order derivatives at x
-Eigen::Vector6s CustomJoint::getCustomFunctionSecondGradientAt(s_t x) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::getCustomFunctionSecondGradientAt(
+    const Eigen::VectorXs& x) const
 {
-  Eigen::Vector6s ddf = Eigen::Vector6s::Zero();
+  math::Jacobian ddf = math::Jacobian::Zero(6, Dimension);
   for (int i = 0; i < 6; i++)
   {
-    ddf(i) = mFunctions[i]->calcDerivative(2, x);
+    int drivenByDof = mFunctionDrivenByDof[i];
+    ddf(i, drivenByDof) = mFunctions[i]->calcDerivative(2, x(drivenByDof));
   }
   return ddf;
 }
@@ -89,12 +267,14 @@ Eigen::Vector6s CustomJoint::getCustomFunctionSecondGradientAt(s_t x) const
 //==============================================================================
 /// This produces the positions of each of the mapping functions, at a given
 /// point of input.
-Eigen::Vector6s CustomJoint::getCustomFunctionPositions(s_t x) const
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::getCustomFunctionPositions(
+    const Eigen::VectorXs& x) const
 {
   Eigen::Vector6s pos = Eigen::Vector6s::Zero();
   for (int i = 0; i < 6; i++)
   {
-    pos(i) = mFunctions[i]->calcValue(x);
+    pos(i) = mFunctions[i]->calcValue(x(mFunctionDrivenByDof[i]));
   }
   return pos;
 }
@@ -102,193 +282,299 @@ Eigen::Vector6s CustomJoint::getCustomFunctionPositions(s_t x) const
 //==============================================================================
 /// This produces the velocities of each of the mapping functions, at a given
 /// point with a specific velocity.
-Eigen::Vector6s CustomJoint::getCustomFunctionVelocities(s_t x, s_t dx) const
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::getCustomFunctionVelocities(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
-  return getCustomFunctionGradientAt(x) * dx;
+  Eigen::Vector6s vel = Eigen::Vector6s::Zero();
+  math::Jacobian fnGrad = getCustomFunctionGradientAt(x);
+  for (int i = 0; i < 6; i++)
+  {
+    int drivenByDof = this->mFunctionDrivenByDof[i];
+    vel(i) = fnGrad(i, drivenByDof) * dx(drivenByDof);
+  }
+  return vel;
 }
 
 //==============================================================================
 /// This produces the accelerations of each of the mapping functions, at a
 /// given point with a specific acceleration.
-Eigen::Vector6s CustomJoint::getCustomFunctionAccelerations(
-    s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::getCustomFunctionAccelerations(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx) const
 {
-  Eigen::Vector6s ddf = ddx * getCustomFunctionGradientAt(x);
+  math::Jacobian ddf = getCustomFunctionGradientAt(x);
+  Eigen::Vector6s acc;
+
   for (int i = 0; i < 6; i++)
   {
-    ddf(i) += mFunctions[i]->calcDerivative(2, x) * dx;
+    int drivenByDof = this->mFunctionDrivenByDof[i];
+    acc(i)
+        = ddf(i, drivenByDof) * ddx(drivenByDof)
+          + mFunctions[i]->calcDerivative(2, x(drivenByDof)) * dx(drivenByDof);
   }
-  return ddf;
+
+  return acc;
 }
 
 //==============================================================================
 /// This produces the derivative of the velocities with respect to changes
 /// in position x
-Eigen::Vector6s CustomJoint::getCustomFunctionVelocitiesDerivativeWrtPos(
-    s_t x, s_t dx) const
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getCustomFunctionVelocitiesDerivativeWrtPos(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
-  return getCustomFunctionSecondGradientAt(x) * dx;
+  math::Jacobian fnGrad = getCustomFunctionSecondGradientAt(x);
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+  for (int i = 0; i < 6; i++)
+  {
+    int drivenByDof = this->mFunctionDrivenByDof[i];
+    jac(i, drivenByDof) = fnGrad(i, drivenByDof) * dx(drivenByDof);
+  }
+  return jac;
 }
 
 //==============================================================================
-Eigen::Vector6s
-CustomJoint::finiteDifferenceCustomFunctionVelocitiesDerivativeWrtPos(
-    s_t x, s_t dx) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceCustomFunctionVelocitiesDerivativeWrtPos(
+        const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
-  double EPS = 1e-7;
-  Eigen::Vector6s pos = getCustomFunctionVelocities(x + EPS, dx);
-  Eigen::Vector6s neg = getCustomFunctionVelocities(x - EPS, dx);
-  return (pos - neg) / (2 * EPS);
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+
+  const double EPS = 1e-7;
+
+  for (int i = 0; i < Dimension; i++)
+  {
+    Eigen::VectorXs perturbed = x;
+    perturbed(i) += EPS;
+    Eigen::Vector6s pos = getCustomFunctionVelocities(perturbed, dx);
+    perturbed = x;
+    perturbed(i) -= EPS;
+    Eigen::Vector6s neg = getCustomFunctionVelocities(perturbed, dx);
+    jac.col(i) = (pos - neg) / (2 * EPS);
+  }
+  return jac;
 }
 
 //==============================================================================
 /// This produces the derivative of the accelerations with respect to changes
 /// in position x
-Eigen::Vector6s CustomJoint::getCustomFunctionAccelerationsDerivativeWrtPos(
-    s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getCustomFunctionAccelerationsDerivativeWrtPos(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx) const
 {
-  Eigen::Vector6s ddf_dx = ddx * getCustomFunctionSecondGradientAt(x);
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+
+  math::Jacobian ddf_dx = getCustomFunctionSecondGradientAt(x);
   for (int i = 0; i < 6; i++)
   {
-    // Most custom functions will have a 0 third derivative, but this is here
-    // just in case
-    ddf_dx(i) += mFunctions[i]->calcDerivative(3, x) * dx;
+    int drivenBy = this->mFunctionDrivenByDof[i];
+
+    jac(i, drivenBy)
+        = ddx(drivenBy) * ddf_dx(i, drivenBy)
+          // Most custom functions will have a 0 third derivative, but this is
+          // here just in case
+          + mFunctions[i]->calcDerivative(3, x(drivenBy)) * dx(drivenBy);
   }
-  return ddf_dx;
+
+  return jac;
 }
 
 //==============================================================================
-Eigen::Vector6s
-CustomJoint::finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
-    s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
+        const Eigen::VectorXs& x,
+        const Eigen::VectorXs& dx,
+        const Eigen::VectorXs& ddx) const
 {
-  double EPS = 1e-7;
-  Eigen::Vector6s pos = getCustomFunctionAccelerations(x + EPS, dx, ddx);
-  Eigen::Vector6s neg = getCustomFunctionAccelerations(x - EPS, dx, ddx);
-  return (pos - neg) / (2 * EPS);
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < Dimension; i++)
+  {
+    Eigen::VectorXs perturbed = x;
+    perturbed(i) += EPS;
+    Eigen::Vector6s pos = getCustomFunctionAccelerations(perturbed, dx, ddx);
+    perturbed = x;
+    perturbed(i) -= EPS;
+    Eigen::Vector6s neg = getCustomFunctionAccelerations(perturbed, dx, ddx);
+    jac.col(i) = (pos - neg) / (2 * EPS);
+  }
+  return jac;
 }
 
 //==============================================================================
 /// This produces the derivative of the accelerations with respect to changes
 /// in velocity dx
-Eigen::Vector6s CustomJoint::getCustomFunctionAccelerationsDerivativeWrtVel(
-    s_t x) const
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getCustomFunctionAccelerationsDerivativeWrtVel(
+    const Eigen::VectorXs& x) const
 {
-  Eigen::Vector6s d_dx = Eigen::Vector6s::Zero();
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+
   for (int i = 0; i < 6; i++)
   {
-    d_dx(i) += mFunctions[i]->calcDerivative(2, x);
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    jac(i, drivenBy) = mFunctions[i]->calcDerivative(2, x(drivenBy));
   }
-  return d_dx;
+  return jac;
 }
 
 //==============================================================================
-Eigen::Vector6s
-CustomJoint::finiteDifferenceCustomFunctionAccelerationsDerivativeWrtVel(
-    s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceCustomFunctionAccelerationsDerivativeWrtVel(
+        const Eigen::VectorXs& x,
+        const Eigen::VectorXs& dx,
+        const Eigen::VectorXs& ddx) const
 {
-  double EPS = 1e-7;
-  Eigen::Vector6s pos = getCustomFunctionAccelerations(x, dx + EPS, ddx);
-  Eigen::Vector6s neg = getCustomFunctionAccelerations(x, dx - EPS, ddx);
-  return (pos - neg) / (2 * EPS);
+  math::Jacobian jac = math::Jacobian::Zero(6, Dimension);
+
+  const double EPS = 1e-7;
+  for (int i = 0; i < Dimension; i++)
+  {
+    Eigen::VectorXs perturbed = dx;
+    perturbed(i) += EPS;
+    Eigen::Vector6s pos = getCustomFunctionAccelerations(x, perturbed, ddx);
+    perturbed = dx;
+    perturbed(i) -= EPS;
+    Eigen::Vector6s neg = getCustomFunctionAccelerations(x, perturbed, ddx);
+    jac.col(i) = (pos - neg) / (2 * EPS);
+  }
+  return jac;
 }
 
 //==============================================================================
 /// This returns the first 3 custom function outputs
-Eigen::Vector3s CustomJoint::getEulerPositions(s_t x) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getEulerPositions(
+    const Eigen::VectorXs& x) const
 {
   Eigen::Vector3s pos;
   for (int i = 0; i < 3; i++)
   {
-    pos(i) = mFunctions[i]->calcValue(x);
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    pos(i) = mFunctions[i]->calcValue(x(drivenBy));
   }
   return pos;
 }
 
 //==============================================================================
 /// This returns the first 3 custom function outputs's derivatives
-Eigen::Vector3s CustomJoint::getEulerVelocities(s_t x, s_t dx) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getEulerVelocities(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
   Eigen::Vector3s vel;
   for (int i = 0; i < 3; i++)
   {
-    vel(i) = mFunctions[i]->calcDerivative(1, x) * dx;
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    vel(i) = mFunctions[i]->calcDerivative(1, x(drivenBy)) * dx(drivenBy);
   }
   return vel;
 }
 
 //==============================================================================
 /// This returns the first 3 custom function outputs's derivatives
-Eigen::Vector3s CustomJoint::getEulerAccelerations(s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getEulerAccelerations(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx) const
 {
   Eigen::Vector3s acc;
   for (int i = 0; i < 3; i++)
   {
-    acc(i) = mFunctions[i]->calcDerivative(1, x) * ddx
-             + mFunctions[i]->calcDerivative(2, x) * dx;
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    acc(i) = mFunctions[i]->calcDerivative(1, x(drivenBy)) * ddx(drivenBy)
+             + mFunctions[i]->calcDerivative(2, x(drivenBy)) * dx(drivenBy);
   }
   return acc;
 }
 
 //==============================================================================
 /// This returns the last 3 custom function outputs
-Eigen::Vector3s CustomJoint::getTranslationPositions(s_t x) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getTranslationPositions(
+    const Eigen::VectorXs& x) const
 {
   Eigen::Vector3s pos;
   for (int i = 3; i < 6; i++)
   {
-    pos(i - 3) = mFunctions[i]->calcValue(x);
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    pos(i - 3) = mFunctions[i]->calcValue(x(drivenBy));
   }
   return pos;
 }
 
 //==============================================================================
 /// This returns the last 3 custom function outputs's derivatives
-Eigen::Vector3s CustomJoint::getTranslationVelocities(s_t x, s_t dx) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getTranslationVelocities(
+    const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const
 {
   Eigen::Vector3s vel;
   for (int i = 3; i < 6; i++)
   {
-    vel(i - 3) = mFunctions[i]->calcDerivative(1, x) * dx;
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    vel(i - 3) = mFunctions[i]->calcDerivative(1, x(drivenBy)) * dx(drivenBy);
   }
   return vel;
 }
 
 //==============================================================================
 /// This returns the last 3 custom function outputs's second derivatives
-Eigen::Vector3s CustomJoint::getTranslationAccelerations(
-    s_t x, s_t dx, s_t ddx) const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getTranslationAccelerations(
+    const Eigen::VectorXs& x,
+    const Eigen::VectorXs& dx,
+    const Eigen::VectorXs& ddx) const
 {
   Eigen::Vector3s acc;
   for (int i = 3; i < 6; i++)
   {
-    acc(i - 3) = mFunctions[i]->calcDerivative(1, x) * ddx
-                 + mFunctions[i]->calcDerivative(2, x) * dx;
+    int drivenBy = this->mFunctionDrivenByDof[i];
+    acc(i - 3) = mFunctions[i]->calcDerivative(1, x(drivenBy)) * ddx(drivenBy)
+                 + mFunctions[i]->calcDerivative(2, x(drivenBy)) * dx(drivenBy);
   }
   return acc;
 }
 
 //==============================================================================
-const std::string& CustomJoint::getType() const
+template <std::size_t Dimension>
+const std::string& CustomJoint<Dimension>::getType() const
 {
   return getStaticType();
 }
 
 //==============================================================================
-const std::string& CustomJoint::getStaticType()
+template <std::size_t Dimension>
+const std::string& CustomJoint<Dimension>::getStaticType()
 {
-  static const std::string name = "CustomJoint";
+  static const std::string name = "CustomJoint" + std::to_string(Dimension);
   return name;
 }
 
 //==============================================================================
-bool CustomJoint::isCyclic(std::size_t) const
+template <std::size_t Dimension>
+bool CustomJoint<Dimension>::isCyclic(std::size_t) const
 {
   return false;
 }
 
 //==============================================================================
-void CustomJoint::setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs)
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::setAxisOrder(
+    EulerJoint::AxisOrder _order, bool _renameDofs)
 {
   mAxisOrder = _order;
   if (_renameDofs)
@@ -300,7 +586,8 @@ void CustomJoint::setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs)
 }
 
 //==============================================================================
-EulerJoint::AxisOrder CustomJoint::getAxisOrder() const
+template <std::size_t Dimension>
+EulerJoint::AxisOrder CustomJoint<Dimension>::getAxisOrder() const
 {
   return mAxisOrder;
 }
@@ -308,55 +595,62 @@ EulerJoint::AxisOrder CustomJoint::getAxisOrder() const
 //==============================================================================
 /// This takes a vector of 1's and -1's to indicate which entries to flip, if
 /// any
-void CustomJoint::setFlipAxisMap(Eigen::Vector3s map)
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::setFlipAxisMap(Eigen::Vector3s map)
 {
   mFlipAxisMap = map;
 }
 
 //==============================================================================
-Eigen::Vector3s CustomJoint::getFlipAxisMap() const
+template <std::size_t Dimension>
+Eigen::Vector3s CustomJoint<Dimension>::getFlipAxisMap() const
 {
   return mFlipAxisMap;
 }
 
 //==============================================================================
-dart::dynamics::Joint* CustomJoint::clone() const
+template <std::size_t Dimension>
+dart::dynamics::Joint* CustomJoint<Dimension>::clone() const
 {
-  CustomJoint* joint = new CustomJoint(this->getJointProperties());
+  CustomJoint<Dimension>* joint
+      = new CustomJoint<Dimension>(this->getJointProperties());
   joint->mFunctions = mFunctions;
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(getFlipAxisMap());
   joint->setAxisOrder(getAxisOrder());
-  joint->setName(getName());
+  joint->setName(this->getName());
   return joint;
 }
 
 //==============================================================================
-void CustomJoint::updateDegreeOfFreedomNames()
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::updateDegreeOfFreedomNames()
 {
-  if (!mDofs[0]->isNamePreserved())
-    mDofs[0]->setName(Joint::mAspectProperties.mName, false);
+  if (!this->mDofs[0]->isNamePreserved())
+    this->mDofs[0]->setName(Joint::mAspectProperties.mName, false);
 }
 
 //==============================================================================
-void CustomJoint::updateRelativeTransform() const
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::updateRelativeTransform() const
 {
-  s_t pos = getPositionsStatic()(0);
+  Eigen::VectorXs pos = this->getPositionsStatic();
   Eigen::Vector3s euler = getEulerPositions(pos);
   Eigen::Isometry3s T
       = EulerJoint::convertToTransform(euler, mAxisOrder, mFlipAxisMap);
   T.translation() = getTranslationPositions(pos);
 
-  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * T
-       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  this->mT = Joint::mAspectProperties.mT_ParentBodyToJoint * T
+             * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
 }
 
 //==============================================================================
-Eigen::Matrix6s CustomJoint::getSpatialJacobianStaticDerivWrtInput(
-    s_t pos) const
+template <std::size_t Dimension>
+Eigen::Matrix6s CustomJoint<Dimension>::getSpatialJacobianStaticDerivWrtInput(
+    const Eigen::VectorXs& pos, std::size_t index) const
 {
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
-  Eigen::Vector6s grad = getCustomFunctionGradientAt(pos);
+  Eigen::Vector6s grad = getCustomFunctionGradientAt(pos).col(index);
 
   Eigen::Matrix6s J = Eigen::Matrix6s::Zero();
   for (int i = 0; i < 6; i++)
@@ -373,8 +667,10 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianStaticDerivWrtInput(
 }
 
 //==============================================================================
-Eigen::Matrix6s CustomJoint::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
-    s_t pos, bool useRidders) const
+template <std::size_t Dimension>
+Eigen::Matrix6s
+CustomJoint<Dimension>::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
+    const Eigen::VectorXs& pos, std::size_t index, bool useRidders) const
 {
   Eigen::Matrix6s result;
 
@@ -382,8 +678,10 @@ Eigen::Matrix6s CustomJoint::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
   math::finiteDifference<Eigen::Matrix6s>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::VectorXs perturbedPos = pos;
+        perturbedPos(index) += eps;
         perturbed = EulerFreeJoint::computeRelativeJacobianStatic(
-            getCustomFunctionPositions(pos + eps),
+            getCustomFunctionPositions(perturbedPos),
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint);
@@ -397,16 +695,25 @@ Eigen::Matrix6s CustomJoint::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
 }
 
 //==============================================================================
-math::Jacobian CustomJoint::getRelativeJacobianDeriv(std::size_t index) const
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::getRelativeJacobianDeriv(
+    std::size_t index) const
 {
-  (void)index;
-  assert(index == 0);
-  s_t pos = getPositionsStatic()(0);
+  Eigen::VectorXs pos = this->getPositions();
 
-  Eigen::Vector6s grad = getCustomFunctionGradientAt(pos);
-  Eigen::Vector6s secondGrad = getCustomFunctionSecondGradientAt(pos);
+  math::Jacobian grad = getCustomFunctionGradientAt(pos);
+  math::Jacobian secondGrad = getCustomFunctionSecondGradientAt(pos);
 
-  return getSpatialJacobianStaticDerivWrtInput(pos) * grad
+  for (int i = 0; i < Dimension; i++)
+  {
+    if (i != index)
+    {
+      // grad.col(i).setZero();
+      secondGrad.col(i).setZero();
+    }
+  }
+
+  return getSpatialJacobianStaticDerivWrtInput(pos, index) * grad
          + EulerFreeJoint::computeRelativeJacobianStatic(
                getCustomFunctionPositions(pos),
                mAxisOrder,
@@ -416,37 +723,39 @@ math::Jacobian CustomJoint::getRelativeJacobianDeriv(std::size_t index) const
 }
 
 //==============================================================================
-math::Jacobian CustomJoint::finiteDifferenceRelativeJacobianDeriv(
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::finiteDifferenceRelativeJacobianDeriv(
     std::size_t index, bool useRidders)
 {
-  (void)index;
-  assert(index == 0);
+  math::Jacobian result = math::Jacobian::Zero(6, this->getNumDofs());
 
-  Eigen::Vector1s original = getPositionsStatic();
-  Eigen::Vector6s result;
+  s_t original = this->getPosition(index);
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
-  math::finiteDifference<Eigen::Vector6s>(
+  math::finiteDifference<math::Jacobian>(
       [&](/* in*/ s_t eps,
-          /*out*/ Eigen::Vector6s& perturbed) {
-        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-        setPositionsStatic(tweaked);
-        perturbed = getRelativeJacobian();
+          /*out*/ math::Jacobian& perturbed) {
+        s_t tweaked = original + eps;
+        this->setPosition(index, tweaked);
+        perturbed = this->getRelativeJacobian();
         return true;
       },
       result,
       eps,
       useRidders);
 
-  setPositionsStatic(original);
+  this->setPosition(index, original);
+
   return result;
 }
 
 //==============================================================================
-Eigen::Vector6s CustomJoint::getRelativeJacobianStatic(
-    const Eigen::Vector1s& position) const
+template <std::size_t Dimension>
+typename math::RealVectorSpace<Dimension>::JacobianMatrix
+CustomJoint<Dimension>::getRelativeJacobianStatic(
+    const typename math::RealVectorSpace<Dimension>::Vector& pos) const
 {
-  s_t pos = position(0);
+  // typename math::RealVectorSpace<Dimension>::JacobianMatrix jacobian;
   return EulerFreeJoint::computeRelativeJacobianStatic(
              getCustomFunctionPositions(pos),
              mAxisOrder,
@@ -456,44 +765,57 @@ Eigen::Vector6s CustomJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-void CustomJoint::updateRelativeJacobian(bool) const
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::updateRelativeJacobian(bool) const
 {
-  mJacobian = getRelativeJacobianStatic(getPositionsStatic());
+  this->mJacobian = getRelativeJacobianStatic(this->getPositionsStatic());
 }
 
 //==============================================================================
-void CustomJoint::updateRelativeJacobianTimeDeriv() const
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::updateRelativeJacobianTimeDeriv() const
 {
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  Eigen::VectorXs pos = this->getPositionsStatic();
+  Eigen::VectorXs vel = this->getVelocitiesStatic();
 
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
-  mJacobianDeriv = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-                       positions,
-                       velocities,
-                       mAxisOrder,
-                       mFlipAxisMap,
-                       Joint::mAspectProperties.mT_ChildBodyToJoint)
-                       * velocities
-                   + EulerFreeJoint::computeRelativeJacobianStatic(
-                         positions,
-                         mAxisOrder,
-                         mFlipAxisMap,
-                         Joint::mAspectProperties.mT_ChildBodyToJoint)
-                         * getCustomFunctionAccelerations(pos, vel, 0.0);
+
+  math::Jacobian customJac = getCustomFunctionGradientAt(pos);
+  math::Jacobian customJacTimeDeriv
+      = getCustomFunctionGradientAtTimeDeriv(pos, vel);
+
+  Eigen::Matrix6s eulerJacTimeDeriv
+      = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
+          positions,
+          velocities,
+          mAxisOrder,
+          mFlipAxisMap,
+          Joint::mAspectProperties.mT_ChildBodyToJoint);
+  Eigen::Matrix6s eulerJac = EulerFreeJoint::computeRelativeJacobianStatic(
+      positions,
+      mAxisOrder,
+      mFlipAxisMap,
+      Joint::mAspectProperties.mT_ChildBodyToJoint);
+
+  this->mJacobianDeriv
+      = eulerJacTimeDeriv * customJac + eulerJac * customJacTimeDeriv;
 }
 
 //==============================================================================
-Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputPos(
-    s_t pos, s_t vel) const
+template <std::size_t Dimension>
+Eigen::Matrix6s
+CustomJoint<Dimension>::getSpatialJacobianTimeDerivDerivWrtInputPos(
+    const Eigen::VectorXs& pos,
+    const Eigen::VectorXs& vel,
+    std::size_t index) const
 {
   Eigen::Matrix6s J = Eigen::Matrix6s::Zero();
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
-  Eigen::Vector6s posGrad = getCustomFunctionGradientAt(pos);
+  Eigen::Vector6s posGrad = getCustomFunctionGradientAt(pos).col(index);
   Eigen::Vector6s velGrad
-      = getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel);
+      = getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel).col(index);
   for (int i = 0; i < 6; i++)
   {
     J += EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
@@ -516,9 +838,13 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputPos(
 }
 
 //==============================================================================
-Eigen::Matrix6s
-CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
-    s_t pos, s_t vel, bool useRidders) const
+template <std::size_t Dimension>
+Eigen::Matrix6s CustomJoint<Dimension>::
+    finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
+        const Eigen::VectorXs& pos,
+        const Eigen::VectorXs& vel,
+        std::size_t index,
+        bool useRidders) const
 {
   Eigen::Matrix6s result;
 
@@ -526,9 +852,11 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
   math::finiteDifference<Eigen::Matrix6s>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::VectorXs perturbedPos = pos;
+        perturbedPos(index) += eps;
         perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-            getCustomFunctionPositions(pos + eps),
-            getCustomFunctionVelocities(pos + eps, vel),
+            getCustomFunctionPositions(perturbedPos),
+            getCustomFunctionVelocities(perturbedPos, vel),
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint);
@@ -542,12 +870,14 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
 }
 
 //==============================================================================
-Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputVel(
-    s_t pos) const
+template <std::size_t Dimension>
+Eigen::Matrix6s
+CustomJoint<Dimension>::getSpatialJacobianTimeDerivDerivWrtInputVel(
+    const Eigen::VectorXs& pos, std::size_t index) const
 {
   Eigen::Matrix6s J = Eigen::Matrix6s::Zero();
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
-  Eigen::Vector6s grad = getCustomFunctionGradientAt(pos);
+  Eigen::Vector6s grad = getCustomFunctionGradientAt(pos).col(index);
   for (int i = 0; i < 6; i++)
   {
     J += EulerFreeJoint::computeRelativeJacobianTimeDerivDerivWrtVel(
@@ -562,9 +892,13 @@ Eigen::Matrix6s CustomJoint::getSpatialJacobianTimeDerivDerivWrtInputVel(
 }
 
 //==============================================================================
-Eigen::Matrix6s
-CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
-    s_t pos, s_t vel, bool useRidders) const
+template <std::size_t Dimension>
+Eigen::Matrix6s CustomJoint<Dimension>::
+    finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
+        const Eigen::VectorXs& pos,
+        const Eigen::VectorXs& vel,
+        std::size_t index,
+        bool useRidders) const
 {
   Eigen::Matrix6s result;
 
@@ -572,9 +906,11 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
   math::finiteDifference<Eigen::Matrix6s>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::Matrix6s& perturbed) {
+        Eigen::VectorXs perturbedVel = vel;
+        perturbedVel(index) += eps;
         perturbed = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
             getCustomFunctionPositions(pos),
-            getCustomFunctionVelocities(pos, vel + eps),
+            getCustomFunctionVelocities(pos, perturbedVel),
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint);
@@ -588,62 +924,87 @@ CustomJoint::finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
 }
 
 //==============================================================================
-math::Jacobian CustomJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getRelativeJacobianTimeDerivDerivWrtPosition(
     std::size_t index) const
 {
   /*
   // The original function we're differentiating, for reference:
 
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  Eigen::VectorXs pos = this->getPositionsStatic();
+  Eigen::VectorXs vel = this->getVelocitiesStatic();
+
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
-  mJacobianDeriv = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-                       positions,
-                       velocities,
-                       mAxisOrder,
-                       Joint::mAspectProperties.mT_ChildBodyToJoint)
-                       * velocities
-                   + EulerFreeJoint::computeRelativeJacobianStatic(
-                         positions,
-                         mAxisOrder,
-                         Joint::mAspectProperties.mT_ChildBodyToJoint)
-                         * getCustomFunctionAccelerations(pos, vel, 0.0);
+
+  math::Jacobian customJac = getCustomFunctionGradientAt(pos);
+  math::Jacobian customJacTimeDeriv
+      = getCustomFunctionGradientAtTimeDeriv(pos, vel);
+
+  Eigen::Matrix6s eulerJacTimeDeriv
+      = EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
+          positions,
+          velocities,
+          mAxisOrder,
+          mFlipAxisMap,
+          Joint::mAspectProperties.mT_ChildBodyToJoint);
+  Eigen::Matrix6s eulerJac = EulerFreeJoint::computeRelativeJacobianStatic(
+      positions,
+      mAxisOrder,
+      mFlipAxisMap,
+      Joint::mAspectProperties.mT_ChildBodyToJoint);
+
+  this->mJacobianDeriv
+      = eulerJacTimeDeriv * customJac + eulerJac * customJacTimeDeriv;
   */
 
-  (void)index;
-  assert(index == 0);
-
-  Eigen::Vector6s J = Eigen::Vector6s::Zero();
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  math::Jacobian J = math::Jacobian::Zero(6, this->getNumDofs());
+  Eigen::VectorXs pos = this->getPositions();
+  Eigen::VectorXs vel = this->getVelocities();
+  Eigen::VectorXs acc = Eigen::VectorXs::Zero(this->getNumDofs());
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
+  Eigen::Vector6s acceleration = getCustomFunctionAccelerations(pos, vel, acc);
 
-  J = getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel) * velocities
+  math::Jacobian customJacTimeDeriv
+      = getCustomFunctionGradientAtTimeDeriv(pos, vel);
+  math::Jacobian dc_dt_dp
+      = getCustomFunctionGradientAtTimeDerivPosDeriv(pos, vel, acc, index);
+  math::Jacobian dc_dp = getCustomFunctionGradientAt(pos);
+  math::Jacobian secondJacWrtIndex = getCustomFunctionSecondGradientAt(pos);
+  for (int i = 0; i < Dimension; i++)
+  {
+    if (i != index)
+    {
+      secondJacWrtIndex.col(i).setZero();
+    }
+  }
+
+  J = getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel, index) * dc_dp
       + EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
             positions,
             velocities,
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint)
-            * getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel)
-      + getSpatialJacobianStaticDerivWrtInput(pos)
-            * getCustomFunctionAccelerations(pos, vel, 0.0)
+            * secondJacWrtIndex
+      + getSpatialJacobianStaticDerivWrtInput(pos, index) * customJacTimeDeriv
       + EulerFreeJoint::computeRelativeJacobianStatic(
             positions,
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint)
-            * getCustomFunctionAccelerationsDerivativeWrtPos(pos, vel, 0.0);
+            * dc_dt_dp;
   return J;
 }
 
 //==============================================================================
-Eigen::Vector6s CustomJoint::scratch()
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::scratch()
 {
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  Eigen::VectorXs pos = this->getPositions();
+  Eigen::VectorXs vel = this->getVelocities();
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
   return EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
@@ -656,18 +1017,19 @@ Eigen::Vector6s CustomJoint::scratch()
 }
 
 //==============================================================================
-Eigen::Vector6s CustomJoint::scratchFd()
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::scratchFd()
 {
-  Eigen::Vector1s original = getPositionsStatic();
   Eigen::Vector6s result;
+  Eigen::VectorXs original = this->getPositions();
 
   bool useRidders = false;
   s_t eps = 1e-7;
   math::finiteDifference<Eigen::Vector6s>(
-      [&](/* in*/ s_t eps,
-          /*out*/ Eigen::Vector6s& perturbed) {
-        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-        setPositionsStatic(tweaked);
+      [&](s_t eps, Eigen::Vector6s& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(0) += eps;
+        this->setPositions(tweaked);
         perturbed = scratch();
         return true;
       },
@@ -675,58 +1037,64 @@ Eigen::Vector6s CustomJoint::scratchFd()
       eps,
       useRidders);
 
-  setPositionsStatic(original);
+  this->setPositions(original);
   return result;
 }
 
 //==============================================================================
-Eigen::Vector6s CustomJoint::scratchAnalytical()
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::scratchAnalytical()
 {
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  Eigen::VectorXs pos = this->getPositions();
+  Eigen::VectorXs vel = this->getVelocities();
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
+  std::size_t index = 0;
 
-  return getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel) * velocities
+  return getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel, index)
+             * velocities
          + EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
                positions,
                velocities,
                mAxisOrder,
                mFlipAxisMap,
                Joint::mAspectProperties.mT_ChildBodyToJoint)
-               * getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel);
+               * getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel).col(
+                   index);
 }
 
 //==============================================================================
-math::Jacobian
-CustomJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
-    std::size_t index, bool useRidders)
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
+        std::size_t index, bool useRidders)
 {
-  (void)index;
-  assert(index == 0);
+  (void)useRidders;
 
-  Eigen::Vector1s original = getPositionsStatic();
-  Eigen::Vector6s result;
+  math::Jacobian result = math::Jacobian::Zero(6, this->getNumDofs());
 
+  Eigen::VectorXs original = this->getPositions();
   s_t eps = useRidders ? 1e-3 : 1e-7;
-  math::finiteDifference<Eigen::Vector6s>(
-      [&](/* in*/ s_t eps,
-          /*out*/ Eigen::Vector6s& perturbed) {
-        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-        setPositionsStatic(tweaked);
-        perturbed = getRelativeJacobianTimeDeriv();
+  math::finiteDifference<math::Jacobian>(
+      [&](s_t eps, math::Jacobian& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(index) += eps;
+        this->setPositions(tweaked);
+        perturbed = this->getRelativeJacobianTimeDeriv();
         return true;
       },
       result,
       eps,
       useRidders);
 
-  setPositionsStatic(original);
+  this->setPositions(original);
   return result;
 }
 
 //==============================================================================
-math::Jacobian CustomJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
+template <std::size_t Dimension>
+math::Jacobian
+CustomJoint<Dimension>::getRelativeJacobianTimeDerivDerivWrtVelocity(
     std::size_t index) const
 {
   /*
@@ -749,59 +1117,57 @@ math::Jacobian CustomJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
                          * getCustomFunctionAccelerations(pos, vel, 0.0);
   */
 
-  (void)index;
-  assert(index == 0);
-
-  Eigen::Vector6s J = Eigen::Vector6s::Zero();
-  s_t pos = getPositionsStatic()(0);
-  s_t vel = getVelocitiesStatic()(0);
+  math::Jacobian J = math::Jacobian::Zero(6, this->getNumDofs());
+  Eigen::VectorXs pos = this->getPositions();
+  Eigen::VectorXs vel = this->getVelocities();
+  Eigen::VectorXs acc = Eigen::VectorXs::Zero(this->getNumDofs());
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
-  Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
 
-  J = getSpatialJacobianTimeDerivDerivWrtInputVel(pos) * velocities
-      + EulerFreeJoint::computeRelativeJacobianTimeDerivStatic(
-            positions,
-            velocities,
-            mAxisOrder,
-            mFlipAxisMap,
-            Joint::mAspectProperties.mT_ChildBodyToJoint)
-            * getCustomFunctionGradientAt(pos)
+  math::Jacobian dc_dt_dv
+      = getCustomFunctionGradientAtTimeDerivVelDeriv(pos, vel, acc, index);
+  math::Jacobian dc_dp = getCustomFunctionGradientAt(pos);
+  J = getSpatialJacobianTimeDerivDerivWrtInputVel(pos, index) * dc_dp
       + EulerFreeJoint::computeRelativeJacobianStatic(
             positions,
             mAxisOrder,
             mFlipAxisMap,
             Joint::mAspectProperties.mT_ChildBodyToJoint)
-            * getCustomFunctionAccelerationsDerivativeWrtVel(pos);
+            * dc_dt_dv;
   return J;
 }
 
 //==============================================================================
-math::Jacobian
-CustomJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
-    std::size_t index, bool useRidders)
+template <std::size_t Dimension>
+math::Jacobian CustomJoint<Dimension>::
+    finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
+        std::size_t index, bool useRidders)
 {
-  (void)index;
-  assert(index == 0);
+  (void)useRidders;
 
-  Eigen::Vector1s original = getVelocitiesStatic();
-  Eigen::Vector6s result;
+  math::Jacobian result = math::Jacobian::Zero(6, Dimension);
 
+  Eigen::VectorXs original = this->getVelocities();
   s_t eps = useRidders ? 1e-3 : 1e-7;
-  math::finiteDifference<Eigen::Vector6s>(
-      [&](/* in*/ s_t eps,
-          /*out*/ Eigen::Vector6s& perturbed) {
-        Eigen::Vector1s tweaked = original + (eps * Eigen::Vector1s::Ones());
-        setVelocitiesStatic(tweaked);
-        perturbed = getRelativeJacobianTimeDeriv();
+  math::finiteDifference<math::Jacobian>(
+      [&](s_t eps, math::Jacobian& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(index) += eps;
+        this->setVelocities(tweaked);
+        perturbed = this->getRelativeJacobianTimeDeriv();
         return true;
       },
       result,
       eps,
       useRidders);
+  this->setVelocities(original);
 
-  setVelocitiesStatic(original);
   return result;
 }
+
+// Instantiate templates
+template class dart::dynamics::CustomJoint<1>;
+template class dart::dynamics::CustomJoint<2>;
+template class dart::dynamics::CustomJoint<3>;
 
 } // namespace dynamics
 } // namespace dart

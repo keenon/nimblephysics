@@ -758,6 +758,10 @@ public:
   /// space
   Eigen::MatrixXs finiteDifferenceRelativeJacobian();
 
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDeriv();
+
   /// This uses finite differencing to compute the relative Jacobian in position
   /// space
   Eigen::MatrixXs finiteDifferenceRelativeJacobianInPositionSpace(

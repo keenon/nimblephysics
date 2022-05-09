@@ -38,8 +38,8 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/math/Helpers.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Helpers.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -406,18 +406,47 @@ Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
   bool useRidders = false;
   s_t eps = 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      s_t original = getVelocity(dof);
-      setVelocity(dof, original + eps);
-      perturbed = getRelativeSpatialVelocity();
-      setVelocity(dof, original);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t original = getVelocity(dof);
+        setVelocity(dof, original + eps);
+        perturbed = getRelativeSpatialVelocity();
+        setVelocity(dof, original);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianTimeDeriv()
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos + eps * vel;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
   return result;
 }
 
@@ -430,18 +459,18 @@ Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianInPositionSpace(
 
   s_t eps = useRidders ? 1e-2 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      s_t original = getPosition(dof);
-      setPosition(dof, original + eps);
-      perturbed = math::logMap(T.inverse() * getRelativeTransform());
-      setPosition(dof, original);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t original = getPosition(dof);
+        setPosition(dof, original + eps);
+        perturbed = math::logMap(T.inverse() * getRelativeTransform());
+        setPosition(dof, original);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   return result;
 }
 

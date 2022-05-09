@@ -2,6 +2,7 @@
 
 #include "dart/dart.hpp"
 #include "dart/math/LinearFunction.hpp"
+#include "dart/math/MathTypes.hpp"
 
 #include "TestHelpers.hpp"
 
@@ -10,13 +11,15 @@ using namespace dart;
 // #define ALL_TESTS
 
 //==============================================================================
-bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
+template <std::size_t Dimension>
+bool verifyCustomJoint(CustomJoint<Dimension>* custom, s_t TEST_THRESHOLD)
 {
-  s_t pos = custom->getPosition(0);
-  s_t vel = custom->getVelocity(0);
+  Eigen::VectorXs pos = custom->getPositions();
+  Eigen::VectorXs vel = custom->getVelocities();
 
-  Eigen::Vector6s customP_dp = custom->getCustomFunctionGradientAt(pos);
-  Eigen::Vector6s customP_dp_fd
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customP_dp
+      = custom->getCustomFunctionGradientAt(pos);
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customP_dp_fd
       = custom->finiteDifferenceCustomFunctionGradientAt(pos);
   if (!equals(customP_dp, customP_dp_fd, 1e-10))
   {
@@ -28,9 +31,9 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
     return false;
   }
 
-  Eigen::Vector6s customV_dp
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customV_dp
       = custom->getCustomFunctionVelocitiesDerivativeWrtPos(pos, vel);
-  Eigen::Vector6s customV_dp_fd
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customV_dp_fd
       = custom->finiteDifferenceCustomFunctionVelocitiesDerivativeWrtPos(
           pos, vel);
   if (!equals(customV_dp, customV_dp_fd, TEST_THRESHOLD))
@@ -43,23 +46,26 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
 
     for (int i = 0; i < 6; i++)
     {
-      std::cout << "Custom function " << i << ":" << std::endl;
+      std::cout << "Custom function " << i << " (driven by DOF "
+                << custom->getCustomFunctionDrivenByDof(i) << "):" << std::endl;
       std::cout << "     ddx:"
-                << custom->getCustomFunction(i)->calcDerivative(2, pos)
+                << custom->getCustomFunction(i)->calcDerivative(
+                       2, pos(custom->getCustomFunctionDrivenByDof(i)))
                 << std::endl;
       std::cout << "  fd_ddx:"
                 << custom->getCustomFunction(i)->finiteDifferenceDerivative(
-                       2, pos)
+                       2, pos(custom->getCustomFunctionDrivenByDof(i)))
                 << std::endl;
     }
     return false;
   }
 
-  Eigen::Vector6s customAcc_dp
-      = custom->getCustomFunctionAccelerationsDerivativeWrtPos(pos, vel, 0.0);
-  Eigen::Vector6s customAcc_dp_fd
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customAcc_dp
+      = custom->getCustomFunctionAccelerationsDerivativeWrtPos(
+          pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()));
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customAcc_dp_fd
       = custom->finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
-          pos, vel, 0.0);
+          pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()));
   if (!equals(customAcc_dp, customAcc_dp_fd, 1e-9))
   {
     std::cout << "Custom dAcc/dp: " << std::endl << customAcc_dp << std::endl;
@@ -71,11 +77,11 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
     return false;
   }
 
-  Eigen::Vector6s customAcc_dv
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customAcc_dv
       = custom->getCustomFunctionAccelerationsDerivativeWrtVel(pos);
-  Eigen::Vector6s customAcc_dv_fd
+  Eigen::Matrix<s_t, 6, Eigen::Dynamic> customAcc_dv_fd
       = custom->finiteDifferenceCustomFunctionAccelerationsDerivativeWrtVel(
-          pos, vel, 0.0);
+          pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()));
   if (!equals(customAcc_dv, customAcc_dv_fd, TEST_THRESHOLD))
   {
     std::cout << "Custom dAcc/dv: " << std::endl << customAcc_dv << std::endl;
@@ -87,132 +93,219 @@ bool verifyCustomJoint(CustomJoint* custom, s_t TEST_THRESHOLD)
     return false;
   }
 
-  Eigen::Matrix6s dsJ = custom->getSpatialJacobianStaticDerivWrtInput(pos);
-  Eigen::Matrix6s dsJ_fd
-      = custom->finiteDifferenceSpatialJacobianStaticDerivWrtInput(pos);
+  math::Jacobian j = custom->getRelativeJacobian();
+  math::Jacobian j_fd = custom->finiteDifferenceRelativeJacobian();
 
-  if (!equals(dsJ, dsJ_fd, TEST_THRESHOLD))
+  if (!equals(j, j_fd, TEST_THRESHOLD))
   {
-
-    std::cout << "getSpatialJacobianDerivWrtInput(): " << std::endl;
-
-    ////////////////////////////
-    /*
-
-    std::cout << "Gradient: " << std::endl
-              << custom->getCustomFunctionGradientAt(pos) << std::endl;
-    std::cout << "Gradient Diff: " << std::endl
-              << custom->finiteDifferenceCustomFunctionGradientAt(pos)
-                     - custom->getCustomFunctionGradientAt(pos)
-              << std::endl;
-    Eigen::Vector6s positions = custom->getCustomFunctionPositions(pos);
-    Eigen::Matrix6s jac
-        = EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
-            positions,
-            1,
-            custom->getAxisOrder(),
-            custom->getFlipAxisMap(),
-            custom->getTransformFromChildBodyNode());
-    Eigen::Matrix6s jacFD
-        = EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
-            positions,
-            1,
-            custom->getAxisOrder(),
-            custom->getFlipAxisMap(),
-            custom->getTransformFromChildBodyNode());
-    std::cout << "Jac: " << std::endl << jac << std::endl;
-    std::cout << "Jac Diff: " << std::endl << jac - jacFD << std::endl;
-
-    */
-    ////////////////////////////
-
-    std::cout << "Analytical dsJ: " << std::endl << dsJ << std::endl;
-    std::cout << "FD dsJ: " << std::endl << dsJ_fd << std::endl;
-    std::cout << "Diff: " << std::endl << dsJ - dsJ_fd << std::endl;
-    EXPECT_TRUE(equals(dsJ, dsJ_fd, TEST_THRESHOLD));
+    std::cout << "relativeJacobian: " << std::endl;
+    std::cout << "Analytical j: " << std::endl << j << std::endl;
+    std::cout << "FD j: " << std::endl << j_fd << std::endl;
+    std::cout << "Diff: " << std::endl << j - j_fd << std::endl;
+    EXPECT_TRUE(equals(j, j_fd, TEST_THRESHOLD));
     return false;
   }
 
-  Eigen::Vector6s dj = custom->getRelativeJacobianDeriv(0);
-  Eigen::Vector6s dj_fd = custom->finiteDifferenceRelativeJacobianDeriv(0);
+  math::Jacobian dc_dt = custom->getCustomFunctionGradientAtTimeDeriv(pos, vel);
+  math::Jacobian dc_dt_fd
+      = custom->finiteDifferenceCustomFunctionGradientAtTimeDeriv(pos, vel);
 
-  if (!equals(dj, dj_fd, TEST_THRESHOLD))
+  if (!equals(dc_dt, dc_dt_fd, TEST_THRESHOLD))
   {
-    std::cout << "relativeJacobianDeriv(): " << std::endl;
-    std::cout << "Analytical dj: " << std::endl << dj << std::endl;
-    std::cout << "FD dj: " << std::endl << dj_fd << std::endl;
-    std::cout << "Diff: " << std::endl << dj - dj_fd << std::endl;
-    EXPECT_TRUE(equals(dj, dj_fd, TEST_THRESHOLD));
+    std::cout << "customFunctionGradientAtTimeDeriv: " << std::endl;
+    std::cout << "Analytical dc_dt: " << std::endl << dc_dt << std::endl;
+    std::cout << "FD dc_dt: " << std::endl << dc_dt_fd << std::endl;
+    std::cout << "Diff: " << std::endl << dc_dt - dc_dt_fd << std::endl;
+    EXPECT_TRUE(equals(dc_dt, dc_dt_fd, TEST_THRESHOLD));
     return false;
   }
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // Check d/dt d/dx of relative Jacobians
-  ////////////////////////////////////////////////////////////////////////////////
+  math::Jacobian dj_dt = custom->getRelativeJacobianTimeDeriv();
+  math::Jacobian dj_dt_fd = custom->finiteDifferenceRelativeJacobianTimeDeriv();
 
-  Eigen::Vector6s dj_dt_dp
-      = custom->getRelativeJacobianTimeDerivDerivWrtPosition(0);
-  Eigen::Vector6s dj_dt_dp_fd
-      = custom->finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(0);
-
-  if (!equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD))
+  if (!equals(dj_dt, dj_dt_fd, TEST_THRESHOLD))
   {
-    std::cout << "getRelativeJacobianTimeDerivDerivWrtPosition(): "
-              << std::endl;
-    std::cout << "Analytical dj dt dp: " << std::endl << dj_dt_dp << std::endl;
-    std::cout << "FD dj dt dp: " << std::endl << dj_dt_dp_fd << std::endl;
-    std::cout << "Diff: " << std::endl << dj_dt_dp - dj_dt_dp_fd << std::endl;
-    EXPECT_TRUE(equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD));
+    std::cout << "relativeJacobianTimeDeriv: " << std::endl;
+    std::cout << "Analytical dj_dt: " << std::endl << dj_dt << std::endl;
+    std::cout << "FD dj_dt: " << std::endl << dj_dt_fd << std::endl;
+    std::cout << "Diff: " << std::endl << dj_dt - dj_dt_fd << std::endl;
+    EXPECT_TRUE(equals(dj_dt, dj_dt_fd, TEST_THRESHOLD));
     return false;
   }
 
-  Eigen::Vector6s dj_dt_dv
-      = custom->getRelativeJacobianTimeDerivDerivWrtVelocity(0);
-  Eigen::Vector6s dj_dt_dv_fd
-      = custom->finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(0);
-
-  if (!equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD))
+  for (int i = 0; i < custom->getNumDofs(); i++)
   {
-    std::cout << "getRelativeJacobianTimeDerivDerivWrtVelocity(): "
-              << std::endl;
-    std::cout << "Analytical dj dt dv: " << std::endl << dj_dt_dv << std::endl;
-    std::cout << "FD dj dt dv: " << std::endl << dj_dt_dv_fd << std::endl;
-    std::cout << "Diff: " << std::endl << dj_dt_dv - dj_dt_dv_fd << std::endl;
-    EXPECT_TRUE(equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD));
-    return false;
-  }
+    Eigen::Matrix6s dsJ = custom->getSpatialJacobianStaticDerivWrtInput(pos, i);
+    Eigen::Matrix6s dsJ_fd
+        = custom->finiteDifferenceSpatialJacobianStaticDerivWrtInput(pos, i);
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // Check d/dt d/dx of spatial Jacobians
-  ////////////////////////////////////////////////////////////////////////////////
+    if (!equals(dsJ, dsJ_fd, TEST_THRESHOLD))
+    {
 
-  Eigen::Matrix6s j3
-      = custom->getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel);
-  Eigen::Matrix6s j3_fd
-      = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
-          pos, vel);
-  if (!equals(j3, j3_fd, TEST_THRESHOLD))
-  {
-    std::cout << "getSpatialJacobianTimeDerivDerivWrtInput(): " << std::endl;
-    std::cout << "Analytical dj dt dx: " << std::endl << j3 << std::endl;
-    std::cout << "FD dj dt dx: " << std::endl << j3_fd << std::endl;
-    std::cout << "Diff: " << std::endl << j3 - j3_fd << std::endl;
-    EXPECT_TRUE(equals(j3, j3_fd, TEST_THRESHOLD));
-    return false;
-  }
+      std::cout << "getSpatialJacobianDerivWrtInput(index=" << i
+                << "): " << std::endl;
 
-  Eigen::Matrix6s j4 = custom->getSpatialJacobianTimeDerivDerivWrtInputVel(pos);
-  Eigen::Matrix6s j4_fd
-      = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
-          pos, vel);
-  if (!equals(j4, j4_fd, TEST_THRESHOLD))
-  {
-    std::cout << "getSpatialJacobianTimeDerivDerivWrtInputVel(): " << std::endl;
-    std::cout << "Analytical dj dt dx: " << std::endl << j4 << std::endl;
-    std::cout << "FD dj dt dx: " << std::endl << j4_fd << std::endl;
-    std::cout << "Diff: " << std::endl << j4 - j4_fd << std::endl;
-    EXPECT_TRUE(equals(j4, j4_fd, TEST_THRESHOLD));
-    return false;
+      ////////////////////////////
+      /*
+
+      std::cout << "Gradient: " << std::endl
+                << custom->getCustomFunctionGradientAt(pos) << std::endl;
+      std::cout << "Gradient Diff: " << std::endl
+                << custom->finiteDifferenceCustomFunctionGradientAt(pos)
+                      - custom->getCustomFunctionGradientAt(pos)
+                << std::endl;
+      Eigen::Vector6s positions = custom->getCustomFunctionPositions(pos);
+      Eigen::Matrix6s jac
+          = EulerFreeJoint::computeRelativeJacobianStaticDerivWrtPos(
+              positions,
+              1,
+              custom->getAxisOrder(),
+              custom->getFlipAxisMap(),
+              custom->getTransformFromChildBodyNode());
+      Eigen::Matrix6s jacFD
+          = EulerFreeJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
+              positions,
+              1,
+              custom->getAxisOrder(),
+              custom->getFlipAxisMap(),
+              custom->getTransformFromChildBodyNode());
+      std::cout << "Jac: " << std::endl << jac << std::endl;
+      std::cout << "Jac Diff: " << std::endl << jac - jacFD << std::endl;
+
+      */
+      ////////////////////////////
+
+      std::cout << "Analytical dsJ: " << std::endl << dsJ << std::endl;
+      std::cout << "FD dsJ: " << std::endl << dsJ_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dsJ - dsJ_fd << std::endl;
+      EXPECT_TRUE(equals(dsJ, dsJ_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dj = custom->getRelativeJacobianDeriv(i);
+    math::Jacobian dj_fd = custom->finiteDifferenceRelativeJacobianDeriv(i);
+
+    if (!equals(dj, dj_fd, TEST_THRESHOLD))
+    {
+      std::cout << "relativeJacobianDeriv(index=" << i << "): " << std::endl;
+      std::cout << "Analytical dj: " << std::endl << dj << std::endl;
+      std::cout << "FD dj: " << std::endl << dj_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj - dj_fd << std::endl;
+      EXPECT_TRUE(equals(dj, dj_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Check d/dt d/dx of relative Jacobians
+    ////////////////////////////////////////////////////////////////////////////////
+
+    math::Jacobian dc_dt_dp
+        = custom->getCustomFunctionGradientAtTimeDerivPosDeriv(
+            pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()), i);
+    math::Jacobian dc_dt_dp_fd
+        = custom->finiteDifferenceCustomFunctionGradientAtTimeDerivPosDeriv(
+            pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()), i);
+
+    if (!equals(dc_dt_dp, dc_dt_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getCustomFunctionGradientAtTimeDerivPosDeriv: "
+                << std::endl;
+      std::cout << "Analytical dc_dt_dp: " << std::endl
+                << dc_dt_dp << std::endl;
+      std::cout << "FD dc_dt_dp: " << std::endl << dc_dt_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dc_dt_dp - dc_dt_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dc_dt_dp, dc_dt_dp_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dc_dt_dv
+        = custom->getCustomFunctionGradientAtTimeDerivVelDeriv(
+            pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()), i);
+    math::Jacobian dc_dt_dv_fd
+        = custom->finiteDifferenceCustomFunctionGradientAtTimeDerivVelDeriv(
+            pos, vel, Eigen::VectorXs::Zero(custom->getNumDofs()), i);
+
+    if (!equals(dc_dt_dv, dc_dt_dv_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getCustomFunctionGradientAtTimeDerivVelDeriv: "
+                << std::endl;
+      std::cout << "Analytical dc_dt_dp: " << std::endl
+                << dc_dt_dv << std::endl;
+      std::cout << "FD dc_dt_dp: " << std::endl << dc_dt_dv_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dc_dt_dv - dc_dt_dv_fd << std::endl;
+      EXPECT_TRUE(equals(dc_dt_dv, dc_dt_dv_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dj_dt_dp
+        = custom->getRelativeJacobianTimeDerivDerivWrtPosition(i);
+    math::Jacobian dj_dt_dp_fd
+        = custom->finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(i);
+
+    if (!equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianTimeDerivDerivWrtPosition(index=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dp: " << std::endl
+                << dj_dt_dp << std::endl;
+      std::cout << "FD dj dt dp: " << std::endl << dj_dt_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dt_dp - dj_dt_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dj_dt_dv
+        = custom->getRelativeJacobianTimeDerivDerivWrtVelocity(i);
+    math::Jacobian dj_dt_dv_fd
+        = custom->finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(i);
+
+    if (!equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianTimeDerivDerivWrtVelocity(index=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dv: " << std::endl
+                << dj_dt_dv << std::endl;
+      std::cout << "FD dj dt dv: " << std::endl << dj_dt_dv_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dt_dv - dj_dt_dv_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Check d/dt d/dx of spatial Jacobians
+    ////////////////////////////////////////////////////////////////////////////////
+
+    Eigen::Matrix6s j3
+        = custom->getSpatialJacobianTimeDerivDerivWrtInputPos(pos, vel, i);
+    Eigen::Matrix6s j3_fd
+        = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
+            pos, vel, i);
+    if (!equals(j3, j3_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getSpatialJacobianTimeDerivDerivWrtInput(index=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dx: " << std::endl << j3 << std::endl;
+      std::cout << "FD dj dt dx: " << std::endl << j3_fd << std::endl;
+      std::cout << "Diff: " << std::endl << j3 - j3_fd << std::endl;
+      EXPECT_TRUE(equals(j3, j3_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    Eigen::Matrix6s j4
+        = custom->getSpatialJacobianTimeDerivDerivWrtInputVel(pos, i);
+    Eigen::Matrix6s j4_fd
+        = custom->finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
+            pos, vel, i);
+    if (!equals(j4, j4_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getSpatialJacobianTimeDerivDerivWrtInputVel(index=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dx: " << std::endl << j4 << std::endl;
+      std::cout << "FD dj dt dx: " << std::endl << j4_fd << std::endl;
+      std::cout << "Diff: " << std::endl << j4 - j4_fd << std::endl;
+      EXPECT_TRUE(equals(j4, j4_fd, TEST_THRESHOLD));
+      return false;
+    }
   }
 
   Eigen::Vector6s scratch = custom->scratchAnalytical();
@@ -411,8 +504,8 @@ TEST(CustomJoint, Construct)
 //==============================================================================
 TEST(CustomJoint, OpenSim_Knee)
 {
-  CustomJoint::Properties props;
-  CustomJoint joint(props);
+  CustomJoint<1>::Properties props;
+  CustomJoint<1> joint(props);
   joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
   std::shared_ptr<math::LinearFunction> linear
       = std::make_shared<math::LinearFunction>(1.0, 0.0);
@@ -449,7 +542,7 @@ TEST(CustomJoint, OpenSim_Knee)
   std::shared_ptr<math::SimmSpline> rotZ
       = std::make_shared<math::SimmSpline>(rotZ_x, rotZ_y);
   (void)rotZ;
-  joint.setCustomFunction(1, rotZ);
+  joint.setCustomFunction(1, rotZ, 0);
 
   std::vector<s_t> rotY_x;
   rotY_x.push_back(0.0);
@@ -484,12 +577,12 @@ TEST(CustomJoint, OpenSim_Knee)
   std::shared_ptr<math::SimmSpline> rotY
       = std::make_shared<math::SimmSpline>(rotY_x, rotY_y);
   (void)rotY;
-  joint.setCustomFunction(2, rotY);
+  joint.setCustomFunction(2, rotY, 0);
 
   std::shared_ptr<math::ConstantFunction> zero
       = std::make_shared<math::ConstantFunction>(0.0);
   (void)zero;
-  joint.setCustomFunction(5, zero);
+  joint.setCustomFunction(5, zero, 0);
   /*
               <SpatialTransform>
                 <!--3 Axes for rotations are listed first.-->
@@ -612,8 +705,8 @@ TEST(CustomJoint, OpenSim_Knee)
 //==============================================================================
 TEST(CustomJoint, Polynomial)
 {
-  CustomJoint::Properties props;
-  CustomJoint joint(props);
+  CustomJoint<1>::Properties props;
+  CustomJoint<1> joint(props);
   joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
 
   // Make 6 random polynomials
@@ -628,7 +721,7 @@ TEST(CustomJoint, Polynomial)
 
     std::shared_ptr<PolynomialFunction> poly
         = std::make_shared<PolynomialFunction>(coeffs);
-    joint.setCustomFunction(i, poly);
+    joint.setCustomFunction(i, poly, 0);
   }
 
   // Check at random positions
@@ -643,6 +736,48 @@ TEST(CustomJoint, Polynomial)
     */
     std::cout << "Testing (" << joint.getPosition(0) << ","
               << joint.getVelocity(0) << ")" << std::endl;
+    if (!verifyCustomJoint(&joint, 1e-9))
+    {
+      return;
+    }
+  }
+}
+
+//==============================================================================
+TEST(CustomJoint, Polynomial2)
+{
+  CustomJoint<2>::Properties props;
+  CustomJoint<2> joint(props);
+  joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
+
+  // Make 6 random polynomials
+  srand(42);
+  for (int i = 0; i < 6; i++)
+  {
+    std::vector<s_t> coeffs;
+    for (int j = 0; j < 10; j++)
+    {
+      coeffs.push_back((((double)rand() / RAND_MAX) * 0.1) - 0.05);
+    }
+
+    std::shared_ptr<PolynomialFunction> poly
+        = std::make_shared<PolynomialFunction>(coeffs);
+    joint.setCustomFunction(i, poly, i % 2);
+  }
+
+  // Check at random positions
+  for (int i = 0; i < 10; i++)
+  {
+    joint.setPositions(Eigen::Vector2s::Random());
+    joint.setVelocities(Eigen::Vector2s::Random());
+
+    /*
+    joint.setPosition(0, 0.0);
+    joint.setVelocity(0, 1.0);
+    */
+    std::cout << "Testing: " << joint.getPositions() << ".."
+              << joint.getVelocities() << std::endl;
+
     if (!verifyCustomJoint(&joint, 1e-9))
     {
       return;

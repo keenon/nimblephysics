@@ -1969,6 +1969,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       else
       {
         assert(false && "Unrecognized function type");
+        exit(1);
       }
 
       if (dofIndex < 3)
@@ -1998,13 +1999,13 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     else if (anySpline)
     {
-      dynamics::CustomJoint* customJoint = nullptr;
+      dynamics::CustomJoint<1>* customJoint = nullptr;
       // Create a CustomJoint
-      dynamics::CustomJoint::Properties props;
+      dynamics::CustomJoint<1>::Properties props;
       props.mName = jointName;
       if (parentBody == nullptr)
       {
-        auto pair = skel->createJointAndBodyNodePair<dynamics::CustomJoint>(
+        auto pair = skel->createJointAndBodyNodePair<dynamics::CustomJoint<1>>(
             nullptr, props, bodyProps);
         customJoint = pair.first;
         childBody = pair.second;
@@ -2013,7 +2014,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       {
         auto pair
             = parentBody
-                  ->createChildJointAndBodyNodePair<dynamics::CustomJoint>(
+                  ->createChildJointAndBodyNodePair<dynamics::CustomJoint<1>>(
                       props, bodyProps);
         customJoint = pair.first;
         childBody = pair.second;
@@ -2030,7 +2031,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       {
         if (i < 3)
         {
-          customJoint->setCustomFunction(i, customFunctions[i]);
+          customJoint->setCustomFunction(i, customFunctions[i], 0);
         }
         else
         {
@@ -2038,19 +2039,20 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           Eigen::Vector3s axis = transformAxisOrder[i - 3];
           if (axis == Eigen::Vector3s::UnitX())
           {
-            customJoint->setCustomFunction(3, customFunctions[i]);
+            customJoint->setCustomFunction(3, customFunctions[i], 0);
           }
           else if (axis == Eigen::Vector3s::UnitY())
           {
-            customJoint->setCustomFunction(4, customFunctions[i]);
+            customJoint->setCustomFunction(4, customFunctions[i], 0);
           }
           else if (axis == Eigen::Vector3s::UnitZ())
           {
-            customJoint->setCustomFunction(5, customFunctions[i]);
+            customJoint->setCustomFunction(5, customFunctions[i], 0);
           }
           else
           {
             assert(false);
+            exit(1);
           }
         }
       }
@@ -2149,6 +2151,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     else
     {
       assert(false);
+      exit(1);
     }
   }
   if (jointType == "WeldJoint")
