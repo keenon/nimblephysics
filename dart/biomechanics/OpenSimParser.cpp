@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -1749,6 +1750,77 @@ OpenSimGRF OpenSimParser::loadGRF(
   return grf;
 }
 
+template <std::size_t Dimension>
+std::pair<dynamics::CustomJoint<Dimension>*, dynamics::BodyNode*>
+createCustomJoint(
+    dynamics::SkeletonPtr skel,
+    std::string jointName,
+    dynamics::BodyNode::Properties bodyProps,
+    dynamics::BodyNode* parentBody,
+    std::vector<std::shared_ptr<math::CustomFunction>> customFunctions,
+    std::vector<int> drivenByDofs,
+    std::vector<Eigen::Vector3s> eulerAxisOrder,
+    std::vector<Eigen::Vector3s> transformAxisOrder)
+{
+  dynamics::CustomJoint<Dimension>* customJoint = nullptr;
+  dynamics::BodyNode* childBody = nullptr;
+  // Create a CustomJoint
+  typename dynamics::CustomJoint<Dimension>::Properties props;
+  props.mName = jointName;
+  if (parentBody == nullptr)
+  {
+    auto pair
+        = skel->createJointAndBodyNodePair<dynamics::CustomJoint<Dimension>>(
+            nullptr, props, bodyProps);
+    customJoint = pair.first;
+    childBody = pair.second;
+  }
+  else
+  {
+    auto pair = parentBody->createChildJointAndBodyNodePair<
+        dynamics::CustomJoint<Dimension>>(props, bodyProps);
+    customJoint = pair.first;
+    childBody = pair.second;
+  }
+
+  assert(customFunctions.size() == 6);
+
+  dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+  Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+  customJoint->setAxisOrder(axisOrder);
+  customJoint->setFlipAxisMap(flips);
+
+  for (int i = 0; i < customFunctions.size(); i++)
+  {
+    if (i < 3)
+    {
+      customJoint->setCustomFunction(i, customFunctions[i], drivenByDofs[i]);
+    }
+    else
+    {
+      // Map to the appropriate slot based on the axis
+      Eigen::Vector3s axis = transformAxisOrder[i - 3];
+      if (axis == Eigen::Vector3s::UnitX())
+      {
+        customJoint->setCustomFunction(3, customFunctions[i], drivenByDofs[i]);
+      }
+      else if (axis == Eigen::Vector3s::UnitY())
+      {
+        customJoint->setCustomFunction(4, customFunctions[i], drivenByDofs[i]);
+      }
+      else if (axis == Eigen::Vector3s::UnitZ())
+      {
+        customJoint->setCustomFunction(5, customFunctions[i], drivenByDofs[i]);
+      }
+      else
+      {
+        assert(false);
+      }
+    }
+  }
+  return std::make_pair(customJoint, childBody);
+}
+
 //==============================================================================
 /// When people finish preparing their model in OpenSim, they save a *.osim
 /// file with all the scales and offsets baked in. This is a utility to go
@@ -1839,6 +1911,37 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   dynamics::Joint* joint = nullptr;
   std::string jointType(jointDetail->Name());
 
+  std::vector<std::string> dofNames;
+
+  tinyxml2::XMLElement* coordinateCursor = nullptr;
+  // This is how the coordinate set is specified in OpenSim v4 files
+  tinyxml2::XMLElement* coordinateSet
+      = jointDetail->FirstChildElement("CoordinateSet");
+  if (coordinateSet)
+  {
+    tinyxml2::XMLElement* objects = coordinateSet->FirstChildElement("objects");
+    if (objects)
+    {
+      coordinateCursor = objects->FirstChildElement("Coordinate");
+    }
+  }
+  // This is how the coordinate set is specified in OpenSim v3 files
+  if (coordinateCursor == nullptr)
+  {
+    coordinateSet = jointDetail->FirstChildElement("coordinates");
+    if (coordinateSet != nullptr)
+    {
+      coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    }
+  }
+  // Iterate through the coordinates
+  while (coordinateCursor)
+  {
+    std::string dofName(coordinateCursor->Attribute("name"));
+    dofNames.push_back(dofName);
+    coordinateCursor = coordinateCursor->NextSiblingElement("Coordinate");
+  }
+
   // Build custom joints
   if (jointType == "CustomJoint")
   {
@@ -1848,15 +1951,17 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         = spatialTransform->FirstChildElement("TransformAxis");
 
     std::vector<std::shared_ptr<math::CustomFunction>> customFunctions;
+    std::vector<int> drivenByDofs;
     std::vector<Eigen::Vector3s> eulerAxisOrder;
     std::vector<Eigen::Vector3s> transformAxisOrder;
+
+    int numLinear = 0;
+    int numConstant = 0;
+    int lastLinearIndex = 0;
 
     int dofIndex = 0;
     /// If all linear, then we're just a EulerFreeJoint
     bool allLinear = true;
-    /// If first 1 is linear, last 5 are constant, then we're just a
-    /// RevoluteJoint
-    bool first1Linear = true;
     /// If first 3 are linear, last 3 are constant, then we're just an
     /// EulerJoint
     bool first3Linear = true;
@@ -1876,6 +1981,25 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       {
         function = transformAxisCursor;
       }
+
+      int drivenByDof = 0;
+      tinyxml2::XMLElement* coordinates
+          = transformAxisCursor->FirstChildElement("coordinates");
+      if (coordinates != nullptr)
+      {
+        const char* text_pointer = coordinates->GetText();
+        if (text_pointer != nullptr)
+        {
+          std::string coordinateName(text_pointer);
+          auto iterator
+              = std::find(dofNames.begin(), dofNames.end(), coordinateName);
+          if (iterator != dofNames.end())
+          {
+            drivenByDof = iterator - dofNames.begin();
+          }
+        }
+      }
+      drivenByDofs.push_back(drivenByDof);
 
       tinyxml2::XMLElement* linearFunction
           = function->FirstChildElement("LinearFunction");
@@ -1907,11 +2031,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
       if (constant != nullptr)
       {
+        numConstant++;
         allLinear = false;
-        if (dofIndex == 0)
-        {
-          first1Linear = false;
-        }
         if (dofIndex < 3)
         {
           first3Linear = false;
@@ -1927,6 +2048,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       }
       else if (linearFunction != nullptr)
       {
+        numLinear++;
+        lastLinearIndex = dofIndex;
         allLocked = false;
         Eigen::Vector2s coeffs
             = readVec2(linearFunction->FirstChildElement("coefficients"));
@@ -1953,10 +2076,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       {
         anySpline = true;
         allLocked = false;
-        if (dofIndex == 0)
-        {
-          first1Linear = false;
-        }
         if (dofIndex < 3)
         {
           first3Linear = false;
@@ -1969,7 +2088,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       else
       {
         assert(false && "Unrecognized function type");
-        exit(1);
       }
 
       if (dofIndex < 3)
@@ -1999,64 +2117,52 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     else if (anySpline)
     {
-      dynamics::CustomJoint<1>* customJoint = nullptr;
-      // Create a CustomJoint
-      dynamics::CustomJoint<1>::Properties props;
-      props.mName = jointName;
-      if (parentBody == nullptr)
+      if (dofNames.size() == 1)
       {
-        auto pair = skel->createJointAndBodyNodePair<dynamics::CustomJoint<1>>(
-            nullptr, props, bodyProps);
-        customJoint = pair.first;
+        auto pair = createCustomJoint<1>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 2)
+      {
+        auto pair = createCustomJoint<2>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 3)
+      {
+        auto pair = createCustomJoint<3>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
         childBody = pair.second;
       }
       else
       {
-        auto pair
-            = parentBody
-                  ->createChildJointAndBodyNodePair<dynamics::CustomJoint<1>>(
-                      props, bodyProps);
-        customJoint = pair.first;
-        childBody = pair.second;
+        assert(false && "Unsupported number of DOFs in CustomJoint");
       }
-
-      assert(customFunctions.size() == 6);
-
-      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
-      Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
-      customJoint->setAxisOrder(axisOrder);
-      customJoint->setFlipAxisMap(flips);
-
-      for (int i = 0; i < customFunctions.size(); i++)
-      {
-        if (i < 3)
-        {
-          customJoint->setCustomFunction(i, customFunctions[i], 0);
-        }
-        else
-        {
-          // Map to the appropriate slot based on the axis
-          Eigen::Vector3s axis = transformAxisOrder[i - 3];
-          if (axis == Eigen::Vector3s::UnitX())
-          {
-            customJoint->setCustomFunction(3, customFunctions[i], 0);
-          }
-          else if (axis == Eigen::Vector3s::UnitY())
-          {
-            customJoint->setCustomFunction(4, customFunctions[i], 0);
-          }
-          else if (axis == Eigen::Vector3s::UnitZ())
-          {
-            customJoint->setCustomFunction(5, customFunctions[i], 0);
-          }
-          else
-          {
-            assert(false);
-            exit(1);
-          }
-        }
-      }
-      joint = customJoint;
     }
     else if (allLinear)
     {
@@ -2121,32 +2227,63 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       eulerJoint->setAxisOrder(axisOrder);
       joint = eulerJoint;
     }
-    else if (first1Linear)
+    else if (numLinear == 1 && numConstant == 5)
     {
-      Eigen::Vector3s axis = eulerAxisOrder[0];
-
-      // Create a RevoluteJoint
-      dynamics::RevoluteJoint* revoluteJoint = nullptr;
-      dynamics::RevoluteJoint::Properties props;
-      props.mName = jointName;
-      if (parentBody == nullptr)
+      if (lastLinearIndex < 3)
       {
-        auto pair = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>(
-            nullptr, props, bodyProps);
-        revoluteJoint = pair.first;
-        childBody = pair.second;
+        Eigen::Vector3s axis = eulerAxisOrder[lastLinearIndex];
+
+        // Create a RevoluteJoint
+        dynamics::RevoluteJoint* revoluteJoint = nullptr;
+        dynamics::RevoluteJoint::Properties props;
+        props.mName = jointName;
+        if (parentBody == nullptr)
+        {
+          auto pair = skel->createJointAndBodyNodePair<dynamics::RevoluteJoint>(
+              nullptr, props, bodyProps);
+          revoluteJoint = pair.first;
+          childBody = pair.second;
+        }
+        else
+        {
+          auto pair
+              = parentBody
+                    ->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>(
+                        props, bodyProps);
+          revoluteJoint = pair.first;
+          childBody = pair.second;
+        }
+        revoluteJoint->setAxis(axis);
+        joint = revoluteJoint;
       }
       else
       {
-        auto pair
-            = parentBody
-                  ->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>(
-                      props, bodyProps);
-        revoluteJoint = pair.first;
-        childBody = pair.second;
+        Eigen::Vector3s axis = transformAxisOrder[lastLinearIndex - 3];
+
+        // Create a PrismaticJoint
+        dynamics::PrismaticJoint* prismaticJoint = nullptr;
+        dynamics::PrismaticJoint::Properties props;
+        props.mName = jointName;
+        if (parentBody == nullptr)
+        {
+          auto pair
+              = skel->createJointAndBodyNodePair<dynamics::PrismaticJoint>(
+                  nullptr, props, bodyProps);
+          prismaticJoint = pair.first;
+          childBody = pair.second;
+        }
+        else
+        {
+          auto pair
+              = parentBody
+                    ->createChildJointAndBodyNodePair<dynamics::PrismaticJoint>(
+                        props, bodyProps);
+          prismaticJoint = pair.first;
+          childBody = pair.second;
+        }
+        prismaticJoint->setAxis(axis);
+        joint = prismaticJoint;
       }
-      revoluteJoint->setAxis(axis);
-      joint = revoluteJoint;
     }
     else
     {
@@ -2225,10 +2362,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
   // Rename the DOFs for each joint
 
-  tinyxml2::XMLElement* coordinateCursor = nullptr;
+  coordinateCursor = nullptr;
   // This is how the coordinate set is specified in OpenSim v4 files
-  tinyxml2::XMLElement* coordinateSet
-      = jointDetail->FirstChildElement("CoordinateSet");
+  coordinateSet = jointDetail->FirstChildElement("CoordinateSet");
   if (coordinateSet)
   {
     tinyxml2::XMLElement* objects = coordinateSet->FirstChildElement("objects");
@@ -2353,6 +2489,16 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         = attachedGeometry->FirstChildElement("Mesh");
     while (meshCursor)
     {
+      if (meshCursor->FirstChildElement("mesh_file")->GetText() == nullptr)
+      {
+        std::cout << "Body Node " << bodyName
+                  << " has an attached <Mesh> object where <mesh_file> is "
+                     "empty. Ignoring."
+                  << std::endl;
+        meshCursor = meshCursor->NextSiblingElement("Mesh");
+        continue;
+      }
+
       std::string mesh_file(
           meshCursor->FirstChildElement("mesh_file")->GetText());
       Eigen::Vector3s scale

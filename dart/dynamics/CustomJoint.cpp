@@ -965,7 +965,6 @@ CustomJoint<Dimension>::getRelativeJacobianTimeDerivDerivWrtPosition(
   Eigen::VectorXs acc = Eigen::VectorXs::Zero(this->getNumDofs());
   Eigen::Vector6s positions = getCustomFunctionPositions(pos);
   Eigen::Vector6s velocities = getCustomFunctionVelocities(pos, vel);
-  Eigen::Vector6s acceleration = getCustomFunctionAccelerations(pos, vel, acc);
 
   math::Jacobian customJacTimeDeriv
       = getCustomFunctionGradientAtTimeDeriv(pos, vel);

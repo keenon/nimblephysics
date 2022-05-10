@@ -14,7 +14,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v3)
@@ -368,7 +368,7 @@ TEST(OpenSimParser, SAVE_IK_FILE)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(OpenSimParser, SAVE_ID_FILE)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -395,4 +395,46 @@ TEST(OpenSimParser, SAVE_ID_FILE)
       "JA1Gait35_id_body_forces.sto",
       "../../../data/osim/JA1GaitResults/JA1Gait35_id_setup.xml");
 }
-// #endif
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, COMPLEX_KNEE)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(skel);
+  verifyFeatherstoneJacobians(world);
+
+  EXPECT_TRUE(file.markersMap.size() > 0);
+  for (auto pair : file.markersMap)
+  {
+    EXPECT_TRUE(pair.second.first != nullptr);
+  }
+
+  /*
+  // Uncomment this for local testing
+  GUIWebsocketServer server;
+  server.serve(8070);
+  server.renderSkeleton(skel);
+
+  Ticker ticker = Ticker(0.01);
+  ticker.registerTickListener([&](long now) {
+    double progress = (now % 2000) / 2000.0;
+    skel->getDof("knee_angle_r")
+        ->setPosition(
+            progress * skel->getDof("knee_angle_r")->getPositionUpperLimit());
+    skel->getDof("knee_angle_l")
+        ->setPosition(
+            progress * skel->getDof("knee_angle_l")->getPositionUpperLimit());
+    server.renderSkeleton(skel);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  server.blockWhileServing();
+  */
+}
+#endif

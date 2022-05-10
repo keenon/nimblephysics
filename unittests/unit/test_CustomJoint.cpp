@@ -8,7 +8,7 @@
 
 using namespace dart;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 //==============================================================================
 template <std::size_t Dimension>
@@ -327,7 +327,8 @@ TEST(CustomJoint, Construct)
 {
   // Create single-body skeleton with a screw joint
   auto skelA = dynamics::Skeleton::create();
-  auto pair = skelA->createJointAndBodyNodePair<dart::dynamics::CustomJoint>();
+  auto pair
+      = skelA->createJointAndBodyNodePair<dart::dynamics::CustomJoint<1>>();
   auto custom = pair.first;
   auto bodyA = pair.second;
 
@@ -404,7 +405,8 @@ TEST(CustomJoint, Construct)
         custom->setCustomFunction(
             j,
             std::make_shared<math::TestBedFunction>(
-                skelAPos(j), skelAVel(j), skelAAcc(j)));
+                skelAPos(j), skelAVel(j), skelAAcc(j)),
+            0);
       }
       skelA->setPositions(Eigen::VectorXs::Zero(1));
       skelA->setVelocities(Eigen::VectorXs::Ones(1));
@@ -414,13 +416,20 @@ TEST(CustomJoint, Construct)
       // Check custom function mappings and various derivatives
       ////////////////////////////////////////////////////////////////////////////////
 
-      EXPECT_TRUE(
-          equals(custom->getCustomFunctionPositions(0.0), skelAPos, 1e-12));
       EXPECT_TRUE(equals(
-          custom->getCustomFunctionVelocities(0.0, 1.0), skelAVel, 1e-12));
+          custom->getCustomFunctionPositions(Eigen::VectorXs::Zero(1)),
+          skelAPos,
+          1e-12));
+      EXPECT_TRUE(equals(
+          custom->getCustomFunctionVelocities(
+              Eigen::VectorXs::Zero(1), Eigen::VectorXs::Ones(1)),
+          skelAVel,
+          1e-12));
 
-      Eigen::Vector6s customAcc
-          = custom->getCustomFunctionAccelerations(0.0, 1.0, 0.0);
+      Eigen::Vector6s customAcc = custom->getCustomFunctionAccelerations(
+          Eigen::VectorXs::Zero(1),
+          Eigen::VectorXs::Ones(1),
+          Eigen::VectorXs::Zero(1));
       if (!equals(customAcc, skelAAcc, 1e-12))
       {
         std::cout << "Custom Acc: " << std::endl << customAcc << std::endl;
