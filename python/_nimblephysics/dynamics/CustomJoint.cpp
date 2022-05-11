@@ -93,7 +93,7 @@ void CustomJoint(py::module& m)
   ::py::class_<
       dart::dynamics::CustomJoint<2>,
       dart::dynamics::GenericJoint<dart::math::R2Space>,
-      std::shared_ptr<dart::dynamics::CustomJoint<2>>>(m, "CustomJoint1")
+      std::shared_ptr<dart::dynamics::CustomJoint<2>>>(m, "CustomJoint2")
       .def(
           "getType",
           &dart::dynamics::CustomJoint<2>::getType,
