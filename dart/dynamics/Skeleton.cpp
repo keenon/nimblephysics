@@ -2750,7 +2750,8 @@ Eigen::VectorXs Skeleton::getRandomPose()
       lowerLimit = -5.0;
     }
     s_t withinBounds
-        = (((pose(i) + 1.0) / 2.0) * (upperLimit - lowerLimit)) + lowerLimit;
+        = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+          + lowerLimit;
     pose(i) = withinBounds;
   }
 
@@ -4132,6 +4133,11 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
       auto pair = cloneBodyNodeTree<dynamics::FreeJoint>(
           body, copy, parent, props, false);
       pair.first->copyTransformsFrom(joint);
+      for (int i = 3; i < 6; i++)
+      {
+        pair.first->setPositionUpperLimit(i, joint->getPositionUpperLimit(i));
+        pair.first->setPositionLowerLimit(i, joint->getPositionLowerLimit(i));
+      }
     }
     else if (joint->getType() == EulerJoint::getStaticType())
     {
@@ -4156,6 +4162,12 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
           body->getParentJoint()->getPositionUpperLimits());
       pair.first->setPositionLowerLimits(
           body->getParentJoint()->getPositionLowerLimits());
+      assert(
+          pair.first->getPositionUpperLimits()
+          == body->getParentJoint()->getPositionUpperLimits());
+      assert(
+          pair.first->getPositionLowerLimits()
+          == body->getParentJoint()->getPositionLowerLimits());
     }
   }
 
@@ -4198,6 +4210,41 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
     assert(
         joint->getTransformFromParentBodyNode().matrix()
         == getJoint(i)->getTransformFromParentBodyNode().matrix());
+    if (getJoint(i)->getType() == RevoluteJoint::getStaticType())
+    {
+      dynamics::RevoluteJoint* ourJoint
+          = static_cast<dynamics::RevoluteJoint*>(getJoint(i));
+      dynamics::RevoluteJoint* copyJoint
+          = static_cast<dynamics::RevoluteJoint*>(joint);
+      assert(ourJoint->getAxis() == copyJoint->getAxis());
+    }
+    if (getJoint(i)->getType() == CustomJoint<2>::getStaticType())
+    {
+      dynamics::CustomJoint<2>* ourJoint
+          = static_cast<dynamics::CustomJoint<2>*>(getJoint(i));
+      dynamics::CustomJoint<2>* copyJoint
+          = static_cast<dynamics::CustomJoint<2>*>(joint);
+      assert(ourJoint->getFlipAxisMap() == copyJoint->getFlipAxisMap());
+      for (int j = 0; j < 6; j++)
+      {
+        assert(
+            ourJoint->getCustomFunctionDrivenByDof(j)
+            == copyJoint->getCustomFunctionDrivenByDof(j));
+      }
+    }
+    // All the joint limits must match except the eulerian joints
+    if (getJoint(i)->getType() != EulerFreeJoint::getStaticType()
+        && getJoint(i)->getType() != EulerJoint::getStaticType())
+    {
+      std::string jointName = joint->getName();
+      (void)jointName;
+      Eigen::VectorXs copyUpperLimits = joint->getPositionUpperLimits();
+      Eigen::VectorXs ourUpperLimits = getJoint(i)->getPositionUpperLimits();
+      assert(copyUpperLimits == ourUpperLimits);
+      assert(
+          joint->getPositionLowerLimits()
+          == getJoint(i)->getPositionLowerLimits());
+    }
   }
 #endif
 

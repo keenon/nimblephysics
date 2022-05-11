@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -17,6 +18,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/IKSolver.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
@@ -69,13 +71,13 @@ bool testFitterGradients(
 
   if (!equals(gradWrtJoints, gradWrtJoints_fd, THRESHOLD))
   {
+    Eigen::MatrixXs comp = Eigen::MatrixXs::Zero(gradWrtJoints.size(), 3);
+    comp.col(0) = gradWrtJoints;
+    comp.col(1) = gradWrtJoints_fd;
+    comp.col(2) = gradWrtJoints - gradWrtJoints_fd;
     std::cout << "Error on grad wrt joints" << std::endl
-              << "Analytical:" << std::endl
-              << gradWrtJoints << std::endl
-              << "FD:" << std::endl
-              << gradWrtJoints_fd << std::endl
-              << "Diff:" << std::endl
-              << gradWrtJoints - gradWrtJoints_fd << std::endl;
+              << "Analytical - FD - Diff:" << std::endl
+              << comp << std::endl;
     return false;
   }
 
@@ -90,13 +92,13 @@ bool testFitterGradients(
 
   if (!equals(gradWrtScales, gradWrtScales_fd, THRESHOLD))
   {
+    Eigen::MatrixXs comp = Eigen::MatrixXs::Zero(gradWrtScales.size(), 3);
+    comp.col(0) = gradWrtScales;
+    comp.col(1) = gradWrtScales_fd;
+    comp.col(2) = gradWrtScales - gradWrtScales_fd;
     std::cout << "Error on grad wrt scales" << std::endl
-              << "Analytical:" << std::endl
-              << gradWrtScales << std::endl
-              << "FD:" << std::endl
-              << gradWrtScales_fd << std::endl
-              << "Diff:" << std::endl
-              << gradWrtScales - gradWrtScales_fd << std::endl;
+              << "Analytical - FD - Diff:" << std::endl
+              << comp << std::endl;
     return false;
   }
 
@@ -762,17 +764,19 @@ bool debugIKInitializationToGUI(
               pos.segment(0, skelBallJoints->getNumDofs())));
           if (clamp)
           {
-            std::cout << "Eigen::VectorXs val = Eigen::VectorXs("
-                      << pos.segment(0, skelBallJoints->getNumDofs()).size()
-                      << ");" << std::endl;
-            std::cout << "ballJointsPos << ";
-            for (int j = 0; j < skelBallJoints->getNumDofs(); j++)
-            {
-              if (j > 0)
-                std::cout << ", ";
-              std::cout << skelBallJoints->getPositions()(j);
-            }
-            std::cout << std::endl;
+            /*
+          std::cout << "Eigen::VectorXs val = Eigen::VectorXs("
+                    << pos.segment(0, skelBallJoints->getNumDofs()).size()
+                    << ");" << std::endl;
+          std::cout << "ballJointsPos << ";
+          for (int j = 0; j < skelBallJoints->getNumDofs(); j++)
+          {
+            if (j > 0)
+              std::cout << ", ";
+            std::cout << skelBallJoints->getPositions()(j);
+          }
+          std::cout << std::endl;
+          */
 
             skel->clampPositionsToLimits();
             skelBallJoints->setPositions(
@@ -800,6 +804,9 @@ bool debugIKInitializationToGUI(
               = newScales;
 
           // Debug to a GUI
+          server.renderSkeleton(
+              skelBallJoints, "ball", Eigen::Vector4s(1.0, 0, 0, 1.0));
+
           server.renderSkeleton(skel);
           Eigen::VectorXs currentMarkerPoses
               = skel->getMarkerWorldPositions(adjustedMarkersSkel);
@@ -864,13 +871,89 @@ bool debugIKInitializationToGUI(
         },
         math::IKConfig().setLogOutput(true).setMaxRestarts(1));
 
+    std::cout << "********** Joints World **********" << std::endl;
+
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      std::string jointName = skel->getJoint(i)->getName();
+
+      Eigen::Matrix4s skelT
+          = skel->getJoint(i)->getRelativeTransform().matrix();
+      Eigen::Matrix4s ballT
+          = skelBallJoints->getJoint(i)->getRelativeTransform().matrix();
+      if ((skelT - ballT).norm() > 1e-8)
+      {
+        std::cout << "Skel and Ball joints transforms don't match for joint \""
+                  << jointName << "\":" << std::endl;
+        std::cout << "Skel:" << std::endl << skelT << std::endl;
+        std::cout << "Ball:" << std::endl << ballT << std::endl;
+
+        auto* joint = skel->getJoint(i);
+        auto* ballJoint = skelBallJoints->getJoint(i);
+        Eigen::VectorXs finalJointPos = joint->getPositions();
+        Eigen::VectorXs ballJointPos = ballJoint->getPositions();
+
+        Eigen::MatrixXs comp = Eigen::MatrixXs::Zero(finalJointPos.size(), 3);
+        comp.col(0) = finalJointPos;
+        comp.col(1) = ballJointPos;
+        comp.col(2) = finalJointPos - ballJointPos;
+        std::cout << "Skel - Ball - Diff" << std::endl << comp << std::endl;
+      }
+    }
+
+    // Check the positions of the joints
+    std::cout << "********** Joints **********" << std::endl;
+
+    Eigen::VectorXs finalJoints = skel->getPositions();
+    int cursor = 0;
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      auto* joint = skel->getJoint(i);
+      auto* ballJoint = skelBallJoints->getJoint(i);
+      int dofs = joint->getNumDofs();
+      Eigen::VectorXs finalJointPos = joint->getPositions();
+      Eigen::VectorXs ballJointPos = ballJoint->getPositions();
+      Eigen::VectorXs goldJointPos = goldPose.segment(cursor, dofs);
+      cursor += dofs;
+
+      if ((finalJointPos - goldJointPos).norm() > 1e-2)
+      {
+        std::cout << "Joint " << joint->getName() << " did not recover gold!"
+                  << std::endl;
+        Eigen::MatrixXs comp = Eigen::MatrixXs::Zero(finalJointPos.size(), 4);
+        comp.col(0) = finalJointPos;
+        comp.col(1) = ballJointPos;
+        comp.col(2) = goldJointPos;
+        comp.col(3) = finalJointPos - goldJointPos;
+        std::cout << "IK - Ball - Gold - Diff" << std::endl
+                  << comp << std::endl;
+      }
+    }
+
+    std::cout << "********** Adjusted Marker **********" << std::endl;
+
     Eigen::VectorXs finalMarkers
-        = skel->getMarkerWorldPositions(adjustedMarkers);
+        = skelBallJoints->getMarkerWorldPositions(adjustedMarkers);
     Eigen::VectorXs diff = markerWorldPoses - finalMarkers;
     for (int i = 0; i < adjustedMarkers.size(); i++)
     {
       auto pair = adjustedMarkers[i];
       Eigen::Vector3s markerDiff = diff.segment<3>(i * 3);
+      s_t markerError = markerDiff.squaredNorm();
+      std::cout << "Error on marker (" << pair.first->getName() << ", ["
+                << pair.second(0) << "," << pair.second(1) << ","
+                << pair.second(2) << "]): " << markerError << std::endl;
+    }
+
+    std::cout << "********** Adjusted Marker Skel **********" << std::endl;
+
+    Eigen::VectorXs finalMarkersSkel
+        = skel->getMarkerWorldPositions(adjustedMarkersSkel);
+    Eigen::VectorXs diffSkel = markerWorldPoses - finalMarkersSkel;
+    for (int i = 0; i < adjustedMarkersSkel.size(); i++)
+    {
+      auto pair = adjustedMarkersSkel[i];
+      Eigen::Vector3s markerDiff = diffSkel.segment<3>(i * 3);
       s_t markerError = markerDiff.squaredNorm();
       std::cout << "Error on marker (" << pair.first->getName() << ", ["
                 << pair.second(0) << "," << pair.second(1) << ","
@@ -2042,7 +2125,6 @@ TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE)
 }
 #endif
 
-/*
 #ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE_BALL_JOINTS)
 {
@@ -2061,18 +2143,20 @@ TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE_BALL_JOINTS)
   srand(42);
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       markers;
-  markers["0"]
-      = std::make_pair(osim->getBodyNode("toes_l"), Eigen::Vector3s::Random());
-  markers["1"]
-      = std::make_pair(osim->getBodyNode("toes_r"), Eigen::Vector3s::Random());
-  markers["2"]
-      = std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
-  markers["3"]
-      = std::make_pair(osim->getBodyNode("tibia_r"), Eigen::Vector3s::Random());
+  markers["0"] = std::make_pair(
+      osimBallJoints->getBodyNode("toes_l"), Eigen::Vector3s::Random());
+  markers["1"] = std::make_pair(
+      osimBallJoints->getBodyNode("toes_r"), Eigen::Vector3s::Random());
+  markers["2"] = std::make_pair(
+      osimBallJoints->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
+  markers["3"] = std::make_pair(
+      osimBallJoints->getBodyNode("tibia_r"), Eigen::Vector3s::Random());
   markers["4"] = std::make_pair(
-      osim->getBodyNode("sagittal_knee_body_l"), Eigen::Vector3s::Random());
+      osimBallJoints->getBodyNode("sagittal_knee_body_l"),
+      Eigen::Vector3s::Random());
   markers["5"] = std::make_pair(
-      osim->getBodyNode("sagittal_knee_body_r"), Eigen::Vector3s::Random());
+      osimBallJoints->getBodyNode("sagittal_knee_body_r"),
+      Eigen::Vector3s::Random());
 
   MarkerFitter fitter(osimBallJoints, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
@@ -2128,7 +2212,6 @@ TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE_BALL_JOINTS)
       fitter, 3, 0.02, false, osimBallJoints, joints, markers));
 }
 #endif
-*/
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, INITIALIZATION)
@@ -3477,10 +3560,12 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
   standard.skeleton->autogroupSymmetricSuffixes();
+  /*
   debugIKInitializationToGUI(
       standard.skeleton,
       Eigen::VectorXs::Zero(standard.skeleton->getNumDofs()),
       0.05);
+  */
 
   for (auto pair : standard.markersMap)
   {

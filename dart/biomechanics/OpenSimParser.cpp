@@ -2416,7 +2416,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       dof->setPositionUpperLimit(defaultValue);
     }
     // Always lock a custom joint
-    if (clamped || isCustomJoint)
+    if (clamped || true)
     {
       if (!clamped && isCustomJoint)
       {

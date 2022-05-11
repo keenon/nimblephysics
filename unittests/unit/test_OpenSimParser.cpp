@@ -414,6 +414,7 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   }
 
   // Uncomment this for local testing
+  /*
   GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
@@ -421,20 +422,15 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   Ticker ticker = Ticker(0.01);
   ticker.registerTickListener([&](long now) {
     double progress = (now % 2000) / 2000.0;
-    double kneeUpperLimit
-        = skel->getDof("knee_angle_l")->getPositionUpperLimit();
-    double kneeLowerLimit
-        = skel->getDof("knee_angle_l")->getPositionLowerLimit();
-    double kneePos
-        = progress * (kneeUpperLimit - kneeLowerLimit) + kneeLowerLimit;
-    std::cout << "Knee pos: " << kneePos << std::endl;
-    skel->getDof("knee_angle_l")->setPosition(kneePos);
-    /*
-    skel->getDof("knee_adduction_r")
-        ->setPosition(
-            progress
-            * skel->getDof("knee_adduction_r")->getPositionUpperLimit());
-    */
+    // Also test: subtalar, intercond (toes)
+    std::string jointName = "ankle_angle_l";
+    double jointUpperLimit = skel->getDof(jointName)->getPositionUpperLimit();
+    double jointLowerLimit = skel->getDof(jointName)->getPositionLowerLimit();
+
+    double jointPos
+        = progress * (jointUpperLimit - jointLowerLimit) + jointLowerLimit;
+    skel->getDof(jointName)->setPosition(jointPos);
+
     server.renderSkeleton(skel);
   });
 
@@ -443,5 +439,6 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   server.blockWhileServing();
 
   verifyFeatherstoneJacobians(world);
+  */
 }
 #endif

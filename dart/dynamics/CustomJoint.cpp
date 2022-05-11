@@ -615,6 +615,7 @@ dart::dynamics::Joint* CustomJoint<Dimension>::clone() const
   CustomJoint<Dimension>* joint
       = new CustomJoint<Dimension>(this->getJointProperties());
   joint->mFunctions = mFunctions;
+  joint->mFunctionDrivenByDof = mFunctionDrivenByDof;
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(getFlipAxisMap());
   joint->setAxisOrder(getAxisOrder());
