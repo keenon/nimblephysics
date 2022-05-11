@@ -2,6 +2,7 @@
 
 #include <future>
 #include <mutex>
+#include <vector>
 
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
@@ -489,8 +490,12 @@ MarkerFitter::MarkerFitter(
     mInitialIKMaxRestarts(100),
     mMaxMarkerOffset(0.2),
     mMinVarianceCutoff(3.0),
-    mMinSphereFitScore(6e-5),
-    mMinAxisFitScore(1.2e-4),
+    mMinSphereFitScore(0.01),
+    mMinAxisFitScore(0.001),
+    // mMinSphereFitScore(6e-5),
+    // mMinAxisFitScore(1.2e-4),
+    mMaxJointWeight(0.5),
+    mMaxAxisWeight(0.5),
     mDebugJointVariability(false),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(1.0),
@@ -729,50 +734,35 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     {
       numTrialsToSample = params.maxTrialsToUseForMultiTrialScaling;
     }
-    // Sample at most M timesteps
-    std::vector<int> timestepsPerTrial;
-    for (int i = 0; i < numTrialsToSample; i++)
+
+    std::vector<int> trialSampledAtIndex;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      timestepsPerTrial.push_back(
-          markerObservationTrials[orderedByJointVariability[i]].size());
-    }
-    int totalTimesteps = 0;
-    for (int i = 0; i < numTrialsToSample; i++)
-    {
-      totalTimesteps += timestepsPerTrial[i];
-    }
-    if (totalTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
-    {
-      double percentage = (double)params.maxTimestepsToUseForMultiTrialScaling
-                          / totalTimesteps;
-      for (int i = 0; i < numTrialsToSample; i++)
-      {
-        timestepsPerTrial[i]
-            = (int)std::floor(percentage * (double)timestepsPerTrial[i]);
-      }
+      trialSampledAtIndex.push_back(-1);
     }
 
-    int totalSamples = 0;
+    int cursor = 0;
     std::cout << "Downsampling the input for scaling performance!" << std::endl;
     std::cout << "Sampling " << numTrialsToSample << "/"
               << markerObservationTrials.size() << std::endl;
     for (int i = 0; i < numTrialsToSample; i++)
     {
-      std::cout << "Trial " << orderedByJointVariability[i] << " sampled "
-                << timestepsPerTrial[i] << "/"
+      std::cout << "Trial " << orderedByJointVariability[i] << " length "
                 << markerObservationTrials[orderedByJointVariability[i]].size()
                 << std::endl;
-      totalSamples += timestepsPerTrial[i];
+      trialSampledAtIndex[orderedByJointVariability[i]] = cursor;
+      cursor += markerObservationTrials[orderedByJointVariability[i]].size();
     }
-    std::cout << "Total timesteps to use for scaling: " << totalSamples
-              << std::endl;
+    std::cout << "Total timesteps to use for scaling: " << cursor << std::endl;
 
     // 5. Construct a merged dataset, including the merged joint and axis data
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
     std::vector<bool> newClip;
     for (int i = 0; i < numTrialsToSample; i++)
     {
-      for (int j = 0; j < timestepsPerTrial[i]; j++)
+      for (int j = 0;
+           j < markerObservationTrials[orderedByJointVariability[i]].size();
+           j++)
       {
         markerObservations.emplace_back(
             markerObservationTrials[orderedByJointVariability[i]][j]);
@@ -782,7 +772,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
 
     // 6. Run the kinematics pipeline on the merged dataset
     MarkerInitialization overallInit = runKinematicsPipeline(
-        markerObservations, newClip, params, numSamples, true);
+        markerObservations, newClip, params, numSamples, false);
 
     std::cout << "Done scaling and computing marker offsets! Now we'll do IK "
                  "on all the trials."
@@ -795,14 +785,38 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       std::cout << "## IK on trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
 
-      jointInits[i].markerOffsets = overallInit.markerOffsets;
       jointInits[i].groupScales = overallInit.groupScales;
+      jointInits[i].markerOffsets = overallInit.markerOffsets;
+      jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
 
-      separateInits.push_back(fineTuneIK(
-          markerObservationTrials[i],
-          params.numBlocks,
-          params.markerWeights,
-          jointInits[i]));
+      jointInits[i].joints = overallInit.joints;
+      jointInits[i].jointMarkerVariability = overallInit.jointMarkerVariability;
+      jointInits[i].jointLoss = overallInit.jointLoss;
+      jointInits[i].jointWeights = overallInit.jointWeights;
+      jointInits[i].axisWeights = overallInit.axisWeights;
+      jointInits[i].axisLoss = overallInit.axisLoss;
+
+      if (trialSampledAtIndex[i] != -1)
+      {
+        int cursor = trialSampledAtIndex[i];
+        int size = markerObservationTrials[i].size();
+        jointInits[i].poses = overallInit.poses.block(
+            0, cursor, overallInit.poses.rows(), size);
+        jointInits[i].poseScores = overallInit.poseScores.segment(cursor, size);
+        jointInits[i].jointCenters = overallInit.jointCenters.block(
+            0, cursor, overallInit.jointCenters.rows(), size);
+        jointInits[i].jointAxis = overallInit.jointAxis.block(
+            0, cursor, overallInit.jointAxis.rows(), size);
+        separateInits.push_back(jointInits[i]);
+      }
+      else
+      {
+        separateInits.push_back(fineTuneIK(
+            markerObservationTrials[i],
+            params.numBlocks,
+            params.markerWeights,
+            jointInits[i]));
+      }
     }
     std::cout << "Finished IKs" << std::endl;
     return separateInits;
@@ -853,6 +867,14 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       separateInits[i].axisLoss = overallInit.axisLoss;
       separateInits[i].jointAxis = overallInit.jointAxis.block(
           0, cursor, overallInit.jointAxis.rows(), size);
+
+      /*
+      separateInits[i] = fineTuneIK(
+          markerObservationTrials[i],
+          params.numBlocks,
+          params.markerWeights,
+          separateInits[i]);
+      */
 
       cursor += size;
     }
@@ -1759,7 +1781,59 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
           = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               mMarkerMap[name].first,
               mMarkerMap[name].second + solution->markerOffsets[name]);
-      // solution->markerOffsets[name]);
+    }
+  }
+
+  // 6. Get the average marker error, and do a final marker offset to cancel it
+  // as best we can
+
+  std::map<std::string, Eigen::Vector3s> markerObservationsSum;
+  std::map<std::string, int> markerNumObservations;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    std::string name = mMarkerNames[i];
+    markerObservationsSum[name] = Eigen::Vector3s::Zero();
+    markerNumObservations[name] = 0;
+  }
+
+  // 6.2. Run through every pose and accumulate error at that point
+
+  Eigen::VectorXs originalPos = mSkeleton->getPositions();
+  for (int i = 0; i < result.poses.cols(); i++)
+  {
+    mSkeleton->setPositions(result.poses.col(i));
+    // Accumulate observations for the tracking markers
+    for (auto& pair : markerObservations[i])
+    {
+      std::string name = pair.first;
+      int index = mMarkerIndices[name];
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> marker = mMarkers[index];
+      Eigen::Vector3s worldPosition = pair.second;
+      Eigen::Vector3s localOffset
+          = (marker.first->getWorldTransform().inverse() * worldPosition)
+                .cwiseQuotient(marker.first->getScale());
+      Eigen::Vector3s netOffset = localOffset - marker.second;
+
+      markerObservationsSum[name] += netOffset;
+      markerNumObservations[name]++;
+    }
+  }
+  mSkeleton->setPositions(originalPos);
+
+  // 6.3. Average out the result
+
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    std::string name = mMarkerNames[i];
+    // Avoid divide-by-zero edge case
+    if (markerNumObservations[name] > 0)
+    {
+      result.markerOffsets[name]
+          = markerObservationsSum[name] / markerNumObservations[name];
+      result.updatedMarkerMap[name]
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              mMarkerMap[name].first,
+              mMarkerMap[name].second + result.markerOffsets[name]);
     }
   }
 
@@ -3203,9 +3277,9 @@ void MarkerFitter::computeJointConfidences(
       initialization.jointWeights(i)
           = mMinSphereFitScore / initialization.jointLoss(i);
       // We cap the weight at 1.0
-      if (initialization.jointWeights(i) > 1.0)
+      if (initialization.jointWeights(i) > mMaxJointWeight)
       {
-        initialization.jointWeights(i) = 1.0;
+        initialization.jointWeights(i) = mMaxJointWeight;
       }
 
       // We want to map low loss (0.001 ish) to 1.0, and we want to map
@@ -3213,14 +3287,15 @@ void MarkerFitter::computeJointConfidences(
       initialization.axisWeights(i)
           = mMinAxisFitScore / initialization.axisLoss(i);
       // We cap the weight at 1.0
-      if (initialization.axisWeights(i) > 1.0)
+      if (initialization.axisWeights(i) > mMaxAxisWeight)
       {
-        initialization.axisWeights(i) = 1.0;
+        initialization.axisWeights(i) = mMaxAxisWeight;
       }
 
       // The axis fit is a strictly hard problem, so if we get a loss within a
       // small constant factor of the joint loss, use the axis
-      if (initialization.axisLoss(i) < 2 * initialization.jointLoss(i))
+      // initialization.jointWeights(i) = 0;
+      if (initialization.axisLoss(i) < 5 * initialization.jointLoss(i))
       {
         initialization.jointWeights(i) = 0;
       }
@@ -3260,6 +3335,20 @@ void MarkerFitter::setMinSphereFitScore(s_t score)
 void MarkerFitter::setMinAxisFitScore(s_t score)
 {
   mMinAxisFitScore = score;
+}
+
+//==============================================================================
+/// This sets the maximum value that we can weight a joint center in IK
+void MarkerFitter::setMaxJointWeight(s_t weight)
+{
+  mMaxJointWeight = weight;
+}
+
+//==============================================================================
+/// This sets the maximum value that we can weight a joint axis in IK
+void MarkerFitter::setMaxAxisWeight(s_t weight)
+{
+  mMaxAxisWeight = weight;
 }
 
 //==============================================================================

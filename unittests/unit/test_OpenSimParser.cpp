@@ -14,7 +14,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v3)
@@ -406,7 +406,6 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   EXPECT_TRUE(skel->getNumDofs() > 0);
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
-  verifyFeatherstoneJacobians(world);
 
   EXPECT_TRUE(file.markersMap.size() > 0);
   for (auto pair : file.markersMap)
@@ -414,7 +413,6 @@ TEST(OpenSimParser, COMPLEX_KNEE)
     EXPECT_TRUE(pair.second.first != nullptr);
   }
 
-  /*
   // Uncomment this for local testing
   GUIWebsocketServer server;
   server.serve(8070);
@@ -423,18 +421,27 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   Ticker ticker = Ticker(0.01);
   ticker.registerTickListener([&](long now) {
     double progress = (now % 2000) / 2000.0;
-    skel->getDof("knee_angle_r")
+    double kneeUpperLimit
+        = skel->getDof("knee_angle_l")->getPositionUpperLimit();
+    double kneeLowerLimit
+        = skel->getDof("knee_angle_l")->getPositionLowerLimit();
+    double kneePos
+        = progress * (kneeUpperLimit - kneeLowerLimit) + kneeLowerLimit;
+    std::cout << "Knee pos: " << kneePos << std::endl;
+    skel->getDof("knee_angle_l")->setPosition(kneePos);
+    /*
+    skel->getDof("knee_adduction_r")
         ->setPosition(
-            progress * skel->getDof("knee_angle_r")->getPositionUpperLimit());
-    skel->getDof("knee_angle_l")
-        ->setPosition(
-            progress * skel->getDof("knee_angle_l")->getPositionUpperLimit());
+            progress
+            * skel->getDof("knee_adduction_r")->getPositionUpperLimit());
+    */
     server.renderSkeleton(skel);
   });
 
   server.registerConnectionListener([&]() { ticker.start(); });
 
   server.blockWhileServing();
-  */
+
+  verifyFeatherstoneJacobians(world);
 }
 #endif

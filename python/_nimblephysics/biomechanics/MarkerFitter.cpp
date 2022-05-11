@@ -295,6 +295,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setMinAxisFitScore,
           ::py::arg("score"))
       .def(
+          "setMaxJointWeight",
+          &dart::biomechanics::MarkerFitter::setMaxJointWeight,
+          ::py::arg("weight"))
+      .def(
+          "setMaxAxisWeight",
+          &dart::biomechanics::MarkerFitter::setMaxAxisWeight,
+          ::py::arg("weight"))
+      .def(
           "setRegularizeAnatomicalMarkerOffsets",
           &dart::biomechanics::MarkerFitter::
               setRegularizeAnatomicalMarkerOffsets,

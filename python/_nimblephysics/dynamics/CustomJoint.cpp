@@ -45,48 +45,94 @@ namespace python {
 void CustomJoint(py::module& m)
 {
   ::py::class_<
-      dart::dynamics::CustomJoint,
+      dart::dynamics::CustomJoint<1>,
       dart::dynamics::GenericJoint<dart::math::R1Space>,
-      std::shared_ptr<dart::dynamics::CustomJoint>>(m, "CustomJoint")
+      std::shared_ptr<dart::dynamics::CustomJoint<1>>>(m, "CustomJoint1")
       .def(
           "getType",
-          &dart::dynamics::CustomJoint::getType,
+          &dart::dynamics::CustomJoint<1>::getType,
           ::py::return_value_policy::reference_internal)
       .def(
           "isCyclic",
-          &dart::dynamics::CustomJoint::isCyclic,
+          &dart::dynamics::CustomJoint<1>::isCyclic,
           ::py::arg("index"))
       .def(
           "setFlipAxisMap",
-          &dart::dynamics::CustomJoint::setFlipAxisMap,
+          &dart::dynamics::CustomJoint<1>::setFlipAxisMap,
           ::py::arg("flipMap"))
-      .def("getFlipAxisMap", &dart::dynamics::CustomJoint::getFlipAxisMap)
+      .def("getFlipAxisMap", &dart::dynamics::CustomJoint<1>::getFlipAxisMap)
       .def(
           "setAxisOrder",
-          &dart::dynamics::CustomJoint::setAxisOrder,
+          &dart::dynamics::CustomJoint<1>::setAxisOrder,
           ::py::arg("order"),
           ::py::arg("renameDofs"))
-      .def("getAxisOrder", &dart::dynamics::CustomJoint::getAxisOrder)
+      .def("getAxisOrder", &dart::dynamics::CustomJoint<1>::getAxisOrder)
       .def(
           "getCustomFunctionPositions",
-          &dart::dynamics::CustomJoint::getCustomFunctionPositions,
+          &dart::dynamics::CustomJoint<1>::getCustomFunctionPositions,
           ::py::arg("x"))
       .def(
           "getCustomFunctionGradientAt",
-          &dart::dynamics::CustomJoint::getCustomFunctionGradientAt,
+          &dart::dynamics::CustomJoint<1>::getCustomFunctionGradientAt,
           ::py::arg("x"))
       .def(
           "getCustomFunctionSecondGradientAt",
-          &dart::dynamics::CustomJoint::getCustomFunctionSecondGradientAt,
+          &dart::dynamics::CustomJoint<1>::getCustomFunctionSecondGradientAt,
           ::py::arg("x"))
       .def(
           "getRelativeJacobianStatic",
-          &dart::dynamics::CustomJoint::getRelativeJacobianStatic,
+          &dart::dynamics::CustomJoint<1>::getRelativeJacobianStatic,
           ::py::arg("positions"))
       .def_static(
           "getStaticType",
           +[]() -> const std::string& {
-            return dart::dynamics::CustomJoint::getStaticType();
+            return dart::dynamics::CustomJoint<1>::getStaticType();
+          },
+          ::py::return_value_policy::reference_internal);
+
+  ::py::class_<
+      dart::dynamics::CustomJoint<2>,
+      dart::dynamics::GenericJoint<dart::math::R2Space>,
+      std::shared_ptr<dart::dynamics::CustomJoint<2>>>(m, "CustomJoint1")
+      .def(
+          "getType",
+          &dart::dynamics::CustomJoint<2>::getType,
+          ::py::return_value_policy::reference_internal)
+      .def(
+          "isCyclic",
+          &dart::dynamics::CustomJoint<2>::isCyclic,
+          ::py::arg("index"))
+      .def(
+          "setFlipAxisMap",
+          &dart::dynamics::CustomJoint<2>::setFlipAxisMap,
+          ::py::arg("flipMap"))
+      .def("getFlipAxisMap", &dart::dynamics::CustomJoint<2>::getFlipAxisMap)
+      .def(
+          "setAxisOrder",
+          &dart::dynamics::CustomJoint<2>::setAxisOrder,
+          ::py::arg("order"),
+          ::py::arg("renameDofs"))
+      .def("getAxisOrder", &dart::dynamics::CustomJoint<2>::getAxisOrder)
+      .def(
+          "getCustomFunctionPositions",
+          &dart::dynamics::CustomJoint<2>::getCustomFunctionPositions,
+          ::py::arg("x"))
+      .def(
+          "getCustomFunctionGradientAt",
+          &dart::dynamics::CustomJoint<2>::getCustomFunctionGradientAt,
+          ::py::arg("x"))
+      .def(
+          "getCustomFunctionSecondGradientAt",
+          &dart::dynamics::CustomJoint<2>::getCustomFunctionSecondGradientAt,
+          ::py::arg("x"))
+      .def(
+          "getRelativeJacobianStatic",
+          &dart::dynamics::CustomJoint<2>::getRelativeJacobianStatic,
+          ::py::arg("positions"))
+      .def_static(
+          "getStaticType",
+          +[]() -> const std::string& {
+            return dart::dynamics::CustomJoint<2>::getStaticType();
           },
           ::py::return_value_policy::reference_internal);
 }

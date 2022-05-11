@@ -1943,6 +1943,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   }
 
   // Build custom joints
+  bool isCustomJoint = false;
   if (jointType == "CustomJoint")
   {
     tinyxml2::XMLElement* spatialTransform
@@ -2117,6 +2118,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     else if (anySpline)
     {
+      isCustomJoint = true;
       if (dofNames.size() == 1)
       {
         auto pair = createCustomJoint<1>(
@@ -2288,7 +2290,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     else
     {
       assert(false);
-      exit(1);
     }
   }
   if (jointType == "WeldJoint")
@@ -2407,11 +2408,24 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     if (locked)
     {
       // TODO: Just replace with a Weld joint
-      // dof->setVelocityUpperLimit(0);
-      // dof->setVelocityLowerLimit(0);
+      /*
+      dof->setVelocityUpperLimit(0);
+      dof->setVelocityLowerLimit(0);
+      */
+      dof->setPositionLowerLimit(defaultValue);
+      dof->setPositionUpperLimit(defaultValue);
     }
-    if (clamped)
+    // Always lock a custom joint
+    if (clamped || isCustomJoint)
     {
+      if (!clamped && isCustomJoint)
+      {
+        std::cout
+            << "DOF \"" << dofName
+            << "\" drives a custom function, yet is not listed as "
+               "clamped. This is unsupported, so we're defaulting to clamped"
+            << std::endl;
+      }
       dof->setPositionLowerLimit(range(0));
       dof->setPositionUpperLimit(range(1));
     }

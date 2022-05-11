@@ -483,6 +483,12 @@ public:
   /// This sets the value used to compute axis fit weights
   void setMinAxisFitScore(s_t score);
 
+  /// This sets the maximum value that we can weight a joint center in IK
+  void setMaxJointWeight(s_t weight);
+
+  /// This sets the maximum value that we can weight a joint axis in IK
+  void setMaxAxisWeight(s_t weight);
+
   /// This sets the value weight used to regularize tracking marker offsets from
   /// where the model thinks they should be
   void setRegularizeTrackingMarkerOffsets(s_t weight);
@@ -857,6 +863,8 @@ protected:
   s_t mMinVarianceCutoff;
   s_t mMinSphereFitScore;
   s_t mMinAxisFitScore;
+  s_t mMaxJointWeight;
+  s_t mMaxAxisWeight;
   bool mDebugJointVariability;
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
