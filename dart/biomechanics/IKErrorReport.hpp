@@ -32,6 +32,10 @@ public:
 
   void printReport(int limitTimesteps = -1);
 
+  void saveCSVMarkerErrorReport(const std::string& path);
+
+  std::vector<std::pair<std::string, s_t>> getSortedMarkerRMSE();
+
   std::vector<std::string> worstMarkers;
   std::vector<Eigen::Vector3s> worstMarkerErrors;
   std::vector<Eigen::Vector3s> worstMarkerReals;
@@ -43,6 +47,10 @@ public:
   s_t averageSumSquaredError;
   s_t averageMaxError;
   s_t anthroPDF;
+  std::vector<std::string> markerNames;
+  std::map<std::string, int> numMarkerObservations;
+  std::map<std::string, s_t> rmseMarkerErrors;
+  std::vector<std::map<std::string, s_t>> markerErrorTimesteps;
 };
 
 } // namespace biomechanics

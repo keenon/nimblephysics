@@ -136,6 +136,14 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
       mot.poses,
       markerTrajectories.markerTimesteps);
   report.printReport(10);
+
+  auto list = report.getSortedMarkerRMSE();
+  for (int i = 0; i < 5; i++)
+  {
+    std::cout << list[i].first << ": " << list[i].second << std::endl;
+  }
+
+  // report.saveCSVMarkerErrorReport("./test.csv");
 }
 // #endif
 // #endif
