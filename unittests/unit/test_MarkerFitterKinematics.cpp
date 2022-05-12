@@ -2048,6 +2048,33 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
 #endif
 
 #ifdef FUNCTIONAL_TESTS
+TEST(MarkerFitter, AUTOGROUP_COMPLEX_KNEE)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/ComplexKnee/"
+            "gait2392_frontHingeKnee_dem.osim")
+            .skeleton;
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  osim->autogroupSymmetricSuffixes();
+  EXPECT_EQ(
+      osim->getScaleGroupIndex(osim->getBodyNode("femur_r")),
+      osim->getScaleGroupIndex(osim->getBodyNode("femur_l")));
+  EXPECT_EQ(
+      osim->getScaleGroupIndex(osim->getBodyNode("tibia_r")),
+      osim->getScaleGroupIndex(osim->getBodyNode("tibia_l")));
+
+  EXPECT_LT(osim->getGroupScales().size(), osim->getBodyScales().size());
+}
+#endif
+
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE)
 {
   std::shared_ptr<dynamics::Skeleton> osim
