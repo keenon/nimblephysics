@@ -481,9 +481,10 @@ InitialMarkerFitParams::setMaxTimestepsToUseForMultiTrialScaling(
 
 //==============================================================================
 MarkerFitter::MarkerFitter(
-    std::shared_ptr<dynamics::Skeleton> skeleton, dynamics::MarkerMap markers)
+    std::shared_ptr<dynamics::Skeleton> skeleton,
+    dynamics::MarkerMap markers,
+    bool ignoreVirtualJointCenterMarkers)
   : mSkeleton(skeleton),
-    mMarkerMap(markers),
     mAnthropometrics(nullptr),
     mAnthropometricWeight(0.001),
     mInitialIKSatisfactoryLoss(0.003),
@@ -498,7 +499,7 @@ MarkerFitter::MarkerFitter(
     mMaxAxisWeight(0.5),
     mDebugJointVariability(false),
     mRegularizeTrackingMarkerOffsets(0.05),
-    mRegularizeAnatomicalMarkerOffsets(1.0),
+    mRegularizeAnatomicalMarkerOffsets(10.0),
     mRegularizeIndividualBodyScales(0.2),
     mRegularizeAllBodyScales(0.2),
     mTolerance(1e-8),
@@ -510,8 +511,49 @@ MarkerFitter::MarkerFitter(
     mDisableLinesearch(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
-  int offset = 0;
+
+  // Pre-filter the markers to get rid of artificial joint centers
+  dynamics::MarkerMap filteredMarkers;
   for (auto pair : markers)
+  {
+    bool isOnJoint = false;
+
+    if (ignoreVirtualJointCenterMarkers)
+    {
+      auto* bodyNode = pair.second.first;
+
+      if ((pair.second.second
+           - bodyNode->getParentJoint()
+                 ->getTransformFromChildBodyNode()
+                 .translation())
+              .squaredNorm()
+          < 1e-9)
+      {
+        isOnJoint = true;
+      };
+      for (int i = 0; i < bodyNode->getNumChildJoints(); i++)
+      {
+        if ((pair.second.second
+             - bodyNode->getChildJoint(i)
+                   ->getTransformFromParentBodyNode()
+                   .translation())
+                .squaredNorm()
+            < 1e-9)
+        {
+          isOnJoint = true;
+          break;
+        }
+      }
+    }
+
+    if (!isOnJoint)
+    {
+      filteredMarkers.emplace(pair);
+    }
+  }
+
+  int offset = 0;
+  for (auto pair : filteredMarkers)
   {
     mMarkerIndices[pair.first] = offset;
     mMarkerNames.push_back(pair.first);
@@ -537,6 +579,7 @@ MarkerFitter::MarkerFitter(
       cursor = parentJoint->getParentBodyNode();
     }
   }
+  mMarkerMap = filteredMarkers;
 
   // Default to a least-squares loss over just the marker errors
   mLossAndGrad = [this](MarkerFitterState* state) {
@@ -3295,7 +3338,7 @@ void MarkerFitter::computeJointConfidences(
       // The axis fit is a strictly hard problem, so if we get a loss within a
       // small constant factor of the joint loss, use the axis
       // initialization.jointWeights(i) = 0;
-      if (initialization.axisLoss(i) < 5 * initialization.jointLoss(i))
+      if (initialization.axisLoss(i) < 2 * initialization.jointLoss(i))
       {
         initialization.jointWeights(i) = 0;
       }
@@ -3556,11 +3599,23 @@ void MarkerFitter::setTriadsToTracking()
   {
     std::string markerName = getMarkerNameAtIndex(i);
     char lastChar = markerName[markerName.size() - 1];
-    if (lastChar == '1' || lastChar == '2' || lastChar == '3' || lastChar == '4'
-        || lastChar == '5')
+    if (lastChar == '1' || lastChar == '2' || lastChar == '3')
     {
       setMarkerIsTracking(markerName);
     }
+  }
+}
+
+//==============================================================================
+/// If we load a list of tracking markers from the OpenSim file, we can
+void MarkerFitter::setTrackingMarkers(const std::vector<std::string>& tracking)
+{
+  for (int i = 0; i < getNumMarkers(); i++)
+  {
+    std::string markerName = getMarkerNameAtIndex(i);
+    bool isTracking = std::find(tracking.begin(), tracking.end(), markerName)
+                      != tracking.end();
+    setMarkerIsTracking(markerName, isTracking);
   }
 }
 

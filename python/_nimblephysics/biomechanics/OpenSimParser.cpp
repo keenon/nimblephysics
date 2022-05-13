@@ -59,6 +59,11 @@ void OpenSimParser(py::module& m)
           ::py::arg("markers"))
       .def_readwrite("skeleton", &dart::biomechanics::OpenSimFile::skeleton)
       .def_readwrite(
+          "trackingMarkers", &dart::biomechanics::OpenSimFile::trackingMarkers)
+      .def_readwrite(
+          "anatomicalMarkers",
+          &dart::biomechanics::OpenSimFile::anatomicalMarkers)
+      .def_readwrite(
           "markersMap", &dart::biomechanics::OpenSimFile::markersMap);
 
   ::py::class_<dart::biomechanics::OpenSimMot>(m, "OpenSimMot")

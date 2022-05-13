@@ -4681,7 +4681,7 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
   // Get the raw marker trajectory data
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
-  for (int i = 1; i <= 45; i++) // 96
+  for (int i = 1; i <= 5; i++) // 96
   {
     std::string number;
     if (i < 10)
@@ -4717,6 +4717,7 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(isDebug ? 1 : 150);
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
 
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
@@ -4724,7 +4725,8 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
   fitter.setIterationLimit(isDebug ? 5 : 400);
 
   // Set all the triads to be tracking markers, instead of anatomical
-  fitter.setTriadsToTracking();
+  // fitter.setTriadsToTracking();
+  fitter.setTrackingMarkers(standard.trackingMarkers);
 
   for (int i = 0; i < fitter.getNumMarkers(); i++)
   {
@@ -5492,7 +5494,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   fitter.setIterationLimit(100);
 
   // Set all the triads to be tracking markers, instead of anatomical
-  fitter.setTriadsToTracking();
+  fitter.setTrackingMarkers(standard.trackingMarkers);
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
 
   for (int i = 0; i < fitter.getNumMarkers(); i++)
   {
@@ -5565,9 +5568,9 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
   // Bilevel optimization
-  fitter.setIterationLimit(100);
+  fitter.setIterationLimit(400);
   std::shared_ptr<BilevelFitResult> bilevelFit
-      = fitter.optimizeBilevel(subsetTimesteps, reinit, 50);
+      = fitter.optimizeBilevel(subsetTimesteps, reinit, 150);
 
   // Fine-tune IK and re-fit all the points
   MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(

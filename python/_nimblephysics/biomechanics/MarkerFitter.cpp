@@ -207,9 +207,11 @@ void MarkerFitter(py::module& m)
               std::shared_ptr<dynamics::Skeleton>,
               std::map<
                   std::string,
-                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>,
+              bool>(),
           ::py::arg("skeleton"),
-          ::py::arg("markers"))
+          ::py::arg("markers"),
+          ::py::arg("ignoreVirtualJointCenterMarkers") = false)
       .def(
           "setInitialIKSatisfactoryLoss",
           &dart::biomechanics::MarkerFitter::setInitialIKSatisfactoryLoss,
@@ -358,6 +360,10 @@ void MarkerFitter(py::module& m)
       .def(
           "setTriadsToTracking",
           &dart::biomechanics::MarkerFitter::setTriadsToTracking)
+      .def(
+          "setTrackingMarkers",
+          &dart::biomechanics::MarkerFitter::setTrackingMarkers,
+          ::py::arg("trackingMarkerNames"))
       .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
 }
 

@@ -72,6 +72,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_MarkerFitterKinematics)
   target_link_libraries(test_MarkerFitterKinematics dart-utils)
 
+  dart_add_test("unit" test_MarkerOffsetPrior)
+  target_link_libraries(test_MarkerOffsetPrior dart-utils)
+
   dart_add_test("unit" test_MarkerLabeller)
   target_link_libraries(test_MarkerLabeller dart-utils)
 

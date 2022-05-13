@@ -303,7 +303,8 @@ class MarkerFitter
 public:
   MarkerFitter(
       std::shared_ptr<dynamics::Skeleton> skeleton,
-      dynamics::MarkerMap markers);
+      dynamics::MarkerMap markers,
+      bool ignoreVirtualJointCenterMarkers = false);
 
   /// Run the whole pipeline of optimization problems to fit the data as closely
   /// as we can, working on multiple trials at once
@@ -593,6 +594,9 @@ public:
   /// This auto-labels any markers whose names end with '1', '2', or '3' as
   /// tracking markers, on the assumption that they're tracking triads.
   void setTriadsToTracking();
+
+  /// If we load a list of tracking markers from the OpenSim file, we can
+  void setTrackingMarkers(const std::vector<std::string>& tracking);
 
   /// Gets the total number of markers we've got in this Fitter
   int getNumMarkers();
