@@ -559,6 +559,15 @@ public:
       std::map<std::string, s_t> markerWeights,
       MarkerInitialization& initialization);
 
+  /// When our parallel-thread IK finishes, sometimes we can have a bit of
+  /// jitter in some of the joints, often around the wrists because the upper
+  /// body in general is poorly modelled in OpenSim. This will go through and
+  /// smooth out the frame-by-frame jitter.
+  MarkerInitialization smoothOutIK(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      MarkerInitialization& initialization);
+
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 6: Run through and do a linear initialization of masses based
   // on link masses.

@@ -4681,7 +4681,7 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
   // Get the raw marker trajectory data
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
-  for (int i = 1; i <= 5; i++) // 96
+  for (int i = 3; i <= 5; i++) // 96
   {
     std::string number;
     if (i < 10)
@@ -4716,7 +4716,7 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
 
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.05);
-  fitter.setInitialIKMaxRestarts(isDebug ? 1 : 150);
+  fitter.setInitialIKMaxRestarts(isDebug ? 1 : 50);
   fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
 
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
@@ -4765,6 +4765,149 @@ for (int i = 0; i < 4; i++)
       isDebug ? shorterTrials[i] : markerObservationTrials[i]);
 }
 */
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, inits[0], markerObservationTrials[0]);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, MULTI_TRIAL_MICHAEL_2)
+{
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_FEMALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = (59 * 2.204) * 0.001;
+  observedValues["Heightin"] = (1.72 * 39.370) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/MichaelTest2/Models/unscaled_generic.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->setScaleGroupUniformScaling(
+      standard.skeleton->getBodyNode("hand_r"));
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  // Get the raw marker trajectory data
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      markerObservationTrials;
+  C3D c3d
+      = C3DLoader::loadC3D("dart://sample/osim/MichaelTest2/C3D/standing.c3d");
+  markerObservationTrials.push_back(c3d.markerTimesteps);
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.1);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(500);
+
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
+  fitter.setRegularizeTrackingMarkerOffsets(0.05);
+  /*
+  fitter.setMinSphereFitScore(0.01);
+  fitter.setMinAxisFitScore(0.001);
+  */
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  if (standard.anatomicalMarkers.size() > 0)
+  {
+    fitter.setTrackingMarkers(standard.trackingMarkers);
+  }
+  else
+  {
+    fitter.setTriadsToTracking();
+  }
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  /*
+//////////////////////////////
+std::vector<std::map<std::string, Eigen::Vector3s>> dummyClip;
+std::vector<bool> newClip;
+for (int i = 0; i < 5; i++)
+{
+  dummyClip.push_back(markerObservationTrials[0][i]);
+  newClip.push_back(false);
+}
+
+MarkerInitialization init = fitter.getInitialization(
+    dummyClip,
+    newClip,
+    InitialMarkerFitParams()
+        .setMaxTrialsToUseForMultiTrialScaling(5)
+        .setMaxTimestepsToUseForMultiTrialScaling(4000));
+MarkerInitialization otherInit = fitter.smoothOutIK(dummyClip, init);
+return;
+
+//////////////////////////////
+*/
+
+  std::vector<MarkerInitialization> inits
+      = fitter.runMultiTrialKinematicsPipeline(
+          markerObservationTrials,
+          InitialMarkerFitParams()
+              .setMaxTrialsToUseForMultiTrialScaling(5)
+              .setMaxTimestepsToUseForMultiTrialScaling(4000),
+          150);
+
+  standard.skeleton->setGroupScales(inits[0].groupScales);
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    std::cout << "Auto error report " << i << ":" << std::endl;
+    IKErrorReport finalKinematicsReport(
+        standard.skeleton,
+        inits[0].updatedMarkerMap,
+        inits[i].poses,
+        markerObservationTrials[i],
+        anthropometrics);
+    finalKinematicsReport.printReport(5);
+  }
+
+  /*
+for (int i = 0; i < 4; i++)
+{
+  fitter.saveTrajectoryAndMarkersToGUI(
+      "./test" + std::to_string(i) + ".json",
+      inits[i],
+      isDebug ? shorterTrials[i] : markerObservationTrials[i]);
+}
+*/
+  std::cout << "Pelvis scaling: "
+            << standard.skeleton->getBodyNode("pelvis")->getScale()
+            << std::endl;
+  std::cout << "Torso scaling: "
+            << standard.skeleton->getBodyNode("torso")->getScale() << std::endl;
 
   // Target markers
   std::shared_ptr<server::GUIWebsocketServer> server

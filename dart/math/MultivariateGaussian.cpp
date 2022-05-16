@@ -183,6 +183,13 @@ std::shared_ptr<MultivariateGaussian> MultivariateGaussian::condition(
   Eigen::MatrixXs cov_21 = getCovSubset(observedIndices, unobservedIndices);
   Eigen::MatrixXs cov_22 = getCovSubset(observedIndices, observedIndices);
 
+  std::cout << "Coniditioning Multivariate Gaussion on:" << std::endl;
+  for (int i = 0; i < observedIndices.size(); i++)
+  {
+    std::cout << getVariableNameAtIndex(observedIndices[i])
+              << " (mu=" << mu_2(i) << "): " << observedVector(i) << std::endl;
+  }
+
   Eigen::MatrixXs cov_22_Inv = cov_22.inverse();
 
   std::vector<std::string> subNames;

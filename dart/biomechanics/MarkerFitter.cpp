@@ -1,6 +1,7 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 
 #include <future>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -8,6 +9,8 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
@@ -1149,6 +1152,21 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               * (init.updatedMarkerMap.at(pair.first)
                      .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
                                               .first->getScale()));
+        server->createBox(
+            "marker_real_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            worldObserved,
+            Eigen::Vector3s::Zero(),
+            Eigen::Vector4s(0, 0, 1, 1),
+            "Skeleton");
+        server->createBox(
+            "marker_inferred_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.007,
+            worldInferred,
+            Eigen::Vector3s::Zero(),
+            Eigen::Vector4s(1, 0, 0, 1),
+            "Skeleton");
+
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
@@ -1157,6 +1175,31 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
             points,
             Eigen::Vector4s(1, 0, 0, 1),
             "Skeleton");
+
+        if (!mMarkerIsTracking.at(mMarkerIndices.at(pair.first)))
+        {
+          Eigen::Vector3s worldOriginal
+              = init.updatedMarkerMap.at(pair.first).first->getWorldTransform()
+                * ((init.updatedMarkerMap.at(pair.first).second
+                    - init.markerOffsets.at(pair.first))
+                       .cwiseProduct(init.updatedMarkerMap.at(pair.first)
+                                         .first->getScale()));
+          server->createBox(
+              "marker_original_" + pair.first,
+              Eigen::Vector3s::Ones() * 0.005,
+              worldOriginal,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector4s(1, 0, 0, 0.3),
+              "Skeleton");
+          std::vector<Eigen::Vector3s> offsetPoints;
+          offsetPoints.push_back(worldOriginal);
+          offsetPoints.push_back(worldInferred);
+          server->createLine(
+              "marker_offset_" + pair.first,
+              offsetPoints,
+              Eigen::Vector4s(1, 0.5, 0.5, 0.3),
+              "Skeleton");
+        }
       }
     }
 
@@ -1880,9 +1923,13 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
     }
   }
 
+  // 7. Do one final "polishing pass" on all the IK
   std::cout << "Done completing bilevel fit!" << std::endl;
 
-  return result;
+  std::cout << "Running final smoothing IK" << std::endl;
+  return smoothOutIK(markerObservations, result);
+
+  // return result;
 }
 
 //==============================================================================
@@ -2035,6 +2082,115 @@ MarkerInitialization MarkerFitter::fineTuneIK(
   }
 
   return result;
+}
+
+//==============================================================================
+/// When our parallel-thread IK finishes, sometimes we can have a bit of
+/// jitter in some of the joints, often around the wrists because the upper
+/// body in general is poorly modelled in OpenSim. This will go through and
+/// smooth out the frame-by-frame jitter.
+MarkerInitialization MarkerFitter::smoothOutIK(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    MarkerInitialization& initialization)
+{
+  MarkerInitialization smoothed(initialization);
+
+  std::vector<std::future<void>> ikFutures;
+
+  int numBlocks = 12;
+  int cursor = 0;
+  int blockDim = (initialization.poses.cols() / numBlocks);
+
+  for (int j = 0; j < numBlocks; j++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skelClone = mSkeleton->cloneSkeleton();
+    int size = std::min(blockDim, (int)initialization.poses.cols() - cursor);
+    int thisCursor = cursor;
+
+    ikFutures.push_back(std::async([&, size, thisCursor, skelClone]() {
+      for (int i = thisCursor; i < thisCursor + size; i++)
+      {
+        std::vector<std::string> observedMarkerNames;
+        std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+            observedMarkers;
+
+        for (auto& pair : markerObservations[i])
+        {
+          if (initialization.updatedMarkerMap.count(pair.first))
+          {
+            observedMarkerNames.push_back(pair.first);
+            auto markerPair = initialization.updatedMarkerMap.at(pair.first);
+            observedMarkers.push_back(std::make_pair(
+                skelClone->getBodyNode(markerPair.first->getName()),
+                markerPair.second));
+          }
+        }
+
+        Eigen::VectorXs markerPoses
+            = Eigen::VectorXs::Zero(observedMarkerNames.size() * 3);
+
+        for (int k = 0; k < observedMarkerNames.size(); k++)
+        {
+          markerPoses.segment<3>(k * 3)
+              = markerObservations[i].at(observedMarkerNames[k]);
+        }
+
+        s_t finalLoss = math::solveIK(
+            // Initial guess
+            initialization.poses.col(i),
+            // Output dimension
+            observedMarkerNames.size() * 3,
+            // Set positions
+            [&skelClone](
+                /* in*/ const Eigen::VectorXs pos, bool clamp) {
+              skelClone->setPositions(pos);
+
+              if (clamp)
+              {
+                skelClone->clampPositionsToLimits();
+              }
+
+              // Return the clamped position
+              return skelClone->getPositions();
+            },
+            [&observedMarkers, &markerPoses, &skelClone](
+                /*out*/ Eigen::VectorXs& diff,
+                /*out*/ Eigen::MatrixXs& jac) {
+              diff = markerPoses
+                     - skelClone->getMarkerWorldPositions(observedMarkers);
+              jac = skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
+                  observedMarkers);
+            },
+            [](Eigen::VectorXs& val) {
+              (void)val;
+              assert(false && "This should never be called");
+            },
+            math::IKConfig()
+                .setMaxStepCount(50)
+                .setConvergenceThreshold(1e-6)
+                .setDontExitTranspose(true)
+                .setLossLowerBound(1e-8)
+                .setMaxRestarts(1)
+                .setStartClamped(true)
+                .setLogOutput(false));
+
+        // 2.3. Record this outcome
+        smoothed.poses.col(i) = skelClone->getPositions();
+        smoothed.poseScores(i) = finalLoss;
+      }
+    }));
+
+    cursor += size;
+  }
+
+  // Join all the futures
+  for (int i = 0; i < ikFutures.size(); i++)
+  {
+    ikFutures[i].get();
+  }
+
+  return smoothed;
 }
 
 //==============================================================================
@@ -4401,7 +4557,7 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     mJointName(joint->getName()),
     mNewClip(newClip),
     mSmoothingLoss(
-        0.01) // 0.1 // just to tie break when there's nothing better available
+        0.01) // just to tie break when there's nothing better available
 {
   mNumTimesteps = markerObservations.size();
 
@@ -4694,7 +4850,7 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
     mNewClip(newClip),
     mKeepCenterLoss(0.01),
     mSmoothingCenterLoss(0.0),
-    mSmoothingAxisLoss(0.01)
+    mSmoothingAxisLoss(1.0)
 {
   mNumTimesteps = markerObservations.size();
 
