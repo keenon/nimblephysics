@@ -16,6 +16,7 @@
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/ResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -269,6 +270,7 @@ C3D C3DLoader::loadC3D(const std::string& uri)
     }
   }
 
+  result.dataRotation = Eigen::Matrix3s::Identity();
   // Automatically rotate the result so that the force plates are on the ground
   if (result.forcePlates.size() > 0
       && result.forcePlates[0].corners.size() == 4)
@@ -308,9 +310,12 @@ C3D C3DLoader::loadC3D(const std::string& uri)
       // there
       Eigen::Vector3s rotVector
           = up.cross(Eigen::Vector3s::UnitY()).normalized() * M_PI / 2;
-      R = math::expMapRot(rotVector);
+      // R = math::expMapRot(rotVector);
       // Rotate by 90deg along the Y axis
-      R = math::expMapRot(-Eigen::Vector3s::UnitY() * M_PI / 2) * R;
+      R = math::expMapRot(-Eigen::Vector3s::UnitY() * M_PI / 2)
+          * math::expMapRot(rotVector);
+
+      result.dataRotation = R;
 #ifndef NDEBUG
       Eigen::Vector3s recovered = R * up;
       s_t diff = (recovered - Eigen::Vector3s::UnitY()).squaredNorm();

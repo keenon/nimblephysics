@@ -41,6 +41,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "dart/biomechanics/C3DLoader.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -242,6 +244,18 @@ void OpenSimParser(py::module& m)
       },
       ::py::arg("skel"),
       ::py::arg("path"));
+
+  sm.def(
+      "loadMotAtLowestMarkerRMSERotation",
+      +[](biomechanics::OpenSimFile osim,
+          const std::string& path,
+          biomechanics::C3D c3d) {
+        return dart::biomechanics::OpenSimParser::
+            loadMotAtLowestMarkerRMSERotation(osim, path, c3d);
+      },
+      ::py::arg("osim"),
+      ::py::arg("path"),
+      ::py::arg("c3d"));
 
   sm.def(
       "saveMot",

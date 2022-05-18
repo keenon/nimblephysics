@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/CustomJoint.hpp"
@@ -26,6 +27,7 @@
 #include "dart/dynamics/WeldJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
 #include "dart/math/CustomFunction.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/math/PolynomialFunction.hpp"
@@ -1099,6 +1101,7 @@ void OpenSimParser::saveTRC(
 OpenSimMot OpenSimParser::loadMot(
     std::shared_ptr<dynamics::Skeleton> skel,
     const common::Uri& uri,
+    Eigen::Matrix3s rotateBy,
     int downsampleByFactor,
     const common::ResourceRetrieverPtr& nullOrRetriever)
 {
@@ -1251,13 +1254,81 @@ OpenSimMot OpenSimParser::loadMot(
       = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.size());
   for (int i = 0; i < poses.size(); i++)
   {
-    posesMatrix.col(i) = poses[i];
+    if (skel->getJoint(0)->getType()
+        == dynamics::EulerFreeJoint::getStaticType())
+    {
+      Eigen::VectorXs ballPoses = skel->convertPositionsToBallSpace(poses[i]);
+
+      // Rotate the orientation
+      Eigen::Vector3s so3 = ballPoses.segment<3>(0);
+      Eigen::Matrix3s R = math::expMapRot(so3);
+      ballPoses.segment<3>(0) = math::logMap(rotateBy * R);
+
+      // Rotate the offset
+      ballPoses.segment<3>(3) = rotateBy * ballPoses.segment<3>(3);
+
+      posesMatrix.col(i) = skel->convertPositionsFromBallSpace(ballPoses);
+    }
+    else
+    {
+      posesMatrix.col(i) = poses[i];
+    }
   }
   OpenSimMot mot;
   mot.poses = posesMatrix;
   mot.timestamps = timestamps;
 
   return mot;
+}
+
+//==============================================================================
+/// This tries a number of rotations as it's loading a .mot file, and returns
+/// the one with the lowest marker error, since that's likely to be the
+/// correct orientation.
+OpenSimMot OpenSimParser::loadMotAtLowestMarkerRMSERotation(
+    OpenSimFile& osim,
+    const common::Uri& uri,
+    C3D& c3d,
+    int downsampleByFactor,
+    const common::ResourceRetrieverPtr& retriever)
+{
+  Eigen::Matrix3s customOsimR = Eigen::Matrix3s::Identity();
+  customOsimR.col(1) = Eigen::Vector3s::UnitZ();
+  customOsimR.col(2) = -1 * Eigen::Vector3s::UnitY();
+
+  std::vector<Eigen::Matrix3s> rotationsToTry;
+  rotationsToTry.push_back(customOsimR);
+  rotationsToTry.push_back(c3d.dataRotation);
+  rotationsToTry.push_back(c3d.dataRotation * customOsimR);
+
+  OpenSimMot bestMot = loadMot(
+      osim.skeleton,
+      uri,
+      Eigen::Matrix3s::Identity(),
+      downsampleByFactor,
+      retriever);
+  s_t bestRMSE
+      = IKErrorReport(
+            osim.skeleton, osim.markersMap, bestMot.poses, c3d.markerTimesteps)
+            .averageRootMeanSquaredError;
+  for (Eigen::Matrix3s bestRotations : rotationsToTry)
+  {
+    OpenSimMot otherMot = loadMot(
+        osim.skeleton, uri, bestRotations, downsampleByFactor, retriever);
+    s_t otherRMSE = IKErrorReport(
+                        osim.skeleton,
+                        osim.markersMap,
+                        otherMot.poses,
+                        c3d.markerTimesteps)
+                        .averageRootMeanSquaredError;
+    if (otherRMSE < bestRMSE)
+    {
+      bestMot = otherMot;
+      bestRMSE = otherRMSE;
+    }
+  }
+
+  return bestMot;
 }
 
 //==============================================================================

@@ -4156,8 +4156,8 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
   // Get the gold data
   OpenSimFile scaled = OpenSimParser::parseOsim(
       "dart://sample/osim/welk002/manually_scaled.osim");
-  OpenSimMot mot = OpenSimParser::loadMot(
-      scaled.skeleton, "dart://sample/osim/welk002/manual_ik.mot");
+  OpenSimMot mot = OpenSimParser::loadMotAtLowestMarkerRMSERotation(
+      scaled, "dart://sample/osim/welk002/manual_ik.mot", c3d);
   Eigen::MatrixXs goldPoses = mot.poses;
   IKErrorReport goldReport(
       scaled.skeleton,
@@ -4291,9 +4291,11 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
   server->serve(8070);
+  server->renderBasis();
+  std::cout << "Data rotation: " << std::endl << c3d.dataRotation << std::endl;
   // , &scaled, goldPoses
   fitter.debugTrajectoryAndMarkersToGUI(
-      server, finalKinematicInit, subsetTimesteps, &c3d);
+      server, finalKinematicInit, subsetTimesteps, &c3d, &scaled, goldPoses);
   server->blockWhileServing();
 }
 #endif

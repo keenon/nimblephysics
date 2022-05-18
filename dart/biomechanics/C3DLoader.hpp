@@ -33,6 +33,8 @@ struct C3D
   // These are useful for faster access to the marker data in certain situations
   Eigen::MatrixXs shuffledMarkersMatrix;
   Eigen::MatrixXs shuffledMarkersMatrixMask;
+  // This is the rotation applied to the loaded data, if any
+  Eigen::Matrix3s dataRotation;
 };
 
 class C3DLoader

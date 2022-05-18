@@ -136,6 +136,17 @@ public:
   static OpenSimMot loadMot(
       std::shared_ptr<dynamics::Skeleton> skel,
       const common::Uri& uri,
+      Eigen::Matrix3s rotateBy = Eigen::Matrix3s::Identity(),
+      int downsampleByFactor = 1,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// This tries a number of rotations as it's loading a .mot file, and returns
+  /// the one with the lowest marker error, since that's likely to be the
+  /// correct orientation.
+  static OpenSimMot loadMotAtLowestMarkerRMSERotation(
+      OpenSimFile& osim,
+      const common::Uri& uri,
+      C3D& c3d,
       int downsampleByFactor = 1,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 

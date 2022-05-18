@@ -498,7 +498,7 @@ MarkerFitter::MarkerFitter(
     mMinAxisFitScore(0.001),
     // mMinSphereFitScore(6e-5),
     // mMinAxisFitScore(1.2e-4),
-    mMaxJointWeight(0.5),
+    mMaxJointWeight(1.0),
     mMaxAxisWeight(0.5),
     mDebugJointVariability(false),
     mRegularizeTrackingMarkerOffsets(0.05),
