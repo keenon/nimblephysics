@@ -338,6 +338,14 @@ public:
           markerObservations,
       InitialMarkerFitParams params = InitialMarkerFitParams());
 
+  /// This is a convenience method to display just some manually labeled gold
+  /// data, without having to first run the optimizer.
+  static void debugGoldTrajectoryAndMarkersToGUI(
+      std::shared_ptr<server::GUIWebsocketServer> server,
+      C3D* c3d,
+      const OpenSimFile* goldSkeleton,
+      const Eigen::MatrixXs goldPoses);
+
   /// This runs a server to display the detailed trajectory information, along
   /// with fit data
   void debugTrajectoryAndMarkersToGUI(

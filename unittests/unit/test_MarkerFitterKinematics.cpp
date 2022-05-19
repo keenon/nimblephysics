@@ -4113,6 +4113,56 @@ TEST(MarkerFitter, NAN_C3D_PROBLEMS)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, RAJAGOPAL_C3D)
+{
+  // Get the raw marker trajectory data
+  C3D c3d = C3DLoader::loadC3D(
+      "dart://sample/osim/MichaelTest/results/C3D/S02DN101.c3d");
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderBasis();
+  std::cout << "Data rotation: " << std::endl << c3d.dataRotation << std::endl;
+  C3DLoader::debugToGUI(c3d, server);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, WELK_C3D)
+{
+  // Get the raw marker trajectory data
+  C3D c3d = C3DLoader::loadC3D(
+      "dart://sample/osim/welk007/c3d_Trimmed_running_exotendon3.c3d");
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps
+      = c3d.markerTimesteps;
+
+  // Get the gold data
+  OpenSimFile scaled = OpenSimParser::parseOsim(
+      "dart://sample/osim/welk007/manually_scaled.osim");
+  OpenSimMot mot = OpenSimParser::loadMotAtLowestMarkerRMSERotation(
+      scaled,
+      "dart://sample/osim/welk007/"
+      "c3d_Trimmed_running_exotendon3_manual_scaling_ik.mot",
+      c3d);
+  Eigen::MatrixXs goldPoses = mot.poses;
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderBasis();
+  std::cout << "Data rotation: " << std::endl << c3d.dataRotation << std::endl;
+  MarkerFitter::debugGoldTrajectoryAndMarkersToGUI(
+      server, &c3d, &scaled, goldPoses);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
 {
   // Create Anthropometric prior

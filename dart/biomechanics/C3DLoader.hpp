@@ -35,12 +35,19 @@ struct C3D
   Eigen::MatrixXs shuffledMarkersMatrixMask;
   // This is the rotation applied to the loaded data, if any
   Eigen::Matrix3s dataRotation;
+
+  /// This computes the weighted distance from each CoP to its nearest marker on
+  /// that timestep. This is used as part of the heuristic to guess which
+  /// convention a C3D file is using for storing its GRF data.
+  s_t getWeightedDistFromCoPToNearestMarker();
 };
 
 class C3DLoader
 {
 public:
   static C3D loadC3D(const std::string& uri);
+
+  static C3D loadC3DWithGRFConvention(const std::string& uri, int convention);
 
   static void debugToGUI(
       C3D& file, std::shared_ptr<server::GUIWebsocketServer> server);

@@ -1051,6 +1051,95 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
 }
 
 //==============================================================================
+/// This is a convenience method to display just some manually labeled gold
+/// data, without having to first run the optimizer.
+void MarkerFitter::debugGoldTrajectoryAndMarkersToGUI(
+    std::shared_ptr<server::GUIWebsocketServer> server,
+    C3D* c3d,
+    const OpenSimFile* goldOsim,
+    const Eigen::MatrixXs goldPoses)
+{
+  Eigen::Vector4s goldColor
+      = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
+  server->renderSkeleton(
+      goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
+  // Render the plates as red rectangles
+  for (int i = 0; i < c3d->forcePlates.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> points;
+    for (int j = 0; j < c3d->forcePlates[i].corners.size(); j++)
+    {
+      points.push_back(c3d->forcePlates[i].corners[j]);
+    }
+    points.push_back(c3d->forcePlates[i].corners[0]);
+
+    server->createLine(
+        "plate_" + std::to_string(i),
+        points,
+        Eigen::Vector4s(1.0, 0., 0., 1.0),
+        "Force Plates");
+  }
+
+  s_t secondsPerTick = 1.0 / 50;
+  std::shared_ptr<realtime::Ticker> ticker
+      = std::make_shared<realtime::Ticker>(secondsPerTick);
+  ticker->registerTickListener(
+      [c3d, server, secondsPerTick, goldOsim, goldPoses, goldColor](long t) {
+        long tick = std::round((s_t)t / (secondsPerTick * 1000));
+        int timestep
+            = tick
+              % std::min(
+                  (long)c3d->markerTimesteps.size(), (long)goldPoses.cols());
+
+        goldOsim->skeleton->setPositions(goldPoses.col(timestep));
+        server->renderSkeleton(
+            goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
+
+        for (auto pair : c3d->markerTimesteps[timestep])
+        {
+          if (goldOsim->markersMap.count(pair.first) > 0)
+          {
+            Eigen::Vector3s worldObserved = pair.second;
+            Eigen::Vector3s worldInferred
+                = goldOsim->markersMap.at(pair.first).first->getWorldTransform()
+                  * (goldOsim->markersMap.at(pair.first)
+                         .second.cwiseProduct(
+                             goldOsim->markersMap.at(pair.first)
+                                 .first->getScale()));
+            std::vector<Eigen::Vector3s> points;
+            points.push_back(worldObserved);
+            points.push_back(worldInferred);
+            server->createLine(
+                "gold_marker_error_" + pair.first,
+                points,
+                Eigen::Vector4s(1, 0, 0, 1),
+                "Manual Skeleton");
+          }
+        }
+
+        for (int i = 0; i < c3d->forcePlates.size(); i++)
+        {
+          server->deleteObject("force_" + std::to_string(i));
+          if (c3d->forcePlates[i].forces[timestep].squaredNorm() > 0)
+          {
+            std::vector<Eigen::Vector3s> forcePoints;
+            forcePoints.push_back(
+                c3d->forcePlates[i].centersOfPressure[timestep]);
+            forcePoints.push_back(
+                c3d->forcePlates[i].centersOfPressure[timestep]
+                + (c3d->forcePlates[i].forces[timestep] * 0.001));
+            server->createLine(
+                "force_" + std::to_string(i),
+                forcePoints,
+                Eigen::Vector4s(1.0, 0, 0, 1.),
+                "Force Plates");
+          }
+        }
+      });
+  server->registerConnectionListener([ticker]() { ticker->start(); });
+}
+
+//==============================================================================
 void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     std::shared_ptr<server::GUIWebsocketServer> server,
     MarkerInitialization init,

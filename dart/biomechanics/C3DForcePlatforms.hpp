@@ -15,6 +15,8 @@ namespace dart {
 
 namespace biomechanics {
 
+const extern int FORCE_PLATFORM_NUM_CONVENTIONS;
+
 ///
 /// \brief Force Platform analyse
 ///
@@ -37,8 +39,10 @@ public:
   /// \brief Declare a ForcePlatForm analyse
   /// \param idx Index of the force platform
   /// \param c3d A reference to the c3d class
+  /// \param method A number referring to the type of method used to resolve the
+  /// GRF data frames, between 0 and FORCE_PLATFORM_NUM_METHODS-1
   ///
-  ForcePlatform(size_t idx, const ezc3d::c3d& c3d);
+  ForcePlatform(size_t idx, const ezc3d::c3d& c3d, int convention);
 
   //---- UNITS ----//
 protected:
@@ -202,7 +206,7 @@ protected:
   /// \param idx Index of the platform
   /// \param c3d A reference to the c3d
   ///
-  void extractData(size_t idx, const ezc3d::c3d& c3d);
+  void extractDataWithConvention(size_t idx, const ezc3d::c3d& c3d, int method);
 };
 
 ///
@@ -214,8 +218,10 @@ class ForcePlatforms
 public:
   ///
   /// \brief Declare a ForcePlatForm analyse holder
+  /// \param method A number referring to the type of method used to resolve the
+  /// GRF data frames, between 0 and FORCE_PLATFORM_NUM_METHODS-1
   ///
-  ForcePlatforms(const ezc3d::c3d& c3d);
+  ForcePlatforms(const ezc3d::c3d& c3d, int method);
 
   //---- DATA ----//
 private:

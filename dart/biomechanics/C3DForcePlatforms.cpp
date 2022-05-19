@@ -13,11 +13,13 @@ namespace dart {
 
 namespace biomechanics {
 
+const extern int FORCE_PLATFORM_NUM_CONVENTIONS = 2;
+
 ForcePlatform::ForcePlatform()
 {
 }
 
-ForcePlatform::ForcePlatform(size_t idx, const ezc3d::c3d& c3d)
+ForcePlatform::ForcePlatform(size_t idx, const ezc3d::c3d& c3d, int convention)
 {
   _meanCorners.setZero();
   _origin.setZero();
@@ -30,7 +32,7 @@ ForcePlatform::ForcePlatform(size_t idx, const ezc3d::c3d& c3d)
   extractOrigin(idx, c3d);
   extractCalMatrix(idx, c3d);
   computePfReferenceFrame();
-  extractData(idx, c3d);
+  extractDataWithConvention(idx, c3d, convention);
 }
 
 const std::string& ForcePlatform::forceUnit() const
@@ -195,7 +197,7 @@ void ForcePlatform::extractType(size_t idx, const ezc3d::c3d& c3d)
   }
 }
 
-ForcePlatforms::ForcePlatforms(const ezc3d::c3d& c3d)
+ForcePlatforms::ForcePlatforms(const ezc3d::c3d& c3d, int convention)
 {
   size_t nbForcePF(c3d.parameters()
                        .group("FORCE_PLATFORM")
@@ -203,7 +205,7 @@ ForcePlatforms::ForcePlatforms(const ezc3d::c3d& c3d)
                        .valuesAsInt()[0]);
   for (size_t i = 0; i < nbForcePF; ++i)
   {
-    _platforms.push_back(ForcePlatform(i, c3d));
+    _platforms.push_back(ForcePlatform(i, c3d, convention));
   }
 }
 
@@ -349,8 +351,11 @@ void ForcePlatform::computePfReferenceFrame()
   }
 }
 
-void ForcePlatform::extractData(size_t idx, const ezc3d::c3d& c3d)
+void ForcePlatform::extractDataWithConvention(
+    size_t idx, const ezc3d::c3d& c3d, int convention)
 {
+  assert(method >= 0 && method <= 1);
+
   const ezc3d::ParametersNS::GroupNS::Group& groupFP(
       c3d.parameters().group("FORCE_PLATFORM"));
 
@@ -474,7 +479,10 @@ void ForcePlatform::extractData(size_t idx, const ezc3d::c3d& c3d)
             force_raw(j) = data_raw(j);
             moment_raw(j) = data_raw(j + 3);
           }
-          // moment_raw += force_raw.cross(_origin);
+          if (convention == 1)
+          {
+            moment_raw += force_raw.cross(_origin);
+          }
         }
         _F[cmp] = _refFrame * force_raw;
         _M[cmp] = _refFrame * moment_raw;
@@ -483,8 +491,14 @@ void ForcePlatform::extractData(size_t idx, const ezc3d::c3d& c3d)
             -moment_raw(1) / force_raw(2), moment_raw(0) / force_raw(2), 0);
         Eigen::Vector3s originNoVertical = _origin;
         originNoVertical(2) = 0.0;
-        // _CoP[cmp] = _refFrame * CoP_raw + _meanCorners;
-        _CoP[cmp] = _refFrame * (CoP_raw + originNoVertical) + _meanCorners;
+        if (convention == 0)
+        {
+          _CoP[cmp] = _refFrame * (CoP_raw + originNoVertical) + _meanCorners;
+        }
+        if (convention == 1)
+        {
+          _CoP[cmp] = _refFrame * CoP_raw + _meanCorners;
+        }
         _Tz[cmp] = _refFrame * (moment_raw - force_raw.cross(-1 * CoP_raw));
         ++cmp;
       }

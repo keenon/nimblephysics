@@ -3,6 +3,7 @@
 #include <algorithm> // std::sort
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <unordered_map>
 #include <vector>
@@ -43,8 +44,74 @@ std::string getAbsolutePath(std::string uri)
   return resourceRetriever->getFilePath(uri);
 }
 
+/*
+  // Choose the convention we will use for reading for the force data based on
+  // which force data convention yields the lowest average RMS distance from
+  // each CoP to its nearest mocap point. The intuition behind this method is
+  // that conventions that are blatantly wrong will tend to be pretty far away
+  // from the nearest foot marker.
+  */
+
+//==============================================================================
+/// This computes the weighted distance from each CoP to its nearest marker on
+/// that timestep. This is used as part of the heuristic to guess which
+/// convention a C3D file is using for storing its GRF data.
+s_t C3D::getWeightedDistFromCoPToNearestMarker()
+{
+  s_t dist = 0;
+  s_t totalWeight = 0;
+
+  for (ForcePlate& plate : forcePlates)
+  {
+    for (int i = 0; i < markerTimesteps.size(); i++)
+    {
+      Eigen::Vector3s cop = plate.centersOfPressure[i];
+
+      s_t minDist = std::numeric_limits<double>::infinity();
+      for (auto& pair : markerTimesteps[i])
+      {
+        s_t dist = (pair.second - cop).norm();
+        if (dist < minDist)
+        {
+          minDist = dist;
+        }
+      }
+      if (isfinite(minDist))
+      {
+        s_t weight = plate.forces[i].norm();
+
+        dist += minDist * weight;
+        totalWeight += weight;
+      }
+    }
+  }
+
+  return dist / totalWeight;
+}
+
 //==============================================================================
 C3D C3DLoader::loadC3D(const std::string& uri)
+{
+  C3D bestResult = loadC3DWithGRFConvention(uri, 0);
+  s_t bestResultRMS = bestResult.getWeightedDistFromCoPToNearestMarker();
+  for (int i = 1; i < biomechanics::FORCE_PLATFORM_NUM_CONVENTIONS; i++)
+  {
+    C3D competingConvention = loadC3DWithGRFConvention(uri, i);
+    s_t competingRMS
+        = competingConvention.getWeightedDistFromCoPToNearestMarker();
+    std::cout << "Best RMS " << bestResultRMS << " vs Competing RMS "
+              << competingRMS << std::endl;
+    if (competingRMS < bestResultRMS)
+    {
+      bestResult = competingConvention;
+      bestResultRMS = competingRMS;
+    }
+  }
+  return bestResult;
+}
+
+//==============================================================================
+C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
 {
   C3D result;
   const std::string path = getAbsolutePath(uri);
@@ -117,7 +184,7 @@ C3D C3DLoader::loadC3D(const std::string& uri)
   }
 
   // Load in the force platforms
-  ForcePlatforms pf(data);
+  ForcePlatforms pf(data, convention);
   const std::vector<ForcePlatform>& forcePlatforms = pf.forcePlatforms();
 
   // Force plate data
