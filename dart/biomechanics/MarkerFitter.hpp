@@ -15,6 +15,7 @@
 #include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
@@ -117,6 +118,7 @@ struct MarkerInitialization
       updatedMarkerMap;
 
   std::vector<dynamics::Joint*> joints;
+  std::vector<std::vector<std::string>> jointsAdjacentMarkers;
   Eigen::VectorXs jointMarkerVariability;
   Eigen::VectorXs jointLoss;
   Eigen::VectorXs jointWeights;
@@ -141,6 +143,16 @@ public:
       dynamics::Joint* joint,
       const std::vector<bool>& newClip,
       Eigen::Ref<Eigen::MatrixXs> out);
+
+  /// This returns true if the given body is the parent of the joint OR if
+  /// there's a hierarchy of fixed joints that connect it to the parent
+  static bool isDynamicParentOfJoint(
+      std::string bodyName, dynamics::Joint* joint);
+
+  /// This returns true if the given body is the child of the joint OR if
+  /// there's a hierarchy of fixed joints that connect it to the child
+  static bool isDynamicChildOfJoint(
+      std::string bodyName, dynamics::Joint* joint);
 
   static bool canFitJoint(
       MarkerFitter* fitter,
@@ -200,8 +212,6 @@ public:
       const std::vector<bool>& newClip,
       Eigen::Ref<Eigen::MatrixXs> out);
 
-  static bool canFitJoint(MarkerFitter* fitter, dynamics::Joint* joint);
-
   int getProblemDim();
 
   Eigen::VectorXs flatten();
@@ -252,12 +262,14 @@ struct InitialMarkerFitParams
   std::map<std::string, s_t> markerWeights;
   std::vector<dynamics::Joint*> joints;
   Eigen::MatrixXs jointCenters;
+  std::vector<std::vector<std::string>> jointAdjacentMarkers;
   Eigen::VectorXs jointWeights;
 
   Eigen::MatrixXs jointAxis;
   Eigen::VectorXs axisWeights;
 
   int numBlocks;
+  int numIKTries;
   Eigen::MatrixXs initPoses;
 
   std::map<std::string, Eigen::Vector3s> markerOffsets;
@@ -272,14 +284,18 @@ struct InitialMarkerFitParams
   InitialMarkerFitParams& setMarkerWeights(
       std::map<std::string, s_t> markerWeights);
   InitialMarkerFitParams& setJointCenters(
-      std::vector<dynamics::Joint*> joints, Eigen::MatrixXs jointCenters);
+      std::vector<dynamics::Joint*> joints,
+      Eigen::MatrixXs jointCenters,
+      std::vector<std::vector<std::string>> jointAdjacentMarkers);
   InitialMarkerFitParams& setJointCentersAndWeights(
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
+      std::vector<std::vector<std::string>> jointAdjacentMarkers,
       Eigen::VectorXs jointWeights);
   InitialMarkerFitParams& setJointAxisAndWeights(
       Eigen::MatrixXs jointAxis, Eigen::VectorXs axisWeights);
   InitialMarkerFitParams& setNumBlocks(int numBlocks);
+  InitialMarkerFitParams& setNumIKTries(int retries);
   InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
   InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
   InitialMarkerFitParams& setMarkerOffsets(
@@ -288,6 +304,13 @@ struct InitialMarkerFitParams
   InitialMarkerFitParams& setMaxTrialsToUseForMultiTrialScaling(int numTrials);
   InitialMarkerFitParams& setMaxTimestepsToUseForMultiTrialScaling(
       int numTimesteps);
+};
+
+struct ScaleAndFitResult
+{
+  Eigen::VectorXs pose;
+  Eigen::VectorXs scale;
+  s_t score;
 };
 
 /**
@@ -368,6 +391,14 @@ public:
       const OpenSimFile* goldSkeleton = nullptr,
       const Eigen::MatrixXs goldPoses = Eigen::MatrixXs::Zero(0, 0));
 
+  /// This automatically finds the "probably correct" rotation for the C3D data
+  /// that has no force plate data and rotates the C3D data to match it. This is
+  /// determined by which orientation for the data has the skeleton torso
+  /// pointed generally upwards most of the time. While this is usually a safe
+  /// assumption, it could break down with breakdancing or some other strang
+  /// motions, so it should be an option to turn it off.
+  void autorotateC3D(C3D* c3d);
+
   ///////////////////////////////////////////////////////////////////////////
   // Pipeline step 1 and 3: (Re)Initialize scaling+IK
   ///////////////////////////////////////////////////////////////////////////
@@ -403,7 +434,7 @@ public:
 
   /// This scales the skeleton and IK fits to the marker observations. It
   /// returns a pair, with (pose, group scales) from the fit.
-  static std::pair<Eigen::VectorXs, Eigen::VectorXs> scaleAndFit(
+  static ScaleAndFitResult scaleAndFit(
       const MarkerFitter* fitter,
       std::map<std::string, Eigen::Vector3s> markerObservations,
       Eigen::VectorXs firstGuessPose,

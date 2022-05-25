@@ -164,11 +164,16 @@ void MarkerFitter(py::module& m)
           "setJointCenters",
           &dart::biomechanics::InitialMarkerFitParams::setJointCenters,
           ::py::arg("joints"),
-          ::py::arg("jointCenters"))
+          ::py::arg("jointCenters"),
+          ::py::arg("jointAdjacentMarkers"))
       .def(
           "setNumBlocks",
           &dart::biomechanics::InitialMarkerFitParams::setNumBlocks,
           ::py::arg("numBlocks"))
+      .def(
+          "setNumIKTries",
+          &dart::biomechanics::InitialMarkerFitParams::setNumIKTries,
+          ::py::arg("tries"))
       .def(
           "setInitPoses",
           &dart::biomechanics::InitialMarkerFitParams::setInitPoses,
@@ -197,6 +202,7 @@ void MarkerFitter(py::module& m)
               setJointCentersAndWeights,
           ::py::arg("joints"),
           ::py::arg("jointCenters"),
+          ::py::arg("jointAdjacentMarkers"),
           ::py::arg("jointWeights"));
 
   ::py::class_<
@@ -364,6 +370,10 @@ void MarkerFitter(py::module& m)
           "setTrackingMarkers",
           &dart::biomechanics::MarkerFitter::setTrackingMarkers,
           ::py::arg("trackingMarkerNames"))
+      .def(
+          "autorotateC3D",
+          &dart::biomechanics::MarkerFitter::autorotateC3D,
+          ::py::arg("c3d"))
       .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
 }
 

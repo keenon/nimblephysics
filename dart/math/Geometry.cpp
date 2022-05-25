@@ -1526,7 +1526,8 @@ Eigen::Vector6s dAdInvR(const Eigen::Isometry3s& _T, const Eigen::Vector6s& _F)
 Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     const Eigen::Vector3s& angle,
     const Eigen::Vector3s& upperBounds,
-    const Eigen::Vector3s& lowerBounds)
+    const Eigen::Vector3s& lowerBounds,
+    dynamics::detail::AxisOrder axisOrder)
 {
   Eigen::Vector3s clampedAngle = angle;
   bool allClamped = true;
@@ -1582,6 +1583,62 @@ Eigen::Vector3s attemptToClampEulerAnglesToBounds(
   if (allClamped)
   {
     return clampedAngle;
+  }
+
+  // If we're rotating by PI/2 (90 degrees) mod PI (180 degrees), then the first
+  // and 3rd axis are colinear.
+  s_t secondAngle = angle(1);
+  s_t secondSign = 1.0;
+  while (secondAngle > M_PI / 2)
+  {
+    secondAngle -= M_PI;
+    secondSign = -secondSign;
+  }
+  while (secondAngle < -M_PI / 2)
+  {
+    secondAngle += M_PI;
+    secondSign = -secondSign;
+  }
+  if (std::abs(secondAngle - (M_PI / 2)) < 1e-4)
+  {
+    if (axisOrder == dynamics::detail::AxisOrder::ZYX
+        || axisOrder == dynamics::detail::AxisOrder::ZYX)
+    {
+      secondSign = -secondSign;
+    }
+
+    // We can now say that angle(0) + angle(2) = clampedAngle(0) +
+    // secondSign*clampedAngle(2)
+
+    s_t c = angle(0) + angle(2);
+    clampedAngle = angle;
+    clampedAngle(0) = c / 2;
+    clampedAngle(2) = secondSign * c / 2;
+
+    // Try to clamp all the angles in the alternate formulation too
+    allClamped = true;
+    for (int i = 0; i < 3; i++)
+    {
+      while (clampedAngle(i) > upperBounds(i))
+      {
+        clampedAngle(i) -= M_PI * 2;
+      }
+      while (clampedAngle(i) < lowerBounds(i))
+      {
+        clampedAngle(i) += M_PI * 2;
+      }
+      // Check if we successfully got this index in-bounds
+      if (clampedAngle(i) > upperBounds(i) || clampedAngle(i) < lowerBounds(i))
+      {
+        allClamped = false;
+        break;
+      }
+    }
+    // If we succeeded, return our attempt
+    if (allClamped)
+    {
+      return clampedAngle;
+    }
   }
 
   // If we still weren't able to clamp this, the angle probably isn't

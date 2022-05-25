@@ -82,6 +82,12 @@ public:
 
   std::shared_ptr<math::CustomFunction> getCustomFunction(std::size_t i);
 
+  /// There is an annoying tendency for custom joints to encode the linear
+  /// offset of the bone in their custom functions. We don't want that, so we
+  /// want to move any relative transform caused by custom functions into the
+  /// parent transform.
+  void zeroTranslationInCustomFunctions();
+
   int getCustomFunctionDrivenByDof(std::size_t i);
 
   /// This gets the Jacobian of the mapping functions. That is, for every

@@ -270,6 +270,14 @@ bool Joint::isDynamic() const
 }
 
 //==============================================================================
+/// Return true if this joint has the same upperlimit and lowerlimit on
+/// positions
+bool Joint::isFixed() const
+{
+  return getPositionUpperLimits() == getPositionLowerLimits();
+}
+
+//==============================================================================
 BodyNode* Joint::getChildBodyNode()
 {
   return mChildBodyNode;

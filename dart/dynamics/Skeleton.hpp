@@ -913,6 +913,12 @@ public:
   // they're currently outside it.
   void clampPositionsToLimits();
 
+  /// There is an annoying tendency for custom joints to encode the linear
+  /// offset of the bone in their custom functions. We don't want that, so we
+  /// want to move any relative transform caused by custom functions into the
+  /// parent transform.
+  void zeroTranslationInCustomFunctions();
+
   //----------------------------------------------------------------------------
   // Constraining links to have the same scale
   //----------------------------------------------------------------------------

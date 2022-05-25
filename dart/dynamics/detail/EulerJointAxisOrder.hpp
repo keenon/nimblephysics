@@ -30,13 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_DYNAMICS_DETAIL_EULERJOINTASPECT_HPP_
-#define DART_DYNAMICS_DETAIL_EULERJOINTASPECT_HPP_
-
-#include <string>
-
-#include "dart/dynamics/GenericJoint.hpp"
-#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
+#ifndef DART_DYNAMICS_DETAIL_EULERJOINT_AXISORDERASPECT_HPP_
+#define DART_DYNAMICS_DETAIL_EULERJOINT_AXISORDERASPECT_HPP_
 
 namespace dart {
 namespace dynamics {
@@ -46,38 +41,14 @@ class EulerJoint;
 namespace detail {
 
 //==============================================================================
-struct EulerJointUniqueProperties
+/// Axis order
+enum class AxisOrder : int
 {
-  /// Euler angle order
-  AxisOrder mAxisOrder;
-
-  /// Constructor
-  EulerJointUniqueProperties(AxisOrder _axisOrder = AxisOrder::XYZ);
-
-  virtual ~EulerJointUniqueProperties() = default;
+  ZYX = 0,
+  XYZ = 1,
+  ZXY = 2,
+  XZY = 3,
 };
-
-//==============================================================================
-struct EulerJointProperties : GenericJoint<math::R3Space>::Properties,
-                              EulerJointUniqueProperties
-{
-  DART_DEFINE_ALIGNED_SHARED_OBJECT_CREATOR(EulerJointProperties)
-
-  /// Composed constructor
-  EulerJointProperties(
-      const GenericJoint<math::R3Space>::Properties& genericJointProperties
-      = GenericJoint<math::R3Space>::Properties(),
-      const EulerJointUniqueProperties& eulerJointProperties
-      = EulerJointUniqueProperties());
-
-  virtual ~EulerJointProperties() = default;
-};
-
-//==============================================================================
-using EulerJointBase = common::EmbedPropertiesOnTopOf<
-    EulerJoint,
-    EulerJointUniqueProperties,
-    GenericJoint<math::R3Space> >;
 
 } // namespace detail
 } // namespace dynamics

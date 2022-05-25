@@ -354,7 +354,7 @@ void ForcePlatform::computePfReferenceFrame()
 void ForcePlatform::extractDataWithConvention(
     size_t idx, const ezc3d::c3d& c3d, int convention)
 {
-  assert(method >= 0 && method <= 1);
+  assert(convention >= 0 && convention <= 1);
 
   const ezc3d::ParametersNS::GroupNS::Group& groupFP(
       c3d.parameters().group("FORCE_PLATFORM"));

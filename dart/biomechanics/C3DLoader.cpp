@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -459,6 +460,62 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
   return result;
 }
 
+//==============================================================================
+/// This will check if markers
+/// obviously "flip" during the trajectory, and unflip them.
+void C3DLoader::fixupMarkerFlips(C3D* c3d)
+{
+  for (int i = 1; i < c3d->markerTimesteps.size(); i++)
+  {
+    std::unordered_map<std::string, std::string> closestMarkerFromLastTimestep;
+
+    for (std::string& marker : c3d->markers)
+    {
+      closestMarkerFromLastTimestep[marker] = marker;
+
+      // If we see the marker on both timesteps, then evaluate which markers
+      // were the closest on last timestep to this marker
+      if (c3d->markerTimesteps[i].count(marker) > 0
+          && c3d->markerTimesteps[i - 1].count(marker) > 0)
+      {
+        Eigen::Vector3s thisTimestep = c3d->markerTimesteps[i].at(marker);
+        for (auto& pair : c3d->markerTimesteps[i - 1])
+        {
+          s_t dist = (pair.second - thisTimestep).norm();
+          if (dist < (c3d->markerTimesteps[i - 1].at(
+                          closestMarkerFromLastTimestep.at(marker))
+                      - thisTimestep)
+                         .norm())
+          {
+            closestMarkerFromLastTimestep[marker] = pair.first;
+          }
+        }
+      }
+    }
+
+    for (std::string& marker : c3d->markers)
+    {
+      // If we weren't closest to ourselves, and instead we were closest to
+      // another marker AND IT WAS CLOSEST TO US, then we've detected a trivial
+      // flip, and we can flip back.
+      if (closestMarkerFromLastTimestep[marker] != marker
+          && closestMarkerFromLastTimestep
+                     [closestMarkerFromLastTimestep[marker]]
+                 == marker)
+      {
+        Eigen::Vector3s tmp = c3d->markerTimesteps[i][marker];
+        std::string otherMarker = closestMarkerFromLastTimestep[marker];
+
+        c3d->markerTimesteps[i][marker] = c3d->markerTimesteps[i][otherMarker];
+        c3d->markerTimesteps[i][otherMarker] = tmp;
+        closestMarkerFromLastTimestep[marker] = marker;
+        closestMarkerFromLastTimestep[otherMarker] = otherMarker;
+      }
+    }
+  }
+}
+
+//==============================================================================
 void C3DLoader::debugToGUI(
     C3D& file, std::shared_ptr<server::GUIWebsocketServer> server)
 {

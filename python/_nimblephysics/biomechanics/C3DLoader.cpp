@@ -72,6 +72,10 @@ void C3DLoader(py::module& m)
       .def_static(
           "loadC3D", &dart::biomechanics::C3DLoader::loadC3D, ::py::arg("uri"))
       .def_static(
+          "fixupMarkerFlips",
+          &dart::biomechanics::C3DLoader::fixupMarkerFlips,
+          ::py::arg("c3d"))
+      .def_static(
           "debugToGUI",
           &dart::biomechanics::C3DLoader::debugToGUI,
           ::py::arg("file"),

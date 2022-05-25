@@ -22,5 +22,10 @@ s_t TestBedFunction::calcDerivative(int order, s_t x) const
   return 0.0;
 }
 
+std::shared_ptr<CustomFunction> TestBedFunction::offsetBy(s_t offset) const
+{
+  return std::make_shared<TestBedFunction>(y + offset, dy, ddy);
+}
+
 } // namespace math
 } // namespace dart

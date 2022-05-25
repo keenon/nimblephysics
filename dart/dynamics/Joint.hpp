@@ -161,6 +161,10 @@ public:
   /// Return true if this joint is dynamic joint.
   bool isDynamic() const;
 
+  /// Return true if this joint has the same upperlimit and lowerlimit on
+  /// positions
+  bool isFixed() const;
+
   /// Get the child BodyNode of this Joint
   BodyNode* getChildBodyNode();
 

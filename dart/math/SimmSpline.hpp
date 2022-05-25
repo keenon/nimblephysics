@@ -58,7 +58,7 @@ class SimmSpline : public CustomFunction
   //=============================================================================
   // MEMBER VARIABLES
   //=============================================================================
-protected:
+public:
   // PROPERTIES
   /** Array of values for the independent variables (i.e., the spline knot
   sequence).  This array must be monotonically increasing. */
@@ -113,6 +113,7 @@ public:
   //--------------------------------------------------------------------------
   s_t calcValue(s_t x) const override;
   s_t calcDerivative(int order, s_t x) const override;
+  std::shared_ptr<CustomFunction> offsetBy(s_t y) const override;
   int getArgumentSize() const;
   int getMaxDerivativeOrder() const;
 

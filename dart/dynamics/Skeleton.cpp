@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <queue>
 #include <string>
 #include <vector>
@@ -3384,6 +3385,7 @@ void Skeleton::clampPositionsToLimits()
   for (int i = 0; i < getNumDofs(); i++)
   {
     auto* dof = getDof(i);
+
     // Special case for rotational joints and euler joints, we're interested in
     // wrapping by 2*PI
     bool wrapByTwoPi = false;
@@ -3400,20 +3402,49 @@ void Skeleton::clampPositionsToLimits()
 
     if (wrapByTwoPi)
     {
-      double clampedPos = dof->getPosition();
+      std::vector<s_t> posesToTry;
+      s_t clampedPos = dof->getPosition();
+      posesToTry.push_back(clampedPos);
       while (clampedPos > dof->getPositionUpperLimit())
       {
         clampedPos -= 2 * M_PI;
+        posesToTry.push_back(clampedPos);
       }
       while (clampedPos < dof->getPositionLowerLimit())
       {
         clampedPos += 2 * M_PI;
+        posesToTry.push_back(clampedPos);
       }
-      // Only set the value if we ended up in bounds
-      if (clampedPos >= dof->getPositionLowerLimit()
-          && clampedPos <= dof->getPositionUpperLimit())
+
+      // Choose the value that results in the smallest constraint violation
+      s_t lowestViolation = std::numeric_limits<double>::infinity();
+      for (s_t pos : posesToTry)
       {
-        dof->setPosition(clampedPos);
+        // Set the value if we ended up in bounds
+        if (clampedPos >= dof->getPositionLowerLimit()
+            && clampedPos <= dof->getPositionUpperLimit())
+        {
+          dof->setPosition(pos);
+          break;
+        }
+        else if (clampedPos > dof->getPositionUpperLimit())
+        {
+          s_t violation = clampedPos - dof->getPositionUpperLimit();
+          if (violation < lowestViolation)
+          {
+            dof->setPosition(pos);
+            lowestViolation = violation;
+          }
+        }
+        else if (clampedPos < dof->getPositionLowerLimit())
+        {
+          s_t violation = dof->getPositionLowerLimit() - pos;
+          if (violation < lowestViolation)
+          {
+            dof->setPosition(pos);
+            lowestViolation = violation;
+          }
+        }
       }
     }
 
@@ -3441,6 +3472,33 @@ void Skeleton::clampPositionsToLimits()
       Eigen::Vector3s pos = getJoint(i)->getPositions();
       pos = math::logMap(math::expMapRot(pos));
       getJoint(i)->setPositions(pos);
+    }
+  }
+}
+
+//==============================================================================
+/// There is an annoying tendency for custom joints to encode the linear
+/// offset of the bone in their custom functions. We don't want that, so we
+/// want to move any relative transform caused by custom functions into the
+/// parent transform.
+void Skeleton::zeroTranslationInCustomFunctions()
+{
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    if (getJoint(i)->getType() == CustomJoint<1>::getStaticType())
+    {
+      static_cast<CustomJoint<1>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
+    }
+    if (getJoint(i)->getType() == CustomJoint<2>::getStaticType())
+    {
+      static_cast<CustomJoint<2>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
+    }
+    if (getJoint(i)->getType() == CustomJoint<3>::getStaticType())
+    {
+      static_cast<CustomJoint<3>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
     }
   }
 }

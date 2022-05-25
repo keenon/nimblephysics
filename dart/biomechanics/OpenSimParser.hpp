@@ -4,10 +4,14 @@
 #include <map>
 #include <string>
 
+#include <tinyxml2.h>
+
 #include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/CustomJoint.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/XmlHelpers.hpp"
@@ -109,6 +113,20 @@ public:
       const std::string& osimOutputStoPath,
       const std::string& osimOutputBodyForcesStoPath,
       const std::string& idInstructionsOutputPath);
+
+  /// This gets called by rationalizeCustomJoints()
+  template <std::size_t Dimension>
+  static void updateCustomJointXML(
+      tinyxml2::XMLElement* element, dynamics::CustomJoint<Dimension>* joint);
+
+  /// Read an *.osim file, move any transforms saved in Custom function
+  /// translation elements into the joint offsets, and write it out to a new
+  /// *.osim file. If there are no "irrational" CustomJoints, then this will
+  /// just save a copy of the original skeleton.
+  static void rationalizeCustomJoints(
+      const common::Uri& uri,
+      const std::string& outputPath,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// Read an *.osim file, move the markers to new locations, and write it out
   /// to a new *.osim file

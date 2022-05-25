@@ -54,6 +54,38 @@ std::shared_ptr<math::CustomFunction> CustomJoint<Dimension>::getCustomFunction(
 }
 
 //==============================================================================
+/// There is an annoying tendency for custom joints to encode the linear
+/// offset of the bone in their custom functions. We don't want that, so we
+/// want to move any relative transform caused by custom functions into the
+/// parent transform.
+template <std::size_t Dimension>
+void CustomJoint<Dimension>::zeroTranslationInCustomFunctions()
+{
+#ifndef NDEBUG
+  Eigen::Vector3s originalT = this->getRelativeTransform().translation();
+#endif
+
+  Eigen::Vector3s defaultValues = Eigen::Vector3s::Zero();
+  for (int i = 3; i < 6; i++)
+  {
+    defaultValues(i - 3)
+        = mFunctions[i]->calcValue(this->getPosition(mFunctionDrivenByDof[i]));
+    this->setCustomFunction(
+        i,
+        mFunctions[i]->offsetBy(-defaultValues(i - 3)),
+        mFunctionDrivenByDof[i]);
+  }
+  Eigen::Isometry3s T = this->getTransformFromParentBodyNode();
+  T.translation() += defaultValues;
+  this->setTransformFromParentBodyNode(T);
+
+#ifndef NDEBUG
+  Eigen::Vector3s finalT = this->getRelativeTransform().translation();
+  assert(originalT == finalT);
+#endif
+}
+
+//==============================================================================
 template <std::size_t Dimension>
 int CustomJoint<Dimension>::getCustomFunctionDrivenByDof(std::size_t i)
 {
@@ -620,6 +652,10 @@ dart::dynamics::Joint* CustomJoint<Dimension>::clone() const
   joint->setFlipAxisMap(getFlipAxisMap());
   joint->setAxisOrder(getAxisOrder());
   joint->setName(this->getName());
+  joint->setPositionUpperLimits(this->getPositionUpperLimits());
+  joint->setPositionLowerLimits(this->getPositionLowerLimits());
+  joint->setVelocityUpperLimits(this->getVelocityUpperLimits());
+  joint->setVelocityLowerLimits(this->getVelocityLowerLimits());
   return joint;
 }
 

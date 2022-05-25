@@ -27,8 +27,11 @@
  * -------------------------------------------------------------------------- */
 
 #include "dart/math/SimmSpline.hpp"
-#include "dart/math/FiniteDifference.hpp"
+
 #include <array>
+#include <memory>
+
+#include "dart/math/FiniteDifference.hpp"
 
 using namespace dart;
 using namespace math;
@@ -439,19 +442,29 @@ s_t SimmSpline::calcDerivative(int order, s_t x) const
     return 0.0;
 }
 
+std::shared_ptr<CustomFunction> SimmSpline::offsetBy(s_t offset) const
+{
+  std::vector<s_t> newY;
+  for (s_t y : this->_y)
+  {
+    newY.push_back(y + offset);
+  }
+  return std::make_shared<SimmSpline>(_x, newY);
+}
+
 s_t SimmSpline::finiteDifferenceFirstDerivative(s_t x, bool useRidders)
 {
   s_t result = 0.;
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /*out*/ s_t& perturbed) {
-      perturbed = calcValue(x + eps);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ s_t& perturbed) {
+        perturbed = calcValue(x + eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   return result;
 }
 

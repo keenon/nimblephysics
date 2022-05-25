@@ -330,6 +330,44 @@ TEST(OpenSimParser, MOVE_OUTPUT_MARKERS)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, RATIONALIZE_CUSTOM_JOINTS)
+{
+  OpenSimParser::rationalizeCustomJoints(
+      "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim",
+      "../../../data/osim/ComplexKnee/"
+      "gait2392_frontHingeKnee_dem_rational.osim");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
+  OpenSimFile rational = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/"
+      "gait2392_frontHingeKnee_dem_rational.osim");
+  standard.skeleton->zeroTranslationInCustomFunctions();
+  for (int i = 0; i < standard.skeleton->getNumBodyNodes(); i++)
+  {
+    EXPECT_TRUE(
+        standard.skeleton->getBodyNode(i)->getWorldTransform().translation()
+        == rational.skeleton->getBodyNode(i)
+               ->getWorldTransform()
+               .translation());
+  }
+  for (int i = 0; i < standard.skeleton->getNumJoints(); i++)
+  {
+    Eigen::Vector3s original
+        = standard.skeleton->getJoint(i)->getRelativeTransform().translation();
+    Eigen::Vector3s recovered
+        = rational.skeleton->getJoint(i)->getRelativeTransform().translation();
+    if ((original - recovered).norm() > 1e-14)
+    {
+      std::cout << "Doesn't match on joint "
+                << standard.skeleton->getJoint(i)->getName() << std::endl;
+      EXPECT_TRUE(original == recovered);
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, SAVE_MOT)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(

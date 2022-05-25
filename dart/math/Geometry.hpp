@@ -36,6 +36,7 @@
 #include <Eigen/Dense>
 
 #include "dart/common/Deprecated.hpp"
+#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
 #include "dart/math/Constants.hpp"
 #include "dart/math/MathTypes.hpp"
 
@@ -76,7 +77,8 @@ Eigen::Matrix3s quatSecondDeriv(
 Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     const Eigen::Vector3s& angle,
     const Eigen::Vector3s& upperBounds,
-    const Eigen::Vector3s& lowerBounds);
+    const Eigen::Vector3s& lowerBounds,
+    dynamics::detail::AxisOrder axisOrder = dynamics::detail::AxisOrder::XYZ);
 
 //------------------------------------------------------------------------------
 /// \brief Given Euler XYX angles, return a 3x3 rotation matrix, which is

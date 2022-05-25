@@ -13,6 +13,7 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BallJoint.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -3582,11 +3583,339 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER_C3D)
 #endif
 
 #ifdef ALL_TESTS
-TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
+TEST(MarkerFitter, CLONE_KNEE_JOINT_LIMITS)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
+  auto skeleton = standard.skeleton->cloneSkeleton();
+  if (skeleton->getPositionUpperLimits()
+      != standard.skeleton->getPositionUpperLimits())
+  {
+    Eigen::MatrixXs comp = Eigen::MatrixXs(skeleton->getNumDofs(), 3);
+    comp.col(0) = standard.skeleton->getPositionUpperLimits();
+    comp.col(1) = skeleton->getPositionUpperLimits();
+    comp.col(2) = standard.skeleton->getPositionUpperLimits()
+                  - skeleton->getPositionUpperLimits();
+    int cursor = 0;
+    for (int i = 0; i < standard.skeleton->getNumJoints(); i++)
+    {
+      auto* joint = standard.skeleton->getJoint(i);
+      int size = joint->getNumDofs();
+      if (comp.col(2).segment(cursor, size).norm() > 0)
+      {
+        std::cout << "Joint " << i << " (of type " << joint->getType()
+                  << ") upper limits do not match!" << std::endl;
+        std::cout << "Original - Cloned - Diff" << std::endl
+                  << comp.block(cursor, 0, size, 3) << std::endl;
+        EXPECT_EQ(comp.col(2).segment(cursor, size).norm(), 0);
+      }
+      cursor += size;
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, WHICH_EULER_ANGLES_ARE_NEGATIVE_GIMBAL_LOCK)
+{
+  Eigen::Vector3s locked = Eigen::Vector3s(0.1, M_PI / 2, -0.1);
+  Eigen::Vector3s lockedPos = Eigen::Vector3s(0.1, M_PI / 2, 0.1);
+  std::cout << "XYZ R-: " << std::endl
+            << math::eulerXYZToMatrix(locked) << std::endl;
+  std::cout << "XYZ R+: " << std::endl
+            << math::eulerXYZToMatrix(lockedPos) << std::endl;
+  // Conlude XYZ: a + c = constant
+
+  std::cout << "ZYX R-: " << std::endl
+            << math::eulerZYXToMatrix(locked) << std::endl;
+  std::cout << "ZYX R+: " << std::endl
+            << math::eulerZYXToMatrix(lockedPos) << std::endl;
+  // Conclude ZYX: a - c = constant
+
+  std::cout << "ZXY R-: " << std::endl
+            << math::eulerZXYToMatrix(locked) << std::endl;
+  std::cout << "ZXY R+: " << std::endl
+            << math::eulerZXYToMatrix(lockedPos) << std::endl;
+  // Conclude ZXY: a + c = constant
+
+  std::cout << "XZY R-: " << std::endl
+            << math::eulerXZYToMatrix(locked) << std::endl;
+  std::cout << "XZY R+: " << std::endl
+            << math::eulerXZYToMatrix(lockedPos) << std::endl;
+  // Conclude XZY: a - c = constant
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, TORSO_GIMBAL_LOCK)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
+  std::shared_ptr<dynamics::Skeleton> skeletonBallJoints
+      = standard.skeleton->convertSkeletonToBallJoints();
+
+  Eigen::Vector3s ballCoords = Eigen::Vector3s(1.16096, 1.28402, 1.28242);
+  dynamics::EulerFreeJoint* eulerFreeJoint
+      = static_cast<dynamics::EulerFreeJoint*>(standard.skeleton->getJoint(0));
+
+  Eigen::Matrix3s R = math::expMapRot(ballCoords);
+  Eigen::Vector3s euler = Eigen::Vector3s::Zero();
+  if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::XYZ)
+  {
+    euler = math::matrixToEulerXYZ(R).cwiseProduct(
+        eulerFreeJoint->getFlipAxisMap());
+  }
+  else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::XZY)
+  {
+    euler = math::matrixToEulerXZY(R).cwiseProduct(
+        eulerFreeJoint->getFlipAxisMap());
+  }
+  else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+  {
+    std::cout << "ZXY" << std::endl;
+    euler = math::matrixToEulerZXY(R).cwiseProduct(
+        eulerFreeJoint->getFlipAxisMap());
+  }
+  else if (eulerFreeJoint->getAxisOrder() == EulerJoint::AxisOrder::ZYX)
+  {
+    euler = math::matrixToEulerZYX(R).cwiseProduct(
+        eulerFreeJoint->getFlipAxisMap());
+  }
+  else
+  {
+    assert(false && "Unsupported AxisOrder when decoding EulerFreeJoint");
+  }
+  // Do our best to pick an equivalent set of EulerAngles that's within
+  // joint bounds, if one exists
+  Eigen::Vector3s eulerClamped = math::attemptToClampEulerAnglesToBounds(
+      euler,
+      eulerFreeJoint->getPositionUpperLimits().head<3>(),
+      eulerFreeJoint->getPositionLowerLimits().head<3>());
+
+  // ZXY
+
+  Eigen::Vector3s recoveredBallCoords
+      = math::logMap(EulerJoint::convertToTransform(
+                         eulerClamped,
+                         eulerFreeJoint->getAxisOrder(),
+                         eulerFreeJoint->getFlipAxisMap())
+                         .linear());
+
+  Eigen::MatrixXs diff = Eigen::MatrixXs::Zero(3, 5);
+  diff.col(0) = ballCoords;
+  diff.col(1) = euler;
+  diff.col(2) = eulerClamped;
+  diff.col(3) = recoveredBallCoords;
+  diff.col(4) = eulerFreeJoint->getFlipAxisMap();
+
+  std::cout << "Diff = " << (recoveredBallCoords - ballCoords).norm()
+            << std::endl;
+  std::cout << "Axis order: " << (int)eulerFreeJoint->getAxisOrder()
+            << std::endl;
+  std::cout << "Ball - Euler - Clamped euler - Recovered - Flips" << std::endl
+            << diff << std::endl;
+
+  Eigen::Matrix3s recoveredR = math::expMapRot(recoveredBallCoords);
+  Eigen::Matrix3s diffR = R - recoveredR;
+  std::cout << "||diffR|| = " << diffR.norm() << std::endl;
+  std::cout << "diffR = " << std::endl << diffR << std::endl;
+
+  /*
+  Eigen::VectorXs pos = Eigen::VectorXs(56);
+  pos << 1.16096, 1.28402, 1.28242, 0.614382, 1.01753, 0.907596, -0.307936,
+      1.94313, 0.569772, 0.405994, -0.323718, 0.120494, 0.705249, 1.46973,
+      -1.72269, 0, 0.00133662, 0.369738, -0.329586, 1.1396, 0.123183, -0.456081,
+      0.33667, -0.696457, 0.192617, 0, -0.0479091, -0.0115866, -0.15661,
+      1.10424, 1.27731, 0.901787, 1, 1, 1, 1, 1.06463, 0.933611, 1, 1, 1.01391,
+      1, 1.31495, 0.839322, 1.35261, 0.741261, 1.07313, 0.896375, 1.08346,
+      1.1542, 1, 1, 1, 1.04301, 0.926338, 1.29632;
+
+  // Verify the translation is lossless
+  Eigen::VectorXs eulerPos
+      = standard.skeleton->convertPositionsFromBallSpace(pos);
+  Eigen::VectorXs recovered
+      = standard.skeleton->convertPositionsToBallSpace(eulerPos);
+
+  Eigen::MatrixXs diff = Eigen::MatrixXs::Zero(pos.size(), 3);
+  diff.col(0) = pos;
+  diff.col(1) = recovered;
+  diff.col(2) = pos - recovered;
+  std::cout << "Pos - Recovered - Diff" << std::endl << diff << std::endl;
+
+  Eigen::VectorXs bodyPoses
+      = Eigen::VectorXs::Zero(skeletonBallJoints->getNumBodyNodes() * 3);
+  skeletonBallJoints->setPositions(pos);
+  for (int i = 0; i < skeletonBallJoints->getNumBodyNodes(); i++)
+  {
+    bodyPoses.segment<3>(i * 3)
+        = skeletonBallJoints->getBodyNode(i)->getWorldTransform().translation();
+  }
+  skeletonBallJoints->setPositions(recovered);
+  Eigen::VectorXs recoveredBodyPoses
+      = Eigen::VectorXs::Zero(skeletonBallJoints->getNumBodyNodes() * 3);
+  for (int i = 0; i < skeletonBallJoints->getNumBodyNodes(); i++)
+  {
+    recoveredBodyPoses.segment<3>(i * 3)
+        = skeletonBallJoints->getBodyNode(i)->getWorldTransform().translation();
+  }
+  std::cout << "!!!!!! Got a recovery error of "
+            << (recoveredBodyPoses - bodyPoses).norm() << std::endl;
+  */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, COMPLEX_KNEE_OFFSETS_ISSUE)
+{
+  /*
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/"
+      "gait2392_frontHingeKnee_dem_rescaled.osim");
   standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->getBodyNode("femur_l")->setScale(
+      Eigen::Vector3s(1.0, 0.75, 1.0));
+  OpenSimParser::saveOsimScalingXMLFile(
+      "test",
+      standard.skeleton,
+      50,
+      1.6,
+      "gait2392_frontHingeKnee_dem.osim",
+      "gait2392_frontHingeKnee_dem_rescaled.osim",
+      "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/ComplexKnee/"
+      "rescale.xml");
+  */
+
+  /*
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderSkeleton(
+      standard.skeleton, "skel", Eigen::Vector4s(0.5, 0.5, 0.5, 1.0));
+
+  std::map<std::string, Eigen::Vector3s> jointPoses
+      = standard.skeleton->getJointWorldPositionsMap();
+
+  auto* body = standard.skeleton->getBodyNode("femur_l");
+  // body->setScale(Eigen::Vector3s(1, 0.75, 1));
+  std::cout << "Body scale: " << body->getScale() << std::endl;
+  std::cout << "Parent joint name: " << body->getParentJoint()->getName()
+            << std::endl;
+  std::cout << "Parent T:" << std::endl
+            << body->getParentJoint()->getTransformFromChildBodyNode().matrix()
+            << std::endl;
+  std::cout << "Parent relative T:" << std::endl
+            << body->getParentJoint()->getRelativeTransform().matrix()
+            << std::endl;
+  std::cout << "Child T:" << std::endl
+            << body->getChildJoint(0)->getTransformFromParentBodyNode().matrix()
+            << std::endl;
+  std::cout << "Child relative T:" << std::endl
+            << body->getChildJoint(0)->getRelativeTransform().matrix()
+            << std::endl;
+
+  std::vector<Eigen::Vector3s> line1;
+  line1.push_back(body->getParentBodyNode()->getWorldTransform().translation());
+  line1.push_back(jointPoses[body->getParentJoint()->getName()]);
+
+  std::vector<Eigen::Vector3s> line2;
+  line2.push_back(jointPoses[body->getParentJoint()->getName()]);
+  line2.push_back(body->getWorldTransform().translation());
+
+  std::vector<Eigen::Vector3s> line3;
+  line3.push_back(body->getWorldTransform().translation());
+  line3.push_back(jointPoses[body->getChildJoint(0)->getName()]);
+
+  std::vector<Eigen::Vector3s> line4;
+  line4.push_back(jointPoses[body->getChildJoint(0)->getName()]);
+  line4.push_back(body->getChildBodyNode(0)->getWorldTransform().translation());
+  server->createLine("line_1", line1, Eigen::Vector4s(1, 0, 0, 1));
+  server->createLine("line_2", line2, Eigen::Vector4s(0, 1, 0, 1));
+  server->createLine("line_3", line3, Eigen::Vector4s(0, 0, 1, 1));
+  server->createLine("line_4", line4, Eigen::Vector4s(0, 1, 1, 1));
+
+  server->blockWhileServing();
+  */
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/"
+      "gait2392_frontHingeKnee_dem.osim");
+  standard.skeleton->zeroTranslationInCustomFunctions();
+
+  std::string bodyNode = "femur_l";
+
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  server->renderSkeleton(standard.skeleton);
+  server->createSphere(
+      "x", 0.01, Eigen::Vector3s::Zero(), Eigen::Vector4s(1, 0, 0, 1));
+  server->createSphere(
+      "y", 0.01, Eigen::Vector3s::Zero(), Eigen::Vector4s(0, 1, 0, 1));
+  server->createSphere(
+      "z", 0.01, Eigen::Vector3s::Zero(), Eigen::Vector4s(0, 0, 1, 1));
+
+  Ticker ticker = Ticker(0.01);
+  ticker.registerTickListener([&](long t) {
+    long PERIOD = 5000;
+    long offset = t % PERIOD;
+    s_t percentage = (s_t)offset / PERIOD;
+
+    int axis = (int)(std::floor((s_t)(t % (3 * PERIOD)) / (PERIOD))) % 3;
+
+    auto* body = standard.skeleton->getBodyNode(bodyNode);
+    body->setScaleLowerBound(Eigen::Vector3s::Zero());
+
+    Eigen::Vector3s scale = Eigen::Vector3s::Ones();
+    scale(axis) = 1.0 - (percentage * 0.55);
+    body->setScale(scale);
+
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+    markers.push_back(std::make_pair(body, Eigen::Vector3s::UnitX()));
+    markers.push_back(std::make_pair(body, Eigen::Vector3s::UnitY()));
+    markers.push_back(std::make_pair(body, Eigen::Vector3s::UnitZ()));
+    Eigen::VectorXs markerWorldPos
+        = standard.skeleton->getMarkerWorldPositions(markers);
+    server->setObjectPosition("x", markerWorldPos.segment<3>(0));
+    server->setObjectPosition("y", markerWorldPos.segment<3>(3));
+    server->setObjectPosition("z", markerWorldPos.segment<3>(6));
+
+    server->renderSkeleton(standard.skeleton);
+  });
+
+  server->registerConnectionListener([&]() { ticker.start(); });
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
+{
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_FEMALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->zeroTranslationInCustomFunctions();
+
   /*
   debugIKInitializationToGUI(
       standard.skeleton,
@@ -3601,26 +3930,58 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
 
   // Get the raw marker trajectory data
   C3D c3d
-      = C3DLoader::loadC3D("dart://sample/osim/ComplexKnee/2022_01_0401.c3d");
-
-  std::vector<std::map<std::string, Eigen::Vector3s>> subMarkerTimesteps
-      = c3d.markerTimesteps;
-
-  std::vector<bool> newClip;
+      = C3DLoader::loadC3D("dart://sample/osim/ComplexKnee/2022_01_0403.c3d");
+  C3DLoader::fixupMarkerFlips(&c3d);
+  /*
+  Eigen::Matrix3s R = math::eulerXYZToMatrix(Eigen::Vector3s(-M_PI / 2, 0, 0));
   for (int i = 0; i < c3d.markerTimesteps.size(); i++)
   {
-    newClip.push_back(false);
+    for (auto& pair : c3d.markerTimesteps[i])
+    {
+      pair.second = R * pair.second;
+    }
   }
+  */
 
   // Create a marker fitter
 
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
-  fitter.setInitialIKSatisfactoryLoss(0.01);
-  fitter.setInitialIKMaxRestarts(100);
-  fitter.setIterationLimit(100);
+  fitter.setInitialIKSatisfactoryLoss(0.005);
+  fitter.setInitialIKMaxRestarts(200);
+  fitter.setIterationLimit(300);
+  fitter.setMaxJointWeight(1.0);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+  // fitter.setRegularizeAllBodyScales(0.0);
+  // fitter.setRegularizeIndividualBodyScales(0.0);
 
   // Set all the triads to be tracking markers, instead of anatomical
-  fitter.setTriadsToTracking();
+  fitter.setTrackingMarkers(standard.trackingMarkers);
+  // fitter.setTriadsToTracking();
+
+  fitter.autorotateC3D(&c3d);
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      markerObservationTrials;
+  markerObservationTrials.push_back(c3d.markerTimesteps);
+
+  /*
+  std::vector<bool> newClip;
+  for (int i = 0; i < markerObservationTrials[0].size(); i++)
+  {
+    newClip.push_back(false);
+  }
+  MarkerInitialization finalKinematicInit = fitter.getInitialization(
+      markerObservationTrials[0], newClip, InitialMarkerFitParams());
+  */
+
+  std::vector<MarkerInitialization> inits
+      = fitter.runMultiTrialKinematicsPipeline(
+          markerObservationTrials,
+          InitialMarkerFitParams()
+              .setMaxTrialsToUseForMultiTrialScaling(5)
+              .setMaxTimestepsToUseForMultiTrialScaling(4000),
+          150);
+  MarkerInitialization finalKinematicInit = inits[0];
 
   for (int i = 0; i < fitter.getNumMarkers(); i++)
   {
@@ -3628,101 +3989,6 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
     std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
               << std::endl;
   }
-
-  std::vector<std::map<std::string, Eigen::Vector3s>> subsetTimesteps;
-  /*
-  for (int i = 0; i < 10; i++)
-  {
-    subsetTimesteps.push_back(markerTrajectories.markerTimesteps[i]);
-  }
-  */
-  subsetTimesteps = c3d.markerTimesteps;
-
-  MarkerInitialization init = fitter.getInitialization(
-      subsetTimesteps, newClip, InitialMarkerFitParams());
-
-  for (auto pair : init.updatedMarkerMap)
-  {
-    assert(pair.second.first != nullptr);
-  }
-
-  IKErrorReport initReport(
-      standard.skeleton, init.updatedMarkerMap, init.poses, subsetTimesteps);
-
-  standard.skeleton->setGroupScales(init.groupScales);
-
-  // init.joints.push_back(standard.skeleton->getJoint("walker_knee_r"));
-  // init.jointCenters = Eigen::MatrixXs::Zero(3, init.poses.cols());
-  // fitter.findJointCenter(0, init, subsetTimesteps);
-
-  fitter.findJointCenters(init, newClip, subsetTimesteps);
-  fitter.findAllJointAxis(init, newClip, subsetTimesteps);
-  fitter.computeJointConfidences(init, subsetTimesteps);
-
-  // Re-initialize the problem, but pass in the joint centers we just found
-  MarkerInitialization reinit = fitter.getInitialization(
-      subsetTimesteps,
-      newClip,
-      InitialMarkerFitParams()
-          .setJointCentersAndWeights(
-              init.joints, init.jointCenters, init.jointWeights)
-          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
-          .setInitPoses(init.poses));
-
-  for (auto pair : reinit.updatedMarkerMap)
-  {
-    assert(pair.second.first != nullptr);
-  }
-
-  IKErrorReport afterJointCentersReport(
-      standard.skeleton,
-      reinit.updatedMarkerMap,
-      reinit.poses,
-      subsetTimesteps);
-
-  // Create Anthropometric prior
-  /*
-  std::shared_ptr<Anthropometrics> anthropometrics
-      = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
-
-  std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
-  std::shared_ptr<MultivariateGaussian> gauss
-      = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
-          cols,
-          0.001); // mm -> m
-
-  std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = 190 * 0.001;
-  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
-
-  gauss = gauss->condition(observedValues);
-  anthropometrics->setDistribution(gauss);
-
-  // fitter.setAnthropometricPrior(anthropometrics, 0.1);
-  */
-
-  // Bilevel optimization
-  fitter.setIterationLimit(200);
-  std::shared_ptr<BilevelFitResult> bilevelFit
-      = fitter.optimizeBilevel(subsetTimesteps, reinit, 50);
-
-  // Fine-tune IK and re-fit all the points
-  MarkerInitialization finalKinematicInit = fitter.completeBilevelResult(
-      subsetTimesteps,
-      newClip,
-      bilevelFit,
-      InitialMarkerFitParams()
-          .setJointCentersAndWeights(
-              reinit.joints, reinit.jointCenters, reinit.jointWeights)
-          .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
-          .setInitPoses(reinit.poses)
-          .setDontRescaleBodies(true)
-          .setGroupScales(bilevelFit->groupScales)
-          .setMarkerOffsets(bilevelFit->markerOffsets));
 
   for (auto pair : finalKinematicInit.updatedMarkerMap)
   {
@@ -3733,27 +3999,37 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
       standard.skeleton,
       finalKinematicInit.updatedMarkerMap,
       finalKinematicInit.poses,
-      subsetTimesteps);
+      c3d.markerTimesteps);
 
-  std::cout << "Initial error report:" << std::endl;
-  initReport.printReport(5);
-  std::cout << "After joint centers report:" << std::endl;
-  afterJointCentersReport.printReport(5);
   std::cout << "Final kinematic fit report:" << std::endl;
   finalKinematicsReport.printReport(5);
 
-  OpenSimParser::saveMot(
-      standard.skeleton,
-      "./autoIK.mot",
-      c3d.timestamps,
-      finalKinematicInit.poses);
+  std::cout << "Pelvis scaling: "
+            << standard.skeleton->getBodyNode("pelvis")->getScale()
+            << std::endl;
+  std::cout << "Torso scaling: "
+            << standard.skeleton->getBodyNode("torso")->getScale() << std::endl;
+  std::cout << "femur_l scaling: "
+            << standard.skeleton->getBodyNode("femur_l")->getScale()
+            << std::endl;
+  std::cout
+      << "sagittal_knee_body_l scaling:"
+      << standard.skeleton->getBodyNode("sagittal_knee_body_l")->getScale()
+      << std::endl;
+  std::cout
+      << "aux_intercond_body_l scaling: "
+      << standard.skeleton->getBodyNode("aux_intercond_body_l")->getScale()
+      << std::endl;
+  std::cout << "tibia_l scaling: "
+            << standard.skeleton->getBodyNode("tibia_l")->getScale()
+            << std::endl;
 
   // Target markers
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
   server->serve(8070);
   fitter.debugTrajectoryAndMarkersToGUI(
-      server, finalKinematicInit, subsetTimesteps, &c3d);
+      server, finalKinematicInit, c3d.markerTimesteps, &c3d);
   server->blockWhileServing();
 }
 #endif
@@ -5941,7 +6217,10 @@ void evaluateOnSyntheticData(
       newClip,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
-              init.joints, init.jointCenters, init.jointWeights)
+              init.joints,
+              init.jointCenters,
+              init.jointsAdjacentMarkers,
+              init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses));
 
@@ -5970,7 +6249,10 @@ void evaluateOnSyntheticData(
       bilevelFit,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
-              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+              reinit.joints,
+              reinit.jointCenters,
+              reinit.jointsAdjacentMarkers,
+              reinit.jointWeights)
           .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
           .setInitPoses(reinit.poses)
           .setDontRescaleBodies(true)

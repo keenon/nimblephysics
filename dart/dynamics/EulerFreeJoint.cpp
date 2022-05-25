@@ -81,6 +81,10 @@ dart::dynamics::Joint* EulerFreeJoint::clone() const
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(mFlipAxisMap);
   joint->setAxisOrder(mAxisOrder);
+  joint->setPositionUpperLimits(getPositionUpperLimits());
+  joint->setPositionLowerLimits(getPositionLowerLimits());
+  joint->setVelocityUpperLimits(getVelocityUpperLimits());
+  joint->setVelocityLowerLimits(getVelocityLowerLimits());
   return joint;
 }
 

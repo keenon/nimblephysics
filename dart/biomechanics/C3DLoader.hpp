@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
@@ -48,6 +49,10 @@ public:
   static C3D loadC3D(const std::string& uri);
 
   static C3D loadC3DWithGRFConvention(const std::string& uri, int convention);
+
+  /// This will check if markers
+  /// obviously "flip" during the trajectory, and unflip them.
+  static void fixupMarkerFlips(C3D* c3d);
 
   static void debugToGUI(
       C3D& file, std::shared_ptr<server::GUIWebsocketServer> server);

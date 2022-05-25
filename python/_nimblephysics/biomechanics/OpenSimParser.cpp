@@ -204,6 +204,15 @@ void OpenSimParser(py::module& m)
 
   sm.def(
       "moveOsimMarkers",
+      +[](const common::Uri& uri, const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::rationalizeCustomJoints(
+            uri, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("outputPath"));
+
+  sm.def(
+      "moveOsimMarkers",
       +[](const common::Uri& uri,
           const std::map<std::string, Eigen::Vector3s>& bodyScales,
           const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&

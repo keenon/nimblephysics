@@ -17,6 +17,7 @@
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
@@ -798,6 +799,291 @@ void OpenSimParser::saveOsimInverseDynamicsXMLFile(
   toolRoot->InsertEndChild(outputBodyForcesFile);
 
   xmlDoc.SaveFile(idInstructionsOutputPath.c_str());
+}
+
+/// This gets called by rationalizeCustomJoints()
+template <std::size_t Dimension>
+void OpenSimParser::updateCustomJointXML(
+    tinyxml2::XMLElement* element, dynamics::CustomJoint<Dimension>* joint)
+{
+  (void)element;
+  (void)joint;
+  string parent_offset_frame
+      = string(element->FirstChildElement("socket_parent_frame")->GetText());
+  string child_offset_frame
+      = string(element->FirstChildElement("socket_child_frame")->GetText());
+
+  // 1. Update the getTransformFromParentBodyNode() and
+  // getTransformFromChildBodyNode()
+  tinyxml2::XMLElement* frames = element->FirstChildElement("frames");
+  tinyxml2::XMLElement* framesCursor = frames->FirstChildElement();
+  while (framesCursor)
+  {
+    string name(framesCursor->Attribute("name"));
+    Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+    if (name == parent_offset_frame)
+    {
+      // Update from parent
+      T = joint->getTransformFromParentBodyNode();
+    }
+    else if (name == child_offset_frame)
+    {
+      // Update from child
+      T = joint->getTransformFromChildBodyNode();
+    }
+    framesCursor->FirstChildElement("translation")
+        ->SetText((std::to_string(T.translation()(0)) + " "
+                   + std::to_string(T.translation()(1)) + " "
+                   + std::to_string(T.translation()(2)))
+                      .c_str());
+
+    framesCursor = framesCursor->NextSiblingElement();
+  }
+
+  // 2. Update the custom functions
+
+  tinyxml2::XMLElement* spatialTransform
+      = element->FirstChildElement("SpatialTransform");
+  tinyxml2::XMLElement* transformAxisCursor
+      = spatialTransform->FirstChildElement("TransformAxis");
+  int index = 0;
+  while (transformAxisCursor)
+  {
+    tinyxml2::XMLElement* function
+        = transformAxisCursor->FirstChildElement("function");
+    // On v3 files, there is no "function" wrapper tag
+    if (function == nullptr)
+    {
+      function = transformAxisCursor;
+    }
+    tinyxml2::XMLElement* linearFunction
+        = function->FirstChildElement("LinearFunction");
+    tinyxml2::XMLElement* simmSpline
+        = function->FirstChildElement("SimmSpline");
+    tinyxml2::XMLElement* polynomialFunction
+        = function->FirstChildElement("PolynomialFunction");
+    // This only exists in v4 files
+    tinyxml2::XMLElement* constant = function->FirstChildElement("Constant");
+    // This only exists in v3 files
+    tinyxml2::XMLElement* multiplier
+        = function->FirstChildElement("MultiplierFunction");
+    if (multiplier != nullptr)
+    {
+      tinyxml2::XMLElement* childFunction
+          = multiplier->FirstChildElement("function");
+      assert(childFunction != nullptr);
+      if (childFunction != nullptr)
+      {
+        constant = childFunction->FirstChildElement("Constant");
+        simmSpline = childFunction->FirstChildElement("SimmSpline");
+        linearFunction = childFunction->FirstChildElement("LinearFunction");
+        polynomialFunction
+            = childFunction->FirstChildElement("PolynomialFunction");
+        assert(constant || simmSpline || linearFunction || polynomialFunction);
+      }
+    }
+
+    if (constant != nullptr)
+    {
+      constant->FirstChildElement("value")->SetText(
+          std::to_string(static_cast<math::ConstantFunction*>(
+                             joint->getCustomFunction(index).get())
+                             ->mValue)
+              .c_str());
+    }
+    else if (linearFunction != nullptr)
+    {
+      math::LinearFunction* linear = static_cast<math::LinearFunction*>(
+          joint->getCustomFunction(index).get());
+
+      linearFunction->FirstChildElement("coefficients")
+          ->SetText((std::to_string(linear->mSlope) + " "
+                     + std::to_string(linear->mYIntercept))
+                        .c_str());
+    }
+    else if (polynomialFunction != nullptr)
+    {
+      math::PolynomialFunction* polynomial
+          = static_cast<math::PolynomialFunction*>(
+              joint->getCustomFunction(index).get());
+
+      std::string coeffString = "";
+      for (int i = 0; i < polynomial->mCoeffs.size(); i++)
+      {
+        if (i > 0)
+          coeffString += " ";
+        coeffString += std::to_string(polynomial->mCoeffs[i]);
+      }
+      polynomialFunction->FirstChildElement("coefficients")
+          ->SetText(coeffString.c_str());
+    }
+    else if (simmSpline != nullptr)
+    {
+      math::SimmSpline* polynomial = static_cast<math::SimmSpline*>(
+          joint->getCustomFunction(index).get());
+      std::string xString = "";
+      for (int i = 0; i < polynomial->_x.size(); i++)
+      {
+        if (i > 0)
+          xString += " ";
+        xString += std::to_string(polynomial->_x[i]);
+      }
+      simmSpline->FirstChildElement("x")->SetText(xString.c_str());
+
+      std::string yString = "";
+      for (int i = 0; i < polynomial->_y.size(); i++)
+      {
+        if (i > 0)
+          yString += " ";
+        yString += std::to_string(polynomial->_y[i]);
+      }
+      simmSpline->FirstChildElement("y")->SetText(yString.c_str());
+    }
+    else
+    {
+      assert(false && "Unrecognized function type");
+    }
+
+    index++;
+    transformAxisCursor
+        = transformAxisCursor->NextSiblingElement("TransformAxis");
+  }
+}
+
+/// Read an *.osim file, move any transforms saved in Custom function
+/// translation elements into the joint offsets, and write it out to a new
+/// *.osim file. If there are no "irrational" CustomJoints, then this will
+/// just save a copy of the original skeleton.
+void OpenSimParser::rationalizeCustomJoints(
+    const common::Uri& uri,
+    const std::string& outputPath,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  OpenSimFile file = parseOsim(uri);
+  // This is the key call, this goes through and fixes all the custom functions
+  // in-memory. The rest of this method is just translating that back to XML.
+  file.skeleton->zeroTranslationInCustomFunctions();
+
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  //--------------------------------------------------------------------------
+  // Load xml and create Document
+  tinyxml2::XMLDocument originalFile;
+  try
+  {
+    openXMLFile(originalFile, uri, retriever);
+  }
+  catch (std::exception const& e)
+  {
+    std::cout << "LoadFile [" << uri.toString() << "] Fails: " << e.what()
+              << std::endl;
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Deep copy document
+
+  tinyxml2::XMLDocument newFile;
+  originalFile.DeepCopy(&newFile);
+
+  //--------------------------------------------------------------------------
+  tinyxml2::XMLElement* docElement
+      = newFile.FirstChildElement("OpenSimDocument");
+  if (docElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <OpenSimDocument> as the root element.\n";
+    return;
+  }
+  tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
+  if (modelElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <Model> as the child of the root "
+             "<OpenSimDocument> element.\n";
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Go through and adjust the custom joints
+
+  tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
+  // For an Opensim 30 mode, where the JointSet is a separate element
+  if (jointSet != nullptr)
+  {
+    tinyxml2::XMLElement* jointSetList = jointSet->FirstChildElement("objects");
+    tinyxml2::XMLElement* jointCursor = jointSetList->FirstChildElement();
+    while (jointCursor)
+    {
+      std::string name(jointCursor->Attribute("name"));
+      dynamics::Joint* joint = file.skeleton->getJoint(name);
+
+      if (joint == nullptr)
+      {
+        jointCursor = jointCursor->NextSiblingElement();
+        continue;
+      }
+
+      if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<1>*>(joint));
+      }
+      else if (joint->getType() == dynamics::CustomJoint<2>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<2>*>(joint));
+      }
+      else if (joint->getType() == dynamics::CustomJoint<3>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<3>*>(joint));
+      }
+
+      jointCursor = jointCursor->NextSiblingElement();
+    }
+  }
+  else
+  {
+    tinyxml2::XMLElement* bodySet = modelElement->FirstChildElement("BodySet");
+    tinyxml2::XMLElement* bodySetList = bodySet->FirstChildElement("objects");
+    tinyxml2::XMLElement* bodyCursor = bodySetList->FirstChildElement("Body");
+    while (bodyCursor)
+    {
+      tinyxml2::XMLElement* jointCursor
+          = bodyCursor->FirstChildElement("Joint");
+      std::string name(jointCursor->Attribute("name"));
+      dynamics::Joint* joint = file.skeleton->getJoint(name);
+      if (joint == nullptr)
+      {
+        bodyCursor = bodyCursor->NextSiblingElement();
+        continue;
+      }
+
+      if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<1>*>(joint));
+      }
+      else if (joint->getType() == dynamics::CustomJoint<2>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<2>*>(joint));
+      }
+      else if (joint->getType() == dynamics::CustomJoint<3>::getStaticType())
+      {
+        updateCustomJointXML(
+            jointCursor, static_cast<dynamics::CustomJoint<3>*>(joint));
+      }
+
+      bodyCursor = bodyCursor->NextSiblingElement();
+    }
+  }
+
+  //--------------------------------------------------------------------------
+  // Save out the result
+  newFile.SaveFile(outputPath.c_str());
 }
 
 //==============================================================================
@@ -2476,16 +2762,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     dof->setName(dofName);
     dof->setPosition(defaultValue);
     dof->setVelocity(defaultSpeedValue);
-    if (locked)
-    {
-      // TODO: Just replace with a Weld joint
-      /*
-      dof->setVelocityUpperLimit(0);
-      dof->setVelocityLowerLimit(0);
-      */
-      dof->setPositionLowerLimit(defaultValue);
-      dof->setPositionUpperLimit(defaultValue);
-    }
     // Always lock a custom joint
     if (clamped || true)
     {
@@ -2499,6 +2775,16 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       }
       dof->setPositionLowerLimit(range(0));
       dof->setPositionUpperLimit(range(1));
+    }
+    if (locked)
+    {
+      // TODO: Just replace with a Weld joint
+      /*
+      dof->setVelocityUpperLimit(0);
+      dof->setVelocityLowerLimit(0);
+      */
+      dof->setPositionLowerLimit(defaultValue);
+      dof->setPositionUpperLimit(defaultValue);
     }
 
     i++;

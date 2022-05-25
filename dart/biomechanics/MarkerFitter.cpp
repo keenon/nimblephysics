@@ -1,6 +1,8 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 
 #include <future>
+#include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -10,8 +12,11 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
@@ -361,6 +366,7 @@ BilevelFitResult::BilevelFitResult() : success(false){};
 //==============================================================================
 InitialMarkerFitParams::InitialMarkerFitParams()
   : numBlocks(12),
+    numIKTries(12),
     dontRescaleBodies(false),
     maxTrialsToUseForMultiTrialScaling(5),
     maxTimestepsToUseForMultiTrialScaling(800)
@@ -375,8 +381,10 @@ InitialMarkerFitParams::InitialMarkerFitParams(
     jointCenters(other.jointCenters),
     jointWeights(other.jointWeights),
     jointAxis(other.jointAxis),
+    jointAdjacentMarkers(other.jointAdjacentMarkers),
     axisWeights(other.axisWeights),
     numBlocks(other.numBlocks),
+    numIKTries(other.numIKTries),
     initPoses(other.initPoses),
     markerOffsets(other.markerOffsets),
     groupScales(other.groupScales),
@@ -398,10 +406,13 @@ InitialMarkerFitParams& InitialMarkerFitParams::setMarkerWeights(
 
 //==============================================================================
 InitialMarkerFitParams& InitialMarkerFitParams::setJointCenters(
-    std::vector<dynamics::Joint*> joints, Eigen::MatrixXs jointCenters)
+    std::vector<dynamics::Joint*> joints,
+    Eigen::MatrixXs jointCenters,
+    std::vector<std::vector<std::string>> jointAdjacentMarkers)
 {
   this->joints = joints;
   this->jointCenters = jointCenters;
+  this->jointAdjacentMarkers = jointAdjacentMarkers;
   return *this;
 }
 
@@ -409,11 +420,13 @@ InitialMarkerFitParams& InitialMarkerFitParams::setJointCenters(
 InitialMarkerFitParams& InitialMarkerFitParams::setJointCentersAndWeights(
     std::vector<dynamics::Joint*> joints,
     Eigen::MatrixXs jointCenters,
+    std::vector<std::vector<std::string>> jointAdjacentMarkers,
     Eigen::VectorXs jointWeights)
 {
   this->joints = joints;
   this->jointCenters = jointCenters;
   this->jointWeights = jointWeights;
+  this->jointAdjacentMarkers = jointAdjacentMarkers;
   return *this;
 }
 
@@ -430,6 +443,13 @@ InitialMarkerFitParams& InitialMarkerFitParams::setJointAxisAndWeights(
 InitialMarkerFitParams& InitialMarkerFitParams::setNumBlocks(int numBlocks)
 {
   this->numBlocks = numBlocks;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams& InitialMarkerFitParams::setNumIKTries(int retries)
+{
+  this->numIKTries = retries;
   return *this;
 }
 
@@ -675,15 +695,23 @@ MarkerFitter::MarkerFitter(
     // 2*(k-1)/k * (x - (x + q + y + z)/k)
     // 2*(k-1)/k*(x - avg)
 
+    /*
+    int pelvisIndex = mSkeleton->getBodyNode("pelvis")->getIndexInSkeleton();
+    Eigen::Vector3s diffPelvis
+        = state->bodyScales.col(pelvisIndex) - (Eigen::Vector3s::Ones());
+    loss += 100 * diffPelvis.squaredNorm();
+    state->bodyScalesGrad.col(pelvisIndex) += 100 * 2 * diffPelvis;
+    */
+
     // s_t gradScale = (k - 1.0) * 2.0 / k;
     for (int i = 0; i < state->bodyScales.cols(); i++)
     {
       Eigen::Vector3s diff = state->bodyScales.col(i) - avgScale;
-      loss += diff.squaredNorm();
+      loss += mRegularizeAllBodyScales * diff.squaredNorm();
 
       // state->bodyScalesGrad.col(i) += 2.0 * ((k - 1) / k) * diff;
       // state->bodyScalesGrad.col(i) += 2.0 * diff;
-      state->bodyScalesGrad.col(i) += 2.0 * diff;
+      state->bodyScalesGrad.col(i) += mRegularizeAllBodyScales * 2.0 * diff;
       /*
       state->bodyScalesGrad.col(i)
           += gradScale * (state->bodyScales.col(i) - avgScale);
@@ -837,6 +865,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
 
       jointInits[i].joints = overallInit.joints;
       jointInits[i].jointMarkerVariability = overallInit.jointMarkerVariability;
+      jointInits[i].jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
       jointInits[i].jointLoss = overallInit.jointLoss;
       jointInits[i].jointWeights = overallInit.jointWeights;
       jointInits[i].axisWeights = overallInit.axisWeights;
@@ -905,6 +934,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       separateInits[i].joints = overallInit.joints;
       separateInits[i].jointMarkerVariability
           = overallInit.jointMarkerVariability;
+      separateInits[i].jointsAdjacentMarkers
+          = overallInit.jointsAdjacentMarkers;
       separateInits[i].jointLoss = overallInit.jointLoss;
       separateInits[i].jointWeights = overallInit.jointWeights;
       separateInits[i].jointCenters = overallInit.jointCenters.block(
@@ -955,7 +986,10 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
       newClip,
       InitialMarkerFitParams(params)
           .setJointCentersAndWeights(
-              init.joints, init.jointCenters, init.jointWeights)
+              init.joints,
+              init.jointCenters,
+              init.jointsAdjacentMarkers,
+              init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses));
 
@@ -973,7 +1007,10 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
         bilevelFit,
         InitialMarkerFitParams(params)
             .setJointCentersAndWeights(
-                init.joints, init.jointCenters, init.jointWeights)
+                init.joints,
+                init.jointCenters,
+                init.jointsAdjacentMarkers,
+                init.jointWeights)
             .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
             .setInitPoses(reinit.poses)
             .setDontRescaleBodies(true)
@@ -1042,7 +1079,10 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
       newClip,
       InitialMarkerFitParams(params)
           .setJointCentersAndWeights(
-              init.joints, init.jointCenters, init.jointWeights)
+              init.joints,
+              init.jointCenters,
+              init.jointsAdjacentMarkers,
+              init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses)
           .setDontRescaleBodies(true));
@@ -1157,6 +1197,16 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   {
     server->renderSkeleton(
         goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
+  }
+
+  for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+  {
+    server->createSphere(
+        "real_joint_center_" + std::to_string(i),
+        0.005,
+        Eigen::Vector3s::Zero(),
+        Eigen::Vector4s(0, 1, 0, 1),
+        "Model Joints");
   }
 
   int numJoints = init.jointCenters.rows() / 3;
@@ -1341,13 +1391,39 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         }
       }
     }
+    std::map<std::string, Eigen::Vector3s> realJointCenters
+        = mSkeleton->getJointWorldPositionsMap();
+    for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+    {
+      server->setObjectPosition(
+          "real_joint_center_" + std::to_string(i),
+          realJointCenters.at(mSkeleton->getJoint(i)->getName()));
+    }
     for (int i = 0; i < numJoints; i++)
     {
       if (init.jointWeights(i) > 0)
       {
+        Eigen::Vector3s inferredJointCenter
+            = init.jointCenters.block<3, 1>(i * 3, timestep);
         server->setObjectPosition(
-            "joint_center_" + std::to_string(i),
-            init.jointCenters.block<3, 1>(i * 3, timestep));
+            "joint_center_" + std::to_string(i), inferredJointCenter);
+        if (i < init.jointsAdjacentMarkers.size())
+        {
+          for (std::string marker : init.jointsAdjacentMarkers[i])
+          {
+            if (markerWorldPositions.count(marker))
+            {
+              std::vector<Eigen::Vector3s> centerToMarker;
+              centerToMarker.push_back(inferredJointCenter);
+              centerToMarker.push_back(markerWorldPositions[marker]);
+              server->createLine(
+                  "joint_center_" + std::to_string(i) + "_to_marker_" + marker,
+                  centerToMarker,
+                  Eigen::Vector4s(0.5, 0.5, 1, 1),
+                  "Functional Joints");
+            }
+          }
+        }
       }
     }
     for (int i = 0; i < numAxis; i++)
@@ -1406,6 +1482,16 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   {
     server.renderSkeleton(
         goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
+  }
+
+  for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+  {
+    server.createSphere(
+        "real_joint_center_" + std::to_string(i),
+        0.005,
+        Eigen::Vector3s::Zero(),
+        Eigen::Vector4s(0, 1, 0, 1),
+        "Skeleton Joint Centers");
   }
 
   int numJoints = init.jointCenters.rows() / 3;
@@ -1486,6 +1572,15 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       }
     }
 
+    std::map<std::string, Eigen::Vector3s> realJointCenters
+        = mSkeleton->getJointWorldPositionsMap();
+    for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+    {
+      server.setObjectPosition(
+          "real_joint_center_" + std::to_string(i),
+          realJointCenters.at(mSkeleton->getJoint(i)->getName()));
+    }
+
     if (goldOsim && goldPoses.size() > 0)
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
@@ -1539,9 +1634,27 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       if (init.jointWeights(i) > 0)
       {
+        Eigen::Vector3s inferredJointCenter
+            = init.jointCenters.block<3, 1>(i * 3, timestep);
         server.setObjectPosition(
-            "joint_center_" + std::to_string(i),
-            init.jointCenters.block<3, 1>(i * 3, timestep));
+            "joint_center_" + std::to_string(i), inferredJointCenter);
+        if (i < init.jointsAdjacentMarkers.size())
+        {
+          for (std::string marker : init.jointsAdjacentMarkers[i])
+          {
+            if (markerWorldPositions.count(marker))
+            {
+              std::vector<Eigen::Vector3s> centerToMarker;
+              centerToMarker.push_back(inferredJointCenter);
+              centerToMarker.push_back(markerWorldPositions[marker]);
+              server.createLine(
+                  "joint_center_" + std::to_string(i) + "_to_marker_" + marker,
+                  centerToMarker,
+                  Eigen::Vector4s(0.5, 0.5, 1, 1),
+                  "Functional Joints");
+            }
+          }
+        }
       }
     }
     for (int i = 0; i < numAxis; i++)
@@ -1578,6 +1691,92 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   }
 
   server.writeFramesJson(path);
+}
+
+//==============================================================================
+/// This automatically finds the "probably correct" rotation for the C3D data
+/// that has no force plate data and rotates the C3D data to match it. This is
+/// determined by which orientation for the data has the skeleton torso
+/// pointed generally upwards most of the time. While this is usually a safe
+/// assumption, it could break down with breakdancing or some other strang
+/// motions, so it should be an option to turn it off.
+void MarkerFitter::autorotateC3D(C3D* c3d)
+{
+  if (c3d->forcePlates.size() > 0)
+  {
+    std::cout << "Attempted to call MarkerFitter::autorotateC3D() on a c3d "
+                 "file with force plates! This is redundant, because c3d files "
+                 "containing forceplates are automatically rotated when "
+                 "they're loaded, and so the call is being ignored."
+              << std::endl;
+    return;
+  }
+  std::vector<bool> newClip;
+  for (int i = 0; i < c3d->markerTimesteps.size(); i++)
+  {
+    newClip.push_back(false);
+  }
+
+  std::vector<Eigen::Matrix3s> rotationsToTry;
+  rotationsToTry.push_back(Eigen::Matrix3s::Identity());
+  // People generally just can't agree on which axis means "up", Y or Z
+  rotationsToTry.push_back(
+      math::eulerXYZToMatrix(Eigen::Vector3s(-M_PI / 2, 0, 0)));
+  rotationsToTry.push_back(
+      math::eulerXYZToMatrix(Eigen::Vector3s(M_PI / 2, 0, 0)));
+
+  s_t smallestMag = std::numeric_limits<double>::infinity();
+  Eigen::Matrix3s smallestMagR = Eigen::Matrix3s::Identity();
+
+  for (Eigen::Matrix3s& R : rotationsToTry)
+  {
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+    for (int i = 0; i < c3d->markerTimesteps.size(); i++)
+    {
+      std::map<std::string, Eigen::Vector3s> rotatedMarkers;
+      for (auto& pair : c3d->markerTimesteps[i])
+      {
+        rotatedMarkers[pair.first] = R * pair.second;
+      }
+      markerTimesteps.push_back(rotatedMarkers);
+    }
+
+    MarkerInitialization init = getInitialization(
+        markerTimesteps,
+        newClip,
+        InitialMarkerFitParams().setNumIKTries(1).setDontRescaleBodies(true));
+
+    Eigen::VectorXs originalPose = mSkeleton->getPositions();
+    s_t avgMag = 0.0;
+    for (int i = 0; i < init.poses.cols(); i++)
+    {
+      mSkeleton->setPositions(init.poses.col(i));
+      s_t mag = math::logMap(
+                    mSkeleton->getJoint(0)->getRelativeTransform().linear())
+                    .norm();
+      avgMag += mag;
+    }
+    avgMag /= init.poses.cols();
+    mSkeleton->setPositions(originalPose);
+
+    if (avgMag < smallestMag)
+    {
+      smallestMag = avgMag;
+      smallestMagR = R;
+    }
+  }
+
+  std::cout << "Picked best rotation for c3d data: " << std::endl
+            << smallestMagR << std::endl;
+
+  c3d->dataRotation = smallestMagR * c3d->dataRotation;
+  for (int i = 0; i < c3d->markerTimesteps.size(); i++)
+  {
+    for (auto& pair : c3d->markerTimesteps[i])
+    {
+      pair.second = smallestMagR * pair.second;
+    }
+  }
 }
 
 //==============================================================================
@@ -1941,6 +2140,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   result.groupScales = params.groupScales;
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
+  result.jointsAdjacentMarkers = params.jointAdjacentMarkers;
   result.jointWeights = params.jointWeights;
 
   result.jointAxis = params.jointAxis;
@@ -2399,8 +2599,7 @@ MarkerInitialization MarkerFitter::getInitialization(
   }
 
   // 2. Find IK+scaling for the beginning of each block independently
-  std::vector<std::future<std::pair<Eigen::VectorXs, Eigen::VectorXs>>>
-      posesAndScalesFutures;
+  std::vector<std::future<ScaleAndFitResult>> posesAndScalesFutures;
 
   if (params.groupScales.size() > 0)
   {
@@ -2434,10 +2633,33 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.dontRescaleBodies));
   }
 
-  std::vector<std::pair<Eigen::VectorXs, Eigen::VectorXs>> posesAndScales;
+  std::vector<ScaleAndFitResult> posesAndScales;
   for (int i = 0; i < numBlocks; i++)
   {
-    posesAndScales.push_back(posesAndScalesFutures[i].get());
+    ScaleAndFitResult result = posesAndScalesFutures[i].get();
+
+    // Do some error checking on the results
+    Eigen::VectorXs posLowerLimits = mSkeleton->getPositionLowerLimits();
+    Eigen::VectorXs posUpperLimits = mSkeleton->getPositionUpperLimits();
+    for (int j = 0; j < mSkeleton->getNumDofs(); j++)
+    {
+      s_t posJ = result.pose(j);
+      if (posJ < posLowerLimits(j))
+      {
+        std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                  << ") below lower limit! " << posJ << " < "
+                  << posLowerLimits(j) << std::endl;
+      }
+      if (posJ > posUpperLimits(j))
+      {
+        std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                  << ") above upper limit! " << posJ << " > "
+                  << posUpperLimits(j) << std::endl;
+      }
+    }
+    // End: error checking
+
+    posesAndScales.push_back(result);
     if (params.dontRescaleBodies)
     {
       std::cout << "Finished initial fit for first timestep of block " << i
@@ -2459,11 +2681,14 @@ MarkerInitialization MarkerFitter::getInitialization(
   {
     Eigen::VectorXs averageGroupScales
         = Eigen::VectorXs::Zero(mSkeleton->getGroupScaleDim());
+    s_t totalWeight = 0.0;
     for (int i = 0; i < numBlocks; i++)
     {
-      averageGroupScales += posesAndScales[i].second;
+      s_t weight = 1.0 / posesAndScales[i].score;
+      averageGroupScales += weight * posesAndScales[i].scale;
+      totalWeight += weight;
     }
-    averageGroupScales /= numBlocks;
+    averageGroupScales /= totalWeight;
     result.groupScales = averageGroupScales;
   }
 
@@ -2472,38 +2697,101 @@ MarkerInitialization MarkerFitter::getInitialization(
       mSkeleton->getNumDofs(), markerObservations.size());
   result.poseScores = Eigen::VectorXs::Zero(markerObservations.size());
 
-  std::vector<std::future<void>> blockFitFutures;
   for (int i = 0; i < numBlocks; i++)
   {
-    std::cout << "Starting fit for whole block " << i << "/" << numBlocks
-              << std::endl;
-
-    blockFitFutures.push_back(std::async(
-        &MarkerFitter::fitTrajectory,
-        this,
-        result.groupScales,
-        posesAndScales[i].first,
-        blocks[i],
-        params.markerWeights,
-        params.markerOffsets,
-        params.joints,
-        jointCenterBlocks[i],
-        params.jointWeights,
-        jointAxisBlocks[i],
-        params.axisWeights,
-        result.poses.block(
-            0,
-            blockStartIndices[i],
-            mSkeleton->getNumDofs(),
-            blockSizeIndices[i]),
-        result.poseScores.segment(blockStartIndices[i], blockSizeIndices[i]),
-        false));
+    result.poses.col(blockStartIndices[i]) = posesAndScales[i].pose;
   }
+  std::vector<bool> shouldProcessBlock;
   for (int i = 0; i < numBlocks; i++)
   {
-    blockFitFutures[i].get();
-    std::cout << "Finished fit for whole block " << i << "/" << numBlocks
-              << std::endl;
+    shouldProcessBlock.push_back(true);
+  }
+
+  // We re-run parallel processing over all the blocks until convergence, or at
+  // most numBlocks times
+  for (int k = 0; k < params.numIKTries; k++)
+  {
+    std::vector<std::future<void>> blockFitFutures;
+    for (int i = 0; i < numBlocks; i++)
+    {
+      std::cout << "Starting fit for whole block " << i << "/" << numBlocks
+                << std::endl;
+
+      if (shouldProcessBlock[i])
+      {
+        blockFitFutures.push_back(std::async(
+            &MarkerFitter::fitTrajectory,
+            this,
+            result.groupScales,
+            result.poses.col(blockStartIndices[i]),
+            blocks[i],
+            params.markerWeights,
+            params.markerOffsets,
+            params.joints,
+            jointCenterBlocks[i],
+            params.jointWeights,
+            jointAxisBlocks[i],
+            params.axisWeights,
+            result.poses.block(
+                0,
+                blockStartIndices[i],
+                mSkeleton->getNumDofs(),
+                blockSizeIndices[i]),
+            result.poseScores.segment(
+                blockStartIndices[i], blockSizeIndices[i]),
+            false));
+      }
+      else
+      {
+        blockFitFutures.push_back(std::async([]() {}));
+      }
+    }
+    for (int i = 0; i < numBlocks; i++)
+    {
+      blockFitFutures[i].get();
+      std::cout << "Finished fit for whole block " << i << "/" << numBlocks
+                << std::endl;
+    }
+
+    bool foundGap = false;
+    for (int i = 1; i < numBlocks; i++)
+    {
+      if (result.poseScores(blockStartIndices[i])
+              > result.poseScores(blockStartIndices[i] - 1) * 3
+          && !newClip[blockStartIndices[i]])
+      {
+        shouldProcessBlock[i] = true;
+        std::cout << "Found bad block start at " << i
+                  << ": prev block ended at "
+                  << result.poseScores(blockStartIndices[i] - 1)
+                  << ", but this block started at "
+                  << result.poseScores(blockStartIndices[i]) << std::endl;
+        result.poses(blockStartIndices[i])
+            = result.poses(blockStartIndices[i] - 1);
+        foundGap = true;
+      }
+      else
+      {
+        shouldProcessBlock[i] = false;
+      }
+    }
+
+    /*
+    Eigen::MatrixXs blockVsScore
+        = Eigen::MatrixXs::Zero(result.poseScores.size(), 2);
+    for (int i = 0; i < numBlocks; i++)
+    {
+      blockVsScore.block(blockStartIndices[i], 0, blockSizeIndices[i], 1)
+          .setConstant(i);
+    }
+    blockVsScore.col(1) = result.poseScores;
+    std::cout << "Block vs score: " << blockVsScore << std::endl;
+    */
+
+    if (!foundGap)
+    {
+      break;
+    }
   }
 
   // 5. Find the local offsets for the anthropometric markers as a simple
@@ -2599,6 +2887,7 @@ MarkerInitialization MarkerFitter::getInitialization(
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
   result.jointWeights = params.jointWeights;
+  result.jointsAdjacentMarkers = params.jointAdjacentMarkers;
 
   result.jointAxis = params.jointAxis;
   result.axisWeights = params.axisWeights;
@@ -2664,7 +2953,7 @@ void MarkerFitter::rescaleIKJacobianForWeightsAndAxis(
 //==============================================================================
 /// This scales the skeleton and IK fits to the marker observations. It
 /// returns a pair, with (pose, group scales) from the fit.
-std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
+ScaleAndFitResult MarkerFitter::scaleAndFit(
     const MarkerFitter* fitter,
     std::map<std::string, Eigen::Vector3s> markerObservations,
     Eigen::VectorXs firstGuessPose,
@@ -2737,7 +3026,7 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
         skeletonBallJoints->getBodyNode(originalMarker.first->getName()),
         originalMarker.second + offset);
   }
-
+  ScaleAndFitResult result;
   if (dontScale)
   {
     // 1.3. Calculate problem size
@@ -2750,14 +3039,13 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
         skeletonBallJoints->getPositions());
 
     // 2. Actually solve the IK
-    math::solveIK(
+    result.score = math::solveIK(
         initialPos,
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
         [&skeletonBallJoints, &skeleton](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(pos);
-
           if (clamp)
           {
             // 1. Map the position back into eulerian space
@@ -2864,7 +3152,7 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
         = skeletonBallJoints->getGroupScales();
 
     // 2. Actually solve the IK
-    s_t result = math::solveIK(
+    result.score = math::solveIK(
         initialPos,
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
@@ -2872,6 +3160,48 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
               pos.segment(0, skeletonBallJoints->getNumDofs()));
+
+          /*
+          // Verify the translation is lossless
+          Eigen::VectorXs eulerPos = skeleton->convertPositionsFromBallSpace(
+              pos.segment(0, skeletonBallJoints->getNumDofs()));
+          Eigen::VectorXs recovered
+              = skeleton->convertPositionsToBallSpace(eulerPos);
+          Eigen::VectorXs bodyPoses = Eigen::VectorXs::Zero(
+              skeletonBallJoints->getNumBodyNodes() * 3);
+          for (int i = 0; i < skeletonBallJoints->getNumBodyNodes(); i++)
+          {
+            bodyPoses.segment<3>(i * 3) = skeletonBallJoints->getBodyNode(i)
+                                              ->getWorldTransform()
+                                              .translation();
+          }
+          skeletonBallJoints->setPositions(recovered);
+          Eigen::VectorXs recoveredBodyPoses = Eigen::VectorXs::Zero(
+              skeletonBallJoints->getNumBodyNodes() * 3);
+          for (int i = 0; i < skeletonBallJoints->getNumBodyNodes(); i++)
+          {
+            recoveredBodyPoses.segment<3>(i * 3)
+                = skeletonBallJoints->getBodyNode(i)
+                      ->getWorldTransform()
+                      .translation();
+          }
+          if ((recoveredBodyPoses - bodyPoses).norm() > 1e-3)
+          {
+            std::cout << "!!!!!! Got a recovery error of "
+                      << (recoveredBodyPoses - bodyPoses).norm() << std::endl;
+            std::cout << "Eigen::VectorXs pos = Eigen::VectorXs(" << pos.size()
+                      << ");" << std::endl;
+            std::cout << "pos << ";
+            for (int i = 0; i < pos.size(); i++)
+            {
+              if (i > 0)
+                std::cout << ", ";
+              std::cout << pos(i);
+            }
+            std::cout << ";" << std::endl;
+          }
+          // End: Verify the translation is lossless
+          */
 
           if (clamp)
           {
@@ -3015,13 +3345,14 @@ std::pair<Eigen::VectorXs, Eigen::VectorXs> MarkerFitter::scaleAndFit(
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
             .setLogOutput(false));
-    std::cout << "Best result: " << result << std::endl;
   }
 
   // 3. Return the result from the best fit we had
+  result.pose = skeleton->getPositions();
+  result.scale = skeleton->getGroupScales();
+  std::cout << "Best result: " << result.score << std::endl;
 
-  return std::make_pair<Eigen::VectorXs, Eigen::VectorXs>(
-      skeleton->getPositions(), skeleton->getGroupScales());
+  return result;
 }
 
 //==============================================================================
@@ -3058,177 +3389,332 @@ void MarkerFitter::fitTrajectory(
     observedJoints.push_back(skeleton->getJoint(joint->getName()));
   }
 
-  // 1.1. Convert the skeleton to have any Euler joints as ball joints
-  std::shared_ptr<dynamics::Skeleton> skeletonBallJoints
-      = skeleton->convertSkeletonToBallJoints();
-  skeletonBallJoints->setGroupScales(groupScales);
-  std::vector<dynamics::Joint*> jointsForSkeletonBallJoints;
-  for (auto joint : joints)
+  bool useBallJoints = true;
+
+  if (useBallJoints)
   {
-    jointsForSkeletonBallJoints.push_back(
-        skeletonBallJoints->getJoint(joint->getName()));
+    // 1.1. Convert the skeleton to have any Euler joints as ball joints
+    std::shared_ptr<dynamics::Skeleton> skeletonBallJoints
+        = skeleton->convertSkeletonToBallJoints();
+    skeletonBallJoints->setGroupScales(groupScales);
+    std::vector<dynamics::Joint*> jointsForSkeletonBallJoints;
+    for (auto joint : joints)
+    {
+      jointsForSkeletonBallJoints.push_back(
+          skeletonBallJoints->getJoint(joint->getName()));
+    }
+
+    // 1.2. The initial guess will be carried from timestep to timestep. The
+    // solution of the previous timestep will form the initial guess for the
+    // next timestep.
+    Eigen::VectorXs initialGuess
+        = skeleton->convertPositionsToBallSpace(firstPoseGuess);
+
+    // 1.3. Verify the results matrix
+    assert(result.rows() == skeleton->getNumDofs());
+    assert(result.cols() == markerObservations.size());
+
+    // 2. Run through each observation in sequence, and do a best fit
+    for (int j = 0; j < markerObservations.size(); j++)
+    {
+      int i = j;
+      if (backwards)
+      {
+        i = markerObservations.size() - 1 - j;
+      }
+
+      /*
+      std::cout << "> Fit timestep " << i << "/" << markerObservations.size()
+                << std::endl;
+      */
+
+      // 2.1. Linearize the marker names and marker observations. This needs to
+      // be done at each step, because the observed markers can be different at
+      // different steps.
+      Eigen::VectorXs markerPoses
+          = Eigen::VectorXs::Zero(markerObservations[i].size() * 3);
+      Eigen::VectorXs markerWeightsVector
+          = Eigen::VectorXs::Ones(markerObservations[i].size());
+      Eigen::VectorXs centerPoses = jointCenters[i];
+      Eigen::VectorXs axisPoses = jointAxis[i];
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerVector;
+      for (std::pair<std::string, Eigen::Vector3s> pair : markerObservations[i])
+      {
+        markerPoses.segment<3>(markerVector.size() * 3) = pair.second;
+        if (markerWeights.count(pair.first))
+        {
+          assert(markerWeights.count(pair.first));
+          markerWeightsVector(markerVector.size())
+              = markerWeights.at(pair.first);
+        }
+        assert(fitter->mMarkerMap.count(pair.first));
+        const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
+            = fitter->mMarkerMap.at(pair.first);
+        Eigen::Vector3s offset = Eigen::Vector3s::Zero();
+        if (markerOffsets.count(pair.first))
+        {
+          assert(markerOffsets.count(pair.first));
+          offset = markerOffsets.at(pair.first);
+        }
+        markerVector.emplace_back(
+            skeletonBallJoints->getBodyNode(originalMarker.first->getName()),
+            originalMarker.second + offset);
+      }
+
+      // 2.2. Actually run the IK solver
+      // Initialize at the old config
+
+      s_t finalLoss = math::solveIK(
+          initialGuess,
+          (markerVector.size() * 3) + (joints.size() * 3),
+          // Set positions
+          [&skeletonBallJoints, &skeleton](
+              /* in*/ const Eigen::VectorXs pos, bool clamp) {
+            skeletonBallJoints->setPositions(pos);
+            if (clamp)
+            {
+              // 1. Map the position back into eulerian space
+              skeleton->setPositions(
+                  skeleton->convertPositionsFromBallSpace(pos));
+              // 2. Clamp the position to limits
+              skeleton->clampPositionsToLimits();
+              // 3. Map the position back into SO3 space
+              skeletonBallJoints->setPositions(
+                  skeleton->convertPositionsToBallSpace(
+                      skeleton->getPositions()));
+            }
+
+            // Return the clamped position
+            return skeletonBallJoints->getPositions();
+          },
+          [&skeletonBallJoints,
+           &markerPoses,
+           &markerVector,
+           &markerWeightsVector,
+           &jointsForSkeletonBallJoints,
+           &centerPoses,
+           &jointWeights,
+           &axisPoses,
+           &axisWeights](
+              /*out*/ Eigen::VectorXs& diff,
+              /*out*/ Eigen::MatrixXs& jac) {
+            diff.segment(0, markerPoses.size())
+                = markerPoses
+                  - skeletonBallJoints->getMarkerWorldPositions(markerVector);
+            for (int i = 0; i < markerWeightsVector.size(); i++)
+            {
+              diff.segment<3>(i * 3) *= markerWeightsVector(i);
+            }
+            Eigen::VectorXs jointPoses
+                = skeletonBallJoints->getJointWorldPositions(
+                    jointsForSkeletonBallJoints);
+            computeJointIKDiff(
+                diff.segment(markerPoses.size(), centerPoses.size()),
+                jointPoses,
+                centerPoses,
+                jointWeights,
+                axisPoses,
+                axisWeights);
+
+            assert(jac.cols() == skeletonBallJoints->getNumDofs());
+            assert(
+                jac.rows()
+                == (markerVector.size() * 3)
+                       + (jointsForSkeletonBallJoints.size() * 3));
+            jac.block(
+                0, 0, markerVector.size() * 3, skeletonBallJoints->getNumDofs())
+                = skeletonBallJoints
+                      ->getMarkerWorldPositionsJacobianWrtJointPositions(
+                          markerVector);
+            jac.block(
+                markerVector.size() * 3,
+                0,
+                jointsForSkeletonBallJoints.size() * 3,
+                skeletonBallJoints->getNumDofs())
+                = skeletonBallJoints
+                      ->getJointWorldPositionsJacobianWrtJointPositions(
+                          jointsForSkeletonBallJoints);
+            rescaleIKJacobianForWeightsAndAxis(
+                jac.block(
+                    markerVector.size() * 3,
+                    0,
+                    jointsForSkeletonBallJoints.size() * 3,
+                    skeletonBallJoints->getNumDofs()),
+                jointWeights,
+                axisPoses,
+                axisWeights);
+          },
+          [&initialGuess](Eigen::VectorXs& val) {
+            assert(false);
+            val = initialGuess;
+          },
+          math::IKConfig()
+              .setMaxStepCount(500)
+              .setConvergenceThreshold(1e-6)
+              .setDontExitTranspose(true)
+              .setLossLowerBound(1e-8)
+              .setMaxRestarts(1)
+              .setStartClamped(true)
+              .setLogOutput(false));
+
+      // 2.3. Record this outcome
+      result.col(i) = skeleton->getPositions();
+      resultScores(i) = finalLoss;
+
+      // 2.4. Set up for the next iteration, by setting the initial guess to the
+      // current solve
+      initialGuess = skeletonBallJoints->getPositions();
+    }
   }
-
-  // 1.2. The initial guess will be carried from timestep to timestep. The
-  // solution of the previous timestep will form the initial guess for the
-  // next timestep.
-  Eigen::VectorXs initialGuess
-      = skeleton->convertPositionsToBallSpace(firstPoseGuess);
-
-  // 1.3. Verify the results matrix
-  assert(result.rows() == skeleton->getNumDofs());
-  assert(result.cols() == markerObservations.size());
-
-  // 2. Run through each observation in sequence, and do a best fit
-  for (int j = 0; j < markerObservations.size(); j++)
+  else
   {
-    int i = j;
-    if (backwards)
+    // 1.2. The initial guess will be carried from timestep to timestep. The
+    // solution of the previous timestep will form the initial guess for the
+    // next timestep.
+    Eigen::VectorXs initialGuess = firstPoseGuess;
+
+    // 1.3. Verify the results matrix
+    assert(result.rows() == skeleton->getNumDofs());
+    assert(result.cols() == markerObservations.size());
+
+    // 2. Run through each observation in sequence, and do a best fit
+    for (int j = 0; j < markerObservations.size(); j++)
     {
-      i = markerObservations.size() - 1 - j;
-    }
-
-    /*
-    std::cout << "> Fit timestep " << i << "/" << markerObservations.size()
-              << std::endl;
-    */
-
-    // 2.1. Linearize the marker names and marker observations. This needs to
-    // be done at each step, because the observed markers can be different at
-    // different steps.
-    Eigen::VectorXs markerPoses
-        = Eigen::VectorXs::Zero(markerObservations[i].size() * 3);
-    Eigen::VectorXs markerWeightsVector
-        = Eigen::VectorXs::Ones(markerObservations[i].size());
-    Eigen::VectorXs centerPoses = jointCenters[i];
-    Eigen::VectorXs axisPoses = jointAxis[i];
-    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerVector;
-    for (std::pair<std::string, Eigen::Vector3s> pair : markerObservations[i])
-    {
-      markerPoses.segment<3>(markerVector.size() * 3) = pair.second;
-      if (markerWeights.count(pair.first))
+      int i = j;
+      if (backwards)
       {
-        assert(markerWeights.count(pair.first));
-        markerWeightsVector(markerVector.size()) = markerWeights.at(pair.first);
+        i = markerObservations.size() - 1 - j;
       }
-      assert(fitter->mMarkerMap.count(pair.first));
-      const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
-          = fitter->mMarkerMap.at(pair.first);
-      Eigen::Vector3s offset = Eigen::Vector3s::Zero();
-      if (markerOffsets.count(pair.first))
+
+      /*
+      std::cout << "> Fit timestep " << i << "/" << markerObservations.size()
+                << std::endl;
+      */
+
+      // 2.1. Linearize the marker names and marker observations. This needs to
+      // be done at each step, because the observed markers can be different at
+      // different steps.
+      Eigen::VectorXs markerPoses
+          = Eigen::VectorXs::Zero(markerObservations[i].size() * 3);
+      Eigen::VectorXs markerWeightsVector
+          = Eigen::VectorXs::Ones(markerObservations[i].size());
+      Eigen::VectorXs centerPoses = jointCenters[i];
+      Eigen::VectorXs axisPoses = jointAxis[i];
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerVector;
+      for (std::pair<std::string, Eigen::Vector3s> pair : markerObservations[i])
       {
-        assert(markerOffsets.count(pair.first));
-        offset = markerOffsets.at(pair.first);
+        markerPoses.segment<3>(markerVector.size() * 3) = pair.second;
+        if (markerWeights.count(pair.first))
+        {
+          assert(markerWeights.count(pair.first));
+          markerWeightsVector(markerVector.size())
+              = markerWeights.at(pair.first);
+        }
+        assert(fitter->mMarkerMap.count(pair.first));
+        const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
+            = fitter->mMarkerMap.at(pair.first);
+        Eigen::Vector3s offset = Eigen::Vector3s::Zero();
+        if (markerOffsets.count(pair.first))
+        {
+          assert(markerOffsets.count(pair.first));
+          offset = markerOffsets.at(pair.first);
+        }
+        markerVector.emplace_back(
+            skeleton->getBodyNode(originalMarker.first->getName()),
+            originalMarker.second + offset);
       }
-      markerVector.emplace_back(
-          skeletonBallJoints->getBodyNode(originalMarker.first->getName()),
-          originalMarker.second + offset);
+
+      // 2.2. Actually run the IK solver
+      // Initialize at the old config
+
+      s_t finalLoss = math::solveIK(
+          initialGuess,
+          (markerVector.size() * 3) + (joints.size() * 3),
+          // Set positions
+          [&skeleton](
+              /* in*/ const Eigen::VectorXs pos, bool clamp) {
+            skeleton->setPositions(pos);
+
+            if (clamp)
+            {
+              // Clamp the position to limits
+              skeleton->clampPositionsToLimits();
+            }
+
+            // Return the clamped position
+            return skeleton->getPositions();
+          },
+          [&skeleton,
+           &joints,
+           &markerPoses,
+           &markerVector,
+           &markerWeightsVector,
+           &centerPoses,
+           &jointWeights,
+           &axisPoses,
+           &axisWeights](
+              /*out*/ Eigen::VectorXs& diff,
+              /*out*/ Eigen::MatrixXs& jac) {
+            diff.segment(0, markerPoses.size())
+                = markerPoses - skeleton->getMarkerWorldPositions(markerVector);
+            for (int i = 0; i < markerWeightsVector.size(); i++)
+            {
+              diff.segment<3>(i * 3) *= markerWeightsVector(i);
+            }
+            Eigen::VectorXs jointPoses
+                = skeleton->getJointWorldPositions(joints);
+            computeJointIKDiff(
+                diff.segment(markerPoses.size(), centerPoses.size()),
+                jointPoses,
+                centerPoses,
+                jointWeights,
+                axisPoses,
+                axisWeights);
+
+            assert(jac.cols() == skeleton->getNumDofs());
+            assert(
+                jac.rows() == (markerVector.size() * 3) + (joints.size() * 3));
+            jac.block(0, 0, markerVector.size() * 3, skeleton->getNumDofs())
+                = skeleton->getMarkerWorldPositionsJacobianWrtJointPositions(
+                    markerVector);
+            jac.block(
+                markerVector.size() * 3,
+                0,
+                joints.size() * 3,
+                skeleton->getNumDofs())
+                = skeleton->getJointWorldPositionsJacobianWrtJointPositions(
+                    joints);
+            rescaleIKJacobianForWeightsAndAxis(
+                jac.block(
+                    markerVector.size() * 3,
+                    0,
+                    joints.size() * 3,
+                    skeleton->getNumDofs()),
+                jointWeights,
+                axisPoses,
+                axisWeights);
+          },
+          [&initialGuess](Eigen::VectorXs& val) {
+            assert(false);
+            val = initialGuess;
+          },
+          math::IKConfig()
+              .setMaxStepCount(500)
+              .setConvergenceThreshold(1e-6)
+              .setDontExitTranspose(true)
+              .setLossLowerBound(1e-8)
+              .setMaxRestarts(1)
+              .setStartClamped(true)
+              .setLogOutput(false));
+
+      // 2.3. Record this outcome
+      result.col(i) = skeleton->getPositions();
+      resultScores(i) = finalLoss;
+
+      // 2.4. Set up for the next iteration, by setting the initial guess to the
+      // current solve
+      initialGuess = skeleton->getPositions();
     }
-
-    // 2.2. Actually run the IK solver
-    // Initialize at the old config
-
-    s_t finalLoss = math::solveIK(
-        initialGuess,
-        (markerVector.size() * 3) + (joints.size() * 3),
-        // Set positions
-        [&skeletonBallJoints, &skeleton](
-            /* in*/ const Eigen::VectorXs pos, bool clamp) {
-          skeletonBallJoints->setPositions(pos);
-
-          if (clamp)
-          {
-            // 1. Map the position back into eulerian space
-            skeleton->setPositions(
-                skeleton->convertPositionsFromBallSpace(pos));
-            // 2. Clamp the position to limits
-            skeleton->clampPositionsToLimits();
-            // 3. Map the position back into SO3 space
-            skeletonBallJoints->setPositions(
-                skeleton->convertPositionsToBallSpace(
-                    skeleton->getPositions()));
-          }
-
-          // Return the clamped position
-          return skeletonBallJoints->getPositions();
-        },
-        [&skeletonBallJoints,
-         &markerPoses,
-         &markerVector,
-         &markerWeightsVector,
-         &jointsForSkeletonBallJoints,
-         &centerPoses,
-         &jointWeights,
-         &axisPoses,
-         &axisWeights](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
-          diff.segment(0, markerPoses.size())
-              = markerPoses
-                - skeletonBallJoints->getMarkerWorldPositions(markerVector);
-          for (int i = 0; i < markerWeightsVector.size(); i++)
-          {
-            diff.segment<3>(i * 3) *= markerWeightsVector(i);
-          }
-          Eigen::VectorXs jointPoses
-              = skeletonBallJoints->getJointWorldPositions(
-                  jointsForSkeletonBallJoints);
-          computeJointIKDiff(
-              diff.segment(markerPoses.size(), centerPoses.size()),
-              jointPoses,
-              centerPoses,
-              jointWeights,
-              axisPoses,
-              axisWeights);
-
-          assert(jac.cols() == skeletonBallJoints->getNumDofs());
-          assert(
-              jac.rows()
-              == (markerVector.size() * 3)
-                     + (jointsForSkeletonBallJoints.size() * 3));
-          jac.block(
-              0, 0, markerVector.size() * 3, skeletonBallJoints->getNumDofs())
-              = skeletonBallJoints
-                    ->getMarkerWorldPositionsJacobianWrtJointPositions(
-                        markerVector);
-          jac.block(
-              markerVector.size() * 3,
-              0,
-              jointsForSkeletonBallJoints.size() * 3,
-              skeletonBallJoints->getNumDofs())
-              = skeletonBallJoints
-                    ->getJointWorldPositionsJacobianWrtJointPositions(
-                        jointsForSkeletonBallJoints);
-          rescaleIKJacobianForWeightsAndAxis(
-              jac.block(
-                  markerVector.size() * 3,
-                  0,
-                  jointsForSkeletonBallJoints.size() * 3,
-                  skeletonBallJoints->getNumDofs()),
-              jointWeights,
-              axisPoses,
-              axisWeights);
-        },
-        [&skeleton, &observedJoints](Eigen::VectorXs& val) {
-          val = skeleton->convertPositionsToBallSpace(
-              skeleton->getRandomPoseForJoints(observedJoints));
-        },
-        math::IKConfig()
-            .setMaxStepCount(500)
-            .setConvergenceThreshold(1e-6)
-            .setDontExitTranspose(true)
-            .setLossLowerBound(1e-8)
-            .setMaxRestarts(1)
-            .setStartClamped(true)
-            .setLogOutput(false));
-
-    // 2.3. Record this outcome
-    result.col(i) = skeleton->getPositions();
-    resultScores(i) = finalLoss;
-
-    // 2.4. Set up for the next iteration, by setting the initial guess to the
-    // current solve
-    initialGuess = skeletonBallJoints->getPositions();
   }
 }
 
@@ -3305,6 +3791,7 @@ void MarkerFitter::findJointCenters(
             newClip,
             initialization.jointCenters.block(
                 i * 3, 0, 3, markerObservations.size()));
+    initialization.jointsAdjacentMarkers.push_back(problemPtr->mActiveMarkers);
 
     futures.push_back(std::async(
         [this, problemPtr] { return this->findJointCenter(problemPtr); }));
@@ -3580,10 +4067,10 @@ void MarkerFitter::computeJointConfidences(
         initialization.axisWeights(i) = mMaxAxisWeight;
       }
 
-      // The axis fit is a strictly hard problem, so if we get a loss within a
+      // The axis fit is a strictly harder problem, so if we get a loss within a
       // small constant factor of the joint loss, use the axis
       // initialization.jointWeights(i) = 0;
-      if (initialization.axisLoss(i) < 2 * initialization.jointLoss(i))
+      if (initialization.axisLoss(i) < 5 * initialization.jointLoss(i))
       {
         initialization.jointWeights(i) = 0;
       }
@@ -4646,7 +5133,7 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
     mJointName(joint->getName()),
     mNewClip(newClip),
     mSmoothingLoss(
-        0.01) // just to tie break when there's nothing better available
+        0.1) // just to tie break when there's nothing better available
 {
   mNumTimesteps = markerObservations.size();
 
@@ -4654,8 +5141,8 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
 
   for (auto pair : fitter->mMarkerMap)
   {
-    if (pair.second.first->getName() == joint->getParentBodyNode()->getName()
-        || pair.second.first->getName() == joint->getChildBodyNode()->getName())
+    if (isDynamicParentOfJoint(pair.second.first->getName(), joint)
+        || isDynamicChildOfJoint(pair.second.first->getName(), joint))
     {
       // Only add the markers if we see them observed at least once in the
       // dataset. If it's never observed, then we'll end up having all sorts of
@@ -4751,20 +5238,84 @@ SphereFitJointCenterProblem::SphereFitJointCenterProblem(
 }
 
 //==============================================================================
+/// This returns true if the given body is the parent of the joint OR if
+/// there's a hierarchy of fixed joints that connect it to the parent
+bool SphereFitJointCenterProblem::isDynamicParentOfJoint(
+    std::string bodyName, dynamics::Joint* joint)
+{
+  while (true)
+  {
+    if (joint->getParentBodyNode() == nullptr)
+      return false;
+    if (bodyName == joint->getParentBodyNode()->getName())
+    {
+      return true;
+    }
+    // Recurse up the chain, as long as we're traversing only fixed joints
+    if (joint->getParentBodyNode()->getParentJoint() != nullptr
+        && joint->getParentBodyNode()->getParentJoint()->isFixed())
+    {
+      joint = joint->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+//==============================================================================
+/// This returns true if the given body is the child of the joint OR if
+/// there's a hierarchy of fixed joints that connect it to the child
+bool SphereFitJointCenterProblem::isDynamicChildOfJoint(
+    std::string bodyName, dynamics::Joint* joint)
+{
+  while (true)
+  {
+    if (joint->getChildBodyNode() == nullptr)
+      return false;
+    if (bodyName == joint->getChildBodyNode()->getName())
+    {
+      return true;
+    }
+    // Recurse down the chain, as long as we're traversing only fixed joints
+    if (joint->getChildBodyNode()->getNumChildJoints() == 1
+        && joint->getChildBodyNode()->getChildJoint(0)->isFixed())
+    {
+      joint = joint->getChildBodyNode()->getChildJoint(0);
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+//==============================================================================
 bool SphereFitJointCenterProblem::canFitJoint(
     MarkerFitter* fitter,
     dynamics::Joint* joint,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations)
 {
-  int numActive = 0;
+  // We can't fit locked joints
+  if (joint->isFixed())
+  {
+    return false;
+  }
+
+  // We can't fit root joints
+  if (joint->getParentBodyNode() == nullptr)
+  {
+    return false;
+  }
+
+  int numActiveParents = 0;
+  int numActiveChildren = 0;
+
   for (auto pair : fitter->mMarkerMap)
   {
-    if (joint->getParentBodyNode()
-        && (pair.second.first->getName()
-                == joint->getParentBodyNode()->getName()
-            || pair.second.first->getName()
-                   == joint->getChildBodyNode()->getName()))
+    if (isDynamicParentOfJoint(pair.second.first->getName(), joint))
     {
       // Only add the markers if we see them observed at least once in the
       // dataset. If it's never observed, then we'll end up having all sorts of
@@ -4773,13 +5324,28 @@ bool SphereFitJointCenterProblem::canFitJoint(
       {
         if (markerObservations[i].count(pair.first) > 0)
         {
-          numActive++;
+          numActiveParents++;
+          break;
+        }
+      }
+    }
+    if (isDynamicChildOfJoint(pair.second.first->getName(), joint))
+    {
+      // Only add the markers if we see them observed at least once in the
+      // dataset. If it's never observed, then we'll end up having all sorts of
+      // divide by zeros
+      for (int i = 0; i < markerObservations.size(); i++)
+      {
+        if (markerObservations[i].count(pair.first) > 0)
+        {
+          numActiveChildren++;
           break;
         }
       }
     }
   }
-  return numActive >= 3;
+  return numActiveParents > 0 && numActiveChildren > 0
+         && (numActiveParents + numActiveChildren >= 3);
 }
 
 //==============================================================================
@@ -4947,8 +5513,10 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
 
   for (auto pair : fitter->mMarkerMap)
   {
-    if (pair.second.first->getName() == joint->getParentBodyNode()->getName()
-        || pair.second.first->getName() == joint->getChildBodyNode()->getName())
+    if (SphereFitJointCenterProblem::isDynamicParentOfJoint(
+            pair.second.first->getName(), joint)
+        || SphereFitJointCenterProblem::isDynamicChildOfJoint(
+            pair.second.first->getName(), joint))
     {
       // Only add the markers if we see them observed at least once in the
       // dataset. If it's never observed, then we'll end up having all sorts of
@@ -5072,25 +5640,6 @@ CylinderFitJointAxisProblem::CylinderFitJointAxisProblem(
       mParallelRadii(j) /= numRadiiObservations(j);
     }
   }
-}
-
-//==============================================================================
-bool CylinderFitJointAxisProblem::canFitJoint(
-    MarkerFitter* fitter, dynamics::Joint* joint)
-{
-  int numActive = 0;
-  for (auto pair : fitter->mMarkerMap)
-  {
-    if (joint->getParentBodyNode()
-        && (pair.second.first->getName()
-                == joint->getParentBodyNode()->getName()
-            || pair.second.first->getName()
-                   == joint->getChildBodyNode()->getName()))
-    {
-      numActive++;
-    }
-  }
-  return numActive >= 2;
 }
 
 //==============================================================================
