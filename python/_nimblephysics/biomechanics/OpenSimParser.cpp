@@ -203,9 +203,9 @@ void OpenSimParser(py::module& m)
       ::py::arg("idInstructionsOutputPath"));
 
   sm.def(
-      "moveOsimMarkers",
+      "rationalizeJoints",
       +[](const common::Uri& uri, const std::string& outputPath) {
-        return dart::biomechanics::OpenSimParser::rationalizeCustomJoints(
+        return dart::biomechanics::OpenSimParser::rationalizeJoints(
             uri, outputPath);
       },
       ::py::arg("inputPath"),

@@ -3601,6 +3601,46 @@ void Skeleton::autogroupSymmetricSuffixes(
 }
 
 //==============================================================================
+/// This finds all the pairs of bodies that share the same suffix, and
+/// different prefixes (for example "ulna_l" and "radius_l", sharing "_l")
+void Skeleton::autogroupSymmetricPrefixes(
+    std::string firstPrefix, std::string secondPrefix)
+{
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* firstBody = getBodyNode(i);
+    std::string firstBodyName = firstBody->getName();
+    if (firstBodyName.size() < firstPrefix.size())
+      continue;
+    std::string firstBodyPrefix = firstBodyName.substr(0, firstPrefix.size());
+    if (firstBodyPrefix != firstPrefix)
+      continue;
+    std::string firstBodySuffix = firstBodyName.substr(
+        firstPrefix.size(), firstBodyName.size() - firstPrefix.size());
+    for (int j = 0; j < getNumBodyNodes(); j++)
+    {
+      if (i == j)
+        continue;
+      dynamics::BodyNode* secondBody = getBodyNode(j);
+      std::string secondBodyName = secondBody->getName();
+      if (secondBodyName.size() < secondPrefix.size())
+        continue;
+      std::string secondBodyPrefix
+          = secondBodyName.substr(0, secondPrefix.size());
+      if (secondBodyPrefix != secondPrefix)
+        continue;
+      std::string secondBodySuffix = secondBodyName.substr(
+          secondPrefix.size(), secondBodyName.size() - secondPrefix.size());
+      if (firstBodySuffix == secondBodySuffix)
+      {
+        // If we make it here, then we have a genuine match, so merge the bodies
+        mergeScaleGroups(firstBody, secondBody);
+      }
+    }
+  }
+}
+
+//==============================================================================
 /// This means that we'll scale a group along all three axis equally. This
 /// constrains scaling.
 void Skeleton::setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform)

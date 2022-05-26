@@ -11,6 +11,7 @@
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/CustomJoint.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/simulation/World.hpp"
@@ -114,7 +115,11 @@ public:
       const std::string& osimOutputBodyForcesStoPath,
       const std::string& idInstructionsOutputPath);
 
-  /// This gets called by rationalizeCustomJoints()
+  /// This gets called by rationalizeJoints()
+  static void updateRootJointLimits(
+      tinyxml2::XMLElement* element, dynamics::EulerFreeJoint* joint);
+
+  /// This gets called by rationalizeJoints()
   template <std::size_t Dimension>
   static void updateCustomJointXML(
       tinyxml2::XMLElement* element, dynamics::CustomJoint<Dimension>* joint);
@@ -123,7 +128,7 @@ public:
   /// translation elements into the joint offsets, and write it out to a new
   /// *.osim file. If there are no "irrational" CustomJoints, then this will
   /// just save a copy of the original skeleton.
-  static void rationalizeCustomJoints(
+  static void rationalizeJoints(
       const common::Uri& uri,
       const std::string& outputPath,
       const common::ResourceRetrieverPtr& retriever = nullptr);

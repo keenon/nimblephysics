@@ -828,6 +828,11 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::autogroupSymmetricSuffixes,
           ::py::arg("leftSuffix") = "_l",
           ::py::arg("rightSuffix") = "_r")
+      .def(
+          "autogroupSymmetricPrefixes",
+          &dart::dynamics::Skeleton::autogroupSymmetricPrefixes,
+          ::py::arg("firstPrefix") = "radius",
+          ::py::arg("secondPrefix") = "ulna")
       .def("getGroupScaleDim", &dart::dynamics::Skeleton::getGroupScaleDim)
       .def(
           "setScaleGroupUniformScaling",

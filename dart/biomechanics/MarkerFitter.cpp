@@ -5,6 +5,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 #include <coin/IpIpoptApplication.hpp>
@@ -1045,9 +1046,7 @@ MarkerInitialization MarkerFitter::runJointsPipeline(
 
   // 1. Find the initial scaling + IK
   MarkerInitialization init = getInitialization(
-      markerObservations,
-      newClip,
-      InitialMarkerFitParams(params).setDontRescaleBodies(true));
+      markerObservations, newClip, InitialMarkerFitParams(params));
   mSkeleton->setGroupScales(init.groupScales);
   // 2. Find the joint centers
   findJointCenters(init, newClip, markerObservations);
@@ -1072,7 +1071,9 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
   }
 
   // 1. Find the initial scaling + IK
-  MarkerInitialization init = runJointsPipeline(markerObservations, params);
+  MarkerInitialization init = runJointsPipeline(
+      markerObservations,
+      InitialMarkerFitParams(params).setDontRescaleBodies(true));
   // 2. Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = getInitialization(
       markerObservations,
@@ -1199,16 +1200,6 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
   }
 
-  for (int i = 0; i < mSkeleton->getNumJoints(); i++)
-  {
-    server->createSphere(
-        "real_joint_center_" + std::to_string(i),
-        0.005,
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector4s(0, 1, 0, 1),
-        "Model Joints");
-  }
-
   int numJoints = init.jointCenters.rows() / 3;
   for (int i = 0; i < numJoints; i++)
   {
@@ -1233,7 +1224,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 1, 0, init.axisWeights(i)),
+          Eigen::Vector4s(0, 0, 1, init.axisWeights(i)),
           "Functional Joints");
     }
   }
@@ -1291,29 +1282,30 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               * (init.updatedMarkerMap.at(pair.first)
                      .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
                                               .first->getScale()));
+        bool isTracking = mMarkerIsTracking[mMarkerIndices[pair.first]];
+        Eigen::Vector4s color = isTracking ? Eigen::Vector4s(0.6, 0.6, 0.6, 1)
+                                           : Eigen::Vector4s(1, 0, 0, 1);
+        std::string label
+            = isTracking ? "Tracking Markers" : "Anatomical Markers";
         server->createBox(
             "marker_real_" + pair.first,
             Eigen::Vector3s::Ones() * 0.01,
             worldObserved,
             Eigen::Vector3s::Zero(),
-            Eigen::Vector4s(0, 0, 1, 1),
-            "Skeleton");
+            isTracking ? color : Eigen::Vector4s(0, 0, 1, 1),
+            label);
         server->createBox(
             "marker_inferred_" + pair.first,
             Eigen::Vector3s::Ones() * 0.007,
             worldInferred,
             Eigen::Vector3s::Zero(),
-            Eigen::Vector4s(1, 0, 0, 1),
-            "Skeleton");
+            color,
+            label);
 
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
-        server->createLine(
-            "marker_error_" + pair.first,
-            points,
-            Eigen::Vector4s(1, 0, 0, 1),
-            "Skeleton");
+        server->createLine("marker_error_" + pair.first, points, color, label);
 
         if (!mMarkerIsTracking.at(mMarkerIndices.at(pair.first)))
         {
@@ -1391,14 +1383,6 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
         }
       }
     }
-    std::map<std::string, Eigen::Vector3s> realJointCenters
-        = mSkeleton->getJointWorldPositionsMap();
-    for (int i = 0; i < mSkeleton->getNumJoints(); i++)
-    {
-      server->setObjectPosition(
-          "real_joint_center_" + std::to_string(i),
-          realJointCenters.at(mSkeleton->getJoint(i)->getName()));
-    }
     for (int i = 0; i < numJoints; i++)
     {
       if (init.jointWeights(i) > 0)
@@ -1430,18 +1414,6 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       if (init.axisWeights(i) > 0)
       {
-        // Render an axis line
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(init.jointAxis.block<3, 1>(i * 6, timestep));
-        points.push_back(
-            init.jointAxis.block<3, 1>(i * 6, timestep)
-            + (init.jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
-        server->createLine(
-            "joint_axis_line_" + std::to_string(i),
-            points,
-            Eigen::Vector4s(0, 1, 0, 1),
-            "Functional Joints");
-
         // Render an axis capsule
         server->setObjectPosition(
             "joint_axis_" + std::to_string(i),
@@ -1481,17 +1453,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   if (goldOsim && goldPoses.size() > 0)
   {
     server.renderSkeleton(
-        goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
-  }
-
-  for (int i = 0; i < mSkeleton->getNumJoints(); i++)
-  {
-    server.createSphere(
-        "real_joint_center_" + std::to_string(i),
-        0.005,
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector4s(0, 1, 0, 1),
-        "Skeleton Joint Centers");
+        goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
   }
 
   int numJoints = init.jointCenters.rows() / 3;
@@ -1518,7 +1480,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 1, 0, init.axisWeights(i)),
+          Eigen::Vector4s(0, 0, 1, init.axisWeights(i)),
           "Functional Joints");
     }
   }
@@ -1558,27 +1520,60 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       {
         Eigen::Vector3s worldObserved = pair.second;
         Eigen::Vector3s worldInferred
-            = init.updatedMarkerMap[pair.first].first->getWorldTransform()
-              * (init.updatedMarkerMap[pair.first].second.cwiseProduct(
-                  init.updatedMarkerMap[pair.first].first->getScale()));
+            = init.updatedMarkerMap.at(pair.first).first->getWorldTransform()
+              * (init.updatedMarkerMap.at(pair.first)
+                     .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
+                                              .first->getScale()));
+        bool isTracking = mMarkerIsTracking[mMarkerIndices[pair.first]];
+        Eigen::Vector4s color = isTracking ? Eigen::Vector4s(0.6, 0.6, 0.6, 1)
+                                           : Eigen::Vector4s(1, 0, 0, 1);
+        std::string label
+            = isTracking ? "Tracking Markers" : "Anatomical Markers";
+        server.createBox(
+            "marker_real_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            worldObserved,
+            Eigen::Vector3s::Zero(),
+            isTracking ? color : Eigen::Vector4s(0, 0, 1, 1),
+            label);
+        server.createBox(
+            "marker_inferred_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.007,
+            worldInferred,
+            Eigen::Vector3s::Zero(),
+            color,
+            label);
+
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
-        server.createLine(
-            "marker_error_" + pair.first,
-            points,
-            Eigen::Vector4s(1, 0, 0, 1),
-            "Skeleton");
-      }
-    }
+        server.createLine("marker_error_" + pair.first, points, color, label);
 
-    std::map<std::string, Eigen::Vector3s> realJointCenters
-        = mSkeleton->getJointWorldPositionsMap();
-    for (int i = 0; i < mSkeleton->getNumJoints(); i++)
-    {
-      server.setObjectPosition(
-          "real_joint_center_" + std::to_string(i),
-          realJointCenters.at(mSkeleton->getJoint(i)->getName()));
+        if (!mMarkerIsTracking.at(mMarkerIndices.at(pair.first)))
+        {
+          Eigen::Vector3s worldOriginal
+              = init.updatedMarkerMap.at(pair.first).first->getWorldTransform()
+                * ((init.updatedMarkerMap.at(pair.first).second
+                    - init.markerOffsets.at(pair.first))
+                       .cwiseProduct(init.updatedMarkerMap.at(pair.first)
+                                         .first->getScale()));
+          server.createBox(
+              "marker_original_" + pair.first,
+              Eigen::Vector3s::Ones() * 0.005,
+              worldOriginal,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector4s(1, 0, 0, 0.3),
+              "Skeleton");
+          std::vector<Eigen::Vector3s> offsetPoints;
+          offsetPoints.push_back(worldOriginal);
+          offsetPoints.push_back(worldInferred);
+          server.createLine(
+              "marker_offset_" + pair.first,
+              offsetPoints,
+              Eigen::Vector4s(1, 0.5, 0.5, 0.3),
+              "Skeleton");
+        }
+      }
     }
 
     if (goldOsim && goldPoses.size() > 0)
@@ -1661,18 +1656,6 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       if (init.axisWeights(i) > 0)
       {
-        // Render an axis line
-        std::vector<Eigen::Vector3s> points;
-        points.push_back(init.jointAxis.block<3, 1>(i * 6, timestep));
-        points.push_back(
-            init.jointAxis.block<3, 1>(i * 6, timestep)
-            + (init.jointAxis.block<3, 1>(i * 6 + 3, timestep) * 0.2));
-        server.createLine(
-            "joint_axis_line_" + std::to_string(i),
-            points,
-            Eigen::Vector4s(0, 1, 0, 1),
-            "Functional Joints");
-
         // Render an axis capsule
         server.setObjectPosition(
             "joint_axis_" + std::to_string(i),
@@ -2758,6 +2741,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     {
       if (result.poseScores(blockStartIndices[i])
               > result.poseScores(blockStartIndices[i] - 1) * 3
+          && result.poseScores(blockStartIndices[i]) > 0.01
           && !newClip[blockStartIndices[i]])
       {
         shouldProcessBlock[i] = true;
@@ -2851,11 +2835,14 @@ MarkerInitialization MarkerFitter::getInitialization(
     if (params.markerOffsets.count(name) > 0)
     {
       assert(params.markerOffsets.count(name));
-      result.markerOffsets[name] = params.markerOffsets.at(name);
-      result.updatedMarkerMap[name]
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              mMarkerMap[name].first,
-              mMarkerMap[name].second + params.markerOffsets.at(name));
+      if (mMarkerIsTracking[i])
+      {
+        result.markerOffsets[name] = params.markerOffsets.at(name);
+        result.updatedMarkerMap[name]
+            = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+                mMarkerMap[name].first,
+                mMarkerMap[name].second + params.markerOffsets.at(name));
+      }
     }
     else
     {
@@ -4327,11 +4314,27 @@ bool MarkerFitter::getMarkerIsTracking(std::string marker)
 /// tracking markers, on the assumption that they're tracking triads.
 void MarkerFitter::setTriadsToTracking()
 {
+  std::unordered_map<std::string, int> prefixCount;
   for (int i = 0; i < getNumMarkers(); i++)
   {
     std::string markerName = getMarkerNameAtIndex(i);
     char lastChar = markerName[markerName.size() - 1];
-    if (lastChar == '1' || lastChar == '2' || lastChar == '3')
+    if (lastChar == '1' || lastChar == '2' || lastChar == '3' || lastChar == '4'
+        || lastChar == '5' || lastChar == '6' || lastChar == '7')
+    {
+      std::string prefix = markerName.substr(0, markerName.size() - 1);
+      if (prefixCount.count(prefix) == 0)
+      {
+        prefixCount[prefix] = 0;
+      }
+      prefixCount[prefix]++;
+    }
+  }
+  for (int i = 0; i < getNumMarkers(); i++)
+  {
+    std::string markerName = getMarkerNameAtIndex(i);
+    std::string prefix = markerName.substr(0, markerName.size() - 1);
+    if (prefixCount.count(prefix) > 0 && prefixCount[prefix] > 1)
     {
       setMarkerIsTracking(markerName);
     }

@@ -40,6 +40,7 @@ template <std::size_t Dimension>
 void CustomJoint<Dimension>::setCustomFunction(
     std::size_t i, std::shared_ptr<math::CustomFunction> fn, int drivenByDof)
 {
+  assert(fn.get() != nullptr);
   mFunctions[i] = fn;
   mFunctionDrivenByDof[i] = drivenByDof;
   this->notifyPositionUpdated();
@@ -50,6 +51,7 @@ template <std::size_t Dimension>
 std::shared_ptr<math::CustomFunction> CustomJoint<Dimension>::getCustomFunction(
     std::size_t i)
 {
+  assert(mFunctions[i].get() != nullptr);
   return mFunctions[i];
 }
 

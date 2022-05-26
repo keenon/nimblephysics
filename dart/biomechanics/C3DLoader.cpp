@@ -100,8 +100,8 @@ C3D C3DLoader::loadC3D(const std::string& uri)
     C3D competingConvention = loadC3DWithGRFConvention(uri, i);
     s_t competingRMS
         = competingConvention.getWeightedDistFromCoPToNearestMarker();
-    std::cout << "Best RMS " << bestResultRMS << " vs Competing RMS "
-              << competingRMS << std::endl;
+    std::cout << "Tried force plate convention " << i << ". Best RMS "
+              << bestResultRMS << " vs this RMS " << competingRMS << std::endl;
     if (competingRMS < bestResultRMS)
     {
       bestResult = competingConvention;

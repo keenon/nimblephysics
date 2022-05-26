@@ -846,11 +846,33 @@ void OpenSimParser::updateCustomJointXML(
       = element->FirstChildElement("SpatialTransform");
   tinyxml2::XMLElement* transformAxisCursor
       = spatialTransform->FirstChildElement("TransformAxis");
-  int index = 0;
+  int rawIndex = 0;
   while (transformAxisCursor)
   {
     tinyxml2::XMLElement* function
         = transformAxisCursor->FirstChildElement("function");
+
+    int index = rawIndex;
+    // For the translation coordinates, we shuffle the axis order when we
+    // construct the joint, so we have to reconstruct that for edits
+    if (index >= 3)
+    {
+      Eigen::Vector3s axis
+          = readVec3(transformAxisCursor->FirstChildElement("axis"));
+      if (axis == Eigen::Vector3s::UnitX())
+      {
+        index = 3;
+      }
+      else if (axis == Eigen::Vector3s::UnitY())
+      {
+        index = 4;
+      }
+      else if (axis == Eigen::Vector3s::UnitZ())
+      {
+        index = 5;
+      }
+    }
+
     // On v3 files, there is no "function" wrapper tag
     if (function == nullptr)
     {
@@ -919,23 +941,24 @@ void OpenSimParser::updateCustomJointXML(
     }
     else if (simmSpline != nullptr)
     {
-      math::SimmSpline* polynomial = static_cast<math::SimmSpline*>(
+      math::SimmSpline* spline = dynamic_cast<math::SimmSpline*>(
           joint->getCustomFunction(index).get());
+      assert(spline != nullptr);
       std::string xString = "";
-      for (int i = 0; i < polynomial->_x.size(); i++)
+      for (int i = 0; i < spline->_x.size(); i++)
       {
         if (i > 0)
           xString += " ";
-        xString += std::to_string(polynomial->_x[i]);
+        xString += std::to_string(spline->_x[i]);
       }
       simmSpline->FirstChildElement("x")->SetText(xString.c_str());
 
       std::string yString = "";
-      for (int i = 0; i < polynomial->_y.size(); i++)
+      for (int i = 0; i < spline->_y.size(); i++)
       {
         if (i > 0)
           yString += " ";
-        yString += std::to_string(polynomial->_y[i]);
+        yString += std::to_string(spline->_y[i]);
       }
       simmSpline->FirstChildElement("y")->SetText(yString.c_str());
     }
@@ -944,9 +967,59 @@ void OpenSimParser::updateCustomJointXML(
       assert(false && "Unrecognized function type");
     }
 
-    index++;
+    rawIndex++;
     transformAxisCursor
         = transformAxisCursor->NextSiblingElement("TransformAxis");
+  }
+}
+
+/// This gets called by rationalizeJoints()
+void OpenSimParser::updateRootJointLimits(
+    tinyxml2::XMLElement* element, dynamics::EulerFreeJoint* joint)
+{
+  (void)element;
+  (void)joint;
+  for (int i = 0; i < 3; i++)
+  {
+    joint->getDof(i)->setPositionLowerLimit(-M_PI);
+    joint->getDof(i)->setPositionUpperLimit(M_PI);
+  }
+
+  tinyxml2::XMLElement* coordinateCursor = nullptr;
+  // This is how the coordinate set is specified in OpenSim v4 files
+  tinyxml2::XMLElement* coordinateSet
+      = element->FirstChildElement("CoordinateSet");
+  if (coordinateSet)
+  {
+    tinyxml2::XMLElement* objects = coordinateSet->FirstChildElement("objects");
+    if (objects)
+    {
+      coordinateCursor = objects->FirstChildElement("Coordinate");
+    }
+  }
+  // This is how the coordinate set is specified in OpenSim v3 files
+  if (coordinateCursor == nullptr)
+  {
+    coordinateSet = element->FirstChildElement("coordinates");
+    if (coordinateSet != nullptr)
+    {
+      coordinateCursor = coordinateSet->FirstChildElement("Coordinate");
+    }
+  }
+  // Iterate through the coordinates, and update the range values
+  int dofIndex = 0;
+  while (coordinateCursor)
+  {
+    if (dofIndex < 3)
+    {
+      coordinateCursor->FirstChildElement("range")->SetText(
+          (std::to_string(joint->getDof(dofIndex)->getPositionLowerLimit())
+           + " "
+           + std::to_string(joint->getDof(dofIndex)->getPositionUpperLimit()))
+              .c_str());
+    }
+    coordinateCursor = coordinateCursor->NextSiblingElement("Coordinate");
+    dofIndex++;
   }
 }
 
@@ -954,7 +1027,7 @@ void OpenSimParser::updateCustomJointXML(
 /// translation elements into the joint offsets, and write it out to a new
 /// *.osim file. If there are no "irrational" CustomJoints, then this will
 /// just save a copy of the original skeleton.
-void OpenSimParser::rationalizeCustomJoints(
+void OpenSimParser::rationalizeJoints(
     const common::Uri& uri,
     const std::string& outputPath,
     const common::ResourceRetrieverPtr& nullOrRetriever)
@@ -1025,7 +1098,13 @@ void OpenSimParser::rationalizeCustomJoints(
         continue;
       }
 
-      if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
+      if (joint->getJointIndexInSkeleton() == 0
+          && joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+      {
+        updateRootJointLimits(
+            jointCursor, static_cast<dynamics::EulerFreeJoint*>(joint));
+      }
+      else if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
       {
         updateCustomJointXML(
             jointCursor, static_cast<dynamics::CustomJoint<1>*>(joint));
@@ -1061,6 +1140,12 @@ void OpenSimParser::rationalizeCustomJoints(
         continue;
       }
 
+      if (joint->getJointIndexInSkeleton() == 0
+          && joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+      {
+        updateRootJointLimits(
+            jointCursor, static_cast<dynamics::EulerFreeJoint*>(joint));
+      }
       if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
       {
         updateCustomJointXML(
@@ -2147,11 +2232,22 @@ createCustomJoint(
   customJoint->setAxisOrder(axisOrder);
   customJoint->setFlipAxisMap(flips);
 
+#ifndef NDEBUG
+  std::vector<bool> setFunction;
+  for (int i = 0; i < 6; i++)
+  {
+    setFunction.push_back(false);
+  }
+#endif
+
   for (int i = 0; i < customFunctions.size(); i++)
   {
     if (i < 3)
     {
       customJoint->setCustomFunction(i, customFunctions[i], drivenByDofs[i]);
+#ifndef NDEBUG
+      setFunction[i] = true;
+#endif
     }
     else
     {
@@ -2160,14 +2256,23 @@ createCustomJoint(
       if (axis == Eigen::Vector3s::UnitX())
       {
         customJoint->setCustomFunction(3, customFunctions[i], drivenByDofs[i]);
+#ifndef NDEBUG
+        setFunction[3] = true;
+#endif
       }
       else if (axis == Eigen::Vector3s::UnitY())
       {
         customJoint->setCustomFunction(4, customFunctions[i], drivenByDofs[i]);
+#ifndef NDEBUG
+        setFunction[4] = true;
+#endif
       }
       else if (axis == Eigen::Vector3s::UnitZ())
       {
         customJoint->setCustomFunction(5, customFunctions[i], drivenByDofs[i]);
+#ifndef NDEBUG
+        setFunction[5] = true;
+#endif
       }
       else
       {
@@ -2175,6 +2280,14 @@ createCustomJoint(
       }
     }
   }
+
+#ifndef NDEBUG
+  for (int i = 0; i < 6; i++)
+  {
+    assert(setFunction[i]);
+  }
+#endif
+
   return std::make_pair(customJoint, childBody);
 }
 
@@ -2370,10 +2483,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       // This only exists in v3 files
       tinyxml2::XMLElement* multiplier
           = function->FirstChildElement("MultiplierFunction");
+      s_t scale = 1.0;
       if (multiplier != nullptr)
       {
         tinyxml2::XMLElement* childFunction
             = multiplier->FirstChildElement("function");
+        scale = atof(multiplier->FirstChildElement("scale")->GetText());
         assert(childFunction != nullptr);
         if (childFunction != nullptr)
         {
@@ -2396,7 +2511,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           first3Linear = false;
         }
 
-        double value = atof(constant->FirstChildElement("value")->GetText());
+        double value
+            = atof(constant->FirstChildElement("value")->GetText()) * scale;
         if (value != 0)
         {
           allLocked = false;
@@ -2418,8 +2534,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           coeffs(0) = 1.0;
         }
         // Example coeffs for linear: 1 0
-        customFunctions.push_back(
-            std::make_shared<math::LinearFunction>(coeffs(0), coeffs(1)));
+        customFunctions.push_back(std::make_shared<math::LinearFunction>(
+            coeffs(0) * scale, coeffs(1) * scale));
       }
       else if (polynomialFunction != nullptr)
       {
@@ -2427,6 +2543,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         allLocked = false;
         std::vector<s_t> coeffs
             = readVecX(polynomialFunction->FirstChildElement("coefficients"));
+        for (int i = 0; i < coeffs.size(); i++)
+        {
+          coeffs[i] *= scale;
+        }
         customFunctions.push_back(
             std::make_shared<math::PolynomialFunction>(coeffs));
       }
@@ -2441,6 +2561,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
         std::vector<s_t> x = readVecX(simmSpline->FirstChildElement("x"));
         std::vector<s_t> y = readVecX(simmSpline->FirstChildElement("y"));
+        for (int i = 0; i < y.size(); i++)
+        {
+          y[i] *= scale;
+        }
         customFunctions.push_back(std::make_shared<math::SimmSpline>(x, y));
       }
       else

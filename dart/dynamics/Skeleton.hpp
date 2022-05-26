@@ -944,6 +944,11 @@ public:
   void autogroupSymmetricSuffixes(
       std::string leftSuffix = "_l", std::string rightSuffix = "_r");
 
+  /// This finds all the pairs of bodies that share the same suffix, and
+  /// different prefixes (for example "ulna_l" and "radius_l", sharing "_l")
+  void autogroupSymmetricPrefixes(
+      std::string firstPrefix = "ulna", std::string secondPrefix = "radius");
+
   /// This means that we'll scale a group along all three axis equally. This
   /// constrains scaling.
   void setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform = true);

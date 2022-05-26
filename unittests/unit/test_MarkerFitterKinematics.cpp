@@ -3836,12 +3836,19 @@ TEST(MarkerFitter, COMPLEX_KNEE_OFFSETS_ISSUE)
   server->blockWhileServing();
   */
 
+  /*
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/osim/ComplexKnee/"
       "gait2392_frontHingeKnee_dem.osim");
+  */
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/welk007/rational_generic.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
   standard.skeleton->zeroTranslationInCustomFunctions();
 
-  std::string bodyNode = "femur_l";
+  // std::string bodyNode = "femur_l";
+  std::string bodyNode = "torso";
 
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
@@ -4434,6 +4441,175 @@ TEST(MarkerFitter, WELK_C3D)
   std::cout << "Data rotation: " << std::endl << c3d.dataRotation << std::endl;
   MarkerFitter::debugGoldTrajectoryAndMarkersToGUI(
       server, &c3d, &scaled, goldPoses);
+  server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, MULTI_TRIAL_WELK)
+{
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss
+      = MultivariateGaussian::loadFromCSV(
+          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          cols,
+          0.001); // mm -> m
+
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = 190 * 0.001;
+  observedValues["Heightin"] = (5 * 12 + 9) * 0.001;
+
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/welk007/unscaled_generic.osim",
+      "../../../data/osim/welk007/rational_generic.osim");
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/welk007/rational_generic.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
+  standard.skeleton->zeroTranslationInCustomFunctions();
+
+  for (auto pair : standard.markersMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  /*
+  Eigen::Matrix3s R = math::eulerXYZToMatrix(Eigen::Vector3s(-M_PI / 2, 0, 0));
+  for (int i = 0; i < c3d.markerTimesteps.size(); i++)
+  {
+    for (auto& pair : c3d.markerTimesteps[i])
+    {
+      pair.second = R * pair.second;
+    }
+  }
+  */
+
+  // Create a marker fitter
+
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.005);
+  fitter.setInitialIKMaxRestarts(200);
+  fitter.setIterationLimit(500);
+  fitter.setMaxJointWeight(0.2);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+  // fitter.setRegularizeAllBodyScales(0.0);
+  // fitter.setRegularizeIndividualBodyScales(0.0);
+  // fitter.setRegularizeAnatomicalMarkerOffsets(50);
+
+  // Set all the triads to be tracking markers, instead of anatomical
+  if (standard.anatomicalMarkers.size() > 10)
+  {
+    fitter.setTrackingMarkers(standard.trackingMarkers);
+  }
+  else
+  {
+    fitter.setTriadsToTracking();
+  }
+
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      markerObservationTrials;
+
+  std::vector<std::string> files;
+  files.push_back("dart://sample/osim/welk007/c3d_Trimmed_LHJC1.c3d");
+  files.push_back("dart://sample/osim/welk007/c3d_Trimmed_RHJC1.c3d");
+  files.push_back(
+      "dart://sample/osim/welk007/c3d_Trimmed_running_exotendon3.c3d");
+  files.push_back(
+      "dart://sample/osim/welk007/c3d_Trimmed_running_natural2.c3d");
+
+  std::vector<C3D> c3ds;
+  for (std::string& file : files)
+  {
+    // Get the raw marker trajectory data
+    c3ds.push_back(C3DLoader::loadC3D(file));
+    C3DLoader::fixupMarkerFlips(&c3ds[c3ds.size() - 1]);
+    markerObservationTrials.push_back(c3ds[c3ds.size() - 1].markerTimesteps);
+  }
+
+  /*
+  std::vector<bool> newClip;
+  for (int i = 0; i < markerObservationTrials[0].size(); i++)
+  {
+    newClip.push_back(false);
+  }
+  MarkerInitialization finalKinematicInit = fitter.getInitialization(
+      markerObservationTrials[0], newClip, InitialMarkerFitParams());
+  */
+
+  std::vector<MarkerInitialization> inits
+      = fitter.runMultiTrialKinematicsPipeline(
+          markerObservationTrials,
+          InitialMarkerFitParams()
+              .setMaxTrialsToUseForMultiTrialScaling(5)
+              .setMaxTimestepsToUseForMultiTrialScaling(4000),
+          150); //
+  MarkerInitialization finalKinematicInit = inits[0];
+
+  for (int i = 0; i < fitter.getNumMarkers(); i++)
+  {
+    std::string name = fitter.getMarkerNameAtIndex(i);
+    std::cout << name << " is tracking: " << fitter.getMarkerIsTracking(name)
+              << std::endl;
+  }
+
+  for (auto pair : finalKinematicInit.updatedMarkerMap)
+  {
+    assert(pair.second.first != nullptr);
+  }
+
+  for (int i = 0; i < c3ds.size(); i++)
+  {
+    IKErrorReport finalKinematicsReport(
+        standard.skeleton,
+        inits[i].updatedMarkerMap,
+        inits[i].poses,
+        markerObservationTrials[i]);
+
+    std::cout << "Final kinematic fit report for " << files[i] << ":"
+              << std::endl;
+    finalKinematicsReport.printReport(5);
+  }
+
+  /*
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      finalKinematicInit.updatedMarkerMap,
+      finalKinematicInit.poses,
+      c3d.markerTimesteps);
+
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+  */
+
+  std::cout << "Pelvis scaling: "
+            << standard.skeleton->getBodyNode("pelvis")->getScale()
+            << std::endl;
+  std::cout << "Torso scaling: "
+            << standard.skeleton->getBodyNode("torso")->getScale() << std::endl;
+  std::cout << "femur_l scaling: "
+            << standard.skeleton->getBodyNode("femur_l")->getScale()
+            << std::endl;
+  std::cout << "tibia_l scaling: "
+            << standard.skeleton->getBodyNode("tibia_l")->getScale()
+            << std::endl;
+
+  // Target markers
+  std::shared_ptr<server::GUIWebsocketServer> server
+      = std::make_shared<server::GUIWebsocketServer>();
+  server->serve(8070);
+  fitter.debugTrajectoryAndMarkersToGUI(
+      server, inits[1], markerObservationTrials[1], &c3ds[1]);
   server->blockWhileServing();
 }
 #endif
