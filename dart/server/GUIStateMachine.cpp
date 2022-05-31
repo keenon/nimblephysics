@@ -6,6 +6,7 @@
 
 #include <assimp/scene.h>
 #include <boost/filesystem.hpp>
+#include <urdf_sensor/sensor.h>
 
 #include "dart/collision/CollisionResult.hpp"
 #include "dart/common/Aspect.hpp"
@@ -20,6 +21,7 @@
 #include "dart/dynamics/SphereShape.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/proto/GUI.pb.h"
 #include "dart/server/RawJsonUtils.hpp"
 #include "dart/server/external/base64/base64.h"
 #include "dart/simulation/World.hpp"
@@ -29,7 +31,6 @@ namespace server {
 
 GUIStateMachine::GUIStateMachine() : mMessagesQueued(0)
 {
-  mJson << "[";
 }
 
 GUIStateMachine::~GUIStateMachine()
@@ -38,130 +39,79 @@ GUIStateMachine::~GUIStateMachine()
 
 std::string GUIStateMachine::getCurrentStateAsJson()
 {
-  std::stringstream json;
-  json << "[";
-  bool isFirst = true;
+  proto::CommandList list;
+  for (auto pair : mLayers)
+  {
+    encodeCreateLayer(list, pair.second);
+  }
   for (auto pair : mBoxes)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateBox(json, pair.second);
-  }
-  for (auto pair : mSpheres)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateSphere(json, pair.second);
-  }
-  for (auto pair : mCapsules)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateCapsule(json, pair.second);
-  }
-  for (auto pair : mLines)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateLine(json, pair.second);
+    encodeCreateBox(list, pair.second);
   }
   for (auto pair : mTextures)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateTexture(json, pair.second);
+    encodeCreateTexture(list, pair.second);
   }
   for (auto pair : mMeshes)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateMesh(json, pair.second);
+    encodeCreateMesh(list, pair.second);
+  }
+  for (auto pair : mSpheres)
+  {
+    encodeCreateSphere(list, pair.second);
+  }
+  for (auto pair : mCapsules)
+  {
+    encodeCreateCapsule(list, pair.second);
+  }
+  for (auto pair : mLines)
+  {
+    encodeCreateLine(list, pair.second);
   }
   for (auto pair : mText)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateText(json, pair.second);
+    encodeCreateText(list, pair.second);
   }
   for (auto pair : mButtons)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateButton(json, pair.second);
+    encodeCreateButton(list, pair.second);
   }
   for (auto pair : mSliders)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateSlider(json, pair.second);
+    encodeCreateSlider(list, pair.second);
   }
   for (auto pair : mPlots)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreatePlot(json, pair.second);
+    encodeCreatePlot(list, pair.second);
   }
   for (auto pair : mRichPlots)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateRichPlot(json, pair.second);
+    encodeCreateRichPlot(list, pair.second);
     for (auto dataPair : pair.second.data)
     {
-      json << ",";
-      encodeSetRichPlotData(json, pair.second.key, dataPair.second);
+      encodeSetRichPlotData(list, pair.second.key, dataPair.second);
     }
   }
   for (auto key : mMouseInteractionEnabled)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeEnableMouseInteraction(json, key);
+    encodeEnableMouseInteraction(list, key);
   }
 
-  json << "]";
-
-  return json.str();
+  return list.SerializeAsString();
 }
 
 /// This formats the latest set of commands as JSON, and clears the buffer
 std::string GUIStateMachine::flushJson()
 {
-  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
+  const std::lock_guard<std::recursive_mutex> lock(mProtoMutex);
 
-  mJson << "]";
-  std::string json = mJson.str();
+  mCommandList.SerializeToString(&mCommandListOutputBuffer);
 
   // Reset
   mMessagesQueued = 0;
-  mJson = std::stringstream();
-  mJson << "[";
+  mCommandList.Clear();
 
-  return json;
+  return mCommandListOutputBuffer;
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -601,8 +551,11 @@ void GUIStateMachine::clear()
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  queueCommand(
-      [&](std::stringstream& json) { json << "{ \"type\": \"clear_all\" }"; });
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_clear_all()->set_dummy(true);
+  });
+
   mBoxes.clear();
   mSpheres.clear();
   mCapsules.clear();
@@ -612,6 +565,32 @@ void GUIStateMachine::clear()
   mButtons.clear();
   mSliders.clear();
   mPlots.clear();
+}
+
+/// Set frames per second
+void GUIStateMachine::setFramesPerSecond(int framesPerSecond)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  queueCommand([this, framesPerSecond](proto::CommandList& json) {
+    encodeSetFramesPerSecond(json, framesPerSecond);
+  });
+}
+
+/// This creates a layer in the web GUI
+void GUIStateMachine::createLayer(
+    std::string key, const Eigen::Vector4s& color, bool defaultShow)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Layer& layer = mLayers[key];
+  layer.key = key;
+  layer.color = color;
+  layer.defaultShow = defaultShow;
+
+  queueCommand([this, key](proto::CommandList& json) {
+    encodeCreateLayer(json, mLayers[key]);
+  });
 }
 
 /// This creates a box in the web GUI under a specified key
@@ -637,8 +616,8 @@ void GUIStateMachine::createBox(
   box.castShadows = castShadows;
   box.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateBox(json, mBoxes[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateBox(list, mBoxes[key]);
   });
 }
 
@@ -663,8 +642,8 @@ void GUIStateMachine::createSphere(
   sphere.castShadows = castShadows;
   sphere.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateSphere(json, mSpheres[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateSphere(list, mSpheres[key]);
   });
 }
 
@@ -693,8 +672,8 @@ void GUIStateMachine::createCapsule(
   capsule.castShadows = castShadows;
   capsule.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateCapsule(json, mCapsules[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCapsule(list, mCapsules[key]);
   });
 }
 
@@ -713,8 +692,8 @@ void GUIStateMachine::createLine(
   line.color = color;
   line.layer = layer;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateLine(json, mLines[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateLine(list, mLines[key]);
   });
 }
 
@@ -754,8 +733,8 @@ void GUIStateMachine::createMesh(
   mesh.castShadows = castShadows;
   mesh.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateMesh(json, mMeshes[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateMesh(list, mMeshes[key]);
   });
 }
 
@@ -897,8 +876,9 @@ void GUIStateMachine::createTexture(
 
   mTextures[key] = tex;
 
-  queueCommand(
-      [&](std::stringstream& json) { encodeCreateTexture(json, tex); });
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateTexture(list, mTextures[key]);
+  });
 }
 
 /// This creates a texture object by loading it from a file
@@ -1024,11 +1004,12 @@ void GUIStateMachine::setObjectPosition(
     mMeshes[key].pos = pos;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_pos\", \"key\": \"" << key
-         << "\", \"pos\": ";
-    vec3ToJson(json, pos);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_position()->set_key(getStringCode(key));
+    command->mutable_set_object_position()->add_data(pos(0));
+    command->mutable_set_object_position()->add_data(pos(1));
+    command->mutable_set_object_position()->add_data(pos(2));
   });
 }
 
@@ -1051,11 +1032,12 @@ void GUIStateMachine::setObjectRotation(
     mMeshes[key].euler = euler;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_rotation\", \"key\": \"" << key
-         << "\", \"euler\": ";
-    vec3ToJson(json, euler);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_rotation()->set_key(getStringCode(key));
+    command->mutable_set_object_rotation()->add_data(euler(0));
+    command->mutable_set_object_rotation()->add_data(euler(1));
+    command->mutable_set_object_rotation()->add_data(euler(2));
   });
 }
 
@@ -1086,11 +1068,13 @@ void GUIStateMachine::setObjectColor(
     mCapsules[key].color = color;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
-         << "\", \"color\": ";
-    vec4ToJson(json, color);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_color()->set_key(getStringCode(key));
+    command->mutable_set_object_color()->add_data(color(0));
+    command->mutable_set_object_color()->add_data(color(1));
+    command->mutable_set_object_color()->add_data(color(2));
+    command->mutable_set_object_color()->add_data(color(3));
   });
 }
 
@@ -1114,11 +1098,12 @@ void GUIStateMachine::setObjectScale(
     mMeshes[key].scale = scale;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_scale\", \"key\": \"" << key
-         << "\", \"scale\": ";
-    vec3ToJson(json, scale);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_scale()->set_key(getStringCode(key));
+    command->mutable_set_object_scale()->add_data(scale(0));
+    command->mutable_set_object_scale()->add_data(scale(1));
+    command->mutable_set_object_scale()->add_data(scale(2));
   });
 }
 
@@ -1126,8 +1111,9 @@ void GUIStateMachine::setObjectScale(
 void GUIStateMachine::setObjectMouseInteractionEnabled(const std::string& key)
 {
   mMouseInteractionEnabled.emplace(key);
-  queueCommand([&](std::stringstream& json) {
-    encodeEnableMouseInteraction(json, key);
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_enable_mouse_interaction()->set_key(getStringCode(key));
   });
 }
 
@@ -1142,8 +1128,9 @@ void GUIStateMachine::deleteObject(const std::string& key)
   mMeshes.erase(key);
   mCapsules.erase(key);
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"delete_object\", \"key\": \"" << key << "\" }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object()->set_key(getStringCode(key));
   });
 }
 
@@ -1248,7 +1235,7 @@ void GUIStateMachine::createText(
 
   mText[key] = text;
 
-  queueCommand([&](std::stringstream& json) { encodeCreateText(json, text); });
+  queueCommand([&](proto::CommandList& list) { encodeCreateText(list, text); });
 }
 
 /// This changes the contents of text on the screen
@@ -1261,9 +1248,10 @@ void GUIStateMachine::setTextContents(
   {
     mText[key].contents = newContents;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_text_contents\", \"key\": " << key
-           << "\", \"label\": \"" << escapeJson(newContents) << "\" }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_text_contents()->set_key(getStringCode(key));
+      command->mutable_set_text_contents()->set_contents(newContents);
     });
   }
   else
@@ -1297,7 +1285,7 @@ void GUIStateMachine::createButton(
   mButtons[key] = button;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateButton(json, button); });
+      [&](proto::CommandList& list) { encodeCreateButton(list, button); });
 }
 
 /// This changes the contents of text on the screen
@@ -1310,9 +1298,10 @@ void GUIStateMachine::setButtonLabel(
   {
     mButtons[key].label = newLabel;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_button_label\", \"key\": " << key
-           << "\", \"label\": \"" << escapeJson(newLabel) << "\" }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_button_label()->set_key(getStringCode(key));
+      command->mutable_set_button_label()->set_label(newLabel);
     });
   }
   else
@@ -1354,7 +1343,7 @@ void GUIStateMachine::createSlider(
   mSliders[key] = slider;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateSlider(json, slider); });
+      [&](proto::CommandList& list) { encodeCreateSlider(list, slider); });
 }
 
 /// This changes the contents of text on the screen
@@ -1366,9 +1355,10 @@ void GUIStateMachine::setSliderValue(const std::string& key, s_t value)
   {
     mSliders[key].value = value;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_value\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(value) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_value()->set_key(getStringCode(key));
+      command->mutable_set_slider_value()->set_value(value);
     });
   }
   else
@@ -1389,9 +1379,10 @@ void GUIStateMachine::setSliderMin(const std::string& key, s_t min)
   {
     mSliders[key].min = min;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_min\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(min) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_min()->set_key(getStringCode(key));
+      command->mutable_set_slider_min()->set_value(min);
     });
   }
   else
@@ -1412,9 +1403,10 @@ void GUIStateMachine::setSliderMax(const std::string& key, s_t max)
   {
     mSliders[key].max = max;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_max\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(max) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_max()->set_key(getStringCode(key));
+      command->mutable_set_slider_max()->set_value(max);
     });
   }
   else
@@ -1457,7 +1449,7 @@ void GUIStateMachine::createPlot(
 
   mPlots[key] = plot;
 
-  queueCommand([&](std::stringstream& json) { encodeCreatePlot(json, plot); });
+  queueCommand([&](proto::CommandList& list) { encodeCreatePlot(list, plot); });
 }
 
 /// This changes the contents of a plot, along with its display limits
@@ -1481,17 +1473,21 @@ void GUIStateMachine::setPlotData(
     mPlots[key].minY = minY;
     mPlots[key].maxY = maxY;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_plot_data\", \"key\": " << key
-           << "\", \"xs\": ";
-      vecToJson(json, xs);
-      json << ", \"ys\": ";
-      vecToJson(json, ys);
-      json << ", \"min_x\": " << numberToJson(minX);
-      json << ", \"max_x\": " << numberToJson(maxX);
-      json << ", \"min_y\": " << numberToJson(minY);
-      json << ", \"max_y\": " << numberToJson(maxY);
-      json << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_plot_data()->set_key(getStringCode(key));
+      command->mutable_set_plot_data()->add_bounds(minX);
+      command->mutable_set_plot_data()->add_bounds(maxX);
+      command->mutable_set_plot_data()->add_bounds(minY);
+      command->mutable_set_plot_data()->add_bounds(maxY);
+      for (s_t x : xs)
+      {
+        command->mutable_set_plot_data()->add_xs(x);
+      }
+      for (s_t y : ys)
+      {
+        command->mutable_set_plot_data()->add_ys(y);
+      }
     });
   }
   else
@@ -1536,7 +1532,7 @@ void GUIStateMachine::createRichPlot(
   mRichPlots[key] = plot;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateRichPlot(json, plot); });
+      [&](proto::CommandList& list) { encodeCreateRichPlot(list, plot); });
 }
 
 /// This sets a single data stream for a rich plot. `name` should be human
@@ -1562,8 +1558,8 @@ void GUIStateMachine::setRichPlotData(
     data.ys = ys;
     mRichPlots[key].data[name] = data;
 
-    queueCommand([this, key, data](std::stringstream& json) {
-      encodeSetRichPlotData(json, key, data);
+    queueCommand([this, key, data](proto::CommandList& list) {
+      encodeSetRichPlotData(list, key, data);
     });
   }
   else
@@ -1588,14 +1584,13 @@ void GUIStateMachine::setRichPlotBounds(
     mRichPlots[key].minY = minY;
     mRichPlots[key].maxY = maxY;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_rich_plot_bounds\", \"key\": " << key
-           << "\", \"xs\": ";
-      json << ", \"min_x\": " << numberToJson(minX);
-      json << ", \"max_x\": " << numberToJson(maxX);
-      json << ", \"min_y\": " << numberToJson(minY);
-      json << ", \"max_y\": " << numberToJson(maxY);
-      json << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_rich_plot_bounds()->set_key(getStringCode(key));
+      command->mutable_set_rich_plot_bounds()->add_bounds(minX);
+      command->mutable_set_rich_plot_bounds()->add_bounds(maxX);
+      command->mutable_set_rich_plot_bounds()->add_bounds(minY);
+      command->mutable_set_rich_plot_bounds()->add_bounds(maxY);
     });
   }
   else
@@ -1630,11 +1625,11 @@ void GUIStateMachine::setUIElementPosition(
     mPlots[key].fromTopLeft = fromTopLeft;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_ui_elem_pos\", \"key\": " << key
-         << "\", \"from_top_left\": ";
-    vec2iToJson(json, fromTopLeft);
-    json << " }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_ui_elem_pos()->set_key(getStringCode(key));
+    command->mutable_set_ui_elem_pos()->add_fromtopleft(fromTopLeft(0));
+    command->mutable_set_ui_elem_pos()->add_fromtopleft(fromTopLeft(1));
   });
 }
 
@@ -1665,11 +1660,11 @@ void GUIStateMachine::setUIElementSize(
     mRichPlots[key].size = size;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_ui_elem_size\", \"key\": " << key
-         << "\", \"size\": ";
-    vec2iToJson(json, size);
-    json << " }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_ui_elem_size()->set_key(getStringCode(key));
+    command->mutable_set_ui_elem_size()->add_size(size(0));
+    command->mutable_set_ui_elem_size()->add_size(size(1));
   });
 }
 
@@ -1684,44 +1679,106 @@ void GUIStateMachine::deleteUIElement(const std::string& key)
   mPlots.erase(key);
   mRichPlots.erase(key);
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"delete_ui_elem\", \"key\": \"" << key << "\" }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_ui_elem()->set_key(getStringCode(key));
   });
 }
 
-void GUIStateMachine::queueCommand(
-    std::function<void(std::stringstream&)> writeCommand)
+/// This gets an integer code for a string
+int GUIStateMachine::getStringCode(const std::string& key)
 {
-  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
-
-  if (mMessagesQueued > 0)
+  if (mStringCodes.count(key) == 0)
   {
-    mJson << ",";
+    int code = mStringCodes.size() + 1;
+    mStringCodes[key] = code;
+    mCodeStrings[code] = key;
   }
-  mMessagesQueued++;
-  writeCommand(mJson);
+  return mStringCodes[key];
 }
 
-void GUIStateMachine::encodeCreateBox(std::stringstream& json, Box& box)
+/// This gets a string code for an integer
+std::string GUIStateMachine::getCodeString(int code)
 {
-  json << "{ \"type\": \"create_box\", \"key\": \"" << box.key
-       << "\", \"size\": ";
-  vec3ToJson(json, box.size);
-  json << ", \"pos\": ";
-  vec3ToJson(json, box.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, box.euler);
-  json << ", \"color\": ";
-  vec4ToJson(json, box.color);
-  json << ", \"layer\": \"" << box.layer << "\"";
-  json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
-  json << "}";
+  if (mCodeStrings.count(code) != 0)
+  {
+    return mCodeStrings[code];
+  }
+  else
+  {
+    return "";
+  }
+}
+
+void GUIStateMachine::queueCommand(
+    std::function<void(proto::CommandList&)> writeCommand)
+{
+  const std::lock_guard<std::recursive_mutex> lock(mProtoMutex);
+
+  writeCommand(mCommandList);
+  mMessagesQueued++;
+}
+
+void GUIStateMachine::encodeSetFramesPerSecond(
+    proto::CommandList& list, int framesPerSecond)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_frames_per_second()->set_framespersecond(
+      framesPerSecond);
+}
+
+void GUIStateMachine::encodeCreateLayer(proto::CommandList& list, Layer& layer)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_layer()->set_key(getStringCode(layer.key));
+  command->mutable_layer()->set_name(layer.key);
+  command->mutable_layer()->add_color(layer.color(0));
+  command->mutable_layer()->add_color(layer.color(1));
+  command->mutable_layer()->add_color(layer.color(2));
+  command->mutable_layer()->add_color(layer.color(3));
+  command->mutable_layer()->set_default_show(layer.defaultShow);
+}
+
+void GUIStateMachine::encodeCreateBox(proto::CommandList& list, Box& box)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_box()->set_key(getStringCode(box.key));
+  command->mutable_box()->set_layer(getStringCode(box.layer));
+  command->mutable_box()->add_data(box.size(0));
+  command->mutable_box()->add_data(box.size(1));
+  command->mutable_box()->add_data(box.size(2));
+  command->mutable_box()->add_data(box.pos(0));
+  command->mutable_box()->add_data(box.pos(1));
+  command->mutable_box()->add_data(box.pos(2));
+  command->mutable_box()->add_data(box.euler(0));
+  command->mutable_box()->add_data(box.euler(1));
+  command->mutable_box()->add_data(box.euler(2));
+  command->mutable_box()->add_data(box.color(0));
+  command->mutable_box()->add_data(box.color(1));
+  command->mutable_box()->add_data(box.color(2));
+  command->mutable_box()->add_data(box.color(3));
+  command->mutable_box()->set_cast_shadows(box.receiveShadows);
+  command->mutable_box()->set_receive_shadows(box.receiveShadows);
 }
 
 void GUIStateMachine::encodeCreateSphere(
-    std::stringstream& json, Sphere& sphere)
+    proto::CommandList& list, Sphere& sphere)
 {
+  proto::Command* command = list.add_command();
+  command->mutable_sphere()->set_key(getStringCode(sphere.key));
+  command->mutable_sphere()->set_layer(getStringCode(sphere.layer));
+  command->mutable_sphere()->set_cast_shadows(sphere.receiveShadows);
+  command->mutable_sphere()->set_receive_shadows(sphere.receiveShadows);
+  command->mutable_sphere()->add_data(sphere.radius);
+  command->mutable_sphere()->add_data(sphere.pos(0));
+  command->mutable_sphere()->add_data(sphere.pos(1));
+  command->mutable_sphere()->add_data(sphere.pos(2));
+  command->mutable_sphere()->add_data(sphere.color(0));
+  command->mutable_sphere()->add_data(sphere.color(1));
+  command->mutable_sphere()->add_data(sphere.color(2));
+  command->mutable_sphere()->add_data(sphere.color(3));
+
+  /*
   json << "{ \"type\": \"create_sphere\", \"key\": \"" << sphere.key
        << "\", \"radius\": " << numberToJson(sphere.radius);
   json << ", \"pos\": ";
@@ -1733,209 +1790,196 @@ void GUIStateMachine::encodeCreateSphere(
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
   json << "}";
+  */
 }
 
 void GUIStateMachine::encodeCreateCapsule(
-    std::stringstream& json, Capsule& capsule)
+    proto::CommandList& list, Capsule& capsule)
 {
-  json << "{ \"type\": \"create_capsule\", \"key\": \"" << capsule.key
-       << "\", \"radius\": " << numberToJson(capsule.radius)
-       << ", \"height\": " << numberToJson(capsule.height);
-  json << ", \"pos\": ";
-  vec3ToJson(json, capsule.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, capsule.euler);
-  json << ", \"color\": ";
-  vec4ToJson(json, capsule.color);
-  json << ", \"layer\": \"" << capsule.layer << "\"";
-  json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": "
-       << (capsule.receiveShadows ? "true" : "false");
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_capsule()->set_key(getStringCode(capsule.key));
+  command->mutable_capsule()->set_layer(getStringCode(capsule.layer));
+  command->mutable_capsule()->set_cast_shadows(capsule.receiveShadows);
+  command->mutable_capsule()->set_receive_shadows(capsule.receiveShadows);
+  command->mutable_capsule()->add_data(capsule.radius);
+  command->mutable_capsule()->add_data(capsule.height);
+  command->mutable_capsule()->add_data(capsule.pos(0));
+  command->mutable_capsule()->add_data(capsule.pos(1));
+  command->mutable_capsule()->add_data(capsule.pos(2));
+  command->mutable_capsule()->add_data(capsule.euler(0));
+  command->mutable_capsule()->add_data(capsule.euler(1));
+  command->mutable_capsule()->add_data(capsule.euler(2));
+  command->mutable_capsule()->add_data(capsule.color(0));
+  command->mutable_capsule()->add_data(capsule.color(1));
+  command->mutable_capsule()->add_data(capsule.color(2));
+  command->mutable_capsule()->add_data(capsule.color(3));
 }
 
-void GUIStateMachine::encodeCreateLine(std::stringstream& json, Line& line)
+void GUIStateMachine::encodeCreateLine(proto::CommandList& list, Line& line)
 {
-  json << "{ \"type\": \"create_line\", \"key\": \"" << line.key;
-  json << "\", \"points\": [";
-  bool firstPoint = true;
+  proto::Command* command = list.add_command();
+  command->mutable_line()->set_key(getStringCode(line.key));
+  command->mutable_line()->set_layer(getStringCode(line.layer));
+  command->mutable_line()->add_color(line.color(0));
+  command->mutable_line()->add_color(line.color(1));
+  command->mutable_line()->add_color(line.color(2));
+  command->mutable_line()->add_color(line.color(3));
   for (Eigen::Vector3s& point : line.points)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, point);
+    command->mutable_line()->add_points(point(0));
+    command->mutable_line()->add_points(point(1));
+    command->mutable_line()->add_points(point(2));
   }
-  json << "], \"color\": ";
-  vec4ToJson(json, line.color);
-  json << ", \"layer\": \"" << line.layer << "\"";
-  json << "}";
 }
 
-void GUIStateMachine::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
+void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
 {
-  json << "{ \"type\": \"create_mesh\", \"key\": \"" << mesh.key;
-  json << "\", \"vertices\": [";
-  bool firstPoint = true;
+  proto::Command* command = list.add_command();
+  command->mutable_mesh()->set_key(getStringCode(mesh.key));
+  command->mutable_mesh()->set_layer(getStringCode(mesh.layer));
   for (Eigen::Vector3s& vertex : mesh.vertices)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, vertex);
+    command->mutable_mesh()->add_vertex(vertex(0));
+    command->mutable_mesh()->add_vertex(vertex(1));
+    command->mutable_mesh()->add_vertex(vertex(2));
   }
-  json << "], \"vertex_normals\": [";
-  firstPoint = true;
   for (Eigen::Vector3s& normal : mesh.vertexNormals)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, normal);
+    command->mutable_mesh()->add_vertex_normal(normal(0));
+    command->mutable_mesh()->add_vertex_normal(normal(1));
+    command->mutable_mesh()->add_vertex_normal(normal(2));
   }
-  json << "], \"faces\": [";
-  firstPoint = true;
   for (Eigen::Vector3i& face : mesh.faces)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3iToJson(json, face);
+    command->mutable_mesh()->add_face(face(0));
+    command->mutable_mesh()->add_face(face(1));
+    command->mutable_mesh()->add_face(face(2));
   }
-  json << "], \"uv\": [";
-  firstPoint = true;
   for (Eigen::Vector2s& uv : mesh.uv)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec2dToJson(json, uv);
+    command->mutable_mesh()->add_uv(uv(0));
+    command->mutable_mesh()->add_uv(uv(1));
   }
-  json << "], \"texture_starts\": [";
-  firstPoint = true;
   for (int i = 0; i < mesh.textures.size(); i++)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    json << "{ \"key\": \"" << mesh.textures[i]
-         << "\", \"start\": " << mesh.textureStartIndices[i] << "}";
+    command->mutable_mesh()->add_texture(getStringCode(mesh.textures[i]));
+    command->mutable_mesh()->add_texture_start(mesh.textureStartIndices[i]);
   }
-  json << "], \"color\": ";
-  vec4ToJson(json, mesh.color);
-  json << ", \"pos\": ";
-  vec3ToJson(json, mesh.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, mesh.euler);
-  json << ", \"scale\": ";
-  vec3ToJson(json, mesh.scale);
-  json << ", \"layer\": \"" << mesh.layer << "\"";
-  json << ", \"cast_shadows\": " << (mesh.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": " << (mesh.receiveShadows ? "true" : "false");
-  json << "}";
+  command->mutable_mesh()->add_data(mesh.scale(0));
+  command->mutable_mesh()->add_data(mesh.scale(1));
+  command->mutable_mesh()->add_data(mesh.scale(2));
+  command->mutable_mesh()->add_data(mesh.pos(0));
+  command->mutable_mesh()->add_data(mesh.pos(1));
+  command->mutable_mesh()->add_data(mesh.pos(2));
+  command->mutable_mesh()->add_data(mesh.euler(0));
+  command->mutable_mesh()->add_data(mesh.euler(1));
+  command->mutable_mesh()->add_data(mesh.euler(2));
+  command->mutable_mesh()->add_data(mesh.color(0));
+  command->mutable_mesh()->add_data(mesh.color(1));
+  command->mutable_mesh()->add_data(mesh.color(2));
+  command->mutable_mesh()->add_data(mesh.color(3));
+  command->mutable_mesh()->set_cast_shadows(mesh.receiveShadows);
+  command->mutable_mesh()->set_receive_shadows(mesh.receiveShadows);
 }
 
 void GUIStateMachine::encodeCreateTexture(
-    std::stringstream& json, Texture& texture)
+    proto::CommandList& list, Texture& texture)
 {
-  json << "{ \"type\": \"create_texture\", \"key\": \"" << texture.key;
-  json << "\", \"base64\": \"" << texture.base64 << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_texture()->set_key(getStringCode(texture.key));
+  command->mutable_texture()->set_base64(texture.base64);
 }
 
 void GUIStateMachine::encodeEnableMouseInteraction(
-    std::stringstream& json, const std::string& key)
+    proto::CommandList& list, const std::string& key)
 {
-  json << "{ \"type\": \"enable_mouse\", \"key\": \"" << key << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_enable_mouse_interaction()->set_key(getStringCode(key));
 }
 
-void GUIStateMachine::encodeCreateText(std::stringstream& json, Text& text)
+void GUIStateMachine::encodeCreateText(proto::CommandList& list, Text& text)
 {
-  json << "{ \"type\": \"create_text\", \"key\": \"" << text.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, text.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, text.size);
-  json << ", \"layer\": \"" << text.layer << "\"";
-  json << ", \"contents\": \"" << escapeJson(text.contents);
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_text()->set_key(getStringCode(text.key));
+  command->mutable_text()->set_layer(getStringCode(text.layer));
+  command->mutable_text()->add_pos(text.fromTopLeft(0));
+  command->mutable_text()->add_pos(text.fromTopLeft(1));
+  command->mutable_text()->add_pos(text.size(0));
+  command->mutable_text()->add_pos(text.size(1));
+  command->mutable_text()->set_contents(text.contents);
 }
 
 void GUIStateMachine::encodeCreateButton(
-    std::stringstream& json, Button& button)
+    proto::CommandList& list, Button& button)
 {
-  json << "{ \"type\": \"create_button\", \"key\": \"" << button.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, button.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, button.size);
-  json << ", \"layer\": \"" << button.layer << "\"";
-  json << ", \"label\": \"" << escapeJson(button.label);
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_button()->set_key(getStringCode(button.key));
+  command->mutable_button()->set_layer(getStringCode(button.layer));
+  command->mutable_button()->add_pos(button.fromTopLeft(0));
+  command->mutable_button()->add_pos(button.fromTopLeft(1));
+  command->mutable_button()->add_pos(button.size(0));
+  command->mutable_button()->add_pos(button.size(1));
+  command->mutable_button()->set_label(button.label);
 }
 
 void GUIStateMachine::encodeCreateSlider(
-    std::stringstream& json, Slider& slider)
+    proto::CommandList& list, Slider& slider)
 {
-  json << "{ \"type\": \"create_slider\", \"key\": \"" << slider.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, slider.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, slider.size);
-  json << ", \"max\": " << numberToJson(slider.max);
-  json << ", \"min\": " << numberToJson(slider.min);
-  json << ", \"value\": " << numberToJson(slider.value);
-  json << ", \"layer\": \"" << slider.layer << "\"";
-  json << ", \"only_ints\": " << (slider.onlyInts ? "true" : "false");
-  json << ", \"horizontal\": " << (slider.horizontal ? "true" : "false");
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_slider()->set_key(getStringCode(slider.key));
+  command->mutable_slider()->set_layer(getStringCode(slider.layer));
+  command->mutable_slider()->add_pos(slider.fromTopLeft(0));
+  command->mutable_slider()->add_pos(slider.fromTopLeft(1));
+  command->mutable_slider()->add_pos(slider.size(0));
+  command->mutable_slider()->add_pos(slider.size(1));
+  command->mutable_slider()->add_data(slider.min);
+  command->mutable_slider()->add_data(slider.max);
+  command->mutable_slider()->add_data(slider.value);
+  command->mutable_slider()->set_only_ints(slider.onlyInts);
+  command->mutable_slider()->set_horizontal(slider.horizontal);
 }
 
-void GUIStateMachine::encodeCreatePlot(std::stringstream& json, Plot& plot)
+void GUIStateMachine::encodeCreatePlot(proto::CommandList& list, Plot& plot)
 {
-  json << "{ \"type\": \"create_plot\", \"key\": \"" << plot.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, plot.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, plot.size);
-  json << ", \"max_x\": " << numberToJson(plot.maxX);
-  json << ", \"min_x\": " << numberToJson(plot.minX);
-  json << ", \"max_y\": " << numberToJson(plot.maxY);
-  json << ", \"min_y\": " << numberToJson(plot.minY);
-  json << ", \"xs\": ";
-  vecToJson(json, plot.xs);
-  json << ", \"ys\": ";
-  vecToJson(json, plot.ys);
-  json << ", \"layer\": \"" << plot.layer << "\"";
-  json << ", \"plot_type\": \"" << plot.type;
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_plot()->set_key(getStringCode(plot.key));
+  command->mutable_plot()->set_layer(getStringCode(plot.layer));
+  command->mutable_plot()->set_plot_type(plot.type);
+  command->mutable_plot()->add_pos(plot.fromTopLeft(0));
+  command->mutable_plot()->add_pos(plot.fromTopLeft(1));
+  command->mutable_plot()->add_pos(plot.size(0));
+  command->mutable_plot()->add_pos(plot.size(1));
+  command->mutable_plot()->add_bounds(plot.minX);
+  command->mutable_plot()->add_bounds(plot.maxX);
+  command->mutable_plot()->add_bounds(plot.minY);
+  command->mutable_plot()->add_bounds(plot.maxY);
+  for (s_t x : plot.xs)
+  {
+    command->mutable_plot()->add_xs(x);
+  }
+  for (s_t y : plot.ys)
+  {
+    command->mutable_plot()->add_ys(y);
+  }
 }
 
 void GUIStateMachine::encodeCreateRichPlot(
-    std::stringstream& json, RichPlot& plot)
+    proto::CommandList& list, RichPlot& plot)
 {
-  json << "{ \"type\": \"create_rich_plot\", \"key\": \"" << plot.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, plot.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, plot.size);
-  json << ", \"max_x\": " << numberToJson(plot.maxX);
-  json << ", \"min_x\": " << numberToJson(plot.minX);
-  json << ", \"max_y\": " << numberToJson(plot.maxY);
-  json << ", \"min_y\": " << numberToJson(plot.minY);
-  json << ", \"layer\": \"" << plot.layer << "\"";
-  json << ", \"title\": \"";
-  json << plot.title;
-  json << "\", \"x_axis_label\": \"";
-  json << plot.xAxisLabel;
-  json << "\", \"y_axis_label\": \"";
-  json << plot.yAxisLabel;
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_rich_plot()->set_key(getStringCode(plot.key));
+  command->mutable_rich_plot()->set_layer(getStringCode(plot.layer));
+  command->mutable_rich_plot()->add_pos(plot.fromTopLeft(0));
+  command->mutable_rich_plot()->add_pos(plot.fromTopLeft(1));
+  command->mutable_rich_plot()->add_pos(plot.size(0));
+  command->mutable_rich_plot()->add_pos(plot.size(1));
+  command->mutable_rich_plot()->add_bounds(plot.minX);
+  command->mutable_rich_plot()->add_bounds(plot.maxX);
+  command->mutable_rich_plot()->add_bounds(plot.minY);
+  command->mutable_rich_plot()->add_bounds(plot.maxY);
+  command->mutable_rich_plot()->set_title(plot.title);
+  command->mutable_rich_plot()->set_x_axis_label(plot.xAxisLabel);
+  command->mutable_rich_plot()->set_y_axis_label(plot.yAxisLabel);
 }
 
 /*
@@ -1950,22 +1994,23 @@ export type SetRichPlotData = {
 };
 */
 void GUIStateMachine::encodeSetRichPlotData(
-    std::stringstream& json,
+    proto::CommandList& list,
     const std::string& plotKey,
     const RichPlotData& data)
 {
-  json << "{ \"type\": \"set_rich_plot_data\", \"key\": \"" << plotKey
-       << "\", \"name\": \"";
-  json << data.name;
-  json << "\", \"color\": \"";
-  json << data.color;
-  json << "\", \"plot_type\": \"";
-  json << data.type;
-  json << "\", \"xs\": ";
-  vecToJson(json, data.xs);
-  json << ", \"ys\": ";
-  vecToJson(json, data.ys);
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_set_rich_plot_data()->set_key(getStringCode(plotKey));
+  command->mutable_set_rich_plot_data()->set_name(data.name);
+  command->mutable_set_rich_plot_data()->set_color(data.color);
+  command->mutable_set_rich_plot_data()->set_plot_type(data.type);
+  for (s_t x : data.xs)
+  {
+    command->mutable_set_rich_plot_data()->add_xs(x);
+  }
+  for (s_t y : data.ys)
+  {
+    command->mutable_set_rich_plot_data()->add_ys(y);
+  }
 }
 
 } // namespace server

@@ -1,10 +1,14 @@
 import NimbleView from "./NimbleView";
 // import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import { CommandRecording } from "./types";
+import protobuf from 'google-protobuf';
+import {dart} from './proto/GUI';
+import { createHash } from 'sha256-uint8array';
 
 class NimbleStandalone {
   view: NimbleView | null;
-  recording: CommandRecording;
+  lastRecordingHash: string;
+  recording: dart.proto.CommandList[];
   playing: boolean;
   startedPlaying: number;
   msPerFrame: number;
@@ -27,6 +31,12 @@ class NimbleStandalone {
     this.viewContainer.className = "NimbleStandalone-container";
     container.appendChild(this.viewContainer);
     this.view = new NimbleView(this.viewContainer, true);
+
+    const instructions = document.createElement("div");
+    instructions.innerHTML = "Press [Space] to Play/Pause"
+    instructions.className =
+      "NimbleStandalone-progress-instructions";
+    this.viewContainer.appendChild(instructions);
 
     this.progressBarContainer = document.createElement("div");
     this.progressBarContainer.className =
@@ -54,7 +64,7 @@ class NimbleStandalone {
       if (this.playing) this.togglePlay();
       this.lastFrame = Math.round(this.recording.length * percentage);
       if (this.view != null) {
-        this.recording[this.lastFrame].forEach(this.view.handleCommand);
+        this.recording[this.lastFrame].command.forEach(this.view.handleCommand);
         this.view.render();
       }
       this.setProgress(percentage);
@@ -79,6 +89,7 @@ class NimbleStandalone {
       }
     });
 
+    this.lastRecordingHash = "";
     this.recording = [];
     this.playing = false;
     this.startedPlaying = new Date().getTime();
@@ -248,9 +259,29 @@ class NimbleStandalone {
    *
    * @param recording The JSON object representing a recording of timestep(s) command(s)
    */
-  setRecording = (recording: CommandRecording) => {
-    if (recording != this.recording) {
-      this.recording = recording;
+  setRecording = (rawBytes: Uint8Array) => {
+    const hash = createHash().update(rawBytes).digest("hex");
+
+    if (hash !== this.lastRecordingHash) {
+      this.lastRecordingHash = hash;
+
+      this.recording = [];
+      let cursor = 0;
+      while (cursor < rawBytes.length) {
+        // Read thet size byte
+        const u32bytes = rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
+        const size = new Uint32Array(u32bytes)[0];
+        cursor += 4;
+        try {
+          let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(rawBytes.buffer.slice(cursor, cursor + size));
+          this.recording.push(command);
+        }
+        catch (e) {
+          console.error(e);
+        }
+        cursor += size;
+      }
+
       this.view.view.onWindowResize();
       if (!this.playing) {
         this.togglePlay();
@@ -267,6 +298,16 @@ class NimbleStandalone {
       this.startFrame = this.lastFrame;
       this.startedPlaying = new Date().getTime();
       this.animationFrame();
+    }
+  };
+
+  handleCommand = (command: dart.proto.Command) => {
+    if (command.set_frames_per_second) {
+      console.log("Frames per second: " + command.set_frames_per_second);
+      this.msPerFrame = 1000 / command.set_frames_per_second.framesPerSecond;
+    }
+    else {
+      this.view.handleCommand(command);
     }
   };
 
@@ -289,7 +330,7 @@ class NimbleStandalone {
       this.setProgress(frameNumber / this.recording.length);
       if (this.view != null) {
         for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
-          this.recording[i].forEach(this.view.handleCommand);
+          this.recording[i].command.forEach(this.handleCommand);
         }
         this.view.render();
       }

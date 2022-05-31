@@ -6,17 +6,19 @@ import View from "./components/View";
 import Slider from "./components/Slider";
 import SimplePlot from "./components/SimplePlot";
 import RichPlot from "./components/RichPlot";
+import { dart } from './proto/GUI';
 import VERSION_NUM from "../../VERSION.txt";
 import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
 import rightMouseSvg from "!!raw-loader!./rightMouse.svg";
+import scrollMouseSvg from "!!raw-loader!./scrollMouse.svg";
 
 const SCALE_FACTOR = 100;
 
 type Text = {
   type: "text";
   container: HTMLElement;
-  key: string;
+  key: number;
   from_top_left: number[];
   size: number[];
   contents: string;
@@ -26,7 +28,7 @@ type Button = {
   type: "button";
   container: HTMLElement;
   buttonElem: HTMLButtonElement;
-  key: string;
+  key: number;
   from_top_left: number[];
   size: number[];
   label: string;
@@ -35,27 +37,43 @@ type Button = {
 class Layer {
   view: DARTView;
   shown: boolean;
+  key: number;
   name: string;
-  objects: Set<string>;
-  uiElements: Set<string>;
+  color: number[];
+  objects: Set<number>;
+  uiElements: Set<number>;
 
-  constructor(name: string, view: DARTView) {
+  constructor(key: number, name: string, color: number[], shown: boolean, view: DARTView) {
+    this.key = key;
     this.name = name;
+    this.color = color;
     this.view = view;
     this.objects = new Set();
     this.uiElements = new Set();
-    this.shown = true;
+    this.shown = shown;
 
     const row = document.createElement("tr");
-    const nameCell = document.createElement("td");
-    row.appendChild(nameCell);
-    nameCell.innerHTML = this.name === '' ? 'Default' : this.name;
+
     const checkCell = document.createElement("td");
     row.appendChild(checkCell);
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = true;
+    checkbox.checked = shown;
     checkCell.appendChild(checkbox);
+
+    const nameCell = document.createElement("td");
+    row.appendChild(nameCell);
+    const nameColor = document.createElement('div');
+    nameColor.style.width = '20px';
+    nameColor.style.height = '20px';
+    nameColor.style.marginRight = '7px';
+    nameColor.style.display = 'inline-block';
+    nameColor.style.verticalAlign = 'middle';
+    nameColor.style.backgroundColor = 'rgba('+(color[0]*255)+','+(color[1]*255)+','+(color[2]*255)+','+color[3]+')';
+    nameCell.appendChild(nameColor);
+    const nameSpan = document.createElement("span");
+    nameSpan.innerHTML = this.name === '' ? 'Default' : this.name;
+    nameCell.appendChild(nameSpan);
 
     this.view.layersTable.appendChild(row);
 
@@ -69,7 +87,7 @@ class Layer {
     };
   }
 
-  addObject = (key: string) => {
+  addObject = (key: number) => {
     this.objects.add(key);
     if (this.shown) {
       this.view.showObject(key);
@@ -79,15 +97,17 @@ class Layer {
     }
   };
 
-  addUIElement = (key: string) => {
+  addUIElement = (key: number) => {
     this.uiElements.add(key);
   };
 
   show = () => {
+    console.log("Show: "+this.name);
     this.shown = true;
     this.objects.forEach((key) => {
       this.view.showObject(key);
     });
+    this.view.render();
   };
 
   hide = () => {
@@ -95,6 +115,7 @@ class Layer {
     this.objects.forEach((key) => {
       this.view.hideObject(key);
     });
+    this.view.render();
   };
 }
 
@@ -106,19 +127,19 @@ class DARTView {
   view: View;
   running: boolean;
 
-  objects: Map<string, THREE.Group | THREE.Mesh | THREE.Line>;
-  keys: Map<THREE.Object3D, string>;
-  textures: Map<string, THREE.Texture>;
-  disposeHandlers: Map<string, () => void>;
-  objectType: Map<string, string>;
+  objects: Map<number, THREE.Group | THREE.Mesh | THREE.Line>;
+  keys: Map<THREE.Object3D, number>;
+  textures: Map<number, THREE.Texture>;
+  disposeHandlers: Map<number, () => void>;
+  objectType: Map<number, string>;
 
-  uiElements: Map<string, Text | Button | Slider | SimplePlot | RichPlot>;
+  uiElements: Map<number, Text | Button | Slider | SimplePlot | RichPlot>;
 
-  dragListeners: ((key: string, pos: number[]) => void)[];
+  dragListeners: ((key: number, pos: number[]) => void)[];
 
   sphereGeometry: THREE.SphereBufferGeometry;
 
-  layers: Map<string, Layer>;
+  layers: Map<number, Layer>;
 
   connected: boolean;
   notConnectedWarning: HTMLElement;
@@ -226,9 +247,6 @@ class DARTView {
 
     const instructionsRow1 = document.createElement("tr");
     instructions.appendChild(instructionsRow1);
-    const instructionsRow2 = document.createElement("tr");
-    instructions.appendChild(instructionsRow2);
-
     const leftMouseCell = document.createElement("td");
     instructionsRow1.appendChild(leftMouseCell);
     const leftMouseImg = document.createElement("svg");
@@ -238,6 +256,8 @@ class DARTView {
     instructionsRow1.appendChild(leftMouseInstructionsCell);
     leftMouseInstructionsCell.innerHTML = "Rotate view";
 
+    const instructionsRow2 = document.createElement("tr");
+    instructions.appendChild(instructionsRow2);
     const rightMouseCell = document.createElement("td");
     instructionsRow2.appendChild(rightMouseCell);
     const rightMouseImg = document.createElement("svg");
@@ -247,18 +267,21 @@ class DARTView {
     instructionsRow2.appendChild(rightMouseInstructionsCell);
     rightMouseInstructionsCell.innerHTML = "Translate view";
 
+    const instructionsRow3 = document.createElement("tr");
+    instructions.appendChild(instructionsRow3);
+    const scrollMouseCell = document.createElement("td");
+    instructionsRow3.appendChild(scrollMouseCell);
+    const scrollMouseImg = document.createElement("svg");
+    scrollMouseImg.innerHTML = scrollMouseSvg;
+    scrollMouseCell.appendChild(scrollMouseImg);
+    const scrollMouseInstructionsCell = document.createElement("td");
+    instructionsRow3.appendChild(scrollMouseInstructionsCell);
+    scrollMouseInstructionsCell.innerHTML = "Zoom view";
+
     this.uiContainer.appendChild(instructions);
 
     this.layersTable = document.createElement("table");
     this.layersTable.className = "GUI_layers";
-    const layersTitleRow = document.createElement("tr");
-    const layersNameTitle = document.createElement("td");
-    layersTitleRow.appendChild(layersNameTitle);
-    layersNameTitle.innerHTML = "Layer";
-    const layersCheckTitle = document.createElement("td");
-    layersTitleRow.appendChild(layersCheckTitle);
-    layersCheckTitle.innerHTML = "Show/Hide";
-    this.layersTable.appendChild(layersTitleRow);
 
     this.uiContainer.appendChild(this.layersTable);
 
@@ -271,15 +294,6 @@ class DARTView {
       NUM_SPHERE_SEGMENTS
     );
   }
-
-  getLayer = (name: string) => {
-    let layer = this.layers.get(name);
-    if (layer == null) {
-      layer = new Layer(name, this);
-      this.layers.set(name, layer);
-    }
-    return layer;
-  };
 
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
     if (e.key === " ") {
@@ -308,152 +322,270 @@ class DARTView {
   /**
    * This reads and handles a command sent from the backend
    */
-  handleCommand = (command: Command) => {
-    if (command.type === "create_box") {
+  handleCommand = (command: dart.proto.Command) => {
+    if (command.layer != null) {
+      const key = command.layer.key;
+      const name = command.layer.name;
+      const color = command.layer.color;
+      const show = command.layer.default_show === true;
+      this.createLayer(key, name, color, show);
+    }
+    else if (command.box != null) {
+      const data = command.box.data;
+      const size: number[] = [data[0], data[1], data[2]];
+      const pos: number[] = [data[3], data[4], data[5]];
+      const euler: number[] = [data[6], data[7], data[8]];
+      const color: number[] = [data[9], data[10], data[11], data[12]];
       this.createBox(
-        command.key,
-        command.size,
-        command.pos,
-        command.euler,
-        command.color,
-        command.layer,
-        command.cast_shadows,
-        command.receive_shadows
+        command.box.key,
+        size,
+        pos,
+        euler,
+        color,
+        command.box.layer,
+        command.box.cast_shadows === true,
+        command.box.receive_shadows === true
       );
-    } else if (command.type === "create_sphere") {
+    }
+    else if (command.sphere != null) {
+      const data = command.sphere.data;
+      const radius: number = data[0];
+      const pos: number[] = [data[1], data[2], data[3]];
+      const color: number[] = [data[4], data[5], data[6], data[7]];
       this.createSphere(
-        command.key,
-        command.radius,
-        command.pos,
-        command.color,
-        command.layer,
-        command.cast_shadows,
-        command.receive_shadows
+        command.sphere.key,
+        radius,
+        pos,
+        color,
+        command.sphere.layer,
+        command.sphere.cast_shadows === true,
+        command.sphere.receive_shadows === true
       );
-    } else if (command.type === "create_capsule") {
+    }
+    else if (command.capsule != null) {
+      const data = command.capsule.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
       this.createCapsule(
-        command.key,
-        command.radius,
-        command.height,
-        command.pos,
-        command.euler,
-        command.color,
-        command.layer,
-        command.cast_shadows,
-        command.receive_shadows
+        command.capsule.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.capsule.layer,
+        command.capsule.cast_shadows === true,
+        command.capsule.receive_shadows === true
       );
-    } else if (command.type === "create_line") {
-      this.createLine(command.key, command.points, command.color, command.layer);
-    } else if (command.type === "create_mesh") {
+    }
+    else if (command.line != null) {
+      const color: number[] = [command.line.color[0], command.line.color[1], command.line.color[2], command.line.color[3]];
+      const vertices: number[][] = [];
+      for (let i = 0; i < command.line.points.length; i++) {
+        if (i % 3 == 0) {
+          vertices.push([]);
+        }
+        vertices[vertices.length-1].push(command.line.points[i]);
+      }
+
+      this.createLine(
+        command.line.key,
+        vertices,
+        color,
+        command.line.layer
+      );
+    }
+    else if (command.mesh != null) {
+      const vertices: number[][] = [];
+      const vertexNormals: number[][] = [];
+      for (let i = 0; i < command.mesh.vertex.length; i++) {
+        if (i % 3 == 0) {
+          vertices.push([]);
+          vertexNormals.push([]);
+        }
+        vertices[vertices.length-1].push(command.mesh.vertex[i]);
+        vertexNormals[vertexNormals.length-1].push(command.mesh.vertex_normal[i]);
+      }
+      const faces: number[][] = [];
+      for (let i = 0; i < command.mesh.face.length; i++) {
+        if (i % 3 == 0) {
+          faces.push([]);
+        }
+        faces[faces.length-1].push(command.mesh.face[i]);
+      }
+      const uvs: number[][] = [];
+      for (let i = 0; i < command.mesh.uv.length; i++) {
+        if (i % 2 == 0) {
+          uvs.push([]);
+        }
+        uvs[uvs.length-1].push(command.mesh.uv[i]);
+      }
+      const texture_starts: {
+        key: number,
+        start: number
+      }[] = [];
+      for (let i = 0; i < command.mesh.texture.length; i++) {
+        texture_starts.push({
+          key: command.mesh.texture[i],
+          start: command.mesh.texture_start[i]
+        });
+      }
+      const data = command.mesh.data;
+      const scale: number[] = [data[0], data[1], data[2]];
+      const pos: number[] = [data[3], data[4], data[5]];
+      const euler: number[] = [data[6], data[7], data[8]];
+      const color: number[] = [data[9], data[10], data[11], data[12]];
       this.createMesh(
-        command.key,
-        command.vertices,
-        command.vertex_normals,
-        command.faces,
-        command.uv,
-        command.texture_starts,
-        command.pos,
-        command.euler,
-        command.scale,
-        command.color,
-        command.layer,
-        command.cast_shadows,
-        command.receive_shadows
+        command.mesh.key,
+        vertices,
+        vertexNormals,
+        faces,
+        uvs,
+        texture_starts,
+        pos,
+        euler,
+        scale,
+        color,
+        command.mesh.layer,
+        command.mesh.cast_shadows === true,
+        command.mesh.receive_shadows === true
       );
-    } else if (command.type === "create_texture") {
-      this.createTexture(command.key, command.base64);
-    } else if (command.type === "set_object_pos") {
-      this.setObjectPos(command.key, command.pos);
-    } else if (command.type === "set_object_rotation") {
-      this.setObjectRotation(command.key, command.euler);
-    } else if (command.type === "set_object_color") {
-      this.setObjectColor(command.key, command.color);
-    } else if (command.type === "set_object_scale") {
-      this.setObjectScale(command.key, command.scale);
-    } else if (command.type === "enable_mouse") {
-      this.enableMouseInteraction(command.key);
-    } else if (command.type === "disable_mouse") {
-      this.disableMouseInteraction(command.key);
-    } else if (command.type === "create_text") {
+    }
+    else if (command.texture != null) {
+      this.createTexture(command.texture.key, command.texture.base64);
+    }
+    else if (command.set_object_position != null) {
+      const data = command.set_object_position.data;
+      const pos: number[] = [data[0], data[1], data[2]];
+      this.setObjectPos(command.set_object_position.key, pos);
+    }
+    else if (command.set_object_rotation != null) {
+      const data = command.set_object_rotation.data;
+      const euler: number[] = [data[0], data[1], data[2]];
+      this.setObjectRotation(command.set_object_rotation.key, euler);
+    }
+    else if (command.set_object_scale != null) {
+      const data = command.set_object_scale.data;
+      const scale: number[] = [data[0], data[1], data[2]];
+      this.setObjectScale(command.set_object_scale.key, scale);
+    }
+    else if (command.set_object_scale != null) {
+      const data = command.set_object_scale.data;
+      const color: number[] = [data[0], data[1], data[2], data[3]];
+      this.setObjectColor(command.set_object_scale.key, color);
+    }
+    else if (command.enable_mouse_interaction != null) {
+      this.enableMouseInteraction(command.enable_mouse_interaction.key);
+    }
+    else if (command.text != null) {
+      const from_top_left: number[] = [command.text.pos[0], command.text.pos[1]];
+      const size: number[] = [command.text.pos[2], command.text.pos[3]];
       this.createText(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.contents,
-        command.layer
+        command.text.key,
+        from_top_left,
+        size,
+        command.text.contents,
+        command.text.layer
       );
-    } else if (command.type === "create_plot") {
+    }
+    else if (command.plot != null) {
+      const from_top_left: number[] = [command.plot.pos[0], command.plot.pos[1]];
+      const size: number[] = [command.plot.pos[2], command.plot.pos[3]];
+      const minX = command.plot.bounds[0];
+      const maxX = command.plot.bounds[1];
+      const minY = command.plot.bounds[2];
+      const maxY = command.plot.bounds[3];
       this.createSimplePlot(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.min_x,
-        command.max_x,
-        command.xs,
-        command.min_y,
-        command.max_y,
-        command.ys,
-        command.plot_type,
-        command.layer
+        command.plot.key,
+        from_top_left,
+        size,
+        minX,
+        maxX,
+        command.plot.xs,
+        minY,
+        maxY,
+        command.plot.ys,
+        command.plot.plot_type as any,
+        command.plot.layer
       );
-    } else if (command.type === "create_rich_plot") {
+    }
+    else if (command.rich_plot != null) {
+      const from_top_left: number[] = [command.rich_plot.pos[0], command.rich_plot.pos[1]];
+      const size: number[] = [command.rich_plot.pos[2], command.rich_plot.pos[3]];
+      const minX = command.rich_plot.bounds[0];
+      const maxX = command.rich_plot.bounds[1];
+      const minY = command.rich_plot.bounds[2];
+      const maxY = command.rich_plot.bounds[3];
       this.createRichPlot(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.min_x,
-        command.max_x,
-        command.min_y,
-        command.max_y,
-        command.title,
-        command.x_axis_label,
-        command.y_axis_label,
-        command.layer
+        command.rich_plot.key,
+        from_top_left,
+        size,
+        minX,
+        maxX,
+        minY,
+        maxY,
+        command.rich_plot.title,
+        command.rich_plot.x_axis_label,
+        command.rich_plot.y_axis_label,
+        command.rich_plot.layer
       );
-    } else if (command.type === "set_rich_plot_data") {
+    }
+    else if (command.set_rich_plot_data != null) {
       this.setRichPlotData(
-        command.key,
-        command.name,
-        command.xs,
-        command.ys,
-        command.color,
-        command.plot_type
+        command.set_rich_plot_data.key,
+        command.set_rich_plot_data.name,
+        command.set_rich_plot_data.xs,
+        command.set_rich_plot_data.ys,
+        command.set_rich_plot_data.color,
+        command.set_rich_plot_data.plot_type as any
       );
-    } else if (command.type === "set_rich_plot_bounds") {
+    }
+    else if (command.set_rich_plot_bounds != null) {
+      const minX = command.set_rich_plot_bounds.bounds[0];
+      const maxX = command.set_rich_plot_bounds.bounds[1];
+      const minY = command.set_rich_plot_bounds.bounds[2];
+      const maxY = command.set_rich_plot_bounds.bounds[3];
       this.setRichPlotBounds(
-        command.key,
-        command.min_x,
-        command.max_x,
-        command.min_y,
-        command.max_y,
+        command.set_rich_plot_bounds.key,
+        minX,
+        maxX,
+        minY,
+        maxY,
       );
-    } else if (command.type === "set_ui_elem_pos") {
-      this.setUIElementPosition(command.key, command.from_top_left);
-    } else if (command.type === "set_ui_elem_size") {
-      this.setUIElementSize(command.key, command.size);
-    } else if (command.type === "delete_ui_elem") {
-      this.deleteUIElement(command.key);
-    } else if (command.type === "delete_object") {
-      this.deleteObject(command.key);
-    } else if (command.type === "set_text_contents") {
-      this.setTextContents(command.key, command.contents);
-    } else if (command.type === "set_button_label") {
-      this.setButtonLabel(command.key, command.label);
-    } else if (command.type === "set_slider_value") {
-      this.setSliderValue(command.key, command.value);
-    } else if (command.type === "set_slider_min") {
-      this.setSliderMin(command.key, command.min);
-    } else if (command.type === "set_slider_max") {
-      this.setSliderMax(command.key, command.max);
-    } else if (command.type === "set_plot_data") {
+    } else if (command.set_ui_elem_pos != null) {
+      this.setUIElementPosition(command.set_ui_elem_pos.key, command.set_ui_elem_pos.fromTopLeft);
+    } else if (command.set_ui_elem_size != null) {
+      this.setUIElementSize(command.set_ui_elem_size.key, command.set_ui_elem_size.size);
+    } else if (command.delete_ui_elem != null) {
+      this.deleteUIElement(command.delete_ui_elem.key);
+    } else if (command.delete_object != null) {
+      this.deleteObject(command.delete_object.key);
+    } else if (command.set_text_contents != null) {
+      this.setTextContents(command.set_text_contents.key, command.set_text_contents.contents);
+    } else if (command.set_button_label != null) {
+      this.setButtonLabel(command.set_button_label.key, command.set_button_label.label);
+    } else if (command.set_slider_value != null) {
+      this.setSliderValue(command.set_slider_value.key, command.set_slider_value.value);
+    } else if (command.set_slider_min != null) {
+      this.setSliderMin(command.set_slider_min.key, command.set_slider_min.value);
+    } else if (command.set_slider_max != null) {
+      this.setSliderMax(command.set_slider_max.key, command.set_slider_max.value);
+    } else if (command.set_plot_data != null) {
+      const minX = command.set_plot_data.bounds[0];
+      const maxX = command.set_plot_data.bounds[1];
+      const minY = command.set_plot_data.bounds[2];
+      const maxY = command.set_plot_data.bounds[3];
       this.setPlotData(
-        command.key,
-        command.min_x,
-        command.max_x,
-        command.xs,
-        command.min_y,
-        command.max_y,
-        command.ys
+        command.set_plot_data.key,
+        minX,
+        maxX,
+        command.set_plot_data.xs,
+        minY,
+        maxY,
+        command.set_plot_data.ys
       );
     }
   };
@@ -482,14 +614,14 @@ class DARTView {
   /**
    * This adds a listener for dragging events
    */
-  addDragListener = (dragListener: (key: string, pos: number[]) => void) => {
+  addDragListener = (dragListener: (key: number, pos: number[]) => void) => {
     this.dragListeners.push(dragListener);
   };
 
   /**
    * This enables mouse interaction on a specific object by key
    */
-  enableMouseInteraction = (key: string) => {
+  enableMouseInteraction = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
       this.view.enableMouseInteraction(obj);
@@ -499,10 +631,26 @@ class DARTView {
   /**
    * This enables mouse interaction on a specific object by key
    */
-  disableMouseInteraction = (key: string) => {
+  disableMouseInteraction = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
       this.view.disableMouseInteraction(obj);
+    }
+  };
+
+  /**
+   * This creates a layer
+   */
+  createLayer = (
+    key: number,
+    name: string,
+    color: number[],
+    shown: boolean
+  ) => {
+    let layer = this.layers.get(key);
+    if (layer == null) {
+      layer = new Layer(key, name, color, shown, this);
+      this.layers.set(key, layer);
     }
   };
 
@@ -512,12 +660,12 @@ class DARTView {
    * Must call render() to see results!
    */
   createBox = (
-    key: string,
+    key: number,
     size: number[],
     pos: number[],
     euler: number[],
     color: number[],
-    layer: string | undefined,
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -556,8 +704,8 @@ class DARTView {
 
     this.view.add(mesh);
 
-    if (layer != null) {
-      this.getLayer(layer).addObject(key);
+    if (layer != null && this.layers.get(layer) != null) {
+      this.layers.get(layer).addObject(key);
     }
   };
 
@@ -567,11 +715,11 @@ class DARTView {
    * Must call render() to see results!
    */
   createSphere = (
-    key: string,
+    key: number,
     radius: number,
     pos: number[],
     color: number[],
-    layer: string | undefined,
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -601,8 +749,8 @@ class DARTView {
 
     this.view.add(mesh);
 
-    if (layer != null) {
-      this.getLayer(layer).addObject(key);
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
     }
   };
 
@@ -612,13 +760,13 @@ class DARTView {
    * Must call render() to see results!
    */
   createCapsule = (
-    key: string,
+    key: number,
     radius: number,
     height: number,
     pos: number[],
     euler: number[],
     color: number[],
-    layer: string | undefined,
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -668,14 +816,14 @@ class DARTView {
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
       material.dispose();
-      geometry.dispose();
+      (geometry as any).dispose();
     });
     this.keys.set(mesh, key);
 
     this.view.add(mesh);
 
-    if (layer != null) {
-      this.getLayer(layer).addObject(key);
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
     }
   };
 
@@ -684,7 +832,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createLine = (key: string, points: number[][], color: number[], layer: string | undefined) => {
+  createLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
     this.objectType.set(key, "line");
     // Try not to recreate geometry. If we already created a line in the past,
     // let's just update its buffers instead of creating fresh ones.
@@ -738,15 +886,16 @@ class DARTView {
       this.view.add(path);
     }
 
-    if (layer != null) {
-      this.getLayer(layer).addObject(key);
+    if (layer != null && this.layers.has(layer)) {
+      // console.log(this.layers.get(layer).name + ": " + this.layers.get(layer).shown);
+      this.layers.get(layer).addObject(key);
     }
   };
 
   /**
    * This loads a texture from a Base64 string encoding of it
    */
-  createTexture = (key: string, base64: string) => {
+  createTexture = (key: number, base64: string) => {
     if (!this.textures.has(key)) {
       this.textures.set(key, new THREE.TextureLoader().load(base64));
     }
@@ -758,17 +907,17 @@ class DARTView {
    * Must call render() to see results!
    */
   createMesh = (
-    key: string,
+    key: number,
     vertices: number[][],
     vertexNormals: number[][],
     faces: number[][],
     uv: number[][],
-    texture_starts: { key: string; start: number }[],
+    texture_starts: { key: number; start: number }[],
     pos: number[],
     euler: number[],
     scale: number[],
     color: number[],
-    layer: string | undefined,
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -868,8 +1017,8 @@ class DARTView {
       this.view.add(mesh);
     }
 
-    if (layer != null) {
-      this.getLayer(layer).addObject(key);
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
     }
   };
 
@@ -878,7 +1027,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectPos = (key: string, pos: number[]) => {
+  setObjectPos = (key: number, pos: number[]) => {
     const obj = this.objects.get(key);
     if (obj) {
       obj.position.x = pos[0] * SCALE_FACTOR;
@@ -892,7 +1041,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectRotation = (key: string, euler: number[]) => {
+  setObjectRotation = (key: number, euler: number[]) => {
     const obj = this.objects.get(key);
     if (obj) {
       obj.rotation.x = euler[0];
@@ -906,7 +1055,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectColor = (key: string, color: number[]) => {
+  setObjectColor = (key: number, color: number[]) => {
     const obj = this.objects.get(key);
     (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
     if (color.length > 3) {
@@ -925,7 +1074,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectScale = (key: string, scale: number[]) => {
+  setObjectScale = (key: number, scale: number[]) => {
     const obj = this.objects.get(key);
     // Don't dynamically set scales on capsules
     if (obj && this.objectType.get(key) != "capsule") {
@@ -938,7 +1087,7 @@ class DARTView {
    * 
    * @param key 
    */
-  hideObject = (key: string) => {
+  hideObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
       this.view.remove(obj);
@@ -950,7 +1099,7 @@ class DARTView {
    * 
    * @param key 
    */
-  showObject = (key: string) => {
+  showObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
       this.view.remove(obj);
@@ -963,7 +1112,7 @@ class DARTView {
    *
    * @param key The key of the object (box, sphere, line, mesh) to be removed
    */
-  deleteObject = (key: string) => {
+  deleteObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
       this.view.remove(obj);
@@ -981,7 +1130,7 @@ class DARTView {
   };
 
   _createUIElementContainer = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[]
   ) => {
@@ -1000,11 +1149,11 @@ class DARTView {
    * This adds a text box to the GUI. This is visible immediately even if you don't call render()
    */
   createText = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     contents: string,
-    layer: string
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let text: Text = {
@@ -1023,12 +1172,12 @@ class DARTView {
    * This adds a button to the GUI. This is visible immediately even if you don't call render()
    */
   createButton = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     label: string,
     onClick: () => void,
-    layer: string
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -1057,7 +1206,7 @@ class DARTView {
    * This adds a slider to the GUI. This is visible immediately even if you don't call render()
    */
   createSlider = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     min: number,
@@ -1066,7 +1215,7 @@ class DARTView {
     onlyInts: boolean,
     horizontal: boolean,
     onChange: (value) => void,
-    layer: string
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -1093,7 +1242,7 @@ class DARTView {
    * This adds a plot to the GUI. This is visible immediately even if you don't call render()
    */
   createSimplePlot = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     minX: number,
@@ -1103,7 +1252,7 @@ class DARTView {
     maxY: number,
     ys: number[],
     plotType: "line" | "scatter",
-    layer: string
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -1131,7 +1280,7 @@ class DARTView {
    * This adds a plot to the GUI. This is visible immediately even if you don't call render()
    */
   createRichPlot = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     minX: number,
@@ -1141,7 +1290,7 @@ class DARTView {
     title: string,
     xAxisLabel: string,
     yAxisLabel: string,
-    layer: string
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -1176,7 +1325,7 @@ class DARTView {
    * @param plotType the type of plot (line or scatter)
    */
   setRichPlotData = (
-    key: string,
+    key: number,
     dataName: string,
     xs: number[],
     ys: number[],
@@ -1200,7 +1349,7 @@ class DARTView {
    * @param maxY 
    */
   setRichPlotBounds = (
-    key: string,
+    key: number,
     minX: number,
     maxX: number,
     minY: number,
@@ -1216,7 +1365,7 @@ class DARTView {
   /**
    * This deletes a UI element (e.g. text, button, slider, plot) by key
    */
-  deleteUIElement = (key: string) => {
+  deleteUIElement = (key: number) => {
     if (this.uiElements.has(key)) {
       this.uiElements.get(key).container.remove();
       this.uiElements.delete(key);
@@ -1226,7 +1375,7 @@ class DARTView {
   /**
    * This moves a UI element (e.g. text, button, slider, plot) by key
    */
-  setUIElementPosition = (key: string, fromTopLeft: number[]) => {
+  setUIElementPosition = (key: number, fromTopLeft: number[]) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       elem.from_top_left = fromTopLeft;
@@ -1239,7 +1388,7 @@ class DARTView {
   /**
    * This resizes a UI element (e.g. text, button, slider, plot) by key
    */
-  setUIElementSize = (key: string, size: number[]) => {
+  setUIElementSize = (key: number, size: number[]) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       elem.size = size;
@@ -1249,35 +1398,35 @@ class DARTView {
     }
   };
 
-  setTextContents = (key: string, contents: string) => {
+  setTextContents = (key: number, contents: string) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "text") elem.container.innerHTML = contents;
     }
   };
 
-  setButtonLabel = (key: string, label: string) => {
+  setButtonLabel = (key: number, label: string) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "button") elem.buttonElem.innerHTML = label;
     }
   };
 
-  setSliderValue = (key: string, value: number) => {
+  setSliderValue = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setValue(value);
     }
   };
 
-  setSliderMin = (key: string, value: number) => {
+  setSliderMin = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setMin(value);
     }
   };
 
-  setSliderMax = (key: string, value: number) => {
+  setSliderMax = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setMax(value);
@@ -1285,7 +1434,7 @@ class DARTView {
   };
 
   setPlotData = (
-    key: string,
+    key: number,
     minX: number,
     maxX: number,
     xs: number[],

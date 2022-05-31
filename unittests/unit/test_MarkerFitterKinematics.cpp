@@ -4604,13 +4604,21 @@ TEST(MarkerFitter, MULTI_TRIAL_WELK)
             << standard.skeleton->getBodyNode("tibia_l")->getScale()
             << std::endl;
 
+  fitter.saveTrajectoryAndMarkersToGUI(
+      "../../../javascript/src/data/movement.bin",
+      inits[0],
+      markerObservationTrials[0],
+      &c3ds[0]);
+
+  /*
   // Target markers
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
   server->serve(8070);
   fitter.debugTrajectoryAndMarkersToGUI(
-      server, inits[1], markerObservationTrials[1], &c3ds[1]);
+      server, inits[0], markerObservationTrials[0], &c3ds[0]);
   server->blockWhileServing();
+  */
 }
 #endif
 

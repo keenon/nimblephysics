@@ -1,4 +1,5 @@
 import NimbleView from "./NimbleView";
+import { dart } from './proto/GUI';
 
 class DARTRemote {
   url: string;
@@ -46,44 +47,54 @@ class DARTRemote {
   /**
    * This reads and handles a command sent from the backend
    */
-  handleCommand = (command: Command) => {
+  handleCommand = (command: dart.proto.Command) => {
     // We manually handle any "interactive" commands here, since the NimbleView object by itself doesn't know what to do with those.
-    if (command.type === "create_button") {
+    if (command.button != null) {
+      const from_top_left: number[] = [command.button.pos[0], command.button.pos[1]];
+      const size: number[] = [command.button.pos[2], command.button.pos[3]];
       this.view.createButton(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.label,
+        command.button.key,
+        from_top_left,
+        size,
+        command.button.label,
         () => {
           const message = JSON.stringify({
             type: "button_click",
-            key: command.key,
+            key: command.button.key,
           });
           if (this.socket != null && this.socket.readyState == WebSocket.OPEN) {
             this.socket.send(message);
           }
-        }
+        },
+        command.button.layer
       );
-    } else if (command.type === "create_slider") {
+    }
+    else if (command.slider != null) {
+      const from_top_left: number[] = [command.slider.pos[0], command.slider.pos[1]];
+      const size: number[] = [command.slider.pos[2], command.slider.pos[3]];
+      const min = command.slider.data[0];
+      const max = command.slider.data[1];
+      const value = command.slider.data[2];
       this.view.createSlider(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.min,
-        command.max,
-        command.value,
-        command.only_ints,
-        command.horizontal,
+        command.slider.key,
+        from_top_left,
+        size,
+        min,
+        max,
+        value,
+        command.slider.only_ints,
+        command.slider.horizontal,
         (new_value: number) => {
           const message = JSON.stringify({
             type: "slider_set_value",
-            key: command.key,
+            key: command.slider.key,
             value: new_value,
           });
           if (this.socket != null && this.socket.readyState == WebSocket.OPEN) {
             this.socket.send(message);
           }
-        }
+        },
+        command.slider.layer
       );
     } else {
       // Otherwise, the command doesn't require any interactive callbacks, so NimbleView can handle it directly.
@@ -108,8 +119,8 @@ class DARTRemote {
     // Listen for messages
     this.socket.addEventListener("message", (event) => {
       try {
-        const data: Command[] = JSON.parse(event.data);
-        data.forEach(this.handleCommand);
+        const list: dart.proto.CommandList = dart.proto.CommandList.deserialize(event.data);
+        list.command.forEach(this.handleCommand);
         this.view.render();
       } catch (e) {
         console.error(

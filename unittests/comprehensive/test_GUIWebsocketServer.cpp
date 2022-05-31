@@ -41,6 +41,7 @@
 #include <gtest/gtest.h>
 
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
@@ -256,6 +257,58 @@ TEST(REALTIME, GUI_SERVER)
   ticker.registerTickListener(
       [&](long ms) { std::cout << "Tick: " << ms << std::endl; });
   */
+
+  server.blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, GUI_SERVER_2)
+{
+  GUIWebsocketServer server;
+  server.serve(8070);
+
+  server.createLayer("Default on", Eigen::Vector4s(1, 0, 0, 1), true);
+  server.createLayer("Default off", Eigen::Vector4s(0, 0, 1, 1), false);
+  server.createBox(
+      "test",
+      Eigen::Vector3s::Ones(),
+      Eigen::Vector3s::Zero(),
+      Eigen::Vector3s::Zero(),
+      Eigen::Vector4s(1, 0, 0, 1),
+      "Default on");
+
+  server.createBox(
+      "test",
+      Eigen::Vector3s::Ones(),
+      Eigen::Vector3s::Ones(),
+      Eigen::Vector3s::Zero(),
+      Eigen::Vector4s(0, 0, 1, 1),
+      "Default off");
+
+  server.createText(
+      "key2",
+      "Testing text",
+      Eigen::Vector2i(150, 150),
+      Eigen::Vector2i(100, 20));
+
+  server.createButton(
+      "key3",
+      "Button",
+      Eigen::Vector2i(200, 150),
+      Eigen::Vector2i(100, 20),
+      []() { std::cout << "Clicked!" << std::endl; });
+
+  server.createSlider(
+      "key4",
+      Eigen::Vector2i(250, 150),
+      Eigen::Vector2i(100, 20),
+      0.0,
+      1.0,
+      0.5,
+      false,
+      true,
+      [](s_t value) { std::cout << "New value: " << value << std::endl; });
 
   server.blockWhileServing();
 }

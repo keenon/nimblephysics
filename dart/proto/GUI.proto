@@ -1,0 +1,255 @@
+syntax = "proto3";
+
+package dart.proto;
+
+message CommandList {
+  repeated Command command = 1;
+}
+
+message Command {
+  oneof command {
+    SetFramesPerSecond set_frames_per_second = 31;
+    ClearAll clear_all = 16;
+    CreateLayer layer = 1;
+    CreateBox box = 2;
+    CreateSphere sphere = 9;
+    CreateCapsule capsule = 10;
+    CreateLine line = 11;
+    CreateMesh mesh = 3;
+    CreateTexture texture = 4;
+    SetObjectPosition set_object_position = 5;
+    SetObjectRotation set_object_rotation = 6;
+    SetObjectColor set_object_color = 7;
+    SetObjectScale set_object_scale = 8;
+    EnableMouseInteraction enable_mouse_interaction = 18;
+    CreateText text = 12;
+    CreateButton button = 13;
+    CreateSlider slider = 14;
+    CreatePlot plot = 15;
+    CreateRichPlot rich_plot = 29;
+    SetRichPlotData set_rich_plot_data = 17;
+    SetRichPlotBounds set_rich_plot_bounds = 30;
+    SetUIElemPos set_ui_elem_pos = 19;
+    SetUIElemSize set_ui_elem_size = 20;
+    DeleteUIElem delete_ui_elem = 21;
+    DeleteObject delete_object = 22;
+    SetTextContents set_text_contents = 23;
+    SetButtonLabel set_button_label = 24;
+    SetSliderValue set_slider_value = 25;
+    SetSliderMin set_slider_min = 26;
+    SetSliderMax set_slider_max = 27;
+    SetPlotData set_plot_data = 28;
+  }
+}
+
+message SetFramesPerSecond {
+  int32 framesPerSecond = 1;
+}
+
+message ClearAll {
+  bool dummy = 1;
+}
+
+message CreateLayer {
+  int32 key = 1;
+  string name = 2;
+  repeated float color = 3;
+  bool default_show = 4;
+}
+
+message CreateBox {
+  int32 key = 1;
+  // Concatenates size, pos, euler, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 2;
+  int32 layer = 3;
+  bool cast_shadows = 4;
+  bool receive_shadows = 5;
+}
+
+message CreateSphere {
+  int32 key = 1;
+  // Concatenates radius, pos, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 2;
+  int32 layer = 3;
+  bool cast_shadows = 4;
+  bool receive_shadows = 5;
+}
+
+message CreateCapsule {
+  int32 key = 1;
+  // Concatenates radius, height, pos, euler, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 2;
+  int32 layer = 3;
+  bool cast_shadows = 4;
+  bool receive_shadows = 5;
+}
+
+message CreateLine {
+  int32 key = 1;
+  repeated float points = 2;
+  repeated float color = 3;
+  int32 layer = 4;
+}
+
+message CreateMesh {
+  int32 key = 1;
+  repeated float vertex = 2;
+  repeated float vertex_normal = 3;
+  repeated int32 face = 4;
+  repeated float uv = 5;
+  repeated int32 texture = 6;
+  repeated int32 texture_start = 7;
+  // Concatenates size, pos, euler, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 8;
+  int32 layer = 9;
+  bool cast_shadows = 10;
+  bool receive_shadows = 11;
+}
+
+message CreateTexture {
+  int32 key = 1;
+  string base64 = 2;
+}
+
+message SetObjectPosition {
+  int32 key = 1;
+  repeated float data = 2;
+}
+
+message SetObjectRotation {
+  int32 key = 1;
+  repeated float data = 2;
+}
+
+message SetObjectColor {
+  int32 key = 1;
+  repeated float data = 2;
+}
+
+message SetObjectScale {
+  int32 key = 1;
+  repeated float data = 2;
+}
+
+message EnableMouseInteraction {
+  int32 key = 1;
+}
+
+message CreateText {
+  int32 key = 1;
+  int32 layer = 2;
+  // 4 ints: from top left, size
+  repeated int32 pos = 3;
+  string contents = 4;
+}
+
+message CreateButton {
+  int32 key = 1;
+  int32 layer = 2;
+  // 4 ints: from top left, size
+  repeated int32 pos = 3;
+  string label = 4;
+}
+
+message CreateSlider {
+  int32 key = 1;
+  int32 layer = 2;
+  // 4 ints: from top left, size
+  repeated int32 pos = 3;
+  // 3 floats: min, max, value
+  repeated float data = 4;
+  bool only_ints = 5;
+  bool horizontal = 6;
+}
+
+message CreatePlot {
+  int32 key = 1;
+  int32 layer = 2;
+  // 4 ints: from top left, size
+  repeated int32 pos = 3;
+  // 4 floats: min x, max x, min y, max y
+  repeated float bounds = 4;
+  repeated float xs = 5;
+  repeated float ys = 6;
+  string plot_type = 7;
+}
+
+message CreateRichPlot {
+  int32 key = 1;
+  int32 layer = 2;
+  // 4 ints: from top left, size
+  repeated int32 pos = 3;
+  // 4 floats: min x, max x, min y, max y
+  repeated float bounds = 4;
+  string title = 5;
+  string x_axis_label = 6;
+  string y_axis_label = 7;
+}
+
+message SetRichPlotData {
+  int32 key = 1;
+  string name = 2;
+  string color = 3;
+  string plot_type = 4;
+  repeated float xs = 6;
+  repeated float ys = 7;
+}
+
+message SetRichPlotBounds {
+  int32 key = 1;
+  // 4 floats: min x, max x, min y, max y
+  repeated float bounds = 4;
+}
+
+message SetUIElemPos {
+  int32 key = 1;
+  // 2 ints: from top left
+  repeated int32 fromTopLeft = 2;
+}
+
+message SetUIElemSize {
+  int32 key = 1;
+  // 2 ints: width, height
+  repeated int32 size = 2;
+}
+
+message DeleteUIElem {
+  int32 key = 1;
+}
+
+message DeleteObject {
+  int32 key = 1;
+}
+
+message SetTextContents {
+  int32 key = 1;
+  string contents = 2;
+}
+
+message SetButtonLabel {
+  int32 key = 1;
+  string label = 2;
+}
+
+message SetSliderValue {
+  int32 key = 1;
+  float value = 2;
+}
+
+message SetSliderMin {
+  int32 key = 1;
+  float value = 2;
+}
+
+message SetSliderMax {
+  int32 key = 1;
+  float value = 2;
+}
+
+message SetPlotData {
+  int32 key = 1;
+  // 4 floats: min x, max x, min y, max y
+  repeated float bounds = 4;
+  repeated float xs = 5;
+  repeated float ys = 6;
+}

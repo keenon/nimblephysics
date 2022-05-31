@@ -27,6 +27,7 @@ struct ForcePlate
 /// This holds marker trajectory information from an OpenSim TRC file
 struct C3D
 {
+  int framesPerSecond;
   std::vector<double> timestamps;
   std::vector<std::string> markers;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;

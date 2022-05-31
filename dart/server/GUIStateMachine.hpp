@@ -20,6 +20,7 @@
 
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/MeshShape.hpp"
+#include "dart/proto/GUI.pb.h"
 #include "dart/server/WebsocketServer.hpp"
 
 namespace dart {
@@ -109,6 +110,15 @@ public:
   /// This completely resets the web GUI, deleting all objects, UI elements,
   /// and listeners
   virtual void clear();
+
+  /// Set frames per second
+  void setFramesPerSecond(int framesPerSecond);
+
+  /// This creates a layer in the web GUI
+  void createLayer(
+      std::string key,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      bool defaultShow = true);
 
   /// This creates a box in the web GUI under a specified key
   void createBox(
@@ -321,40 +331,6 @@ public:
       s_t minY,
       s_t maxY);
 
-  /*
-export type CreateRichPlotCommand = {
-  type: "create_rich_plot";
-  key: string;
-  from_top_left: number[];
-  size: number[];
-  min_x: number;
-  max_x: number;
-  min_y: number;
-  max_y: number;
-  title: string;
-  x_axis_label: string;
-  y_axis_label: string;
-};
-
-export type SetRichPlotData = {
-  type: "set_rich_plot_data";
-  key: string;
-  name: string;
-  color: string;
-  xs: number[];
-  ys: number[];
-  plot_type: "line" | "scatter";
-};
-
-export type SetRichPlotBounds = {
-  type: "set_rich_plot_bounds";
-  key: string;
-  min_x: number;
-  max_x: number;
-  min_y: number;
-  max_y: number;
-};
-  */
   /// This creates a rich plot with axis labels, a title, tickmarks, and
   /// multiple simultaneous lines
   void createRichPlot(
@@ -395,15 +371,33 @@ export type SetRichPlotBounds = {
   /// This deletes a UI element by key
   void deleteUIElement(const std::string& key);
 
+  /// This gets an integer code for a string
+  int getStringCode(const std::string& key);
+
+  /// This gets a string code for an integer
+  std::string getCodeString(int code);
+
 protected:
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()
   std::recursive_mutex globalMutex;
-  std::recursive_mutex mJsonMutex;
+  std::recursive_mutex mProtoMutex;
   int mMessagesQueued;
-  std::stringstream mJson;
+  proto::CommandList mCommandList;
+  std::string mCommandListOutputBuffer;
   // This is a list of all the objects with mouse interaction enabled
   std::unordered_set<std::string> mMouseInteractionEnabled;
+
+  std::unordered_map<std::string, int> mStringCodes;
+  std::unordered_map<int, std::string> mCodeStrings;
+
+  struct Layer
+  {
+    std::string key;
+    Eigen::Vector4s color;
+    bool defaultShow;
+  };
+  std::unordered_map<std::string, Layer> mLayers;
 
   struct Box
   {
@@ -554,23 +548,25 @@ protected:
   };
   std::unordered_map<std::string, RichPlot> mRichPlots;
 
-  void queueCommand(std::function<void(std::stringstream&)> writeCommand);
+  void queueCommand(std::function<void(proto::CommandList&)> writeCommand);
 
-  void encodeCreateBox(std::stringstream& json, Box& box);
-  void encodeCreateSphere(std::stringstream& json, Sphere& sphere);
-  void encodeCreateCapsule(std::stringstream& json, Capsule& capsule);
-  void encodeCreateLine(std::stringstream& json, Line& line);
-  void encodeCreateMesh(std::stringstream& json, Mesh& mesh);
-  void encodeCreateTexture(std::stringstream& json, Texture& texture);
+  void encodeSetFramesPerSecond(proto::CommandList& list, int framesPerSecond);
+  void encodeCreateLayer(proto::CommandList& list, Layer& layer);
+  void encodeCreateBox(proto::CommandList& list, Box& box);
+  void encodeCreateSphere(proto::CommandList& list, Sphere& sphere);
+  void encodeCreateCapsule(proto::CommandList& list, Capsule& capsule);
+  void encodeCreateLine(proto::CommandList& list, Line& line);
+  void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);
+  void encodeCreateTexture(proto::CommandList& list, Texture& texture);
   void encodeEnableMouseInteraction(
-      std::stringstream& json, const std::string& key);
-  void encodeCreateText(std::stringstream& json, Text& text);
-  void encodeCreateButton(std::stringstream& json, Button& button);
-  void encodeCreateSlider(std::stringstream& json, Slider& slider);
-  void encodeCreatePlot(std::stringstream& json, Plot& plot);
-  void encodeCreateRichPlot(std::stringstream& json, RichPlot& plot);
+      proto::CommandList& list, const std::string& key);
+  void encodeCreateText(proto::CommandList& list, Text& text);
+  void encodeCreateButton(proto::CommandList& list, Button& button);
+  void encodeCreateSlider(proto::CommandList& list, Slider& slider);
+  void encodeCreatePlot(proto::CommandList& list, Plot& plot);
+  void encodeCreateRichPlot(proto::CommandList& list, RichPlot& plot);
   void encodeSetRichPlotData(
-      std::stringstream& json,
+      proto::CommandList& list,
       const std::string& plotKey,
       const RichPlotData& data);
 };

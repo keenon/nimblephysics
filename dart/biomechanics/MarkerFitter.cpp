@@ -1190,17 +1190,57 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     const OpenSimFile* goldOsim,
     const Eigen::MatrixXs goldPoses)
 {
-  server->renderSkeleton(
-      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
-  Eigen::Vector4s goldColor
+  std::string autoFitLayerName = "Auto-fit Skeleton";
+  Eigen::Vector4s autoFitLayerColor = Eigen::Vector4s(0.8, 0.8, 0.8, 1.0);
+  std::string trackingMarkersLayerName = "Tracking Markers";
+  Eigen::Vector4s trackingMarkersLayerColor
+      = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0);
+  std::string anatomicalMarkersLayerName = "Anatomical Markers";
+  Eigen::Vector4s anatomicalMarkersLayerColor
+      = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
+  std::string markersErrorLayerName = "Marker Errors";
+  Eigen::Vector4s markersErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  std::string forcePlateLayerName = "Force Plates";
+  Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+
+  std::string functionalJointCenterLayerName = "Functional Joint Centers";
+  Eigen::Vector4s functionalJointCenterLayerColor
+      = Eigen::Vector4s(0.0, 1.0, 0.0, 1.0);
+  std::string originalMarkerLocationsLayerName
+      = "Original Anatomical Marker Locations";
+  Eigen::Vector4s originalMarkerLocationsLayerColor
+      = Eigen::Vector4s(0.0, 0.0, 1.0, 0.3);
+  std::string manualLayerName = "Manual Skeleton";
+  Eigen::Vector4s manualLayerColor
       = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
+
+  server->createLayer(autoFitLayerName, autoFitLayerColor, true);
+  server->createLayer(
+      trackingMarkersLayerName, trackingMarkersLayerColor, true);
+  server->createLayer(
+      anatomicalMarkersLayerName, anatomicalMarkersLayerColor, true);
+  server->createLayer(markersErrorLayerName, markersErrorLayerColor, true);
+  server->createLayer(forcePlateLayerName, forcePlateLayerColor, true);
+
+  server->createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, false);
+  server->createLayer(
+      originalMarkerLocationsLayerName,
+      originalMarkerLocationsLayerColor,
+      false);
+  server->renderSkeleton(
+      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, autoFitLayerName);
+
   if (goldOsim && goldPoses.size() > 0)
   {
+    server->createLayer(manualLayerName, manualLayerColor, false);
     server->renderSkeleton(
-        goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
+        goldOsim->skeleton, "gold_", manualLayerColor, manualLayerName);
   }
 
   int numJoints = init.jointCenters.rows() / 3;
+  server->createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
   for (int i = 0; i < numJoints; i++)
   {
     if (init.jointWeights(i) > 0)
@@ -1209,8 +1249,12 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           "joint_center_" + std::to_string(i),
           0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 0, 1, init.jointWeights(i)),
-          "Functional Joints");
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init.jointWeights(i)),
+          functionalJointCenterLayerName);
     }
   }
   int numAxis = init.jointAxis.rows() / 6;
@@ -1224,8 +1268,12 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 0, 1, init.axisWeights(i)),
-          "Functional Joints");
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init.axisWeights(i)),
+          functionalJointCenterLayerName);
     }
   }
 
@@ -1244,8 +1292,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       server->createLine(
           "plate_" + std::to_string(i),
           points,
-          Eigen::Vector4s(1.0, 0., 0., 1.0),
-          "Force Plates");
+          forcePlateLayerColor,
+          forcePlateLayerName);
     }
   }
 
@@ -1261,13 +1309,27 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
                                 secondsPerTick,
                                 goldOsim,
                                 goldPoses,
-                                goldColor,
+                                manualLayerName,
+                                manualLayerColor,
+                                autoFitLayerName,
+                                trackingMarkersLayerName,
+                                trackingMarkersLayerColor,
+                                anatomicalMarkersLayerName,
+                                anatomicalMarkersLayerColor,
+                                markersErrorLayerColor,
+                                markersErrorLayerName,
+                                originalMarkerLocationsLayerName,
+                                originalMarkerLocationsLayerColor,
+                                functionalJointCenterLayerName,
+                                functionalJointCenterLayerColor,
+                                forcePlateLayerName,
+                                forcePlateLayerColor,
                                 this](long t) {
     long tick = std::round((s_t)t / (secondsPerTick * 1000));
     int timestep = tick % init.poses.cols();
     mSkeleton->setPositions(init.poses.col(timestep));
     server->renderSkeleton(
-        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
+        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, autoFitLayerName);
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerObservations[timestep];
@@ -1283,17 +1345,18 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
                      .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
                                               .first->getScale()));
         bool isTracking = mMarkerIsTracking[mMarkerIndices[pair.first]];
-        Eigen::Vector4s color = isTracking ? Eigen::Vector4s(0.6, 0.6, 0.6, 1)
-                                           : Eigen::Vector4s(1, 0, 0, 1);
-        std::string label
-            = isTracking ? "Tracking Markers" : "Anatomical Markers";
+        Eigen::Vector4s color = isTracking ? trackingMarkersLayerColor
+                                           : anatomicalMarkersLayerColor;
+        std::string label = isTracking ? trackingMarkersLayerName
+                                       : anatomicalMarkersLayerName;
         server->createBox(
             "marker_real_" + pair.first,
             Eigen::Vector3s::Ones() * 0.01,
             worldObserved,
             Eigen::Vector3s::Zero(),
-            isTracking ? color : Eigen::Vector4s(0, 0, 1, 1),
+            color,
             label);
+        /*
         server->createBox(
             "marker_inferred_" + pair.first,
             Eigen::Vector3s::Ones() * 0.007,
@@ -1301,11 +1364,16 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
             Eigen::Vector3s::Zero(),
             color,
             label);
+        */
 
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
-        server->createLine("marker_error_" + pair.first, points, color, label);
+        server->createLine(
+            "marker_error_" + pair.first,
+            points,
+            markersErrorLayerColor,
+            markersErrorLayerName);
 
         if (!mMarkerIsTracking.at(mMarkerIndices.at(pair.first)))
         {
@@ -1320,16 +1388,16 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               Eigen::Vector3s::Ones() * 0.005,
               worldOriginal,
               Eigen::Vector3s::Zero(),
-              Eigen::Vector4s(1, 0, 0, 0.3),
-              "Skeleton");
+              originalMarkerLocationsLayerColor,
+              originalMarkerLocationsLayerName);
           std::vector<Eigen::Vector3s> offsetPoints;
           offsetPoints.push_back(worldOriginal);
           offsetPoints.push_back(worldInferred);
           server->createLine(
               "marker_offset_" + pair.first,
               offsetPoints,
-              Eigen::Vector4s(1, 0.5, 0.5, 0.3),
-              "Skeleton");
+              originalMarkerLocationsLayerColor,
+              originalMarkerLocationsLayerName);
         }
       }
     }
@@ -1338,7 +1406,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
       server->renderSkeleton(
-          goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
+          goldOsim->skeleton, "gold_", manualLayerColor, manualLayerName);
 
       for (auto pair : markerWorldPositions)
       {
@@ -1356,8 +1424,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           server->createLine(
               "gold_marker_error_" + pair.first,
               points,
-              Eigen::Vector4s(1, 0, 0, 1),
-              "Manual Skeleton");
+              manualLayerColor,
+              manualLayerName);
         }
       }
     }
@@ -1378,8 +1446,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           server->createLine(
               "force_" + std::to_string(i),
               forcePoints,
-              Eigen::Vector4s(1.0, 0, 0, 1.),
-              "Force Plates");
+              forcePlateLayerColor,
+              forcePlateLayerName);
         }
       }
     }
@@ -1403,8 +1471,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               server->createLine(
                   "joint_center_" + std::to_string(i) + "_to_marker_" + marker,
                   centerToMarker,
-                  Eigen::Vector4s(0.5, 0.5, 1, 1),
-                  "Functional Joints");
+                  functionalJointCenterLayerColor,
+                  functionalJointCenterLayerName);
             }
           }
         }
@@ -1444,19 +1512,57 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     const OpenSimFile* goldOsim,
     const Eigen::MatrixXs goldPoses)
 {
+  std::string autoFitLayerName = "Auto-fit Skeleton";
+  Eigen::Vector4s autoFitLayerColor = Eigen::Vector4s(0.8, 0.8, 0.8, 1.0);
+  std::string trackingMarkersLayerName = "Tracking Markers";
+  Eigen::Vector4s trackingMarkersLayerColor
+      = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0);
+  std::string anatomicalMarkersLayerName = "Anatomical Markers";
+  Eigen::Vector4s anatomicalMarkersLayerColor
+      = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
+  std::string markersErrorLayerName = "Marker Errors";
+  Eigen::Vector4s markersErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  std::string forcePlateLayerName = "Force Plates";
+  Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+
+  std::string functionalJointCenterLayerName = "Functional Joint Centers";
+  Eigen::Vector4s functionalJointCenterLayerColor
+      = Eigen::Vector4s(0.0, 1.0, 0.0, 1.0);
+  std::string originalMarkerLocationsLayerName
+      = "Original Anatomical Marker Locations";
+  Eigen::Vector4s originalMarkerLocationsLayerColor
+      = Eigen::Vector4s(0.0, 0.0, 1.0, 0.3);
+  std::string manualLayerName = "Manual Skeleton";
+  Eigen::Vector4s manualLayerColor
+      = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
+
   server::GUIRecording server;
+  server.setFramesPerSecond(c3d->framesPerSecond);
+  server.createLayer(autoFitLayerName, autoFitLayerColor, true);
+  server.createLayer(trackingMarkersLayerName, trackingMarkersLayerColor, true);
+  server.createLayer(
+      anatomicalMarkersLayerName, anatomicalMarkersLayerColor, true);
+  server.createLayer(markersErrorLayerName, markersErrorLayerColor, true);
+  server.createLayer(forcePlateLayerName, forcePlateLayerColor, true);
+
+  server.createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, false);
+  server.createLayer(
+      originalMarkerLocationsLayerName,
+      originalMarkerLocationsLayerColor,
+      false);
   server.renderSkeleton(
       mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
-
-  Eigen::Vector4s goldColor
-      = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
   if (goldOsim && goldPoses.size() > 0)
   {
+    server.createLayer(manualLayerName, manualLayerColor, false);
     server.renderSkeleton(
-        goldOsim->skeleton, "gold_", goldColor, "Gold Skeleton");
+        goldOsim->skeleton, "gold_", manualLayerColor, manualLayerName);
   }
 
   int numJoints = init.jointCenters.rows() / 3;
+  server.createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
   for (int i = 0; i < numJoints; i++)
   {
     if (init.jointWeights(i) > 0)
@@ -1465,8 +1571,12 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           "joint_center_" + std::to_string(i),
           0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 0, 1, init.jointWeights(i)),
-          "Functional Joints");
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init.jointWeights(i)),
+          functionalJointCenterLayerName);
     }
   }
   int numAxis = init.jointAxis.rows() / 6;
@@ -1480,8 +1590,12 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
-          Eigen::Vector4s(0, 0, 1, init.axisWeights(i)),
-          "Functional Joints");
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init.axisWeights(i)),
+          functionalJointCenterLayerName);
     }
   }
 
@@ -1500,8 +1614,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       server.createLine(
           "plate_" + std::to_string(i),
           points,
-          Eigen::Vector4s(1.0, 0., 0., 1.0),
-          "Force Plates");
+          forcePlateLayerColor,
+          forcePlateLayerName);
     }
   }
 
@@ -1509,7 +1623,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   {
     mSkeleton->setPositions(init.poses.col(timestep));
     server.renderSkeleton(
-        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
+        mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, autoFitLayerName);
 
     std::map<std::string, Eigen::Vector3s> markerWorldPositions
         = markerObservations[timestep];
@@ -1525,29 +1639,35 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
                      .second.cwiseProduct(init.updatedMarkerMap.at(pair.first)
                                               .first->getScale()));
         bool isTracking = mMarkerIsTracking[mMarkerIndices[pair.first]];
-        Eigen::Vector4s color = isTracking ? Eigen::Vector4s(0.6, 0.6, 0.6, 1)
-                                           : Eigen::Vector4s(1, 0, 0, 1);
-        std::string label
-            = isTracking ? "Tracking Markers" : "Anatomical Markers";
+        Eigen::Vector4s color = isTracking ? trackingMarkersLayerColor
+                                           : anatomicalMarkersLayerColor;
+        std::string label = isTracking ? trackingMarkersLayerName
+                                       : anatomicalMarkersLayerName;
         server.createBox(
             "marker_real_" + pair.first,
             Eigen::Vector3s::Ones() * 0.01,
             worldObserved,
             Eigen::Vector3s::Zero(),
-            isTracking ? color : Eigen::Vector4s(0, 0, 1, 1),
+            color,
             label);
-        server.createBox(
+        /*
+        server->createBox(
             "marker_inferred_" + pair.first,
             Eigen::Vector3s::Ones() * 0.007,
             worldInferred,
             Eigen::Vector3s::Zero(),
             color,
             label);
+        */
 
         std::vector<Eigen::Vector3s> points;
         points.push_back(worldObserved);
         points.push_back(worldInferred);
-        server.createLine("marker_error_" + pair.first, points, color, label);
+        server.createLine(
+            "marker_error_" + pair.first,
+            points,
+            markersErrorLayerColor,
+            markersErrorLayerName);
 
         if (!mMarkerIsTracking.at(mMarkerIndices.at(pair.first)))
         {
@@ -1562,16 +1682,16 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
               Eigen::Vector3s::Ones() * 0.005,
               worldOriginal,
               Eigen::Vector3s::Zero(),
-              Eigen::Vector4s(1, 0, 0, 0.3),
-              "Skeleton");
+              originalMarkerLocationsLayerColor,
+              originalMarkerLocationsLayerName);
           std::vector<Eigen::Vector3s> offsetPoints;
           offsetPoints.push_back(worldOriginal);
           offsetPoints.push_back(worldInferred);
           server.createLine(
               "marker_offset_" + pair.first,
               offsetPoints,
-              Eigen::Vector4s(1, 0.5, 0.5, 0.3),
-              "Skeleton");
+              originalMarkerLocationsLayerColor,
+              originalMarkerLocationsLayerName);
         }
       }
     }
@@ -1580,7 +1700,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
       server.renderSkeleton(
-          goldOsim->skeleton, "gold_", goldColor, "Manual Skeleton");
+          goldOsim->skeleton, "gold_", manualLayerColor, manualLayerName);
 
       for (auto pair : markerWorldPositions)
       {
@@ -1598,8 +1718,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           server.createLine(
               "gold_marker_error_" + pair.first,
               points,
-              Eigen::Vector4s(1, 0, 0, 1),
-              "Manual Skeleton");
+              manualLayerColor,
+              manualLayerName);
         }
       }
     }
@@ -1620,8 +1740,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           server.createLine(
               "force_" + std::to_string(i),
               forcePoints,
-              Eigen::Vector4s(1.0, 0, 0, 1.),
-              "Force Plates");
+              forcePlateLayerColor,
+              forcePlateLayerName);
         }
       }
     }
@@ -1645,8 +1765,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
               server.createLine(
                   "joint_center_" + std::to_string(i) + "_to_marker_" + marker,
                   centerToMarker,
-                  Eigen::Vector4s(0.5, 0.5, 1, 1),
-                  "Functional Joints");
+                  functionalJointCenterLayerColor,
+                  functionalJointCenterLayerName);
             }
           }
         }

@@ -51,6 +51,16 @@ void GUIStateMachine(py::module& m)
       .def(::py::init<>())
       .def("clear", &dart::server::GUIStateMachine::clear)
       .def(
+          "setFramesPerSecond",
+          &dart::server::GUIStateMachine::setFramesPerSecond,
+          ::py::arg("framesPerSecond"))
+      .def(
+          "createLayer",
+          &dart::server::GUIStateMachine::createLayer,
+          ::py::arg("key"),
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+          ::py::arg("defaultShow") = true)
+      .def(
           "createBox",
           &dart::server::GUIStateMachine::createBox,
           ::py::arg("key"),

@@ -8,6 +8,7 @@
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
+#include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
@@ -15,7 +16,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace math;
@@ -24,6 +25,33 @@ using namespace simulation;
 using namespace neural;
 using namespace server;
 using namespace realtime;
+using namespace biomechanics;
+
+#ifdef ALL_TESTS
+TEST(REALTIME, GUI_SERVER_2)
+{
+  GUIRecording recording;
+
+  recording.createLayer(
+      "Test layer", Eigen::Vector4s(1.0, 0.5, 0.5, 1.0), true);
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/welk007/unscaled_generic.osim");
+  auto mot = OpenSimParser::loadMot(
+      standard.skeleton,
+      "dart://sample/osim/welk007/"
+      "c3d_Trimmed_running_natural2_manual_scaling_ik.mot");
+
+  for (int i = 0; i < mot.poses.cols(); i++)
+  {
+    standard.skeleton->setPositions(mot.poses.col(i));
+    recording.renderSkeleton(standard.skeleton);
+    recording.saveFrame();
+  }
+
+  recording.writeFramesJson("../../../javascript/src/data/test.bin");
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(RECORDING, GUI_SERVER)

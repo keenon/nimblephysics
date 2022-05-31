@@ -1,7 +1,12 @@
 #include "dart/server/GUIRecording.hpp"
 
+#include <cstdio>
 #include <fstream>
 #include <iostream>
+
+#include "stdio.h"
+// #include <google/protobuf/io/coded_stream.h>
+// #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 namespace dart {
 
@@ -40,18 +45,10 @@ int GUIRecording::getNumFrames()
 std::string GUIRecording::getFramesJson(int startFrame)
 {
   std::stringstream stream;
-  stream << "[";
-  if (startFrame < 0)
-    startFrame = 0;
   for (int i = startFrame; i < mFrames.size(); i++)
   {
-    if (i > 0)
-    {
-      stream << ",";
-    }
     stream << mFrames[i];
   }
-  stream << "]";
   return stream.str();
 }
 
@@ -67,9 +64,7 @@ void GUIRecording::writeFramesJson(const std::string& path, int startFrame)
   std::cout << "Saving GUI Recording to file \"" << path << "\"..."
             << std::endl;
 
-  std::ofstream jsonFile;
-  jsonFile.open(path);
-  jsonFile << "[";
+  FILE* file = fopen(path.c_str(), "wb");
   if (startFrame < 0)
     startFrame = 0;
   for (int i = startFrame; i < mFrames.size(); i++)
@@ -79,14 +74,12 @@ void GUIRecording::writeFramesJson(const std::string& path, int startFrame)
       std::cout << "> Writing frame " << i << "/" << mFrames.size()
                 << std::endl;
     }
-    if (i > 0)
-    {
-      jsonFile << ",";
-    }
-    jsonFile << mFrames[i];
+    int size = mFrames[i].size();
+    assert(sizeof(int) == 4);
+    fwrite(&size, 4, 1, file);
+    fwrite(mFrames[i].c_str(), mFrames[i].size(), 1, file);
   }
-  jsonFile << "]";
-  jsonFile.close();
+  fclose(file);
 
   std::cout << "Finished saving GUI Recording to file \"" << path << "\"!"
             << std::endl;

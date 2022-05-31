@@ -24,6 +24,7 @@
     "@babel/preset-env": "^7.11.5",
     "@babel/preset-typescript": "^7.10.4",
     "@types/react": "^17.0.37",
+    "arraybuffer-loader": "^1.0.8",
     "babel-loader": "^8.1.0",
     "css-loader": "^4.3.0",
     "declaration-bundler-webpack-plugin": "^1.0.3",
@@ -43,6 +44,8 @@
     "react": "^17.0.2"
   },
   "dependencies": {
-    "three": "^0.121.1"
+    "google-protobuf": "^3.20.1",
+    "sha256-uint8array": "^0.10.3",
+    "three": "0.121.1"
   }
 }

@@ -2,7 +2,10 @@ import NimbleStandalone from "./NimbleStandalone";
 import NimbleStandaloneReact from "./NimbleStandaloneReact";
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import previewJson from './data/preview.json';
+import rawBinary from '!!arraybuffer-loader!./data/movement.bin';
+
+const rawArray = new Uint8Array(rawBinary);
+console.log(rawArray);
 
 const ReactTestBed = () => {
   const [show, setShow] = useState(true);
@@ -48,7 +51,7 @@ const ReactTestBed = () => {
     children.push(React.createElement(NimbleStandaloneReact, {
       loading,
       loadingProgress,
-      recording: loaded ? previewJson : null,
+      recording: loaded ? rawArray : null,
       style: {
         width: "800px",
         height: "500px"

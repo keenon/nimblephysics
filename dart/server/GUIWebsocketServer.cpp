@@ -89,7 +89,7 @@ void GUIWebsocketServer::serve(int port)
       std::string jsonStr = getCurrentStateAsJson();
       try
       {
-        mServer->send(conn, jsonStr);
+        mServer->send(conn, base64_encode(jsonStr));
       }
       catch (...)
       {
@@ -147,7 +147,7 @@ void GUIWebsocketServer::serve(int port)
     }
     else if (args["type"].asString() == "button_click")
     {
-      std::string key = args["key"].asString();
+      std::string key = this->getCodeString(args["key"].asInt());
       if (mButtons.find(key) != mButtons.end())
       {
         mButtons[key].onClick();
@@ -155,7 +155,7 @@ void GUIWebsocketServer::serve(int port)
     }
     else if (args["type"].asString() == "slider_set_value")
     {
-      std::string key = args["key"].asString();
+      std::string key = this->getCodeString(args["key"].asInt());
       s_t value = static_cast<s_t>(args["value"].asDouble());
       if (mSliders.find(key) != mSliders.end())
       {
@@ -394,7 +394,7 @@ void GUIWebsocketServer::flush()
     std::string json = flushJson();
     try
     {
-      mServer->broadcast(json);
+      mServer->broadcast(base64_encode(json));
     }
     catch (...)
     {

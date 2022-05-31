@@ -123,6 +123,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
 
   double frameRate = data.header().frameRate();
   std::cout << "Framerate: " << frameRate << std::endl;
+  result.framesPerSecond = frameRate;
   int numFrames = data.header().nbFrames();
   int analogFramesPerFrame = data.header().nbAnalogByFrame();
 

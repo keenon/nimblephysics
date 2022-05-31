@@ -7,6 +7,18 @@
   height: 100%;
 }
 
+.NimbleStandalone-progress-instructions {
+  position: absolute;
+  bottom: 50px;
+  left: 20px;
+  height: 20px;
+  width: calc(100% - 40px);
+  text-align: center;
+  font-family: "Advent Pro", sans-serif;
+  color: #848484;
+  font-weight: bold;
+}
+
 .NimbleStandalone-progress-bar-container {
   position: absolute;
   bottom: 20px;
@@ -23,13 +35,11 @@
   height: 5px;
   width: 100%;
   background: rgb(255, 184, 0);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 184, 0, 1) 0%,
-    rgba(245, 71, 71, 1) 33%,
-    rgba(207, 50, 158, 1) 67%,
-    rgba(141, 25, 233, 1) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 184, 0, 1) 0%,
+      rgba(245, 71, 71, 1) 33%,
+      rgba(207, 50, 158, 1) 67%,
+      rgba(141, 25, 233, 1) 100%);
 }
 
 .NimbleStandalone-progress-bar {
@@ -57,8 +67,7 @@
   transition: opacity 0.2s ease-in-out;
 }
 
-.NimbleStandalone-progress-bar-container:hover
-  .NimbleStandalone-progress-bar-scrub {
+.NimbleStandalone-progress-bar-container:hover .NimbleStandalone-progress-bar-scrub {
   opacity: 1;
 }
 
@@ -87,13 +96,11 @@
   width: 80%;
   height: 25px;
   border-radius: 15px;
-  background: linear-gradient(
-    90deg,
-    rgba(141, 25, 233, 1) 0%,
-    rgba(207, 50, 158, 1) 33%,
-    rgba(245, 71, 71, 1) 67%,
-    rgba(255, 184, 0, 1) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(141, 25, 233, 1) 0%,
+      rgba(207, 50, 158, 1) 33%,
+      rgba(245, 71, 71, 1) 67%,
+      rgba(255, 184, 0, 1) 100%);
 }
 
 .NimbleStandalone-loading-bar-container-inner-bg {
@@ -120,31 +127,27 @@
   position: absolute;
   width: 166%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    rgba(141, 25, 233, 1) 0%,
-    rgba(207, 50, 158, 1) 33%,
-    rgba(245, 71, 71, 1) 67%,
-    rgba(255, 184, 0, 1) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(141, 25, 233, 1) 0%,
+      rgba(207, 50, 158, 1) 33%,
+      rgba(245, 71, 71, 1) 67%,
+      rgba(255, 184, 0, 1) 100%);
 }
 
-.NimbleStandalone-plot-title {
-
-}
+.NimbleStandalone-plot-title {}
 
 $triangle-size: 5px;
 
 .NimbleStandalone-triangle {
-  width: 0; 
-  height: 0; 
+  width: 0;
+  height: 0;
   display: inline-block;
   margin-left: 5px;
 
   &.NimbleStandalone-triangle-shown {
     border-left: $triangle-size solid transparent;
     border-right: $triangle-size solid transparent;
-    
+
     border-top: $triangle-size solid black;
     margin-bottom: 2px;
   }
@@ -227,7 +230,8 @@ $triangle-size: 5px;
 
       canvas {
         outline: none;
-        -webkit-tap-highlight-color: rgba(255, 255, 255, 0); /* mobile webkit */
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+        /* mobile webkit */
       }
     }
   }
@@ -298,14 +302,14 @@ $triangle-size: 5px;
     top: 80px;
     /* font-family: "Advent Pro", sans-serif; */
     color: #848484;
-    font-weight: bold;
-    font-size: 16px;
+    /* font-weight: bold; */
+    font-size: 13px;
     border-collapse: collapse;
   }
 
   .GUI_layers td {
     vertical-align: middle;
-    border: 1px solid black;
-    padding: 5px;
+    /* border: 1px solid black; */
+    padding: 2px;
   }
 }
