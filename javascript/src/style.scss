@@ -13,10 +13,20 @@
   left: 20px;
   height: 20px;
   width: calc(100% - 40px);
-  text-align: center;
+  text-align: left;
   font-family: "Advent Pro", sans-serif;
   color: #848484;
   font-weight: bold;
+}
+
+.NimbleStandalone-playback-speed-container {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  height: 20px;
+  width: calc(100% - 40px);
+  text-align: right;
+  color: #848484;
 }
 
 .NimbleStandalone-progress-bar-container {

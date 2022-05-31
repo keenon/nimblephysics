@@ -11,6 +11,8 @@ class NimbleStandalone {
   recording: dart.proto.CommandList[];
   playing: boolean;
   startedPlaying: number;
+  originalMsPerFrame: number;
+  playbackMultiple: number;
   msPerFrame: number;
   startFrame: number;
   lastFrame: number;
@@ -22,9 +24,13 @@ class NimbleStandalone {
   progressScrub: HTMLDivElement;
 
   loadingContainerMounted: boolean;
+  loadingTitle: HTMLDivElement;
   loadingContainer: HTMLDivElement;
   loadingProgressBarContainer: HTMLDivElement;
   loadingProgressBarBg: HTMLDivElement;
+
+  playbackSpeed: HTMLInputElement;
+  playbackSpeedDisplay: HTMLDivElement;
 
   constructor(container: HTMLElement) {
     this.viewContainer = document.createElement("div");
@@ -37,6 +43,25 @@ class NimbleStandalone {
     instructions.className =
       "NimbleStandalone-progress-instructions";
     this.viewContainer.appendChild(instructions);
+
+    const playbackSpeedContainer = document.createElement("div");
+    playbackSpeedContainer.className = "NimbleStandalone-playback-speed-container";
+    this.viewContainer.appendChild(playbackSpeedContainer);
+    this.playbackSpeed = document.createElement("input");
+    this.playbackSpeed.type = 'range';
+    this.playbackSpeed.min = '0.01';
+    this.playbackSpeed.max = '1.5';
+    this.playbackSpeed.value = '1.0';
+    this.playbackSpeed.step = '0.01';
+    this.playbackSpeedDisplay = document.createElement('div');
+    this.playbackSpeedDisplay.innerHTML = '1.00x speed';
+    playbackSpeedContainer.appendChild(this.playbackSpeedDisplay);
+    playbackSpeedContainer.appendChild(this.playbackSpeed);
+    this.playbackSpeed.oninput = (e: Event) => {
+      const val: number = parseFloat(this.playbackSpeed.value);
+      this.playbackSpeedDisplay.innerHTML = val+'x speed';
+      this.setPlaybackSpeed(val);
+    }
 
     this.progressBarContainer = document.createElement("div");
     this.progressBarContainer.className =
@@ -94,7 +119,9 @@ class NimbleStandalone {
     this.playing = false;
     this.startedPlaying = new Date().getTime();
     this.lastFrame = -1;
-    this.msPerFrame = 20;
+    this.originalMsPerFrame = 20.0;
+    this.playbackMultiple = 1.0;
+    this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
     this.startFrame = 0;
 
     this.loadingContainerMounted = false;
@@ -107,10 +134,10 @@ class NimbleStandalone {
     this.loadingContainer.appendChild(loadingLogo);
     */
 
-    const loadingTitle = document.createElement("div");
-    loadingTitle.className = "NimbleStandalone-loading-text";
-    loadingTitle.innerHTML = "nimble<b>viewer</b> loading...";
-    this.loadingContainer.appendChild(loadingTitle);
+    this.loadingTitle = document.createElement("div");
+    this.loadingTitle.className = "NimbleStandalone-loading-text";
+    this.loadingTitle.innerHTML = "nimble<b>viewer</b> loading...";
+    this.loadingContainer.appendChild(this.loadingTitle);
 
     const loadingProgressBarOuterContainer = document.createElement("div");
     loadingProgressBarOuterContainer.className =
@@ -199,6 +226,13 @@ class NimbleStandalone {
   };
 
   /**
+   * Sets the loading text we display to users
+   */
+  setLoadingType = (type: string) => {
+    this.loadingTitle.innerHTML = "nimble<b>viewer</b> "+type+"...";
+  }
+
+  /**
    * The loading progress
    *
    * @param progress The progress from 0-1 in loading
@@ -229,6 +263,7 @@ class NimbleStandalone {
    * @param url The URL to load a recording from, in order to play back
    */
   loadRecording = (url: string) => {
+    this.setLoadingType("loading");
     this.setLoadingProgress(0.0);
 
     let xhr = new XMLHttpRequest();
@@ -245,9 +280,6 @@ class NimbleStandalone {
       } else {
         let response = JSON.parse(xhr.response);
         this.setRecording(response);
-        setTimeout(() => {
-          this.hideLoadingBar();
-        }, 100);
       }
     };
 
@@ -266,26 +298,52 @@ class NimbleStandalone {
       this.lastRecordingHash = hash;
 
       this.recording = [];
-      let cursor = 0;
-      while (cursor < rawBytes.length) {
-        // Read thet size byte
-        const u32bytes = rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
-        const size = new Uint32Array(u32bytes)[0];
-        cursor += 4;
-        try {
-          let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(rawBytes.buffer.slice(cursor, cursor + size));
-          this.recording.push(command);
-        }
-        catch (e) {
-          console.error(e);
-        }
-        cursor += size;
-      }
+      let cursor = [0];
 
-      this.view.view.onWindowResize();
-      if (!this.playing) {
-        this.togglePlay();
-      }
+      this.setLoadingType("unzipping data");
+      let parseMoreBytes = () => {
+        const startTime = new Date().getTime();
+
+        if (cursor[0] < rawBytes.length) {
+          while (cursor[0] < rawBytes.length) {
+            // Read thet size byte
+            const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
+            const size = new Uint32Array(u32bytes)[0];
+            cursor[0] += 4;
+            try {
+              this.setLoadingProgress(cursor[0] / rawBytes.buffer.byteLength);
+              let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(rawBytes.buffer.slice(cursor[0], cursor[0] + size));
+              this.recording.push(command);
+            }
+            catch (e) {
+              console.error(e);
+            }
+            cursor[0] += size;
+
+            const elapsed = new Date().getTime() - startTime;
+            if (elapsed > 200) {
+              break;
+            }
+          }
+          requestAnimationFrame(parseMoreBytes);
+        }
+        else {
+          setTimeout(() => {
+            this.hideLoadingBar();
+            this.setLoadingType("loading");
+            this.view.view.onWindowResize();
+            if (!this.playing) {
+              this.togglePlay();
+            }
+          }, 100);
+        }
+      };
+      parseMoreBytes();
+    }
+    else {
+      setTimeout(() => {
+        this.hideLoadingBar();
+      }, 100);
     }
   };
 
@@ -301,10 +359,29 @@ class NimbleStandalone {
     }
   };
 
+  /**
+   * This sets our playback speed to a multiple of the fundamental number for this data.
+   */
+  setPlaybackSpeed = (multiple: number) => {
+    this.startFrame = this.getCurrentFrame();
+    this.startedPlaying = new Date().getTime();
+
+    this.playbackMultiple = multiple;
+    this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
+  };
+
+  getCurrentFrame = () => {
+    const elapsed: number = new Date().getTime() - this.startedPlaying;
+    return (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
+      this.recording.length;
+  };
+
+
   handleCommand = (command: dart.proto.Command) => {
     if (command.set_frames_per_second) {
       console.log("Frames per second: " + command.set_frames_per_second);
-      this.msPerFrame = 1000 / command.set_frames_per_second.framesPerSecond;
+      this.originalMsPerFrame = 1000.0 / command.set_frames_per_second.framesPerSecond;
+      this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
     }
     else {
       this.view.handleCommand(command);
@@ -319,9 +396,7 @@ class NimbleStandalone {
     if (!this.playing) return;
 
     const elapsed: number = new Date().getTime() - this.startedPlaying;
-    let frameNumber =
-      (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
-      this.recording.length;
+    let frameNumber = this.getCurrentFrame();
     if (frameNumber != this.lastFrame) {
       if (frameNumber < this.lastFrame) {
         // Reset at the beginning
@@ -329,9 +404,18 @@ class NimbleStandalone {
       }
       this.setProgress(frameNumber / this.recording.length);
       if (this.view != null) {
+        // This is much more efficient. It's not perfect, because sometimes frames will be dropped that did important things, but if the general convention is followed that everything is initialized on the first frame, this works.
+        if (this.lastFrame == -1 && frameNumber != 0) {
+          this.recording[0].command.forEach(this.handleCommand);
+        }
+        this.recording[frameNumber].command.forEach(this.handleCommand);
+
+        // This is the slower but more correct method.
+        /*
         for (let i = this.lastFrame + 1; i <= frameNumber; i++) {
           this.recording[i].command.forEach(this.handleCommand);
         }
+        */
         this.view.render();
       }
       this.lastFrame = frameNumber;
