@@ -6,7 +6,7 @@
 
 #include <assimp/scene.h>
 #include <boost/filesystem.hpp>
-#include <urdf_sensor/sensor.h>
+// #include <urdf_sensor/sensor.h>
 
 #include "dart/collision/CollisionResult.hpp"
 #include "dart/common/Aspect.hpp"
