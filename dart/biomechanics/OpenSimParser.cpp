@@ -256,6 +256,7 @@ void OpenSimParser::saveOsimScalingXMLFile(
     double massKg,
     double heightM,
     const std::string& osimInputPath,
+    const std::string& osimInputMarkersPath,
     const std::string& osimOutputPath,
     const std::string& scalingInstructionsOutputPath)
 {
@@ -356,7 +357,7 @@ void OpenSimParser::saveOsimScalingXMLFile(
 
   XMLElement* genericModelMaker_markerSetFile
       = xmlDoc.NewElement("marker_set_file");
-  genericModelMaker_markerSetFile->SetText("Unassigned");
+  genericModelMaker_markerSetFile->SetText(osimInputMarkersPath.c_str());
   genericModelMaker->InsertEndChild(genericModelMaker_markerSetFile);
 
   XMLElement* modelScaler = xmlDoc.NewElement("ModelScaler");
@@ -1276,6 +1277,80 @@ void OpenSimParser::moveOsimMarkers(
     }
 
     marker = marker->NextSiblingElement("Marker");
+  }
+
+  newFile.SaveFile(outputPath.c_str());
+}
+
+//==============================================================================
+/// Read an *.osim file, then save just the markers to a new *.osim file
+void OpenSimParser::filterJustMarkers(
+    const common::Uri& uri,
+    const std::string& outputPath,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  //--------------------------------------------------------------------------
+  // Load xml and create Document
+  tinyxml2::XMLDocument originalFile;
+  try
+  {
+    openXMLFile(originalFile, uri, retriever);
+  }
+  catch (std::exception const& e)
+  {
+    std::cout << "LoadFile [" << uri.toString() << "] Fails: " << e.what()
+              << std::endl;
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Deep copy document
+
+  tinyxml2::XMLDocument newFile;
+  originalFile.DeepCopy(&newFile);
+
+  //--------------------------------------------------------------------------
+  tinyxml2::XMLElement* docElement
+      = newFile.FirstChildElement("OpenSimDocument");
+  if (docElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <OpenSimDocument> as the root element.\n";
+    return;
+  }
+  tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
+  if (modelElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <Model> as the child of the root "
+             "<OpenSimDocument> element.\n";
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Go through the body nodes and adjust the scaling
+  tinyxml2::XMLElement* markerSet
+      = modelElement->FirstChildElement("MarkerSet");
+  tinyxml2::XMLNode* cursor = modelElement->FirstChild();
+  while (cursor != nullptr)
+  {
+    if (cursor != markerSet)
+    {
+      tinyxml2::XMLNode* tmpCursor = cursor;
+      cursor = cursor->NextSibling();
+      modelElement->DeleteChild(tmpCursor);
+    }
+    else
+    {
+      cursor = cursor->NextSibling();
+    }
+  }
+  while (markerSet->NextSibling() != nullptr)
+  {
+    modelElement->DeleteChild(markerSet->NextSibling());
   }
 
   newFile.SaveFile(outputPath.c_str());

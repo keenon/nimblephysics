@@ -275,6 +275,7 @@ TEST(OpenSimParser, SCALING)
       68.0,
       1.8,
       "Rajagopal2015.osim",
+      "Rajagopal2015_markers.osim",
       "Rajagopal2015_rescaled.osim",
       "../../../data/osim/Rajagopal2015/ScalingInstructions.xml");
 }
@@ -326,6 +327,10 @@ TEST(OpenSimParser, MOVE_OUTPUT_MARKERS)
       bodyScales,
       markerOffsets,
       "../../../data/osim/Rajagopal2015/Rajagopal2015_markersMoved.osim");
+
+  OpenSimParser::filterJustMarkers(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015_markersMoved.osim",
+      "../../../data/osim/Rajagopal2015/justMarkers.osim");
 }
 #endif
 

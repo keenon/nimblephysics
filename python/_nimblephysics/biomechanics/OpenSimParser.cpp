@@ -108,6 +108,7 @@ void OpenSimParser(py::module& m)
           double massKg,
           double heightM,
           const std::string& osimInputPath,
+          const std::string& osimInputMarkersPath,
           const std::string& osimOutputPath,
           const std::string& scalingInstructionsOutputPath) {
         return dart::biomechanics::OpenSimParser::saveOsimScalingXMLFile(
@@ -116,6 +117,7 @@ void OpenSimParser(py::module& m)
             massKg,
             heightM,
             osimInputPath,
+            osimInputMarkersPath,
             osimOutputPath,
             scalingInstructionsOutputPath);
       },
@@ -124,6 +126,7 @@ void OpenSimParser(py::module& m)
       ::py::arg("massKg"),
       ::py::arg("heightM"),
       ::py::arg("osimInputPath"),
+      ::py::arg("osimInputMarkersPath"),
       ::py::arg("osimOutputPath"),
       ::py::arg("scalingInstructionsOutputPath"));
 
@@ -224,6 +227,15 @@ void OpenSimParser(py::module& m)
       ::py::arg("inputPath"),
       ::py::arg("bodyScales"),
       ::py::arg("markerOffsets"),
+      ::py::arg("outputPath"));
+
+  sm.def(
+      "filterJustMarkers",
+      +[](const common::Uri& uri, const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::filterJustMarkers(
+            uri, outputPath);
+      },
+      ::py::arg("inputPath"),
       ::py::arg("outputPath"));
 
   sm.def(

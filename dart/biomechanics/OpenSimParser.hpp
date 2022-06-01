@@ -81,6 +81,7 @@ public:
       double massKg,
       double heightM,
       const std::string& osimInputPath,
+      const std::string& osimInputMarkersPath,
       const std::string& osimOutputPath,
       const std::string& scalingInstructionsOutputPath);
 
@@ -140,6 +141,12 @@ public:
       const std::map<std::string, Eigen::Vector3s>& bodyScales,
       const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
           markerOffsets,
+      const std::string& outputPath,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// Read an *.osim file, then save just the markers to a new *.osim file
+  static void filterJustMarkers(
+      const common::Uri& uri,
       const std::string& outputPath,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
