@@ -25,6 +25,8 @@ struct IKConfig
   IKConfig& setDontExitTranspose(bool v);
   IKConfig& setLineSearch(bool v);
   IKConfig& setLogOutput(bool v);
+  IKConfig& setInputNames(const std::vector<std::string>& inputNames);
+  IKConfig& setOutputNames(const std::vector<std::string>& outputNames);
 
   s_t convergenceThreshold = 1e-7;
   int maxStepCount = 100;
@@ -35,6 +37,8 @@ struct IKConfig
   bool dontExitTranspose = false;
   bool lineSearch = true;
   bool logOutput = false;
+  std::vector<std::string> inputNames;
+  std::vector<std::string> outputNames;
 };
 
 struct IKResult
@@ -44,8 +48,22 @@ struct IKResult
   bool clamped;
 };
 
+void verifyJacobian(
+    Eigen::VectorXs atPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
+    int targetSize,
+    std::function<Eigen::VectorXs(
+        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+    std::function<void(
+        /*out*/ Eigen::VectorXs& diff,
+        /*out*/ Eigen::MatrixXs& jac)> eval,
+    IKConfig config = IKConfig());
+
 s_t solveIK(
     Eigen::VectorXs initialPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
         /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
@@ -57,6 +75,8 @@ s_t solveIK(
 
 IKResult refineIK(
     Eigen::VectorXs initialPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
         /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,

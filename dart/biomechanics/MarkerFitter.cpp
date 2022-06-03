@@ -532,7 +532,9 @@ MarkerFitter::MarkerFitter(
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
-    mDisableLinesearch(false)
+    mDisableLinesearch(false),
+    mAnatomicalMarkerDefaultWeight(1.0),
+    mTrackingMarkerDefaultWeight(0.02)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
 
@@ -1186,7 +1188,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
-    C3D* c3d,
+    std::vector<ForcePlate> forcePlates,
     const OpenSimFile* goldOsim,
     const Eigen::MatrixXs goldPoses)
 {
@@ -1277,17 +1279,17 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     }
   }
 
-  if (c3d != nullptr)
+  // Render the plates as red rectangles
+  for (int i = 0; i < forcePlates.size(); i++)
   {
-    // Render the plates as red rectangles
-    for (int i = 0; i < c3d->forcePlates.size(); i++)
+    if (forcePlates[i].corners.size() > 0)
     {
       std::vector<Eigen::Vector3s> points;
-      for (int j = 0; j < c3d->forcePlates[i].corners.size(); j++)
+      for (int j = 0; j < forcePlates[i].corners.size(); j++)
       {
-        points.push_back(c3d->forcePlates[i].corners[j]);
+        points.push_back(forcePlates[i].corners[j]);
       }
-      points.push_back(c3d->forcePlates[i].corners[0]);
+      points.push_back(forcePlates[i].corners[0]);
 
       server->createLine(
           "plate_" + std::to_string(i),
@@ -1300,7 +1302,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   s_t secondsPerTick = 1.0 / 50;
   std::shared_ptr<realtime::Ticker> ticker
       = std::make_shared<realtime::Ticker>(secondsPerTick);
-  ticker->registerTickListener([c3d,
+  ticker->registerTickListener([forcePlates,
                                 server,
                                 init,
                                 markerObservations,
@@ -1430,27 +1432,24 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       }
     }
 
-    if (c3d != nullptr)
+    for (int i = 0; i < forcePlates.size(); i++)
     {
-      for (int i = 0; i < c3d->forcePlates.size(); i++)
+      server->deleteObject("force_" + std::to_string(i));
+      if (forcePlates[i].forces[timestep].squaredNorm() > 0)
       {
-        server->deleteObject("force_" + std::to_string(i));
-        if (c3d->forcePlates[i].forces[timestep].squaredNorm() > 0)
-        {
-          std::vector<Eigen::Vector3s> forcePoints;
-          forcePoints.push_back(
-              c3d->forcePlates[i].centersOfPressure[timestep]);
-          forcePoints.push_back(
-              c3d->forcePlates[i].centersOfPressure[timestep]
-              + (c3d->forcePlates[i].forces[timestep] * 0.001));
-          server->createLine(
-              "force_" + std::to_string(i),
-              forcePoints,
-              forcePlateLayerColor,
-              forcePlateLayerName);
-        }
+        std::vector<Eigen::Vector3s> forcePoints;
+        forcePoints.push_back(forcePlates[i].centersOfPressure[timestep]);
+        forcePoints.push_back(
+            forcePlates[i].centersOfPressure[timestep]
+            + (forcePlates[i].forces[timestep] * 0.001));
+        server->createLine(
+            "force_" + std::to_string(i),
+            forcePoints,
+            forcePlateLayerColor,
+            forcePlateLayerName);
       }
     }
+
     for (int i = 0; i < numJoints; i++)
     {
       if (init.jointWeights(i) > 0)
@@ -1508,7 +1507,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
-    C3D* c3d,
+    int framesPerSecond,
+    std::vector<ForcePlate> forcePlates,
     const OpenSimFile* goldOsim,
     const Eigen::MatrixXs goldPoses)
 {
@@ -1537,7 +1537,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
 
   server::GUIRecording server;
-  server.setFramesPerSecond(c3d->framesPerSecond);
+  server.setFramesPerSecond(framesPerSecond);
   server.createLayer(autoFitLayerName, autoFitLayerColor, true);
   server.createLayer(trackingMarkersLayerName, trackingMarkersLayerColor, true);
   server.createLayer(
@@ -1552,7 +1552,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       originalMarkerLocationsLayerColor,
       false);
   server.renderSkeleton(
-      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, "Skeleton");
+      mSkeleton, "auto_", Eigen::Vector4s::Ones() * -1, autoFitLayerName);
   if (goldOsim && goldPoses.size() > 0)
   {
     server.createLayer(manualLayerName, manualLayerColor, false);
@@ -1599,17 +1599,17 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     }
   }
 
-  if (c3d != nullptr)
+  // Render the plates as red rectangles
+  for (int i = 0; i < forcePlates.size(); i++)
   {
-    // Render the plates as red rectangles
-    for (int i = 0; i < c3d->forcePlates.size(); i++)
+    if (forcePlates[i].corners.size() > 0)
     {
       std::vector<Eigen::Vector3s> points;
-      for (int j = 0; j < c3d->forcePlates[i].corners.size(); j++)
+      for (int j = 0; j < forcePlates[i].corners.size(); j++)
       {
-        points.push_back(c3d->forcePlates[i].corners[j]);
+        points.push_back(forcePlates[i].corners[j]);
       }
-      points.push_back(c3d->forcePlates[i].corners[0]);
+      points.push_back(forcePlates[i].corners[0]);
 
       server.createLine(
           "plate_" + std::to_string(i),
@@ -1724,25 +1724,21 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       }
     }
 
-    if (c3d != nullptr)
+    for (int i = 0; i < forcePlates.size(); i++)
     {
-      for (int i = 0; i < c3d->forcePlates.size(); i++)
+      server.deleteObject("force_" + std::to_string(i));
+      if (forcePlates[i].forces[timestep].squaredNorm() > 0)
       {
-        server.deleteObject("force_" + std::to_string(i));
-        if (c3d->forcePlates[i].forces[timestep].squaredNorm() > 0)
-        {
-          std::vector<Eigen::Vector3s> forcePoints;
-          forcePoints.push_back(
-              c3d->forcePlates[i].centersOfPressure[timestep]);
-          forcePoints.push_back(
-              c3d->forcePlates[i].centersOfPressure[timestep]
-              + (c3d->forcePlates[i].forces[timestep] * 0.001));
-          server.createLine(
-              "force_" + std::to_string(i),
-              forcePoints,
-              forcePlateLayerColor,
-              forcePlateLayerName);
-        }
+        std::vector<Eigen::Vector3s> forcePoints;
+        forcePoints.push_back(forcePlates[i].centersOfPressure[timestep]);
+        forcePoints.push_back(
+            forcePlates[i].centersOfPressure[timestep]
+            + (forcePlates[i].forces[timestep] * 0.001));
+        server.createLine(
+            "force_" + std::to_string(i),
+            forcePoints,
+            forcePlateLayerColor,
+            forcePlateLayerName);
       }
     }
     for (int i = 0; i < numJoints; i++)
@@ -2351,8 +2347,8 @@ MarkerInitialization MarkerFitter::fineTuneIK(
   std::vector<std::string> anatomicalMarkerNames;
   for (int j = 0; j < mMarkerNames.size(); j++)
   {
-    if (!mMarkerIsTracking[j])
-      anatomicalMarkerNames.push_back(mMarkerNames[j]);
+    // if (!mMarkerIsTracking[j])
+    anatomicalMarkerNames.push_back(mMarkerNames[j]);
   }
 
   // 1. Divide the marker observations into N sequential blocks.
@@ -2531,6 +2527,8 @@ MarkerInitialization MarkerFitter::smoothOutIK(
         s_t finalLoss = math::solveIK(
             // Initial guess
             initialization.poses.col(i),
+            skelClone->getPositionUpperLimits(),
+            skelClone->getPositionLowerLimits(),
             // Output dimension
             observedMarkerNames.size() * 3,
             // Set positions
@@ -2549,8 +2547,8 @@ MarkerInitialization MarkerFitter::smoothOutIK(
             [&observedMarkers, &markerPoses, &skelClone](
                 /*out*/ Eigen::VectorXs& diff,
                 /*out*/ Eigen::MatrixXs& jac) {
-              diff = markerPoses
-                     - skelClone->getMarkerWorldPositions(observedMarkers);
+              diff = skelClone->getMarkerWorldPositions(observedMarkers)
+                     - markerPoses;
               jac = skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
                   observedMarkers);
             },
@@ -2625,8 +2623,8 @@ MarkerInitialization MarkerFitter::getInitialization(
   std::vector<std::string> anatomicalMarkerNames;
   for (int j = 0; j < mMarkerNames.size(); j++)
   {
-    if (!mMarkerIsTracking[j])
-      anatomicalMarkerNames.push_back(mMarkerNames[j]);
+    // if (!mMarkerIsTracking[j])
+    anatomicalMarkerNames.push_back(mMarkerNames[j]);
   }
 
   // 1. Divide the marker observations into N sequential blocks.
@@ -3013,7 +3011,7 @@ void MarkerFitter::computeJointIKDiff(
     Eigen::VectorXs& jointAxis,
     Eigen::VectorXs& axisWeights)
 {
-  diff = jointCenters - jointPoses;
+  diff = jointPoses - jointCenters;
   for (int i = 0; i < jointWeights.size(); i++)
   {
     diff.segment<3>(i * 3) *= jointWeights(i);
@@ -3025,7 +3023,7 @@ void MarkerFitter::computeJointIKDiff(
     Eigen::Vector3s actualJointPos = jointPoses.segment<3>(i * 3);
 
     // Subtract out any component parallel to the axis
-    Eigen::Vector3s jointDiff = axisCenter - actualJointPos;
+    Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
     jointDiff -= jointDiff.dot(axisDir) * axisDir;
 
     diff.segment<3>(i * 3) += jointDiff * axisWeights(i);
@@ -3112,6 +3110,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
   Eigen::VectorXs markerWeightsVector
       = Eigen::VectorXs::Ones(markerObservations.size());
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerVector;
+  std::vector<std::string> outputNames;
   for (std::pair<std::string, Eigen::Vector3s> pair : markerObservations)
   {
     markerPoses.segment<3>(markerVector.size() * 3) = pair.second;
@@ -3119,6 +3118,13 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     {
       assert(markerWeights.count(pair.first));
       markerWeightsVector(markerVector.size()) = markerWeights.at(pair.first);
+    }
+    else
+    {
+      markerWeightsVector(markerVector.size())
+          = fitter->mMarkerIsTracking.at(fitter->mMarkerIndices.at(pair.first))
+                ? fitter->mTrackingMarkerDefaultWeight
+                : fitter->mAnatomicalMarkerDefaultWeight;
     }
     assert(fitter->mMarkerMap.count(pair.first));
     const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
@@ -3132,7 +3138,28 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     markerVector.emplace_back(
         skeletonBallJoints->getBodyNode(originalMarker.first->getName()),
         originalMarker.second + offset);
+    Eigen::Vector3s markerPos = originalMarker.second + offset;
+    std::string markerPrefix = "marker " + originalMarker.first->getName()
+                               + " (" + std::to_string(markerPos(0)) + ","
+                               + std::to_string(markerPos(1)) + ","
+                               + std::to_string(markerPos(2)) + ")";
+    outputNames.push_back(markerPrefix + " X");
+    outputNames.push_back(markerPrefix + " Y");
+    outputNames.push_back(markerPrefix + " Z");
   }
+  for (int i = 0; i < joints.size(); i++)
+  {
+    std::string jointPrefix = "joint " + joints[i]->getName();
+    outputNames.push_back(jointPrefix + " X");
+    outputNames.push_back(jointPrefix + " Y");
+    outputNames.push_back(jointPrefix + " Z");
+  }
+  std::vector<std::string> inputNames;
+  for (int i = 0; i < skeletonBallJoints->getNumDofs(); i++)
+  {
+    inputNames.push_back("dof " + skeletonBallJoints->getDof(i)->getName());
+  }
+
   ScaleAndFitResult result;
   if (dontScale)
   {
@@ -3148,6 +3175,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
+        skeletonBallJoints->getPositionUpperLimits(),
+        skeletonBallJoints->getPositionLowerLimits(),
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
         [&skeletonBallJoints, &skeleton](
@@ -3182,12 +3211,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
           diff.segment(0, markerPoses.size())
-              = markerPoses
-                - skeletonBallJoints->getMarkerWorldPositions(markerVector);
-          for (int i = 0; i < markerWeightsVector.size(); i++)
-          {
-            diff.segment<3>(i * 3) *= markerWeightsVector(i);
-          }
+              = skeletonBallJoints->getMarkerWorldPositions(markerVector)
+                - markerPoses;
           Eigen::VectorXs jointPoses
               = skeletonBallJoints->getJointWorldPositions(
                   jointsForSkeletonBallJoints);
@@ -3218,6 +3243,11 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               = skeletonBallJoints
                     ->getJointWorldPositionsJacobianWrtJointPositions(
                         jointsForSkeletonBallJoints);
+          for (int i = 0; i < markerWeightsVector.size(); i++)
+          {
+            diff.segment<3>(i * 3) *= markerWeightsVector(i);
+            jac.block(i * 3, 0, 3, jac.cols()) *= markerWeightsVector(i);
+          }
           rescaleIKJacobianForWeightsAndAxis(
               jac.block(
                   markerVector.size() * 3,
@@ -3239,7 +3269,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
-            .setLogOutput(false));
+            .setLogOutput(false)
+            .setInputNames(inputNames)
+            .setOutputNames(outputNames));
   }
   else
   {
@@ -3247,20 +3279,58 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     int problemDim = skeletonBallJoints->getNumDofs()
                      + skeletonBallJoints->getGroupScaleDim();
 
+    // Record debug names for the scale groups
+    for (int i = 0; i < skeletonBallJoints->getNumScaleGroups(); i++)
+    {
+      auto group = skeletonBallJoints->getBodyScaleGroup(i);
+      std::string prefix = "scale group [";
+      for (auto* body : group.nodes)
+      {
+        prefix += " " + body->getName();
+      }
+      prefix += " ] ";
+      if (group.uniformScaling)
+      {
+        inputNames.push_back(prefix + " scale");
+      }
+      else
+      {
+        inputNames.push_back(prefix + " X");
+        inputNames.push_back(prefix + " Y");
+        inputNames.push_back(prefix + " Z");
+      }
+    }
+
     // 1.4. Set our initial guess for IK to whatever the current pose of the
     // skeleton is
     Eigen::VectorXs initialPos = Eigen::VectorXs::Ones(problemDim);
+    Eigen::VectorXs lowerBound = Eigen::VectorXs::Zero(problemDim);
+    Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(problemDim);
     initialPos.segment(0, skeletonBallJoints->getNumDofs())
         = skeletonBallJoints->convertPositionsToBallSpace(
             skeletonBallJoints->getPositions());
+    lowerBound.segment(0, skeletonBallJoints->getNumDofs())
+        = skeletonBallJoints->getPositionLowerLimits();
+    upperBound.segment(0, skeletonBallJoints->getNumDofs())
+        = skeletonBallJoints->getPositionUpperLimits();
     initialPos.segment(
         skeletonBallJoints->getNumDofs(),
         skeletonBallJoints->getGroupScaleDim())
         = skeletonBallJoints->getGroupScales();
+    lowerBound.segment(
+        skeletonBallJoints->getNumDofs(),
+        skeletonBallJoints->getGroupScaleDim())
+        = skeletonBallJoints->getGroupScalesLowerBound();
+    upperBound.segment(
+        skeletonBallJoints->getNumDofs(),
+        skeletonBallJoints->getGroupScaleDim())
+        = skeletonBallJoints->getGroupScalesUpperBound();
 
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
         [&skeletonBallJoints, &skeleton](
@@ -3359,12 +3429,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
           diff.segment(0, markerPoses.size())
-              = markerPoses
-                - skeletonBallJoints->getMarkerWorldPositions(markerVector);
-          for (int i = 0; i < markerWeightsVector.size(); i++)
-          {
-            diff.segment<3>(i * 3) *= markerWeightsVector(i);
-          }
+              = skeletonBallJoints->getMarkerWorldPositions(markerVector)
+                - markerPoses;
           Eigen::VectorXs jointPoses
               = skeletonBallJoints->getJointWorldPositions(
                   jointsForSkeletonBallJoints);
@@ -3398,6 +3464,11 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               = skeletonBallJoints
                     ->getMarkerWorldPositionsJacobianWrtGroupScales(
                         markerVector);
+          for (int i = 0; i < markerWeightsVector.size(); i++)
+          {
+            diff.segment<3>(i * 3) *= markerWeightsVector(i);
+            jac.block(i * 3, 0, 3, jac.cols()) *= markerWeightsVector(i);
+          }
 
           jac.block(
               markerVector.size() * 3,
@@ -3451,7 +3522,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
-            .setLogOutput(false));
+            .setLogOutput(false)
+            .setInputNames(inputNames)
+            .setOutputNames(outputNames));
   }
 
   // 3. Return the result from the best fit we had
@@ -3545,6 +3618,7 @@ void MarkerFitter::fitTrajectory(
       Eigen::VectorXs centerPoses = jointCenters[i];
       Eigen::VectorXs axisPoses = jointAxis[i];
       std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerVector;
+      std::vector<std::string> outputNames;
       for (std::pair<std::string, Eigen::Vector3s> pair : markerObservations[i])
       {
         markerPoses.segment<3>(markerVector.size() * 3) = pair.second;
@@ -3553,6 +3627,14 @@ void MarkerFitter::fitTrajectory(
           assert(markerWeights.count(pair.first));
           markerWeightsVector(markerVector.size())
               = markerWeights.at(pair.first);
+        }
+        else
+        {
+          markerWeightsVector(markerVector.size())
+              = fitter->mMarkerIsTracking.at(
+                    fitter->mMarkerIndices.at(pair.first))
+                    ? fitter->mTrackingMarkerDefaultWeight
+                    : fitter->mAnatomicalMarkerDefaultWeight;
         }
         assert(fitter->mMarkerMap.count(pair.first));
         const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
@@ -3566,6 +3648,26 @@ void MarkerFitter::fitTrajectory(
         markerVector.emplace_back(
             skeletonBallJoints->getBodyNode(originalMarker.first->getName()),
             originalMarker.second + offset);
+        Eigen::Vector3s markerPos = originalMarker.second + offset;
+        std::string markerPrefix = "marker " + originalMarker.first->getName()
+                                   + " (" + std::to_string(markerPos(0)) + ","
+                                   + std::to_string(markerPos(1)) + ","
+                                   + std::to_string(markerPos(2)) + ")";
+        outputNames.push_back(markerPrefix + " X");
+        outputNames.push_back(markerPrefix + " Y");
+        outputNames.push_back(markerPrefix + " Z");
+      }
+      for (int i = 0; i < joints.size(); i++)
+      {
+        std::string jointPrefix = "joint " + joints[i]->getName();
+        outputNames.push_back(jointPrefix + " X");
+        outputNames.push_back(jointPrefix + " Y");
+        outputNames.push_back(jointPrefix + " Z");
+      }
+      std::vector<std::string> inputNames;
+      for (int i = 0; i < skeletonBallJoints->getNumDofs(); i++)
+      {
+        inputNames.push_back("dof " + skeletonBallJoints->getDof(i)->getName());
       }
 
       // 2.2. Actually run the IK solver
@@ -3573,6 +3675,8 @@ void MarkerFitter::fitTrajectory(
 
       s_t finalLoss = math::solveIK(
           initialGuess,
+          skeletonBallJoints->getPositionUpperLimits(),
+          skeletonBallJoints->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
           [&skeletonBallJoints, &skeleton](
@@ -3606,12 +3710,8 @@ void MarkerFitter::fitTrajectory(
               /*out*/ Eigen::VectorXs& diff,
               /*out*/ Eigen::MatrixXs& jac) {
             diff.segment(0, markerPoses.size())
-                = markerPoses
-                  - skeletonBallJoints->getMarkerWorldPositions(markerVector);
-            for (int i = 0; i < markerWeightsVector.size(); i++)
-            {
-              diff.segment<3>(i * 3) *= markerWeightsVector(i);
-            }
+                = skeletonBallJoints->getMarkerWorldPositions(markerVector)
+                  - markerPoses;
             Eigen::VectorXs jointPoses
                 = skeletonBallJoints->getJointWorldPositions(
                     jointsForSkeletonBallJoints);
@@ -3641,6 +3741,11 @@ void MarkerFitter::fitTrajectory(
                 = skeletonBallJoints
                       ->getJointWorldPositionsJacobianWrtJointPositions(
                           jointsForSkeletonBallJoints);
+            for (int i = 0; i < markerWeightsVector.size(); i++)
+            {
+              diff.segment<3>(i * 3) *= markerWeightsVector(i);
+              jac.block(i * 3, 0, 3, jac.cols()) *= markerWeightsVector(i);
+            }
             rescaleIKJacobianForWeightsAndAxis(
                 jac.block(
                     markerVector.size() * 3,
@@ -3662,7 +3767,9 @@ void MarkerFitter::fitTrajectory(
               .setLossLowerBound(1e-8)
               .setMaxRestarts(1)
               .setStartClamped(true)
-              .setLogOutput(false));
+              .setLogOutput(false)
+              .setInputNames(inputNames)
+              .setOutputNames(outputNames));
 
       // 2.3. Record this outcome
       result.col(i) = skeleton->getPositions();
@@ -3717,6 +3824,14 @@ void MarkerFitter::fitTrajectory(
           markerWeightsVector(markerVector.size())
               = markerWeights.at(pair.first);
         }
+        else
+        {
+          markerWeightsVector(markerVector.size())
+              = fitter->mMarkerIsTracking.at(
+                    fitter->mMarkerIndices.at(pair.first))
+                    ? fitter->mTrackingMarkerDefaultWeight
+                    : fitter->mAnatomicalMarkerDefaultWeight;
+        }
         assert(fitter->mMarkerMap.count(pair.first));
         const std::pair<dynamics::BodyNode*, Eigen::Vector3s>& originalMarker
             = fitter->mMarkerMap.at(pair.first);
@@ -3736,6 +3851,8 @@ void MarkerFitter::fitTrajectory(
 
       s_t finalLoss = math::solveIK(
           initialGuess,
+          skeleton->getPositionUpperLimits(),
+          skeleton->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
           [&skeleton](
@@ -3763,11 +3880,7 @@ void MarkerFitter::fitTrajectory(
               /*out*/ Eigen::VectorXs& diff,
               /*out*/ Eigen::MatrixXs& jac) {
             diff.segment(0, markerPoses.size())
-                = markerPoses - skeleton->getMarkerWorldPositions(markerVector);
-            for (int i = 0; i < markerWeightsVector.size(); i++)
-            {
-              diff.segment<3>(i * 3) *= markerWeightsVector(i);
-            }
+                = skeleton->getMarkerWorldPositions(markerVector) - markerPoses;
             Eigen::VectorXs jointPoses
                 = skeleton->getJointWorldPositions(joints);
             computeJointIKDiff(
@@ -3791,6 +3904,11 @@ void MarkerFitter::fitTrajectory(
                 skeleton->getNumDofs())
                 = skeleton->getJointWorldPositionsJacobianWrtJointPositions(
                     joints);
+            for (int i = 0; i < markerWeightsVector.size(); i++)
+            {
+              diff.segment<3>(i * 3) *= markerWeightsVector(i);
+              jac.block(i * 3, 0, 3, jac.cols()) *= markerWeightsVector(i);
+            }
             rescaleIKJacobianForWeightsAndAxis(
                 jac.block(
                     markerVector.size() * 3,
@@ -4273,6 +4391,22 @@ void MarkerFitter::setRegularizeAllBodyScales(s_t weight)
 void MarkerFitter::setDebugJointVariability(bool debug)
 {
   mDebugJointVariability = debug;
+}
+
+//==============================================================================
+/// This is the default weight that gets assigned to anatomical markers during
+/// IK, if nothing marker-specific gets assigned.
+void MarkerFitter::setAnatomicalMarkerDefaultWeight(s_t weight)
+{
+  mAnatomicalMarkerDefaultWeight = weight;
+}
+
+//==============================================================================
+/// This is the default weight that gets assigned to tracking markers during
+/// IK, if nothing marker-specific gets assigned.
+void MarkerFitter::setTrackingMarkerDefaultWeight(s_t weight)
+{
+  mTrackingMarkerDefaultWeight = weight;
 }
 
 //==============================================================================

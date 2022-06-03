@@ -12,7 +12,7 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/biomechanics/Anthropometrics.hpp"
-#include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
@@ -376,7 +376,7 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      C3D* c3d = nullptr,
+      std::vector<ForcePlate> forcePlates = std::vector<ForcePlate>(),
       const OpenSimFile* goldSkeleton = nullptr,
       const Eigen::MatrixXs goldPoses = Eigen::MatrixXs::Zero(0, 0));
 
@@ -387,7 +387,8 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerTrajectories,
-      C3D* c3d = nullptr,
+      int framesPerSecond,
+      std::vector<ForcePlate> forcePlates = std::vector<ForcePlate>(),
       const OpenSimFile* goldSkeleton = nullptr,
       const Eigen::MatrixXs goldPoses = Eigen::MatrixXs::Zero(0, 0));
 
@@ -550,6 +551,14 @@ public:
   /// If set to true, we print the pair observation counts and data for
   /// computing joint variability.
   void setDebugJointVariability(bool debug);
+
+  /// This is the default weight that gets assigned to anatomical markers during
+  /// IK, if nothing marker-specific gets assigned.
+  void setAnatomicalMarkerDefaultWeight(s_t weight);
+
+  /// This is the default weight that gets assigned to tracking markers during
+  /// IK, if nothing marker-specific gets assigned.
+  void setTrackingMarkerDefaultWeight(s_t weight);
 
   /// This returns a score summarizing how much the markers attached to this
   /// joint move relative to one another.
@@ -922,6 +931,8 @@ protected:
   s_t mRegularizeAnatomicalMarkerOffsets;
   s_t mRegularizeIndividualBodyScales;
   s_t mRegularizeAllBodyScales;
+  s_t mAnatomicalMarkerDefaultWeight;
+  s_t mTrackingMarkerDefaultWeight;
 
   // These are IPOPT settings
   double mTolerance;

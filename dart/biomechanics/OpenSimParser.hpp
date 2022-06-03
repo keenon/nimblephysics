@@ -7,6 +7,7 @@
 #include <tinyxml2.h>
 
 #include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -50,6 +51,7 @@ struct OpenSimTRC
   std::vector<double> timestamps;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
   std::map<std::string, std::vector<Eigen::Vector3s>> markerLines;
+  int framesPerSecond;
 };
 
 struct OpenSimMot
@@ -212,9 +214,9 @@ public:
       const Eigen::MatrixXs& poses);
 
   /// This grabs the GRF forces from a *.mot file
-  static OpenSimGRF loadGRF(
+  static std::vector<ForcePlate> loadGRF(
       const common::Uri& uri,
-      int downsampleByFactor = 1,
+      int targetFramesPerSecond = 100,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim

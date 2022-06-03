@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -1471,6 +1472,14 @@ OpenSimTRC OpenSimParser::loadTRC(
     }
   }
 
+  if (result.timestamps.size() > 1)
+  {
+    int frames = result.timestamps.size();
+    s_t elapsed = result.timestamps[result.timestamps.size() - 1]
+                  - result.timestamps[0];
+    result.framesPerSecond = std::round(frames / elapsed);
+  }
+
   return result;
 }
 
@@ -2005,9 +2014,9 @@ void OpenSimParser::saveMarkerLocationsMot(
 
 //==============================================================================
 /// This grabs the GRF forces from a *.mot file
-OpenSimGRF OpenSimParser::loadGRF(
+std::vector<ForcePlate> OpenSimParser::loadGRF(
     const common::Uri& uri,
-    int downsampleByFactor,
+    int targetFramesPerSecond,
     const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
@@ -2215,17 +2224,39 @@ OpenSimGRF OpenSimParser::loadGRF(
   assert(timestamps.size() == copRows.size());
   assert(timestamps.size() == wrenchRows.size());
 
+  int downsampleByFactor = 1;
+  if (timestamps.size() > 1)
+  {
+    int frames = timestamps.size();
+    s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
+    int framesPerSecond = std::round(frames / elapsed);
+    if (framesPerSecond < targetFramesPerSecond)
+    {
+      std::cout << "WARNING!!! OpenSimParser is trying to load "
+                   "ground-reaction-force data from "
+                << uri.toString()
+                << ", but the requested target frames per second ("
+                << targetFramesPerSecond
+                << ", probably to match a corresponding .trc file) is HIGHER "
+                   "than the file's native frames per second ("
+                << framesPerSecond
+                << "). We don't yet support up-sampling GRF data, so this will "
+                   "result in mismatched data!"
+                << std::endl;
+    }
+    else
+    {
+      downsampleByFactor = framesPerSecond / targetFramesPerSecond;
+    }
+  }
+
   // Process result into its final form
 
-  int numTimesteps = (int)ceil((double)timestamps.size() / downsampleByFactor);
-
-  OpenSimGRF grf;
+  std::vector<ForcePlate> forcePlates;
   for (int i = 0; i < numPlates; i++)
   {
-    grf.plateCOPs.push_back(
-        Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, numTimesteps));
-    grf.plateGRFs.push_back(
-        Eigen::Matrix<s_t, 6, Eigen::Dynamic>::Zero(6, numTimesteps));
+    forcePlates.emplace_back();
+    ForcePlate& forcePlate = forcePlates[forcePlates.size() - 1];
 
     int downsampleClock = 0;
     Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
@@ -2242,8 +2273,9 @@ OpenSimGRF OpenSimParser::loadGRF(
       if (downsampleClock <= 0)
       {
         downsampleClock = downsampleByFactor;
-        grf.plateCOPs[i].col(cursor) = copAvg / numAveraged;
-        grf.plateGRFs[i].col(cursor) = wrenchAvg / numAveraged;
+        forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
+        forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
+        forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);
         cursor++;
 
         numAveraged = 0;
@@ -2253,18 +2285,7 @@ OpenSimGRF OpenSimParser::loadGRF(
     }
   }
 
-  int downsampleClock = 0;
-  for (int t = 0; t < timestamps.size(); t++)
-  {
-    downsampleClock--;
-    if (downsampleClock <= 0)
-    {
-      grf.timestamps.push_back(timestamps[t]);
-      downsampleClock = downsampleByFactor;
-    }
-  }
-
-  return grf;
+  return forcePlates;
 }
 
 template <std::size_t Dimension>

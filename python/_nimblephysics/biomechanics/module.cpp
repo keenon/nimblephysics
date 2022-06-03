@@ -40,6 +40,7 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
+void ForcePlate(py::module& sm);
 void LilypadSolver(py::module& sm);
 void BatchGaitInverseDynamics(py::module& sm);
 void OpenSimParser(py::module& sm);
@@ -58,6 +59,7 @@ void dart_biomechanics(py::module& m)
       = "This provides biomechanics utilities in Nimble, including inverse "
         "dynamics and (eventually) mocap support and muscle estimation.";
 
+  ForcePlate(sm);
   LilypadSolver(sm);
   BatchGaitInverseDynamics(sm);
   OpenSimParser(sm);

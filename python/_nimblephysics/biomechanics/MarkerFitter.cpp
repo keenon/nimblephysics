@@ -332,12 +332,20 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setDebugJointVariability,
           ::py::arg("debug"))
       .def(
+          "setAnatomicalMarkerDefaultWeight",
+          &dart::biomechanics::MarkerFitter::setAnatomicalMarkerDefaultWeight,
+          ::py::arg("weight"))
+      .def(
+          "setTrackingMarkerDefaultWeight",
+          &dart::biomechanics::MarkerFitter::setTrackingMarkerDefaultWeight,
+          ::py::arg("weight"))
+      .def(
           "debugTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
           ::py::arg("server"),
           ::py::arg("init"),
           ::py::arg("markerObservations"),
-          ::py::arg("c3d") = nullptr,
+          ::py::arg("forcePlates") = nullptr,
           ::py::arg("goldOsim") = nullptr,
           ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def(
@@ -346,7 +354,8 @@ void MarkerFitter(py::module& m)
           ::py::arg("path"),
           ::py::arg("init"),
           ::py::arg("markerObservations"),
-          ::py::arg("c3d") = nullptr,
+          ::py::arg("frameRate"),
+          ::py::arg("forcePlates") = nullptr,
           ::py::arg("goldOsim") = nullptr,
           ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def_static(

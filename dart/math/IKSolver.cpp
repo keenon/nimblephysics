@@ -6,9 +6,13 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <string>
 #include <vector>
 
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
+#include "dart/utils/PackageResourceRetriever.hpp"
 
 namespace dart {
 namespace math {
@@ -79,8 +83,116 @@ IKConfig& IKConfig::setLogOutput(bool v)
   return *this;
 }
 
+IKConfig& IKConfig::setInputNames(const std::vector<std::string>& v)
+{
+  inputNames = v;
+  return *this;
+}
+
+IKConfig& IKConfig::setOutputNames(const std::vector<std::string>& v)
+{
+  outputNames = v;
+  return *this;
+}
+
+void verifyJacobian(
+    Eigen::VectorXs originalPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
+    int targetSize,
+    std::function<Eigen::VectorXs(
+        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+    std::function<void(
+        /*out*/ Eigen::VectorXs& diff,
+        /*out*/ Eigen::MatrixXs& jac)> eval,
+    IKConfig config)
+{
+  // Get the original analytical result
+  Eigen::MatrixXs analyticalJac(targetSize, originalPos.size());
+  Eigen::VectorXs analyticalDiff(targetSize);
+  setPosAndClamp(originalPos, false);
+  eval(analyticalDiff, analyticalJac);
+
+  // Finite difference the same Jacobian
+  Eigen::MatrixXs result(targetSize, originalPos.size());
+  Eigen::MatrixXs scratch(targetSize, originalPos.size());
+  s_t eps = 1e-4;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweakedPos = originalPos;
+        tweakedPos(dof) += eps;
+        setPosAndClamp(tweakedPos, false);
+        Eigen::VectorXs out(targetSize);
+        eval(out, scratch);
+        perturbed = out;
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  for (int i = 0; i < originalPos.size(); i++)
+  {
+    if (originalPos(i) >= upperBound(i) - eps)
+    {
+      analyticalJac.col(i).setZero();
+      result.col(i).setZero();
+    }
+    if (originalPos(i) <= lowerBound(i) + eps)
+    {
+      analyticalJac.col(i).setZero();
+      result.col(i).setZero();
+    }
+  }
+
+  // Reset everything how we left it
+  setPosAndClamp(originalPos, false);
+
+  if ((result - analyticalJac).norm() > 1e-8)
+  {
+    std::cout << "Error! Jacobians do not match!! Diff="
+              << (result - analyticalJac).norm() << "" << std::endl;
+    std::cout << "Analytical: " << std::endl
+              << analyticalJac.block(0, 0, 7, 7) << std::endl;
+    std::cout << "Brute force: " << std::endl
+              << result.block(0, 0, 7, 7) << std::endl;
+    Eigen::MatrixXs diff = analyticalJac - result;
+    std::cout << "Diff: " << std::endl << diff.block(0, 0, 7, 7) << std::endl;
+    std::cout << "Input names size vs Actual input size (should be the same): "
+              << config.inputNames.size() << " - " << originalPos.size()
+              << std::endl;
+    std::cout
+        << "Output names size vs Actual output size (should be the same): "
+        << config.outputNames.size() << " - " << targetSize << std::endl;
+    for (int i = 0; i < diff.rows(); i++)
+    {
+      for (int j = 0; j < diff.cols(); j++)
+      {
+        if (abs(diff(i, j)) > 1e-8)
+        {
+          std::cout << "d (output "
+                    << (config.outputNames.size() > i ? config.outputNames[i]
+                                                      : std::to_string(i))
+                    << " with val " << analyticalDiff(i) << ") wrt d (input "
+                    << (config.inputNames.size() > j ? config.inputNames[j]
+                                                     : std::to_string(j))
+                    << " with val " << originalPos(j)
+                    << ") error: " << diff(i, j) << ", analytical "
+                    << analyticalJac(i, j) << ", FD " << result(i, j)
+                    << std::endl;
+        }
+      }
+    }
+    exit(1);
+  }
+}
+
 s_t solveIK(
     Eigen::VectorXs initialPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
         /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
@@ -90,6 +202,17 @@ s_t solveIK(
     std::function<void(/*out*/ Eigen::VectorXs& pos)> getRandomRestart,
     IKConfig config)
 {
+#ifndef NDEBUG
+  verifyJacobian(
+      initialPos,
+      upperBound,
+      lowerBound,
+      targetSize,
+      setPosAndClamp,
+      eval,
+      config);
+#endif
+
   s_t bestError = std::numeric_limits<s_t>::infinity();
   Eigen::VectorXs bestResult = initialPos;
 
@@ -112,6 +235,8 @@ s_t solveIK(
 
     IKResult result = refineIK(
         pos,
+        upperBound,
+        lowerBound,
         targetSize,
         setPosAndClamp,
         eval,
@@ -141,8 +266,14 @@ s_t solveIK(
 
   // For the best restart, run the remainder of the steps to further refine the
   // IK solution
-  IKResult result
-      = refineIK(bestResult, targetSize, setPosAndClamp, eval, config);
+  IKResult result = refineIK(
+      bestResult,
+      upperBound,
+      lowerBound,
+      targetSize,
+      setPosAndClamp,
+      eval,
+      config);
 
   if (config.logOutput)
   {
@@ -153,6 +284,8 @@ s_t solveIK(
 
 IKResult refineIK(
     Eigen::VectorXs initialPos,
+    Eigen::VectorXs upperBound,
+    Eigen::VectorXs lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
         /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
@@ -161,6 +294,9 @@ IKResult refineIK(
         /*out*/ Eigen::MatrixXs& jac)> eval,
     IKConfig config)
 {
+  (void)upperBound;
+  (void)lowerBound;
+
   Eigen::VectorXs pos = initialPos;
 
   // Allocate these values once, to re-use in the inner loop
@@ -327,7 +463,7 @@ IKResult refineIK(
       }
     }
     lastPos = pos;
-    pos = setPosAndClamp(pos + (lr * delta), clamp);
+    pos = setPosAndClamp(pos - (lr * delta), clamp);
   }
 
   if (config.logOutput)

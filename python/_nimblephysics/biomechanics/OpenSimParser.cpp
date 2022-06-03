@@ -77,6 +77,8 @@ void OpenSimParser(py::module& m)
           "markerTimesteps", &dart::biomechanics::OpenSimTRC::markerTimesteps)
       .def_readwrite(
           "markerLines", &dart::biomechanics::OpenSimTRC::markerLines)
+      .def_readwrite(
+          "framesPerSecond", &dart::biomechanics::OpenSimTRC::framesPerSecond)
       .def_readwrite("timestamps", &dart::biomechanics::OpenSimTRC::timestamps);
 
   ::py::class_<dart::biomechanics::OpenSimScaleAndMarkerOffsets>(
@@ -244,6 +246,15 @@ void OpenSimParser(py::module& m)
         return dart::biomechanics::OpenSimParser::loadTRC(path);
       },
       ::py::arg("path"));
+
+  sm.def(
+      "loadGRF",
+      +[](const std::string& path, int targetFramesPerSecond) {
+        return dart::biomechanics::OpenSimParser::loadGRF(
+            path, targetFramesPerSecond);
+      },
+      ::py::arg("path"),
+      ::py::arg("targetFramesPerSecond") = 100);
 
   sm.def(
       "saveTRC",

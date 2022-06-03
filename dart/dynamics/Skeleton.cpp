@@ -3649,6 +3649,13 @@ void Skeleton::setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform)
 }
 
 //==============================================================================
+/// This returns the number of scale groups
+int Skeleton::getNumScaleGroups()
+{
+  return mBodyScaleGroups.size();
+}
+
+//==============================================================================
 /// This returns the dimension of the scale group
 int Skeleton::getScaleGroupDim(int groupIndex)
 {
@@ -5885,11 +5892,23 @@ s_t Skeleton::fitJointsToWorldPositions(
   {
     Eigen::VectorXs initialPos
         = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs lowerBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs upperBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
     initialPos.segment(0, getNumDofs()) = getPositions();
+    lowerBound.segment(0, getNumDofs()) = getPositionLowerLimits();
+    upperBound.segment(0, getNumDofs()) = getPositionUpperLimits();
     initialPos.segment(getNumDofs(), getGroupScaleDim()) = getGroupScales();
+    lowerBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesLowerBound();
+    upperBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesUpperBound();
 
     return math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         positionJoints.size() * 3,
         [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
@@ -5917,7 +5936,7 @@ s_t Skeleton::fitJointsToWorldPositions(
         [this, targetPositions, positionJoints](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getJointWorldPositions(positionJoints);
+          diff = getJointWorldPositions(positionJoints) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == positionJoints.size() * 3);
           jac.setZero();
@@ -5937,6 +5956,8 @@ s_t Skeleton::fitJointsToWorldPositions(
   {
     return math::solveIK(
         getPositions(),
+        getPositionUpperLimits(),
+        getPositionLowerLimits(),
         positionJoints.size() * 3,
         [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
           setPositions(pos);
@@ -5950,7 +5971,7 @@ s_t Skeleton::fitJointsToWorldPositions(
         [this, targetPositions, positionJoints](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getJointWorldPositions(positionJoints);
+          diff = getJointWorldPositions(positionJoints) - targetPositions;
           jac = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
         },
         [this](Eigen::VectorXs& val) { val = getRandomPose(); },
@@ -5972,11 +5993,23 @@ s_t Skeleton::fitMarkersToWorldPositions(
   {
     Eigen::VectorXs initialPos
         = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs lowerBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs upperBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
     initialPos.segment(0, getNumDofs()) = getPositions();
+    lowerBound.segment(0, getNumDofs()) = getPositionLowerLimits();
+    upperBound.segment(0, getNumDofs()) = getPositionUpperLimits();
     initialPos.segment(getNumDofs(), getGroupScaleDim()) = getGroupScales();
+    lowerBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesLowerBound();
+    upperBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesUpperBound();
 
     return math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         markers.size() * 3,
         [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
@@ -6004,7 +6037,7 @@ s_t Skeleton::fitMarkersToWorldPositions(
         [this, targetPositions, markers](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getMarkerWorldPositions(markers);
+          diff = getMarkerWorldPositions(markers) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == markers.size() * 3);
           jac.setZero();
@@ -6023,6 +6056,8 @@ s_t Skeleton::fitMarkersToWorldPositions(
   {
     return math::solveIK(
         getPositions(),
+        getPositionUpperLimits(),
+        getPositionLowerLimits(),
         markers.size() * 3,
         [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
           setPositions(pos);
@@ -6036,7 +6071,7 @@ s_t Skeleton::fitMarkersToWorldPositions(
         [this, targetPositions, markers, markerWeights](
             /*out*/ Eigen::VectorXs& diff,
             /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getMarkerWorldPositions(markers);
+          diff = getMarkerWorldPositions(markers) - targetPositions;
           for (int j = 0; j < markerWeights.size(); j++)
           {
             diff.segment<3>(j * 3) *= markerWeights(j);

@@ -30,10 +30,16 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
-#include <dart/biomechanics/C3DLoader.hpp>
+#include "dart/biomechanics/ForcePlate.hpp"
+
+#include <memory>
+
+#include <dart/biomechanics/OpenSimParser.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/MeshShape.hpp>
+#include <dart/dynamics/Skeleton.hpp>
+#include <dart/simulation/World.hpp>
 #include <pybind11/eigen.h>
-#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -42,34 +48,17 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void C3DLoader(py::module& m)
+void ForcePlate(py::module& m)
 {
-  ::py::class_<dart::biomechanics::C3D>(m, "C3D")
-      .def_readwrite("timestamps", &dart::biomechanics::C3D::timestamps)
-      .def_readwrite("markers", &dart::biomechanics::C3D::markers)
+  ::py::class_<dart::biomechanics::ForcePlate>(m, "ForcePlate")
       .def_readwrite(
-          "markerTimesteps", &dart::biomechanics::C3D::markerTimesteps)
-      .def_readwrite("forcePlates", &dart::biomechanics::C3D::forcePlates)
-      .def_readwrite("dataRotation", &dart::biomechanics::C3D::dataRotation)
+          "worldOrigin", &dart::biomechanics::ForcePlate::worldOrigin)
+      .def_readwrite("corners", &dart::biomechanics::ForcePlate::corners)
       .def_readwrite(
-          "shuffledMarkersMatrix",
-          &dart::biomechanics::C3D::shuffledMarkersMatrix)
-      .def_readwrite(
-          "shuffledMarkersMatrixMask",
-          &dart::biomechanics::C3D::shuffledMarkersMatrixMask);
-
-  ::py::class_<dart::biomechanics::C3DLoader>(m, "C3DLoader")
-      .def_static(
-          "loadC3D", &dart::biomechanics::C3DLoader::loadC3D, ::py::arg("uri"))
-      .def_static(
-          "fixupMarkerFlips",
-          &dart::biomechanics::C3DLoader::fixupMarkerFlips,
-          ::py::arg("c3d"))
-      .def_static(
-          "debugToGUI",
-          &dart::biomechanics::C3DLoader::debugToGUI,
-          ::py::arg("file"),
-          ::py::arg("server"));
+          "centersOfPressure",
+          &dart::biomechanics::ForcePlate::centersOfPressure)
+      .def_readwrite("moments", &dart::biomechanics::ForcePlate::moments)
+      .def_readwrite("forces", &dart::biomechanics::ForcePlate::forces);
 }
 
 } // namespace python

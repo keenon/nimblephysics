@@ -477,11 +477,24 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
   // 3.3. Set our initial guess for IK to whatever the current pose of the
   // skeleton is
   Eigen::VectorXs initialPos = Eigen::VectorXs::Ones(problemDim);
+  Eigen::VectorXs lowerBound = Eigen::VectorXs::Zero(problemDim);
+  Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(problemDim);
   initialPos.segment(0, skeletonBallJoints->getNumDofs())
-      = mSkeleton->convertPositionsToBallSpace(mSkeleton->getPositions());
+      = skeletonBallJoints->convertPositionsToBallSpace(
+          skeletonBallJoints->getPositions());
+  lowerBound.segment(0, skeletonBallJoints->getNumDofs())
+      = skeletonBallJoints->getPositionLowerLimits();
+  upperBound.segment(0, skeletonBallJoints->getNumDofs())
+      = skeletonBallJoints->getPositionUpperLimits();
   initialPos.segment(
       skeletonBallJoints->getNumDofs(), skeletonBallJoints->getGroupScaleDim())
       = skeletonBallJoints->getGroupScales();
+  lowerBound.segment(
+      skeletonBallJoints->getNumDofs(), skeletonBallJoints->getGroupScaleDim())
+      = skeletonBallJoints->getGroupScalesLowerBound();
+  upperBound.segment(
+      skeletonBallJoints->getNumDofs(), skeletonBallJoints->getGroupScaleDim())
+      = skeletonBallJoints->getGroupScalesUpperBound();
 
   // 3.4. Linearize the joint center guesses
   Eigen::VectorXs jointCenterVec
@@ -508,6 +521,8 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
     // 3.5. Actually solve the IK
     s_t result = math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         jointCenterVec.size(),
         // Set positions
         [&skeletonBallJoints, this](const Eigen::VectorXs pos, bool clamp) {
@@ -555,7 +570,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
             Eigen::VectorXs& diff, Eigen::MatrixXs& jac) {
           Eigen::VectorXs jointPoses
               = skeletonBallJoints->getJointWorldPositions(ballSkelJoints);
-          diff = jointCenterVec - jointPoses;
+          diff = jointPoses - jointCenterVec;
 
           assert(
               jac.cols()

@@ -8,21 +8,13 @@
 
 #include <Eigen/Dense>
 
+#include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
 
 namespace biomechanics {
-
-struct ForcePlate
-{
-  Eigen::Vector3s worldOrigin;
-  std::vector<Eigen::Vector3s> corners;
-  std::vector<Eigen::Vector3s> centersOfPressure;
-  std::vector<Eigen::Vector3s> moments;
-  std::vector<Eigen::Vector3s> forces;
-};
 
 /// This holds marker trajectory information from an OpenSim TRC file
 struct C3D

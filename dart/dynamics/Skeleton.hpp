@@ -953,6 +953,9 @@ public:
   /// constrains scaling.
   void setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform = true);
 
+  /// This returns the number of scale groups
+  int getNumScaleGroups();
+
   /// This returns the dimension of the scale group
   int getScaleGroupDim(int groupIndex);
 
