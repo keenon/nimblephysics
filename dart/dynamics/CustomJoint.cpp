@@ -63,7 +63,9 @@ std::shared_ptr<math::CustomFunction> CustomJoint<Dimension>::getCustomFunction(
 template <std::size_t Dimension>
 void CustomJoint<Dimension>::zeroTranslationInCustomFunctions()
 {
+  Eigen::Isometry3s parentT = this->getTransformFromParentBodyNode();
 #ifndef NDEBUG
+  Eigen::Vector3s originalParentTranslation = parentT.translation();
   Eigen::Vector3s originalT = this->getRelativeTransform().translation();
 #endif
 
@@ -76,14 +78,42 @@ void CustomJoint<Dimension>::zeroTranslationInCustomFunctions()
         i,
         mFunctions[i]->offsetBy(-defaultValues(i - 3)),
         mFunctionDrivenByDof[i]);
+    assert(
+        mFunctions[i]->calcValue(this->getPosition(mFunctionDrivenByDof[i]))
+        == 0);
   }
-  Eigen::Isometry3s T = this->getTransformFromParentBodyNode();
-  T.translation() += defaultValues;
-  this->setTransformFromParentBodyNode(T);
+  Eigen::VectorXs pos = this->getPositionsStatic();
+  Eigen::Vector3s euler = getEulerPositions(pos);
+  Eigen::Isometry3s T
+      = EulerJoint::convertToTransform(euler, mAxisOrder, mFlipAxisMap);
+  T.translation() = getTranslationPositions(pos);
+  Eigen::Matrix3s childRotation
+      = T.linear() * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  parentT.translation() += childRotation * defaultValues;
+  this->setTransformFromParentBodyNode(parentT);
 
 #ifndef NDEBUG
   Eigen::Vector3s finalT = this->getRelativeTransform().translation();
-  assert(originalT == finalT);
+  if ((originalT - finalT).squaredNorm() > 1e-8)
+  {
+    std::cout << "Positions: " << std::endl
+              << this->getPositions() << std::endl;
+    std::cout << "Custom Functions: " << std::endl
+              << this->getCustomFunctionPositions(this->getPositions())
+              << std::endl;
+    Eigen::MatrixXs diff = Eigen::MatrixXs::Zero(3, 6);
+    diff.col(0) = originalT;
+    diff.col(1) = originalParentTranslation;
+    diff.col(2) = defaultValues;
+    diff.col(3) = parentT.translation();
+    diff.col(4) = finalT;
+    diff.col(5) = originalT - finalT;
+    std::cout << "Original - Original Parent T - Custom T - New Parent T - "
+                 "Final - Error"
+              << std::endl
+              << diff << std::endl;
+    assert(originalT == finalT);
+  }
 #endif
 }
 

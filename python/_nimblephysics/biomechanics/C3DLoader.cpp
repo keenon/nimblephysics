@@ -46,6 +46,8 @@ void C3DLoader(py::module& m)
 {
   ::py::class_<dart::biomechanics::C3D>(m, "C3D")
       .def_readwrite("timestamps", &dart::biomechanics::C3D::timestamps)
+      .def_readwrite(
+          "framesPerSecond", &dart::biomechanics::C3D::framesPerSecond)
       .def_readwrite("markers", &dart::biomechanics::C3D::markers)
       .def_readwrite(
           "markerTimesteps", &dart::biomechanics::C3D::markerTimesteps)

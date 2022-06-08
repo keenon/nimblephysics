@@ -5,6 +5,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -723,6 +724,296 @@ MarkerFitter::MarkerFitter(
 
     return loss;
   };
+}
+
+//==============================================================================
+/// This will go through original marker data and attempt to detect common
+/// anomalies, generate warnings to help the user fix their own issues, and
+/// produce fixes where possible.
+MarkersErrorReport MarkerFitter::generateDataErrorsReport(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        immutableMarkerObservations)
+{
+  MarkersErrorReport report;
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
+      = immutableMarkerObservations;
+
+  // 0. Generate a list of the markers we observe in this clip
+
+  std::map<std::string, int> observedMarkersMap;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    for (auto& pair : markerObservations[i])
+    {
+      observedMarkersMap[pair.first] = 1;
+    }
+  }
+  std::vector<std::string> observedMarkers;
+  for (auto& pair : observedMarkersMap)
+  {
+    observedMarkers.push_back(pair.first);
+  }
+
+  // 1. Attempt to detect marker flips that occur partway through the trajectory
+
+  std::map<std::string, std::string> lastFlips;
+  for (int i = 1; i < markerObservations.size(); i++)
+  {
+    std::unordered_map<std::string, std::string> closestMarkerFromLastTimestep;
+
+    for (std::string& marker : observedMarkers)
+    {
+      closestMarkerFromLastTimestep[marker] = marker;
+
+      // If we see the marker on both timesteps, then evaluate which markers
+      // were the closest on last timestep to this marker
+      if (markerObservations[i].count(marker) > 0
+          && markerObservations[i - 1].count(marker) > 0)
+      {
+        Eigen::Vector3s thisTimestep = markerObservations[i].at(marker);
+        for (auto& pair : markerObservations[i - 1])
+        {
+          s_t dist = (pair.second - thisTimestep).norm();
+          if (dist < (markerObservations[i - 1].at(
+                          closestMarkerFromLastTimestep.at(marker))
+                      - thisTimestep)
+                         .norm())
+          {
+            closestMarkerFromLastTimestep[marker] = pair.first;
+          }
+        }
+      }
+    }
+
+    for (std::string& marker : observedMarkers)
+    {
+      // If we weren't closest to ourselves, and instead we were closest to
+      // another marker AND IT WAS CLOSEST TO US, then we've detected a trivial
+      // flip, and we can flip back.
+      if (closestMarkerFromLastTimestep[marker] != marker
+          && closestMarkerFromLastTimestep
+                     [closestMarkerFromLastTimestep[marker]]
+                 == marker)
+      {
+        Eigen::Vector3s tmp = markerObservations[i][marker];
+        std::string otherMarker = closestMarkerFromLastTimestep[marker];
+
+        if (lastFlips[marker] != otherMarker)
+        {
+          lastFlips[marker] = otherMarker;
+          report.warnings.push_back(
+              "Marker \"" + marker + "\" was flipped with \"" + otherMarker
+              + "\" starting on frame " + std::to_string(i));
+        }
+
+        markerObservations[i][marker] = markerObservations[i][otherMarker];
+        markerObservations[i][otherMarker] = tmp;
+        closestMarkerFromLastTimestep[marker] = marker;
+        closestMarkerFromLastTimestep[otherMarker] = otherMarker;
+      }
+      else
+      {
+        if (lastFlips[marker] != marker && i > 1)
+        {
+          report.warnings.push_back(
+              "Marker \"" + marker + "\" ended flip with \"" + lastFlips[marker]
+              + "\" (reverted to itself) on frame " + std::to_string(i));
+        }
+        lastFlips[marker] = marker;
+      }
+    }
+  }
+
+  // 3. Generate a warning about mismatched markers between the model and the
+  // data.
+
+  // The only reason this could be a problem is if the overlap is too small
+  std::vector<std::string> markersInBoth;
+  // This could be suspicious, and should generate a warning
+  std::vector<std::string> markersInJustMocap;
+  // These are not a big deal, and generally indicate virtual markers
+  std::vector<std::string> markersInJustModel;
+
+  for (std::string& marker : observedMarkers)
+  {
+    if (mMarkerMap.count(marker) > 0)
+    {
+      markersInBoth.push_back(marker);
+    }
+    else
+    {
+      markersInJustMocap.push_back(marker);
+      report.info.push_back(
+          "The marker \"" + marker
+          + "\" appears in the mocap data, but not on the model");
+    }
+  }
+  for (std::string& marker : mMarkerNames)
+  {
+    if (observedMarkersMap.count(marker) == 0)
+    {
+      markersInJustModel.push_back(marker);
+      report.info.push_back("The marker \""+marker+"\" appears in the model, but not in the mocap data. This generally happens because the marker is a virtual marker. We ignore virtual markers, so this is not a problem, just a heads up.");
+    }
+  }
+
+  if (markersInBoth.size() < 8)
+  {
+    report.warnings.push_back("We only found " + std::to_string(markersInBoth.size()) + " model markers that also appear in the motion capture! This will probably lead to suboptimal results, and likely means this file doesn't match the model you uploaded!");
+  }
+
+  report.markerObservationsAttemptedFixed = markerObservations;
+  return report;
+}
+
+//==============================================================================
+/// After we've finished our initialization, it may become clear that markers
+/// in some of the files should be reversed. This method will do that check,
+/// and if it finds that the markers should be reversed it does the swap,
+/// re-runs IK, and records the result in a new init. If it doesn't find
+/// anything, this is a no-op.
+bool MarkerFitter::checkForFlippedMarkers(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        immutableMarkerObservations,
+    MarkerInitialization& init,
+    MarkersErrorReport& report)
+{
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
+      = immutableMarkerObservations;
+
+  std::cout << "Checking for marker swaps..." << std::endl;
+
+  // 0. Generate a list of the markers we observe in this clip
+
+  std::map<std::string, int> observedMarkersMap;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    for (auto& pair : markerObservations[i])
+    {
+      observedMarkersMap[pair.first] = 1;
+    }
+  }
+  std::vector<std::string> observedMarkers;
+  for (auto& pair : observedMarkersMap)
+  {
+    observedMarkers.push_back(pair.first);
+  }
+
+  // Attempt to detect markers that were mistakenly assigned to each other
+  // during labelling. This is tricky, but the motivating example is that in
+  // half of Scott Uhlrich's OpenCap trials the foot markers are on one side of
+  // the foot, and in the other half of the trials the foot markers are flipped.
+
+  Eigen::VectorXs originalPose = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+  std::map<std::string, std::map<std::string, s_t>> totalDistances;
+  std::map<std::string, std::map<std::string, int>> totalObservations;
+  for (std::string& marker : mMarkerNames)
+  {
+    for (std::string& innerMarker : observedMarkers)
+    {
+      totalDistances[marker][innerMarker] = 0.0;
+    }
+  }
+
+  mSkeleton->setGroupScales(init.groupScales);
+  for (int i = 0; i < init.poses.cols(); i++)
+  {
+    mSkeleton->setPositions(init.poses.col(i));
+    std::map<std::string, Eigen::Vector3s> markerPos
+        = mSkeleton->getMarkerMapWorldPositions(init.updatedMarkerMap);
+    for (auto& pair : markerPos)
+    {
+      for (auto& innerPair : markerObservations[i])
+      {
+        totalDistances[pair.first][innerPair.first]
+            += (pair.second - innerPair.second).norm();
+        totalObservations[pair.first][innerPair.first]++;
+      }
+    }
+  }
+  mSkeleton->setPositions(originalPose);
+  mSkeleton->setGroupScales(originalScales);
+
+  std::map<std::string, std::string> closestMarkers;
+  for (std::string& marker : mMarkerNames)
+  {
+    std::string closestMarker = marker;
+    s_t closestMarkerDistance = totalDistances[marker][marker]
+                                / (totalObservations[marker][marker] > 0
+                                       ? totalObservations[marker][marker]
+                                       : 1.0);
+
+    for (std::string& innerMarker : observedMarkers)
+    {
+      int observed = totalObservations[marker][innerMarker];
+      if (observed > 0)
+      {
+        s_t avgDist = totalDistances[marker][innerMarker] / observed;
+        if (avgDist < closestMarkerDistance)
+        {
+          closestMarker = innerMarker;
+          closestMarkerDistance = avgDist;
+        }
+      }
+    }
+
+    closestMarkers[marker] = closestMarker;
+  }
+
+  std::map<std::string, std::string> swapped;
+  bool anySwapped = false;
+
+  for (std::string& marker : mMarkerNames)
+  {
+    // If we're not closest to ourselves, and the thing we're closest to is
+    // closest to us, then this is a good indication that we've found a marker
+    // that shouldn't have been swapped! We also check that it hasn't already
+    // been swapped with us, cause we don't want to double-swap and end up
+    // swapping back.
+    if (closestMarkers[marker] != marker
+        && closestMarkers[closestMarkers[marker]] == marker
+        && swapped.count(closestMarkers[marker]) == 0)
+    {
+      report.warnings.push_back(
+          "Marker \"" + marker + "\" seems it was swapped with \""
+          + closestMarkers[marker] + "\" for the whole clip.");
+      swapped[marker] = closestMarkers[marker];
+      swapped[closestMarkers[marker]] = marker;
+      anySwapped = true;
+
+      for (int i = 0; i < markerObservations.size(); i++)
+      {
+        if (markerObservations[i].count(marker) > 0
+            && markerObservations[i].count(closestMarkers[marker]))
+        {
+          Eigen::Vector3s tmp
+              = markerObservations[i].at(closestMarkers[marker]);
+          markerObservations[i][closestMarkers[marker]]
+              = markerObservations[i].at(marker);
+          markerObservations[i][marker] = tmp;
+        }
+        else if (markerObservations[i].count(marker) > 0)
+        {
+          markerObservations[i][closestMarkers[marker]]
+              = markerObservations[i].at(marker);
+          markerObservations[i].erase(marker);
+        }
+        else if (markerObservations[i].count(closestMarkers[marker]) > 0)
+        {
+          markerObservations[i][marker]
+              = markerObservations[i].at(closestMarkers[marker]);
+          markerObservations[i].erase(closestMarkers[marker]);
+        }
+      }
+    }
+  }
+  if (anySwapped)
+  {
+    report.markerObservationsAttemptedFixed = markerObservations;
+  }
+
+  return anySwapped;
 }
 
 //==============================================================================
@@ -2803,9 +3094,11 @@ MarkerInitialization MarkerFitter::getInitialization(
     result.poses.col(blockStartIndices[i]) = posesAndScales[i].pose;
   }
   std::vector<bool> shouldProcessBlock;
+  std::vector<s_t> lastBlockLoss;
   for (int i = 0; i < numBlocks; i++)
   {
     shouldProcessBlock.push_back(true);
+    lastBlockLoss.push_back(std::numeric_limits<double>::infinity());
   }
 
   // We re-run parallel processing over all the blocks until convergence, or at
@@ -2857,20 +3150,34 @@ MarkerInitialization MarkerFitter::getInitialization(
     bool foundGap = false;
     for (int i = 1; i < numBlocks; i++)
     {
-      if (result.poseScores(blockStartIndices[i])
-              > result.poseScores(blockStartIndices[i] - 1) * 3
-          && result.poseScores(blockStartIndices[i]) > 0.01
-          && !newClip[blockStartIndices[i]])
+      s_t blockStartLoss = result.poseScores(blockStartIndices[i]);
+      if (blockStartLoss > result.poseScores(blockStartIndices[i] - 1) * 3
+          && blockStartLoss > 0.01 && !newClip[blockStartIndices[i]])
       {
-        shouldProcessBlock[i] = true;
-        std::cout << "Found bad block start at " << i
-                  << ": prev block ended at "
-                  << result.poseScores(blockStartIndices[i] - 1)
-                  << ", but this block started at "
-                  << result.poseScores(blockStartIndices[i]) << std::endl;
-        result.poses(blockStartIndices[i])
-            = result.poses(blockStartIndices[i] - 1);
-        foundGap = true;
+        s_t lastBlockStartLoss = lastBlockLoss[i];
+        if (std::abs(blockStartLoss - lastBlockStartLoss) < 1e-3)
+        {
+          std::cout << "Bad block start at " << i << ": prev block ended at "
+                    << result.poseScores(blockStartIndices[i] - 1)
+                    << ", but this block started at "
+                    << result.poseScores(blockStartIndices[i])
+                    << ". However, no improvement since last iteration, so "
+                       "we're not going to retry this block."
+                    << std::endl;
+        }
+        else
+        {
+          lastBlockLoss[i] = blockStartLoss;
+          shouldProcessBlock[i] = true;
+          std::cout << "Found bad block start at " << i
+                    << ": prev block ended at "
+                    << result.poseScores(blockStartIndices[i] - 1)
+                    << ", but this block started at "
+                    << result.poseScores(blockStartIndices[i]) << std::endl;
+          result.poses(blockStartIndices[i])
+              = result.poses(blockStartIndices[i] - 1);
+          foundGap = true;
+        }
       }
       else
       {

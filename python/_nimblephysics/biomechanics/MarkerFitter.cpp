@@ -100,6 +100,15 @@ void MarkerFitter(py::module& m)
           "rawMarkerOffsets",
           &dart::biomechanics::BilevelFitResult::rawMarkerOffsets);
 
+  ::py::class_<dart::biomechanics::MarkersErrorReport>(m, "MarkersErrorReport")
+      .def_readwrite(
+          "warnings", &dart::biomechanics::MarkersErrorReport::warnings)
+      .def_readwrite("info", &dart::biomechanics::MarkersErrorReport::info)
+      .def_readwrite(
+          "markerObservationsAttemptedFixed",
+          &dart::biomechanics::MarkersErrorReport::
+              markerObservationsAttemptedFixed);
+
   ::py::class_<dart::biomechanics::MarkerInitialization>(
       m, "MarkerInitialization")
       .def_readwrite("poses", &dart::biomechanics::MarkerInitialization::poses)
@@ -271,6 +280,16 @@ void MarkerFitter(py::module& m)
           ::py::arg("initialization"),
           ::py::arg("numSamples"),
           ::py::arg("applyInnerProblemGradientConstraints") = true)
+      .def(
+          "generateDataErrorsReport",
+          &dart::biomechanics::MarkerFitter::generateDataErrorsReport,
+          ::py::arg("markerObservations"))
+      .def(
+          "checkForFlippedMarkers",
+          &dart::biomechanics::MarkerFitter::checkForFlippedMarkers,
+          ::py::arg("markerObservations"),
+          ::py::arg("init"),
+          ::py::arg("report"))
       .def(
           "runMultiTrialKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runMultiTrialKinematicsPipeline,

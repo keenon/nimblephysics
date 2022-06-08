@@ -1392,10 +1392,24 @@ void runEngine(
     OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[i]);
     framesPerSecond.push_back(trc.framesPerSecond);
 
-    std::vector<ForcePlate> grf
-        = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
     markerObservationTrials.push_back(trc.markerTimesteps);
-    forcePlates.push_back(grf);
+    if (i < grfFiles.size())
+    {
+      std::vector<ForcePlate> grf
+          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+      forcePlates.push_back(grf);
+    }
+    else
+    {
+      forcePlates.emplace_back();
+    }
+  }
+
+  std::vector<MarkersErrorReport> reports;
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    reports.push_back(
+        fitter.generateDataErrorsReport(markerObservationTrials[i]));
   }
 
   std::vector<MarkerInitialization> results
@@ -1405,6 +1419,45 @@ void runEngine(
               .setMaxTrialsToUseForMultiTrialScaling(5)
               .setMaxTimestepsToUseForMultiTrialScaling(4000),
           150);
+
+  bool anySwapped = false;
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    if (fitter.checkForFlippedMarkers(
+            markerObservationTrials[i], results[i], reports[i]))
+    {
+      anySwapped = true;
+      markerObservationTrials[i] = reports[i].markerObservationsAttemptedFixed;
+    }
+  }
+  if (anySwapped)
+  {
+    std::cout
+        << "******** Unfortunately, it looks like some markers were swapped in "
+           "the uploaded data, so we have to run the whole pipeline "
+           "again with unswapped markers. ********"
+        << std::endl;
+
+    results = fitter.runMultiTrialKinematicsPipeline(
+        markerObservationTrials,
+        InitialMarkerFitParams()
+            .setMaxTrialsToUseForMultiTrialScaling(5)
+            .setMaxTimestepsToUseForMultiTrialScaling(4000),
+        150);
+  }
+
+  for (int i = 0; i < reports.size(); i++)
+  {
+    std::cout << "Trial " << std::to_string(i) << std::endl;
+    for (std::string& warning : reports[i].warnings)
+    {
+      std::cout << "Warning: " << warning << std::endl;
+    }
+    for (std::string& info : reports[i].info)
+    {
+      std::cout << "Info: " << info << std::endl;
+    }
+  }
 
   IKErrorReport finalKinematicsReport(
       standard.skeleton,
@@ -5083,6 +5136,32 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
       59,
       1.72,
       "female");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, DETECT_MARKER_FLIPS)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2.trc");
+  std::vector<std::string> grfFiles;
+  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2_forces.mot");
+
+  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/squats1.trc");
+  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/squats1_forces.mot");
+  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/DJ1.trc");
+  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/DJ1_forces.mot");
+
+  runEngine(
+      "dart://sample/osim/DetectMarkerFlip/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      79.4,
+      1.85,
+      "male");
 }
 #endif
 

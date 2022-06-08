@@ -313,6 +313,14 @@ struct ScaleAndFitResult
   s_t score;
 };
 
+struct MarkersErrorReport
+{
+  std::vector<std::string> warnings;
+  std::vector<std::string> info;
+  std::vector<std::map<std::string, Eigen::Vector3s>>
+      markerObservationsAttemptedFixed;
+};
+
 /**
  * This is the high level object that handles fitting skeletons to mocap data.
  *
@@ -328,6 +336,24 @@ public:
       std::shared_ptr<dynamics::Skeleton> skeleton,
       dynamics::MarkerMap markers,
       bool ignoreVirtualJointCenterMarkers = false);
+
+  /// This will go through original marker data and attempt to detect common
+  /// anomalies, generate warnings to help the user fix their own issues, and
+  /// produce fixes where possible.
+  MarkersErrorReport generateDataErrorsReport(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
+  /// After we've finished our initialization, it may become clear that markers
+  /// in some of the files should be reversed. This method will do that check,
+  /// and if it finds that the markers should be reversed it does the swap,
+  /// re-runs IK, and records the result in a new init. If it doesn't find
+  /// anything, this is a no-op.
+  bool checkForFlippedMarkers(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      MarkerInitialization& initialization,
+      MarkersErrorReport& report);
 
   /// Run the whole pipeline of optimization problems to fit the data as closely
   /// as we can, working on multiple trials at once

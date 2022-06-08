@@ -2027,6 +2027,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   bool inHeader = true;
 
+  std::vector<std::string> colNames;
   std::vector<int> colToPlate;
   std::vector<int> colToCOP;
   std::vector<int> colToWrench;
@@ -2094,83 +2095,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
         if (lineNumber == 0)
         {
-          int plate = -1;
-          int cop = -1;
-          int wrench = -1;
-
-          if (token != "time")
-          {
-            // Default to plate 0
-            plate = 0;
-          }
-
-          // Find plate number
-          for (int p = 1; p < 10; p++)
-          {
-            if (token.find(std::to_string(p)) != std::string::npos)
-            {
-              plate = p - 1;
-            }
-          }
-          // It's pretty common to do R and L plates, instead of numbered plates
-          if (token.find("R") != std::string::npos
-              || token.find("_r") != std::string::npos
-              || token.find("r_") != std::string::npos)
-          {
-            plate = 0;
-          }
-          if (token.find("L") != std::string::npos
-              || token.find("_l") != std::string::npos
-              || token.find("l_") != std::string::npos)
-          {
-            plate = 1;
-          }
-
-          if (token.find("px") != std::string::npos)
-          {
-            cop = 0;
-          }
-          if (token.find("py") != std::string::npos)
-          {
-            cop = 1;
-          }
-          if (token.find("pz") != std::string::npos)
-          {
-            cop = 2;
-          }
-          if (token.find("mx") != std::string::npos)
-          {
-            wrench = 0;
-          }
-          if (token.find("my") != std::string::npos)
-          {
-            wrench = 1;
-          }
-          if (token.find("mz") != std::string::npos)
-          {
-            wrench = 2;
-          }
-          if (token.find("vx") != std::string::npos)
-          {
-            wrench = 3;
-          }
-          if (token.find("vy") != std::string::npos)
-          {
-            wrench = 4;
-          }
-          if (token.find("vz") != std::string::npos)
-          {
-            wrench = 5;
-          }
-
-          if (plate + 1 > numPlates)
-          {
-            numPlates = plate + 1;
-          }
-
-          colToPlate.push_back(plate);
-          colToCOP.push_back(cop);
-          colToWrench.push_back(wrench);
+          colNames.push_back(token);
         }
         else
         {
@@ -2208,7 +2133,130 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
       }
 
-      if (lineNumber > 0)
+      if (lineNumber == 0)
+      {
+        // Find the unique prefix/suffixes
+        std::map<std::string, int> prefixSuffixNumbers;
+
+        for (int i = 0; i < colNames.size(); i++)
+        {
+          const std::string& token = colNames[i];
+
+          // Compute the names of the columns
+          int plate = -1;
+          int cop = -1;
+          int wrench = -1;
+
+          std::string empty = "";
+          std::string prefixSuffix = token;
+
+          if (token.find("px") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("px"), 2, empty);
+            cop = 0;
+          }
+          if (token.find("py") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("py"), 2, empty);
+            cop = 1;
+          }
+          if (token.find("pz") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("pz"), 2, empty);
+            cop = 2;
+          }
+          if (token.find("mx") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("mx"), 2, empty);
+            wrench = 0;
+          }
+          if (token.find("my") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("my"), 2, empty);
+            wrench = 1;
+          }
+          if (token.find("mz") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("mz"), 2, empty);
+            wrench = 2;
+          }
+          if (token.find("torque_x") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("torque_x"), std::string("torque_x").size(), empty);
+            wrench = 0;
+          }
+          if (token.find("torque_y") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("torque_y"), std::string("torque_y").size(), empty);
+            wrench = 1;
+          }
+          if (token.find("torque_z") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("torque_z"), std::string("torque_z").size(), empty);
+            wrench = 2;
+          }
+          if (token.find("vx") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("vx"), 2, empty);
+            wrench = 3;
+          }
+          if (token.find("vy") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("vy"), 2, empty);
+            wrench = 4;
+          }
+          if (token.find("vz") != std::string::npos)
+          {
+            prefixSuffix.replace(token.find("vz"), 2, empty);
+            wrench = 5;
+          }
+
+          if (prefixSuffix.find("force") != std::string::npos)
+          {
+            prefixSuffix.replace(prefixSuffix.find("force"), 5, empty);
+          }
+          if (prefixSuffix.find("moment") != std::string::npos)
+          {
+            prefixSuffix.replace(prefixSuffix.find("moment"), 6, empty);
+          }
+          if (prefixSuffix.find("torque") != std::string::npos)
+          {
+            prefixSuffix.replace(prefixSuffix.find("torque"), 6, empty);
+          }
+
+          while (prefixSuffix.find("__") != std::string::npos)
+          {
+            prefixSuffix.replace(prefixSuffix.find("__"), 2, std::string("_"));
+          }
+
+          if (token == "time")
+          {
+            // Default to plate 0
+            plate = 0;
+          }
+          else if (prefixSuffixNumbers.count(prefixSuffix) > 0)
+          {
+            plate = prefixSuffixNumbers.at(prefixSuffix);
+          }
+          else
+          {
+            std::cout << "Reading new GRF column prefixSuffix: " << prefixSuffix
+                      << std::endl;
+            plate = prefixSuffixNumbers.size();
+            prefixSuffixNumbers[prefixSuffix] = plate;
+          }
+
+          colToPlate.push_back(plate);
+          colToCOP.push_back(cop);
+          colToWrench.push_back(wrench);
+        }
+
+        numPlates = prefixSuffixNumbers.size();
+      }
+      else
       {
         copRows.push_back(cops);
         wrenchRows.push_back(wrenches);

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
@@ -141,6 +142,30 @@ TEST(OpenSimParser, LOAD_GRF)
                 << grf.plateGRFs[p].col(i) << std::endl;
     }
   }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_NORMAL_GRF)
+{
+  std::vector<ForcePlate> forcePlates = OpenSimParser::loadGRF(
+      "dart://sample/osim/Rajagopal2015_v3_scaled/"
+      "S01DN603_grf.mot",
+      10);
+
+  EXPECT_EQ(forcePlates.size(), 2);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_WEIRD_GRF)
+{
+  std::vector<ForcePlate> forcePlates = OpenSimParser::loadGRF(
+      "dart://sample/osim/WeirdGRF/"
+      "weird.mot",
+      10);
+
+  EXPECT_EQ(forcePlates.size(), 2);
 }
 #endif
 
