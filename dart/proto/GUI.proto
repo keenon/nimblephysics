@@ -21,6 +21,8 @@ message Command {
     SetObjectRotation set_object_rotation = 6;
     SetObjectColor set_object_color = 7;
     SetObjectScale set_object_scale = 8;
+    SetObjectTooltip set_object_tooltip = 32;
+    DeleteObjectTooltip delete_object_tooltip = 33;
     EnableMouseInteraction enable_mouse_interaction = 18;
     CreateText text = 12;
     CreateButton button = 13;
@@ -129,6 +131,15 @@ message SetObjectColor {
 message SetObjectScale {
   int32 key = 1;
   repeated float data = 2;
+}
+
+message SetObjectTooltip {
+  int32 key = 1;
+  string tooltip = 2;
+}
+
+message DeleteObjectTooltip {
+  int32 key = 1;
 }
 
 message EnableMouseInteraction {

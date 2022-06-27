@@ -73,7 +73,7 @@ export namespace dart.proto {
         }
     }
     export class Command extends pb_1.Message {
-        #one_of_decls = [[31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 18, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
+        #one_of_decls = [[31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
         constructor(data?: any[] | ({} & (({
             set_frames_per_second?: SetFramesPerSecond;
             clear_all?: never;
@@ -88,6 +88,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -120,6 +122,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -152,6 +156,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -184,6 +190,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -216,6 +224,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -248,6 +258,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -280,6 +292,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -312,6 +326,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -344,6 +360,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -376,6 +394,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -408,6 +428,8 @@ export namespace dart.proto {
             set_object_rotation?: SetObjectRotation;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -440,6 +462,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: SetObjectColor;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -472,6 +496,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: SetObjectScale;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -504,6 +530,76 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: SetObjectTooltip;
+            delete_object_tooltip?: never;
+            enable_mouse_interaction?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: DeleteObjectTooltip;
+            enable_mouse_interaction?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: EnableMouseInteraction;
             text?: never;
             button?: never;
@@ -536,6 +632,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: CreateText;
             button?: never;
@@ -568,6 +666,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: CreateButton;
@@ -600,6 +700,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -632,6 +734,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -664,6 +768,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -696,6 +802,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -728,6 +836,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -760,6 +870,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -792,6 +904,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -824,6 +938,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -856,6 +972,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -888,6 +1006,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -920,6 +1040,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -952,6 +1074,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -984,6 +1108,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -1016,6 +1142,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -1048,6 +1176,8 @@ export namespace dart.proto {
             set_object_rotation?: never;
             set_object_color?: never;
             set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
             enable_mouse_interaction?: never;
             text?: never;
             button?: never;
@@ -1108,6 +1238,12 @@ export namespace dart.proto {
                 }
                 if ("set_object_scale" in data && data.set_object_scale != undefined) {
                     this.set_object_scale = data.set_object_scale;
+                }
+                if ("set_object_tooltip" in data && data.set_object_tooltip != undefined) {
+                    this.set_object_tooltip = data.set_object_tooltip;
+                }
+                if ("delete_object_tooltip" in data && data.delete_object_tooltip != undefined) {
+                    this.delete_object_tooltip = data.delete_object_tooltip;
                 }
                 if ("enable_mouse_interaction" in data && data.enable_mouse_interaction != undefined) {
                     this.enable_mouse_interaction = data.enable_mouse_interaction;
@@ -1243,6 +1379,18 @@ export namespace dart.proto {
         set set_object_scale(value: SetObjectScale) {
             pb_1.Message.setOneofWrapperField(this, 8, this.#one_of_decls[0], value);
         }
+        get set_object_tooltip() {
+            return pb_1.Message.getWrapperField(this, SetObjectTooltip, 32) as SetObjectTooltip;
+        }
+        set set_object_tooltip(value: SetObjectTooltip) {
+            pb_1.Message.setOneofWrapperField(this, 32, this.#one_of_decls[0], value);
+        }
+        get delete_object_tooltip() {
+            return pb_1.Message.getWrapperField(this, DeleteObjectTooltip, 33) as DeleteObjectTooltip;
+        }
+        set delete_object_tooltip(value: DeleteObjectTooltip) {
+            pb_1.Message.setOneofWrapperField(this, 33, this.#one_of_decls[0], value);
+        }
         get enable_mouse_interaction() {
             return pb_1.Message.getWrapperField(this, EnableMouseInteraction, 18) as EnableMouseInteraction;
         }
@@ -1353,7 +1501,7 @@ export namespace dart.proto {
         }
         get command() {
             const cases: {
-                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "enable_mouse_interaction" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
+                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "set_object_tooltip" | "delete_object_tooltip" | "enable_mouse_interaction" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
             } = {
                 0: "none",
                 31: "set_frames_per_second",
@@ -1369,6 +1517,8 @@ export namespace dart.proto {
                 6: "set_object_rotation",
                 7: "set_object_color",
                 8: "set_object_scale",
+                32: "set_object_tooltip",
+                33: "delete_object_tooltip",
                 18: "enable_mouse_interaction",
                 12: "text",
                 13: "button",
@@ -1388,7 +1538,7 @@ export namespace dart.proto {
                 27: "set_slider_max",
                 28: "set_plot_data"
             };
-            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 18, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
+            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
         }
         static fromObject(data: {
             set_frames_per_second?: ReturnType<typeof SetFramesPerSecond.prototype.toObject>;
@@ -1404,6 +1554,8 @@ export namespace dart.proto {
             set_object_rotation?: ReturnType<typeof SetObjectRotation.prototype.toObject>;
             set_object_color?: ReturnType<typeof SetObjectColor.prototype.toObject>;
             set_object_scale?: ReturnType<typeof SetObjectScale.prototype.toObject>;
+            set_object_tooltip?: ReturnType<typeof SetObjectTooltip.prototype.toObject>;
+            delete_object_tooltip?: ReturnType<typeof DeleteObjectTooltip.prototype.toObject>;
             enable_mouse_interaction?: ReturnType<typeof EnableMouseInteraction.prototype.toObject>;
             text?: ReturnType<typeof CreateText.prototype.toObject>;
             button?: ReturnType<typeof CreateButton.prototype.toObject>;
@@ -1462,6 +1614,12 @@ export namespace dart.proto {
             }
             if (data.set_object_scale != null) {
                 message.set_object_scale = SetObjectScale.fromObject(data.set_object_scale);
+            }
+            if (data.set_object_tooltip != null) {
+                message.set_object_tooltip = SetObjectTooltip.fromObject(data.set_object_tooltip);
+            }
+            if (data.delete_object_tooltip != null) {
+                message.delete_object_tooltip = DeleteObjectTooltip.fromObject(data.delete_object_tooltip);
             }
             if (data.enable_mouse_interaction != null) {
                 message.enable_mouse_interaction = EnableMouseInteraction.fromObject(data.enable_mouse_interaction);
@@ -1534,6 +1692,8 @@ export namespace dart.proto {
                 set_object_rotation?: ReturnType<typeof SetObjectRotation.prototype.toObject>;
                 set_object_color?: ReturnType<typeof SetObjectColor.prototype.toObject>;
                 set_object_scale?: ReturnType<typeof SetObjectScale.prototype.toObject>;
+                set_object_tooltip?: ReturnType<typeof SetObjectTooltip.prototype.toObject>;
+                delete_object_tooltip?: ReturnType<typeof DeleteObjectTooltip.prototype.toObject>;
                 enable_mouse_interaction?: ReturnType<typeof EnableMouseInteraction.prototype.toObject>;
                 text?: ReturnType<typeof CreateText.prototype.toObject>;
                 button?: ReturnType<typeof CreateButton.prototype.toObject>;
@@ -1591,6 +1751,12 @@ export namespace dart.proto {
             }
             if (this.set_object_scale != null) {
                 data.set_object_scale = this.set_object_scale.toObject();
+            }
+            if (this.set_object_tooltip != null) {
+                data.set_object_tooltip = this.set_object_tooltip.toObject();
+            }
+            if (this.delete_object_tooltip != null) {
+                data.delete_object_tooltip = this.delete_object_tooltip.toObject();
             }
             if (this.enable_mouse_interaction != null) {
                 data.enable_mouse_interaction = this.enable_mouse_interaction.toObject();
@@ -1678,6 +1844,10 @@ export namespace dart.proto {
                 writer.writeMessage(7, this.set_object_color, () => this.set_object_color.serialize(writer));
             if (this.set_object_scale !== undefined)
                 writer.writeMessage(8, this.set_object_scale, () => this.set_object_scale.serialize(writer));
+            if (this.set_object_tooltip !== undefined)
+                writer.writeMessage(32, this.set_object_tooltip, () => this.set_object_tooltip.serialize(writer));
+            if (this.delete_object_tooltip !== undefined)
+                writer.writeMessage(33, this.delete_object_tooltip, () => this.delete_object_tooltip.serialize(writer));
             if (this.enable_mouse_interaction !== undefined)
                 writer.writeMessage(18, this.enable_mouse_interaction, () => this.enable_mouse_interaction.serialize(writer));
             if (this.text !== undefined)
@@ -1761,6 +1931,12 @@ export namespace dart.proto {
                         break;
                     case 8:
                         reader.readMessage(message.set_object_scale, () => message.set_object_scale = SetObjectScale.deserialize(reader));
+                        break;
+                    case 32:
+                        reader.readMessage(message.set_object_tooltip, () => message.set_object_tooltip = SetObjectTooltip.deserialize(reader));
+                        break;
+                    case 33:
+                        reader.readMessage(message.delete_object_tooltip, () => message.delete_object_tooltip = DeleteObjectTooltip.deserialize(reader));
                         break;
                     case 18:
                         reader.readMessage(message.enable_mouse_interaction, () => message.enable_mouse_interaction = EnableMouseInteraction.deserialize(reader));
@@ -3456,6 +3632,163 @@ export namespace dart.proto {
         }
         static deserializeBinary(bytes: Uint8Array): SetObjectScale {
             return SetObjectScale.deserialize(bytes);
+        }
+    }
+    export class SetObjectTooltip extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+            tooltip?: string;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+                if ("tooltip" in data && data.tooltip != undefined) {
+                    this.tooltip = data.tooltip;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get tooltip() {
+            return pb_1.Message.getField(this, 2) as string;
+        }
+        set tooltip(value: string) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        static fromObject(data: {
+            key?: number;
+            tooltip?: string;
+        }) {
+            const message = new SetObjectTooltip({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            if (data.tooltip != null) {
+                message.tooltip = data.tooltip;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+                tooltip?: string;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            if (this.tooltip != null) {
+                data.tooltip = this.tooltip;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (typeof this.tooltip === "string" && this.tooltip.length)
+                writer.writeString(2, this.tooltip);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): SetObjectTooltip {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new SetObjectTooltip();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    case 2:
+                        message.tooltip = reader.readString();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): SetObjectTooltip {
+            return SetObjectTooltip.deserialize(bytes);
+        }
+    }
+    export class DeleteObjectTooltip extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        static fromObject(data: {
+            key?: number;
+        }) {
+            const message = new DeleteObjectTooltip({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): DeleteObjectTooltip {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new DeleteObjectTooltip();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): DeleteObjectTooltip {
+            return DeleteObjectTooltip.deserialize(bytes);
         }
     }
     export class EnableMouseInteraction extends pb_1.Message {

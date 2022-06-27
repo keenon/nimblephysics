@@ -21,6 +21,8 @@ public:
 
   void start();
   void stop();
+  void toggle();
+  bool isRunning();
 
 protected:
   void mainLoop();

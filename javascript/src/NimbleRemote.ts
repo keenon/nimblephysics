@@ -32,7 +32,7 @@ class DARTRemote {
       }
     });
 
-    this.view.addDragListener((key: string, pos: number[]) => {
+    this.view.addDragListener((key: number, pos: number[]) => {
       const message = JSON.stringify({
         type: "drag",
         key,

@@ -68,6 +68,10 @@ std::string GUIStateMachine::getCurrentStateAsJson()
   {
     encodeCreateLine(list, pair.second);
   }
+  for (auto pair : mTooltips)
+  {
+    encodeSetTooltip(list, pair.second);
+  }
   for (auto pair : mText)
   {
     encodeCreateText(list, pair.second);
@@ -343,6 +347,7 @@ void GUIStateMachine::renderSkeleton(
                      "and MeshShape and CapsuleShape are "
                   << "supported. This shape will be invisible in the GUI.\n";
           }
+          setObjectTooltip(shapeName, node->getName());
         }
       }
       else
@@ -1107,6 +1112,34 @@ void GUIStateMachine::setObjectScale(
   });
 }
 
+/// This sets a tooltip for the object at key.
+void GUIStateMachine::setObjectTooltip(
+    const std::string& key, const std::string& tooltip)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Tooltip& t = mTooltips[key];
+  t.key = key;
+  t.tooltip = tooltip;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeSetTooltip(list, mTooltips[key]);
+  });
+}
+
+/// This removes a tooltip for the object at key.
+void GUIStateMachine::deleteObjectTooltip(const std::string& key)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  mTooltips.erase(key);
+
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object_tooltip()->set_key(getStringCode(key));
+  });
+}
+
 /// This sets an object to allow mouse interaction on the GUI
 void GUIStateMachine::setObjectMouseInteractionEnabled(const std::string& key)
 {
@@ -1122,11 +1155,18 @@ void GUIStateMachine::deleteObject(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
+  // This is a no-op if the object does not exist.
+  if (!hasObject(key))
+  {
+    return;
+  }
+
   mBoxes.erase(key);
   mSpheres.erase(key);
   mLines.erase(key);
   mMeshes.erase(key);
   mCapsules.erase(key);
+  mTooltips.erase(key);
 
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
@@ -1880,6 +1920,14 @@ void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
   command->mutable_mesh()->add_data(mesh.color(3));
   command->mutable_mesh()->set_cast_shadows(mesh.receiveShadows);
   command->mutable_mesh()->set_receive_shadows(mesh.receiveShadows);
+}
+
+void GUIStateMachine::encodeSetTooltip(
+    proto::CommandList& list, Tooltip& tooltip)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_object_tooltip()->set_key(getStringCode(tooltip.key));
+  command->mutable_set_object_tooltip()->set_tooltip(tooltip.tooltip);
 }
 
 void GUIStateMachine::encodeCreateTexture(

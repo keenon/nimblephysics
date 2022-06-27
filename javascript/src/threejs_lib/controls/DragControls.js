@@ -67,6 +67,7 @@ var DragControls = function ( _objects, _camera, _domElement ) {
   
   function add(object) {
     _objects.push(object);
+    console.log("Adding object, now have "+_objects.length);
   }
   
   function remove(object) {
@@ -106,6 +107,7 @@ var DragControls = function ( _objects, _camera, _domElement ) {
 		_raycaster.setFromCamera( _mouse, _camera );
 		_raycaster.intersectObjects( _objects, true, _intersections );
 
+    console.log("Of "+_objects.length+" _objects have " + _intersections.length + " intersections");
 		if ( _intersections.length > 0 ) {
 
 			var object = _intersections[ 0 ].object;

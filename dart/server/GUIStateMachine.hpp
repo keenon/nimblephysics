@@ -245,6 +245,12 @@ public:
   /// lines.
   void setObjectScale(const std::string& key, const Eigen::Vector3s& scale);
 
+  /// This sets a tooltip for the object at key.
+  void setObjectTooltip(const std::string& key, const std::string& tooltip);
+
+  /// This removes a tooltip for the object at key.
+  void deleteObjectTooltip(const std::string& key);
+
   /// This sets an object to allow mouse interaction on the GUI
   void setObjectMouseInteractionEnabled(const std::string& key);
 
@@ -445,6 +451,13 @@ protected:
   };
   std::unordered_map<std::string, Line> mLines;
 
+  struct Tooltip
+  {
+    std::string key;
+    std::string tooltip;
+  };
+  std::unordered_map<std::string, Tooltip> mTooltips;
+
   struct Mesh
   {
     std::string key;
@@ -557,6 +570,7 @@ protected:
   void encodeCreateCapsule(proto::CommandList& list, Capsule& capsule);
   void encodeCreateLine(proto::CommandList& list, Line& line);
   void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);
+  void encodeSetTooltip(proto::CommandList& list, Tooltip& tooltip);
   void encodeCreateTexture(proto::CommandList& list, Texture& texture);
   void encodeEnableMouseInteraction(
       proto::CommandList& list, const std::string& key);

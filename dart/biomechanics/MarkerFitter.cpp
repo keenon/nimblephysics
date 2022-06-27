@@ -824,6 +824,41 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     }
   }
 
+  // 2. Generate a warning if there aren't enough fixed markers on the pelvis
+  bool hasPelvis = false;
+  for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
+  {
+    std::string name = mSkeleton->getBodyNode(i)->getName();
+    if (name == "pelvis" || name == "Pelvis" || name == "PELVIS")
+    {
+      hasPelvis = true;
+      break;
+    }
+  }
+  if (hasPelvis)
+  {
+    int numFixedOnPelvis = 0;
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      if (mMarkers[i].first->getName() == "pelvis"
+          || mMarkers[i].first->getName() == "Pelvis"
+          || mMarkers[i].first->getName() == "PELVIS")
+      {
+        if (!mMarkerIsTracking[i] && observedMarkersMap.count(mMarkerNames[i]))
+        {
+          numFixedOnPelvis++;
+        }
+      }
+    }
+    if (numFixedOnPelvis < 3)
+    {
+      report.warnings.push_back(
+          "Need more fixed markers on the pelvis! This trial only has "
+          + std::to_string(numFixedOnPelvis)
+          + ". We recommend 3 (or more) for good results.");
+    }
+  }
+
   // 3. Generate a warning about mismatched markers between the model and the
   // data.
 
@@ -1491,6 +1526,11 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   std::string anatomicalMarkersLayerName = "Anatomical Markers";
   Eigen::Vector4s anatomicalMarkersLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
+  std::string unusedMarkersLayerName = "Unused Markers";
+  Eigen::Vector4s unusedMarkersLayerColor = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0);
+  std::string virtualMarkersLayerName = "Virtual Markers";
+  Eigen::Vector4s virtualMarkersLayerColor
+      = Eigen::Vector4s(0.5, 1.0, 0.5, 1.0);
   std::string markersErrorLayerName = "Marker Errors";
   Eigen::Vector4s markersErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
@@ -1512,6 +1552,8 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
       trackingMarkersLayerName, trackingMarkersLayerColor, true);
   server->createLayer(
       anatomicalMarkersLayerName, anatomicalMarkersLayerColor, true);
+  server->createLayer(unusedMarkersLayerName, unusedMarkersLayerColor, true);
+  server->createLayer(virtualMarkersLayerName, virtualMarkersLayerColor, false);
   server->createLayer(markersErrorLayerName, markersErrorLayerColor, true);
   server->createLayer(forcePlateLayerName, forcePlateLayerColor, true);
 
@@ -1538,6 +1580,9 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
   {
     if (init.jointWeights(i) > 0)
     {
+      server->setObjectTooltip(
+          "joint_center_" + std::to_string(i),
+          "Joint center: " + init.joints[i]->getName());
       server->createSphere(
           "joint_center_" + std::to_string(i),
           0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
@@ -1590,6 +1635,42 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     }
   }
 
+  std::set<std::string> observedMarkers;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    for (auto pair : markerObservations[i])
+    {
+      observedMarkers.emplace(pair.first);
+    }
+  }
+
+  for (std::string marker : observedMarkers)
+  {
+    if (mMarkerMap.count(marker) == 0)
+    {
+      server->setObjectTooltip(
+          "marker_unused_" + marker, "Unused Marker: " + marker);
+    }
+  }
+
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (observedMarkers.count(mMarkerNames[i]) == 0)
+    {
+      server->setObjectTooltip(
+          "marker_virtual_" + mMarkerNames[i],
+          "Virtual Marker: " + mMarkerNames[i]);
+    }
+    else
+    {
+      bool isTracking = mMarkerIsTracking[i];
+      server->setObjectTooltip(
+          "marker_real_" + mMarkerNames[i],
+          (isTracking ? "Tracking Marker: " : "Anatomical Marker: ")
+              + mMarkerNames[i]);
+    }
+  }
+
   s_t secondsPerTick = 1.0 / 50;
   std::shared_ptr<realtime::Ticker> ticker
       = std::make_shared<realtime::Ticker>(secondsPerTick);
@@ -1609,6 +1690,11 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
                                 trackingMarkersLayerColor,
                                 anatomicalMarkersLayerName,
                                 anatomicalMarkersLayerColor,
+                                unusedMarkersLayerName,
+                                unusedMarkersLayerColor,
+                                virtualMarkersLayerName,
+                                virtualMarkersLayerColor,
+                                observedMarkers,
                                 markersErrorLayerColor,
                                 markersErrorLayerName,
                                 originalMarkerLocationsLayerName,
@@ -1692,6 +1778,44 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
               originalMarkerLocationsLayerColor,
               originalMarkerLocationsLayerName);
         }
+      }
+      else
+      {
+        server->createBox(
+            "marker_unused_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            pair.second,
+            Eigen::Vector3s::Zero(),
+            unusedMarkersLayerColor,
+            unusedMarkersLayerName);
+      }
+    }
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPosition
+        = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
+    for (auto pair : markerWorldPosition)
+    {
+      if (markerWorldPositions.count(pair.first) == 0)
+      {
+        if (init.updatedMarkerMap.count(pair.first) > 0)
+        {
+          server->deleteObject("marker_original_" + pair.first);
+        }
+        else
+        {
+          server->deleteObject("marker_unused_" + pair.first);
+        }
+      }
+      if (observedMarkers.count(pair.first) == 0)
+      {
+        // This is a virtual marker:
+        server->createBox(
+            "marker_virtual_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            pair.second,
+            Eigen::Vector3s::Zero(),
+            virtualMarkersLayerColor,
+            virtualMarkersLayerName);
       }
     }
 
@@ -1787,6 +1911,13 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     }
   });
   server->registerConnectionListener([ticker]() { ticker->start(); });
+
+  server->registerKeydownListener([ticker](std::string key) {
+    if (key == " ")
+    {
+      ticker->toggle();
+    }
+  });
   // TODO: it'd be nice if this method didn't block forever, but we need to hold
   // onto a bunch of resources otherwise
   // server->blockWhileServing();
@@ -1811,6 +1942,11 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   std::string anatomicalMarkersLayerName = "Anatomical Markers";
   Eigen::Vector4s anatomicalMarkersLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
+  std::string unusedMarkersLayerName = "Unused Markers";
+  Eigen::Vector4s unusedMarkersLayerColor = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0);
+  std::string virtualMarkersLayerName = "Virtual Markers";
+  Eigen::Vector4s virtualMarkersLayerColor
+      = Eigen::Vector4s(0.5, 1.0, 0.5, 1.0);
   std::string markersErrorLayerName = "Marker Errors";
   Eigen::Vector4s markersErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
@@ -1833,6 +1969,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   server.createLayer(trackingMarkersLayerName, trackingMarkersLayerColor, true);
   server.createLayer(
       anatomicalMarkersLayerName, anatomicalMarkersLayerColor, true);
+  server.createLayer(unusedMarkersLayerName, unusedMarkersLayerColor, true);
+  server.createLayer(virtualMarkersLayerName, virtualMarkersLayerColor, false);
   server.createLayer(markersErrorLayerName, markersErrorLayerColor, true);
   server.createLayer(forcePlateLayerName, forcePlateLayerColor, true);
 
@@ -1858,6 +1996,9 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   {
     if (init.jointWeights(i) > 0)
     {
+      server.setObjectTooltip(
+          "joint_center_" + std::to_string(i),
+          "Joint center: " + init.joints[i]->getName());
       server.createSphere(
           "joint_center_" + std::to_string(i),
           0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
@@ -1907,6 +2048,42 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           points,
           forcePlateLayerColor,
           forcePlateLayerName);
+    }
+  }
+
+  std::set<std::string> observedMarkers;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    for (auto pair : markerObservations[i])
+    {
+      observedMarkers.emplace(pair.first);
+    }
+  }
+
+  for (std::string marker : observedMarkers)
+  {
+    if (mMarkerMap.count(marker) == 0)
+    {
+      server.setObjectTooltip(
+          "marker_unused_" + marker, "Unused Marker: " + marker);
+    }
+  }
+
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (observedMarkers.count(mMarkerNames[i]) == 0)
+    {
+      server.setObjectTooltip(
+          "marker_virtual_" + mMarkerNames[i],
+          "Virtual Marker: " + mMarkerNames[i]);
+    }
+    else
+    {
+      bool isTracking = mMarkerIsTracking[i];
+      server.setObjectTooltip(
+          "marker_real_" + mMarkerNames[i],
+          (isTracking ? "Tracking Marker: " : "Anatomical Marker: ")
+              + mMarkerNames[i]);
     }
   }
 
@@ -1984,6 +2161,44 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
               originalMarkerLocationsLayerColor,
               originalMarkerLocationsLayerName);
         }
+      }
+      else
+      {
+        server.createBox(
+            "marker_unused_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            pair.second,
+            Eigen::Vector3s::Zero(),
+            unusedMarkersLayerColor,
+            unusedMarkersLayerName);
+      }
+    }
+
+    std::map<std::string, Eigen::Vector3s> markerWorldPosition
+        = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
+    for (auto pair : markerWorldPosition)
+    {
+      if (markerWorldPositions.count(pair.first) == 0)
+      {
+        if (init.updatedMarkerMap.count(pair.first) > 0)
+        {
+          server.deleteObject("marker_original_" + pair.first);
+        }
+        else
+        {
+          server.deleteObject("marker_unused_" + pair.first);
+        }
+      }
+      if (observedMarkers.count(pair.first) == 0)
+      {
+        // This is a virtual marker:
+        server.createBox(
+            "marker_virtual_" + pair.first,
+            Eigen::Vector3s::Ones() * 0.01,
+            pair.second,
+            Eigen::Vector3s::Zero(),
+            virtualMarkersLayerColor,
+            virtualMarkersLayerName);
       }
     }
 

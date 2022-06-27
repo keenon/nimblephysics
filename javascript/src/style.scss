@@ -192,6 +192,16 @@ $triangle-size: 5px;
     z-index: 5;
     pointer-events: none;
 
+    .Tooltip {
+      position: absolute;
+      opacity: 0;
+      transition: opacity 50ms ease-in-out;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 5px;
+      color: white;
+    }
+
     .DARTWindow-ui-elem {
       pointer-events: all;
 

@@ -128,6 +128,7 @@ class DARTView {
   running: boolean;
 
   objects: Map<number, THREE.Group | THREE.Mesh | THREE.Line>;
+  objectColors: Map<number, number[]>;
   keys: Map<THREE.Object3D, number>;
   textures: Map<number, THREE.Texture>;
   disposeHandlers: Map<number, () => void>;
@@ -145,6 +146,9 @@ class DARTView {
   notConnectedWarning: HTMLElement;
   layersTable: HTMLElement;
 
+  tooltip: HTMLElement;
+  hovering: number[];
+
   constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
     this.container = container;
@@ -155,7 +159,13 @@ class DARTView {
     this.container.appendChild(this.glContainer);
     this.container.appendChild(this.uiContainer);
 
+    this.tooltip = document.createElement("div");
+    this.tooltip.className = 'Tooltip';
+    this.uiContainer.appendChild(this.tooltip);
+    this.hovering = []
+
     this.objects = new Map();
+    this.objectColors = new Map();
     this.keys = new Map();
     this.disposeHandlers = new Map();
     this.textures = new Map();
@@ -205,7 +215,7 @@ class DARTView {
     updateCamera();
     */
 
-    this.view = new View(this.scene, this.glContainer);
+    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff);
     this.running = false;
 
     this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
@@ -301,6 +311,50 @@ class DARTView {
     }
   };
 
+  onTooltipHoveron = (keys: number[], tooltip: string, top_x: number, top_y: number) => {
+    this.tooltip.innerHTML = tooltip;
+    this.tooltip.style.top = top_y+'px';
+    this.tooltip.style.left = top_x+'px';
+    this.tooltip.style.opacity = '1.0';
+    if (JSON.stringify(keys) !== JSON.stringify(this.hovering)) {
+      if (this.hovering.length > 0) {
+        this.hovering.forEach(k => {
+          this.resetObjectColor(k);
+        });
+      }
+
+      keys.forEach((key) => {
+        const currentColor = this.objectColors.get(key);
+        let hoverColor = [currentColor[0]*0.7, currentColor[1]*0.7, currentColor[2]*0.7, 1];
+        this.setObjectColor(key, hoverColor, false);
+      })
+
+      this.hovering = keys;
+      this.render();
+    }
+    window.addEventListener('mousemove', this.tooltipMousemoveListener);
+  };
+
+  tooltipMousemoveListener = (e: MouseEvent) => {
+    const rect = this.container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    this.tooltip.style.top = mouseY+'px';
+    this.tooltip.style.left = mouseX+'px';
+  }
+
+  onTooltipHoveroff = () => {
+    if (this.hovering.length > 0) {
+      this.hovering.forEach(k => {
+        this.resetObjectColor(k);
+      });
+      this.hovering = [];
+      this.render();
+    }
+    this.tooltip.style.opacity = '0.0';
+    window.removeEventListener('mousemove', this.tooltipMousemoveListener);
+  };
+
   /**
    * This cleans up any resources that the view is using
    */
@@ -380,6 +434,12 @@ class DARTView {
         command.capsule.cast_shadows === true,
         command.capsule.receive_shadows === true
       );
+    }
+    else if (command.set_object_tooltip != null) {
+      this.setTooltip(command.set_object_tooltip.key, command.set_object_tooltip.tooltip);
+    }
+    else if (command.delete_object_tooltip != null) {
+      this.deleteTooltip(command.delete_object_tooltip.key);
     }
     else if (command.line != null) {
       const color: number[] = [command.line.color[0], command.line.color[1], command.line.color[2], command.line.color[3]];
@@ -472,10 +532,10 @@ class DARTView {
       const scale: number[] = [data[0], data[1], data[2]];
       this.setObjectScale(command.set_object_scale.key, scale);
     }
-    else if (command.set_object_scale != null) {
-      const data = command.set_object_scale.data;
+    else if (command.set_object_color != null) {
+      const data = command.set_object_color.data;
       const color: number[] = [data[0], data[1], data[2], data[3]];
-      this.setObjectColor(command.set_object_scale.key, color);
+      this.setObjectColor(command.set_object_color.key, color, true);
     }
     else if (command.enable_mouse_interaction != null) {
       this.enableMouseInteraction(command.enable_mouse_interaction.key);
@@ -624,7 +684,7 @@ class DARTView {
   enableMouseInteraction = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.enableMouseInteraction(obj);
+      this.view.enableMouseInteraction(key);
     }
   };
 
@@ -634,7 +694,7 @@ class DARTView {
   disableMouseInteraction = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.disableMouseInteraction(obj);
+      this.view.disableMouseInteraction(key);
     }
   };
 
@@ -669,43 +729,64 @@ class DARTView {
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
+    this.objectColors.set(key, color);
     if (this.objects.has(key)) {
-      this.deleteObject(key);
+      const mesh = this.objects.get(key) as THREE.Mesh;
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(size[0], size[1], size[2]);
+
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      material.color.r = color[0];
+      material.color.g = color[1];
+      material.color.b = color[2];
+      if (color.length > 3 && color[3] < 1.0) {
+        material.transparent = true;
+        material.opacity = color[3];
+      }
     }
-    const material = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(color[0], color[1], color[2]),
-    });
-    if (color.length > 3 && color[3] < 1.0) {
-      material.transparent = true;
-      material.opacity = color[3];
-    }
-    const geometry = new THREE.BoxBufferGeometry(
-      SCALE_FACTOR,
-      SCALE_FACTOR,
-      SCALE_FACTOR
-    );
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.x = pos[0] * SCALE_FACTOR;
-    mesh.position.y = pos[1] * SCALE_FACTOR;
-    mesh.position.z = pos[2] * SCALE_FACTOR;
-    mesh.rotation.x = euler[0];
-    mesh.rotation.y = euler[1];
-    mesh.rotation.z = euler[2];
-    mesh.castShadow = castShadows;
-    mesh.receiveShadow = receiveShadows;
-    mesh.scale.set(size[0], size[1], size[2]);
+    else {
+      const material = new THREE.MeshLambertMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+      });
+      if (color.length > 3 && color[3] < 1.0) {
+        material.transparent = true;
+        material.opacity = color[3];
+      }
+      const geometry = new THREE.BoxBufferGeometry(
+        SCALE_FACTOR,
+        SCALE_FACTOR,
+        SCALE_FACTOR
+      );
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(size[0], size[1], size[2]);
 
-    this.objects.set(key, mesh);
-    this.disposeHandlers.set(key, () => {
-      material.dispose();
-      geometry.dispose();
-    });
-    this.keys.set(mesh, key);
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        material.dispose();
+        geometry.dispose();
+      });
+      this.keys.set(mesh, key);
 
-    this.view.add(mesh);
+      this.view.add(key, mesh);
 
-    if (layer != null && this.layers.get(layer) != null) {
-      this.layers.get(layer).addObject(key);
+      if (layer != null && this.layers.get(layer) != null) {
+        this.layers.get(layer).addObject(key);
+      }
     }
   };
 
@@ -726,6 +807,7 @@ class DARTView {
     if (this.objects.has(key)) {
       this.deleteObject(key);
     }
+    this.objectColors.set(key, color);
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
@@ -747,7 +829,7 @@ class DARTView {
     });
     this.keys.set(mesh, key);
 
-    this.view.add(mesh);
+    this.view.add(key, mesh);
 
     if (layer != null && this.layers.has(layer)) {
       this.layers.get(layer).addObject(key);
@@ -774,6 +856,7 @@ class DARTView {
       this.deleteObject(key);
     }
     this.objectType.set(key, "capsule");
+    this.objectColors.set(key, color);
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
@@ -820,7 +903,7 @@ class DARTView {
     });
     this.keys.set(mesh, key);
 
-    this.view.add(mesh);
+    this.view.add(key, mesh);
 
     if (layer != null && this.layers.has(layer)) {
       this.layers.get(layer).addObject(key);
@@ -834,6 +917,7 @@ class DARTView {
    */
   createLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
     this.objectType.set(key, "line");
+    this.objectColors.set(key, color);
     // Try not to recreate geometry. If we already created a line in the past,
     // let's just update its buffers instead of creating fresh ones.
     if (this.objects.has(key)) {
@@ -857,7 +941,7 @@ class DARTView {
       // line.geometry.computeBoundingBox();
       // line.geometry.computeBoundingSphere();
 
-      this.view.add(line);
+      this.view.add(key, line);
     } else {
       const pathMaterial = new THREE.LineBasicMaterial({
         color: new THREE.Color(color[0], color[1], color[2]),
@@ -883,7 +967,7 @@ class DARTView {
       });
       this.keys.set(path, key);
 
-      this.view.add(path);
+      this.view.add(key, path);
     }
 
     if (layer != null && this.layers.has(layer)) {
@@ -891,6 +975,20 @@ class DARTView {
       this.layers.get(layer).addObject(key);
     }
   };
+
+  /**
+   * This registers a tooltip for a specific object in the view
+   */
+  setTooltip = (key: number, tooltip: string) => {
+    this.view.setTooltip(key, tooltip);
+  }
+
+  /**
+   * This removes the tooltip for a specific object in the view
+   */
+  deleteTooltip = (key: number) => {
+    this.view.removeTooltip(key);
+  }
 
   /**
    * This loads a texture from a Base64 string encoding of it
@@ -934,7 +1032,7 @@ class DARTView {
       mesh.castShadow = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(scale[0], scale[1], scale[2]);
-      this.view.add(mesh);
+      this.view.add(key, mesh);
     } else {
       let meshMaterial;
       if (texture_starts.length > 0 && uv.length > 0) {
@@ -948,6 +1046,7 @@ class DARTView {
           color: new THREE.Color(color[0], color[1], color[2]),
         });
       }
+      this.objectColors.set(key, color);
       if (color.length > 3 && color[3] < 1.0) {
         meshMaterial.transparent = true;
         meshMaterial.opacity = color[3];
@@ -1014,7 +1113,7 @@ class DARTView {
       });
       this.keys.set(mesh, key);
 
-      this.view.add(mesh);
+      this.view.add(key, mesh);
     }
 
     if (layer != null && this.layers.has(layer)) {
@@ -1055,8 +1154,11 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectColor = (key: number, color: number[]) => {
+  setObjectColor = (key: number, color: number[], save: boolean = true) => {
     const obj = this.objects.get(key);
+    if (save) {
+      this.objectColors.set(key, color);
+    }
     (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
     if (color.length > 3) {
       if (color[3] == 1.0) {
@@ -1067,6 +1169,13 @@ class DARTView {
         (obj as any).material.opacity = color[3];
       }
     }
+  };
+
+  /**
+   * This resets an object to the saved color
+   */
+  resetObjectColor = (key: number) => {
+    this.setObjectColor(key, this.objectColors.get(key));
   };
 
   /**
@@ -1090,7 +1199,7 @@ class DARTView {
   hideObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
-      this.view.remove(obj);
+      this.view.remove(key);
     }
   };
 
@@ -1102,8 +1211,7 @@ class DARTView {
   showObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
-      this.view.remove(obj);
-      this.view.add(obj);
+      this.view.add(key, obj);
     }
   };
 
@@ -1115,7 +1223,7 @@ class DARTView {
   deleteObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
-      this.view.remove(obj);
+      this.view.remove(key);
       this.keys.delete(obj);
       this.scene.remove(obj);
       // Keep lines around, and just update the buffers if they ever get recreated
@@ -1457,7 +1565,7 @@ class DARTView {
    */
   clear() {
     this.objects.forEach((v, k) => {
-      this.view.remove(v);
+      this.view.remove(k);
     });
     this.disposeHandlers.forEach((v, k) => v());
     this.objects.clear();

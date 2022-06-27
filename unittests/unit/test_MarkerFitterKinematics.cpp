@@ -1408,8 +1408,10 @@ void runEngine(
   std::vector<MarkersErrorReport> reports;
   for (int i = 0; i < markerObservationTrials.size(); i++)
   {
-    reports.push_back(
-        fitter.generateDataErrorsReport(markerObservationTrials[i]));
+    MarkersErrorReport report
+        = fitter.generateDataErrorsReport(markerObservationTrials[i]);
+    markerObservationTrials[i] = report.markerObservationsAttemptedFixed;
+    reports.push_back(report);
   }
 
   std::vector<MarkerInitialization> results
@@ -1469,6 +1471,22 @@ void runEngine(
   std::cout << "Final kinematic fit report:" << std::endl;
   finalKinematicsReport.printReport(5);
 
+  std::cout << "Final marker locations: " << std::endl;
+  for (auto& pair : results[0].updatedMarkerMap)
+  {
+    Eigen::Vector3s offset = pair.second.second;
+    std::cout << pair.first << ": " << pair.second.first->getName() << ", "
+              << offset(0) << " " << offset(1) << " " << offset(2) << std::endl;
+  }
+
+  fitter.saveTrajectoryAndMarkersToGUI(
+      "../../../javascript/src/data/movement2.bin",
+      results[0],
+      markerObservationTrials[0],
+      framesPerSecond[0],
+      forcePlates[0]);
+
+  /*
   // Target markers
   std::shared_ptr<server::GUIWebsocketServer> server
       = std::make_shared<server::GUIWebsocketServer>();
@@ -1477,6 +1495,7 @@ void runEngine(
   fitter.debugTrajectoryAndMarkersToGUI(
       server, results[0], markerObservationTrials[0], forcePlates[0]);
   server->blockWhileServing();
+  */
 }
 
 #ifdef FUNCTIONAL_TESTS
@@ -5112,6 +5131,26 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
   runEngine(
       "dart://sample/osim/MichaelTest3/unscaled_generic.osim",
       c3dFiles,
+      trcFiles,
+      grfFiles,
+      59,
+      1.72,
+      "female");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, SINGLE_TRIAL_ANKLE_EXO)
+{
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back("dart://sample/osim/AnkleExo/static1_day1_NW1.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/AnkleExo/Rajagopal2015.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
       59,
       1.72,
       "female");
