@@ -3460,6 +3460,20 @@ void recursiveCreateJoint(
   Eigen::Vector3s massCenter
       = readVec3(bodyNode->FirstChildElement("mass_center"));
   Eigen::Vector6s inertia = readVec6(bodyNode->FirstChildElement("inertia"));
+  if (mass <= 0)
+  {
+    std::cout << "WARNING! We're refusing to set a 0 mass for "
+              << childBody->getName()
+              << ", because NimblePhysics does not support 0 masses. "
+                 "Defaulting to 0.0001."
+              << std::endl;
+    mass = 0.0001;
+  }
+  if (inertia.segment<3>(0).norm() == 0)
+  {
+    inertia.segment<3>(0).setConstant(0.0001);
+  }
+
   dynamics::Inertia inertiaObj(
       mass,
       massCenter(0),
@@ -3545,12 +3559,6 @@ OpenSimFile OpenSimParser::readOsim30(
     std::string type(jointCursor->Name());
     std::string name(jointCursor->Attribute("name"));
 
-    if (name == "patellofemoral_r" || name == "patellofemoral_l")
-    {
-      jointCursor = jointCursor->NextSiblingElement();
-      continue;
-    }
-
     string parent_offset_frame = string(
         jointCursor->FirstChildElement("socket_parent_frame")->GetText());
     string child_offset_frame = string(
@@ -3591,6 +3599,14 @@ OpenSimFile OpenSimParser::readOsim30(
       framesCursor = framesCursor->NextSiblingElement();
     }
 
+    if (name == "patellofemoral_r" || name == "patellofemoral_l"
+        || childName == "/bodyset/patella_r"
+        || childName == "/bodyset/patella_l")
+    {
+      jointCursor = jointCursor->NextSiblingElement();
+      continue;
+    }
+
     OpenSimJointXML& joint = jointLookupMap[name];
     joint.name = name;
     joint.type = type;
@@ -3609,6 +3625,14 @@ OpenSimFile OpenSimParser::readOsim30(
       joint.parent = nullptr;
     }
 
+    if (bodyLookupMap.find(childName) == bodyLookupMap.end())
+    {
+      std::cout << "ERROR loading *.osim file: Joint " << name
+                << " has child body \"" << childName
+                << "\", yet the child was not found in the <BodySet>"
+                << std::endl;
+      exit(1);
+    }
     assert(bodyLookupMap.find(childName) != bodyLookupMap.end());
     assert(bodyLookupMap[childName].parent == nullptr);
     joint.child = &bodyLookupMap[childName];

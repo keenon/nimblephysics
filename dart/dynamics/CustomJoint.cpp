@@ -79,8 +79,9 @@ void CustomJoint<Dimension>::zeroTranslationInCustomFunctions()
         mFunctions[i]->offsetBy(-defaultValues(i - 3)),
         mFunctionDrivenByDof[i]);
     assert(
-        mFunctions[i]->calcValue(this->getPosition(mFunctionDrivenByDof[i]))
-        == 0);
+        abs(mFunctions[i]->calcValue(this->getPosition(mFunctionDrivenByDof[i]))
+            - 0)
+        < 1e-8);
   }
   Eigen::VectorXs pos = this->getPositionsStatic();
   Eigen::Vector3s euler = getEulerPositions(pos);

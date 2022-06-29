@@ -2781,9 +2781,12 @@ Eigen::VectorXs Skeleton::getRandomPoseForJoints(
 
   for (auto joint : joints)
   {
-    pose.segment(joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
-        = randomPose.segment(
-            joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs());
+    if (joint->getNumDofs() > 0)
+    {
+      pose.segment(joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+          = randomPose.segment(
+              joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs());
+    }
   }
 
   return pose;
