@@ -203,6 +203,7 @@ s_t solveIK(
         getRandomRestart,
     IKConfig config)
 {
+  /*
 #ifndef NDEBUG
   verifyJacobian(
       initialPos,
@@ -213,6 +214,7 @@ s_t solveIK(
       eval,
       config);
 #endif
+  */
 
   s_t bestError = std::numeric_limits<s_t>::infinity();
   Eigen::VectorXs bestResult = initialPos;

@@ -49,9 +49,9 @@ struct IKResult
 };
 
 void verifyJacobian(
-    Eigen::VectorXs atPos,
-    Eigen::VectorXs upperBound,
-    Eigen::VectorXs lowerBound,
+    const Eigen::VectorXs& atPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
         /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,

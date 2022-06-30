@@ -370,6 +370,7 @@ InitialMarkerFitParams::InitialMarkerFitParams()
   : numBlocks(12),
     numIKTries(12),
     dontRescaleBodies(false),
+    dontMoveMarkers(false),
     maxTrialsToUseForMultiTrialScaling(5),
     maxTimestepsToUseForMultiTrialScaling(800)
 {
@@ -391,6 +392,7 @@ InitialMarkerFitParams::InitialMarkerFitParams(
     markerOffsets(other.markerOffsets),
     groupScales(other.groupScales),
     dontRescaleBodies(other.dontRescaleBodies),
+    dontMoveMarkers(other.dontMoveMarkers),
     maxTrialsToUseForMultiTrialScaling(
         other.maxTrialsToUseForMultiTrialScaling),
     maxTimestepsToUseForMultiTrialScaling(
@@ -468,6 +470,14 @@ InitialMarkerFitParams& InitialMarkerFitParams::setDontRescaleBodies(
     bool dontRescaleBodies)
 {
   this->dontRescaleBodies = dontRescaleBodies;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams& InitialMarkerFitParams::setDontMoveMarkers(
+    bool dontMoveMarkers)
+{
+  this->dontMoveMarkers = dontMoveMarkers;
   return *this;
 }
 
@@ -1188,22 +1198,21 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       std::cout << "## IK on trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
 
-      jointInits[i].groupScales = overallInit.groupScales;
-      jointInits[i].markerOffsets = overallInit.markerOffsets;
-      jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
-
-      jointInits[i].joints = overallInit.joints;
-      jointInits[i].jointMarkerVariability = overallInit.jointMarkerVariability;
-      jointInits[i].jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
-      jointInits[i].jointLoss = overallInit.jointLoss;
-      jointInits[i].jointWeights = overallInit.jointWeights;
-      jointInits[i].axisWeights = overallInit.axisWeights;
-      jointInits[i].axisLoss = overallInit.axisLoss;
-
       if (trialSampledAtIndex[i] != -1)
       {
         int cursor = trialSampledAtIndex[i];
         int size = markerObservationTrials[i].size();
+        jointInits[i].groupScales = overallInit.groupScales;
+        jointInits[i].markerOffsets = overallInit.markerOffsets;
+        jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
+        jointInits[i].joints = overallInit.joints;
+        jointInits[i].jointMarkerVariability
+            = overallInit.jointMarkerVariability;
+        jointInits[i].jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
+        jointInits[i].jointLoss = overallInit.jointLoss;
+        jointInits[i].jointWeights = overallInit.jointWeights;
+        jointInits[i].axisWeights = overallInit.axisWeights;
+        jointInits[i].axisLoss = overallInit.axisLoss;
         jointInits[i].poses = overallInit.poses.block(
             0, cursor, overallInit.poses.rows(), size);
         jointInits[i].poseScores = overallInit.poseScores.segment(cursor, size);
@@ -1215,11 +1224,16 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       }
       else
       {
-        separateInits.push_back(fineTuneIK(
+        separateInits.push_back(runPrescaledPipeline(
             markerObservationTrials[i],
-            params.numBlocks,
-            params.markerWeights,
-            jointInits[i]));
+            InitialMarkerFitParams(params)
+                .setGroupScales(overallInit.groupScales)
+                .setMarkerOffsets(overallInit.markerOffsets)));
+        // separateInits.push_back(fineTuneIK(
+        //     markerObservationTrials[i],
+        //     params.numBlocks,
+        //     params.markerWeights,
+        //     jointInits[i]));
       }
     }
     std::cout << "Finished IKs" << std::endl;
@@ -1306,8 +1320,10 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
 
   // 2. Find the joint centers
   findJointCenters(init, newClip, markerObservations);
+  assert(init.joints.size() * 3 == init.jointCenters.rows());
   findAllJointAxis(init, newClip, markerObservations);
   computeJointConfidences(init, markerObservations);
+  assert(init.joints.size() * 3 == init.jointCenters.rows());
 
   // 3. Re-initialize the problem, but pass in the joint centers we just found
   MarkerInitialization reinit = getInitialization(
@@ -1414,7 +1430,8 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
               init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses)
-          .setDontRescaleBodies(true));
+          .setDontRescaleBodies(true)
+          .setDontMoveMarkers(true));
 
   return reinit;
 }
@@ -2842,6 +2859,8 @@ MarkerInitialization MarkerFitter::fineTuneIK(
   assert(
       initialization.jointCenters.cols() == 0
       || initialization.jointCenters.cols() == markerObservations.size());
+  assert(
+      initialization.jointCenters.rows() == initialization.joints.size() * 3);
 
   // 0. Prep configuration variables we'll use for the rest of the algo
   // Upper bound the number of blocks at the number of observations
@@ -2898,6 +2917,9 @@ MarkerInitialization MarkerFitter::fineTuneIK(
         || initialization.jointCenters.cols() > i);
     if (initialization.jointCenters.cols() > i)
     {
+      assert(
+          initialization.jointCenters.rows()
+          == initialization.joints.size() * 3);
       jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
           initialization.jointCenters.col(i));
     }
@@ -3119,6 +3141,7 @@ MarkerInitialization MarkerFitter::getInitialization(
   assert(
       params.jointCenters.cols() == 0
       || params.jointCenters.cols() == markerObservations.size());
+  assert(params.jointCenters.rows() == params.joints.size() * 3);
 
   // 0. Prep configuration variables we'll use for the rest of the algo
   int numBlocks = params.numBlocks;
@@ -3173,6 +3196,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
     if (params.jointCenters.cols() > i)
     {
+      assert(params.jointCenters.rows() == params.joints.size() * 3);
       jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
           params.jointCenters.col(i));
     }
@@ -3423,87 +3447,110 @@ MarkerInitialization MarkerFitter::getInitialization(
   // 5. Find the local offsets for the anthropometric markers as a simple
   // average
 
-  bool offsetAnthropometricMarkersToo = false;
-
-  // 5.1. Initialize empty maps to accumulate sums into
-
-  std::map<std::string, Eigen::Vector3s> trackingMarkerObservationsSum;
-  std::map<std::string, int> trackingMarkerNumObservations;
-  for (int i = 0; i < mMarkerNames.size(); i++)
+  if (params.dontMoveMarkers == false)
   {
-    if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
+    bool offsetAnthropometricMarkersToo = false;
+
+    // 5.1. Initialize empty maps to accumulate sums into
+
+    std::map<std::string, Eigen::Vector3s> trackingMarkerObservationsSum;
+    std::map<std::string, int> trackingMarkerNumObservations;
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
+      {
+        std::string name = mMarkerNames[i];
+        trackingMarkerObservationsSum[name] = Eigen::Vector3s::Zero();
+        trackingMarkerNumObservations[name] = 0;
+      }
+    }
+
+    // 5.2. Run through every pose in the solve, and accumulate error at that
+    // point
+
+    Eigen::VectorXs originalPos = mSkeleton->getPositions();
+    for (int i = 0; i < result.poses.cols(); i++)
+    {
+      mSkeleton->setPositions(result.poses.col(i));
+      // Accumulate observations for the tracking markers
+      for (auto& pair : markerObservations[i])
+      {
+        std::string name = pair.first;
+        int index = mMarkerIndices[name];
+        if (mMarkerIsTracking[index] || offsetAnthropometricMarkersToo)
+        {
+          std::pair<dynamics::BodyNode*, Eigen::Vector3s> trackingMarker
+              = mMarkers[index];
+          Eigen::Vector3s worldPosition = pair.second;
+          Eigen::Vector3s localOffset
+              = (trackingMarker.first->getWorldTransform().inverse()
+                 * worldPosition)
+                    .cwiseQuotient(trackingMarker.first->getScale());
+          Eigen::Vector3s netOffset = localOffset - trackingMarker.second;
+
+          trackingMarkerObservationsSum[name] += netOffset;
+          trackingMarkerNumObservations[name]++;
+        }
+      }
+    }
+    mSkeleton->setPositions(originalPos);
+
+    // 5.3. Average out the result
+
+    for (int i = 0; i < mMarkerNames.size(); i++)
     {
       std::string name = mMarkerNames[i];
-      trackingMarkerObservationsSum[name] = Eigen::Vector3s::Zero();
-      trackingMarkerNumObservations[name] = 0;
-    }
-  }
-
-  // 5.2. Run through every pose in the solve, and accumulate error at that
-  // point
-
-  Eigen::VectorXs originalPos = mSkeleton->getPositions();
-  for (int i = 0; i < result.poses.cols(); i++)
-  {
-    mSkeleton->setPositions(result.poses.col(i));
-    // Accumulate observations for the tracking markers
-    for (auto& pair : markerObservations[i])
-    {
-      std::string name = pair.first;
-      int index = mMarkerIndices[name];
-      if (mMarkerIsTracking[index] || offsetAnthropometricMarkersToo)
+      if (params.markerOffsets.count(name) > 0)
       {
-        std::pair<dynamics::BodyNode*, Eigen::Vector3s> trackingMarker
-            = mMarkers[index];
-        Eigen::Vector3s worldPosition = pair.second;
-        Eigen::Vector3s localOffset
-            = (trackingMarker.first->getWorldTransform().inverse()
-               * worldPosition)
-                  .cwiseQuotient(trackingMarker.first->getScale());
-        Eigen::Vector3s netOffset = localOffset - trackingMarker.second;
-
-        trackingMarkerObservationsSum[name] += netOffset;
-        trackingMarkerNumObservations[name]++;
+        assert(params.markerOffsets.count(name));
+        if (mMarkerIsTracking[i])
+        {
+          result.markerOffsets[name] = params.markerOffsets.at(name);
+          result.updatedMarkerMap[name]
+              = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+                  mMarkerMap[name].first,
+                  mMarkerMap[name].second + params.markerOffsets.at(name));
+        }
+      }
+      else
+      {
+        if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
+        {
+          // Avoid divide-by-zero edge case
+          if (trackingMarkerNumObservations[name] == 0)
+          {
+            result.markerOffsets[name] = Eigen::Vector3s::Zero();
+          }
+          else
+          {
+            result.markerOffsets[name] = trackingMarkerObservationsSum[name]
+                                         / trackingMarkerNumObservations[name];
+          }
+          result.updatedMarkerMap[name]
+              = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+                  mMarkerMap[name].first,
+                  mMarkerMap[name].second + result.markerOffsets[name]);
+        }
+        else
+        {
+          result.markerOffsets[name] = Eigen::Vector3s::Zero();
+          result.updatedMarkerMap[name] = mMarkerMap[name];
+        }
       }
     }
   }
-  mSkeleton->setPositions(originalPos);
-
-  // 5.3. Average out the result
-
-  for (int i = 0; i < mMarkerNames.size(); i++)
+  else
   {
-    std::string name = mMarkerNames[i];
-    if (params.markerOffsets.count(name) > 0)
+    for (int i = 0; i < mMarkerNames.size(); i++)
     {
-      assert(params.markerOffsets.count(name));
-      if (mMarkerIsTracking[i])
+      std::string name = mMarkerNames[i];
+      if (params.markerOffsets.count(name) > 0)
       {
         result.markerOffsets[name] = params.markerOffsets.at(name);
         result.updatedMarkerMap[name]
             = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
                 mMarkerMap[name].first,
                 mMarkerMap[name].second + params.markerOffsets.at(name));
-      }
-    }
-    else
-    {
-      if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
-      {
-        // Avoid divide-by-zero edge case
-        if (trackingMarkerNumObservations[name] == 0)
-        {
-          result.markerOffsets[name] = Eigen::Vector3s::Zero();
-        }
-        else
-        {
-          result.markerOffsets[name] = trackingMarkerObservationsSum[name]
-                                       / trackingMarkerNumObservations[name];
-        }
-        result.updatedMarkerMap[name]
-            = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-                mMarkerMap[name].first,
-                mMarkerMap[name].second + result.markerOffsets[name]);
       }
       else
       {
@@ -4194,6 +4241,9 @@ void MarkerFitter::fitTrajectory(
         inputNames.push_back("dof " + skeletonBallJoints->getDof(i)->getName());
       }
 
+      assert(markerPoses.size() == markerVector.size() * 3);
+      assert(centerPoses.size() == joints.size() * 3);
+
       // 2.2. Actually run the IK solver
       // Initialize at the old config
 
@@ -4233,6 +4283,8 @@ void MarkerFitter::fitTrajectory(
            axisWeights](
               /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
               /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+            assert(diff.size() == markerPoses.size() + centerPoses.size());
+
             diff.segment(0, markerPoses.size())
                 = skeletonBallJoints->getMarkerWorldPositions(markerVector)
                   - markerPoses;
@@ -4489,6 +4541,9 @@ void MarkerFitter::findJointCenters(
   }
   initialization.jointCenters = Eigen::MatrixXs::Zero(
       initialization.joints.size() * 3, markerObservations.size());
+  assert(
+      initialization.joints.size() * 3 == initialization.jointCenters.rows());
+
   initialization.jointWeights
       = Eigen::VectorXs::Ones(initialization.joints.size());
   initialization.jointLoss

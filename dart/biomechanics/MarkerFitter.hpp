@@ -275,6 +275,7 @@ struct InitialMarkerFitParams
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   Eigen::VectorXs groupScales;
   bool dontRescaleBodies;
+  bool dontMoveMarkers;
 
   int maxTrialsToUseForMultiTrialScaling;
   int maxTimestepsToUseForMultiTrialScaling;
@@ -298,6 +299,7 @@ struct InitialMarkerFitParams
   InitialMarkerFitParams& setNumIKTries(int retries);
   InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
   InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
+  InitialMarkerFitParams& setDontMoveMarkers(bool dontMoveMarkers);
   InitialMarkerFitParams& setMarkerOffsets(
       std::map<std::string, Eigen::Vector3s> markerOffsets);
   InitialMarkerFitParams& setGroupScales(Eigen::VectorXs groupScales);
