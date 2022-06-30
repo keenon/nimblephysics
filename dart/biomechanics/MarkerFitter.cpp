@@ -3527,11 +3527,11 @@ MarkerInitialization MarkerFitter::getInitialization(
 /// joint centers and also a bunch of weighted joint axis.
 void MarkerFitter::computeJointIKDiff(
     Eigen::Ref<Eigen::VectorXs> diff,
-    Eigen::VectorXs& jointPoses,
-    Eigen::VectorXs& jointCenters,
-    Eigen::VectorXs& jointWeights,
-    Eigen::VectorXs& jointAxis,
-    Eigen::VectorXs& axisWeights)
+    const Eigen::VectorXs& jointPoses,
+    const Eigen::VectorXs& jointCenters,
+    const Eigen::VectorXs& jointWeights,
+    const Eigen::VectorXs& jointAxis,
+    const Eigen::VectorXs& axisWeights)
 {
   diff = jointPoses - jointCenters;
   for (int i = 0; i < jointWeights.size(); i++)
@@ -3558,9 +3558,9 @@ void MarkerFitter::computeJointIKDiff(
 /// as well as the direction for axis losses.
 void MarkerFitter::rescaleIKJacobianForWeightsAndAxis(
     Eigen::Ref<Eigen::MatrixXs> jac,
-    Eigen::VectorXs& jointWeights,
-    Eigen::VectorXs& jointAxis,
-    Eigen::VectorXs& axisWeights)
+    const Eigen::VectorXs& jointWeights,
+    const Eigen::VectorXs& jointAxis,
+    const Eigen::VectorXs& axisWeights)
 {
   for (int i = 0; i < jointWeights.size(); i++)
   {
@@ -4201,7 +4201,7 @@ void MarkerFitter::fitTrajectory(
           skeletonBallJoints->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
-          [&skeletonBallJoints, &skeleton](
+          [skeletonBallJoints, skeleton](
               /* in*/ const Eigen::VectorXs pos, bool clamp) {
             skeletonBallJoints->setPositions(pos);
             if (clamp)
@@ -4220,15 +4220,15 @@ void MarkerFitter::fitTrajectory(
             // Return the clamped position
             return skeletonBallJoints->getPositions();
           },
-          [&skeletonBallJoints,
-           &markerPoses,
-           &markerVector,
-           &markerWeightsVector,
-           &jointsForSkeletonBallJoints,
-           &centerPoses,
-           &jointWeights,
-           &axisPoses,
-           &axisWeights](
+          [skeletonBallJoints,
+           markerPoses,
+           markerVector,
+           markerWeightsVector,
+           jointsForSkeletonBallJoints,
+           centerPoses,
+           jointWeights,
+           axisPoses,
+           axisWeights](
               /*out*/ Eigen::VectorXs& diff,
               /*out*/ Eigen::MatrixXs& jac) {
             diff.segment(0, markerPoses.size())
@@ -4278,7 +4278,7 @@ void MarkerFitter::fitTrajectory(
                 axisPoses,
                 axisWeights);
           },
-          [&initialGuess](Eigen::VectorXs& val) {
+          [initialGuess](Eigen::VectorXs& val) {
             assert(false);
             val = initialGuess;
           },
@@ -4377,7 +4377,7 @@ void MarkerFitter::fitTrajectory(
           skeleton->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
-          [&skeleton](
+          [skeleton](
               /* in*/ const Eigen::VectorXs pos, bool clamp) {
             skeleton->setPositions(pos);
 
@@ -4390,15 +4390,15 @@ void MarkerFitter::fitTrajectory(
             // Return the clamped position
             return skeleton->getPositions();
           },
-          [&skeleton,
-           &joints,
-           &markerPoses,
-           &markerVector,
-           &markerWeightsVector,
-           &centerPoses,
-           &jointWeights,
-           &axisPoses,
-           &axisWeights](
+          [skeleton,
+           joints,
+           markerPoses,
+           markerVector,
+           markerWeightsVector,
+           centerPoses,
+           jointWeights,
+           axisPoses,
+           axisWeights](
               /*out*/ Eigen::VectorXs& diff,
               /*out*/ Eigen::MatrixXs& jac) {
             diff.segment(0, markerPoses.size())
@@ -4441,7 +4441,7 @@ void MarkerFitter::fitTrajectory(
                 axisPoses,
                 axisWeights);
           },
-          [&initialGuess](Eigen::VectorXs& val) {
+          [initialGuess](Eigen::VectorXs& val) {
             assert(false);
             val = initialGuess;
           },

@@ -444,20 +444,20 @@ public:
   /// joint centers and also a bunch of weighted joint axis.
   static void computeJointIKDiff(
       Eigen::Ref<Eigen::VectorXs> diff,
-      Eigen::VectorXs& jointPoses,
-      Eigen::VectorXs& jointCenters,
-      Eigen::VectorXs& jointWeights,
-      Eigen::VectorXs& jointAxis,
-      Eigen::VectorXs& axisWeights);
+      const Eigen::VectorXs& jointPoses,
+      const Eigen::VectorXs& jointCenters,
+      const Eigen::VectorXs& jointWeights,
+      const Eigen::VectorXs& jointAxis,
+      const Eigen::VectorXs& axisWeights);
 
   /// This takes a Jacobian of joint world positions (with respect to anything),
   /// and rescales and reshapes to reflect the weights on joint and axis losses,
   /// as well as the direction for axis losses.
   static void rescaleIKJacobianForWeightsAndAxis(
       Eigen::Ref<Eigen::MatrixXs> jac,
-      Eigen::VectorXs& jointWeights,
-      Eigen::VectorXs& jointAxis,
-      Eigen::VectorXs& axisWeights);
+      const Eigen::VectorXs& jointWeights,
+      const Eigen::VectorXs& jointAxis,
+      const Eigen::VectorXs& axisWeights);
 
   /// This scales the skeleton and IK fits to the marker observations. It
   /// returns a pair, with (pose, group scales) from the fit.
