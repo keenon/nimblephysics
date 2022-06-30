@@ -5937,8 +5937,8 @@ s_t Skeleton::fitJointsToWorldPositions(
           return clampedPos;
         },
         [this, targetPositions, positionJoints](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = getJointWorldPositions(positionJoints) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == positionJoints.size() * 3);
@@ -5949,7 +5949,7 @@ s_t Skeleton::fitJointsToWorldPositions(
               0, getNumDofs(), positionJoints.size() * 3, getGroupScaleDim())
               = getJointWorldPositionsJacobianWrtGroupScales(positionJoints);
         },
-        [this](Eigen::VectorXs& val) {
+        [this](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, getNumDofs()) = getRandomPose();
           val.segment(getNumDofs(), getGroupScaleDim()).setConstant(1.0);
         },
@@ -5972,12 +5972,12 @@ s_t Skeleton::fitJointsToWorldPositions(
           return pos;
         },
         [this, targetPositions, positionJoints](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = getJointWorldPositions(positionJoints) - targetPositions;
           jac = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
         },
-        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        [this](Eigen::Ref<Eigen::VectorXs> val) { val = getRandomPose(); },
         config);
   }
 }
@@ -6038,8 +6038,8 @@ s_t Skeleton::fitMarkersToWorldPositions(
           return clampedPos;
         },
         [this, targetPositions, markers](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = getMarkerWorldPositions(markers) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == markers.size() * 3);
@@ -6049,7 +6049,7 @@ s_t Skeleton::fitMarkersToWorldPositions(
           jac.block(0, getNumDofs(), markers.size() * 3, getGroupScaleDim())
               = getMarkerWorldPositionsJacobianWrtGroupScales(markers);
         },
-        [this](Eigen::VectorXs& val) {
+        [this](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, getNumDofs()) = getRandomPose();
           val.segment(getNumDofs(), getGroupScaleDim()).setConstant(1.0);
         },
@@ -6072,8 +6072,8 @@ s_t Skeleton::fitMarkersToWorldPositions(
           return pos;
         },
         [this, targetPositions, markers, markerWeights](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = getMarkerWorldPositions(markers) - targetPositions;
           for (int j = 0; j < markerWeights.size(); j++)
           {
@@ -6081,7 +6081,7 @@ s_t Skeleton::fitMarkersToWorldPositions(
           }
           jac = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
         },
-        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        [this](Eigen::Ref<Eigen::VectorXs> val) { val = getRandomPose(); },
         config);
   }
 }

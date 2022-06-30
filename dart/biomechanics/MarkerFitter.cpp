@@ -3051,14 +3051,16 @@ MarkerInitialization MarkerFitter::smoothOutIK(
               return skelClone->getPositions();
             },
             [&observedMarkers, &markerPoses, &skelClone](
-                /*out*/ Eigen::VectorXs& diff,
-                /*out*/ Eigen::MatrixXs& jac) {
-              diff = skelClone->getMarkerWorldPositions(observedMarkers)
-                     - markerPoses;
-              jac = skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
-                  observedMarkers);
+                /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+                /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+              diff.segment(0, markerPoses.size())
+                  = skelClone->getMarkerWorldPositions(observedMarkers)
+                    - markerPoses;
+              jac.block(0, 0, jac.rows(), jac.cols())
+                  = skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
+                      observedMarkers);
             },
-            [](Eigen::VectorXs& val) {
+            [](Eigen::Ref<Eigen::VectorXs> val) {
               (void)val;
               assert(false && "This should never be called");
             },
@@ -3730,8 +3732,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          &jointWeights,
          &jointAxis,
          &axisWeights](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff.segment(0, markerPoses.size())
               = skeletonBallJoints->getMarkerWorldPositions(markerVector)
                 - markerPoses;
@@ -3781,7 +3783,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               axisWeights);
         },
         // Generate a random restart position
-        [&skeleton, &observedJoints](Eigen::VectorXs& val) {
+        [&skeleton, &observedJoints](Eigen::Ref<Eigen::VectorXs> val) {
           val = skeleton->convertPositionsToBallSpace(
               skeleton->getRandomPoseForJoints(observedJoints));
         },
@@ -3948,8 +3950,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          &jointWeights,
          &jointAxis,
          &axisWeights](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff.segment(0, markerPoses.size())
               = skeletonBallJoints->getMarkerWorldPositions(markerVector)
                 - markerPoses;
@@ -4029,7 +4031,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         },
         // Generate a random restart position
         [&skeletonBallJoints, &skeleton, &observedJoints](
-            Eigen::VectorXs& val) {
+            Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skeletonBallJoints->getNumDofs())
               = skeleton->convertPositionsToBallSpace(
                   skeleton->getRandomPoseForJoints(observedJoints));
@@ -4229,8 +4231,8 @@ void MarkerFitter::fitTrajectory(
            jointWeights,
            axisPoses,
            axisWeights](
-              /*out*/ Eigen::VectorXs& diff,
-              /*out*/ Eigen::MatrixXs& jac) {
+              /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+              /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
             diff.segment(0, markerPoses.size())
                 = skeletonBallJoints->getMarkerWorldPositions(markerVector)
                   - markerPoses;
@@ -4278,7 +4280,7 @@ void MarkerFitter::fitTrajectory(
                 axisPoses,
                 axisWeights);
           },
-          [initialGuess](Eigen::VectorXs& val) {
+          [initialGuess](Eigen::Ref<Eigen::VectorXs> val) {
             assert(false);
             val = initialGuess;
           },
@@ -4399,8 +4401,8 @@ void MarkerFitter::fitTrajectory(
            jointWeights,
            axisPoses,
            axisWeights](
-              /*out*/ Eigen::VectorXs& diff,
-              /*out*/ Eigen::MatrixXs& jac) {
+              /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+              /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
             diff.segment(0, markerPoses.size())
                 = skeleton->getMarkerWorldPositions(markerVector) - markerPoses;
             Eigen::VectorXs jointPoses
@@ -4441,7 +4443,7 @@ void MarkerFitter::fitTrajectory(
                 axisPoses,
                 axisWeights);
           },
-          [initialGuess](Eigen::VectorXs& val) {
+          [initialGuess](Eigen::Ref<Eigen::VectorXs> val) {
             assert(false);
             val = initialGuess;
           },

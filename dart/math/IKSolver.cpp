@@ -96,15 +96,15 @@ IKConfig& IKConfig::setOutputNames(const std::vector<std::string>& v)
 }
 
 void verifyJacobian(
-    Eigen::VectorXs originalPos,
-    Eigen::VectorXs upperBound,
-    Eigen::VectorXs lowerBound,
+    const Eigen::VectorXs& originalPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
-        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
     std::function<void(
-        /*out*/ Eigen::VectorXs& diff,
-        /*out*/ Eigen::MatrixXs& jac)> eval,
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
     IKConfig config)
 {
   // Get the original analytical result
@@ -190,16 +190,17 @@ void verifyJacobian(
 }
 
 s_t solveIK(
-    Eigen::VectorXs initialPos,
-    Eigen::VectorXs upperBound,
-    Eigen::VectorXs lowerBound,
+    const Eigen::VectorXs& initialPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
-        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
     std::function<void(
-        /*out*/ Eigen::VectorXs& diff,
-        /*out*/ Eigen::MatrixXs& jac)> eval,
-    std::function<void(/*out*/ Eigen::VectorXs& pos)> getRandomRestart,
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
+    std::function<void(/*out*/ Eigen::Ref<Eigen::VectorXs> pos)>
+        getRandomRestart,
     IKConfig config)
 {
 #ifndef NDEBUG
@@ -283,15 +284,15 @@ s_t solveIK(
 }
 
 IKResult refineIK(
-    Eigen::VectorXs initialPos,
-    Eigen::VectorXs upperBound,
-    Eigen::VectorXs lowerBound,
+    const Eigen::VectorXs& initialPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
-        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
     std::function<void(
-        /*out*/ Eigen::VectorXs& diff,
-        /*out*/ Eigen::MatrixXs& jac)> eval,
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
     IKConfig config)
 {
   (void)upperBound;

@@ -1,10 +1,13 @@
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+// #include <experimental/filesystem>
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -882,8 +885,8 @@ bool debugIKInitializationToGUI(
          markerWorldPoses,
          adjustedMarkers,
          markerWeightsVector](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = skelBallJoints->getMarkerWorldPositions(adjustedMarkers)
                  - markerWorldPoses;
           assert(
@@ -911,7 +914,7 @@ bool debugIKInitializationToGUI(
             jac.block(i * 3, 0, 3, jac.cols()) *= markerWeightsVector(i);
           }
         },
-        [skel, skelBallJoints](Eigen::VectorXs& val) {
+        [skel, skelBallJoints](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skelBallJoints->getNumDofs())
               = skel->convertPositionsToBallSpace(skel->getRandomPose());
           val.segment(
@@ -1174,8 +1177,8 @@ bool debugFitToGUI(
           return clampedPos;
         },
         [skelBallJoints, markerWorldPoses, adjustedMarkers](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff = skelBallJoints->getMarkerWorldPositions(adjustedMarkers)
                  - markerWorldPoses;
           assert(
@@ -1197,7 +1200,7 @@ bool debugFitToGUI(
               = skelBallJoints->getMarkerWorldPositionsJacobianWrtGroupScales(
                   adjustedMarkers);
         },
-        [skel, skelBallJoints](Eigen::VectorXs& val) {
+        [skel, skelBallJoints](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skelBallJoints->getNumDofs())
               = skel->convertPositionsToBallSpace(skel->getRandomPose());
           val.segment(
@@ -1538,7 +1541,8 @@ void evaluateOnSyntheticData(
     std::string scaledModelPath,
     std::vector<std::string> motFiles,
     s_t massKg,
-    std::string sex)
+    std::string sex,
+    std::string outputFolder = "")
 {
   /////////////////////////////////////////////////////////////////
   // Generate the gold marker data
@@ -1547,10 +1551,12 @@ void evaluateOnSyntheticData(
   OpenSimFile scaled = OpenSimParser::parseOsim(scaledModelPath);
 
   std::vector<Eigen::MatrixXs> goldTrajectories;
+  std::vector<std::vector<s_t>> goldTimestamps;
   for (std::string& path : motFiles)
   {
     OpenSimMot mot = OpenSimParser::loadMot(scaled.skeleton, path);
     goldTrajectories.push_back(mot.poses);
+    goldTimestamps.push_back(mot.timestamps);
   }
 
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
@@ -1604,6 +1610,38 @@ void evaluateOnSyntheticData(
     std::cout << "Average joint error (rad): " << avgDiff << std::endl;
     std::cout << "Average joint error (deg): " << (avgDiff / M_PI) * 180
               << std::endl;
+
+    if (outputFolder.length() > 0)
+    {
+      std::string fileName = motFiles[j].substr(motFiles[j].find_last_of("/"));
+      fileName = fileName.substr(0, fileName.find_first_of("."));
+
+      std::ofstream file;
+      file.open(outputFolder + "/" + fileName + ".csv");
+
+      file << "time";
+
+      for (int d = 0; d < scaled.skeleton->getNumDofs(); d++)
+      {
+        const std::string name = scaled.skeleton->getDof(d)->getName();
+        file << "," << name << "_gold," << name << "_rec";
+      }
+      file << std::endl;
+
+      for (int i = 0; i < goldPoses.cols(); i++)
+      {
+        Eigen::VectorXs goldPose = goldPoses.col(i);
+        Eigen::VectorXs guessPose = results[j].poses.col(i);
+        file << goldTimestamps[j][i];
+        for (int d = 0; d < scaled.skeleton->getNumDofs(); d++)
+        {
+          file << "," << goldPose(d) << "," << guessPose(d);
+        }
+        file << std::endl;
+      }
+
+      file.close();
+    }
   }
 }
 
@@ -6488,7 +6526,8 @@ TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_SPRINTING)
       "dart://sample/osim/Sprinter/sprinter_scaled.osim",
       motFiles,
       68,
-      "male");
+      "male",
+      "../../../python/research/synthetic_recovery/sprinting");
 }
 #endif
 

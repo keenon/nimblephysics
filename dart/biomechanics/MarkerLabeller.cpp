@@ -567,7 +567,7 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
         },
         // Compute the Jacobian
         [&skeletonBallJoints, &jointCenterVec, &ballSkelJoints](
-            Eigen::VectorXs& diff, Eigen::MatrixXs& jac) {
+            Eigen::Ref<Eigen::VectorXs> diff, Eigen::Ref<Eigen::MatrixXs> jac) {
           Eigen::VectorXs jointPoses
               = skeletonBallJoints->getJointWorldPositions(ballSkelJoints);
           diff = jointPoses - jointCenterVec;
@@ -594,7 +594,8 @@ LabelledMarkers MarkerLabeller::labelPointClouds(
                         ballSkelJoints);
         },
         // Generate a random restart position
-        [&skeletonBallJoints, &skelJoints, this](Eigen::VectorXs& val) {
+        [&skeletonBallJoints, &skelJoints, this](
+            Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skeletonBallJoints->getNumDofs())
               = mSkeleton->convertPositionsToBallSpace(
                   mSkeleton->getRandomPoseForJoints(skelJoints));
