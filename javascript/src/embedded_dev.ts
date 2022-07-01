@@ -2,7 +2,7 @@ import NimbleStandalone from "./NimbleStandalone";
 import NimbleStandaloneReact from "./NimbleStandaloneReact";
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import rawBinary from '!!arraybuffer-loader!./data/movement2.bin';
+import rawBinary from '!!arraybuffer-loader!./data/movement.bin';
 
 const rawArray = new Uint8Array(rawBinary);
 console.log(rawArray);

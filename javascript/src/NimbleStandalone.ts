@@ -8,7 +8,8 @@ import { createHash } from 'sha256-uint8array';
 class NimbleStandalone {
   view: NimbleView | null;
   lastRecordingHash: string;
-  recording: dart.proto.CommandList[];
+  rawBytes: Uint8Array;
+  framePointers: number[];
   playing: boolean;
   startedPlaying: number;
   originalMsPerFrame: number;
@@ -87,9 +88,9 @@ class NimbleStandalone {
       if (percentage < 0) percentage = 0;
       if (percentage > 1) percentage = 1;
       if (this.playing) this.togglePlay();
-      this.lastFrame = Math.round(this.recording.length * percentage);
+      this.lastFrame = Math.round(this.framePointers.length * percentage);
       if (this.view != null) {
-        this.recording[this.lastFrame].command.forEach(this.view.handleCommand);
+        this.getRecordingFrame(this.lastFrame).command.forEach(this.view.handleCommand);
         this.view.render();
       }
       this.setProgress(percentage);
@@ -108,14 +109,14 @@ class NimbleStandalone {
 
     window.addEventListener("keydown", this.keyboardListener);
 
-    this.view.addDragListener((key: string, pos: number[]) => {
+    this.view.addDragListener((key: number, pos: number[]) => {
       if (this.view != null) {
         this.view.setObjectPos(key, pos);
       }
     });
 
     this.lastRecordingHash = "";
-    this.recording = [];
+    this.framePointers = [];
     this.playing = false;
     this.startedPlaying = new Date().getTime();
     this.lastFrame = -1;
@@ -286,6 +287,15 @@ class NimbleStandalone {
     xhr.send();
   };
 
+  getRecordingFrame: (number) => dart.proto.CommandList = (index: number) => {
+    let cursor: number = this.framePointers[index];
+    const u32bytes = this.rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
+    const size = new Uint32Array(u32bytes)[0];
+    cursor += 4;
+    let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(this.rawBytes.buffer.slice(cursor, cursor + size));
+    return command;
+  };
+
   /**
    * This replaces the set of recorded commands we're replaying
    *
@@ -296,8 +306,9 @@ class NimbleStandalone {
 
     if (hash !== this.lastRecordingHash) {
       this.lastRecordingHash = hash;
+      this.rawBytes = rawBytes;
+      this.framePointers = [];
 
-      this.recording = [];
       let cursor = [0];
 
       this.setLoadingType("unzipping data");
@@ -307,17 +318,10 @@ class NimbleStandalone {
         if (cursor[0] < rawBytes.length) {
           while (cursor[0] < rawBytes.length) {
             // Read thet size byte
+            this.framePointers.push(cursor[0]);
             const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
             const size = new Uint32Array(u32bytes)[0];
             cursor[0] += 4;
-            try {
-              this.setLoadingProgress(cursor[0] / rawBytes.buffer.byteLength);
-              let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(rawBytes.buffer.slice(cursor[0], cursor[0] + size));
-              this.recording.push(command);
-            }
-            catch (e) {
-              console.error(e);
-            }
             cursor[0] += size;
 
             const elapsed = new Date().getTime() - startTime;
@@ -373,7 +377,7 @@ class NimbleStandalone {
   getCurrentFrame = () => {
     const elapsed: number = new Date().getTime() - this.startedPlaying;
     return (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
-      this.recording.length;
+      this.framePointers.length;
   };
 
 
@@ -402,13 +406,13 @@ class NimbleStandalone {
         // Reset at the beginning
         this.lastFrame = -1;
       }
-      this.setProgress(frameNumber / this.recording.length);
+      this.setProgress(frameNumber / this.framePointers.length);
       if (this.view != null) {
         // This is much more efficient. It's not perfect, because sometimes frames will be dropped that did important things, but if the general convention is followed that everything is initialized on the first frame, this works.
         if (this.lastFrame == -1 && frameNumber != 0) {
-          this.recording[0].command.forEach(this.handleCommand);
+          this.getRecordingFrame(0).command.forEach(this.handleCommand);
         }
-        this.recording[frameNumber].command.forEach(this.handleCommand);
+        this.getRecordingFrame(frameNumber).command.forEach(this.handleCommand);
 
         // This is the slower but more correct method.
         /*
