@@ -318,6 +318,7 @@ class NimbleStandalone {
         if (cursor[0] < rawBytes.length) {
           while (cursor[0] < rawBytes.length) {
             // Read thet size byte
+            this.setLoadingProgress(cursor[0] / rawBytes.buffer.byteLength);
             this.framePointers.push(cursor[0]);
             const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
             const size = new Uint32Array(u32bytes)[0];

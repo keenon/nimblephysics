@@ -1,6 +1,6 @@
 {
   "name": "nimble-visualizer",
-  "version": "0.8.6",
+  "version": "0.8.8",
   "description": "A WebGL-based visualizer for Nimble trajectories",
   "entry": {
     "index": "index.js",
