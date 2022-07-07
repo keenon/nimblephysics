@@ -1457,6 +1457,9 @@ std::vector<MarkerInitialization> runEngine(
 
   if (saveGUI)
   {
+    std::cout << "Saving trajectory..." << std::endl;
+    std::cout << "FPS: " << framesPerSecond[0] << std::endl;
+    std::cout << "Force plates len: " << forcePlates.size() << std::endl;
     fitter.saveTrajectoryAndMarkersToGUI(
         "../../../javascript/src/data/movement2.bin",
         results[0],
@@ -1550,13 +1553,43 @@ void evaluateOnSyntheticData(
 
   OpenSimFile scaled = OpenSimParser::parseOsim(scaledModelPath);
 
+  std::map<std::string, Eigen::Vector3s> goldScales;
+  for (int i = 0; i < scaled.skeleton->getNumBodyNodes(); i++)
+  {
+    auto* body = scaled.skeleton->getBodyNode(i);
+    Eigen::Vector3s bodyScale = body->getScale();
+    if (body->getNumShapeNodes() > 0)
+    {
+      dynamics::Shape* shape = body->getShapeNode(0)->getShape().get();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh = static_cast<dynamics::MeshShape*>(shape);
+        bodyScale = mesh->getScale();
+      }
+    }
+    goldScales[body->getName()] = bodyScale;
+    for (auto& pair : scaled.markersMap)
+    {
+      if (pair.second.first == body)
+      {
+        pair.second.second = pair.second.second.cwiseProduct(bodyScale);
+      }
+    }
+  }
+
   std::vector<Eigen::MatrixXs> goldTrajectories;
   std::vector<std::vector<s_t>> goldTimestamps;
+  std::vector<int> goldFPS;
+  std::vector<std::vector<ForcePlate>> goldForcePlates;
   for (std::string& path : motFiles)
   {
     OpenSimMot mot = OpenSimParser::loadMot(scaled.skeleton, path);
     goldTrajectories.push_back(mot.poses);
     goldTimestamps.push_back(mot.timestamps);
+    goldFPS.push_back(
+        (int)((double)mot.timestamps.size())
+        / (mot.timestamps[mot.timestamps.size() - 1] - mot.timestamps[0]));
+    goldForcePlates.emplace_back();
   }
 
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
@@ -1583,12 +1616,12 @@ void evaluateOnSyntheticData(
   std::vector<MarkerInitialization> results = runEngine(
       modelPath,
       markerObservationTrials,
-      std::vector<int>(),
-      std::vector<std::vector<ForcePlate>>(),
+      goldFPS,
+      goldForcePlates,
       massKg,
       heightM,
       sex,
-      false,
+      true,
       false);
 
   /////////////////////////////////////////////////////////////////
@@ -6522,8 +6555,8 @@ TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_SPRINTING)
   std::vector<std::string> motFiles;
   motFiles.push_back("dart://sample/osim/Sprinter/run0500cms.mot");
   evaluateOnSyntheticData(
-      "dart://sample/osim/Sprinter/sprinter.osim",
-      "dart://sample/osim/Sprinter/sprinter_scaled.osim",
+      "dart://sample/osim/Sprinter/sprinter_no_virtual.osim", // sprinter_no_virtual
+      "dart://sample/osim/Sprinter/sprinter_scaled_no_virtual.osim",
       motFiles,
       68,
       "male",
@@ -6543,7 +6576,8 @@ TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_DJ2)
       "LaiArnoldModified2017_poly_withArms_weldHand_scaled.osim",
       motFiles,
       68,
-      "male");
+      "male",
+      "../../../python/research/synthetic_recovery/sprinting");
 }
 #endif
 

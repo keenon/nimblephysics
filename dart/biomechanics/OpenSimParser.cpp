@@ -54,6 +54,25 @@ namespace dart {
 using namespace utils;
 namespace biomechanics {
 
+const std::string WHITESPACE = " \n\r\t\f\v";
+
+std::string ltrim(const std::string& s)
+{
+  size_t start = s.find_first_not_of(WHITESPACE);
+  return (start == std::string::npos) ? "" : s.substr(start);
+}
+
+std::string rtrim(const std::string& s)
+{
+  size_t end = s.find_last_not_of(WHITESPACE);
+  return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+}
+
+std::string trim(const std::string& s)
+{
+  return rtrim(ltrim(s));
+}
+
 //==============================================================================
 OpenSimFile::OpenSimFile(
     dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
@@ -3019,11 +3038,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         coordinateCursor->FirstChildElement("default_speed_value")->GetText());
     Eigen::Vector2s range
         = readVec2(coordinateCursor->FirstChildElement("range"));
-    bool locked
-        = std::string(coordinateCursor->FirstChildElement("locked")->GetText())
-          == "true";
+    bool locked = trim(std::string(
+                      coordinateCursor->FirstChildElement("locked")->GetText()))
+                  == "true";
     bool clamped
-        = std::string(coordinateCursor->FirstChildElement("clamped")->GetText())
+        = trim(std::string(
+              coordinateCursor->FirstChildElement("clamped")->GetText()))
           == "true";
 
     dynamics::DegreeOfFreedom* dof = joint->getDof(i);
@@ -3228,7 +3248,7 @@ OpenSimFile OpenSimParser::readOsim40(
   tinyxml2::XMLElement* bodyCursor = bodySetList->FirstChildElement("Body");
   while (bodyCursor)
   {
-    std::string name(bodyCursor->Attribute("name"));
+    std::string name = trim(std::string(bodyCursor->Attribute("name")));
     // std::cout << name << std::endl;
 
     if (name == "ground")
@@ -3278,8 +3298,8 @@ OpenSimFile OpenSimParser::readOsim40(
 
       if (jointDetail != nullptr)
       {
-        std::string parentName = std::string(
-            jointDetail->FirstChildElement("parent_body")->GetText());
+        std::string parentName = trim(std::string(
+            jointDetail->FirstChildElement("parent_body")->GetText()));
         dynamics::BodyNode* parentBody = bodyLookupMap[parentName];
         assert(parentName == "ground" || parentBody != nullptr);
         // Get shared properties across all joint types
@@ -3373,8 +3393,10 @@ OpenSimFile OpenSimParser::readOsim40(
         std::string bodyName
             = markerCursor->FirstChildElement("body")->GetText();
         bool fixed
-            = std::string(markerCursor->FirstChildElement("fixed")->GetText())
-              == "true";
+            = markerCursor->FirstChildElement("fixed") == nullptr
+              || trim(std::string(
+                     markerCursor->FirstChildElement("fixed")->GetText()))
+                     == "true";
 
         dynamics::BodyNode* body = skel->getBodyNode(bodyName);
         if (body != nullptr)
@@ -3692,7 +3714,7 @@ OpenSimFile OpenSimParser::readOsim30(
         tinyxml2::XMLElement* fixedElem
             = markerCursor->FirstChildElement("fixed");
         bool fixed = fixedElem == nullptr
-                     || std::string(fixedElem->GetText()) == "true";
+                     || trim(std::string(fixedElem->GetText())) == "true";
         dynamics::BodyNode* body = skel->getBodyNode(bodyName);
 
         if (body != nullptr)
