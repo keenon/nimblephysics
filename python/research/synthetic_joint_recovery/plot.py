@@ -4,11 +4,13 @@ import csv
 from typing import List
 
 
-def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False):
+def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitTimesteps=-1):
     with open(file, newline='') as f:
         reader = csv.DictReader(f)
 
         rows = [row for row in reader]
+        if limitTimesteps != -1:
+            rows = rows[:limitTimesteps]
 
         time = np.asarray([float(row['time']) for row in rows])
 
@@ -83,10 +85,12 @@ def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False):
         plt.show()
 
 
-# plot("./sprinting/run0500cms.csv",
-#      ['pelvis_tilt', 'pelvis_list', 'hip_flexion_l', 'hip_flexion_r', 'knee_angle_r', 'ankle_angle_l'], 3, 2)
+# To produce Figure 3, uncomment the below code:
 
-# plot("./sprinting/run0500cms.csv",
-#      ['knee_angle_r', 'ankle_angle_r', 'knee_angle_l', 'ankle_angle_l', 'pelvis_list'], 3, 2, True)  # 'elbow_flex_r', 'arm_add_l'
-plot("./sprinting/DJ2.csv",
-     ['pelvis_tilt', 'pelvis_list', 'hip_flexion_l', 'knee_angle_l', 'lumbar_extension'], 3, 2, True)  # 'elbow_flex_r', 'arm_add_l'
+plot("./data/run0500cms.csv",
+     ['knee_angle_r', 'ankle_angle_r', 'knee_angle_l', 'ankle_angle_l', 'pelvis_list'], 3, 2, True, 173)
+
+# To produce Figure 4, uncomment the below code:
+
+# plot("./data/DJ2.csv",
+#      ['pelvis_tilt', 'pelvis_list', 'hip_flexion_l', 'knee_angle_l', 'lumbar_extension'], 3, 2, True)
