@@ -855,6 +855,9 @@ void Skeleton(py::module& m)
           &dart::dynamics::Skeleton::getJointWorldPositions,
           ::py::arg("joints"))
       .def(
+          "getJointWorldPositionsMap",
+          &dart::dynamics::Skeleton::getJointWorldPositionsMap)
+      .def(
           "getJointWorldPositionsJacobianWrtJointPositions",
           &dart::dynamics::Skeleton::
               getJointWorldPositionsJacobianWrtJointPositions,
