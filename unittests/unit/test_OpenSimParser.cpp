@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <gtest/gtest.h>
 
 #include "dart/biomechanics/C3DLoader.hpp"
@@ -356,6 +358,40 @@ TEST(OpenSimParser, MOVE_OUTPUT_MARKERS)
   OpenSimParser::filterJustMarkers(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015_markersMoved.osim",
       "../../../data/osim/Rajagopal2015/justMarkers.osim");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, OVERWRITE_OUTPUT_MARKERS)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>> markerOffsets;
+  markerOffsets["TEST1"] = std::make_pair("femur_l", Eigen::Vector3s::Ones());
+  markerOffsets["TEST2"] = std::make_pair("femur_r", Eigen::Vector3s::Zero());
+  markerOffsets["TEST3"]
+      = std::make_pair("pelvis", -1 * Eigen::Vector3s::Ones());
+  std::map<std::string, bool> anatomical;
+  anatomical["TEST1"] = true;
+  anatomical["TEST2"] = false;
+  // anatomical["TEST3"] = false;
+
+  OpenSimParser::overwriteOsimMarkers(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      markerOffsets,
+      anatomical,
+      "../../../data/osim/Rajagopal2015/Rajagopal2015_markersReplaced.osim");
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015_markersReplaced.osim");
+  EXPECT_EQ(file.markersMap.size(), 3);
+  EXPECT_EQ(file.markersMap.count("TEST1"), 1);
+  EXPECT_EQ(file.markersMap.count("TEST2"), 1);
+  EXPECT_EQ(file.markersMap.count("TEST3"), 1);
+  EXPECT_EQ(file.markersMap.count("FOOBAR"), 0);
+  EXPECT_EQ(file.anatomicalMarkers.size(), 1);
+  EXPECT_EQ(file.anatomicalMarkers[0], "TEST1");
+  EXPECT_EQ(file.trackingMarkers.size(), 2);
 }
 #endif
 

@@ -232,6 +232,21 @@ void OpenSimParser(py::module& m)
       ::py::arg("outputPath"));
 
   sm.def(
+      "replaceOsimMarkers",
+      +[](const common::Uri& uri,
+          const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+              markerOffsets,
+          const std::map<std::string, bool>& isAnatomical,
+          const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::replaceOsimMarkers(
+            uri, markerOffsets, isAnatomical, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("markers"),
+      ::py::arg("isAnatomical"),
+      ::py::arg("outputPath"));
+
+  sm.def(
       "filterJustMarkers",
       +[](const common::Uri& uri, const std::string& outputPath) {
         return dart::biomechanics::OpenSimParser::filterJustMarkers(

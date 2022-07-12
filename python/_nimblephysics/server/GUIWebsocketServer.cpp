@@ -105,6 +105,12 @@ void GUIWebsocketServer(py::module& m)
           "registerDragListener",
           &dart::server::GUIWebsocketServer::registerDragListener,
           ::py::arg("key"),
+          ::py::arg("listener"),
+          ::py::arg("endDrag"))
+      .def(
+          "registerTooltipChangeListener",
+          &dart::server::GUIWebsocketServer::registerTooltipChangeListener,
+          ::py::arg("key"),
           ::py::arg("listener"));
 }
 

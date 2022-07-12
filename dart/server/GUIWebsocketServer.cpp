@@ -176,7 +176,7 @@ void GUIWebsocketServer::serve(int port)
     }
     else if (args["type"].asString() == "drag")
     {
-      std::string key = args["key"].asString();
+      std::string key = this->getCodeString(args["key"].asInt());
       Eigen::Vector3s pos = Eigen::Vector3s(
           static_cast<s_t>(args["pos"][0].asDouble()),
           static_cast<s_t>(args["pos"][1].asDouble()),
@@ -185,6 +185,24 @@ void GUIWebsocketServer::serve(int port)
       for (auto handler : mDragListeners[key])
       {
         handler(pos);
+      }
+    }
+    else if (args["type"].asString() == "drag_end")
+    {
+      std::string key = this->getCodeString(args["key"].asInt());
+      for (auto handler : mDragEndListeners[key])
+      {
+        handler();
+      }
+    }
+    else if (args["type"].asString() == "edit_tooltip")
+    {
+      std::string key = this->getCodeString(args["key"].asInt());
+      std::string tooltip = args["tooltip"].asString();
+
+      for (auto handler : mTooltipChangeListeners[key])
+      {
+        handler(tooltip);
       }
     }
   });
@@ -420,12 +438,27 @@ void GUIWebsocketServer::clear()
 /// "listener" whenever the object is dragged with the desired drag
 /// coordinates
 GUIWebsocketServer& GUIWebsocketServer::registerDragListener(
-    const std::string& key, std::function<void(Eigen::Vector3s)> listener)
+    const std::string& key,
+    std::function<void(Eigen::Vector3s)> listener,
+    std::function<void()> endDrag)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  setObjectMouseInteractionEnabled(key);
+  setObjectDragEnabled(key);
   mDragListeners[key].push_back(listener);
+  mDragEndListeners[key].push_back(endDrag);
+  return *this;
+}
+
+/// This enables the user to edit the tooltip on an object, and calls this
+/// listener when the tooltip changes.
+GUIWebsocketServer& GUIWebsocketServer::registerTooltipChangeListener(
+    const std::string& key, std::function<void(std::string)> listener)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  setObjectTooltipEditable(key);
+  mTooltipChangeListeners[key].push_back(listener);
   return *this;
 }
 

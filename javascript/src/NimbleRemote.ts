@@ -42,6 +42,27 @@ class DARTRemote {
         this.socket.send(message);
       }
     });
+
+    this.view.addDragEndListener((key: number) => {
+      const message = JSON.stringify({
+        type: "drag_end",
+        key
+      });
+      if (this.socket != null && this.socket.readyState == WebSocket.OPEN) {
+        this.socket.send(message);
+      }
+    });
+
+    this.view.addTooltipEditListener((key: number, tooltip: string) => {
+      const message = JSON.stringify({
+        type: "edit_tooltip",
+        key,
+        tooltip,
+      });
+      if (this.socket != null && this.socket.readyState == WebSocket.OPEN) {
+        this.socket.send(message);
+      }
+    });
   }
 
   /**

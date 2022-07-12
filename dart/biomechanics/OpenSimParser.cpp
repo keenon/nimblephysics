@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include <tinyxml2.h>
+
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/common/Uri.hpp"
@@ -1189,6 +1191,119 @@ void OpenSimParser::rationalizeJoints(
 
   //--------------------------------------------------------------------------
   // Save out the result
+  newFile.SaveFile(outputPath.c_str());
+}
+
+/// Read an *.osim file, overwrite all the markers, and write it out
+/// to a new *.osim file
+void OpenSimParser::replaceOsimMarkers(
+    const common::Uri& uri,
+    const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+        markers,
+    const std::map<std::string, bool> isAnatomical,
+    const std::string& outputPath,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  //--------------------------------------------------------------------------
+  // Load xml and create Document
+  tinyxml2::XMLDocument originalFile;
+  try
+  {
+    openXMLFile(originalFile, uri, retriever);
+  }
+  catch (std::exception const& e)
+  {
+    std::cout << "LoadFile [" << uri.toString() << "] Fails: " << e.what()
+              << std::endl;
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Deep copy document
+
+  tinyxml2::XMLDocument newFile;
+  originalFile.DeepCopy(&newFile);
+
+  //--------------------------------------------------------------------------
+  tinyxml2::XMLElement* docElement
+      = newFile.FirstChildElement("OpenSimDocument");
+  if (docElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <OpenSimDocument> as the root element.\n";
+    return;
+  }
+  tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
+  if (modelElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <Model> as the child of the root "
+             "<OpenSimDocument> element.\n";
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Go through the body nodes and adjust the scaling
+  tinyxml2::XMLElement* markerSet
+      = modelElement->FirstChildElement("MarkerSet");
+
+  if (markerSet == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <MarkerSet> as the child of the root "
+             "<Model> element.\n";
+    return;
+  }
+
+  tinyxml2::XMLElement* markerSetObjects
+      = markerSet->FirstChildElement("objects");
+  if (markerSetObjects == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <objects> as the child of the root "
+             "<MarkerSet> element.\n";
+    return;
+  }
+
+  markerSetObjects->DeleteChildren();
+
+  for (auto& pair : markers)
+  {
+    tinyxml2::XMLElement* marker
+        = markerSetObjects->InsertNewChildElement("Marker");
+    /*
+            <Marker name="RACR">
+                <!--Body segment in the model on which the marker resides.-->
+                <body>torso</body>
+                <!--Location of a marker on the body segment.-->
+                <location> -0.003000 0.425000 0.130000</location>
+                <!--Flag (true or false) specifying whether or not a marker
+       should be kept fixed in the marker placement step.  i.e. If false, the
+       marker is allowed to move.--> <fixed>false</fixed>
+            </Marker>
+    */
+    marker->SetAttribute("name", pair.first.c_str());
+
+    tinyxml2::XMLElement* body = marker->InsertNewChildElement("body");
+    body->SetText(pair.second.first.c_str());
+
+    tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
+    Eigen::Vector3s markerOffset = pair.second.second;
+    location->SetText((" " + std::to_string(markerOffset(0)) + " "
+                       + std::to_string(markerOffset(1)) + " "
+                       + std::to_string(markerOffset(2)))
+                          .c_str());
+
+    tinyxml2::XMLElement* fixed = marker->InsertNewChildElement("fixed");
+    fixed->SetText(
+        (isAnatomical.count(pair.first) > 0 && isAnatomical.at(pair.first))
+            ? "true"
+            : "false");
+  }
+
   newFile.SaveFile(outputPath.c_str());
 }
 

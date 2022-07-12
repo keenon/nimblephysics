@@ -251,8 +251,12 @@ public:
   /// This removes a tooltip for the object at key.
   void deleteObjectTooltip(const std::string& key);
 
-  /// This sets an object to allow mouse interaction on the GUI
-  void setObjectMouseInteractionEnabled(const std::string& key);
+  /// This sets an object to allow dragging around by the mouse on the GUI
+  void setObjectDragEnabled(const std::string& key);
+
+  /// This sets an object to allow editing the tooltip by double-clicking on the
+  /// object
+  void setObjectTooltipEditable(const std::string& key);
 
   /// This deletes an object by key
   void deleteObject(const std::string& key);
@@ -392,7 +396,8 @@ protected:
   proto::CommandList mCommandList;
   std::string mCommandListOutputBuffer;
   // This is a list of all the objects with mouse interaction enabled
-  std::unordered_set<std::string> mMouseInteractionEnabled;
+  std::unordered_set<std::string> mDragEnabled;
+  std::unordered_set<std::string> mTooltipEditable;
 
   std::unordered_map<std::string, int> mStringCodes;
   std::unordered_map<int, std::string> mCodeStrings;
@@ -572,7 +577,8 @@ protected:
   void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);
   void encodeSetTooltip(proto::CommandList& list, Tooltip& tooltip);
   void encodeCreateTexture(proto::CommandList& list, Texture& texture);
-  void encodeEnableMouseInteraction(
+  void encodeEnableDrag(proto::CommandList& list, const std::string& key);
+  void encodeEnableEditTooltip(
       proto::CommandList& list, const std::string& key);
   void encodeCreateText(proto::CommandList& list, Text& text);
   void encodeCreateButton(proto::CommandList& list, Button& button);

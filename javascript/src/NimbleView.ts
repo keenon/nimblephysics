@@ -137,6 +137,8 @@ class DARTView {
   uiElements: Map<number, Text | Button | Slider | SimplePlot | RichPlot>;
 
   dragListeners: ((key: number, pos: number[]) => void)[];
+  dragEndListeners: ((key: number) => void)[];
+  tooltipEditListeners: ((key: number, tooltip: string) => void)[];
 
   sphereGeometry: THREE.SphereBufferGeometry;
 
@@ -148,6 +150,7 @@ class DARTView {
 
   tooltip: HTMLElement;
   hovering: number[];
+  editingTooltip: boolean = false;
 
   constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
@@ -172,6 +175,8 @@ class DARTView {
     this.uiElements = new Map();
     this.objectType = new Map();
     this.dragListeners = [];
+    this.dragEndListeners = [];
+    this.tooltipEditListeners = [];
     this.layers = new Map();
 
     this.scene = new THREE.Scene();
@@ -215,11 +220,12 @@ class DARTView {
     updateCamera();
     */
 
-    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff);
+    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff, this.onEditTooltip);
     this.running = false;
 
     this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
 
+    window.addEventListener('mousemove', this.tooltipMousemoveListener);
     /// Get ready to deal with object dragging
 
     this.view.setDragHandler((obj: THREE.Object3D, posVec: THREE.Vector3) => {
@@ -232,6 +238,9 @@ class DARTView {
       if (key != null) {
         this.dragListeners.forEach((listener) => listener(key, pos));
       }
+    }, (obj: THREE.Object3D) => {
+      let key = this.keys.get(obj);
+      this.dragEndListeners.forEach(l => l(key));
     });
 
     /// Random GUI stuff
@@ -312,6 +321,10 @@ class DARTView {
   };
 
   onTooltipHoveron = (keys: number[], tooltip: string, top_x: number, top_y: number) => {
+    if (this.editingTooltip) {
+      return;
+    }
+
     this.tooltip.innerHTML = tooltip;
     this.tooltip.style.top = top_y+'px';
     this.tooltip.style.left = top_x+'px';
@@ -332,10 +345,49 @@ class DARTView {
       this.hovering = keys;
       this.render();
     }
-    window.addEventListener('mousemove', this.tooltipMousemoveListener);
+  };
+
+  onEditTooltip = (key: number) => {
+    this.editingTooltip = true;
+    this.tooltip.style.opacity = '1.0';
+    const textField = document.createElement('input');
+    textField.type = 'text';
+    textField.value = this.tooltip.innerHTML;
+    this.tooltip.innerHTML = '';
+    this.tooltip.className += ' Tooltip-edit';
+    this.tooltip.appendChild(textField);
+    const lostFocus = () => {
+      const finalValue = textField.value;
+      this.tooltip.removeChild(textField);
+      this.tooltip.innerHTML = finalValue;
+      this.tooltip.className = 'Tooltip';
+
+      this.tooltipEditListeners.forEach(l => l(key, finalValue));
+
+      this.editingTooltip = false;
+    };
+    const onBlur = () => {
+      lostFocus();
+      this.onTooltipHoveroff();
+    };
+    textField.addEventListener('blur', onBlur);
+    textField.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        // Prevent a race condition with the blur handler that is difficult to reason about
+        textField.removeEventListener('blur', onBlur);
+        lostFocus();
+      }
+    });
+    textField.focus();
   };
 
   tooltipMousemoveListener = (e: MouseEvent) => {
+    if (this.editingTooltip) {
+      return;
+    }
+
     const rect = this.container.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -344,6 +396,10 @@ class DARTView {
   }
 
   onTooltipHoveroff = () => {
+    if (this.editingTooltip) {
+      return;
+    }
+
     if (this.hovering.length > 0) {
       this.hovering.forEach(k => {
         this.resetObjectColor(k);
@@ -352,7 +408,6 @@ class DARTView {
       this.render();
     }
     this.tooltip.style.opacity = '0.0';
-    window.removeEventListener('mousemove', this.tooltipMousemoveListener);
   };
 
   /**
@@ -363,7 +418,7 @@ class DARTView {
 
     // Clean up leftover callbacks that could cause a leak
     this.disposeHandlers.clear();
-    this.view.setDragHandler(null);
+    this.view.setDragHandler(null, null);
     this.glContainer.removeEventListener("keydown", this.glContainerKeyboardEventListener);
 
     this.scene = null;
@@ -537,8 +592,11 @@ class DARTView {
       const color: number[] = [data[0], data[1], data[2], data[3]];
       this.setObjectColor(command.set_object_color.key, color, true);
     }
-    else if (command.enable_mouse_interaction != null) {
-      this.enableMouseInteraction(command.enable_mouse_interaction.key);
+    else if (command.enable_drag != null) {
+      this.enableDrag(command.enable_drag.key);
+    }
+    else if (command.enable_edit_tooltip != null) {
+      this.enableEditTooltip(command.enable_edit_tooltip.key);
     }
     else if (command.text != null) {
       const from_top_left: number[] = [command.text.pos[0], command.text.pos[1]];
@@ -678,23 +736,54 @@ class DARTView {
     this.dragListeners.push(dragListener);
   };
 
+  addDragEndListener = (dragEndListener: (key: number) => void) => {
+    this.dragEndListeners.push(dragEndListener);
+  };
+
+  /**
+   * This adds a listener for tooltip edit events
+   */
+  addTooltipEditListener = (tooltipListener: (key: number, tooltip: string) => void) => {
+    this.tooltipEditListeners.push(tooltipListener);
+  };
+
   /**
    * This enables mouse interaction on a specific object by key
    */
-  enableMouseInteraction = (key: number) => {
+  enableDrag = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.enableMouseInteraction(key);
+      this.view.enableDrag(key);
     }
   };
 
   /**
    * This enables mouse interaction on a specific object by key
    */
-  disableMouseInteraction = (key: number) => {
+  disableDrag = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.disableMouseInteraction(key);
+      this.view.disableDrag(key);
+    }
+  };
+
+  /**
+   * This enables mouse interaction on a specific object by key
+   */
+  enableEditTooltip = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj != null) {
+      this.view.enableEditTooltip(key);
+    }
+  };
+
+  /**
+   * This enables mouse interaction on a specific object by key
+   */
+  disableEditTooltip = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj != null) {
+      this.view.disableEditTooltip(key);
     }
   };
 

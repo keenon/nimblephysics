@@ -23,7 +23,8 @@ message Command {
     SetObjectScale set_object_scale = 8;
     SetObjectTooltip set_object_tooltip = 32;
     DeleteObjectTooltip delete_object_tooltip = 33;
-    EnableMouseInteraction enable_mouse_interaction = 18;
+    EnableDrag enable_drag = 18;
+    EnableEditTooltip enable_edit_tooltip = 34;
     CreateText text = 12;
     CreateButton button = 13;
     CreateSlider slider = 14;
@@ -142,7 +143,11 @@ message DeleteObjectTooltip {
   int32 key = 1;
 }
 
-message EnableMouseInteraction {
+message EnableDrag {
+  int32 key = 1;
+}
+
+message EnableEditTooltip {
   int32 key = 1;
 }
 

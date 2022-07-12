@@ -136,6 +136,16 @@ public:
       const std::string& outputPath,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// Read an *.osim file, overwrite all the markers, and write it out
+  /// to a new *.osim file
+  static void replaceOsimMarkers(
+      const common::Uri& uri,
+      const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+          markers,
+      const std::map<std::string, bool> isAnatomical,
+      const std::string& outputPath,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
   /// Read an *.osim file, move the markers to new locations, and write it out
   /// to a new *.osim file
   static void moveOsimMarkers(

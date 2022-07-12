@@ -202,6 +202,10 @@ $triangle-size: 5px;
       color: white;
     }
 
+    .Tooltip-edit {
+      pointer-events: all;
+    }
+
     .DARTWindow-ui-elem {
       pointer-events: all;
 

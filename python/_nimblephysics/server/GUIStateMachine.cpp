@@ -129,6 +129,11 @@ void GUIStateMachine(py::module& m)
           ::py::arg("key"),
           ::py::arg("color"))
       .def(
+          "setObjectTooltip",
+          &dart::server::GUIStateMachine::setObjectTooltip,
+          ::py::arg("key"),
+          ::py::arg("tooltip"))
+      .def(
           "deleteObject",
           &dart::server::GUIStateMachine::deleteObject,
           ::py::arg("key"))

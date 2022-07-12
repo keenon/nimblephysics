@@ -30,12 +30,12 @@ dart_add_test("unit" test_UniversalJoint)
 dart_add_test("unit" test_MarkerFitterAxisDetection)
 dart_add_test("unit" test_AssignmentMatcher)
 dart_add_test("unit" test_MarkerTrace)
+
 if(DART_USE_ARBITRARY_PRECISION)
-dart_add_test("unit" test_MPFR)
+  dart_add_test("unit" test_MPFR)
 endif()
 
 if(TARGET dart-utils)
-
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
 
@@ -150,13 +150,11 @@ if(TARGET dart-planning)
 endif()
 
 foreach(collision_engine
-    dart-collision-bullet
-    dart-collision-ode)
-
+  dart-collision-bullet
+  dart-collision-ode)
   if(TARGET ${collision_engine})
     target_link_libraries(test_CollisionGroups ${collision_engine})
   endif()
-
 endforeach()
 
 dart_format_add(test_Inertia.cpp)

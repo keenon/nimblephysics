@@ -96,9 +96,13 @@ std::string GUIStateMachine::getCurrentStateAsJson()
       encodeSetRichPlotData(list, pair.second.key, dataPair.second);
     }
   }
-  for (auto key : mMouseInteractionEnabled)
+  for (auto key : mDragEnabled)
   {
-    encodeEnableMouseInteraction(list, key);
+    encodeEnableDrag(list, key);
+  }
+  for (auto key : mTooltipEditable)
+  {
+    encodeEnableEditTooltip(list, key);
   }
 
   return list.SerializeAsString();
@@ -1140,13 +1144,24 @@ void GUIStateMachine::deleteObjectTooltip(const std::string& key)
   });
 }
 
-/// This sets an object to allow mouse interaction on the GUI
-void GUIStateMachine::setObjectMouseInteractionEnabled(const std::string& key)
+/// This sets an object to allow dragging around by the mouse on the GUI
+void GUIStateMachine::setObjectDragEnabled(const std::string& key)
 {
-  mMouseInteractionEnabled.emplace(key);
+  mDragEnabled.emplace(key);
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
-    command->mutable_enable_mouse_interaction()->set_key(getStringCode(key));
+    command->mutable_enable_drag()->set_key(getStringCode(key));
+  });
+}
+
+/// This sets an object to allow editing the tooltip by double-clicking on the
+/// object
+void GUIStateMachine::setObjectTooltipEditable(const std::string& key)
+{
+  mTooltipEditable.emplace(key);
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_enable_edit_tooltip()->set_key(getStringCode(key));
   });
 }
 
@@ -1938,11 +1953,18 @@ void GUIStateMachine::encodeCreateTexture(
   command->mutable_texture()->set_base64(texture.base64);
 }
 
-void GUIStateMachine::encodeEnableMouseInteraction(
+void GUIStateMachine::encodeEnableDrag(
     proto::CommandList& list, const std::string& key)
 {
   proto::Command* command = list.add_command();
-  command->mutable_enable_mouse_interaction()->set_key(getStringCode(key));
+  command->mutable_enable_drag()->set_key(getStringCode(key));
+}
+
+void GUIStateMachine::encodeEnableEditTooltip(
+    proto::CommandList& list, const std::string& key)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_enable_edit_tooltip()->set_key(getStringCode(key));
 }
 
 void GUIStateMachine::encodeCreateText(proto::CommandList& list, Text& text)

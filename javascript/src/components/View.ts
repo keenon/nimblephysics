@@ -19,11 +19,13 @@ class View {
   inScene: Map<number, THREE.Object3D>;
   tooltips: Map<number, string>;
   tooltipSets: Map<string, number[]>;
-  mouseInteractionEnabled: Map<number, boolean>;
+  dragEnabled: Map<number, boolean>;
+  editTooltipEnabled: Map<number, boolean>;
   onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void;
   onTooltipHoveroff: () => void;
+  onEditTooltip: (key: number) => void;
 
-  constructor(scene: THREE.Scene, parent: HTMLElement, onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void, onTooltipHoveroff: () => void) {
+  constructor(scene: THREE.Scene, parent: HTMLElement, onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void, onTooltipHoveroff: () => void, onEditTooltip: (key: number) => void) {
     this.scene = scene;
     this.container = document.createElement("div");
     this.container.className = "View__container";
@@ -31,6 +33,7 @@ class View {
     this.parent = parent;
     this.onTooltipHoveron = onTooltipHoveron;
     this.onTooltipHoveroff = onTooltipHoveroff;
+    this.onEditTooltip = onEditTooltip;
 
     // these two lines are essentially this.refreshSize(), but fix TS errors
     this.width = this.parent.getBoundingClientRect().width;
@@ -75,7 +78,8 @@ class View {
     this.tooltips = new Map();
     this.tooltipSets = new Map();
     this.inScene = new Map();
-    this.mouseInteractionEnabled = new Map();
+    this.dragEnabled = new Map();
+    this.editTooltipEnabled = new Map();
 
     this.dragControls.addEventListener("dragstart", () => {
       this.orbitControls.enabled = false;
@@ -83,6 +87,9 @@ class View {
     this.dragControls.addEventListener("dragend", () => {
       this.orbitControls.enabled = true;
     });
+    this.dragControls.addEventListener("doubleclick", ((evt: {object: THREE.Object3D, key: number}) => {
+      this.onEditTooltip(evt.key);
+    }) as any)
     this.dragControls.addEventListener("hoveron", ((evt: {object: THREE.Object3D, key: number, top_x: number, top_y: number}) => {
       if (this.tooltips.has(evt.key)) {
         const tooltip = this.tooltips.get(evt.key);
@@ -114,9 +121,10 @@ class View {
   };
 
   setDragHandler = (
-    handler: (obj: THREE.Object3D, pos: THREE.Vector3) => void
+    handler: (obj: THREE.Object3D, pos: THREE.Vector3) => void,
+    onFinish: (obj: THREE.Object3D) => void
   ) => {
-    this.dragControls.setDragHandler(handler);
+    this.dragControls.setDragHandler(handler, onFinish);
   };
 
   add = (key: number, obj: THREE.Object3D) => {
@@ -129,7 +137,8 @@ class View {
     }
     this.inScene.set(key, obj);
     this.scene.add(obj);
-    this.recomputeInteractiveList();
+    this.recomputeDragList();
+    this.recomputeTooltipList();
   };
 
   remove = (key: number) => {
@@ -137,14 +146,15 @@ class View {
     if (obj != null) {
       this.scene.remove(obj);
       this.inScene.delete(key);
-      this.recomputeInteractiveList();
+      this.recomputeDragList();
+      this.recomputeTooltipList();
     }
   };
 
   setTooltip = (key: number, tip: string) => {
     this.tooltips.set(key, tip);
     this.recomputeTooltipSet(tip);
-    this.recomputeInteractiveList();
+    this.recomputeTooltipList();
   };
 
   removeTooltip = (key: number) => {
@@ -153,7 +163,7 @@ class View {
     if (oldTip != null) {
       this.recomputeTooltipSet(oldTip);
     }
-    this.recomputeInteractiveList();
+    this.recomputeTooltipList();
   }
 
   recomputeTooltipSet = (tip: string) => {
@@ -166,39 +176,57 @@ class View {
     this.tooltipSets.set(tip, list);
   };
 
-  enableMouseInteraction = (key: number) => {
-    this.mouseInteractionEnabled.set(key, true);
-    this.recomputeInteractiveList();
+  enableDrag = (key: number) => {
+    this.dragEnabled.set(key, true);
+    this.recomputeDragList();
   };
 
-  disableMouseInteraction = (key: number) => {
-    this.mouseInteractionEnabled.delete(key);
-    this.recomputeInteractiveList();
+  disableDrag = (key: number) => {
+    this.dragEnabled.delete(key);
+    this.recomputeDragList();
   };
 
-  recomputeInteractiveList = () => {
-    let interactiveList: THREE.Object3D[] = [];
-    let keys: number[] = [];
-    this.mouseInteractionEnabled.forEach((v,k) => {
+  enableEditTooltip = (key: number) => {
+    this.editTooltipEnabled.set(key, true);
+    this.recomputeTooltipList();
+  };
+
+  disableEditTooltip = (key: number) => {
+    this.editTooltipEnabled.delete(key);
+    this.recomputeTooltipList();
+  };
+
+  recomputeDragList = () => {
+    let dragList: THREE.Object3D[] = [];
+    let dragKeys: number[] = [];
+    this.dragEnabled.forEach((v,k) => {
       if (v) {
         let obj = this.inScene.get(k);
         if (obj != null) {
-          keys.push(k);
-          interactiveList.push(obj);
-        }
-      }
-    })
-    this.tooltips.forEach((tip,k) => {
-      // Don't duplicate entries
-      if (!this.mouseInteractionEnabled.has(k)) {
-        let obj = this.inScene.get(k);
-        if (obj != null) {
-          keys.push(k);
-          interactiveList.push(obj);
+          dragKeys.push(k);
+          dragList.push(obj);
         }
       }
     });
-    this.dragControls.setInteractiveList(interactiveList, keys);
+    this.dragControls.setDragList(dragList, dragKeys);
+  };
+
+  recomputeTooltipList = () => {
+    let tooltipList: THREE.Object3D[] = [];
+    let tooltipEditable: boolean[] = [];
+    let tooltipKeys: number[] = [];
+    this.tooltips.forEach((tip,k) => {
+      let obj = this.inScene.get(k);
+      let editable = false;
+      if (this.editTooltipEnabled.has(k)) editable = this.editTooltipEnabled.get(k);
+
+      if (obj != null) {
+        tooltipKeys.push(k);
+        tooltipList.push(obj);
+        tooltipEditable.push(editable);
+      }
+    });
+    this.dragControls.setTooltipList(tooltipList, tooltipKeys, tooltipEditable);
   };
 
   refreshSize = () => {

@@ -4,6 +4,15 @@ import csv
 from typing import List
 
 
+joint_dict = {}
+joint_dict["knee_angle_r"] = "Right Knee Flexion"
+joint_dict["ankle_angle_r"] = "Right Ankle Flexion"
+joint_dict["knee_angle_l"] = "Left Knee Flexion"
+joint_dict["ankle_angle_l"] = "Left Ankle Flexion"
+joint_dict["pelvis_list"] = "Pelvis List"
+
+
+
 def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitTimesteps=-1):
     with open(file, newline='') as f:
         reader = csv.DictReader(f)
@@ -13,6 +22,13 @@ def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitT
             rows = rows[:limitTimesteps]
 
         time = np.asarray([float(row['time']) for row in rows])
+        time_end = time[-1]
+        time_start = time[0]
+        time_length = len(time)
+        time_dur = time_end - time_start
+        time_perc = time/time_end*100
+
+
 
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
                   'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
@@ -40,6 +56,9 @@ def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitT
 
         for i in range(len(joints)):
             joint: str = joints[i]
+            jointname = joint_dict[joint]
+
+
             gold = np.asarray([float(row[joint+'_gold'])
                               for row in rows]) * 180.0 / 3.14159
             rec = np.asarray([float(row[joint+'_rec'])
@@ -47,26 +66,25 @@ def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitT
             error = gold - rec
 
             if errorPlot:
-                errAx.plot(time, error, label='"'+joint +
-                           '" Error', color=colors[i])
+                errAx.plot(time_perc, error, label=''+jointname, color=colors[i])
 
             ax: plt.Axes = axs[i]
-            ax.plot(time, rec, label='Recovered "'+joint+'"',
+            ax.plot(time_perc, rec, label='Recovered '+jointname,
                     linewidth=2.0, color='black')  # 0D6EFD
-            ax.plot(time, gold, label='Original "'+joint+'"',
+            ax.plot(time_perc, gold, label='Original '+jointname,
                     linewidth=2.0, color=colors[i])  # '#FF8A00'
             ax.axhline(0, linestyle='--', color='black', linewidth=1.0,
                        alpha=0.5)
-            ax.fill_between(time, gold, rec, alpha=0.1,
+            ax.fill_between(time_perc, gold, rec, alpha=0.1,
                             facecolor='black')  # '#E12026'
-            ax.set_xlabel('Time (s)')
+            ax.set_xlabel('Percent Gait Cycle')
             ax.set_ylabel('Position (deg)')
-            ax.set_title('"'+joint +
-                         '" Joint (avg err = '+str(round(np.mean(np.abs(error)), 2))+' deg)')
+            ax.set_title(''+jointname +
+                         ' (avg err = '+str(round(np.mean(np.abs(error)), 2))+' deg)')
             ax.legend(loc=4, prop={'size': 6})
 
-            ax.set(xlim=(min(time), max(time)))
-            # ax.set(xlim=(0, max(time)),
+            ax.set(xlim=(min(time_perc), max(time_perc)))
+            # ax.set(xlim=(0, max(time_perc)),
             #        ylim=(min(gold + rec + [0]), max(gold + rec + [0])))
             # ylim=(globalMin, globalMax))
             # ylim=(min(gold + rec + [0]), max(gold + rec)))
@@ -75,8 +93,8 @@ def plot(file: str, joints: List[str], nrows=1, ncols=1, errorPlot=False, limitT
             errAx.axhline(0, linestyle='--', color='black', linewidth=1.0,
                           alpha=0.5)
             errAx.set(ylim=(-7, 7))
-            errAx.set(xlim=(min(time), max(time)))
-            errAx.set_xlabel('Time (s)')
+            errAx.set(xlim=(min(time_perc), max(time_perc)))
+            errAx.set_xlabel('Percent Gait Cycle')
             errAx.set_ylabel('Error (deg)')
             errAx.set_title('Joint Reconstruction Error')
             errAx.legend(prop={'size': 6})
