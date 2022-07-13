@@ -592,7 +592,10 @@ void OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     std::string bodyName = skel->getBodyNode(i)->getName();
-    if (bodyName.find("calcn") != std::string::npos)
+    if (bodyName.find("calcn") != std::string::npos
+        || bodyName.find("Foot") != std::string::npos
+        || bodyName.find("foot") != std::string::npos
+        || bodyName.find("talus") != std::string::npos)
     {
       footBodyNames.push_back(bodyName);
     }
