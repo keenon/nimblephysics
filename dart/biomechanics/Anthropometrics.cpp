@@ -363,20 +363,29 @@ std::map<std::string, s_t> Anthropometrics::measure(
   for (AnthroMetric& metric : mMetrics)
   {
     setSkelToMetricPose(skel, metric);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyA), metric.offsetA);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyB), metric.offsetB);
-    if (metric.axis == Eigen::Vector3s::Zero())
+    if (skel->getBodyNode(metric.bodyA) == nullptr
+        || skel->getBodyNode(metric.bodyB) == nullptr)
     {
-      result[metric.name] = skel->getDistanceInWorldSpace(markerA, markerB);
+      result[metric.name] = 0.0;
     }
     else
     {
-      result[metric.name]
-          = skel->getDistanceAlongAxis(markerA, markerB, metric.axis);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyA), metric.offsetA);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyB), metric.offsetB);
+
+      if (metric.axis == Eigen::Vector3s::Zero())
+      {
+        result[metric.name] = skel->getDistanceInWorldSpace(markerA, markerB);
+      }
+      else
+      {
+        result[metric.name]
+            = skel->getDistanceAlongAxis(markerA, markerB, metric.axis);
+      }
     }
   }
   skel->setPositions(originalPos);
@@ -415,23 +424,27 @@ Eigen::VectorXs Anthropometrics::getGradientOfLogPDFWrtBodyScales(
   for (AnthroMetric& metric : mMetrics)
   {
     setSkelToMetricPose(skel, metric);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyA), metric.offsetA);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyB), metric.offsetB);
 
-    if (metric.axis == Eigen::Vector3s::Zero())
+    if (skel->getBodyNode(metric.bodyA) != nullptr
+        && skel->getBodyNode(metric.bodyB) != nullptr)
     {
-      grad += gradMap[metric.name]
-              * skel->getGradientOfDistanceWrtBodyScales(markerA, markerB);
-    }
-    else
-    {
-      grad += gradMap[metric.name]
-              * skel->getGradientOfDistanceAlongAxisWrtBodyScales(
-                  markerA, markerB, metric.axis);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyA), metric.offsetA);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyB), metric.offsetB);
+      if (metric.axis == Eigen::Vector3s::Zero())
+      {
+        grad += gradMap[metric.name]
+                * skel->getGradientOfDistanceWrtBodyScales(markerA, markerB);
+      }
+      else
+      {
+        grad += gradMap[metric.name]
+                * skel->getGradientOfDistanceAlongAxisWrtBodyScales(
+                    markerA, markerB, metric.axis);
+      }
     }
   }
   skel->setPositions(originalPos);
@@ -483,23 +496,27 @@ Eigen::VectorXs Anthropometrics::getGradientOfLogPDFWrtGroupScales(
   for (AnthroMetric& metric : mMetrics)
   {
     setSkelToMetricPose(skel, metric);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyA), metric.offsetA);
-    std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-            skel->getBodyNode(metric.bodyB), metric.offsetB);
 
-    if (metric.axis == Eigen::Vector3s::Zero())
+    if (skel->getBodyNode(metric.bodyA) != nullptr
+        && skel->getBodyNode(metric.bodyB) != nullptr)
     {
-      grad += gradMap[metric.name]
-              * skel->getGradientOfDistanceWrtGroupScales(markerA, markerB);
-    }
-    else
-    {
-      grad += gradMap[metric.name]
-              * skel->getGradientOfDistanceAlongAxisWrtGroupScales(
-                  markerA, markerB, metric.axis);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyA), metric.offsetA);
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
+          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              skel->getBodyNode(metric.bodyB), metric.offsetB);
+      if (metric.axis == Eigen::Vector3s::Zero())
+      {
+        grad += gradMap[metric.name]
+                * skel->getGradientOfDistanceWrtGroupScales(markerA, markerB);
+      }
+      else
+      {
+        grad += gradMap[metric.name]
+                * skel->getGradientOfDistanceAlongAxisWrtGroupScales(
+                    markerA, markerB, metric.axis);
+      }
     }
   }
   skel->setPositions(originalPos);

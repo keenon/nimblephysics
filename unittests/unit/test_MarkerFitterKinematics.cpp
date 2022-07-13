@@ -5301,6 +5301,26 @@ for (int i = 0; i < 4; i++)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, SINGLE_TRIAL_HARVARD)
+{
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back("dart://sample/osim/Harvard1/markers.c3d");
+  // c3dFiles.push_back("dart://sample/osim/Harvard1/standing.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Harvard1/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      77,
+      1.829,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
 {
   std::vector<std::string> c3dFiles;

@@ -2706,6 +2706,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
     int numLinear = 0;
     int numConstant = 0;
+    int firstLinearIndex = 0;
     int lastLinearIndex = 0;
 
     int dofIndex = 0;
@@ -2801,6 +2802,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       else if (linearFunction != nullptr)
       {
         numLinear++;
+        if (firstLinearIndex == 0)
+        {
+          firstLinearIndex = dofIndex;
+        }
         lastLinearIndex = dofIndex;
         allLocked = false;
         Eigen::Vector2s coeffs
@@ -3045,6 +3050,33 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         prismaticJoint->setAxis(axis);
         joint = prismaticJoint;
       }
+    }
+    else if (numLinear == 2 && numConstant == 4 && lastLinearIndex < 3)
+    {
+      // Create a RevoluteJoint
+      dynamics::UniversalJoint* universalJoint = nullptr;
+      dynamics::UniversalJoint::Properties props;
+      props.mName = jointName;
+      if (parentBody == nullptr)
+      {
+        auto pair = skel->createJointAndBodyNodePair<dynamics::UniversalJoint>(
+            nullptr, props, bodyProps);
+        universalJoint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        auto pair
+            = parentBody
+                  ->createChildJointAndBodyNodePair<dynamics::UniversalJoint>(
+                      props, bodyProps);
+        universalJoint = pair.first;
+        childBody = pair.second;
+      }
+      universalJoint->setAxis1(eulerAxisOrder[firstLinearIndex]);
+      universalJoint->setAxis2(eulerAxisOrder[lastLinearIndex]);
+
+      joint = universalJoint;
     }
     else
     {

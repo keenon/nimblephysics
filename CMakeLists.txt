@@ -1,6 +1,6 @@
-#===============================================================================
+# ===============================================================================
 # CMake settings
-#===============================================================================
+# ===============================================================================
 if(MSVC)
   cmake_minimum_required(VERSION 3.8.0)
 else()
@@ -9,7 +9,6 @@ endif()
 
 # Build universal binaries on OSX - this needs to be set before the project() command
 # set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
-
 project(dart)
 
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
@@ -57,12 +56,11 @@ if(WIN32)
   set(CMAKE_INSTALL_PREFIX "C:/Golems" CACHE PATH "Install prefix" FORCE)
 endif()
 
-
 include_directories(SYSTEM "${CMAKE_SOURCE_DIR}/dart/server/external/")
 
-#===============================================================================
+# ===============================================================================
 # Project settings
-#===============================================================================
+# ===============================================================================
 
 # If you change the version, please update the <version> tag in package.xml.
 set(DART_MAJOR_VERSION "6")
@@ -72,13 +70,14 @@ set(DART_VERSION "${DART_MAJOR_VERSION}.${DART_MINOR_VERSION}.${DART_PATCH_VERSI
 set(DART_PKG_DESC "Dynamic Animation and Robotics Toolkit.")
 set(DART_PKG_EXTERNAL_DEPS "eigen, ccd, assimp, boost")
 
-#===============================================================================
+# ===============================================================================
 # Build options
-#===============================================================================
+# ===============================================================================
 # set(CMAKE_VERBOSE_MAKEFILE on)
 option(DART_VERBOSE "Whether print detailed information in CMake process" ON)
 message(STATUS "DART_VERBOSE = ${DART_VERBOSE}")
 option(ENABLE_OPENMP "Build with OpenMP parallaization enabled" ON)
+
 if(MSVC)
   set(DART_RUNTIME_LIBRARY "/MD" CACHE STRING "BaseName chosen by the user at CMake configure time")
   set_property(CACHE DART_RUNTIME_LIBRARY PROPERTY STRINGS /MD /MT)
@@ -86,6 +85,7 @@ if(MSVC)
 else()
   option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 endif()
+
 # Warning: DART_ENABLE_SIMD should be ON only when you build DART and the DART
 # dependent projects on the same machine. If this option is on, then compile
 # option `-march=native` is added to the target `dart` that enables all
@@ -105,6 +105,7 @@ option(DART_BUILD_BENCHMARKS "Build benchmarks" ON)
 
 set(DART_USE_ARBITRARY_PRECISION OFF)
 message(STATUS "DART_USE_ARBITRARY_PRECISION = ${DART_USE_ARBITRARY_PRECISION}")
+
 if(DART_USE_ARBITRARY_PRECISION)
   message(STATUS "Using arbitrary precision. WARNING: Do not use this for production builds, it's far too slow.")
   add_compile_definitions(DART_USE_ARBITRARY_PRECISION)
@@ -116,17 +117,17 @@ if(DART_BUILD_DARTPY)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Print intro
-#===============================================================================
+# ===============================================================================
 message(STATUS "")
 message(STATUS "============================================")
 message(STATUS "                DART ${DART_VERSION}")
 message(STATUS "============================================")
 
-#===============================================================================
+# ===============================================================================
 # CodeCov settings
-#===============================================================================
+# ===============================================================================
 if(DART_CODECOV)
   include(CodeCoverage)
   setup_target_for_coverage(codecov ctest coverage)
@@ -135,12 +136,13 @@ if(DART_CODECOV)
   )
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Build type settings
-#===============================================================================
+# ===============================================================================
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: Debug | Release | RelWithDebInfo | MinSizeRel" FORCE)
 endif()
+
 string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPERCASE)
 
 set(BUILD_TYPE_DEBUG FALSE)
@@ -160,40 +162,44 @@ else()
   message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} unknown. Valid options are: Debug | Release | RelWithDebInfo | MinSizeRel")
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Find dependencies
-#===============================================================================
+# ===============================================================================
 include(DARTFindDependencies)
 
-#===============================================================================
+# ===============================================================================
 # Check for non-case-sensitive filesystems
-#===============================================================================
+# ===============================================================================
 execute_process(COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/case_sensitive_filesystem
-                RESULT_VARIABLE FILESYSTEM_CASE_SENSITIVE_RETURN)
+  RESULT_VARIABLE FILESYSTEM_CASE_SENSITIVE_RETURN)
+
 if(${FILESYSTEM_CASE_SENSITIVE_RETURN} EQUAL 0)
   set(FILESYSTEM_CASE_SENSITIVE TRUE)
 else()
   set(FILESYSTEM_CASE_SENSITIVE FALSE)
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Compiler flags
-#===============================================================================
+# ===============================================================================
 if(MSVC)
-
   # Visual Studio enables C++14 support by default
   if(MSVC_VERSION VERSION_LESS 1900)
     message(FATAL_ERROR "${PROJECT_NAME} requires VS2017 or greater.")
   endif()
+
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
   endif()
+
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /permissive- /Zc:twoPhase-")
-  #set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO")
+
+  # set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO")
   if(NOT DART_MSVC_DEFAULT_OPTIONS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DART_RUNTIME_LIBRARY}d /Zi /Gy /W1 /EHsc")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${DART_RUNTIME_LIBRARY} /Zi /GL /Gy /W1 /EHsc")
   endif(NOT DART_MSVC_DEFAULT_OPTIONS)
+
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_compile_options(/wd4334)
   add_compile_options(/wd4267)
@@ -204,75 +210,83 @@ if(MSVC)
   add_compile_options(/wd4305)
   add_compile_options(/wd4838)
   add_compile_options(/bigobj)
+
   if(MSVC_VERSION GREATER_EQUAL 1915)
     add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
   endif()
 
 elseif(CMAKE_COMPILER_IS_GNUCXX)
-
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     # Even if we're treating all warnings as errors, still ignore sign comparison, cause that shows up in every for loop
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-sign-compare -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-reorder")
   endif()
+
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC -Werror=return-type")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion -dumpversion OUTPUT_VARIABLE GCC_VERSION)
   set(CXX_COMPILER_VERSION ${GCC_VERSION})
+
   if(GCC_VERSION VERSION_LESS 5.3.1)
     message(FATAL_ERROR "The installed g++ version is ${GCC_VERSION}. ${PROJECT_NAME} requires g++ 5.3.1 or greater.")
   endif()
+
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-omit-frame-pointer -fno-inline-functions -fno-inline-functions-called-once -fno-optimize-sibling-calls")
+
   if(DART_FAST_DEBUG)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1")
   endif()
+
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_DEBUG} -pg")
   set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-
   # if(DART_TREAT_WARNINGS_AS_ERRORS)
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
-    # Turn warning "deprecated-declarations" into an warning even if -Werror is
-    # specified until we abandon glut.
+  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-error=deprecated-declarations")
+  # Turn warning "deprecated-declarations" into an warning even if -Werror is
+  # specified until we abandon glut.
   # endif()
   if(DART_TREAT_WARNINGS_AS_ERRORS)
     # Even if we're treating all warnings as errors, still ignore sign comparison, cause that shows up in every for loop
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra -Werror=return-type -Wno-sign-compare -Wno-deprecated -Wno-deprecated-declarations -Wno-reorder")
   endif()
+
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CLANG_VERSION)
   set(CXX_COMPILER_VERSION ${CLANG_VERSION})
+
   if(CLANG_VERSION VERSION_LESS 3.8)
     message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.8 or greater.")
   endif()
+
   if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   endif()
+
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-omit-frame-pointer -fno-inline-functions -fno-optimize-sibling-calls")
+
   if(DART_FAST_DEBUG)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1")
   endif()
+
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_DEBUG} -pg")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 else()
-
   message(SEND_ERROR "Compiler[${CMAKE_CXX_COMPILER_ID}] not supported.")
-
 endif()
 
-if (APPLE)
+if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Print build summary
-#===============================================================================
+# ===============================================================================
 if(DART_VERBOSE)
   message(STATUS "")
   message(STATUS "[ Build summary ]")
@@ -285,6 +299,7 @@ if(DART_VERBOSE)
   message(STATUS "Build gui::osg   : ${DART_BUILD_GUI_OSG}")
   message(STATUS "Install path     : ${CMAKE_INSTALL_PREFIX}")
   message(STATUS "CXX_FLAGS        : ${CMAKE_CXX_FLAGS}")
+
   if(${CMAKE_BUILD_TYPE_UPPERCASE} STREQUAL "RELEASE")
     message(STATUS "CXX_FLAGS_RELEASE: ${CMAKE_CXX_FLAGS_RELEASE}")
   elseif(${CMAKE_BUILD_TYPE_UPPERCASE} STREQUAL "DEBUG")
@@ -294,24 +309,24 @@ if(DART_VERBOSE)
   elseif(${CMAKE_BUILD_TYPE_UPPERCASE} STREQUAL "PROFILE")
     message(STATUS "CXX_FLAGS_PROFILE: ${CMAKE_CXX_FLAGS_PROFILE}")
   endif()
+
   message(STATUS "CMAKE_SOURCE_DIR : ${CMAKE_SOURCE_DIR}")
   message(STATUS "CMAKE_BINARY_DIR : ${CMAKE_BINARY_DIR}")
 endif(DART_VERBOSE)
 
-#===============================================================================
+# ===============================================================================
 # Add sub-directories
-#===============================================================================
-
+# ===============================================================================
 add_subdirectory(dart)
 
 set(DART_IN_SOURCE_BUILD TRUE)
 
 if(TARGET dart)
-
   # Add a "tests" target to build unit tests.
   enable_testing()
+
   if(MSVC)
-    # add_subdirectory(unittests)
+  # add_subdirectory(unittests)
   else()
     add_subdirectory(unittests EXCLUDE_FROM_ALL)
   endif()
@@ -321,19 +336,19 @@ if(DART_BUILD_EXTRAS)
   add_subdirectory(extras)
 endif()
 
-#===============================================================================
+# ===============================================================================
 # CMake configuration files for components and targets
-#===============================================================================
+# ===============================================================================
 # Generate and install CMake configuration files for each component <C>:
 # - <C>Component.cmake, which defines:
-#   - dart_<C>_DEPENDENCIES: list of component dependencies
-#   - dart_<C>_LIBRARIES: list of library targets in this component
+# - dart_<C>_DEPENDENCIES: list of component dependencies
+# - dart_<C>_LIBRARIES: list of library targets in this component
 # - <C>Targets.cmake, which creates IMPORTED targets
 install_component_exports(${PROJECT_NAME})
 
-#===============================================================================
+# ===============================================================================
 # Configure files
-#===============================================================================
+# ===============================================================================
 if(DART_VERBOSE)
   message(STATUS "")
   message(STATUS "[ Configured files ]")
@@ -353,10 +368,12 @@ include(CMakePackageConfigHelpers)
 set(DART_CONFIG_IN ${CMAKE_SOURCE_DIR}/cmake/${PROJECT_NAME_UPPERCASE}Config.cmake.in)
 set(DART_CONFIG_OUT ${CMAKE_BINARY_DIR}/${PROJECT_NAME_UPPERCASE}Config.cmake)
 set(DART_VERSION_OUT ${CMAKE_BINARY_DIR}/cmake/${PROJECT_NAME_UPPERCASE}ConfigVersion.cmake)
+
 if(DART_VERBOSE)
   message(STATUS ${DART_CONFIG_OUT})
   message(STATUS ${DART_VERSION_OUT})
 endif()
+
 configure_package_config_file(
   ${DART_CONFIG_IN}
   ${DART_CONFIG_OUT}
@@ -375,9 +392,11 @@ install(
 # Generate the DART pkg-config
 set(PC_CONFIG_IN ${CMAKE_SOURCE_DIR}/cmake/dart.pc.in)
 set(PC_CONFIG_OUT ${CMAKE_BINARY_DIR}/cmake/dart.pc)
+
 if(DART_VERBOSE)
   message(STATUS ${PC_CONFIG_OUT})
 endif()
+
 configure_file(${PC_CONFIG_IN} ${PC_CONFIG_OUT} @ONLY)
 install(FILES ${PC_CONFIG_OUT} DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
@@ -386,9 +405,9 @@ install(FILES package.xml DESTINATION
   ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}
 )
 
-#===============================================================================
+# ===============================================================================
 # Install sample data, examples, and tutorials
-#===============================================================================
+# ===============================================================================
 
 # Sample data
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/data"
@@ -402,26 +421,25 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/examples"
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tutorials"
   DESTINATION ${DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH})
 
-#===============================================================================
+# ===============================================================================
 # Python bindings
-#===============================================================================
-
-if (DART_BUILD_DARTPY)
+# ===============================================================================
+if(DART_BUILD_DARTPY)
   add_subdirectory(python)
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Uninstall
-#===============================================================================
+# ===============================================================================
 
 # Add an "uninstall" target
 # Ref: http://www.cmake.org/Wiki/CMake_FAQ#Can_I_do_.22make_uninstall.22_with_CMake.3F
 configure_file("${PROJECT_SOURCE_DIR}/cmake/uninstall_target.cmake.in" "${PROJECT_BINARY_DIR}/uninstall_target.cmake" IMMEDIATE @ONLY)
 add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${PROJECT_BINARY_DIR}/uninstall_target.cmake")
 
-#===============================================================================
+# ===============================================================================
 # Code Formatting
-#===============================================================================
+# ===============================================================================
 if(DART_VERBOSE)
   message(STATUS "")
   message(STATUS "[ Code Formatting ]")
@@ -436,7 +454,6 @@ get_property(formatting_files GLOBAL PROPERTY DART_FORMAT_FILES)
 list(LENGTH formatting_files formatting_files_length)
 
 if(CLANG_FORMAT_EXECUTABLE)
-
   if(DART_VERBOSE)
     message(STATUS "Looking for clang-format - found")
   endif()
@@ -445,53 +462,51 @@ if(CLANG_FORMAT_EXECUTABLE)
 
   if(formatting_files)
     add_custom_target(format
-                      COMMAND ${CMAKE_COMMAND} -E echo "Formatting ${formatting_files_length} files... "
-                      COMMAND ${CLANG_FORMAT_EXECUTABLE} -style=file -i ${formatting_files}
-                      COMMAND ${CMAKE_COMMAND} -E echo "Done."
-                      DEPENDS ${CLANG_FORMAT_EXECUTABLE}
-                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dart)
+      COMMAND ${CMAKE_COMMAND} -E echo "Formatting ${formatting_files_length} files... "
+      COMMAND ${CLANG_FORMAT_EXECUTABLE} -style=file -i ${formatting_files}
+      COMMAND ${CMAKE_COMMAND} -E echo "Done."
+      DEPENDS ${CLANG_FORMAT_EXECUTABLE}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dart)
 
     add_custom_target(check-format
-                      COMMAND ${CMAKE_COMMAND} -E echo "Checking ${formatting_files_length} files... "
-                      COMMAND ${CMAKE_SOURCE_DIR}/tools/check_format.sh ${CLANG_FORMAT_EXECUTABLE} ${formatting_files}
-                      COMMAND ${CMAKE_COMMAND} -E echo "Done."
-                      DEPENDS ${CLANG_FORMAT_EXECUTABLE}
-                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dart)
+      COMMAND ${CMAKE_COMMAND} -E echo "Checking ${formatting_files_length} files... "
+      COMMAND ${CMAKE_SOURCE_DIR}/tools/check_format.sh ${CLANG_FORMAT_EXECUTABLE} ${formatting_files}
+      COMMAND ${CMAKE_COMMAND} -E echo "Done."
+      DEPENDS ${CLANG_FORMAT_EXECUTABLE}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dart)
   else()
     add_custom_target(format
-                      COMMAND ${CMAKE_COMMAND} -E echo "Warning: Not found any source files to format.")
+      COMMAND ${CMAKE_COMMAND} -E echo "Warning: Not found any source files to format.")
 
     add_custom_target(check-format
-                      COMMAND ${CMAKE_COMMAND} -E echo "Warning: Not found any source files to check.")
+      COMMAND ${CMAKE_COMMAND} -E echo "Warning: Not found any source files to check.")
   endif()
 
 else()
-
   if(DART_VERBOSE)
     message(STATUS "Looking for clang-format - NOT found, please install clang-format to enable automatic code formatting")
   endif()
-
 endif()
 
-#===============================================================================
+# ===============================================================================
 # API Document using Doxygen
 # References:
-#   http://mementocodex.wordpress.com/2013/01/19/how-to-generate-code-documentation-with-doxygen-and-cmake-a-slightly-improved-approach/
-#   http://www.cmake.org/pipermail/cmake/2007-February/012796.html
-#===============================================================================
+# http://mementocodex.wordpress.com/2013/01/19/how-to-generate-code-documentation-with-doxygen-and-cmake-a-slightly-improved-approach/
+# http://www.cmake.org/pipermail/cmake/2007-February/012796.html
+# ===============================================================================
 set(DOXYGEN_FOUND OFF) # Temporarily disable Doxygen
-if(DOXYGEN_FOUND)
 
-  set(DOXYGEN_DOXYFILE_IN      "${PROJECT_SOURCE_DIR}/doxygen/Doxyfile.in"    )
-  set(DOXYGEN_DOXYFILE         "${PROJECT_BINARY_DIR}/doxygen/Doxyfile"       )
-  set(DOXYGEN_HTML_INDEX       "${PROJECT_BINARY_DIR}/doxygen/html/index.html")
-  set(DOXYGEN_OUTPUT_ROOT      "${PROJECT_BINARY_DIR}/doxygen/html"           )
-  set(DOXYGEN_GENERATE_TAGFILE "${DOXYGEN_OUTPUT_ROOT}/${PROJECT_NAME}.tag"   )
-  set(DOXYGEN_INCLUDE_PATH     "${PROJECT_SOURCE_DIR}"                        )
-  set(DOXYGEN_INPUT_ROOT       "${PROJECT_SOURCE_DIR}/dart"                   )
-  set(DOXYGEN_EXTRA_INPUTS     "${PROJECT_SOURCE_DIR}/doxygen/mainpage.dox"   )
-  set(DOXYGEN_EXCLUDE          "${PROJECT_SOURCE_DIR}/dart/external"          )
-  set(DOXYGEN_STRIP_FROM_PATH  "${CMAKE_CURRENT_SOURCE_DIR}"                  )
+if(DOXYGEN_FOUND)
+  set(DOXYGEN_DOXYFILE_IN "${PROJECT_SOURCE_DIR}/doxygen/Doxyfile.in")
+  set(DOXYGEN_DOXYFILE "${PROJECT_BINARY_DIR}/doxygen/Doxyfile")
+  set(DOXYGEN_HTML_INDEX "${PROJECT_BINARY_DIR}/doxygen/html/index.html")
+  set(DOXYGEN_OUTPUT_ROOT "${PROJECT_BINARY_DIR}/doxygen/html")
+  set(DOXYGEN_GENERATE_TAGFILE "${DOXYGEN_OUTPUT_ROOT}/${PROJECT_NAME}.tag")
+  set(DOXYGEN_INCLUDE_PATH "${PROJECT_SOURCE_DIR}")
+  set(DOXYGEN_INPUT_ROOT "${PROJECT_SOURCE_DIR}/dart")
+  set(DOXYGEN_EXTRA_INPUTS "${PROJECT_SOURCE_DIR}/doxygen/mainpage.dox")
+  set(DOXYGEN_EXCLUDE "${PROJECT_SOURCE_DIR}/dart/external")
+  set(DOXYGEN_STRIP_FROM_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 
   # Generate a Doxyfile. This uses the variables:
   #
@@ -511,18 +526,21 @@ if(DOXYGEN_FOUND)
     COMMAND ${CMAKE_COMMAND} -E echo_append "Building API Documentation..."
     COMMAND ${DOXYGEN_EXECUTABLE} -u ${DOXYGEN_DOXYFILE}
     COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_DOXYFILE}
+
     # Strip path prefix from all paths in dart.tag
     COMMAND ${CMAKE_COMMAND} -E echo "Stripping paths from"
-        "${DOXYGEN_GENERATE_TAGFILE}"
+    "${DOXYGEN_GENERATE_TAGFILE}"
     COMMAND sed -i s:${DOXYGEN_STRIP_FROM_PATH}::g ${DOXYGEN_GENERATE_TAGFILE}
+
     # Strip all doxygen="path" HTML tags
     COMMAND ${CMAKE_COMMAND} -E echo "Stripping Doxygen HTML tags"
     COMMAND find "${DOXYGEN_OUTPUT_ROOT}" -type f -name "*.html"
-        -exec sed -i 's: doxygen=\"[^\"]*\"::g' {} \\$<SEMICOLON>
+    -exec sed -i 's: doxygen=\"[^\"]*\"::g' {} \\$<SEMICOLON>
     COMMAND ${CMAKE_COMMAND} -E echo "Done."
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doxygen
     DEPENDS ${DOXYGEN_DOXYFILE}
   )
+
   # add_custom_target(docs ALL DEPENDS ${DOXYGEN_HTML_INDEX})
   add_custom_target(docs DEPENDS ${DOXYGEN_HTML_INDEX})
   add_custom_target(
@@ -544,26 +562,26 @@ if(DOXYGEN_FOUND)
   add_custom_target(view_docs "${OPEN_COMMAND}" "${DOXYGEN_HTML_INDEX}"
     DEPENDS "${DOXYGEN_HTML_INDEX}"
     COMMENT "Opening documentation in a web browser.")
-
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Coloring build outputs using gccfilter if appliciable
 # Ref: http://stackoverflow.com/questions/14399984/make-cmake-use-gccfilter
-#===============================================================================
+# ===============================================================================
 if("${PERLMODULES_FOUND}" STREQUAL "TRUE")
   if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_GNUCPP)
     option(COLOR_GCC "Use GCCFilter to color compiler output messages" ON)
     set(COLOR_GCC_OPTIONS "-c -r -w" CACHE STRING "Arguments that are passed to gccfilter when output coloring is switchend on. Defaults to -c -r -w.")
+
     if(COLOR_GCC)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${PROJECT_SOURCE_DIR}/tools/gccfilter ${COLOR_GCC_OPTIONS}")
     endif()
   endif()
 endif()
 
-#===============================================================================
+# ===============================================================================
 # Build Instructions
-#===============================================================================
+# ===============================================================================
 message(STATUS "")
 message(STATUS "Run 'make' to build all the components")
 message(STATUS "Run 'make tests' to build all the unittests")
@@ -571,7 +589,7 @@ message(STATUS "Run 'make examples' to build all the examples")
 message(STATUS "Run 'make tutorials' to build all the tutorials")
 message(STATUS "Run 'make view_docs' to see the API documentation")
 
-#===============================================================================
+# ===============================================================================
 # END
-#===============================================================================
+# ===============================================================================
 message(STATUS "")

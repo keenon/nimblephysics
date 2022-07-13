@@ -4324,7 +4324,11 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
           = static_cast<dynamics::RevoluteJoint*>(getJoint(i));
       dynamics::RevoluteJoint* copyJoint
           = static_cast<dynamics::RevoluteJoint*>(joint);
-      assert(ourJoint->getAxis() == copyJoint->getAxis());
+#ifndef NDEBUG
+      Eigen::Vector3s ourAxis = ourJoint->getAxis();
+      Eigen::Vector3s copyAxis = copyJoint->getAxis();
+      assert((ourAxis - copyAxis).norm() < 1e-15);
+#endif
     }
     if (getJoint(i)->getType() == CustomJoint<2>::getStaticType())
     {
