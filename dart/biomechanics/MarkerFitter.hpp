@@ -339,6 +339,13 @@ public:
       dynamics::MarkerMap markers,
       bool ignoreVirtualJointCenterMarkers = false);
 
+  /// This just checks if there are enough markers in the data with the names
+  /// expected by the model. Returns true if there are enough, and false
+  /// otherwise.
+  bool checkForEnoughMarkers(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
   /// This will go through original marker data and attempt to detect common
   /// anomalies, generate warnings to help the user fix their own issues, and
   /// produce fixes where possible.

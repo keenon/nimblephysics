@@ -281,6 +281,10 @@ void MarkerFitter(py::module& m)
           ::py::arg("numSamples"),
           ::py::arg("applyInnerProblemGradientConstraints") = true)
       .def(
+          "checkForEnoughMarkers",
+          &dart::biomechanics::MarkerFitter::checkForEnoughMarkers,
+          ::py::arg("markerObservations"))
+      .def(
           "generateDataErrorsReport",
           &dart::biomechanics::MarkerFitter::generateDataErrorsReport,
           ::py::arg("markerObservations"))

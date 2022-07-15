@@ -737,6 +737,40 @@ MarkerFitter::MarkerFitter(
 }
 
 //==============================================================================
+/// This just checks if there are enough markers in the data with the names
+/// expected by the model. Returns true if there are enough, and false
+/// otherwise.
+bool MarkerFitter::checkForEnoughMarkers(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  // Generate a list of the markers we observe in this clip
+
+  std::map<std::string, int> observedMarkersMap;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    for (auto& pair : markerObservations[i])
+    {
+      observedMarkersMap[pair.first] = 1;
+    }
+  }
+  std::vector<std::string> intersectionMarkers;
+  for (auto& pair : observedMarkersMap)
+  {
+    if (mMarkerMap.count(pair.first))
+    {
+      intersectionMarkers.push_back(pair.first);
+    }
+  }
+
+  if (intersectionMarkers.size() < 8)
+  {
+    return false;
+  }
+  return true;
+}
+
+//==============================================================================
 /// This will go through original marker data and attempt to detect common
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.

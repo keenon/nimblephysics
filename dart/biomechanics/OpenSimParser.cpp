@@ -3731,44 +3731,120 @@ OpenSimFile OpenSimParser::readOsim30(
     std::string type(jointCursor->Name());
     std::string name(jointCursor->Attribute("name"));
 
-    string parent_offset_frame = string(
-        jointCursor->FirstChildElement("socket_parent_frame")->GetText());
-    string child_offset_frame = string(
-        jointCursor->FirstChildElement("socket_child_frame")->GetText());
-
-    tinyxml2::XMLElement* frames = jointCursor->FirstChildElement("frames");
-    tinyxml2::XMLElement* framesCursor = frames->FirstChildElement();
+    string parent_offset_frame;
+    if (jointCursor->FirstChildElement("socket_parent_frame"))
+    {
+      parent_offset_frame = string(
+          jointCursor->FirstChildElement("socket_parent_frame")->GetText());
+    }
+    else if (jointCursor->FirstChildElement(
+                 "socket_parent_frame_connectee_name"))
+    {
+      parent_offset_frame = string(
+          jointCursor->FirstChildElement("socket_parent_frame_connectee_name")
+              ->GetText());
+    }
+    else
+    {
+      std::cout << "OpenSimParser encountered an error! Joint \"" << name
+                << "\" does not specify either a <socket_parent_frame> or a "
+                   "<socket_parent_frame_connectee_name>! This may be because "
+                   "the OpenSim file is in an older and unsupported version. "
+                   "Try a newer format."
+                << std::endl;
+      return null_file;
+    }
+    string child_offset_frame;
+    if (jointCursor->FirstChildElement("socket_child_frame"))
+    {
+      child_offset_frame = string(
+          jointCursor->FirstChildElement("socket_child_frame")->GetText());
+    }
+    else if (jointCursor->FirstChildElement(
+                 "socket_child_frame_connectee_name"))
+    {
+      child_offset_frame = string(
+          jointCursor->FirstChildElement("socket_child_frame_connectee_name")
+              ->GetText());
+    }
+    else
+    {
+      std::cout << "OpenSimParser encountered an error! Joint \"" << name
+                << "\" does not specify either a <socket_child_frame> or a "
+                   "<socket_child_frame_connectee_name>! This may be because "
+                   "the OpenSim file is particularly old. Try a newer format."
+                << std::endl;
+      return null_file;
+    }
 
     string parentName = "";
     Eigen::Isometry3s fromParent = Eigen::Isometry3s::Identity();
     string childName = "";
     Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
 
-    while (framesCursor)
+    /// Check if the parent and child linkages are defined in frames
+    tinyxml2::XMLElement* frames = jointCursor->FirstChildElement("frames");
+    if (frames)
     {
-      string parent_body
-          = string(framesCursor->FirstChildElement("socket_parent")->GetText());
-      Eigen::Vector3s translation
-          = readVec3(framesCursor->FirstChildElement("translation"));
-      Eigen::Vector3s rotationXYZ
-          = readVec3(framesCursor->FirstChildElement("orientation"));
-      Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
-      T.linear() = math::eulerXYZToMatrix(rotationXYZ);
-      T.translation() = translation;
+      tinyxml2::XMLElement* framesCursor = frames->FirstChildElement();
 
-      string name(framesCursor->Attribute("name"));
-      if (name == parent_offset_frame)
+      while (framesCursor)
       {
-        parentName = parent_body;
-        fromParent = T;
-      }
-      else if (name == child_offset_frame)
-      {
-        childName = parent_body;
-        fromChild = T;
-      }
+        string parent_body;
+        if (framesCursor->FirstChildElement("socket_parent"))
+        {
+          parent_body = string(
+              framesCursor->FirstChildElement("socket_parent")->GetText());
+        }
+        else if (framesCursor->FirstChildElement(
+                     "socket_parent_connectee_name"))
+        {
+          parent_body = string(
+              framesCursor->FirstChildElement("socket_parent_connectee_name")
+                  ->GetText());
+        }
+        Eigen::Vector3s translation
+            = readVec3(framesCursor->FirstChildElement("translation"));
+        Eigen::Vector3s rotationXYZ
+            = readVec3(framesCursor->FirstChildElement("orientation"));
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = math::eulerXYZToMatrix(rotationXYZ);
+        T.translation() = translation;
 
-      framesCursor = framesCursor->NextSiblingElement();
+        string name(framesCursor->Attribute("name"));
+        if (name == parent_offset_frame)
+        {
+          parentName = parent_body;
+          fromParent = T;
+        }
+        else if (name == child_offset_frame)
+        {
+          childName = parent_body;
+          fromChild = T;
+        }
+
+        framesCursor = framesCursor->NextSiblingElement();
+      }
+    }
+    // If the linkages to children and parents weren't defined in the Frames
+    // list, then the linkages are just the raw names
+    if (childName == "")
+    {
+      childName = child_offset_frame;
+    }
+    if (parentName == "")
+    {
+      parentName = parent_offset_frame;
+    }
+
+    // Trim leading "../" because we don't care about relative paths
+    while (childName.rfind("../", 0) == 0)
+    {
+      childName = childName.substr(3);
+    }
+    while (parentName.rfind("../", 0) == 0)
+    {
+      parentName = parentName.substr(3);
     }
 
     if (name == "patellofemoral_r" || name == "patellofemoral_l"
@@ -3792,12 +3868,28 @@ OpenSimFile OpenSimParser::readOsim30(
       bodyLookupMap[parentName].children.push_back(&joint);
       joint.parent = &bodyLookupMap[parentName];
     }
+    else if (
+        bodyLookupMap.find("/bodyset/" + parentName) != bodyLookupMap.end())
+    {
+      bodyLookupMap["/bodyset/" + parentName].children.push_back(&joint);
+      joint.parent = &bodyLookupMap["/bodyset/" + parentName];
+    }
     else
     {
       joint.parent = nullptr;
     }
 
-    if (bodyLookupMap.find(childName) == bodyLookupMap.end())
+    if (bodyLookupMap.find(childName) != bodyLookupMap.end())
+    {
+      joint.child = &bodyLookupMap[childName];
+      bodyLookupMap[childName].parent = &joint;
+    }
+    else if (bodyLookupMap.find("/bodyset/" + childName) != bodyLookupMap.end())
+    {
+      joint.child = &bodyLookupMap["/bodyset/" + childName];
+      bodyLookupMap["/bodyset/" + childName].parent = &joint;
+    }
+    else
     {
       std::cout << "ERROR loading *.osim file: Joint " << name
                 << " has child body \"" << childName
@@ -3805,10 +3897,6 @@ OpenSimFile OpenSimParser::readOsim30(
                 << std::endl;
       exit(1);
     }
-    assert(bodyLookupMap.find(childName) != bodyLookupMap.end());
-    assert(bodyLookupMap[childName].parent == nullptr);
-    joint.child = &bodyLookupMap[childName];
-    bodyLookupMap[childName].parent = &joint;
 
     jointCursor = jointCursor->NextSiblingElement();
   }
@@ -3857,9 +3945,58 @@ OpenSimFile OpenSimParser::readOsim30(
         std::string name(markerCursor->Attribute("name"));
         Eigen::Vector3s offset
             = readVec3(markerCursor->FirstChildElement("location"));
-        std::string socketName
-            = markerCursor->FirstChildElement("socket_parent_frame")->GetText();
-        std::string bodyName = bodyLookupMap[socketName].name;
+        std::string socketName;
+
+        if (markerCursor->FirstChildElement("socket_parent_frame"))
+        {
+          socketName = markerCursor->FirstChildElement("socket_parent_frame")
+                           ->GetText();
+        }
+        else if (markerCursor->FirstChildElement(
+                     "socket_parent_frame_connectee_name"))
+        {
+          socketName
+              = markerCursor
+                    ->FirstChildElement("socket_parent_frame_connectee_name")
+                    ->GetText();
+        }
+        else
+        {
+          std::cout
+              << "OpenSimParser encountered an error! Marker \"" << name
+              << "\" does not specify either a <socket_parent_frame> or a "
+                 "<socket_parent_frame_connectee_name>! This may be because "
+                 "the OpenSim file is in an older and unsupported version. "
+                 "Try a newer format."
+              << std::endl;
+          return null_file;
+        }
+
+        while (socketName.rfind("../", 0) == 0)
+        {
+          socketName = socketName.substr(strlen("../"));
+        }
+
+        std::string bodyName;
+        if (bodyLookupMap.find(socketName) != bodyLookupMap.end())
+        {
+          bodyName = bodyLookupMap[socketName].name;
+        }
+        else if (
+            bodyLookupMap.find("/bodyset/" + socketName) != bodyLookupMap.end())
+        {
+          bodyName = bodyLookupMap["/bodyset/" + socketName].name;
+        }
+        else
+        {
+          std::cout << "Warning: OpenSimParser attempting to read marker \""
+                    << name << "\" attached to socket \"" << socketName
+                    << "\" which does not exist! As a last ditch effort to "
+                       "recover, we'll "
+                       "assume the socket name is the body name."
+                    << std::endl;
+          bodyName = socketName;
+        }
 
         tinyxml2::XMLElement* fixedElem
             = markerCursor->FirstChildElement("fixed");

@@ -367,6 +367,23 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       }
     }
 
+    // Try to get "up" to point exactly along a unit axis, to make subsequent
+    // math more accurate
+    up = up.normalized();
+    if (std::abs(up(0)) < 0.01)
+    {
+      up(0) = 0;
+    }
+    if (std::abs(up(1)) < 0.01)
+    {
+      up(1) = 0;
+    }
+    if (std::abs(up(2)) < 0.01)
+    {
+      up(2) = 0;
+    }
+    up = up.normalized();
+
     // Complete the "up" vector into a full basis
     Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
     if (up == Eigen::Vector3s::UnitY())
@@ -388,11 +405,11 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
 #ifndef NDEBUG
       Eigen::Vector3s recovered = R * up;
       s_t diff = (recovered - Eigen::Vector3s::UnitY()).squaredNorm();
-      assert(diff < 1e-16);
       if (diff > 1e-16)
       {
         std::cout << "Bad R!" << std::endl;
       }
+      // assert(diff < 1e-16);
 #endif
 
       /*

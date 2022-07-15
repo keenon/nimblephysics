@@ -17,7 +17,17 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-// #define ALL_TESTS
+#define ALL_TESTS
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, OLDER_FORMAT)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Bugs/tmpc9bpl7gs/unscaled_generic_raw.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_v3)
@@ -119,31 +129,10 @@ TEST(OpenSimParser, LOAD_TRC)
 #ifdef ALL_TESTS
 TEST(OpenSimParser, LOAD_GRF)
 {
-  OpenSimGRF grf = OpenSimParser::loadGRF(
+  std::vector<ForcePlate> grf = OpenSimParser::loadGRF(
       "dart://sample/osim/Rajagopal2015_v3_scaled/"
       "S01DN603_grf.mot",
       10);
-  EXPECT_TRUE(grf.timestamps.size() > 0);
-  EXPECT_EQ(grf.plateCOPs.size(), 2);
-  EXPECT_EQ(grf.plateGRFs.size(), 2);
-  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.plateCOPs[1].cols());
-  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.plateGRFs[0].cols());
-  EXPECT_EQ(grf.plateGRFs[0].cols(), grf.plateGRFs[1].cols());
-  EXPECT_EQ(grf.plateCOPs[0].cols(), grf.timestamps.size());
-
-  // Print out to check that things look reasonable
-  for (int i = 0; i < 3; i++)
-  {
-    std::cout << "Timestep " << i << " [" << grf.timestamps[i]
-              << "s]:" << std::endl;
-    for (int p = 0; p < grf.plateCOPs.size(); p++)
-    {
-      std::cout << "Plate " << p << std::endl;
-      std::cout << "COP: " << std::endl << grf.plateCOPs[p].col(i) << std::endl;
-      std::cout << "Wrench: " << std::endl
-                << grf.plateGRFs[p].col(i) << std::endl;
-    }
-  }
 }
 #endif
 
@@ -376,7 +365,7 @@ TEST(OpenSimParser, OVERWRITE_OUTPUT_MARKERS)
   anatomical["TEST2"] = false;
   // anatomical["TEST3"] = false;
 
-  OpenSimParser::overwriteOsimMarkers(
+  OpenSimParser::replaceOsimMarkers(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
       markerOffsets,
       anatomical,
@@ -398,7 +387,7 @@ TEST(OpenSimParser, OVERWRITE_OUTPUT_MARKERS)
 #ifdef ALL_TESTS
 TEST(OpenSimParser, RATIONALIZE_CUSTOM_JOINTS)
 {
-  OpenSimParser::rationalizeCustomJoints(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/ComplexKnee/gait2392_frontHingeKnee_dem.osim",
       "../../../data/osim/ComplexKnee/"
       "gait2392_frontHingeKnee_dem_rational.osim");

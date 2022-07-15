@@ -1320,7 +1320,8 @@ std::vector<MarkerInitialization> runEngine(
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
-  fitter.setIterationLimit(400);
+  // fitter.setIterationLimit(400);
+  fitter.setIterationLimit(50);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
@@ -1390,6 +1391,17 @@ std::vector<MarkerInitialization> runEngine(
     reports.push_back(report);
   }
 
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    if (!fitter.checkForEnoughMarkers(markerObservationTrials[i]))
+    {
+      std::cout << "Input files don't have enough markers that match the "
+                   "OpenSim model! Aborting."
+                << std::endl;
+      return std::vector<MarkerInitialization>();
+    }
+  }
+
   std::vector<MarkerInitialization> results
       = fitter.runMultiTrialKinematicsPipeline(
           markerObservationTrials,
@@ -1454,6 +1466,60 @@ std::vector<MarkerInitialization> runEngine(
     std::cout << pair.first << ": " << pair.second.first->getName() << ", "
               << offset(0) << " " << offset(1) << " " << offset(2) << std::endl;
   }
+
+  std::cout << "Saving marker error report" << std::endl;
+  finalKinematicsReport.saveCSVMarkerErrorReport(
+      "./_ik_per_marker_error_report.csv");
+  std::vector<s_t> timestamps;
+  for (int i = 0; i < results[0].poses.cols(); i++)
+  {
+    timestamps.push_back(i);
+  }
+  for (int i = 0; i < results.size(); i++)
+  {
+    std::cout << "Saving GRF Mot " << i << std::endl;
+    OpenSimParser::saveGRFMot("./_grf.mot", timestamps, forcePlates[i]);
+  }
+  for (int i = 0; i < results.size(); i++)
+  {
+    std::cout << "Saving TRC " << i << std::endl;
+    OpenSimParser::saveTRC(
+        "./test.trc", timestamps, markerObservationTrials[i]);
+  }
+  std::vector<std::string> markerNames;
+  for (auto& pair : standard.markersMap)
+  {
+    markerNames.push_back(pair.first);
+  }
+  std::cout << "Saving OpenSim IK XML" << std::endl;
+  OpenSimParser::saveOsimInverseKinematicsXMLFile(
+      "trial",
+      markerNames,
+      "Models/optimized_scale_and_markers.osim",
+      "./test.trc",
+      "_ik_by_opensim.mot",
+      "./_ik_setup.xml");
+  // TODO: remove me
+  for (int i = 0; i < results.size(); i++)
+  {
+    std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
+    OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+        "test_name",
+        standard.skeleton,
+        results[i].poses,
+        forcePlates[i],
+        "name_grf.mot",
+        "./_external_forces.xml");
+  }
+  std::cout << "Saving OpenSim ID XML" << std::endl;
+  OpenSimParser::saveOsimInverseDynamicsXMLFile(
+      "trial",
+      "Models/optimized_scale_and_markers.osim",
+      "./_ik.mot",
+      "./_external_forces.xml",
+      "_id.sto",
+      "_id_body_forces.sto",
+      "./_id_setup.xml");
 
   if (saveGUI)
   {
@@ -5340,6 +5406,132 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, BUG1)
+{
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/trials/P002_flatrun_fixed_1/"
+      "markers.c3d");
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/trials/P002_Static_01/"
+      "markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      58,
+      1.59,
+      "male");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG2)
+{
+  // CustomJoint "Abdjnt" has a funny 5-DOF structure, which breaks a the loader
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back("dart://sample/osim/Bugs/9402d0/markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Bugs/9402d0/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      76,
+      1.72,
+      "male");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG3)
+{
+  // There's a "ScapulothoracicJoint" which isn't supported
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back("dart://sample/osim/Bugs/79597a1/markers.trc");
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Bugs/79597a1/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      200,
+      1.75,
+      "male");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG4)
+{
+  // CustomJoint "L5_S1_IVDjnt" has a <PiecewiseLinearFunction>, which is not
+  // yet supported
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back("dart://sample/osim/Bugs/ee8cdcfd/markers.trc");
+  std::vector<std::string> grfFiles;
+  grfFiles.push_back("dart://sample/osim/Bugs/ee8cdcfd/grf.mot");
+  runEngine(
+      "dart://sample/osim/Bugs/ee8cdcfd/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      200,
+      1.75,
+      "male");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG5)
+{
+  // Gets a NaN on a joint Jacobian, because the input marker set doesn't match
+  // the model
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/fbba09/tmpubw9erd6/trials/trial1/markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Bugs/fbba09/tmpubw9erd6/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      200,
+      1.75,
+      "male");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG6)
+{
+  // Older OpenSim Format
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/osim/Bugs/tmpc9bpl7gs/trials/subject01_walk1/markers.trc");
+  std::vector<std::string> grfFiles;
+  grfFiles.push_back(
+      "dart://sample/osim/Bugs/tmpc9bpl7gs/trials/subject01_walk1/grf.mot");
+  runEngine(
+      "dart://sample/osim/Bugs/tmpc9bpl7gs/unscaled_generic_raw.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      88,
+      1.79,
+      "unknown",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SINGLE_TRIAL_ANKLE_EXO)
 {
   std::vector<std::string> c3dFiles;
@@ -5374,7 +5566,8 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
       grfFiles,
       59,
       1.72,
-      "female");
+      "female",
+      true);
 }
 #endif
 
