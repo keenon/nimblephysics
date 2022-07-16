@@ -5515,6 +5515,7 @@ TEST(MarkerFitter, BUG6)
   // Older OpenSim Format
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;
+  // d37bbcb1
   trcFiles.push_back(
       "dart://sample/osim/Bugs/tmpc9bpl7gs/trials/subject01_walk1/markers.trc");
   std::vector<std::string> grfFiles;

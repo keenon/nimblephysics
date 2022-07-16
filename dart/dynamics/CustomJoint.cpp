@@ -1237,6 +1237,9 @@ math::Jacobian CustomJoint<Dimension>::
 template class dart::dynamics::CustomJoint<1>;
 template class dart::dynamics::CustomJoint<2>;
 template class dart::dynamics::CustomJoint<3>;
+template class dart::dynamics::CustomJoint<4>;
+template class dart::dynamics::CustomJoint<5>;
+template class dart::dynamics::CustomJoint<6>;
 
 } // namespace dynamics
 } // namespace dart

@@ -2937,7 +2937,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                    "way to remove this WeldJoint, things should run faster."
                 << std::endl;
     }
-    else if (allLinear && !anySpline)
+    else if (allLinear && !anySpline && dofNames.size() == 6)
     {
       dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
       dynamics::EulerJoint::AxisOrder transOrder
@@ -2971,7 +2971,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       eulerFreeJoint->setFlipAxisMap(flips);
       joint = eulerFreeJoint;
     }
-    else if (first3Linear && !anySpline)
+    else if (
+        first3Linear && !anySpline
+        && (dofNames.size() == 3 || dofNames.size() == 6))
     {
       dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
       Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
@@ -3131,6 +3133,48 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         joint = pair.first;
         childBody = pair.second;
       }
+      else if (dofNames.size() == 4)
+      {
+        auto pair = createCustomJoint<4>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 5)
+      {
+        auto pair = createCustomJoint<5>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 6)
+      {
+        auto pair = createCustomJoint<6>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
       else
       {
         assert(false && "Unsupported number of DOFs in CustomJoint");
@@ -3202,8 +3246,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   }
   else
   {
-    std::cout << "ERROR: Nimble OpenSimParser doesn't support joint type \""
-              << jointType << "\". Exiting with failure." << std::endl;
+    std::cout << "ERROR: Nimble OpenSimParser doesn't yet support joint type \""
+              << jointType
+              << "\". Nimble's support for OpenSim features is still under "
+                 "construction, so support may be added in the future. For "
+                 "now, though, we're exiting with failure."
+              << std::endl;
     exit(1);
   }
 
