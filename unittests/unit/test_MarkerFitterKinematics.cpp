@@ -1320,8 +1320,8 @@ std::vector<MarkerInitialization> runEngine(
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
-  // fitter.setIterationLimit(400);
-  fitter.setIterationLimit(50);
+  fitter.setIterationLimit(400);
+  // fitter.setIterationLimit(50);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
@@ -5483,7 +5483,8 @@ TEST(MarkerFitter, BUG4)
       grfFiles,
       200,
       1.75,
-      "male");
+      "male",
+      true);
 }
 #endif
 

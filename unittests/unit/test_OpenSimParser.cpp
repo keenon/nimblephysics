@@ -20,6 +20,16 @@ using namespace realtime;
 #define ALL_TESTS
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, PIECEWISE_LINEAR)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Bugs/ee8cdcfd/unscaled_generic.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, OLDER_FORMAT)
 {
   OpenSimFile file = OpenSimParser::parseOsim(

@@ -34,6 +34,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/PiecewiseLinearFunction.hpp"
 #include "dart/math/PolynomialFunction.hpp"
 #include "dart/math/SimmSpline.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
@@ -908,6 +909,8 @@ void OpenSimParser::updateCustomJointXML(
         = function->FirstChildElement("LinearFunction");
     tinyxml2::XMLElement* simmSpline
         = function->FirstChildElement("SimmSpline");
+    tinyxml2::XMLElement* piecewiseLinear
+        = function->FirstChildElement("PiecewiseLinearFunction");
     tinyxml2::XMLElement* polynomialFunction
         = function->FirstChildElement("PolynomialFunction");
     // This only exists in v4 files
@@ -924,10 +927,14 @@ void OpenSimParser::updateCustomJointXML(
       {
         constant = childFunction->FirstChildElement("Constant");
         simmSpline = childFunction->FirstChildElement("SimmSpline");
+        piecewiseLinear
+            = function->FirstChildElement("PiecewiseLinearFunction");
         linearFunction = childFunction->FirstChildElement("LinearFunction");
         polynomialFunction
             = childFunction->FirstChildElement("PolynomialFunction");
-        assert(constant || simmSpline || linearFunction || polynomialFunction);
+        assert(
+            constant || simmSpline || piecewiseLinear || linearFunction
+            || polynomialFunction);
       }
     }
 
@@ -987,6 +994,30 @@ void OpenSimParser::updateCustomJointXML(
         yString += std::to_string(spline->_y[i]);
       }
       simmSpline->FirstChildElement("y")->SetText(yString.c_str());
+    }
+    else if (piecewiseLinear != nullptr)
+    {
+      math::PiecewiseLinearFunction* pl
+          = dynamic_cast<math::PiecewiseLinearFunction*>(
+              joint->getCustomFunction(index).get());
+      assert(pl != nullptr);
+      std::string xString = "";
+      for (int i = 0; i < pl->_x.size(); i++)
+      {
+        if (i > 0)
+          xString += " ";
+        xString += std::to_string(pl->_x[i]);
+      }
+      piecewiseLinear->FirstChildElement("x")->SetText(xString.c_str());
+
+      std::string yString = "";
+      for (int i = 0; i < pl->_y.size(); i++)
+      {
+        if (i > 0)
+          yString += " ";
+        yString += std::to_string(pl->_y[i]);
+      }
+      piecewiseLinear->FirstChildElement("y")->SetText(yString.c_str());
     }
     else
     {
@@ -2758,6 +2789,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           = function->FirstChildElement("LinearFunction");
       tinyxml2::XMLElement* simmSpline
           = function->FirstChildElement("SimmSpline");
+      tinyxml2::XMLElement* piecewiseLinear
+          = function->FirstChildElement("PiecewiseLinearFunction");
       tinyxml2::XMLElement* polynomialFunction
           = function->FirstChildElement("PolynomialFunction");
       // This only exists in v4 files
@@ -2776,11 +2809,14 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         {
           constant = childFunction->FirstChildElement("Constant");
           simmSpline = childFunction->FirstChildElement("SimmSpline");
+          piecewiseLinear
+              = childFunction->FirstChildElement("PiecewiseLinearFunction");
           linearFunction = childFunction->FirstChildElement("LinearFunction");
           polynomialFunction
               = childFunction->FirstChildElement("PolynomialFunction");
           assert(
-              constant || simmSpline || linearFunction || polynomialFunction);
+              constant || simmSpline || piecewiseLinear || linearFunction
+              || polynomialFunction);
         }
       }
 
@@ -2853,6 +2889,24 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         }
         customFunctions.push_back(std::make_shared<math::SimmSpline>(x, y));
       }
+      else if (piecewiseLinear != nullptr)
+      {
+        anySpline = true;
+        allLocked = false;
+        if (dofIndex < 3)
+        {
+          first3Linear = false;
+        }
+
+        std::vector<s_t> x = readVecX(piecewiseLinear->FirstChildElement("x"));
+        std::vector<s_t> y = readVecX(piecewiseLinear->FirstChildElement("y"));
+        for (int i = 0; i < y.size(); i++)
+        {
+          y[i] *= scale;
+        }
+        customFunctions.push_back(
+            std::make_shared<math::PiecewiseLinearFunction>(x, y));
+      }
       else
       {
         assert(false && "Unrecognized function type");
@@ -2883,57 +2937,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                    "way to remove this WeldJoint, things should run faster."
                 << std::endl;
     }
-    else if (anySpline)
-    {
-      isCustomJoint = true;
-      if (dofNames.size() == 1)
-      {
-        auto pair = createCustomJoint<1>(
-            skel,
-            jointName,
-            bodyProps,
-            parentBody,
-            customFunctions,
-            drivenByDofs,
-            eulerAxisOrder,
-            transformAxisOrder);
-        joint = pair.first;
-        childBody = pair.second;
-      }
-      else if (dofNames.size() == 2)
-      {
-        auto pair = createCustomJoint<2>(
-            skel,
-            jointName,
-            bodyProps,
-            parentBody,
-            customFunctions,
-            drivenByDofs,
-            eulerAxisOrder,
-            transformAxisOrder);
-        joint = pair.first;
-        childBody = pair.second;
-      }
-      else if (dofNames.size() == 3)
-      {
-        auto pair = createCustomJoint<3>(
-            skel,
-            jointName,
-            bodyProps,
-            parentBody,
-            customFunctions,
-            drivenByDofs,
-            eulerAxisOrder,
-            transformAxisOrder);
-        joint = pair.first;
-        childBody = pair.second;
-      }
-      else
-      {
-        assert(false && "Unsupported number of DOFs in CustomJoint");
-      }
-    }
-    else if (allLinear)
+    else if (allLinear && !anySpline)
     {
       dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
       dynamics::EulerJoint::AxisOrder transOrder
@@ -2967,7 +2971,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       eulerFreeJoint->setFlipAxisMap(flips);
       joint = eulerFreeJoint;
     }
-    else if (first3Linear)
+    else if (first3Linear && !anySpline)
     {
       dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
       Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
@@ -2996,7 +3000,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       eulerJoint->setAxisOrder(axisOrder);
       joint = eulerJoint;
     }
-    else if (numLinear == 1 && numConstant == 5)
+    else if (numLinear == 1 && numConstant == 5 && !anySpline)
     {
       if (lastLinearIndex < 3)
       {
@@ -3054,7 +3058,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         joint = prismaticJoint;
       }
     }
-    else if (numLinear == 2 && numConstant == 4 && lastLinearIndex < 3)
+    else if (
+        numLinear == 2 && numConstant == 4 && lastLinearIndex < 3 && !anySpline)
     {
       // Create a RevoluteJoint
       dynamics::UniversalJoint* universalJoint = nullptr;
@@ -3083,7 +3088,53 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     else
     {
-      assert(false);
+      isCustomJoint = true;
+      if (dofNames.size() == 1)
+      {
+        auto pair = createCustomJoint<1>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 2)
+      {
+        auto pair = createCustomJoint<2>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else if (dofNames.size() == 3)
+      {
+        auto pair = createCustomJoint<3>(
+            skel,
+            jointName,
+            bodyProps,
+            parentBody,
+            customFunctions,
+            drivenByDofs,
+            eulerAxisOrder,
+            transformAxisOrder);
+        joint = pair.first;
+        childBody = pair.second;
+      }
+      else
+      {
+        assert(false && "Unsupported number of DOFs in CustomJoint");
+      }
     }
   }
   if (jointType == "WeldJoint")
