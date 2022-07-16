@@ -19,6 +19,17 @@ using namespace realtime;
 
 #define ALL_TESTS
 
+/*
+// This leads to a hard exit
+TEST(OpenSimParser, UNSUPPORTED_JOINT_TYPE)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Bugs/79597a1/unscaled_generic.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+}
+*/
+
 #ifdef ALL_TESTS
 TEST(OpenSimParser, PIECEWISE_LINEAR)
 {

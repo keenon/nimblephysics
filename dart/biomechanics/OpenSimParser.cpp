@@ -3137,7 +3137,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       }
     }
   }
-  if (jointType == "WeldJoint")
+  else if (jointType == "WeldJoint")
   {
     dynamics::WeldJoint::Properties props;
     props.mName = jointName;
@@ -3152,7 +3152,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                  "way to remove this WeldJoint, things should run faster."
               << std::endl;
   }
-  if (jointType == "PinJoint")
+  else if (jointType == "PinJoint")
   {
     // Create a RevoluteJoint
     dynamics::RevoluteJoint* revoluteJoint = nullptr;
@@ -3176,7 +3176,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     joint = revoluteJoint;
   }
-  if (jointType == "UniversalJoint")
+  else if (jointType == "UniversalJoint")
   {
     // Create a UniversalJoint
     dynamics::UniversalJoint* universalJoint = nullptr;
@@ -3200,6 +3200,13 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     joint = universalJoint;
   }
+  else
+  {
+    std::cout << "ERROR: Nimble OpenSimParser doesn't support joint type \""
+              << jointType << "\". Exiting with failure." << std::endl;
+    exit(1);
+  }
+
   assert(childBody != nullptr);
   joint->setName(jointName);
   // std::cout << jointName << std::endl;
