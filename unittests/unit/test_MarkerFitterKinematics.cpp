@@ -5417,8 +5417,13 @@ TEST(MarkerFitter, BUG1)
       "markers.c3d");
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
-  runEngine(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/unscaled_generic.osim",
+      "../../../data/osim/Bugs/641e8fd/tmpfx__tup_/"
+      "unscaled_generic_rational.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/"
+      "unscaled_generic_rational.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5436,8 +5441,11 @@ TEST(MarkerFitter, BUG2)
   c3dFiles.push_back("dart://sample/osim/Bugs/9402d0/markers.c3d");
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
-  runEngine(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/Bugs/9402d0/unscaled_generic.osim",
+      "../../../data/osim/Bugs/9402d0/unscaled_generic_rational.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/9402d0/unscaled_generic_rational.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5455,8 +5463,11 @@ TEST(MarkerFitter, BUG3)
   std::vector<std::string> trcFiles;
   trcFiles.push_back("dart://sample/osim/Bugs/79597a1/markers.trc");
   std::vector<std::string> grfFiles;
-  runEngine(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/Bugs/79597a1/unscaled_generic.osim",
+      "../../../data/osim/Bugs/79597a1/unscaled_generic_rational.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/79597a1/unscaled_generic_rational.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5476,8 +5487,11 @@ TEST(MarkerFitter, BUG4)
   trcFiles.push_back("dart://sample/osim/Bugs/ee8cdcfd/markers.trc");
   std::vector<std::string> grfFiles;
   grfFiles.push_back("dart://sample/osim/Bugs/ee8cdcfd/grf.mot");
-  runEngine(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/Bugs/ee8cdcfd/unscaled_generic.osim",
+      "../../../data/osim/Bugs/ee8cdcfd/unscaled_generic_rational.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/ee8cdcfd/unscaled_generic_rational.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5498,8 +5512,13 @@ TEST(MarkerFitter, BUG5)
       "dart://sample/osim/Bugs/fbba09/tmpubw9erd6/trials/trial1/markers.c3d");
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
-  runEngine(
+  OpenSimParser::rationalizeJoints(
       "dart://sample/osim/Bugs/fbba09/tmpubw9erd6/unscaled_generic.osim",
+      "../../../data/osim/Bugs/fbba09/tmpubw9erd6/"
+      "unscaled_generic_rational.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/fbba09/tmpubw9erd6/"
+      "unscaled_generic_rational.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5517,12 +5536,17 @@ TEST(MarkerFitter, BUG6)
   std::vector<std::string> trcFiles;
   // d37bbcb1
   trcFiles.push_back(
-      "dart://sample/osim/Bugs/tmpc9bpl7gs/trials/subject01_walk1/markers.trc");
+      "dart://sample/osim/Bugs/d37bbcb1/tmp50nejuzl/trials/subject01_walk1/"
+      "markers.trc");
   std::vector<std::string> grfFiles;
   grfFiles.push_back(
-      "dart://sample/osim/Bugs/tmpc9bpl7gs/trials/subject01_walk1/grf.mot");
+      "dart://sample/osim/Bugs/d37bbcb1/tmp50nejuzl/trials/subject01_walk1/"
+      "grf.mot");
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/d37bbcb1/tmp50nejuzl/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/d37bbcb1/tmp50nejuzl/unscaled_generic.osim");
   runEngine(
-      "dart://sample/osim/Bugs/tmpc9bpl7gs/unscaled_generic_raw.osim",
+      "dart://sample/osim/Bugs/d37bbcb1/tmp50nejuzl/unscaled_generic.osim",
       c3dFiles,
       trcFiles,
       grfFiles,

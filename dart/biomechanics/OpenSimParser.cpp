@@ -835,36 +835,80 @@ void OpenSimParser::updateCustomJointXML(
 {
   (void)element;
   (void)joint;
-  string parent_offset_frame
-      = string(element->FirstChildElement("socket_parent_frame")->GetText());
-  string child_offset_frame
-      = string(element->FirstChildElement("socket_child_frame")->GetText());
+  string parent_offset_frame;
+  if (element->FirstChildElement("socket_parent_frame"))
+  {
+    parent_offset_frame
+        = string(element->FirstChildElement("socket_parent_frame")->GetText());
+  }
+  else if (element->FirstChildElement("socket_parent_frame_connectee_name"))
+  {
+    parent_offset_frame = string(
+        element->FirstChildElement("socket_parent_frame_connectee_name")
+            ->GetText());
+  }
+  else
+  {
+    std::cout << "OpenSimParser encountered an error! Joint \""
+              << joint->getName()
+              << "\" does not specify either a <socket_parent_frame> or a "
+                 "<socket_parent_frame_connectee_name>! This may be because "
+                 "the OpenSim file is in an older and unsupported version. "
+                 "Try a newer format."
+              << std::endl;
+    return;
+  }
+  string child_offset_frame;
+  if (element->FirstChildElement("socket_child_frame"))
+  {
+    child_offset_frame
+        = string(element->FirstChildElement("socket_child_frame")->GetText());
+  }
+  else if (element->FirstChildElement("socket_child_frame_connectee_name"))
+  {
+    child_offset_frame
+        = string(element->FirstChildElement("socket_child_frame_connectee_name")
+                     ->GetText());
+  }
+  else
+  {
+    std::cout << "OpenSimParser encountered an error! Joint \""
+              << joint->getName()
+              << "\" does not specify either a <socket_child_frame> or a "
+                 "<socket_child_frame_connectee_name>! This may be because "
+                 "the OpenSim file is particularly old. Try a newer format."
+              << std::endl;
+    return;
+  }
 
   // 1. Update the getTransformFromParentBodyNode() and
   // getTransformFromChildBodyNode()
   tinyxml2::XMLElement* frames = element->FirstChildElement("frames");
-  tinyxml2::XMLElement* framesCursor = frames->FirstChildElement();
-  while (framesCursor)
+  if (frames)
   {
-    string name(framesCursor->Attribute("name"));
-    Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
-    if (name == parent_offset_frame)
+    tinyxml2::XMLElement* framesCursor = frames->FirstChildElement();
+    while (framesCursor)
     {
-      // Update from parent
-      T = joint->getTransformFromParentBodyNode();
-    }
-    else if (name == child_offset_frame)
-    {
-      // Update from child
-      T = joint->getTransformFromChildBodyNode();
-    }
-    framesCursor->FirstChildElement("translation")
-        ->SetText((std::to_string(T.translation()(0)) + " "
-                   + std::to_string(T.translation()(1)) + " "
-                   + std::to_string(T.translation()(2)))
-                      .c_str());
+      string name(framesCursor->Attribute("name"));
+      Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+      if (name == parent_offset_frame)
+      {
+        // Update from parent
+        T = joint->getTransformFromParentBodyNode();
+      }
+      else if (name == child_offset_frame)
+      {
+        // Update from child
+        T = joint->getTransformFromChildBodyNode();
+      }
+      framesCursor->FirstChildElement("translation")
+          ->SetText((std::to_string(T.translation()(0)) + " "
+                     + std::to_string(T.translation()(1)) + " "
+                     + std::to_string(T.translation()(2)))
+                        .c_str());
 
-    framesCursor = framesCursor->NextSiblingElement();
+      framesCursor = framesCursor->NextSiblingElement();
+    }
   }
 
   // 2. Update the custom functions
@@ -3706,6 +3750,20 @@ struct OpenSimBodyXML
 };
 
 //==============================================================================
+int recursiveCountChildren(OpenSimJointXML* joint)
+{
+  int numChildren = 1; // every joint has one body as a child
+  if (joint->child != nullptr)
+  {
+    for (auto* childJoint : joint->child->children)
+    {
+      numChildren += recursiveCountChildren(childJoint);
+    }
+  }
+  return numChildren;
+}
+
+//==============================================================================
 void recursiveCreateJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,
@@ -4010,14 +4068,50 @@ OpenSimFile OpenSimParser::readOsim30(
   //--------------------------------------------------------------------------
   // Check tree invarients
 
-  OpenSimJointXML* root = nullptr;
+  std::vector<OpenSimJointXML*> roots;
   for (auto& pair : jointLookupMap)
   {
     if (pair.second.parent == nullptr)
     {
-      assert(root == nullptr);
-      root = &pair.second;
+      roots.push_back(&pair.second);
     }
+  }
+
+  OpenSimJointXML* root = nullptr;
+  if (roots.size() == 0)
+  {
+    std::cout
+        << "Error reading OpenSim file, looks like the joints form a loop "
+           "rather than a tree. This is unsupported. Returning a null skeleton."
+        << std::endl;
+    return null_file;
+  }
+  else if (roots.size() == 1)
+  {
+    root = roots[0];
+  }
+  else if (roots.size() > 1)
+  {
+    std::cout
+        << "WARNING: There is more than one kinematic tree in the OpenSim file:"
+        << std::endl;
+    root = roots[0];
+    int mostChildren = 0;
+    for (int i = 0; i < roots.size(); i++)
+    {
+      int numChildren = recursiveCountChildren(roots[i]);
+      std::cout << " - " << roots[i]->name << ": " << numChildren << " children"
+                << std::endl;
+      if (numChildren > mostChildren)
+      {
+        root = roots[i];
+        mostChildren = numChildren;
+      }
+    }
+    std::cout << "Choosing " << root->name
+              << " as root kinematic tree because it has the most children, "
+                 "ignoring the others."
+              << std::endl;
   }
 
   assert(root != nullptr);
