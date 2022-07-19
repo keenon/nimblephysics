@@ -1321,7 +1321,6 @@ std::vector<MarkerInitialization> runEngine(
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
   fitter.setIterationLimit(400);
-  // fitter.setIterationLimit(50);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
@@ -5408,6 +5407,8 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
 #ifdef ALL_TESTS
 TEST(MarkerFitter, BUG1)
 {
+  // TODO: this still causes some kind of bug/crash
+
   std::vector<std::string> c3dFiles;
   c3dFiles.push_back(
       "dart://sample/osim/Bugs/641e8fd/tmpfx__tup_/trials/P002_flatrun_fixed_1/"
@@ -5429,7 +5430,8 @@ TEST(MarkerFitter, BUG1)
       grfFiles,
       58,
       1.59,
-      "male");
+      "male",
+      true);
 }
 #endif
 
@@ -5547,6 +5549,35 @@ TEST(MarkerFitter, BUG6)
       "../../../data/osim/Bugs/d37bbcb1/tmp50nejuzl/unscaled_generic.osim");
   runEngine(
       "dart://sample/osim/Bugs/d37bbcb1/tmp50nejuzl/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      88,
+      1.79,
+      "unknown",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG7)
+{
+  // Older OpenSim Format
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmpwf_tkvrf/trials/BFND_W20/"
+      "markers.c3d");
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmpwf_tkvrf/trials/BFND_W21/"
+      "markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/tmpwf_tkvrf/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/tmpwf_tkvrf/unscaled_generic.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/tmpwf_tkvrf/unscaled_generic.osim",
       c3dFiles,
       trcFiles,
       grfFiles,

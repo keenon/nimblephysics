@@ -1,3 +1,4 @@
+#include <memory>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -8,6 +9,8 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
+#include "dart/utils/sdf/SdfParser.hpp"
+#include "dart/utils/urdf/DartLoader.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
@@ -28,6 +31,24 @@ TEST(OpenSimParser, UNSUPPORTED_JOINT_TYPE)
   std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   EXPECT_TRUE(skel->getNumDofs() > 0);
 }
+*/
+
+/*
+#ifdef ALL_TESTS
+TEST(OpenSimParser, CONVERT_TO_SDF)
+{
+  OpenSimParser::convertOsimToSDF(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      "../../../data/osim/Rajagopal2015/Rajagopal2015.sdf");
+  std::shared_ptr<dynamics::Skeleton> skel = SdfParser::readSkeleton(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.sdf");
+
+  GUIWebsocketServer server;
+  server.renderSkeleton(skel);
+  server.serve(8070);
+  server.blockWhileServing();
+}
+#endif
 */
 
 #ifdef ALL_TESTS

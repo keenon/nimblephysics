@@ -129,6 +129,11 @@ void GUIStateMachine(py::module& m)
           ::py::arg("key"),
           ::py::arg("color"))
       .def(
+          "setObjectScale",
+          &dart::server::GUIStateMachine::setObjectScale,
+          ::py::arg("key"),
+          ::py::arg("scale"))
+      .def(
           "setObjectTooltip",
           &dart::server::GUIStateMachine::setObjectTooltip,
           ::py::arg("key"),

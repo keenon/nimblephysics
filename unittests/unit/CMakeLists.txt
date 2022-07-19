@@ -57,9 +57,6 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkelParser)
   target_link_libraries(test_SkelParser dart-utils)
 
-  dart_add_test("unit" test_OpenSimParser)
-  target_link_libraries(test_OpenSimParser dart-utils)
-
   dart_add_test("unit" test_SkeletonConverter)
   target_link_libraries(test_SkeletonConverter dart-utils)
 
@@ -104,6 +101,10 @@ if(TARGET dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)
+  dart_add_test("unit" test_OpenSimParser)
+  target_link_libraries(test_OpenSimParser dart-utils)
+  target_link_libraries(test_OpenSimParser dart-utils-urdf)
+
   dart_add_test("unit" test_ConstraintSolver)
   target_link_libraries(test_ConstraintSolver dart-utils)
   target_link_libraries(test_ConstraintSolver dart-utils-urdf)

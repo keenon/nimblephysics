@@ -237,6 +237,10 @@ public:
   static OpenSimScaleAndMarkerOffsets getScaleAndMarkerOffsets(
       const OpenSimFile& standardSkeleton, const OpenSimFile& scaledSkeleton);
 
+  /// This does its best to convert a *.osim file to a URDF file.
+  static void convertOsimToSDF(
+      const common::Uri& uri, const std::string& outputPath);
+
 protected:
   static OpenSimFile readOsim30(
       const common::Uri& uri,
