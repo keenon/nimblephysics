@@ -2,7 +2,7 @@
 # All rights reserved.
 #
 # The list of contributors can be found at:
-#   https://github.com/dartsim/dart/blob/master/LICENSE
+# https://github.com/dartsim/dart/blob/master/LICENSE
 #
 # This file is provided under the "BSD-style" License
 
@@ -20,15 +20,16 @@ if(APPLE)
     list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libssl.dylib)
     list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libcrypto.dylib)
     message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
+
   # ARM64 macs
   elseif(EXISTS "/opt/homebrew/Cellar/openssl@1.1/")
     message(STATUS "Setting root dir for OpenSSL")
-    set(OPENSSL_ROOT_DIR /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1)
+    set(OPENSSL_ROOT_DIR /opt/homebrew/Cellar/openssl@1.1/1.1.1q)
 
     find_package(OpenSSL REQUIRED)
-    include_directories(/opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/include)
-    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/lib/libssl.dylib)
-    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1l_1/lib/libcrypto.dylib)
+    include_directories(/opt/homebrew/Cellar/openssl@1.1/1.1.1q/include)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1q/lib/libssl.dylib)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1q/lib/libcrypto.dylib)
     message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
   endif()
 endif()
@@ -36,6 +37,7 @@ endif()
 find_package(gRPC CONFIG REQUIRED)
 
 message(STATUS "gRPC_FOUND: ${gRPC_FOUND}")
+
 # get_target_property(gRPC_INCLUDE_DIRS gRPC::grpc++ INTERFACE_INCLUDE_DIRECTORIES)
 # get_target_property(gRPC_LIBRARIES gRPC::grpc++ INTERFACE_LINK_LIBRARIES)
 message(STATUS "gRPC_INCLUDE_DIRS: ${gRPC_INCLUDE_DIRS}")
