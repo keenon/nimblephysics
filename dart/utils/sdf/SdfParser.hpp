@@ -56,6 +56,8 @@ dynamics::SkeletonPtr readSkeleton(
     const common::Uri& uri,
     const common::ResourceRetrieverPtr& retriever = nullptr);
 
+void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel);
+
 } // namespace SdfParser
 
 } // namespace utils

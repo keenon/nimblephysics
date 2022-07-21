@@ -37,6 +37,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -133,6 +134,77 @@ void EulerJoint::setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs)
 EulerJoint::AxisOrder EulerJoint::getAxisOrder() const
 {
   return mAspectProperties.mAxisOrder;
+}
+
+//==============================================================================
+/// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+Eigen::Vector3s EulerJoint::getAxis(int index) const
+{
+  if (getAxisOrder() == AxisOrder::XYZ)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+  }
+  if (getAxisOrder() == AxisOrder::XZY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+  }
+  if (getAxisOrder() == AxisOrder::ZXY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+  }
+  if (getAxisOrder() == AxisOrder::ZYX)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+  }
+  std::cout
+      << "ERROR: EulerJoint is being asked for an axis that is out of bounds!"
+      << std::endl;
+  assert(false);
+  return Eigen::Vector3s::UnitX();
 }
 
 //==============================================================================

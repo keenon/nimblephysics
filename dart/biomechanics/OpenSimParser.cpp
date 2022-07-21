@@ -1,6 +1,7 @@
 #include "dart/biomechanics/OpenSimParser.hpp"
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -23,6 +24,7 @@
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/Inertia.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PrismaticJoint.hpp"
@@ -45,7 +47,9 @@
 #include "dart/math/SimmSpline.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
+#include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/XmlHelpers.hpp"
+#include "dart/utils/sdf/SdfParser.hpp"
 
 using namespace std;
 
@@ -2736,302 +2740,51 @@ OpenSimScaleAndMarkerOffsets OpenSimParser::getScaleAndMarkerOffsets(
 
 //==============================================================================
 /// This does its best to convert a *.osim file to a URDF file.
-void OpenSimParser::convertOsimToSDF(
-    const common::Uri& uri, const std::string& outputPath)
+bool OpenSimParser::convertOsimToSDF(
+    const common::Uri& uri,
+    const std::string& outputPath,
+    std::map<std::string, std::string> mergeBodiesInto)
 {
-  // TODO: remove this once implementation is complete
-  std::cout << "This method is not yet implemented!" << std::endl;
-  exit(1);
-
   OpenSimFile file = parseOsim(uri);
 
-  using namespace tinyxml2;
-
-  tinyxml2::XMLDocument xmlDoc;
-
-  XMLElement* sdf = xmlDoc.NewElement("sdf");
-  sdf->SetAttribute("version", "1.4");
-  xmlDoc.InsertFirstChild(sdf);
-
-  XMLElement* model = xmlDoc.NewElement("model");
-  model->SetAttribute("name", file.skeleton->getName().c_str());
-  sdf->InsertFirstChild(model);
-
-  for (int i = 0; i < file.skeleton->getNumBodyNodes(); i++)
+  std::shared_ptr<dynamics::Skeleton> simplified
+      = file.skeleton->simplifySkeleton(
+          file.skeleton->getName(), mergeBodiesInto);
+  if (simplified)
   {
-    auto* body = file.skeleton->getBodyNode(i);
-
-    XMLElement* link = xmlDoc.NewElement("link");
-    link->SetAttribute("name", body->getName().c_str());
-
-    XMLElement* visual = nullptr;
-    XMLElement* visualGeometry = nullptr;
-
-    XMLElement* collision = nullptr;
-    XMLElement* collisionGeometry = nullptr;
-
-    for (int j = 0; j < body->getNumShapeNodes(); j++)
-    {
-      auto* shapeNode = body->getShapeNode(j);
-      dynamics::Shape* shape = shapeNode->getShape().get();
-
-      if (shapeNode->hasVisualAspect())
-      {
-        visual = xmlDoc.NewElement("visual");
-        visual->SetAttribute("name", (body->getName() + "_visual").c_str());
-        link->InsertEndChild(visual);
-        visualGeometry = xmlDoc.NewElement("geometry");
-        visual->InsertEndChild(visualGeometry);
-        XMLElement* visualPose = xmlDoc.NewElement("pose");
-        visual->InsertEndChild(visualPose);
-        visualPose->SetText(
-            (writeVec3(shapeNode->getRelativeTranslation()) + " "
-             + writeVec3(
-                 math::matrixToEulerXYZ(shapeNode->getRelativeRotation())))
-                .c_str());
-      }
-      if (shapeNode->hasCollisionAspect())
-      {
-        collision = xmlDoc.NewElement("collision");
-        collision->SetAttribute(
-            "name", (body->getName() + "_collision").c_str());
-        link->InsertEndChild(collision);
-        collisionGeometry = xmlDoc.NewElement("geometry");
-        collision->InsertEndChild(collisionGeometry);
-        XMLElement* collisionPose = xmlDoc.NewElement("pose");
-        collision->InsertEndChild(collisionPose);
-        collisionPose->SetText(
-            (writeVec3(shapeNode->getRelativeTranslation()) + " "
-             + writeVec3(
-                 math::matrixToEulerXYZ(shapeNode->getRelativeRotation())))
-                .c_str());
-      }
-
-      // Create the object from scratch
-      if (shape->getType() == "BoxShape")
-      {
-        dynamics::BoxShape* boxShape = dynamic_cast<dynamics::BoxShape*>(shape);
-
-        if (shapeNode->hasVisualAspect())
-        {
-          XMLElement* visualBox = xmlDoc.NewElement("box");
-          XMLElement* scale = xmlDoc.NewElement("scale");
-          scale->SetText(writeVec3(boxShape->getSize()).c_str());
-          visualBox->InsertEndChild(scale);
-          visualGeometry->InsertEndChild(visualBox);
-        }
-        if (shapeNode->hasCollisionAspect())
-        {
-          XMLElement* collisionBox = xmlDoc.NewElement("box");
-          XMLElement* scale = xmlDoc.NewElement("scale");
-          scale->SetText(writeVec3(boxShape->getSize()).c_str());
-          collisionBox->InsertEndChild(scale);
-          collisionGeometry->InsertEndChild(collisionBox);
-        }
-      }
-      else if (shape->getType() == "MeshShape")
-      {
-        dynamics::MeshShape* meshShape
-            = dynamic_cast<dynamics::MeshShape*>(shape);
-
-        if (shapeNode->hasVisualAspect())
-        {
-          XMLElement* visualMesh = xmlDoc.NewElement("mesh");
-          XMLElement* scale = xmlDoc.NewElement("scale");
-          scale->SetText(writeVec3(meshShape->getScale()).c_str());
-          visualMesh->InsertEndChild(scale);
-          XMLElement* uri = xmlDoc.NewElement("uri");
-          uri->SetText(meshShape->getMeshPath().c_str());
-          visualMesh->InsertEndChild(uri);
-          visualGeometry->InsertEndChild(visualMesh);
-        }
-        if (shapeNode->hasCollisionAspect())
-        {
-          XMLElement* collisionMesh = xmlDoc.NewElement("mesh");
-          XMLElement* scale = xmlDoc.NewElement("scale");
-          scale->SetText(writeVec3(meshShape->getScale()).c_str());
-          collisionMesh->InsertEndChild(scale);
-          XMLElement* uri = xmlDoc.NewElement("uri");
-          uri->SetText(meshShape->getMeshPath().c_str());
-          collisionMesh->InsertEndChild(uri);
-          collisionGeometry->InsertEndChild(collisionMesh);
-        }
-      }
-      else if (shape->getType() == "SphereShape")
-      {
-        dynamics::SphereShape* sphereShape
-            = dynamic_cast<dynamics::SphereShape*>(shape);
-
-        if (shapeNode->hasVisualAspect())
-        {
-          XMLElement* visualSphere = xmlDoc.NewElement("sphere");
-          visualSphere->SetAttribute("radius", sphereShape->getRadius());
-          XMLElement* radius = xmlDoc.NewElement("radius");
-          radius->SetText(std::to_string(sphereShape->getRadius()).c_str());
-          visualSphere->InsertEndChild(radius);
-          visualGeometry->InsertEndChild(visualSphere);
-        }
-        if (shapeNode->hasCollisionAspect())
-        {
-          XMLElement* collisionSphere = xmlDoc.NewElement("sphere");
-          XMLElement* radius = xmlDoc.NewElement("radius");
-          radius->SetText(std::to_string(sphereShape->getRadius()).c_str());
-          collisionSphere->InsertEndChild(radius);
-          collisionGeometry->InsertEndChild(collisionSphere);
-        }
-      }
-      else if (shape->getType() == "CapsuleShape")
-      {
-        // Ignore
-      }
-      else if (
-          shape->getType() == "EllipsoidShape"
-          && dynamic_cast<dynamics::EllipsoidShape*>(shape)->isSphere())
-      {
-        // Ignore
-      }
-      else
-      {
-        // Ignore
-      }
-    }
-
-    XMLElement* inertial = xmlDoc.NewElement("inertial");
-    link->InsertEndChild(inertial);
-
-    XMLElement* inertialMass = xmlDoc.NewElement("mass");
-    inertialMass->SetText(std::to_string(body->getMass()).c_str());
-    inertial->InsertEndChild(inertialMass);
-    XMLElement* inertialPose = xmlDoc.NewElement("pose");
-    inertialPose->SetText((writeVec3(body->getInertia().getLocalCOM()) + " "
-                           + writeVec3(Eigen::Vector3s::Zero()))
-                              .c_str());
-    inertial->InsertEndChild(inertialPose);
-
-    XMLElement* inertialInertia = xmlDoc.NewElement("inertia");
-    s_t i_xx = 0;
-    s_t i_xy = 0;
-    s_t i_xz = 0;
-    s_t i_yy = 0;
-    s_t i_yz = 0;
-    s_t i_zz = 0;
-    body->getMomentOfInertia(i_xx, i_yy, i_zz, i_xy, i_xz, i_yz);
-    XMLElement* inertiaXX = xmlDoc.NewElement("ixx");
-    inertiaXX->SetText(std::to_string(i_xx).c_str());
-    inertialInertia->InsertEndChild(inertiaXX);
-
-    XMLElement* inertiaXY = xmlDoc.NewElement("ixy");
-    inertiaXY->SetText(std::to_string(i_xy).c_str());
-    inertialInertia->InsertEndChild(inertiaXY);
-
-    XMLElement* inertiaXZ = xmlDoc.NewElement("ixz");
-    inertiaXZ->SetText(std::to_string(i_xz).c_str());
-    inertialInertia->InsertEndChild(inertiaXZ);
-
-    XMLElement* inertiaYY = xmlDoc.NewElement("iyy");
-    inertiaYY->SetText(std::to_string(i_yy).c_str());
-    inertialInertia->InsertEndChild(inertiaYY);
-
-    XMLElement* inertiaYZ = xmlDoc.NewElement("iyz");
-    inertiaYZ->SetText(std::to_string(i_yz).c_str());
-    inertialInertia->InsertEndChild(inertiaYZ);
-
-    XMLElement* inertiaZZ = xmlDoc.NewElement("izz");
-    inertiaZZ->SetText(std::to_string(i_zz).c_str());
-    inertialInertia->InsertEndChild(inertiaZZ);
-
-    inertial->InsertEndChild(inertialInertia);
-
-    model->InsertEndChild(link);
+    SdfParser::writeSkeleton(outputPath, simplified);
+    return true;
   }
-
-  for (int i = 0; i < file.skeleton->getNumJoints(); i++)
+  else
   {
-    auto* joint = file.skeleton->getJoint(i);
-    if (joint->getParentBodyNode() == nullptr)
-      continue;
-
-    XMLElement* jointXml = xmlDoc.NewElement("joint");
-    jointXml->SetAttribute("name", joint->getName().c_str());
-    model->InsertEndChild(jointXml);
-
-    if (joint->getType() == dynamics::RevoluteJoint::getStaticType())
-    {
-      dynamics::RevoluteJoint* revolute
-          = static_cast<dynamics::RevoluteJoint*>(joint);
-
-      jointXml->SetAttribute("type", "revolute");
-      XMLElement* axis = xmlDoc.NewElement("axis");
-      XMLElement* xyz = xmlDoc.NewElement("xyz");
-      xyz->SetText(writeVec3(revolute->getAxis()).c_str());
-      axis->InsertEndChild(xyz);
-      jointXml->InsertEndChild(axis);
-    }
-    else if (joint->getType() == dynamics::UniversalJoint::getStaticType())
-    {
-      dynamics::UniversalJoint* universal
-          = static_cast<dynamics::UniversalJoint*>(joint);
-
-      jointXml->SetAttribute("type", "revolute2");
-      XMLElement* axis1 = xmlDoc.NewElement("axis");
-      XMLElement* xyz1 = xmlDoc.NewElement("xyz");
-      xyz1->SetText(writeVec3(universal->getAxis1()).c_str());
-      axis1->InsertEndChild(xyz1);
-      jointXml->InsertEndChild(axis1);
-
-      XMLElement* axis2 = xmlDoc.NewElement("axis2");
-      XMLElement* xyz2 = xmlDoc.NewElement("xyz");
-      xyz2->SetText(writeVec3(universal->getAxis2()).c_str());
-      axis2->InsertEndChild(xyz2);
-      jointXml->InsertEndChild(axis2);
-    }
-    else if (joint->getType() == dynamics::EulerJoint::getStaticType())
-    {
-      dynamics::EulerJoint* euler = static_cast<dynamics::EulerJoint*>(joint);
-      (void)euler;
-      jointXml->SetAttribute("type", "ball");
-    }
-    else if (joint->getType() == dynamics::BallJoint::getStaticType())
-    {
-      dynamics::BallJoint* ball = static_cast<dynamics::BallJoint*>(joint);
-      (void)ball;
-      jointXml->SetAttribute("type", "ball");
-    }
-    else if (joint->getType() == dynamics::WeldJoint::getStaticType())
-    {
-      dynamics::WeldJoint* weld = static_cast<dynamics::WeldJoint*>(joint);
-      (void)weld;
-      jointXml->SetAttribute("type", "fixed");
-    }
-    else if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
-    {
-      dynamics::CustomJoint<1>* custom
-          = static_cast<dynamics::CustomJoint<1>*>(joint);
-      (void)custom;
-      jointXml->SetAttribute("type", "revolute");
-
-      Eigen::Vector3s axisDir
-          = Eigen::Vector3s::UnitX(); // TODO: figure this out properly
-
-      XMLElement* axis = xmlDoc.NewElement("axis");
-      XMLElement* xyz = xmlDoc.NewElement("xyz");
-      xyz->SetText(writeVec3(axisDir).c_str());
-      axis->InsertEndChild(xyz);
-      jointXml->InsertEndChild(axis);
-    }
-
-    XMLElement* parent = xmlDoc.NewElement("parent");
-    parent->SetText(joint->getParentBodyNode()->getName().c_str());
-    jointXml->InsertEndChild(parent);
-
-    XMLElement* child = xmlDoc.NewElement("child");
-    child->SetText(joint->getChildBodyNode()->getName().c_str());
-    jointXml->InsertEndChild(child);
-
-    joint->getType();
+    // Unable to simplify skeleton, so unable to write
+    return false;
   }
+}
 
-  xmlDoc.SaveFile(outputPath.c_str());
+/// This does its best to convert a *.osim file to an MJCF file. It will
+/// simplify the skeleton by merging any bodies that are requested, and
+/// deleting any joints linking those bodies.
+bool OpenSimParser::convertOsimToMJCF(
+    const common::Uri& uri,
+    const std::string& outputPath,
+    std::map<std::string, std::string> mergeBodiesInto)
+{
+  OpenSimFile file = parseOsim(uri);
+
+  std::shared_ptr<dynamics::Skeleton> simplified
+      = file.skeleton->simplifySkeleton(
+          file.skeleton->getName(), mergeBodiesInto);
+  if (simplified)
+  {
+    MJCFExporter::writeSkeleton(outputPath, simplified);
+    return true;
+  }
+  else
+  {
+    // Unable to simplify skeleton, so unable to write
+    return false;
+  }
 }
 
 //==============================================================================

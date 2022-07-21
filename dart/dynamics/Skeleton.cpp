@@ -561,6 +561,111 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
 }
 
 //==============================================================================
+/// Creates and returns a clone of this Skeleton, where we merge the provided
+/// bodies together and approximate the CustomJoints with simpler joint types.
+SkeletonPtr Skeleton::simplifySkeleton(
+    const std::string& cloneName,
+    std::map<std::string, std::string> mergeBodiesInto) const
+{
+  (void)mergeBodiesInto;
+
+  SkeletonPtr skelClone = Skeleton::create(cloneName);
+
+  for (std::size_t i = 0; i < getNumBodyNodes(); ++i)
+  {
+    // Create a clone of the parent Joint
+    Joint* joint = getJoint(i)->simplifiedClone();
+    if (joint == nullptr)
+    {
+      std::cout << "WARNING: Skeleton " << getName() << " cannot be simplified"
+                << std::endl;
+      return nullptr;
+    }
+
+    // Identify the original parent BodyNode
+    const BodyNode* originalParent = getBodyNode(i)->getParentBodyNode();
+
+    // Grab the parent BodyNode clone (using its name, which is guaranteed to be
+    // unique), or use nullptr if this is a root BodyNode
+    BodyNode* parentClone
+        = (originalParent == nullptr)
+              ? nullptr
+              : skelClone->getBodyNode(originalParent->getName());
+
+    if ((nullptr != originalParent) && (nullptr == parentClone))
+    {
+      dterr << "[Skeleton::clone] Failed to find a clone of BodyNode named ["
+            << originalParent->getName() << "] which is needed as the parent "
+            << "of the BodyNode named [" << getBodyNode(i)->getName()
+            << "] and should already have been created. Please report this as "
+            << "a bug!\n";
+    }
+
+    BodyNode* newBody = getBodyNode(i)->clone(parentClone, joint, false);
+
+    skelClone->registerBodyNode(newBody);
+  }
+
+  // Clone over the nodes in such a way that their indexing will match up with
+  // the original
+  for (const auto& nodeType : mNodeMap)
+  {
+    for (const auto& node : nodeType.second)
+    {
+      const BodyNode* originalBn = node->getBodyNodePtr();
+      BodyNode* newBn = skelClone->getBodyNode(originalBn->getName());
+      node->cloneNode(newBn)->attach();
+    }
+  }
+
+  skelClone->setProperties(getAspectProperties());
+  skelClone->setName(cloneName);
+  skelClone->setState(getState());
+
+  // Fix mimic joint references
+  for (std::size_t i = 0; i < getNumJoints(); ++i)
+  {
+    Joint* joint = skelClone->getJoint(i);
+    if (joint->getActuatorType() == Joint::MIMIC)
+    {
+      const Joint* mimicJoint
+          = skelClone->getJoint(joint->getMimicJoint()->getName());
+      if (mimicJoint)
+      {
+        joint->setMimicJoint(
+            mimicJoint, joint->getMimicMultiplier(), joint->getMimicOffset());
+      }
+      else
+      {
+        dterr << "[Skeleton::clone] Failed to clone mimic joint successfully: "
+              << "Unable to find the mimic joint ["
+              << joint->getMimicJoint()->getName()
+              << "] in the cloned Skeleton. Please report this as a bug!\n";
+      }
+    }
+  }
+
+  // Fix the scale groups
+  for (auto group : mBodyScaleGroups)
+  {
+    if (group.nodes.size() > 0)
+    {
+      for (int i = 1; i < group.nodes.size(); i++)
+      {
+        skelClone->mergeScaleGroups(
+            skelClone->getBodyNode(group.nodes[0]->getName()),
+            skelClone->getBodyNode(group.nodes[i]->getName()));
+      }
+      skelClone->setScaleGroupUniformScaling(
+          skelClone->getBodyNode(group.nodes[0]->getName()),
+          group.uniformScaling);
+    }
+  }
+
+  return skelClone;
+}
+
+//==============================================================================
 MetaSkeletonPtr Skeleton::cloneMetaSkeleton(const std::string& cloneName) const
 {
   return cloneSkeleton(cloneName);

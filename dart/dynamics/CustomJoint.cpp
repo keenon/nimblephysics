@@ -5,6 +5,7 @@
 
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
+#include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/LinearFunction.hpp"
@@ -690,6 +691,86 @@ dart::dynamics::Joint* CustomJoint<Dimension>::clone() const
   joint->setVelocityUpperLimits(this->getVelocityUpperLimits());
   joint->setVelocityLowerLimits(this->getVelocityLowerLimits());
   return joint;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<1>::simplifiedClone() const
+{
+  Eigen::Isometry3s T_zero = EulerJoint::convertToTransform(
+      getEulerPositions(Eigen::Vector1s(0)), mAxisOrder, mFlipAxisMap);
+  Eigen::Isometry3s T_lower = EulerJoint::convertToTransform(
+      getEulerPositions(Eigen::Vector1s(getPositionLowerLimit(0))),
+      mAxisOrder,
+      mFlipAxisMap);
+  Eigen::Isometry3s T_upper = EulerJoint::convertToTransform(
+      getEulerPositions(Eigen::Vector1s(getPositionUpperLimit(0))),
+      mAxisOrder,
+      mFlipAxisMap);
+  Eigen::Isometry3s relative = (T_lower.inverse() * T_upper);
+  Eigen::Vector3s axisDir = math::logMap(relative.linear()).normalized();
+  Eigen::Isometry3s T_upperLimit = (T_zero.inverse() * T_upper);
+  Eigen::Vector3s upperLimitRot = math::logMap(T_upperLimit.linear());
+  s_t upperLimitVal = axisDir.dot(upperLimitRot);
+  Eigen::Isometry3s T_lowerLimit = (T_zero.inverse() * T_lower);
+  Eigen::Vector3s lowerLimitRot = math::logMap(T_lowerLimit.linear());
+  s_t lowerLimitVal = axisDir.dot(lowerLimitRot);
+
+  RevoluteJoint::Properties props;
+  props.mAxis = axisDir;
+  props.mName = getName();
+  props.mDofNames[0] = getDofName(0);
+  props.mPositionLowerLimits = Eigen::Vector1s(lowerLimitVal);
+  props.mPositionUpperLimits = Eigen::Vector1s(upperLimitVal);
+  RevoluteJoint* joint = new RevoluteJoint(props);
+  joint->mChildBodyNode = mChildBodyNode;
+  joint->copyTransformsFrom(this);
+  return joint;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<2>::simplifiedClone() const
+{
+  std::cout << "WARNING: 2 DOF CustomJoint does not support simplification yet!"
+            << std::endl;
+  return nullptr;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<3>::simplifiedClone() const
+{
+  std::cout << "WARNING: 3 DOF CustomJoint does not support simplification yet!"
+            << std::endl;
+  return nullptr;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<4>::simplifiedClone() const
+{
+  std::cout << "WARNING: 4 DOF CustomJoint does not support simplification yet!"
+            << std::endl;
+  return nullptr;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<5>::simplifiedClone() const
+{
+  std::cout << "WARNING: 5 DOF CustomJoint does not support simplification yet!"
+            << std::endl;
+  return nullptr;
+}
+
+//==============================================================================
+template <>
+dart::dynamics::Joint* CustomJoint<6>::simplifiedClone() const
+{
+  std::cout << "WARNING: 6 DOF CustomJoint does not support simplification yet!"
+            << std::endl;
+  return nullptr;
 }
 
 //==============================================================================

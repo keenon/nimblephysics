@@ -61,6 +61,11 @@ void SkeletonConverter(py::module& m)
           ::py::arg("sourceJoint"),
           ::py::arg("targetJoint"))
       .def(
+          "createVirtualMarkers",
+          &dart::biomechanics::SkeletonConverter::createVirtualMarkers,
+          ::py::arg("addFakeMarkers") = 3,
+          ::py::arg("weightFakeMarkers") = 0.1)
+      .def(
           "rescaleAndPrepTarget",
           &dart::biomechanics::SkeletonConverter::rescaleAndPrepTarget,
           ::py::arg("addFakeMarkers") = 3,

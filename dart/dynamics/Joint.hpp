@@ -922,6 +922,11 @@ protected:
   /// class.
   virtual Joint* clone() const = 0;
 
+  /// Create a clone of this Joint, or (if this joint cannot be represented in
+  /// SDF or MJCF, like CustomJoint's) create a simplified approximation of this
+  /// joint.
+  virtual Joint* simplifiedClone() const;
+
   /// Called by the Skeleton class
   virtual void registerDofs() = 0;
 

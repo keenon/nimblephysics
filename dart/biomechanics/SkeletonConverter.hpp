@@ -24,6 +24,11 @@ public:
   /// rotations are as close as possible.
   void linkJoints(dynamics::Joint* sourceJoint, dynamics::Joint* targetJoint);
 
+  /// This assumes that both skeletons are already scaled and aligned, and just
+  /// goes through and adds fake markers
+  void createVirtualMarkers(
+      int addFakeMarkers = 3, s_t weightFakeMarkers = 0.1);
+
   /// This will do its best to map the target onto the source skeleton
   void rescaleAndPrepTarget(
       int addFakeMarkers = 3,

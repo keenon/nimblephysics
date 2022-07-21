@@ -213,6 +213,12 @@ public:
   /// Creates and returns a clone of this Skeleton.
   SkeletonPtr cloneSkeleton(const std::string& cloneName) const;
 
+  /// Creates and returns a clone of this Skeleton, where we merge the provided
+  /// bodies together and approximate the CustomJoints with simpler joint types.
+  SkeletonPtr simplifySkeleton(
+      const std::string& cloneName,
+      std::map<std::string, std::string> mergeBodiesInto) const;
+
   // Documentation inherited
   MetaSkeletonPtr cloneMetaSkeleton(
       const std::string& cloneName) const override;

@@ -14,6 +14,31 @@ SkeletonConverter::SkeletonConverter(
   : mSourceSkeleton(source), mTargetSkeleton(target)
 {
   mSourceSkeletonBallJoints = mSourceSkeleton->convertSkeletonToBallJoints();
+#ifndef NDEBUG
+  for (int i = 0; i < mSourceSkeleton->getNumJoints(); i++)
+  {
+    dynamics::Joint* sourceJoint = mSourceSkeleton->getJoint(i);
+    dynamics::Joint* sourceJointWithBalls
+        = mSourceSkeletonBallJoints->getJoint(i);
+    Eigen::Matrix4s originalChild
+        = sourceJoint->getTransformFromChildBodyNode().matrix();
+    Eigen::Matrix4s originalParent
+        = sourceJoint->getTransformFromParentBodyNode().matrix();
+    Eigen::Matrix4s convertedChild
+        = sourceJointWithBalls->getTransformFromChildBodyNode().matrix();
+    Eigen::Matrix4s convertedParent
+        = sourceJointWithBalls->getTransformFromParentBodyNode().matrix();
+    assert((originalChild - convertedChild).norm() < 1e-10);
+    if ((originalParent - convertedParent).norm() >= 1e-10)
+    {
+      std::cout << "Original parent T" << std::endl
+                << originalParent << std::endl;
+      std::cout << "Converted parent T" << std::endl
+                << convertedParent << std::endl;
+    }
+    assert((originalParent - convertedParent).norm() < 1e-10);
+  }
+#endif
 }
 
 //==============================================================================
@@ -70,16 +95,10 @@ Eigen::VectorXs SkeletonConverter::getTargetMarkerWorldPositions()
 }
 
 //==============================================================================
-/// This will do its best to map the target onto the source skeleton
-void SkeletonConverter::rescaleAndPrepTarget(
-    int addFakeMarkers,
-    s_t weightFakeMarkers,
-    ////// IK options
-    s_t convergenceThreshold,
-    int maxStepCount,
-    s_t leastSquaresDamping,
-    bool lineSearch,
-    bool logOutput)
+/// This assumes that both skeletons are already scaled and aligned, and just
+/// goes through and adds fake markers
+void SkeletonConverter::createVirtualMarkers(
+    int addFakeMarkers, s_t weightFakeMarkers)
 {
   if (addFakeMarkers < 0)
   {
@@ -95,39 +114,6 @@ void SkeletonConverter::rescaleAndPrepTarget(
         << addFakeMarkers << ", so clamping to 3" << std::endl;
     addFakeMarkers = 3;
   }
-  mSourceSkeleton->fitJointsToWorldPositions(
-      mSourceJoints,
-      getTargetJointWorldPositions(),
-      true,
-      math::IKConfig()
-          .setConvergenceThreshold(convergenceThreshold)
-          .setMaxStepCount(maxStepCount)
-          .setLeastSquaresDamping(leastSquaresDamping)
-          .setLineSearch(lineSearch)
-          .setLogOutput(logOutput));
-  for (int i = 0; i < mSourceSkeleton->getNumBodyNodes(); i++)
-  {
-    mSourceSkeletonBallJoints->getBodyNode(i)->setScale(
-        mSourceSkeleton->getBodyNode(i)->getScale());
-  }
-#ifndef NDEBUG
-  for (int i = 0; i < mSourceSkeleton->getNumJoints(); i++)
-  {
-    dynamics::Joint* sourceJoint = mSourceSkeleton->getJoint(i);
-    dynamics::Joint* sourceJointWithBalls
-        = mSourceSkeletonBallJoints->getJoint(i);
-    Eigen::Matrix4s originalChild
-        = sourceJoint->getTransformFromChildBodyNode().matrix();
-    Eigen::Matrix4s originalParent
-        = sourceJoint->getTransformFromParentBodyNode().matrix();
-    Eigen::Matrix4s convertedChild
-        = sourceJointWithBalls->getTransformFromChildBodyNode().matrix();
-    Eigen::Matrix4s convertedParent
-        = sourceJointWithBalls->getTransformFromParentBodyNode().matrix();
-    assert(originalChild == convertedChild);
-    assert(originalParent == convertedParent);
-  }
-#endif
   mMarkerWeights = Eigen::VectorXs::Ones(mTargetJoints.size() * 4);
   int cursor = 0;
   // Go through and create a bunch of "fake" 3D markers that register pairs of
@@ -225,6 +211,63 @@ void SkeletonConverter::rescaleAndPrepTarget(
   s_t errorFromBalls = diff.squaredNorm();
   assert(errorFromBalls < 1e-16);
 #endif
+}
+
+//==============================================================================
+/// This will do its best to map the target onto the source skeleton
+void SkeletonConverter::rescaleAndPrepTarget(
+    int addFakeMarkers,
+    s_t weightFakeMarkers,
+    ////// IK options
+    s_t convergenceThreshold,
+    int maxStepCount,
+    s_t leastSquaresDamping,
+    bool lineSearch,
+    bool logOutput)
+{
+  (void)logOutput;
+  Eigen::VectorXs targetJointPositions = getTargetJointWorldPositions();
+  mSourceSkeleton->fitJointsToWorldPositions(
+      mSourceJoints,
+      targetJointPositions,
+      true,
+      math::IKConfig()
+          .setConvergenceThreshold(convergenceThreshold)
+          .setMaxStepCount(maxStepCount)
+          .setLeastSquaresDamping(leastSquaresDamping)
+          .setLineSearch(lineSearch)
+          .setLogOutput(true));
+  for (int i = 0; i < mSourceSkeleton->getNumBodyNodes(); i++)
+  {
+    mSourceSkeletonBallJoints->getBodyNode(i)->setScale(
+        mSourceSkeleton->getBodyNode(i)->getScale());
+  }
+#ifndef NDEBUG
+  for (int i = 0; i < mSourceSkeleton->getNumJoints(); i++)
+  {
+    dynamics::Joint* sourceJoint = mSourceSkeleton->getJoint(i);
+    dynamics::Joint* sourceJointWithBalls
+        = mSourceSkeletonBallJoints->getJoint(i);
+    Eigen::Matrix4s originalChild
+        = sourceJoint->getTransformFromChildBodyNode().matrix();
+    Eigen::Matrix4s originalParent
+        = sourceJoint->getTransformFromParentBodyNode().matrix();
+    Eigen::Matrix4s convertedChild
+        = sourceJointWithBalls->getTransformFromChildBodyNode().matrix();
+    Eigen::Matrix4s convertedParent
+        = sourceJointWithBalls->getTransformFromParentBodyNode().matrix();
+    assert((originalChild - convertedChild).norm() < 1e-10);
+    if ((originalParent - convertedParent).norm() >= 1e-10)
+    {
+      std::cout << "Original parent T" << std::endl
+                << originalParent << std::endl;
+      std::cout << "Converted parent T" << std::endl
+                << convertedParent << std::endl;
+    }
+    assert((originalParent - convertedParent).norm() < 1e-10);
+  }
+#endif
+  createVirtualMarkers(addFakeMarkers, weightFakeMarkers);
 }
 
 //==============================================================================

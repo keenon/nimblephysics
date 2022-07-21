@@ -335,6 +335,20 @@ void OpenSimParser(py::module& m)
       &dart::biomechanics::OpenSimParser::getScaleAndMarkerOffsets,
       ::py::arg("standardSkeleton"),
       ::py::arg("scaledSkeleton"));
+
+  sm.def(
+      "convertOsimToSDF",
+      &dart::biomechanics::OpenSimParser::convertOsimToSDF,
+      ::py::arg("uri"),
+      ::py::arg("outputPath"),
+      ::py::arg("mergeBodiesInto"));
+
+  sm.def(
+      "convertOsimToMJCF",
+      &dart::biomechanics::OpenSimParser::convertOsimToMJCF,
+      ::py::arg("uri"),
+      ::py::arg("outputPath"),
+      ::py::arg("mergeBodiesInto"));
 }
 
 } // namespace python

@@ -105,6 +105,15 @@ Joint::ExtendedProperties::ExtendedProperties(
 }
 
 //==============================================================================
+/// Create a clone of this Joint, or (if this joint cannot be represented in
+/// SDF or MJCF, like CustomJoint's) create a simplified approximation of this
+/// joint.
+Joint* Joint::simplifiedClone() const
+{
+  return clone();
+}
+
+//==============================================================================
 Joint::~Joint()
 {
   // Do nothing

@@ -228,6 +228,8 @@ public:
 
   dart::dynamics::Joint* clone() const override;
 
+  dart::dynamics::Joint* simplifiedClone() const override;
+
   void updateDegreeOfFreedomNames() override;
 
   void updateRelativeTransform() const override;

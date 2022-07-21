@@ -74,6 +74,89 @@ EulerJoint::AxisOrder EulerFreeJoint::getAxisOrder() const
 }
 
 //==============================================================================
+/// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+Eigen::Vector3s EulerFreeJoint::getAxis(int index) const
+{
+  if (getAxisOrder() == EulerJoint::AxisOrder::XYZ)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::XZY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::ZYX)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ();
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY();
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitX();
+    }
+  }
+  if (index == 3)
+  {
+    return Eigen::Vector3s::UnitX();
+  }
+  if (index == 4)
+  {
+    return Eigen::Vector3s::UnitY();
+  }
+  if (index == 5)
+  {
+    return Eigen::Vector3s::UnitZ();
+  }
+  std::cout << "ERROR: EulerFreeJoint is being asked for an axis that is out "
+               "of bounds!"
+            << std::endl;
+  assert(false);
+  return Eigen::Vector3s::UnitX();
+}
+
+//==============================================================================
 dart::dynamics::Joint* EulerFreeJoint::clone() const
 {
   EulerFreeJoint* joint = new EulerFreeJoint(this->getJointProperties());

@@ -77,6 +77,9 @@ public:
   /// Return the axis order
   EulerJoint::AxisOrder getAxisOrder() const;
 
+  /// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+  Eigen::Vector3s getAxis(int index) const;
+
   dart::dynamics::Joint* clone() const override;
 
   void updateDegreeOfFreedomNames() override;
@@ -123,7 +126,8 @@ public:
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
       const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint, bool useRidders = true);
+      const Eigen::Isometry3s& childBodyToJoint,
+      bool useRidders = true);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivStatic(
       const Eigen::Vector6s& positions,
@@ -172,7 +176,6 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint,
       bool useRidders = true);
-
 
 protected:
   EulerJoint::AxisOrder mAxisOrder;

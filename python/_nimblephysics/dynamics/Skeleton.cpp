@@ -289,6 +289,16 @@ void Skeleton(py::module& m)
           },
           ::py::arg("cloneName"))
       .def(
+          "simplifySkeleton",
+          +[](const dart::dynamics::Skeleton* self,
+              const std::string& cloneName,
+              std::map<std::string, std::string> mergeBodiesInto)
+              -> dart::dynamics::SkeletonPtr {
+            return self->simplifySkeleton(cloneName, mergeBodiesInto);
+          },
+          ::py::arg("cloneName"),
+          ::py::arg("mergeBodiesInto"))
+      .def(
           "setConfiguration",
           +[](dart::dynamics::Skeleton* self,
               const dart::dynamics::Skeleton::Configuration& configuration)

@@ -33,6 +33,7 @@
 #ifndef DART_DYNAMICS_REVOLUTEJOINT_HPP_
 #define DART_DYNAMICS_REVOLUTEJOINT_HPP_
 
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/detail/RevoluteJointAspect.hpp"
 
 namespace dart {
@@ -43,6 +44,7 @@ class RevoluteJoint : public detail::RevoluteJointBase
 {
 public:
   friend class Skeleton;
+  friend class CustomJoint<1>;
   using UniqueProperties = detail::RevoluteJointUniqueProperties;
   using Properties = detail::RevoluteJointProperties;
   using Base = detail::RevoluteJointBase;

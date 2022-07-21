@@ -6,9 +6,11 @@
 #include "dart/biomechanics/C3DLoader.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
+#include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
+#include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/sdf/SdfParser.hpp"
 #include "dart/utils/urdf/DartLoader.hpp"
 
@@ -33,23 +35,155 @@ TEST(OpenSimParser, UNSUPPORTED_JOINT_TYPE)
 }
 */
 
-/*
 #ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_SDF)
 {
+  auto file = OpenSimParser::parseOsim(
+      "dart://sample/osim/MichaelTest/results/Models/autoscaled.osim");
+
+  std::map<std::string, std::string> mergeBodiesInto;
+  mergeBodiesInto["ulna_r"] = "radius_r";
+  mergeBodiesInto["ulna_l"] = "radius_l";
   OpenSimParser::convertOsimToSDF(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
-      "../../../data/osim/Rajagopal2015/Rajagopal2015.sdf");
+      "dart://sample/osim/MichaelTest/results/Models/autoscaled.osim",
+      "../../../data/osim/MichaelTest/results/Models/model.sdf",
+      mergeBodiesInto);
+
   std::shared_ptr<dynamics::Skeleton> skel = SdfParser::readSkeleton(
-      "dart://sample/osim/Rajagopal2015/Rajagopal2015.sdf");
+      "dart://sample/osim/MichaelTest/results/Models/model.sdf");
+
+  /*
+  // skel->getDof("walker_knee_r")->setPosition(1.0);
+  // skel->getDof("walker_knee_l")->setPosition(0.5);
+  GUIWebsocketServer server;
+  server.renderSkeleton(skel);
+  server.renderSkeleton(file.skeleton, "osim");
+  server.serve(8070);
+  server.blockWhileServing();
+  */
+
+  /*
+  SkeletonConverter converter(skel, file.skeleton);
+  // Set the root orientation to be the same
+  for (int i = 0; i < 6; i++)
+  {
+    skel->setPosition(i, file.skeleton->getPosition(i));
+  }
+  // Link joints
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    auto* sourceJoint = skel->getJoint(i);
+    if (file.skeleton->getJoint(sourceJoint->getName()) != nullptr)
+    {
+      converter.linkJoints(
+          sourceJoint, file.skeleton->getJoint(sourceJoint->getName()));
+    }
+  }
+  converter.createVirtualMarkers();
+
+  auto mot = OpenSimParser::loadMot(
+      file.skeleton,
+      "dart://sample/osim/MichaelTest/results/IK/S02DN101_ik.mot");
+  Eigen::MatrixXs convertedPoses = converter.convertMotion(mot.poses);
+  OpenSimParser::saveMot(
+      skel,
+      "../../../data/osim/MichaelTest/results/S02DN101.mot",
+      mot.timestamps,
+      convertedPoses);
 
   GUIWebsocketServer server;
   server.renderSkeleton(skel);
+
+  // Render the converted poses over time
+  int timestep = 0;
+  std::shared_ptr<realtime::Ticker> ticker
+      = std::make_shared<realtime::Ticker>(1.0 / 50);
+  ticker->registerTickListener([&](long) {
+    skel->setPositions(convertedPoses.col(timestep));
+    server.renderSkeleton(skel);
+    timestep++;
+    if (timestep >= convertedPoses.cols())
+      timestep = 0;
+  });
+  server.registerConnectionListener([&]() { ticker->start(); });
+
   server.serve(8070);
   server.blockWhileServing();
+  */
 }
 #endif
-*/
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, CONVERT_TO_MJCF)
+{
+  auto file = OpenSimParser::parseOsim(
+      "dart://sample/osim/MichaelTest4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::map<std::string, std::string> mergeBodiesInto;
+  mergeBodiesInto["ulna_r"] = "radius_r";
+  mergeBodiesInto["ulna_l"] = "radius_l";
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton->simplifySkeleton(
+      file.skeleton->getName(), mergeBodiesInto);
+
+  MJCFExporter::writeSkeleton(
+      "../../../data/osim/MichaelTest4/Models/model.mjcf", skel);
+  /*
+  OpenSimParser::convertOsimToMJCF(
+      "dart://sample/osim/MichaelTest/results/Models/autoscaled.osim",
+      "../../../data/osim/MichaelTest/results/Models/model.mjcf",
+      mergeBodiesInto);
+  */
+
+  /*
+  SkeletonConverter converter(skel, file.skeleton);
+  // Set the root orientation to be the same
+  for (int i = 0; i < 6; i++)
+  {
+    skel->setPosition(i, file.skeleton->getPosition(i));
+  }
+  // Link joints
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    auto* sourceJoint = skel->getJoint(i);
+    if (file.skeleton->getJoint(sourceJoint->getName()) != nullptr)
+    {
+      converter.linkJoints(
+          sourceJoint, file.skeleton->getJoint(sourceJoint->getName()));
+    }
+  }
+  converter.createVirtualMarkers();
+
+  auto mot = OpenSimParser::loadMot(
+      file.skeleton, "dart://sample/osim/MichaelTest4/IK/S02DN101_ik.mot");
+  Eigen::MatrixXs convertedPoses = converter.convertMotion(mot.poses);
+  OpenSimParser::saveMot(
+      skel,
+      "../../../data/osim/MichaelTest4/S02DN101.mot",
+      mot.timestamps,
+      convertedPoses);
+
+  GUIWebsocketServer server;
+  server.renderSkeleton(skel);
+
+  // Render the converted poses over time
+  int timestep = 0;
+  std::shared_ptr<realtime::Ticker> ticker
+      = std::make_shared<realtime::Ticker>(1.0 / 50);
+  ticker->registerTickListener([&](long) {
+    skel->setPositions(convertedPoses.col(timestep));
+    server.renderSkeleton(skel);
+    timestep++;
+    if (timestep >= convertedPoses.cols())
+      timestep = 0;
+  });
+  server.registerConnectionListener([&]() { ticker->start(); });
+
+  server.serve(8070);
+  server.blockWhileServing();
+  */
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, PIECEWISE_LINEAR)

@@ -94,6 +94,9 @@ public:
   /// Return the axis order
   AxisOrder getAxisOrder() const;
 
+  /// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+  Eigen::Vector3s getAxis(int index) const;
+
   /// This takes a vector of 1's and -1's to indicate which entries to flip, if
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);

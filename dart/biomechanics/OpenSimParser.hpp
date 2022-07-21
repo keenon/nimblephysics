@@ -2,6 +2,7 @@
 #define DART_UTILS_OSIMPARSER_HPP_
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include <tinyxml2.h>
@@ -237,9 +238,21 @@ public:
   static OpenSimScaleAndMarkerOffsets getScaleAndMarkerOffsets(
       const OpenSimFile& standardSkeleton, const OpenSimFile& scaledSkeleton);
 
-  /// This does its best to convert a *.osim file to a URDF file.
-  static void convertOsimToSDF(
-      const common::Uri& uri, const std::string& outputPath);
+  /// This does its best to convert a *.osim file to an SDF file. It will
+  /// simplify the skeleton by merging any bodies that are requested, and
+  /// deleting any joints linking those bodies.
+  static bool convertOsimToSDF(
+      const common::Uri& uri,
+      const std::string& outputPath,
+      std::map<std::string, std::string> mergeBodiesInto);
+
+  /// This does its best to convert a *.osim file to an MJCF file. It will
+  /// simplify the skeleton by merging any bodies that are requested, and
+  /// deleting any joints linking those bodies.
+  static bool convertOsimToMJCF(
+      const common::Uri& uri,
+      const std::string& outputPath,
+      std::map<std::string, std::string> mergeBodiesInto);
 
 protected:
   static OpenSimFile readOsim30(
