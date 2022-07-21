@@ -538,7 +538,7 @@ void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
 
     s_t totalMass = body->getMass();
     Eigen::Vector3s COM = body->getInertia().getLocalCOM();
-    dart::dynamics::Inertia inertia = body->getInertia();
+    // dart::dynamics::Inertia inertia = body->getInertia();
 
     XMLElement* inertialMass = xmlDoc.NewElement("mass");
     inertialMass->SetText(std::to_string(totalMass).c_str());

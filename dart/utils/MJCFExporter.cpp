@@ -68,7 +68,7 @@ void recursivelyWriteJointAndBody(
   XMLElement* inertiaXml = xmlDoc.NewElement("inertial");
   inertiaXml->SetAttribute("pos", writeVec3(body->getCOM()).c_str());
   inertiaXml->SetAttribute("mass", std::to_string(body->getMass()).c_str());
-  dart::dynamics::Inertia inertia = body->getInertia();
+  // dart::dynamics::Inertia inertia = body->getInertia();
   s_t i_xx = 0;
   s_t i_xy = 0;
   s_t i_xz = 0;
