@@ -13,6 +13,7 @@
 
 #include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
+#include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
@@ -315,14 +316,6 @@ struct ScaleAndFitResult
   s_t score;
 };
 
-struct MarkersErrorReport
-{
-  std::vector<std::string> warnings;
-  std::vector<std::string> info;
-  std::vector<std::map<std::string, Eigen::Vector3s>>
-      markerObservationsAttemptedFixed;
-};
-
 /**
  * This is the high level object that handles fitting skeletons to mocap data.
  *
@@ -481,7 +474,9 @@ public:
       Eigen::VectorXs jointWeights,
       Eigen::VectorXs jointAxis,
       Eigen::VectorXs axisWeights,
-      bool dontScale = false);
+      bool dontScale = false,
+      int debugIndex = 0,
+      bool debug = false);
 
   /// Pipeline step 1, 3, and 5:
   /// This fits IK to the given trajectory, without scaling

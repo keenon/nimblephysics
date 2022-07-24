@@ -13,6 +13,8 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/biomechanics/MarkerFixer.hpp"
+#include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -778,16 +780,15 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         immutableMarkerObservations)
 {
-  MarkersErrorReport report;
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
-      = immutableMarkerObservations;
+  MarkersErrorReport report
+      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations);
 
-  // 0. Generate a list of the markers we observe in this clip
+  // 1. Generate a list of the markers we observe in this clip
 
   std::map<std::string, int> observedMarkersMap;
-  for (int i = 0; i < markerObservations.size(); i++)
+  for (int i = 0; i < immutableMarkerObservations.size(); i++)
   {
-    for (auto& pair : markerObservations[i])
+    for (auto& pair : immutableMarkerObservations[i])
     {
       observedMarkersMap[pair.first] = 1;
     }
@@ -796,76 +797,6 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
   for (auto& pair : observedMarkersMap)
   {
     observedMarkers.push_back(pair.first);
-  }
-
-  // 1. Attempt to detect marker flips that occur partway through the trajectory
-
-  std::map<std::string, std::string> lastFlips;
-  for (int i = 1; i < markerObservations.size(); i++)
-  {
-    std::unordered_map<std::string, std::string> closestMarkerFromLastTimestep;
-
-    for (std::string& marker : observedMarkers)
-    {
-      closestMarkerFromLastTimestep[marker] = marker;
-
-      // If we see the marker on both timesteps, then evaluate which markers
-      // were the closest on last timestep to this marker
-      if (markerObservations[i].count(marker) > 0
-          && markerObservations[i - 1].count(marker) > 0)
-      {
-        Eigen::Vector3s thisTimestep = markerObservations[i].at(marker);
-        for (auto& pair : markerObservations[i - 1])
-        {
-          s_t dist = (pair.second - thisTimestep).norm();
-          if (dist < (markerObservations[i - 1].at(
-                          closestMarkerFromLastTimestep.at(marker))
-                      - thisTimestep)
-                         .norm())
-          {
-            closestMarkerFromLastTimestep[marker] = pair.first;
-          }
-        }
-      }
-    }
-
-    for (std::string& marker : observedMarkers)
-    {
-      // If we weren't closest to ourselves, and instead we were closest to
-      // another marker AND IT WAS CLOSEST TO US, then we've detected a trivial
-      // flip, and we can flip back.
-      if (closestMarkerFromLastTimestep[marker] != marker
-          && closestMarkerFromLastTimestep
-                     [closestMarkerFromLastTimestep[marker]]
-                 == marker)
-      {
-        Eigen::Vector3s tmp = markerObservations[i][marker];
-        std::string otherMarker = closestMarkerFromLastTimestep[marker];
-
-        if (lastFlips[marker] != otherMarker)
-        {
-          lastFlips[marker] = otherMarker;
-          report.warnings.push_back(
-              "Marker \"" + marker + "\" was flipped with \"" + otherMarker
-              + "\" starting on frame " + std::to_string(i));
-        }
-
-        markerObservations[i][marker] = markerObservations[i][otherMarker];
-        markerObservations[i][otherMarker] = tmp;
-        closestMarkerFromLastTimestep[marker] = marker;
-        closestMarkerFromLastTimestep[otherMarker] = otherMarker;
-      }
-      else
-      {
-        if (lastFlips[marker] != marker && i > 1)
-        {
-          report.warnings.push_back(
-              "Marker \"" + marker + "\" ended flip with \"" + lastFlips[marker]
-              + "\" (reverted to itself) on frame " + std::to_string(i));
-        }
-        lastFlips[marker] = marker;
-      }
-    }
   }
 
   // 2. Generate a warning if there aren't enough fixed markers on the pelvis
@@ -941,7 +872,6 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     report.warnings.push_back("We only found " + std::to_string(markersInBoth.size()) + " model markers that also appear in the motion capture! This will probably lead to suboptimal results, and likely means this file doesn't match the model you uploaded!");
   }
 
-  report.markerObservationsAttemptedFixed = markerObservations;
   return report;
 }
 
@@ -3266,6 +3196,7 @@ MarkerInitialization MarkerFitter::getInitialization(
   }
 
   // 2. Find IK+scaling for the beginning of each block independently
+  std::vector<ScaleAndFitResult> posesAndScales;
   std::vector<std::future<ScaleAndFitResult>> posesAndScalesFutures;
 
   if (params.groupScales.size() > 0)
@@ -3284,7 +3215,22 @@ MarkerInitialization MarkerFitter::getInitialization(
       std::cout << "Starting initial scale+fit for first timestep of block "
                 << i << "/" << numBlocks << std::endl;
     }
-    // posesAndScales.push_back(scaleAndFit(this, blocks[i][0]));
+    /*
+    posesAndScales.push_back(scaleAndFit(
+        this,
+        blocks[i][0],
+        firstGuessPoses[i],
+        params.markerWeights,
+        params.markerOffsets,
+        params.joints,
+        jointCenterBlocks[i][0],
+        params.jointWeights,
+        jointAxisBlocks[i][0],
+        params.axisWeights,
+        params.dontRescaleBodies,
+        i,
+        false));
+        */
     posesAndScalesFutures.push_back(std::async(
         &MarkerFitter::scaleAndFit,
         this,
@@ -3297,10 +3243,11 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.jointWeights,
         jointAxisBlocks[i][0],
         params.axisWeights,
-        params.dontRescaleBodies));
+        params.dontRescaleBodies,
+        i,
+        false));
   }
 
-  std::vector<ScaleAndFitResult> posesAndScales;
   for (int i = 0; i < numBlocks; i++)
   {
     ScaleAndFitResult result = posesAndScalesFutures[i].get();
@@ -3674,7 +3621,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     Eigen::VectorXs jointWeights,
     Eigen::VectorXs jointAxis,
     Eigen::VectorXs axisWeights,
-    bool dontScale)
+    bool dontScale,
+    int debugIndex,
+    bool debug)
 {
   // 0. To make this thread safe, we're going to clone the fitter skeleton
   std::shared_ptr<dynamics::Skeleton> skeleton;
@@ -3777,6 +3726,23 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     initialPos = skeletonBallJoints->convertPositionsToBallSpace(
         skeletonBallJoints->getPositions());
 
+    if (debug)
+    {
+      std::cout << "Beginning IK (no scaling) for block " << debugIndex
+                << std::endl;
+      std::cout << "Joint weights: " << jointWeights << std::endl;
+      std::cout << "Axis weights: " << axisWeights << std::endl;
+      std::cout << "First guess pose: " << firstGuessPose << std::endl;
+#ifndef NDEBUG
+      std::vector<double> timestamps;
+      timestamps.push_back(0.0);
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+      markerTimesteps.push_back(markerObservations);
+      OpenSimParser::saveTRC(
+          "./replicateBadIK.trc", timestamps, markerTimesteps);
+#endif
+    }
+
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
@@ -3874,7 +3840,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
-            .setLogOutput(false)
+            .setLogOutput(debug)
             .setInputNames(inputNames)
             .setOutputNames(outputNames));
   }
@@ -3913,7 +3879,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     Eigen::VectorXs upperBound = Eigen::VectorXs::Zero(problemDim);
     initialPos.segment(0, skeletonBallJoints->getNumDofs())
         = skeletonBallJoints->convertPositionsToBallSpace(
-            skeletonBallJoints->getPositions());
+            skeleton->getPositions());
     lowerBound.segment(0, skeletonBallJoints->getNumDofs())
         = skeletonBallJoints->getPositionLowerLimits();
     upperBound.segment(0, skeletonBallJoints->getNumDofs())
@@ -3930,6 +3896,23 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         skeletonBallJoints->getNumDofs(),
         skeletonBallJoints->getGroupScaleDim())
         = skeletonBallJoints->getGroupScalesUpperBound();
+
+    if (debug)
+    {
+      std::cout << "Beginning IK (with scaling) for block " << debugIndex
+                << std::endl;
+      std::cout << "Joint weights: " << jointWeights << std::endl;
+      std::cout << "Axis weights: " << axisWeights << std::endl;
+      std::cout << "First guess pose: " << firstGuessPose << std::endl;
+#ifndef NDEBUG
+      std::vector<double> timestamps;
+      timestamps.push_back(0.0);
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+      markerTimesteps.push_back(markerObservations);
+      OpenSimParser::saveTRC(
+          "./replicateBadIK.trc", timestamps, markerTimesteps);
+#endif
+    }
 
     // 2. Actually solve the IK
     result.score = math::solveIK(
@@ -4127,7 +4110,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
             .setMaxRestarts(fitter->mInitialIKMaxRestarts)
-            .setLogOutput(false)
+            .setLogOutput(debug)
             .setInputNames(inputNames)
             .setOutputNames(outputNames));
   }
@@ -4136,6 +4119,29 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
   result.pose = skeleton->getPositions();
   result.scale = skeleton->getGroupScales();
   std::cout << "Best result: " << result.score << std::endl;
+
+  /*
+  if (result.score > 0.15)
+  {
+    // This is very bad
+    std::cout << "Very bad result! Recursing in the hope of doing better:"
+              << std::endl;
+    return scaleAndFit(
+        fitter,
+        markerObservations,
+        firstGuessPose,
+        markerWeights,
+        markerOffsets,
+        joints,
+        jointCenters,
+        jointWeights,
+        jointAxis,
+        axisWeights,
+        dontScale,
+        debugIndex,
+        true);
+  }
+  */
 
   return result;
 }

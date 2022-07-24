@@ -31,7 +31,11 @@
  */
 
 #include <Eigen/Dense>
+#include <dart/biomechanics/MarkerFixer.hpp>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -40,37 +44,22 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void ForcePlate(py::module& sm);
-void LilypadSolver(py::module& sm);
-void BatchGaitInverseDynamics(py::module& sm);
-void OpenSimParser(py::module& sm);
-void SkeletonConverter(py::module& sm);
-void MarkerFitter(py::module& sm);
-void MarkerFixer(py::module& sm);
-void MarkerLabeller(py::module& sm);
-void IKErrorReport(py::module& sm);
-void Anthropometrics(py::module& sm);
-void C3DLoader(py::module& sm);
-
-void dart_biomechanics(py::module& m)
+void MarkerFixer(py::module& m)
 {
-  auto sm = m.def_submodule("biomechanics");
+  ::py::class_<dart::biomechanics::MarkersErrorReport>(m, "MarkersErrorReport")
+      .def_readwrite(
+          "warnings", &dart::biomechanics::MarkersErrorReport::warnings)
+      .def_readwrite("info", &dart::biomechanics::MarkersErrorReport::info)
+      .def_readwrite(
+          "markerObservationsAttemptedFixed",
+          &dart::biomechanics::MarkersErrorReport::
+              markerObservationsAttemptedFixed);
 
-  sm.doc()
-      = "This provides biomechanics utilities in Nimble, including inverse "
-        "dynamics and (eventually) mocap support and muscle estimation.";
-
-  ForcePlate(sm);
-  LilypadSolver(sm);
-  BatchGaitInverseDynamics(sm);
-  OpenSimParser(sm);
-  SkeletonConverter(sm);
-  MarkerFixer(sm);
-  MarkerFitter(sm);
-  MarkerLabeller(sm);
-  IKErrorReport(sm);
-  Anthropometrics(sm);
-  C3DLoader(sm);
+  ::py::class_<dart::biomechanics::MarkerFixer>(m, "MarkerFixer")
+      .def_static(
+          "generateDataErrorsReport",
+          &dart::biomechanics::MarkerFixer::generateDataErrorsReport,
+          ::py::arg("immutableMarkerObservations"));
 }
 
 } // namespace python

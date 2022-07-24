@@ -167,15 +167,15 @@ TEST(OpenSimParser, CONVERT_TO_MJCF)
   server.renderSkeleton(skel);
 
   // Render the converted poses over time
-  int timestep = 0;
+  int timestep = 900;
   std::shared_ptr<realtime::Ticker> ticker
       = std::make_shared<realtime::Ticker>(1.0 / 50);
   ticker->registerTickListener([&](long) {
     skel->setPositions(convertedPoses.col(timestep));
     server.renderSkeleton(skel);
     timestep++;
-    if (timestep >= convertedPoses.cols())
-      timestep = 0;
+    if (timestep >= 1300)
+      timestep = 900;
   });
   server.registerConnectionListener([&]() { ticker->start(); });
 

@@ -17,6 +17,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
+#include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -1031,23 +1032,37 @@ bool debugIKInitializationToGUI(
 }
 
 bool debugFitToGUI(
-    std::shared_ptr<dynamics::Skeleton>& skel,
+    std::shared_ptr<dynamics::Skeleton> skel,
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         adjustedMarkersSkel,
+    std::vector<std::string> markerNames,
     Eigen::VectorXs markerWorldPoses,
-    std::shared_ptr<dynamics::Skeleton>& goldSkel,
+    std::shared_ptr<dynamics::Skeleton> goldSkel,
     Eigen::VectorXs goldTarget)
 {
   server::GUIWebsocketServer server;
   server.serve(8070);
   server.renderSkeleton(skel);
 
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    server.createSphere(
+        markerNames[i],
+        0.01,
+        markerWorldPoses.segment<3>(i * 3),
+        Eigen::Vector4s(1, 0, 0, 0.5));
+    server.setObjectTooltip(markerNames[i], markerNames[i]);
+  }
+
   Eigen::VectorXs originalGroupScales = skel->getGroupScales();
 
   // std::shared_ptr<dynamics::Skeleton> goldTarget = skel->clone();
   // goldTarget->setPositions(goldPose);
-  goldSkel->setPositions(goldTarget);
-  server.renderSkeleton(goldSkel, "gold");
+  if (goldSkel)
+  {
+    goldSkel->setPositions(goldTarget);
+    server.renderSkeleton(goldSkel, "gold");
+  }
 
   std::shared_ptr<dynamics::Skeleton> skelBallJoints
       = skel->convertSkeletonToBallJoints();
@@ -1219,7 +1234,8 @@ bool debugFitToGUI(
           }
           std::cout << std::endl;
         },
-        math::IKConfig().setLogOutput(true).setMaxRestarts(1));
+        math::IKConfig().setLogOutput(true).setMaxRestarts(1).setMaxStepCount(
+            1000));
 
     Eigen::VectorXs finalMarkers
         = skel->getMarkerWorldPositions(adjustedMarkers);
@@ -1262,10 +1278,62 @@ void drawTimeSeriesFigureToGUI(
           0.01,
           pair.second,
           Eigen::Vector4s(237.0 / 255, 118.0 / 255, 114.0 / 255, 1));
+      server->setObjectTooltip(
+          "marker_" + pair.first + "_" + std::to_string(cursor), pair.first);
     }
 
     cursor += setSize;
   }
+}
+
+void drawTimeSeriesMarkersToGUI(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
+    std::map<std::string, Eigen::Vector3s> brokenObservations)
+{
+  server::GUIWebsocketServer server;
+  server.serve(8070);
+
+  std::cout << "Timesteps: " << markerObservations.size() << std::endl;
+
+  for (auto& pair : brokenObservations)
+  {
+    server.createSphere(
+        pair.first, 0.01, pair.second, Eigen::Vector4s(1, 0, 0, 1));
+  }
+
+  Ticker ticker = Ticker(0.005);
+
+  int i = 0;
+  ticker.registerTickListener([&](long) {
+    for (auto pair : markerObservations[i])
+    {
+      std::string markerKey = "marker_" + pair.first;
+      server.createSphere(
+          markerKey,
+          0.01,
+          pair.second,
+          Eigen::Vector4s(237.0 / 255, 118.0 / 255, 114.0 / 255, 1));
+      server.setObjectTooltip(markerKey, pair.first);
+
+      if (brokenObservations.count(pair.first))
+      {
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(brokenObservations[pair.first]);
+        points.push_back(pair.second);
+        server.createLine("line_" + pair.first, points);
+      }
+    }
+    i++;
+    if (i > markerObservations.size())
+    {
+      i = 0;
+    }
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  server.blockWhileServing();
 }
 
 std::vector<MarkerInitialization> runEngine(
@@ -1386,6 +1454,10 @@ std::vector<MarkerInitialization> runEngine(
   {
     MarkersErrorReport report
         = fitter.generateDataErrorsReport(markerObservationTrials[i]);
+    for (std::string& warning : report.warnings)
+    {
+      std::cout << "DATA WARNING: " << warning << std::endl;
+    }
     markerObservationTrials[i] = report.markerObservationsAttemptedFixed;
     reports.push_back(report);
   }
@@ -1469,21 +1541,28 @@ std::vector<MarkerInitialization> runEngine(
   std::cout << "Saving marker error report" << std::endl;
   finalKinematicsReport.saveCSVMarkerErrorReport(
       "./_ik_per_marker_error_report.csv");
-  std::vector<s_t> timestamps;
-  for (int i = 0; i < results[0].poses.cols(); i++)
+  std::vector<std::vector<s_t>> timestamps;
+  for (int i = 0; i < results.size(); i++)
   {
-    timestamps.push_back(i);
+    timestamps.emplace_back();
+    for (int t = 0; t < results[i].poses.cols(); t++)
+    {
+      timestamps[i].push_back((s_t)t * (1.0 / framesPerSecond[i]));
+    }
   }
   for (int i = 0; i < results.size(); i++)
   {
     std::cout << "Saving GRF Mot " << i << std::endl;
-    OpenSimParser::saveGRFMot("./_grf.mot", timestamps, forcePlates[i]);
+    OpenSimParser::saveGRFMot("./_grf.mot", timestamps[i], forcePlates[i]);
   }
   for (int i = 0; i < results.size(); i++)
   {
     std::cout << "Saving TRC " << i << std::endl;
+    std::cout << "timestamps[i]: " << timestamps[i].size() << std::endl;
+    std::cout << "markerObservationTrials[i]: "
+              << markerObservationTrials[i].size() << std::endl;
     OpenSimParser::saveTRC(
-        "./test.trc", timestamps, markerObservationTrials[i]);
+        "./test.trc", timestamps[i], markerObservationTrials[i]);
   }
   std::vector<std::string> markerNames;
   for (auto& pair : standard.markersMap)
@@ -5589,6 +5668,89 @@ TEST(MarkerFitter, BUG7)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, BUG8)
+{
+  // Bad marker noise
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/trials/Take 2022-07-19 01DE/"
+      "markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/trials/Take 2022-07-19 01SE/"
+      "markers.trc");
+  std::vector<std::string> grfFiles;
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/tmpkbyfh4v5/unscaled_generic.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      54,
+      1.6,
+      "female",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BAD_MARKER_NOISE)
+{
+  OpenSimTRC wholeTrajectory = OpenSimParser::loadTRC(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/trials/Take 2022-07-19 01DE/"
+      "markers.trc");
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/tmpkbyfh4v5/unscaled_generic.osim");
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/unscaled_generic.osim");
+  MarkerFitter fitter(file.skeleton, file.markersMap);
+
+  MarkersErrorReport report
+      = fitter.generateDataErrorsReport(wholeTrajectory.markerTimesteps);
+
+  OpenSimTRC brokenDataExample = OpenSimParser::loadTRC(
+      "dart://sample/osim/Bugs/tmpkbyfh4v5/replicateBadIK.trc");
+  drawTimeSeriesMarkersToGUI(
+      report.markerObservationsAttemptedFixed,
+      brokenDataExample.markerTimesteps[0]);
+
+  std::vector<std::string> observedMarkers;
+  for (auto& pair : file.markersMap)
+  {
+    if (brokenDataExample.markerTimesteps[0].count(pair.first))
+    {
+      observedMarkers.push_back(pair.first);
+    }
+  }
+
+  std::cout << "Observed " << observedMarkers.size() << " markers" << std::endl;
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  Eigen::VectorXs markerPoses
+      = Eigen::VectorXs::Zero(observedMarkers.size() * 3);
+  for (int i = 0; i < observedMarkers.size(); i++)
+  {
+    markers.push_back(file.markersMap[observedMarkers[i]]);
+    markerPoses.segment<3>(i * 3)
+        = brokenDataExample.markerTimesteps[0][observedMarkers[i]];
+  }
+
+  debugFitToGUI(
+      file.skeleton,
+      markers,
+      observedMarkers,
+      markerPoses,
+      nullptr,
+      Eigen::VectorXs::Zero(0));
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SINGLE_TRIAL_ANKLE_EXO)
 {
   std::vector<std::string> c3dFiles;
@@ -5633,10 +5795,10 @@ TEST(MarkerFitter, DETECT_MARKER_FLIPS)
 {
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;
-  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2.trc");
   std::vector<std::string> grfFiles;
-  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2_forces.mot");
 
+  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2.trc");
+  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2_forces.mot");
   trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/squats1.trc");
   grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/squats1_forces.mot");
   trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/DJ1.trc");
@@ -5650,7 +5812,8 @@ TEST(MarkerFitter, DETECT_MARKER_FLIPS)
       grfFiles,
       79.4,
       1.85,
-      "male");
+      "male",
+      true);
 }
 #endif
 
@@ -7029,16 +7192,19 @@ TEST(MarkerFitter, EVAL_PERFORMANCE)
 
   /*
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+  std::vector<std::string> markerNames;
   Eigen::VectorXs targetPoses = Eigen::VectorXs::Zero(goldMarkers.size() * 3);
   for (auto pair : goldMarkers)
   {
     std::cout << "Marker: " << pair.first << std::endl;
     targetPoses.segment<3>(markers.size() * 3) = pair.second;
     markers.push_back(standard.markersMap[pair.first]);
+    markerNames.push_back(pair.first);
   }
   Eigen::VectorXs markerWeights = Eigen::VectorXs::Ones(markers.size());
   debugFitToGUI(
-      standard.skeleton, markers, targetPoses, scaled.skeleton, goldPose);
+      standard.skeleton, markers, markerNames, targetPoses, scaled.skeleton,
+  goldPose);
   */
 
   // Get a random subset of the data

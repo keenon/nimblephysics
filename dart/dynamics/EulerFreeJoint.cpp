@@ -81,60 +81,60 @@ Eigen::Vector3s EulerFreeJoint::getAxis(int index) const
   {
     if (index == 0)
     {
-      return Eigen::Vector3s::UnitX();
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
     }
     if (index == 1)
     {
-      return Eigen::Vector3s::UnitY();
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
     }
     if (index == 2)
     {
-      return Eigen::Vector3s::UnitZ();
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(2);
     }
   }
   if (getAxisOrder() == EulerJoint::AxisOrder::XZY)
   {
     if (index == 0)
     {
-      return Eigen::Vector3s::UnitX();
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
     }
     if (index == 1)
     {
-      return Eigen::Vector3s::UnitZ();
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(1);
     }
     if (index == 2)
     {
-      return Eigen::Vector3s::UnitY();
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
     }
   }
   if (getAxisOrder() == EulerJoint::AxisOrder::ZXY)
   {
     if (index == 0)
     {
-      return Eigen::Vector3s::UnitZ();
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
     }
     if (index == 1)
     {
-      return Eigen::Vector3s::UnitX();
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(1);
     }
     if (index == 2)
     {
-      return Eigen::Vector3s::UnitY();
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
     }
   }
   if (getAxisOrder() == EulerJoint::AxisOrder::ZYX)
   {
     if (index == 0)
     {
-      return Eigen::Vector3s::UnitZ();
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
     }
     if (index == 1)
     {
-      return Eigen::Vector3s::UnitY();
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
     }
     if (index == 2)
     {
-      return Eigen::Vector3s::UnitX();
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(2);
     }
   }
   if (index == 3)

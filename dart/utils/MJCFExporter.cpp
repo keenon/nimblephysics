@@ -93,15 +93,15 @@ void recursivelyWriteJointAndBody(
     */
     XMLElement* sideCamera = xmlDoc.NewElement("camera");
     sideCamera->SetAttribute("name", "side");
-    sideCamera->SetAttribute("pos", "0 -4 2");
-    sideCamera->SetAttribute("xyaxes", "1 0 0 0 1 2");
+    sideCamera->SetAttribute("pos", "0 -.1 4.7");
+    sideCamera->SetAttribute("euler", "0 0 0");
     sideCamera->SetAttribute("mode", "trackcom");
     bodyXml->InsertEndChild(sideCamera);
 
     XMLElement* backCamera = xmlDoc.NewElement("camera");
     backCamera->SetAttribute("name", "back");
-    backCamera->SetAttribute("pos", "-4 0 2");
-    backCamera->SetAttribute("xyaxes", "0 -1 0 1 0 2");
+    backCamera->SetAttribute("pos", "-4.7 -.1 0");
+    backCamera->SetAttribute("euler", "0 -1.570796325 0");
     backCamera->SetAttribute("mode", "trackcom");
     bodyXml->InsertEndChild(backCamera);
   }
@@ -139,6 +139,18 @@ void recursivelyWriteJointAndBody(
           "range",
           (std::to_string(revolute->getPositionLowerLimit(0)) + " "
            + std::to_string(revolute->getPositionUpperLimit(0)))
+              .c_str());
+    }
+    else
+    {
+      std::cout << "Joint " << revolute->getName()
+                << " had backwards joints limits: "
+                << revolute->getPositionLowerLimit(0) << " "
+                << revolute->getPositionUpperLimit(0) << std::endl;
+      jointXml->SetAttribute(
+          "range",
+          (std::to_string(revolute->getPositionUpperLimit(0)) + " "
+           + std::to_string(revolute->getPositionLowerLimit(0)))
               .c_str());
     }
   }
@@ -209,7 +221,14 @@ void recursivelyWriteJointAndBody(
       motor->SetAttribute("name", joint->getDofName(i).c_str());
 
       XMLElement* jointX = xmlDoc.NewElement("joint");
-      bodyXml->InsertEndChild(jointX);
+      if (isRoot)
+      {
+        bodyXml->InsertFirstChild(jointX);
+      }
+      else
+      {
+        bodyXml->InsertEndChild(jointX);
+      }
       jointX->SetAttribute(
           "pos",
           writeVec3(joint->getTransformFromChildBodyNode().translation())
@@ -267,7 +286,14 @@ void recursivelyWriteJointAndBody(
       }
 
       XMLElement* jointX = xmlDoc.NewElement("joint");
-      bodyXml->InsertEndChild(jointX);
+      if (isRoot)
+      {
+        bodyXml->InsertFirstChild(jointX);
+      }
+      else
+      {
+        bodyXml->InsertEndChild(jointX);
+      }
       jointX->SetAttribute(
           "pos",
           writeVec3(joint->getTransformFromChildBodyNode().translation())
@@ -408,6 +434,10 @@ void MJCFExporter::writeSkeleton(
   compiler->SetAttribute("angle", "radian");
   compiler->SetAttribute("coordinate", "local");
   compiler->SetAttribute("meshdir", "Geometry/");
+  compiler->SetAttribute("inertiafromgeom", "auto");
+  compiler->SetAttribute("balanceinertia", "true");
+  compiler->SetAttribute("boundmass", "0.001");
+  compiler->SetAttribute("boundinertia", "0.001");
   mujoco->InsertFirstChild(compiler);
 
   XMLElement* defaultXml = xmlDoc.NewElement("default");
@@ -417,11 +447,37 @@ void MJCFExporter::writeSkeleton(
   defaultGeom->SetAttribute(
       "conaffinity", "0"); // Disable all collisions between meshes
   defaultGeom->SetAttribute("rgba", "0.7 0.5 .3 1");
+  defaultGeom->SetAttribute("margin", "0.001");
   defaultXml->InsertEndChild(defaultGeom);
 
   XMLElement* defaultSite = xmlDoc.NewElement("site");
   defaultSite->SetAttribute("rgba", "0.7 0.5 0.3 1");
   defaultXml->InsertEndChild(defaultSite);
+
+  XMLElement* defaultJoint = xmlDoc.NewElement("joint");
+  defaultJoint->SetAttribute("limited", "true");
+  defaultJoint->SetAttribute("damping", "0.5");
+  defaultJoint->SetAttribute("armature", "0.1");
+  defaultJoint->SetAttribute("stiffness", "2");
+  defaultXml->InsertEndChild(defaultJoint);
+
+  XMLElement* defaultMotor = xmlDoc.NewElement("motor");
+  defaultMotor->SetAttribute("ctrllimited", "true");
+  defaultMotor->SetAttribute("ctrlrange", "-1 1");
+  defaultXml->InsertEndChild(defaultMotor);
+
+  XMLElement* option = xmlDoc.NewElement("option");
+  option->SetAttribute("timestep", "0.01");
+  mujoco->InsertEndChild(option);
+
+  XMLElement* size = xmlDoc.NewElement("size");
+  size->SetAttribute("njmax", "1000");
+  size->SetAttribute("nconmax", "400");
+  size->SetAttribute("nuser_jnt", "1");
+  mujoco->InsertEndChild(size);
+
+  // <option timestep="0.01"/>
+  // <size njmax="1000" nconmax="400" nuser_jnt="1"/>
 
   XMLElement* assetXml = xmlDoc.NewElement("asset");
   mujoco->InsertEndChild(assetXml);
@@ -490,6 +546,18 @@ void MJCFExporter::writeSkeleton(
   diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3"
   specular=".1 .1 .1"/>
   */
+
+  worldbody->InsertNewComment(
+      "\n"
+      "        <body name=\"treadmill\" pos=\"0 0 0\">\n"
+      "            <geom pos=\"0 0 .2\" friction=\"1 .1 .1\"  "
+      "material=\"MatPlane\" name=\"treadmill\"  "
+      "rgba=\".4 .5 .4 1\" mass=\"20000\" size=\"50 1.5 0.1\" type=\"box\" "
+      "condim=\"3\" />\n"
+      "            <joint name=\"treadmill\" axis = \"1 0 0 \" pos=\"0 "
+      "0 0\" range=\"-100 100\" type=\"slide\"/>\n"
+      "        </body>\n"
+      "        ");
 
   XMLElement* floor = xmlDoc.NewElement("geom");
   floor->SetAttribute("condim", "3");
