@@ -1,5 +1,9 @@
+#include <memory>
+
 #include <dart/utils/sdf/SdfParser.hpp>
 #include <pybind11/pybind11.h>
+
+#include "dart/dynamics/Skeleton.hpp"
 
 namespace py = pybind11;
 
@@ -15,6 +19,13 @@ void SdfParser(py::module& m)
         return dart::utils::SdfParser::readSkeleton(path);
       },
       ::py::arg("path"));
+  sm.def(
+      "writeSkeleton",
+      [](const std::string path, std::shared_ptr<dynamics::Skeleton> skel) {
+        return dart::utils::SdfParser::writeSkeleton(path, skel);
+      },
+      ::py::arg("path"),
+      ::py::arg("skeleton"));
   sm.def(
       "readWorld",
       [](const std::string path) {
