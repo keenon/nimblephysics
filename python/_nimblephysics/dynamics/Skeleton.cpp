@@ -663,6 +663,12 @@ void Skeleton(py::module& m)
             return self->getDof(name);
           },
           ::py::return_value_policy::reference_internal,
+          ::py::arg("name"))
+      .def(
+          "getDofByIndex",
+          +[](dart::dynamics::Skeleton* self, int i)
+              -> dart::dynamics::DegreeOfFreedom* { return self->getDof(i); },
+          ::py::return_value_policy::reference_internal,
           ::py::arg("index"))
       .def(
           "getDofs",
