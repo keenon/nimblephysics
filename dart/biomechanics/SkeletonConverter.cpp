@@ -376,6 +376,9 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
         leastSquaresDamping,
         lineSearch,
         logOutput);
+
+    (void)bestError;
+    /*
     if (bestError > 0.1)
     {
       std::cout << "ERROR: Had a terrible fit! Got a best error " << bestError
@@ -417,19 +420,6 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
       // Re-run the fit with logs on, to see what happened (and provide
       // breakpoints)
       mSourceSkeleton->setPositions(originalPos);
-      // Just angle
-      /*
-      std::cout << "Fitting angles" << std::endl;
-      mSourceSkeleton->fitJointsToWorldPositions(
-          std::vector<dynamics::Joint*>(),
-          Eigen::VectorXs::Zero(0),
-          mSourceJoints,
-          getTargetJointWorldAngles(),
-          false,
-          100,
-          true,
-          true);
-      */
       // Just position
       std::cout << "Fitting position" << std::endl;
       mSourceSkeleton->fitJointsToWorldPositions(
@@ -445,6 +435,7 @@ Eigen::MatrixXs SkeletonConverter::convertMotion(
 
       return sourceMotion;
     }
+    */
 
     sourceMotion.col(i) = mSourceSkeleton->getPositions();
   }
