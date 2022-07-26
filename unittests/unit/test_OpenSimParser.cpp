@@ -114,6 +114,84 @@ TEST(OpenSimParser, CONVERT_TO_SDF)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, CONVERT_TO_SDF_2)
+{
+  auto file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Bugs/tmp187o1np6/unscaled_generic.osim");
+
+  std::map<std::string, std::string> mergeBodiesInto;
+  mergeBodiesInto["ulna_r"] = "radius_r";
+  mergeBodiesInto["ulna_l"] = "radius_l";
+  OpenSimParser::convertOsimToSDF(
+      "dart://sample/osim/Bugs/tmp187o1np6/unscaled_generic.osim",
+      "../../../data/osim/Bugs/tmp187o1np6/model.sdf",
+      mergeBodiesInto);
+
+  std::shared_ptr<dynamics::Skeleton> skel = SdfParser::readSkeleton(
+      "dart://sample/osim/Bugs/tmp187o1np6/model.sdf");
+
+  /*
+  // skel->getDof("walker_knee_r")->setPosition(1.0);
+  // skel->getDof("walker_knee_l")->setPosition(0.5);
+  GUIWebsocketServer server;
+  server.renderSkeleton(skel);
+  server.renderSkeleton(file.skeleton, "osim");
+  server.serve(8070);
+  server.blockWhileServing();
+  */
+
+  /*
+  SkeletonConverter converter(skel, file.skeleton);
+  // Set the root orientation to be the same
+  for (int i = 0; i < 6; i++)
+  {
+    skel->setPosition(i, file.skeleton->getPosition(i));
+  }
+  // Link joints
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    auto* sourceJoint = skel->getJoint(i);
+    if (file.skeleton->getJoint(sourceJoint->getName()) != nullptr)
+    {
+      converter.linkJoints(
+          sourceJoint, file.skeleton->getJoint(sourceJoint->getName()));
+    }
+  }
+  converter.createVirtualMarkers();
+
+  auto mot = OpenSimParser::loadMot(
+      file.skeleton,
+      "dart://sample/osim/MichaelTest/results/IK/S02DN101_ik.mot");
+  Eigen::MatrixXs convertedPoses = converter.convertMotion(mot.poses);
+  OpenSimParser::saveMot(
+      skel,
+      "../../../data/osim/MichaelTest/results/S02DN101.mot",
+      mot.timestamps,
+      convertedPoses);
+
+  GUIWebsocketServer server;
+  server.renderSkeleton(skel);
+
+  // Render the converted poses over time
+  int timestep = 0;
+  std::shared_ptr<realtime::Ticker> ticker
+      = std::make_shared<realtime::Ticker>(1.0 / 50);
+  ticker->registerTickListener([&](long) {
+    skel->setPositions(convertedPoses.col(timestep));
+    server.renderSkeleton(skel);
+    timestep++;
+    if (timestep >= convertedPoses.cols())
+      timestep = 0;
+  });
+  server.registerConnectionListener([&]() { ticker->start(); });
+
+  server.serve(8070);
+  server.blockWhileServing();
+  */
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_MJCF)
 {
   auto file = OpenSimParser::parseOsim(

@@ -268,6 +268,13 @@ void recursivelyWriteJointAndBody(
     jointXml->SetAttribute("damping", "0");
     jointXml->SetAttribute("frictionloss", "0");
     jointXml->SetAttribute("armature", "0");
+    // damping="0" stiffness="0" armature="0"
+    if (isRoot)
+    {
+      jointXml->SetAttribute("damping", "0");
+      jointXml->SetAttribute("stiffness", "0");
+      jointXml->SetAttribute("armature", "0");
+    }
   }
   else if (joint->getType() == dynamics::EulerFreeJoint::getStaticType())
   {
@@ -315,6 +322,13 @@ void recursivelyWriteJointAndBody(
             (std::to_string(eulerFreeJoint->getPositionLowerLimit(i)) + " "
              + std::to_string(eulerFreeJoint->getPositionUpperLimit(i)))
                 .c_str());
+      }
+      // damping="0" stiffness="0" armature="0"
+      if (isRoot)
+      {
+        jointX->SetAttribute("damping", "0");
+        jointX->SetAttribute("stiffness", "0");
+        jointX->SetAttribute("armature", "0");
       }
     }
   }

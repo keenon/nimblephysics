@@ -721,6 +721,15 @@ void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
       jointXml->InsertEndChild(axis);
       */
     }
+    else
+    {
+      std::cout << "Unsupported joint type! " << joint->getType()
+                << " on joint " << joint->getName() << std::endl;
+      std::cout << "Joint " << joint->getName() << " parent body is "
+                << joint->getParentBodyNode()->getName() << std::endl;
+      std::cout << "Defaulting to a fixed joint!" << std::endl;
+      jointXml->SetAttribute("type", "fixed");
+    }
 
     XMLElement* parentXml = xmlDoc.NewElement("parent");
     parentXml->SetText(joint->getParentBodyNode()->getName().c_str());
