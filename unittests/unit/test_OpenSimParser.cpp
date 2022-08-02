@@ -7,6 +7,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
@@ -260,6 +261,27 @@ TEST(OpenSimParser, CONVERT_TO_MJCF)
   server.serve(8070);
   server.blockWhileServing();
   */
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, CONVERT_TO_MJCF_2)
+{
+  auto file = OpenSimParser::parseOsim(
+      "dart://sample/osim/MichaelTest5/Models/"
+      "optimized_scale_and_markers.osim");
+  dynamics::EulerFreeJoint* joint
+      = static_cast<dynamics::EulerFreeJoint*>(file.skeleton->getJoint(0));
+  std::cout << "Axis order: " << (int)joint->getAxisOrder() << std::endl;
+
+  std::map<std::string, std::string> mergeBodiesInto;
+  mergeBodiesInto["ulna_r"] = "radius_r";
+  mergeBodiesInto["ulna_l"] = "radius_l";
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton->simplifySkeleton(
+      file.skeleton->getName(), mergeBodiesInto);
+
+  MJCFExporter::writeSkeleton(
+      "../../../data/osim/MichaelTest5/Models/model.mjcf", skel);
 }
 #endif
 

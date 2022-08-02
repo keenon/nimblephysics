@@ -281,8 +281,19 @@ void recursivelyWriteJointAndBody(
     dynamics::EulerFreeJoint* eulerFreeJoint
         = static_cast<dynamics::EulerFreeJoint*>(joint);
     (void)eulerFreeJoint;
-    for (int i = 0; i < 6; i++)
+    for (int j = 0; j < 6; j++)
     {
+      int i = j;
+      // We put the translation elements first, so we flip the last 3 and first
+      // 3 DOFs
+      if (j < 3)
+      {
+        i = j + 3;
+      }
+      else
+      {
+        i = j - 3;
+      }
       if (!isRoot)
       {
         XMLElement* motor = xmlDoc.NewElement("motor");
@@ -293,14 +304,7 @@ void recursivelyWriteJointAndBody(
       }
 
       XMLElement* jointX = xmlDoc.NewElement("joint");
-      if (isRoot)
-      {
-        bodyXml->InsertFirstChild(jointX);
-      }
-      else
-      {
-        bodyXml->InsertEndChild(jointX);
-      }
+      bodyXml->InsertEndChild(jointX);
       jointX->SetAttribute(
           "pos",
           writeVec3(joint->getTransformFromChildBodyNode().translation())

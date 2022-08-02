@@ -160,6 +160,10 @@ Eigen::Vector3s EulerFreeJoint::getAxis(int index) const
 dart::dynamics::Joint* EulerFreeJoint::clone() const
 {
   EulerFreeJoint* joint = new EulerFreeJoint(this->getJointProperties());
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    joint->setDofName(i, getDofName(i));
+  }
   joint->setName(getName());
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(mFlipAxisMap);
