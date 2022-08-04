@@ -2876,6 +2876,43 @@ Eigen::VectorXs Skeleton::getRandomPose()
 }
 
 //==============================================================================
+/// This gets a random pose that's valid within joint limits
+Eigen::VectorXs Skeleton::getRandomVelocity()
+{
+  Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    s_t upperLimit = getDof(i)->getVelocityUpperLimit();
+    if (upperLimit == std::numeric_limits<s_t>::infinity())
+    {
+      upperLimit = 5.0;
+    }
+    s_t lowerLimit = getDof(i)->getVelocityLowerLimit();
+    if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
+    {
+      lowerLimit = -5.0;
+    }
+    s_t withinBounds
+        = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+          + lowerLimit;
+    pose(i) = withinBounds;
+  }
+
+  /*
+#ifndef NDEBUG
+  Eigen::VectorXs oldPose = getPositions();
+  setPositions(pose);
+  clampPositionsToLimits();
+  Eigen::VectorXs clampedPos = getPositions();
+  assert(clampedPos == pose);
+  setPositions(oldPose);
+#endif
+  */
+
+  return pose;
+}
+
+//==============================================================================
 /// This gets a random pose that's valid within joint limits, but only changes
 /// the specified joints. All unspecified joints are left as 0.
 Eigen::VectorXs Skeleton::getRandomPoseForJoints(

@@ -797,6 +797,9 @@ public:
   /// This gets a random pose that's valid within joint limits
   Eigen::VectorXs getRandomPose();
 
+  /// This gets a random velocity that's valid within joint limits
+  Eigen::VectorXs getRandomVelocity();
+
   /// This gets a random pose that's valid within joint limits, but only changes
   /// the specified joints. All unspecified joints are left as 0.
   Eigen::VectorXs getRandomPoseForJoints(std::vector<dynamics::Joint*> joints);

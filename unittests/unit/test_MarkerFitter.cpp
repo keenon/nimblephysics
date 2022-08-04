@@ -5697,6 +5697,64 @@ TEST(MarkerFitter, BUG8)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, BUG9)
+{
+  // Bad marker noise
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmp3ezmdjp5/trials/10vel_02_RHS3/"
+      "markers.c3d");
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmp3ezmdjp5/trials/10vel_02_RHS4/"
+      "markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/tmp3ezmdjp5/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/tmp3ezmdjp5/unscaled_generic.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/tmp3ezmdjp5/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      74.3,
+      1.685,
+      "female",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, BUG10)
+{
+  // Bad marker noise
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmpyy5xhwh7/trials/10vel_02_RHS3/"
+      "markers.c3d");
+  c3dFiles.push_back(
+      "dart://sample/osim/Bugs/tmpyy5xhwh7/trials/10vel_02_RHS4/"
+      "markers.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  OpenSimParser::rationalizeJoints(
+      "dart://sample/osim/Bugs/tmpyy5xhwh7/unscaled_generic_raw.osim",
+      "../../../data/osim/Bugs/tmpyy5xhwh7/unscaled_generic.osim");
+  runEngine(
+      "dart://sample/osim/Bugs/tmpyy5xhwh7/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      74.3,
+      1.685,
+      "female",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, BAD_MARKER_NOISE)
 {
   OpenSimTRC wholeTrajectory = OpenSimParser::loadTRC(
@@ -5803,6 +5861,29 @@ TEST(MarkerFitter, DETECT_MARKER_FLIPS)
   grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/squats1_forces.mot");
   trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/DJ1.trc");
   grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/DJ1_forces.mot");
+
+  runEngine(
+      "dart://sample/osim/DetectMarkerFlip/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      79.4,
+      1.85,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, DETECT_MARKER_FLIPS)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  trcFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2.trc");
+  grfFiles.push_back("dart://sample/osim/DetectMarkerFlip/walking2_forces.mot");
 
   runEngine(
       "dart://sample/osim/DetectMarkerFlip/"

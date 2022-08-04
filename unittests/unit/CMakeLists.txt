@@ -66,17 +66,14 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkeletonMarkers)
   target_link_libraries(test_SkeletonMarkers dart-utils)
 
-  dart_add_test("unit" test_MarkerFitterKinematics)
-  target_link_libraries(test_MarkerFitterKinematics dart-utils)
+  dart_add_test("unit" test_MarkerFitter)
+  target_link_libraries(test_MarkerFitter dart-utils)
 
   dart_add_test("unit" test_MarkerOffsetPrior)
   target_link_libraries(test_MarkerOffsetPrior dart-utils)
 
   dart_add_test("unit" test_MarkerLabeller)
   target_link_libraries(test_MarkerLabeller dart-utils)
-
-  dart_add_test("unit" test_MarkerFitterDynamics)
-  target_link_libraries(test_MarkerFitterDynamics dart-utils)
 
   dart_add_test("unit" test_Scaling)
   target_link_libraries(test_Scaling dart-utils)
@@ -143,6 +140,14 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_Sensors)
   target_link_libraries(test_Sensors dart-utils)
   target_link_libraries(test_Sensors dart-utils-urdf)
+
+  dart_add_test("unit" test_DynamicsFitter)
+  target_link_libraries(test_DynamicsFitter dart-utils)
+  target_link_libraries(test_DynamicsFitter dart-utils-urdf)
+
+  dart_add_test("unit" test_RotationalGradients)
+  target_link_libraries(test_RotationalGradients dart-utils)
+  target_link_libraries(test_RotationalGradients dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)

@@ -3403,24 +3403,35 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   while (coordinateCursor)
   {
     std::string dofName(coordinateCursor->Attribute("name"));
-    double defaultValue
-        = atof(coordinateCursor->FirstChildElement("default_value")->GetText());
-    double defaultSpeedValue = atof(
-        coordinateCursor->FirstChildElement("default_speed_value")->GetText());
-    Eigen::Vector2s range
-        = readVec2(coordinateCursor->FirstChildElement("range"));
-    bool locked = trim(std::string(
-                      coordinateCursor->FirstChildElement("locked")->GetText()))
-                  == "true";
+    bool locked
+        = coordinateCursor->FirstChildElement("locked") != nullptr
+          && trim(std::string(
+                 coordinateCursor->FirstChildElement("locked")->GetText()))
+                 == "true";
     bool clamped
-        = trim(std::string(
-              coordinateCursor->FirstChildElement("clamped")->GetText()))
-          == "true";
+        = coordinateCursor->FirstChildElement("clamped") != nullptr
+          && trim(std::string(
+                 coordinateCursor->FirstChildElement("clamped")->GetText()))
+                 == "true";
 
     dynamics::DegreeOfFreedom* dof = joint->getDof(i);
     dof->setName(dofName);
-    dof->setPosition(defaultValue);
-    dof->setVelocity(defaultSpeedValue);
+
+    if (coordinateCursor->FirstChildElement("default_value"))
+    {
+      double defaultValue = atof(
+          coordinateCursor->FirstChildElement("default_value")->GetText());
+      dof->setPosition(defaultValue);
+    }
+
+    if (coordinateCursor->FirstChildElement("default_speed_value"))
+    {
+      double defaultSpeedValue
+          = atof(coordinateCursor->FirstChildElement("default_speed_value")
+                     ->GetText());
+      dof->setVelocity(defaultSpeedValue);
+    }
+
     // Always lock a custom joint
     if (clamped || true)
     {
@@ -3432,8 +3443,13 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                "clamped. This is unsupported, so we're defaulting to clamped"
             << std::endl;
       }
-      dof->setPositionLowerLimit(range(0));
-      dof->setPositionUpperLimit(range(1));
+      if (coordinateCursor->FirstChildElement("range"))
+      {
+        Eigen::Vector2s range
+            = readVec2(coordinateCursor->FirstChildElement("range"));
+        dof->setPositionLowerLimit(range(0));
+        dof->setPositionUpperLimit(range(1));
+      }
     }
     if (locked)
     {
@@ -3442,8 +3458,13 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       dof->setVelocityUpperLimit(0);
       dof->setVelocityLowerLimit(0);
       */
-      dof->setPositionLowerLimit(defaultValue);
-      dof->setPositionUpperLimit(defaultValue);
+      if (coordinateCursor->FirstChildElement("default_value"))
+      {
+        double defaultValue = atof(
+            coordinateCursor->FirstChildElement("default_value")->GetText());
+        dof->setPositionLowerLimit(defaultValue);
+        dof->setPositionUpperLimit(defaultValue);
+      }
     }
 
     i++;
