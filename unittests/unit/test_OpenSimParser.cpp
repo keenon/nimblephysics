@@ -214,7 +214,6 @@ TEST(OpenSimParser, CONVERT_TO_MJCF)
       mergeBodiesInto);
   */
 
-  /*
   SkeletonConverter converter(skel, file.skeleton);
   // Set the root orientation to be the same
   for (int i = 0; i < 6; i++)
@@ -260,7 +259,6 @@ TEST(OpenSimParser, CONVERT_TO_MJCF)
 
   server.serve(8070);
   server.blockWhileServing();
-  */
 }
 #endif
 

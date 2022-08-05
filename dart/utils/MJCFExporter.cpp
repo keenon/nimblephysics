@@ -112,61 +112,16 @@ void recursivelyWriteJointAndBody(
         = static_cast<dynamics::RevoluteJoint*>(joint);
     (void)revolute;
 
-    XMLElement* motor = xmlDoc.NewElement("motor");
-    actuatorsXml->InsertEndChild(motor);
-    motor->SetAttribute("gear", "100");
-    motor->SetAttribute("joint", joint->getDofName(0).c_str());
-    motor->SetAttribute("name", joint->getDofName(0).c_str());
-
-    XMLElement* jointXml = xmlDoc.NewElement("joint");
-    bodyXml->InsertEndChild(jointXml);
-    jointXml->SetAttribute(
-        "pos",
-        writeVec3(joint->getTransformFromChildBodyNode().translation())
-            .c_str());
-    jointXml->SetAttribute("name", joint->getDofName(0).c_str());
-    jointXml->SetAttribute("type", "hinge");
-    jointXml->SetAttribute(
-        "axis",
-        writeVec3(
-            joint->getTransformFromChildBodyNode().linear()
-            * revolute->getAxis())
-            .c_str());
-    if (revolute->getPositionUpperLimit(0) > revolute->getPositionLowerLimit(0))
-    {
-      jointXml->SetAttribute("limited", "true");
-      jointXml->SetAttribute(
-          "range",
-          (std::to_string(revolute->getPositionLowerLimit(0)) + " "
-           + std::to_string(revolute->getPositionUpperLimit(0)))
-              .c_str());
-    }
-    else
-    {
-      std::cout << "Joint " << revolute->getName()
-                << " had backwards joints limits: "
-                << revolute->getPositionLowerLimit(0) << " "
-                << revolute->getPositionUpperLimit(0) << std::endl;
-      jointXml->SetAttribute(
-          "range",
-          (std::to_string(revolute->getPositionUpperLimit(0)) + " "
-           + std::to_string(revolute->getPositionLowerLimit(0)))
-              .c_str());
-    }
-  }
-  else if (joint->getType() == dynamics::UniversalJoint::getStaticType())
-  {
-    dynamics::UniversalJoint* universal
-        = static_cast<dynamics::UniversalJoint*>(joint);
-    (void)universal;
-
-    for (int i = 0; i < 1; i++)
+    // If the upper limit == the lower limit, then we're a locked joint, and we
+    // can express that in MuJoCo by just not including the joint at all.
+    if (revolute->getPositionUpperLimit(0)
+        != revolute->getPositionLowerLimit(0))
     {
       XMLElement* motor = xmlDoc.NewElement("motor");
       actuatorsXml->InsertEndChild(motor);
       motor->SetAttribute("gear", "100");
-      motor->SetAttribute("joint", joint->getDofName(i).c_str());
-      motor->SetAttribute("name", joint->getDofName(i).c_str());
+      motor->SetAttribute("joint", joint->getDofName(0).c_str());
+      motor->SetAttribute("name", joint->getDofName(0).c_str());
 
       XMLElement* jointXml = xmlDoc.NewElement("joint");
       bodyXml->InsertEndChild(jointXml);
@@ -180,17 +135,74 @@ void recursivelyWriteJointAndBody(
           "axis",
           writeVec3(
               joint->getTransformFromChildBodyNode().linear()
-              * (i == 0 ? universal->getAxis1() : universal->getAxis2()))
+              * revolute->getAxis())
               .c_str());
-      if (universal->getPositionUpperLimit(i)
-          > universal->getPositionLowerLimit(i))
+      if (revolute->getPositionUpperLimit(0)
+          > revolute->getPositionLowerLimit(0))
       {
         jointXml->SetAttribute("limited", "true");
         jointXml->SetAttribute(
             "range",
-            (std::to_string(universal->getPositionLowerLimit(i)) + " "
-             + std::to_string(universal->getPositionUpperLimit(i)))
+            (std::to_string(revolute->getPositionLowerLimit(0)) + " "
+             + std::to_string(revolute->getPositionUpperLimit(0)))
                 .c_str());
+      }
+      else
+      {
+        std::cout << "Joint " << revolute->getName()
+                  << " had backwards joints limits: "
+                  << revolute->getPositionLowerLimit(0) << " "
+                  << revolute->getPositionUpperLimit(0) << std::endl;
+        jointXml->SetAttribute("limited", "true");
+        jointXml->SetAttribute(
+            "range",
+            (std::to_string(revolute->getPositionUpperLimit(0)) + " "
+             + std::to_string(revolute->getPositionLowerLimit(0)))
+                .c_str());
+      }
+    }
+  }
+  else if (joint->getType() == dynamics::UniversalJoint::getStaticType())
+  {
+    dynamics::UniversalJoint* universal
+        = static_cast<dynamics::UniversalJoint*>(joint);
+    (void)universal;
+
+    for (int i = 0; i < 2; i++)
+    {
+      if (universal->getPositionUpperLimit(i)
+          != universal->getPositionLowerLimit(i))
+      {
+        XMLElement* motor = xmlDoc.NewElement("motor");
+        actuatorsXml->InsertEndChild(motor);
+        motor->SetAttribute("gear", "100");
+        motor->SetAttribute("joint", joint->getDofName(i).c_str());
+        motor->SetAttribute("name", joint->getDofName(i).c_str());
+
+        XMLElement* jointXml = xmlDoc.NewElement("joint");
+        bodyXml->InsertEndChild(jointXml);
+        jointXml->SetAttribute(
+            "pos",
+            writeVec3(joint->getTransformFromChildBodyNode().translation())
+                .c_str());
+        jointXml->SetAttribute("name", joint->getDofName(0).c_str());
+        jointXml->SetAttribute("type", "hinge");
+        jointXml->SetAttribute(
+            "axis",
+            writeVec3(
+                joint->getTransformFromChildBodyNode().linear()
+                * (i == 0 ? universal->getAxis1() : universal->getAxis2()))
+                .c_str());
+        if (universal->getPositionUpperLimit(i)
+            > universal->getPositionLowerLimit(i))
+        {
+          jointXml->SetAttribute("limited", "true");
+          jointXml->SetAttribute(
+              "range",
+              (std::to_string(universal->getPositionLowerLimit(i)) + " "
+               + std::to_string(universal->getPositionUpperLimit(i)))
+                  .c_str());
+        }
       }
     }
   }
