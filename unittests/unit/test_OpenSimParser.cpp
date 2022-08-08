@@ -37,6 +37,14 @@ TEST(OpenSimParser, UNSUPPORTED_JOINT_TYPE)
 */
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_FBLS_MODEL)
+{
+  auto file = OpenSimParser::parseOsim("dart://sample/osim/FBLSmodel.osim");
+  (void)file;
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_SDF)
 {
   auto file = OpenSimParser::parseOsim(

@@ -3661,12 +3661,17 @@ OpenSimFile OpenSimParser::readOsim40(
 
     if (joint)
     {
-      // WeldJoint
+      // Implicit WeldJoint
       if (joint->FirstChild() == nullptr)
       {
       }
       tinyxml2::XMLElement* jointDetail = nullptr;
-
+      // Explicit WeldJoint
+      tinyxml2::XMLElement* weldJoint = joint->FirstChildElement("WeldJoint");
+      if (weldJoint)
+      {
+        jointDetail = weldJoint;
+      }
       // CustomJoint
       tinyxml2::XMLElement* customJoint
           = joint->FirstChildElement("CustomJoint");
@@ -3726,6 +3731,8 @@ OpenSimFile OpenSimParser::readOsim40(
         childBody = pair.second;
       }
     }
+    assert(childBody != nullptr);
+
     double mass = atof(bodyCursor->FirstChildElement("mass")->GetText());
     Eigen::Vector3s massCenter
         = readVec3(bodyCursor->FirstChildElement("mass_center"));
