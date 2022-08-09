@@ -4,7 +4,10 @@
 #include "dart/constraint/ConstraintBase.hpp"
 #include "dart/constraint/ContactConstraint.hpp"
 #include "dart/dynamics/BallJoint.hpp"
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -1223,7 +1226,7 @@ DifferentiableContactConstraint::getScrewAxisForPositionGradient(
 Eigen::Vector6s DifferentiableContactConstraint::getScrewAxisForForceGradient(
     dynamics::DegreeOfFreedom* screwDof, dynamics::DegreeOfFreedom* rotateDof)
 {
-  // Special case: all angular DOFs within FreeJoints effect each other in
+  // Special case: all angular DOFs within FreeJoints affect each other in
   // special ways
   if (screwDof->getJoint() == rotateDof->getJoint()
       && screwDof->getJoint()->getType()
@@ -1249,6 +1252,58 @@ Eigen::Vector6s DifferentiableContactConstraint::getScrewAxisForForceGradient(
     if (axisIndex < 3 && rotateIndex < 3)
     {
       return ballJoint->getScrewAxisGradientForForce(axisIndex, rotateIndex);
+    }
+  }
+  // Special case: all angular DOFs within CustomJoints affect each other in
+  // special ways
+  if (screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::CustomJoint<1>::getStaticType())
+  {
+    dynamics::CustomJoint<1>* customJoint
+        = static_cast<dynamics::CustomJoint<1>*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+
+    return customJoint->getScrewAxisGradientForForce(axisIndex, rotateIndex);
+  }
+  // Special case: EulerFreeJoint
+  else if (
+      screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::EulerFreeJoint::getStaticType())
+  {
+    // dynamics::EulerFreeJoint* freeJoint =
+    // static_cast<dynamics::EulerFreeJoint*>(screwDof->getJoint());
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+    if (rotateIndex < 3)
+    {
+      // If we're rotating
+      // Previous euler rotations don't change subsequent rotations
+      if (axisIndex < rotateIndex)
+      {
+        return Eigen::Vector6s::Zero();
+      }
+      // Previous euler rotations don't change translations
+      if (axisIndex >= 3)
+      {
+        return Eigen::Vector6s::Zero();
+      }
+    }
+  }
+  // Special case: EulerJoint
+  else if (
+      screwDof->getJoint() == rotateDof->getJoint()
+      && screwDof->getJoint()->getType()
+             == dynamics::EulerJoint::getStaticType())
+  {
+    int axisIndex = screwDof->getIndexInJoint();
+    int rotateIndex = rotateDof->getIndexInJoint();
+    // Previous euler rotations don't change subsequent rotations
+    if (axisIndex < rotateIndex)
+    {
+      return Eigen::Vector6s::Zero();
     }
   }
   // General case:

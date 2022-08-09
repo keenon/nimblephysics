@@ -5,13 +5,190 @@
 #include <tuple>
 
 #include "dart/biomechanics/ForcePlate.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/utils/AccelerationSmoother.hpp"
 
 namespace dart {
 namespace biomechanics {
 
+//==============================================================================
+ResidualForceHelper::ResidualForceHelper(
+    std::shared_ptr<dynamics::Skeleton> skeleton, std::vector<int> forceBodies)
+  : mSkel(skeleton)
+{
+  for (int i : forceBodies)
+  {
+    mForces.emplace_back(skeleton, i);
+  }
+}
+
+//==============================================================================
+// Computes the residual for a specific timestep
+Eigen::Vector6s ResidualForceHelper::calculateResidual(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  // TODO: this is certainly a more efficient way to do this, since we only care
+  // about the first 6 values anyways
+  Eigen::MatrixXs M = mSkel->getMassMatrix();
+  Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+  Eigen::VectorXs Fs = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  for (int i = 0; i < mForces.size(); i++)
+  {
+    Eigen::VectorXs fTaus
+        = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+    Fs += fTaus;
+  }
+  Eigen::VectorXs manualTau = M * ddq + C - Fs;
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+
+  return manualTau.head<6>();
+}
+
+//==============================================================================
+// Computes the residual norm for a specific timestep
+s_t ResidualForceHelper::calculateResidualNorm(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  return calculateResidual(q, dq, ddq, forcesConcat).squaredNorm();
+}
+
+//==============================================================================
+// Computes the Jacobian of the residual with respect to the first position
+Eigen::MatrixXs ResidualForceHelper::calculateResidualJacobianWrt(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  // Eigen::VectorXs manualTau = M * acc + C - Fs;
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    Eigen::MatrixXs dM = mSkel->getJacobianOfM(ddq, wrt);
+    Eigen::MatrixXs dC = mSkel->getJacobianOfC(wrt);
+    Eigen::MatrixXs dFs
+        = Eigen::MatrixXs::Zero(mSkel->getNumDofs(), wrt->dim(mSkel.get()));
+    for (int i = 0; i < mForces.size(); i++)
+    {
+      Eigen::MatrixXs dfTaus
+          = mForces[i].getJacobianOfTauWrt(forcesConcat.segment<6>(i * 6), wrt);
+      dFs += dfTaus;
+    }
+    Eigen::MatrixXs jac = dM + dC - dFs;
+
+    mSkel->setPositions(originalPos);
+    mSkel->setVelocities(originalVel);
+
+    // Only take the first 6 rows
+    return jac.block(0, 0, 6, jac.cols());
+  }
+  else if (
+      wrt == neural::WithRespectTo::GROUP_MASSES
+      || wrt == neural::WithRespectTo::GROUP_COMS
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS)
+  {
+    Eigen::MatrixXs dM = mSkel->getJacobianOfM(ddq, wrt);
+    Eigen::MatrixXs dC = mSkel->getJacobianOfC(wrt);
+    Eigen::MatrixXs jac = dM + dC;
+
+    mSkel->setPositions(originalPos);
+    mSkel->setVelocities(originalVel);
+
+    // Only take the first 6 rows
+    return jac.block(0, 0, 6, jac.cols());
+  }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    Eigen::MatrixXs dC = mSkel->getJacobianOfC(neural::WithRespectTo::VELOCITY);
+    // Only take the first 6 rows
+    return dC.block(0, 0, 6, dC.cols());
+  }
+  else if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    Eigen::MatrixXs M = mSkel->getMassMatrix();
+    // Only take the first 6 rows
+    return M.block(0, 0, 6, M.cols());
+  }
+  else
+  {
+    return finiteDifferenceResidualJacobianWrt(q, dq, ddq, forcesConcat, wrt);
+  }
+}
+
+//==============================================================================
+// Computes the Jacobian of the residual with respect to the first position
+Eigen::MatrixXs ResidualForceHelper::finiteDifferenceResidualJacobianWrt(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs result(6, wrt->dim(mSkel.get()));
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::VectorXs originalWrt = wrt->get(mSkel.get());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-2 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs newWrt = originalWrt;
+        newWrt(dof) += eps;
+        wrt->set(mSkel.get(), newWrt);
+        perturbed = calculateResidual(
+            mSkel->getPositions(),
+            mSkel->getVelocities(),
+            mSkel->getAccelerations(),
+            forcesConcat);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  wrt->set(mSkel.get(), originalWrt);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+  return result;
+}
+
+//==============================================================================
 DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,

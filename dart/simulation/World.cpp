@@ -268,11 +268,11 @@ void World::runLcpConstraintEngine(bool _resetCommand)
 void World::replaceConstraintEngineFn(const constraintEngineFnType& engineFn)
 {
   dtwarn << "[World::replaceConstraintEngineFn] WARNING: "
-          "GRADIENTS WILL "
-        << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
-        << "don't yet support differentiating through `timestep()` if you've "
-        << "called `replaceConstraintEngineFn()` to "
-          "customize the constraint engine function.\n";
+            "GRADIENTS WILL "
+         << "BE INCORRECT!!!! Nimble is still under heavy development, and we "
+         << "don't yet support differentiating through `timestep()` if you've "
+         << "called `replaceConstraintEngineFn()` to "
+            "customize the constraint engine function.\n";
 
   mConstraintEngineFn = engineFn;
 }
@@ -1234,6 +1234,226 @@ Eigen::VectorXs World::getControlForces()
 }
 
 //==============================================================================
+/// Gets the dimension of the group scales for all skeletons in the world
+/// concatenated together as a single vector
+int World::getGroupScaleDim()
+{
+  int dim = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    dim += mSkeletons[i]->getGroupScaleDim();
+  }
+  return dim;
+}
+
+//==============================================================================
+/// Gets the sum of the number of the scale groups for all skeletons in the
+/// world
+int World::getNumScaleGroups()
+{
+  int dim = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    dim += mSkeletons[i]->getNumScaleGroups();
+  }
+  return dim;
+}
+
+//==============================================================================
+/// Gets the group scales for all skeletons in the world concatenated together
+/// as a single vector
+Eigen::VectorXs World::getGroupScales()
+{
+  Eigen::VectorXs scales = Eigen::VectorXs(getGroupScaleDim());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getGroupScaleDim();
+    scales.segment(cursor, dofs) = mSkeletons[i]->getGroupScales();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This gets the masses of each scale group, concatenated
+Eigen::VectorXs World::getGroupMasses()
+{
+  Eigen::VectorXs scales = Eigen::VectorXs(getNumScaleGroups());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups();
+    scales.segment(cursor, dofs) = mSkeletons[i]->getGroupMasses();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This sets the masses of each scale group, concatenated
+void World::setGroupMasses(Eigen::VectorXs masses)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups();
+    mSkeletons[i]->setGroupMasses(masses.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each group's mass, concatenated
+Eigen::VectorXs World::getGroupMassesUpperBound()
+{
+  Eigen::VectorXs scales = Eigen::VectorXs(getNumScaleGroups());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups();
+    scales.segment(cursor, dofs) = mSkeletons[i]->getGroupMassesUpperBound();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This gets the lower bound for each group's mass, concatenated
+Eigen::VectorXs World::getGroupMassesLowerBound()
+{
+  Eigen::VectorXs scales = Eigen::VectorXs(getNumScaleGroups());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups();
+    scales.segment(cursor, dofs) = mSkeletons[i]->getGroupMassesLowerBound();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This gets the COMs of each scale group, concatenated
+Eigen::VectorXs World::getGroupCOMs()
+{
+  Eigen::VectorXs coms = Eigen::VectorXs(getNumScaleGroups() * 3);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 3;
+    coms.segment(cursor, dofs) = mSkeletons[i]->getGroupCOMs();
+    cursor += dofs;
+  }
+  return coms;
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's COM, concatenated
+Eigen::VectorXs World::getGroupCOMUpperBound()
+{
+  Eigen::VectorXs coms = Eigen::VectorXs(getNumScaleGroups() * 3);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 3;
+    coms.segment(cursor, dofs) = mSkeletons[i]->getGroupCOMUpperBound();
+    cursor += dofs;
+  }
+  return coms;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's COM, concatenated
+Eigen::VectorXs World::getGroupCOMLowerBound()
+{
+  Eigen::VectorXs coms = Eigen::VectorXs(getNumScaleGroups() * 3);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 3;
+    coms.segment(cursor, dofs) = mSkeletons[i]->getGroupScalesLowerBound();
+    cursor += dofs;
+  }
+  return coms;
+}
+
+//==============================================================================
+/// This sets the COMs of each scale group, concatenated
+void World::setGroupCOMs(Eigen::VectorXs coms)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 3;
+    mSkeletons[i]->setGroupMasses(coms.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+/// This gets the Inertias of each scale group (the 6 vector), concatenated
+Eigen::VectorXs World::getGroupInertias()
+{
+  Eigen::VectorXs inertias = Eigen::VectorXs(getNumScaleGroups() * 6);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 6;
+    inertias.segment(cursor, dofs) = mSkeletons[i]->getGroupInertias();
+    cursor += dofs;
+  }
+  return inertias;
+}
+
+//==============================================================================
+/// This sets the Inertias of each scale group (the 6 vector), concatenated
+void World::setGroupInertias(Eigen::VectorXs inertias)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 6;
+    mSkeletons[i]->setGroupInertias(inertias.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs World::getGroupInertiasUpperBound()
+{
+  Eigen::VectorXs inertias = Eigen::VectorXs(getNumScaleGroups() * 6);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 6;
+    inertias.segment(cursor, dofs)
+        = mSkeletons[i]->getGroupInertiasUpperBound();
+    cursor += dofs;
+  }
+  return inertias;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs World::getGroupInertiasLowerBound()
+{
+  Eigen::VectorXs inertias = Eigen::VectorXs(getNumScaleGroups() * 6);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() * 6;
+    inertias.segment(cursor, dofs)
+        = mSkeletons[i]->getGroupInertiasLowerBound();
+    cursor += dofs;
+  }
+  return inertias;
+}
+
+//==============================================================================
 Eigen::VectorXs World::getControlForceUpperLimits()
 {
   Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
@@ -1318,6 +1538,70 @@ Eigen::VectorXs World::getVelocityLowerLimits()
 }
 
 //==============================================================================
+// This gives the vector of position upper limits for all the DOFs in this
+// world
+Eigen::VectorXs World::getAccelerationUpperLimits()
+{
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getAccelerationUpperLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+// This gives the vector of position lower limits for all the DOFs in this
+// world
+Eigen::VectorXs World::getAccelerationLowerLimits()
+{
+  Eigen::VectorXs limits = Eigen::VectorXs(mDofs);
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumDofs();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getAccelerationLowerLimits();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+// This gives the vector of position upper limits for all the scale groups in
+// this world
+Eigen::VectorXs World::getGroupScalesUpperLimits()
+{
+  Eigen::VectorXs limits = Eigen::VectorXs(getGroupScaleDim());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getGroupScaleDim();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getGroupScalesUpperBound();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
+// This gives the vector of position lower limits for all the scale groups in
+// this world
+Eigen::VectorXs World::getGroupScalesLowerLimits()
+{
+  Eigen::VectorXs limits = Eigen::VectorXs(getGroupScaleDim());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getGroupScaleDim();
+    limits.segment(cursor, dofs) = mSkeletons[i]->getGroupScalesLowerBound();
+    cursor += dofs;
+  }
+  return limits;
+}
+
+//==============================================================================
 // This gives the vector of mass upper limits for all the registered bodies in
 // this world
 Eigen::VectorXs World::getMassUpperLimits()
@@ -1377,6 +1661,20 @@ void World::setControlForces(Eigen::VectorXs forces)
   {
     std::size_t dofs = mSkeletons[i]->getNumDofs();
     mSkeletons[i]->setControlForces(forces.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+/// Sets the scales of all the scale groups in the world from a single
+/// concatenated state vector
+void World::setGroupScales(Eigen::VectorXs scales)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getGroupScaleDim();
+    mSkeletons[i]->setGroupScales(scales.segment(cursor, dofs));
     cursor += dofs;
   }
 }

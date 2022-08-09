@@ -209,6 +209,8 @@ public:
       s_t _Ixz = 0.0,
       s_t _Iyz = 0.0);
 
+  void setMomentVector(Eigen::Vector6s moment);
+
   /// Return moment of inertia defined around the center of mass
   void getMomentOfInertia(
       s_t& _Ixx, s_t& _Iyy, s_t& _Izz, s_t& _Ixy, s_t& _Ixz, s_t& _Iyz) const;
@@ -1279,7 +1281,8 @@ public:
   Eigen::Vector3s mScaleLowerBound;
   Eigen::Vector3s mScaleUpperBound;
 
-  /// This beta describe linear relationship that used for SSID itself could be further optimized later
+  /// This beta describe linear relationship that used for SSID itself could be
+  /// further optimized later
   Eigen::Vector3s mBeta;
 
   //--------------------------------------------------------------------------

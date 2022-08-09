@@ -3797,6 +3797,7 @@ void Skeleton::setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform)
 /// This returns the number of scale groups
 int Skeleton::getNumScaleGroups()
 {
+  ensureBodyScaleGroups();
   return mBodyScaleGroups.size();
 }
 
@@ -3908,6 +3909,349 @@ int Skeleton::getGroupScaleDim()
     }
   }
   return sum;
+}
+
+//==============================================================================
+/// This produces a human-readable description of the group scale vector index
+std::string Skeleton::debugGroupScaleIndex(int groupIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  std::string result = std::to_string(groupIdx) + " ";
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  if (group->uniformScaling)
+  {
+    result += "[uniform]";
+  }
+  else if (axis == 0)
+  {
+    result += "[X]";
+  }
+  else if (axis == 1)
+  {
+    result += "[Y]";
+  }
+  else if (axis == 2)
+  {
+    result += "[Z]";
+  }
+  for (dynamics::BodyNode* node : group->nodes)
+  {
+    result += " " + node->getName();
+  }
+  return result;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::getGroupScaleMovementOnBodyInWorldSpace(
+    int groupIdx, int bodyIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  Eigen::Vector3s motionSum = Eigen::Vector3s::Zero();
+
+  const Eigen::MatrixXi& parents = getJointParentMap();
+
+  BodyNode* target = getBodyNode(bodyIdx);
+  int targetJointIdx = target->getParentJoint()->getJointIndexInSkeleton();
+
+  // //==============================================================================
+  // /// Set the scale of the child body
+  // void Joint::setChildScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mChildScale = scale;
+  //   mAspectProperties.mT_ChildBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  //   updateRelativeJacobian();
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // /// Set the scale of the parent body
+  // void Joint::setParentScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mParentScale = scale;
+  //   mAspectProperties.mT_ParentBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // void Joint::updateRelativeTransform()
+  // {
+  //    mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+  //         * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  // }
+
+  for (int i = 0; i < group->nodes.size(); i++)
+  {
+    BodyNode* source = group->nodes[i];
+    int sourceJointIdx = source->getParentJoint()->getJointIndexInSkeleton();
+
+    if (source == target || parents(sourceJointIdx, targetJointIdx) == 1)
+    {
+      Eigen::Vector3s localT
+          = source->getParentJoint()->getOriginalTransformFromChildBodyNode();
+      if (!group->uniformScaling)
+      {
+        localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+      }
+
+      Eigen::Vector3s worldParentChildT
+          = source->getWorldTransform().linear() * -localT;
+      motionSum += worldParentChildT;
+    }
+
+    if (parents(sourceJointIdx, targetJointIdx) == 1)
+    {
+      for (int j = 0; j < source->getNumChildJoints(); j++)
+      {
+        dynamics::Joint* childJoint = source->getChildJoint(j);
+        if (childJoint == target->getParentJoint()
+            || parents(childJoint->getJointIndexInSkeleton(), targetJointIdx))
+        {
+          Eigen::Vector3s localT
+              = childJoint->getOriginalTransformFromParentBodyNode();
+          if (!group->uniformScaling)
+          {
+            localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+          }
+          Eigen::Vector3s worldChildParentT
+              = source->getWorldTransform().linear() * localT;
+          motionSum += worldChildParentT;
+        }
+      }
+    }
+  }
+
+  return motionSum;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::finiteDifferenceGroupScaleMovementOnBodyInWorldSpace(
+    int groupIdx, int bodyIdx)
+{
+  Eigen::VectorXs original = getGroupScales();
+  Eigen::Vector3s result;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(groupIdx) += eps;
+        setGroupScales(tweaked);
+        perturbed = getBodyNode(bodyIdx)->getWorldTransform().translation();
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+  return result;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::getGroupScaleMovementOnJointInWorldSpace(
+    int groupIdx, int jointIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  Eigen::Vector3s motionSum = Eigen::Vector3s::Zero();
+
+  const Eigen::MatrixXi& parents = getJointParentMap();
+
+  // //==============================================================================
+  // /// Set the scale of the child body
+  // void Joint::setChildScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mChildScale = scale;
+  //   mAspectProperties.mT_ChildBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  //   updateRelativeJacobian();
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // /// Set the scale of the parent body
+  // void Joint::setParentScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mParentScale = scale;
+  //   mAspectProperties.mT_ParentBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // void Joint::updateRelativeTransform()
+  // {
+  //    mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+  //         * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  // }
+
+  for (int i = 0; i < group->nodes.size(); i++)
+  {
+    BodyNode* source = group->nodes[i];
+    int sourceJointIdx = source->getParentJoint()->getJointIndexInSkeleton();
+
+    if (parents(sourceJointIdx, jointIdx) == 1)
+    {
+      Eigen::Vector3s localT
+          = source->getParentJoint()->getOriginalTransformFromChildBodyNode();
+      if (!group->uniformScaling)
+      {
+        localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+      }
+
+      Eigen::Vector3s worldParentChildT
+          = source->getWorldTransform().linear() * -localT;
+      motionSum += worldParentChildT;
+    }
+
+    for (int j = 0; j < source->getNumChildJoints(); j++)
+    {
+      dynamics::Joint* childJoint = source->getChildJoint(j);
+      if (childJoint->getJointIndexInSkeleton() == jointIdx
+          || parents(childJoint->getJointIndexInSkeleton(), jointIdx))
+      {
+        Eigen::Vector3s localT
+            = childJoint->getOriginalTransformFromParentBodyNode();
+        if (!group->uniformScaling)
+        {
+          localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+        }
+        Eigen::Vector3s worldChildParentT
+            = source->getWorldTransform().linear() * localT;
+        motionSum += worldChildParentT;
+      }
+    }
+  }
+
+  return motionSum;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::finiteDifferenceGroupScaleMovementOnJointInWorldSpace(
+    int groupIdx, int jointIdx)
+{
+  Eigen::VectorXs original = getGroupScales();
+  Eigen::Vector3s result;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(groupIdx) += eps;
+        setGroupScales(tweaked);
+        perturbed = getJointWorldPosition(jointIdx);
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+  return result;
 }
 
 //==============================================================================
@@ -4046,6 +4390,185 @@ Eigen::VectorXs Skeleton::getGroupScalesLowerBound()
     }
   }
   assert(cursor == groups.size());
+  return groups;
+}
+
+//==============================================================================
+/// This gets the masses of each scale group, concatenated
+Eigen::VectorXs Skeleton::getGroupMasses()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getMass();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the masses of each scale group, concatenated
+void Skeleton::setGroupMasses(Eigen::VectorXs masses)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (auto* node : mBodyScaleGroups[i].nodes)
+    {
+      node->setMass(masses(i));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each group's mass, concatenated
+Eigen::VectorXs Skeleton::getGroupMassesUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getInertia().getMassUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each group's mass, concatenated
+Eigen::VectorXs Skeleton::getGroupMassesLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getInertia().getMassLowerBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the COMs of each scale group, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMs()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOM();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's COM, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOMUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's COM, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOMLowerBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the COMs of each scale group, concatenated
+void Skeleton::setGroupCOMs(Eigen::VectorXs coms)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (auto* node : mBodyScaleGroups[i].nodes)
+    {
+      node->setLocalCOM(coms.segment<3>(i * 3));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the Inertias of each scale group (the 6 vector), concatenated
+Eigen::VectorXs Skeleton::getGroupInertias()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<6>(i * 6)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentVector();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the Inertias of each scale group (the 6 vector), concatenated
+void Skeleton::setGroupInertias(Eigen::VectorXs inertias)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (auto* node : mBodyScaleGroups[i].nodes)
+    {
+      node->setMomentVector(inertias.segment<6>(i * 6));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs Skeleton::getGroupInertiasUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<6>(i * 6)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs Skeleton::getGroupInertiasLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<6>(i * 6)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentLowerBound();
+  }
   return groups;
 }
 
@@ -4650,6 +5173,15 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
 }
 
 //==============================================================================
+/// This returns the world position of a joint
+Eigen::Vector3s Skeleton::getJointWorldPosition(int idx) const
+{
+  return (getJoint(idx)->getChildBodyNode()->getWorldTransform()
+          * getJoint(idx)->getTransformFromChildBodyNode())
+      .translation();
+}
+
+//==============================================================================
 /// This returns a map with the world positions of each joint, keyed by joint
 /// name
 std::map<std::string, Eigen::Vector3s> Skeleton::getJointWorldPositionsMap()
@@ -4658,10 +5190,7 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getJointWorldPositionsMap()
   std::map<std::string, Eigen::Vector3s> result;
   for (int i = 0; i < getNumJoints(); i++)
   {
-    result[getJoint(i)->getName()]
-        = (getJoint(i)->getChildBodyNode()->getWorldTransform()
-           * getJoint(i)->getTransformFromChildBodyNode())
-              .translation();
+    result[getJoint(i)->getName()] = getJointWorldPosition(i);
   }
   return result;
 }

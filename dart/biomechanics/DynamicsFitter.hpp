@@ -8,9 +8,62 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/DifferentiableExternalForce.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 
 namespace dart {
 namespace biomechanics {
+
+/**
+ * This class factors out the code to deal with calculating residual forces, and
+ * the associated Jacobians of residual force with respect to lots of different
+ * inputs.
+ */
+class ResidualForceHelper
+{
+public:
+  ResidualForceHelper(
+      std::shared_ptr<dynamics::Skeleton> skeleton,
+      std::vector<int> forceBodies);
+
+  ///////////////////////////////////////////
+  // Computes the residual for a specific timestep
+  Eigen::Vector6s calculateResidual(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ///////////////////////////////////////////
+  // Computes the residual norm for a specific timestep
+  s_t calculateResidualNorm(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ///////////////////////////////////////////
+  // Computes the Jacobian of the residual with respect to the first position
+  Eigen::MatrixXs calculateResidualJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ///////////////////////////////////////////
+  // Computes the Jacobian of the residual with respect to the first position
+  Eigen::MatrixXs finiteDifferenceResidualJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+protected:
+  std::shared_ptr<dynamics::Skeleton> mSkel;
+  std::vector<neural::DifferentiableExternalForce> mForces;
+};
 
 /**
  * We create a single initialization object, and pass it around to optimization

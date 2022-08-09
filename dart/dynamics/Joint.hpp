@@ -195,6 +195,12 @@ public:
   /// Get transformation from child body node to this joint
   const Eigen::Isometry3s& getTransformFromChildBodyNode() const;
 
+  /// Get the unscaled transformation from parent body node to this joint
+  const Eigen::Vector3s& getOriginalTransformFromParentBodyNode() const;
+
+  /// Get the unscaled transformation from child body node to this joint
+  const Eigen::Vector3s& getOriginalTransformFromChildBodyNode() const;
+
   /// Copy the transfromFromParentNode and transfromFromChildNode, and their
   /// scales, from another joint
   void copyTransformsFrom(const dynamics::Joint* other);

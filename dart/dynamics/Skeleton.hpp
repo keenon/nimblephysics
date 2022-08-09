@@ -981,6 +981,29 @@ public:
   /// This returns the dimensions of the grouped scale vector.
   int getGroupScaleDim();
 
+  /// This produces a human-readable description of the group scale vector index
+  std::string debugGroupScaleIndex(int groupIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a body.
+  Eigen::Vector3s getGroupScaleMovementOnBodyInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a body.
+  Eigen::Vector3s finiteDifferenceGroupScaleMovementOnBodyInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a joint.
+  Eigen::Vector3s getGroupScaleMovementOnJointInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a joint.
+  Eigen::Vector3s finiteDifferenceGroupScaleMovementOnJointInWorldSpace(
+      int groupIdx, int bodyIdx);
+
   /// This sets the scales of all the body nodes according to their group
   /// membership. The `scale` vector is expected to be the same size as the
   /// number of groups.
@@ -1001,6 +1024,44 @@ public:
   /// This returns the upper bound values for each index in the group scales
   /// vector
   Eigen::VectorXs getGroupScalesLowerBound();
+
+  /// This gets the masses of each scale group, concatenated
+  Eigen::VectorXs getGroupMasses();
+
+  /// This sets the masses of each scale group, concatenated
+  void setGroupMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesUpperBound();
+
+  /// This gets the lower bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesLowerBound();
+
+  /// This gets the COMs of each scale group, concatenated
+  Eigen::VectorXs getGroupCOMs();
+
+  /// This gets the upper bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMUpperBound();
+
+  /// This gets the lower bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMLowerBound();
+
+  /// This sets the COMs of each scale group, concatenated
+  void setGroupCOMs(Eigen::VectorXs coms);
+
+  /// This gets the Inertias of each scale group (the 6 vector), concatenated
+  Eigen::VectorXs getGroupInertias();
+
+  /// This sets the Inertias of each scale group (the 6 vector), concatenated
+  void setGroupInertias(Eigen::VectorXs inertias);
+
+  /// This gets the upper bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasUpperBound();
+
+  /// This gets the lower bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasLowerBound();
 
   /// This is a general purpose utility to convert a Gradient wrt Body scales to
   /// one wrt Group scales
@@ -1109,6 +1170,9 @@ public:
   /// in 3D world space, for the registered joints.
   Eigen::VectorXs getJointWorldPositions(
       const std::vector<dynamics::Joint*>& joints) const;
+
+  /// This returns the world position of a joint
+  Eigen::Vector3s getJointWorldPosition(int idx) const;
 
   /// This returns a map with the world positions of each joint, keyed by joint
   /// name

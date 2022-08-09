@@ -96,11 +96,23 @@ public:
   /// Get the mass
   s_t getMass() const;
 
+  /// Set the mass bounds
+  void setMassLowerBound(s_t _mass);
+  s_t getMassLowerBound() const;
+  void setMassUpperBound(s_t _mass);
+  s_t getMassUpperBound() const;
+
   /// Set the center of mass with respect to the Body-fixed frame
   void setLocalCOM(const Eigen::Vector3s& _com);
 
   /// Get the center of mass with respect to the Body-fixed frame
   const Eigen::Vector3s& getLocalCOM() const;
+
+  /// Get the center of mass bounds with respect to the Body-fixed frame
+  void setLocalCOMLowerBound(Eigen::Vector3s bounds);
+  const Eigen::Vector3s& getLocalCOMLowerBound() const;
+  void setLocalCOMUpperBound(Eigen::Vector3s bounds);
+  const Eigen::Vector3s& getLocalCOMUpperBound() const;
 
   /// Set the moment of inertia (about the center of mass). Note that only the
   /// top-right corner of the matrix will be used, because a well-formed inertia
@@ -112,6 +124,15 @@ public:
 
   /// Get the moment of inertia
   Eigen::Matrix3s getMoment() const;
+
+  /// Set the moment of inertia (about the center of mass)
+  void setMomentVector(Eigen::Vector6s moment);
+  const Eigen::Vector6s getMomentVector() const;
+  /// Set the moment of inertia bounds (about the center of mass)
+  void setMomentLowerBound(Eigen::Vector6s bound);
+  const Eigen::Vector6s& getMomentLowerBound() const;
+  void setMomentUpperBound(Eigen::Vector6s bound);
+  const Eigen::Vector6s& getMomentUpperBound() const;
 
   /// Set the spatial tensor
   void setSpatialTensor(const Eigen::Matrix6s& _spatial);
@@ -149,12 +170,18 @@ protected:
 
   /// Overall mass
   s_t mMass;
+  s_t mMassLowerBound;
+  s_t mMassUpperBound;
 
   /// Center of mass in the Body frame
   Eigen::Vector3s mCenterOfMass;
+  Eigen::Vector3s mCenterOfMassLowerBound;
+  Eigen::Vector3s mCenterOfMassUpperBound;
 
   /// The six parameters of the moment of inertia located at the center of mass
   std::array<s_t, 6> mMoment;
+  Eigen::Vector6s mMomentLowerBound;
+  Eigen::Vector6s mMomentUpperBound;
 
   /// Cache for generalized spatial inertia of the Body
   Eigen::Matrix6s mSpatialTensor;

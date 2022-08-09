@@ -130,6 +130,30 @@ s_t Inertia::getMass() const
 }
 
 //==============================================================================
+void Inertia::setMassLowerBound(s_t _mass)
+{
+  mMassLowerBound = _mass;
+}
+
+//==============================================================================
+s_t Inertia::getMassLowerBound() const
+{
+  return mMassLowerBound;
+}
+
+//==============================================================================
+void Inertia::setMassUpperBound(s_t _mass)
+{
+  mMassUpperBound = _mass;
+}
+
+//==============================================================================
+s_t Inertia::getMassUpperBound() const
+{
+  return mMassUpperBound;
+}
+
+//==============================================================================
 void Inertia::setLocalCOM(const Eigen::Vector3s& _com)
 {
   mCenterOfMass = _com;
@@ -140,6 +164,30 @@ void Inertia::setLocalCOM(const Eigen::Vector3s& _com)
 const Eigen::Vector3s& Inertia::getLocalCOM() const
 {
   return mCenterOfMass;
+}
+
+//==============================================================================
+void Inertia::setLocalCOMLowerBound(Eigen::Vector3s bounds)
+{
+  mCenterOfMassLowerBound = bounds;
+}
+
+//==============================================================================
+const Eigen::Vector3s& Inertia::getLocalCOMLowerBound() const
+{
+  return mCenterOfMassLowerBound;
+}
+
+//==============================================================================
+void Inertia::setLocalCOMUpperBound(Eigen::Vector3s bounds)
+{
+  mCenterOfMassUpperBound = bounds;
+}
+
+//==============================================================================
+const Eigen::Vector3s& Inertia::getLocalCOMUpperBound() const
+{
+  return mCenterOfMassUpperBound;
 }
 
 //==============================================================================
@@ -186,6 +234,50 @@ Eigen::Matrix3s Inertia::getMoment() const
   I(1, 2) = I(2, 1) = mMoment[I_YZ - 4];
 
   return I;
+}
+
+//==============================================================================
+void Inertia::setMomentVector(Eigen::Vector6s moment)
+{
+  mMoment[I_XX - 4] = moment(0);
+  mMoment[I_YY - 4] = moment(1);
+  mMoment[I_ZZ - 4] = moment(2);
+  mMoment[I_XY - 4] = moment(3);
+  mMoment[I_XZ - 4] = moment(4);
+  mMoment[I_YZ - 4] = moment(5);
+}
+
+//==============================================================================
+const Eigen::Vector6s Inertia::getMomentVector() const
+{
+  Eigen::Vector6s vec;
+  vec << mMoment[I_XX - 4], mMoment[I_YY - 4], mMoment[I_ZZ - 4],
+      mMoment[I_XY - 4], mMoment[I_XZ - 4], mMoment[I_YZ - 4];
+  return vec;
+}
+
+//==============================================================================
+void Inertia::setMomentLowerBound(Eigen::Vector6s bound)
+{
+  mMomentLowerBound = bound;
+}
+
+//==============================================================================
+const Eigen::Vector6s& Inertia::getMomentLowerBound() const
+{
+  return mMomentLowerBound;
+}
+
+//==============================================================================
+void Inertia::setMomentUpperBound(Eigen::Vector6s bound)
+{
+  mMomentUpperBound = bound;
+}
+
+//==============================================================================
+const Eigen::Vector6s& Inertia::getMomentUpperBound() const
+{
+  return mMomentUpperBound;
 }
 
 //==============================================================================
@@ -405,6 +497,7 @@ bool Inertia::operator==(const Inertia& other) const
 /// This rescales the object by "ratio" in each of the specified axis
 void Inertia::rescale(Eigen::Vector3s ratio)
 {
+  // TODO: fix this!!!
   setLocalCOM(getLocalCOM().cwiseProduct(ratio));
   Eigen::Matrix3s scaledMoment = getMoment().cwiseProduct(
       ratio * ratio.transpose()); // The MOI is an integral of m*r*r, so needs

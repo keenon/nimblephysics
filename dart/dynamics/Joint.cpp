@@ -709,6 +709,20 @@ const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 }
 
 //==============================================================================
+/// Get the unscaled transformation from parent body node to this joint
+const Eigen::Vector3s& Joint::getOriginalTransformFromParentBodyNode() const
+{
+  return mAspectProperties.mOriginalParentTranslation;
+}
+
+//==============================================================================
+/// Get the unscaled transformation from child body node to this joint
+const Eigen::Vector3s& Joint::getOriginalTransformFromChildBodyNode() const
+{
+  return mAspectProperties.mOriginalChildTranslation;
+}
+
+//==============================================================================
 /// Copy the transfromFromParentNode and transfromFromChildNode, and their
 /// scales, from another joint
 void Joint::copyTransformsFrom(const dynamics::Joint* other)
@@ -743,6 +757,7 @@ void Joint::setParentScale(Eigen::Vector3s scale)
   mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  updateRelativeJacobian();
   notifyPositionUpdated();
 }
 

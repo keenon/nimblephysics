@@ -645,7 +645,7 @@ s_t BodyNode::getMass() const
 void BodyNode::setBeta(Eigen::Vector3s beta)
 {
   // In order to prevent numerical issue or divide by zero issue.
-  assert(beta.norm()>=1e-6);
+  assert(beta.norm() >= 1e-6);
   mBeta = beta;
 }
 
@@ -659,6 +659,14 @@ void BodyNode::setMomentOfInertia(
     s_t _Ixx, s_t _Iyy, s_t _Izz, s_t _Ixy, s_t _Ixz, s_t _Iyz)
 {
   mAspectProperties.mInertia.setMoment(_Ixx, _Iyy, _Izz, _Ixy, _Ixz, _Iyz);
+
+  dirtyArticulatedInertia();
+}
+
+//==============================================================================
+void BodyNode::setMomentVector(Eigen::Vector6s moment)
+{
+  mAspectProperties.mInertia.setMomentVector(moment);
 
   dirtyArticulatedInertia();
 }
@@ -2946,7 +2954,7 @@ void BodyNode::computeJacobianOfMForward(neural::WithRespectTo* wrt)
   if (mParentBodyNode)
     mMddq_dV = math::AdInvT(T, mParentBodyNode->mMddq_dV) + S * ddq;
   else
-    mMddq_dV.noalias() = S * ddq;
+    mMddq_dV = S * ddq; // .noalias()
 
   // TODO(JS): iterate joints instead for vectorization
   for (auto i = 0u; i < numDofs; ++i)

@@ -289,6 +289,14 @@ public:
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index, bool useRidders = true);
 
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6s getScrewAxisGradientForPosition(
+      int axisDof, int rotateDof) override;
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6s getScrewAxisGradientForForce(
+      int axisDof, int rotateDof) override;
+
   ///////////////////////////////////////////////////////////////////////////
   // Only for use during development and testing of Jacobians.
   ///////////////////////////////////////////////////////////////////////////

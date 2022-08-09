@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -7,12 +8,16 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BallJoint.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/DifferentiableContactConstraint.hpp"
+#include "dart/neural/DifferentiableExternalForce.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -30,6 +35,374 @@ using namespace dart;
 using namespace biomechanics;
 using namespace server;
 using namespace realtime;
+
+void applyExternalForces(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces)
+{
+  skel->clearExternalForces();
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = skel->getBodyNode(i);
+    if (worldForces.count(i))
+    {
+      body->setExtWrench(
+          math::dAdT(body->getWorldTransform(), worldForces.at(i)));
+    }
+  }
+}
+
+bool testForwardDynamicsFormula(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces)
+{
+  (void)skel;
+  (void)worldForces;
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+
+  // Compute normal forward dynamics
+  (void)worldForces;
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  skel->integrateVelocities(skel->getTimeStep());
+  Eigen::VectorXs nextVel = skel->getVelocities();
+
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  skel->setControlForces(originalTau);
+
+  // Compute analytical forward dynamics
+  Eigen::MatrixXs Minv = skel->getInvMassMatrix();
+  Eigen::VectorXs tau = skel->getControlForces();
+  Eigen::VectorXs C = skel->getCoriolisAndGravityForces();
+  s_t dt = skel->getTimeStep();
+
+  Eigen::VectorXs preSolveV = originalVel + dt * Minv * (tau - C);
+  Eigen::VectorXs f_cDeltaV = Eigen::VectorXs::Zero(preSolveV.size());
+
+  Eigen::MatrixXi parents = skel->getDofParentMap();
+
+  for (auto& pair : worldForces)
+  {
+    DifferentiableExternalForce force(skel, pair.first);
+    Eigen::VectorXs fTaus = force.computeTau(pair.second);
+
+#ifndef NDEBUG
+    dynamics::BodyNode* body = skel->getBodyNode(pair.first);
+    std::vector<int> parentDofs;
+    for (int i = 0; i < body->getParentJoint()->getNumDofs(); i++)
+    {
+      parentDofs.push_back(
+          body->getParentJoint()->getDof(i)->getIndexInSkeleton());
+    }
+    Eigen::VectorXs rawTaus = Eigen::VectorXs::Zero(skel->getNumDofs());
+    for (int i = 0; i < skel->getNumDofs(); i++)
+    {
+      bool isParent = false;
+      for (int j : parentDofs)
+      {
+        if (parents(i, j) == 1 || i == j)
+        {
+          isParent = true;
+          break;
+        }
+      }
+      if (!isParent)
+        continue;
+      rawTaus(i) = DifferentiableContactConstraint::getWorldScrewAxisForForce(
+                       skel->getDof(i))
+                       .dot(pair.second);
+    }
+    if (!equals(rawTaus, fTaus, 1e-8))
+    {
+      std::cout << "Taus don't equal!" << std::endl;
+    }
+#endif
+
+    f_cDeltaV += dt * Minv * fTaus;
+  }
+  Eigen::VectorXs postSolveV = preSolveV + f_cDeltaV;
+
+  if (!equals(nextVel, postSolveV, 1e-8))
+  {
+    std::cout << "Failed to recover next V!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(nextVel.size(), 4);
+    compare.col(0) = nextVel;
+    compare.col(1) = postSolveV;
+    compare.col(2) = nextVel - postSolveV;
+    compare.col(3) = f_cDeltaV;
+    std::cout << "Forward - Analytical - Diff - Delta V: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool testInverseDynamicsFormula(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  skel->integrateVelocities(skel->getTimeStep());
+  Eigen::VectorXs nextVel = skel->getVelocities();
+
+  // Reset
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  // ID method
+  Eigen::VectorXs taus = skel->getInverseDynamics(nextVel);
+
+  if (!equals(taus, originalTau, 1e-8))
+  {
+    std::cout << "Failed to recover ID forces!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(taus.size(), 3);
+    compare.col(0) = originalTau;
+    compare.col(1) = taus;
+    compare.col(2) = originalTau - taus;
+    std::cout << "Original - Recovered - Diff: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  // Decomposed ID formula
+
+  // Eigen::VectorXs nextV = originalVel + dt * Minv * (tau - C +
+  // sum(J[i]*f[i]));
+  //
+  // Eigen::VectorXs (M * (nextV - originalVel) / dt) + C - Fs = tau;
+
+  Eigen::MatrixXs M = skel->getMassMatrix();
+  Eigen::VectorXs acc = (nextVel - originalVel) / skel->getTimeStep();
+  Eigen::VectorXs C = skel->getCoriolisAndGravityForces();
+  Eigen::VectorXs Fs = Eigen::VectorXs::Zero(skel->getNumDofs());
+  for (auto& pair : worldForces)
+  {
+    DifferentiableExternalForce force(skel, pair.first);
+    Eigen::VectorXs fTaus = force.computeTau(pair.second);
+    Fs += fTaus;
+  }
+
+  Eigen::VectorXs manualTau = M * acc + C - Fs;
+
+  if (!equals(manualTau, originalTau, 1e-8))
+  {
+    std::cout << "Failed to recover ID forces with manual ID formula!"
+              << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(taus.size(), 3);
+    compare.col(0) = originalTau;
+    compare.col(1) = manualTau;
+    compare.col(2) = originalTau - manualTau;
+    std::cout << "Original - Recovered - Diff: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool testResidualAgainstID(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  Eigen::Vector6s originalResidual = originalTau.head<6>();
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  Eigen::VectorXs acc = skel->getAccelerations();
+
+  // Reset
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  std::vector<int> forceBodies;
+  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
+  for (auto& pair : worldForces)
+  {
+    concatForces.segment<6>(forceBodies.size() * 6) = pair.second;
+    forceBodies.push_back(pair.first);
+  }
+
+  ResidualForceHelper helper(skel, forceBodies);
+
+  Eigen::Vector6s manualResidual
+      = helper.calculateResidual(originalPos, originalVel, acc, concatForces);
+
+  if (!equals(manualResidual, originalResidual, 1e-8))
+  {
+    std::cout << "Failed to recover residual!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+    compare.col(0) = originalResidual;
+    compare.col(1) = manualResidual;
+    compare.col(2) = originalResidual - manualResidual;
+    std::cout << "Original - Recovered - Diff: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool testMassJacobian(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  skel->setControlForces(originalTau);
+  skel->clearExternalForces();
+  skel->computeForwardDynamics();
+  Eigen::VectorXs acc = skel->getAccelerations();
+  skel->integrateVelocities(skel->getTimeStep());
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  // Do these break my thing?
+  Eigen::MatrixXs Minv = skel->getInvMassMatrix();
+  Eigen::VectorXs tau = skel->getControlForces();
+  Eigen::VectorXs C = skel->getCoriolisAndGravityForces();
+  s_t dt = skel->getTimeStep();
+
+  Eigen::VectorXs preSolveV = originalVel + dt * Minv * (tau - C);
+  Eigen::VectorXs f_cDeltaV = Eigen::VectorXs::Zero(preSolveV.size());
+
+  Eigen::MatrixXi parents = skel->getDofParentMap();
+
+  DifferentiableExternalForce force(
+      skel, skel->getBodyNode("calcn_r")->getIndexInSkeleton());
+  Eigen::VectorXs fTaus = force.computeTau(Eigen::Vector6s::Random());
+  // </break>
+
+  Eigen::MatrixXs dM
+      = skel->getJacobianOfM(acc, neural::WithRespectTo::POSITION);
+  Eigen::MatrixXs dM_fd
+      = skel->finiteDifferenceJacobianOfM(acc, neural::WithRespectTo::POSITION);
+
+  if (!equals(dM, dM_fd, 1e-8))
+  {
+    std::cout << "dM and dM_fd not equal!" << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << dM.block(0, 0, 6, 6) << std::endl;
+    std::cout << "FD:" << std::endl << dM_fd.block(0, 0, 6, 6) << std::endl;
+    std::cout << "Diff (" << (dM_fd - dM).minCoeff() << " - "
+              << (dM_fd - dM).maxCoeff() << "):" << std::endl
+              << (dM_fd - dM).block(0, 0, 6, 6) << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool testCoriolisJacobianWrtPos(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  skel->clearExternalForces();
+  Eigen::MatrixXs dC = skel->getJacobianOfC(neural::WithRespectTo::POSITION);
+  Eigen::MatrixXs dC_fd
+      = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::POSITION);
+
+  if (!equals(dC, dC_fd, 1e-8))
+  {
+    std::cout << "dC and dC_fd not equal (with respect to POSITION)!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << dC.block(0, 0, 6, 6) << std::endl;
+    std::cout << "FD:" << std::endl << dC_fd.block(0, 0, 6, 6) << std::endl;
+    std::cout << "Diff (" << (dC_fd - dC).minCoeff() << " - "
+              << (dC_fd - dC).maxCoeff() << "):" << std::endl
+              << (dC_fd - dC).block(0, 0, 6, 6) << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool testCoriolisJacobianWrtVel(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  skel->clearExternalForces();
+  Eigen::MatrixXs dC = skel->getJacobianOfC(neural::WithRespectTo::VELOCITY);
+  Eigen::MatrixXs dC_fd
+      = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::VELOCITY);
+
+  if (!equals(dC, dC_fd, 1e-8))
+  {
+    std::cout << "dC and dC_fd not equal (with respect to VELOCITY)!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << dC.block(0, 0, 6, 6) << std::endl;
+    std::cout << "FD:" << std::endl << dC_fd.block(0, 0, 6, 6) << std::endl;
+    std::cout << "Diff (" << (dC_fd - dC).minCoeff() << " - "
+              << (dC_fd - dC).maxCoeff() << "):" << std::endl
+              << (dC_fd - dC).block(0, 0, 6, 6) << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool testResidualJacWrt(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  Eigen::Vector6s originalResidual = originalTau.head<6>();
+  (void)originalResidual;
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  Eigen::VectorXs acc = skel->getAccelerations();
+  skel->integrateVelocities(skel->getTimeStep());
+
+  // Reset
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  applyExternalForces(skel, worldForces);
+  skel->clearExternalForces();
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  std::vector<int> forceBodies;
+  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
+  for (auto& pair : worldForces)
+  {
+    concatForces.segment<6>(forceBodies.size() * 6) = pair.second;
+    forceBodies.push_back(pair.first);
+  }
+  ResidualForceHelper helper(skel, forceBodies);
+
+  Eigen::MatrixXs analytical = helper.calculateResidualJacobianWrt(
+      originalPos, originalVel, acc, concatForces, wrt);
+  Eigen::MatrixXs fd = helper.finiteDifferenceResidualJacobianWrt(
+      originalPos, originalVel, acc, concatForces, wrt);
+
+  if (!equals(analytical, fd, 2e-8))
+  {
+    std::cout << "Jacobian of tau wrt " << wrt->name() << " not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << analytical.block(0, 0, 6, 10) << std::endl;
+    std::cout << "FD:" << std::endl << fd.block(0, 0, 6, 10) << std::endl;
+    std::cout << "Diff (" << (fd - analytical).minCoeff() << " - "
+              << (fd - analytical).maxCoeff() << "):" << std::endl
+              << (fd - analytical).block(0, 0, 6, 10) << std::endl;
+    return false;
+  }
+
+  return true;
+}
 
 std::shared_ptr<DynamicsInitialization> runEngine(
     OpenSimFile standard,
@@ -133,6 +506,44 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       framesPerSecond,
       saveGUI);
 }
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, ID_EQNS)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+  file.skeleton->setPositions(file.skeleton->getRandomPose());
+  file.skeleton->setVelocities(file.skeleton->getRandomVelocity());
+
+  std::map<int, Eigen::Vector6s> worldForces;
+  worldForces[file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton()]
+      = Eigen::Vector6s::Random() * 1000;
+  worldForces[file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton()]
+      = Eigen::Vector6s::Random() * 1000;
+
+  EXPECT_TRUE(testForwardDynamicsFormula(file.skeleton, worldForces));
+  EXPECT_TRUE(testInverseDynamicsFormula(file.skeleton, worldForces));
+  EXPECT_TRUE(testResidualAgainstID(file.skeleton, worldForces));
+  EXPECT_TRUE(testMassJacobian(file.skeleton));
+  EXPECT_TRUE(testCoriolisJacobianWrtPos(file.skeleton));
+  EXPECT_TRUE(testCoriolisJacobianWrtVel(file.skeleton));
+  EXPECT_TRUE(
+      testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
+  EXPECT_TRUE(
+      testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::VELOCITY));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::ACCELERATION));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::GROUP_SCALES));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::GROUP_MASSES));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::GROUP_COMS));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
+}
+#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MASS_INITIALIZATION)

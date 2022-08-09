@@ -1314,6 +1314,31 @@ math::Jacobian CustomJoint<Dimension>::
   return result;
 }
 
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::getScrewAxisGradientForPosition(
+    int axisDof, int rotateDof)
+{
+  // Defaults to Finite Differencing - this is slow, but at least it's
+  // approximately correct. Child joints should override with a faster
+  // implementation.
+  return Joint::finiteDifferenceScrewAxisGradientForPosition(
+      axisDof, rotateDof);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the rotate dof
+template <std::size_t Dimension>
+Eigen::Vector6s CustomJoint<Dimension>::getScrewAxisGradientForForce(
+    int axisDof, int rotateDof)
+{
+  // Defaults to Finite Differencing - this is slow, but at least it's
+  // approximately correct. Child joints should override with a faster
+  // implementation.
+  return Joint::finiteDifferenceScrewAxisGradientForForce(axisDof, rotateDof);
+}
+
 // Instantiate templates
 template class dart::dynamics::CustomJoint<1>;
 template class dart::dynamics::CustomJoint<2>;
