@@ -205,7 +205,8 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint);
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   static math::Jacobian computeRelativeJacobianTimeDerivDerivWrtPos(
       std::size_t index,

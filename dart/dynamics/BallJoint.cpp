@@ -137,7 +137,8 @@ Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian BallJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
   // return finiteDifferenceRelativeJacobianDeriv(index);

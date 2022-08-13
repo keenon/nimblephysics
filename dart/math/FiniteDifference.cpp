@@ -583,6 +583,8 @@ template void finiteDifference<Eigen::Matrix6s>(
     std::function<bool(s_t, Eigen::Matrix6s&)>, Eigen::Matrix6s&, s_t, bool);
 template void finiteDifference<Eigen::Matrix3s>(
     std::function<bool(s_t, Eigen::Matrix3s&)>, Eigen::Matrix3s&, s_t, bool);
+template void finiteDifference<Eigen::Matrix4s>(
+    std::function<bool(s_t, Eigen::Matrix4s&)>, Eigen::Matrix4s&, s_t, bool);
 template void finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
     std::function<bool(s_t, Eigen::Matrix<s_t, 6, 2>&)>,
     Eigen::Matrix<s_t, 6, 2>&,

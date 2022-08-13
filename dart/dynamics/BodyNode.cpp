@@ -2965,8 +2965,8 @@ void BodyNode::computeJacobianOfMForward(neural::WithRespectTo* wrt)
       const int dofIndexInJoint = static_cast<int>(dof->getIndexInJoint());
       const Eigen::Vector6s Hcol = H.col(dofIndexInJoint);
 
-      const Jacobian DS_Dq
-          = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+      const Jacobian DS_Dq = mParentJoint->getRelativeJacobianDerivWrtPosition(
+          dof->getIndexInJoint());
       const Jacobian DdS_Dq
           = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
               dof->getIndexInJoint());
@@ -3086,7 +3086,8 @@ void BodyNode::computeJacobianOfMBackward(
       if (mParentJoint->hasDof(dof))
       {
         const Jacobian DS_Dq
-            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+            = mParentJoint->getRelativeJacobianDerivWrtPosition(
+                dof->getIndexInJoint());
 
         dMddq.block(iStart, jStart, jointNumDofs, 1)
             += DS_Dq.transpose() * mMddq_F;
@@ -3144,7 +3145,8 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
         const Eigen::Vector6s Hcol = H.col(dofIndexInJoint);
 
         const Jacobian DS_Dq
-            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+            = mParentJoint->getRelativeJacobianDerivWrtPosition(
+                dof->getIndexInJoint());
         const Jacobian DdS_Dq
             = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
                 dof->getIndexInJoint());
@@ -3198,7 +3200,8 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
       if (mParentJoint->hasDof(dof))
       {
         const Jacobian DS_Dq
-            = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+            = mParentJoint->getRelativeJacobianDerivWrtPosition(
+                dof->getIndexInJoint());
         const Jacobian DdS_Dq
             = mParentJoint->getRelativeJacobianTimeDerivDerivWrtPosition(
                 dof->getIndexInJoint());
@@ -3440,7 +3443,8 @@ void BodyNode::computeJacobianOfCBackward(
         if (mParentJoint->hasDof(dof))
         {
           const Jacobian DS_Dq
-              = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+              = mParentJoint->getRelativeJacobianDerivWrtPosition(
+                  dof->getIndexInJoint());
 
           dCg_seg += DS_Dq.transpose() * mCg_F;
         }
@@ -3858,7 +3862,8 @@ bool BodyNode::debugJacobianOfMBackward(
     if (mParentJoint->hasDof(dof))
     {
       const Jacobian DS_Dq
-          = mParentJoint->getRelativeJacobianDeriv(dof->getIndexInJoint());
+          =
+    mParentJoint->getRelativeJacobianDerivWrtPosition(dof->getIndexInJoint());
       dMddq.block(iStart, jStart, jointNumDofs, 1)
           += DS_Dq.transpose() * mMddq_F;
     }
@@ -3867,7 +3872,8 @@ bool BodyNode::debugJacobianOfMBackward(
     Eigen::MatrixXs analytical = S.transpose() * mMddq_F_p; // m x 1
     for (int i = 0; i < parentDofs; i++)
     {
-      const Eigen::MatrixXs& DS_Dq = mParentJoint->getRelativeJacobianDeriv(i);
+      const Eigen::MatrixXs& DS_Dq
+          = mParentJoint->getRelativeJacobianDerivWrtPosition(i);
       int offset = mParentJoint->getDof(i)->getIndexInSkeleton();
       // Rightmost columns of the block correspond to parent DOFs
       analytical.col(offset) += DS_Dq.transpose() * mMddq_F;
@@ -3890,7 +3896,7 @@ bool BodyNode::debugJacobianOfMBackward(
       for (int i = 0; i < parentDofs; i++)
       {
         const Eigen::MatrixXs& DS_Dq
-            = mParentJoint->getRelativeJacobianDeriv(i);
+            = mParentJoint->getRelativeJacobianDerivWrtPosition(i);
         std::cout << "DS_Dq[" << i << "]: " << std::endl << DS_Dq << std::endl;
         std::cout << "DS_Dq[" << i << "].T * mMddq_F: " << std::endl
                   << DS_Dq.transpose() * mMddq_F << std::endl;

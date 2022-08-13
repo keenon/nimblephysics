@@ -90,7 +90,8 @@ public:
   JacobianMatrix getRelativeJacobianStatic(
       const Eigen::Vector6s& position) const override;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  JacobianMatrix getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   void updateRelativeJacobian(bool) const override;
 

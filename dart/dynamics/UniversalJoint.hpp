@@ -104,7 +104,8 @@ public:
       const Eigen::Vector2s& _positions,
       const Eigen::Vector2s& _velocities) const;
 
-  math::Jacobian getRelativeJacobianDeriv(size_t index) const override;
+  Eigen::Matrix<s_t, 6, 2> getRelativeJacobianDerivWrtPositionStatic(
+      size_t index) const override;
 
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
       size_t index) const override;

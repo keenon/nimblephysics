@@ -182,7 +182,7 @@ bool verifyCustomJoint(CustomJoint<Dimension>* custom, s_t TEST_THRESHOLD)
       return false;
     }
 
-    math::Jacobian dj = custom->getRelativeJacobianDeriv(i);
+    math::Jacobian dj = custom->getRelativeJacobianDerivWrtPosition(i);
     math::Jacobian dj_fd = custom->finiteDifferenceRelativeJacobianDeriv(i);
 
     if (!equals(dj, dj_fd, TEST_THRESHOLD))

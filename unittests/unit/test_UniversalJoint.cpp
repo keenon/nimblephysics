@@ -33,7 +33,8 @@ void testUniversalJoint(dart::dynamics::UniversalJoint* joint)
   // Jacobians
   for (int j = 0; j < 2; j++)
   {
-    Eigen::Matrix<s_t, 6, 2> dpos_J = joint->getRelativeJacobianDeriv(j);
+    Eigen::Matrix<s_t, 6, 2> dpos_J
+        = joint->getRelativeJacobianDerivWrtPosition(j);
     Eigen::Matrix<s_t, 6, 2> dpos_J_fd
         = joint->finiteDifferenceRelativeJacobianDerivWrtPos(pos, j);
     if (!equals(dpos_J, dpos_J_fd, THRESHOLD))

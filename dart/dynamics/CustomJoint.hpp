@@ -246,7 +246,8 @@ public:
       std::size_t index,
       bool useRidders = true) const;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  JacobianMatrix getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(
       std::size_t index, bool useRidders = true);

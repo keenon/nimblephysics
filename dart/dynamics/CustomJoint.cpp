@@ -847,7 +847,8 @@ CustomJoint<Dimension>::finiteDifferenceSpatialJacobianStaticDerivWrtInput(
 
 //==============================================================================
 template <std::size_t Dimension>
-math::Jacobian CustomJoint<Dimension>::getRelativeJacobianDeriv(
+typename math::RealVectorSpace<Dimension>::JacobianMatrix
+CustomJoint<Dimension>::getRelativeJacobianDerivWrtPositionStatic(
     std::size_t index) const
 {
   Eigen::VectorXs pos = this->getPositions();

@@ -258,7 +258,181 @@ bool testResidualAgainstID(
   return true;
 }
 
-bool testMassJacobian(std::shared_ptr<dynamics::Skeleton> skel)
+bool testBodyScaleJointJacobians(
+    std::shared_ptr<dynamics::Skeleton> skel, int joint)
+{
+  Eigen::Isometry3s originalParent
+      = skel->getJoint(joint)->getTransformFromParentBodyNode();
+  Eigen::Isometry3s originalChild
+      = skel->getJoint(joint)->getTransformFromChildBodyNode();
+
+  Eigen::Isometry3s randomParent = originalParent;
+  randomParent.translation() = Eigen::Vector3s::Random();
+  Eigen::Isometry3s randomChild = originalChild;
+  randomChild.translation() = Eigen::Vector3s::Random();
+
+  skel->getJoint(joint)->setTransformFromParentBodyNode(randomParent);
+  skel->getJoint(joint)->setTransformFromChildBodyNode(randomChild);
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::Vector6s normal
+        = skel->getJoint(joint)->getLocalTransformScrewWrtChildScale(axis);
+    Eigen::Vector6s fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceLocalTransformScrewWrtChildScale(axis);
+
+    if (!equals(fd, normal, 1e-8))
+    {
+      Eigen::Vector3s offset
+          = skel->getJoint(joint)->getOriginalTransformFromChildBodyNode();
+
+      std::cout << "Screw of relative transform "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to child scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Original child offset (mag = " << offset.norm()
+                << "): " << std::endl
+                << offset << std::endl;
+      std::cout << "Analytical (mag = " << normal.norm() << "): " << std::endl
+                << normal << std::endl;
+      std::cout << "FD (mag = " << fd.norm() << "): " << std::endl
+                << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::Vector6s normal
+        = skel->getJoint(joint)->getLocalTransformScrewWrtParentScale(axis);
+    Eigen::Vector6s fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceLocalTransformScrewWrtParentScale(axis);
+    if (!equals(fd, normal, 1e-8))
+    {
+      Eigen::Vector3s offset
+          = skel->getJoint(joint)->getOriginalTransformFromParentBodyNode();
+
+      std::cout << "Screw of relative transform "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to parent scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Original child offset (mag = " << offset.norm()
+                << "): " << std::endl
+                << offset << std::endl;
+      std::cout << "Analytical (mag = " << normal.norm() << "): " << std::endl
+                << normal << std::endl;
+      std::cout << "FD (mag = " << fd.norm() << "): " << std::endl
+                << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::MatrixXs normal
+        = skel->getJoint(joint)->getRelativeJacobianDerivWrtParentScale(axis);
+    Eigen::MatrixXs fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceRelativeJacobianDerivWrtParentScale(axis);
+
+    if (!equals(fd, normal, 1e-8))
+    {
+      std::cout << "Gradient of relative jacobian "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to parent scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Analytical: " << std::endl << normal << std::endl;
+      std::cout << "FD: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::MatrixXs normal
+        = skel->getJoint(joint)->getRelativeJacobianDerivWrtChildScale(axis);
+    Eigen::MatrixXs fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceRelativeJacobianDerivWrtChildScale(axis);
+
+    if (!equals(fd, normal, 1e-8))
+    {
+      std::cout << "Gradient of relative jacobian "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to child scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Analytical: " << std::endl << normal << std::endl;
+      std::cout << "FD: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::MatrixXs normal
+        = skel->getJoint(joint)
+              ->getRelativeJacobianTimeDerivDerivWrtParentScale(axis);
+    Eigen::MatrixXs fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceRelativeJacobianTimeDerivDerivWrtParentScale(
+                  axis);
+
+    if (!equals(fd, normal, 1e-8))
+    {
+      std::cout << "Gradient of time derivative of relative jacobian "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to parent scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Analytical: " << std::endl << normal << std::endl;
+      std::cout << "FD: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  for (int axis = -1; axis < 3; axis++)
+  {
+    Eigen::MatrixXs normal
+        = skel->getJoint(joint)->getRelativeJacobianTimeDerivDerivWrtChildScale(
+            axis);
+    Eigen::MatrixXs fd
+        = skel->getJoint(joint)
+              ->finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(
+                  axis);
+
+    if (!equals(fd, normal, 1e-8))
+    {
+      std::cout << "Gradient of time derivative of relative jacobian "
+                << skel->getJoint(joint)->getName() << " (type "
+                << skel->getJoint(joint)->getType()
+                << ") with respect to child scale axis " << axis
+                << " didn't equal analytical!" << std::endl;
+      std::cout << "Analytical: " << std::endl << normal << std::endl;
+      std::cout << "FD: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - normal << std::endl;
+      return false;
+    }
+  }
+
+  skel->getJoint(joint)->setTransformFromParentBodyNode(originalParent);
+  skel->getJoint(joint)->setTransformFromChildBodyNode(originalChild);
+
+  return true;
+}
+
+bool testMassJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel, neural::WithRespectTo* wrt)
 {
   Eigen::VectorXs originalPos = skel->getPositions();
   Eigen::VectorXs originalVel = skel->getVelocities();
@@ -272,30 +446,13 @@ bool testMassJacobian(std::shared_ptr<dynamics::Skeleton> skel)
   skel->setVelocities(originalVel);
   skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
 
-  // Do these break my thing?
-  Eigen::MatrixXs Minv = skel->getInvMassMatrix();
-  Eigen::VectorXs tau = skel->getControlForces();
-  Eigen::VectorXs C = skel->getCoriolisAndGravityForces();
-  s_t dt = skel->getTimeStep();
-
-  Eigen::VectorXs preSolveV = originalVel + dt * Minv * (tau - C);
-  Eigen::VectorXs f_cDeltaV = Eigen::VectorXs::Zero(preSolveV.size());
-
-  Eigen::MatrixXi parents = skel->getDofParentMap();
-
-  DifferentiableExternalForce force(
-      skel, skel->getBodyNode("calcn_r")->getIndexInSkeleton());
-  Eigen::VectorXs fTaus = force.computeTau(Eigen::Vector6s::Random());
-  // </break>
-
-  Eigen::MatrixXs dM
-      = skel->getJacobianOfM(acc, neural::WithRespectTo::POSITION);
-  Eigen::MatrixXs dM_fd
-      = skel->finiteDifferenceJacobianOfM(acc, neural::WithRespectTo::POSITION);
+  Eigen::MatrixXs dM = skel->getJacobianOfM(acc, wrt);
+  Eigen::MatrixXs dM_fd = skel->finiteDifferenceJacobianOfM(acc, wrt);
 
   if (!equals(dM, dM_fd, 1e-8))
   {
-    std::cout << "dM and dM_fd not equal!" << std::endl;
+    std::cout << "dM and dM_fd with respect to " << wrt->name() << " not equal!"
+              << std::endl;
     std::cout << "Analytical:" << std::endl
               << dM.block(0, 0, 6, 6) << std::endl;
     std::cout << "FD:" << std::endl << dM_fd.block(0, 0, 6, 6) << std::endl;
@@ -525,7 +682,19 @@ TEST(DynamicsFitter, ID_EQNS)
   EXPECT_TRUE(testForwardDynamicsFormula(file.skeleton, worldForces));
   EXPECT_TRUE(testInverseDynamicsFormula(file.skeleton, worldForces));
   EXPECT_TRUE(testResidualAgainstID(file.skeleton, worldForces));
-  EXPECT_TRUE(testMassJacobian(file.skeleton));
+
+  for (int i = 0; i < file.skeleton->getNumJoints(); i++)
+  {
+    bool success = testBodyScaleJointJacobians(file.skeleton, i);
+    if (!success)
+    {
+      EXPECT_TRUE(success);
+      return;
+    }
+  }
+
+  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::POSITION));
+  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
   EXPECT_TRUE(testCoriolisJacobianWrtPos(file.skeleton));
   EXPECT_TRUE(testCoriolisJacobianWrtVel(file.skeleton));
   EXPECT_TRUE(

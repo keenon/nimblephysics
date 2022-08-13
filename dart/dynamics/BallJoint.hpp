@@ -95,7 +95,8 @@ public:
   Eigen::Matrix<s_t, 6, 3> getRelativeJacobianStatic(
       const Eigen::Vector3s& _positions) const override;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
 
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(

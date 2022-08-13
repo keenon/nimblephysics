@@ -1632,6 +1632,23 @@ GenericJoint<ConfigSpaceT>::getRelativeJacobianStatic() const
 
 //==============================================================================
 template <class ConfigSpaceT>
+math::Jacobian GenericJoint<ConfigSpaceT>::getRelativeJacobianDerivWrtPosition(
+    std::size_t index) const
+{
+  return getRelativeJacobianDerivWrtPositionStatic(index);
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+typename GenericJoint<ConfigSpaceT>::JacobianMatrix
+GenericJoint<ConfigSpaceT>::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t /*index*/) const
+{
+  return GenericJoint<ConfigSpaceT>::JacobianMatrix::Zero();
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
 math::Jacobian GenericJoint<ConfigSpaceT>::getRelativeJacobian(
     const Eigen::VectorXs& positions) const
 {
@@ -1963,7 +1980,7 @@ void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_A(
     if (hasDof(dof))
     {
       const Jacobian DS_Dq
-          = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianDerivWrtPosition(dof->getIndexInJoint());
       const Jacobian DdS_Dq
           = this->getRelativeJacobianTimeDerivDerivWrtPosition(
               dof->getIndexInJoint());
@@ -2072,7 +2089,7 @@ Eigen::MatrixXs GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_B(
       const Eigen::Vector6s Scol = S.col(dofIndexInJoint);
 
       const Jacobian DS_Dq
-          = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianDerivWrtPosition(dof->getIndexInJoint());
       const Jacobian DdS_Dq
           = this->getRelativeJacobianTimeDerivDerivWrtPosition(
               dof->getIndexInJoint());
@@ -2632,9 +2649,9 @@ void GenericJoint<ConfigSpaceT>::updateAccelerationDynamic(
       * (mTotalForce
          - getRelativeJacobianStatic().transpose() * artInertia
                * math::AdInvT(this->getRelativeTransform(), spatialAcc)));
-  //std::cout<<"Projection Factor: \n"<<getInvProjArtInertia()<<std::endl;
-  //std::cout<<"TotalForce: \n"<<mTotalForce<<std::endl;
-  // Verification
+  // std::cout<<"Projection Factor: \n"<<getInvProjArtInertia()<<std::endl;
+  // std::cout<<"TotalForce: \n"<<mTotalForce<<std::endl;
+  //  Verification
   assert(!math::isNan(getAccelerationsStatic()));
 }
 

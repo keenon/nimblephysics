@@ -244,7 +244,8 @@ Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian EulerFreeJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
   return computeRelativeJacobianStaticDerivWrtPos(
       getPositionsStatic(),

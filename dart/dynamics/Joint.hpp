@@ -709,12 +709,41 @@ public:
   virtual math::Jacobian getRelativeJacobian(
       const Eigen::VectorXs& positions) const = 0;
 
-  // TODO(JS): Rename and add documentation
-  virtual math::Jacobian getRelativeJacobianDeriv(std::size_t /*index*/) const
-  {
-    // TODO(JS): Remove
-    return math::Jacobian::Zero(6, getNumDofs());
-  }
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the position of one of the joint's DOFs
+  virtual math::Jacobian getRelativeJacobianDerivWrtPosition(
+      std::size_t /*index*/) const = 0;
+
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the parent body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianDerivWrtParentScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the relative
+  /// Jacobian with respect to changes in the parent body's scale along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtParentScale(int axis);
+
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the child body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianDerivWrtChildScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the relative
+  /// Jacobian with respect to changes in the child body's scale along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtChildScale(int axis);
 
   /// Get time derivative of spatial Jacobian of the child BodyNode relative to
   /// the parent BodyNode expressed in the child BodyNode frame
@@ -735,6 +764,68 @@ public:
     // TODO(JS): Remove
     return math::Jacobian::Zero(6, getNumDofs());
   }
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s getLocalTransformScrewWrtParentScale(int axis) const;
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s finiteDifferenceLocalTransformScrewWrtParentScale(int axis);
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s getLocalTransformScrewWrtChildScale(int axis) const;
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s finiteDifferenceLocalTransformScrewWrtChildScale(int axis);
+
+  /// Gets the derivative of the time derivative of the spatial Jacobian of the
+  /// child BodyNode relative to the parent BodyNode expressed in the child
+  /// BodyNode frame, with respect to the scaling of the parent body along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtParentScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the time deriv of
+  /// the relative Jacobian with respect to changes in the parent body's scale
+  /// along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtParentScale(
+      int axis);
+
+  /// Gets the derivative of the time derivative of the spatial Jacobian of the
+  /// child BodyNode relative to the parent BodyNode expressed in the child
+  /// BodyNode frame, with respect to the scaling of the child body along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the time deriv of
+  /// the relative Jacobian with respect to changes in the child body's scale
+  /// along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(
+      int axis);
 
   /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
   /// expressed in the child BodyNode frame, in the `q` vector space. This is

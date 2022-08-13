@@ -699,7 +699,8 @@ EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
 }
 
 //==============================================================================
-math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix<s_t, 6, 3> EulerJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
   return computeRelativeJacobianDerivWrtPos(
       index,

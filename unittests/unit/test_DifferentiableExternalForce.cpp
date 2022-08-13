@@ -143,7 +143,7 @@ bool testGroupScaleMoveBody(std::shared_ptr<dynamics::Skeleton> skel, int body)
   return true;
 }
 
-bool testGroupScaleMoveJoint(
+bool testBodyScaleJointJacobians(
     std::shared_ptr<dynamics::Skeleton> skel, int joint)
 {
   for (int col = 0; col < skel->getGroupScaleDim(); col++)
@@ -224,7 +224,7 @@ bool testAllJacobians(
   }
   for (int i = 0; i < skel->getNumJoints(); i++)
   {
-    if (!testGroupScaleMoveJoint(skel, i))
+    if (!testBodyScaleJointJacobians(skel, i))
     {
       return false;
     }

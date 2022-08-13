@@ -604,7 +604,8 @@ Eigen::Matrix6s FreeJoint::finiteDifferenceRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian FreeJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix6s FreeJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
   // return finiteDifferenceRelativeJacobianTimeDerivDeriv2(index);
