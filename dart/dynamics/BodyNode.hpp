@@ -1162,7 +1162,7 @@ protected:
 public:
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCForward() against the finite differencing equivalents.
-  void debugJacobianOfCForward(neural::WithRespectTo* wrt);
+  bool debugJacobianOfCForward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial velocity with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt, bool useRidders = true);
@@ -1172,7 +1172,7 @@ public:
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCBackword() against the finite differencing equivalents.
-  void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
+  bool debugJacobianOfCBackward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of gravity force (mFgravity) with respect to
   /// wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfGravityForce(

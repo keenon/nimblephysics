@@ -1150,6 +1150,7 @@ void Joint::setChildScale(Eigen::Vector3s scale)
   mAspectProperties.mChildScale = scale;
   mAspectProperties.mT_ChildBodyToJoint.translation()
       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  mNeedTransformUpdate = true;
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -1161,6 +1162,7 @@ void Joint::setParentScale(Eigen::Vector3s scale)
   mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  mNeedTransformUpdate = true;
   updateRelativeJacobian();
   notifyPositionUpdated();
 }

@@ -61,6 +61,7 @@
 #include "dart/math/Helpers.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 
 #define SET_ALL_FLAGS(X)                                                       \
   for (auto& cache : mTreeCache)                                               \
@@ -1776,7 +1777,7 @@ void Skeleton::setGradientConstraintMatrices(
 Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXs DCg_Dp = Eigen::MatrixXs::Zero(dofs, dofs);
+  Eigen::MatrixXs DCg_Dp = Eigen::MatrixXs::Zero(dofs, wrt->dim(this));
 
   if (wrt == neural::WithRespectTo::FORCE)
   {
@@ -1784,7 +1785,8 @@ Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
   }
   else if (
       wrt == neural::WithRespectTo::POSITION
-      || wrt == neural::WithRespectTo::VELOCITY)
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
   {
     std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
 
@@ -1821,14 +1823,16 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
     const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXs DM_Dq = Eigen::MatrixXs::Zero(dofs, dofs);
+  Eigen::MatrixXs DM_Dp = Eigen::MatrixXs::Zero(dofs, wrt->dim(this));
 
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
   {
-    return DM_Dq;
+    return DM_Dp;
   }
-  else if (wrt == neural::WithRespectTo::POSITION)
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
   {
     const auto old_ddq = getAccelerations();
     setAccelerations(x);
@@ -1843,12 +1847,12 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
     for (int i = bodyNodes.size() - 1; i >= 0; i--)
     {
       BodyNode* bodyNode = bodyNodes[i];
-      bodyNode->computeJacobianOfMBackward(wrt, DM_Dq);
+      bodyNode->computeJacobianOfMBackward(wrt, DM_Dp);
     }
 
     setAccelerations(old_ddq);
 
-    return DM_Dq;
+    return DM_Dp;
   }
   else
   {
@@ -3676,6 +3680,7 @@ void Skeleton::ensureBodyScaleGroups()
       group.nodes.push_back(getBodyNode(i));
       group.uniformScaling = false;
     }
+    updateGroupScaleIndices();
   }
 }
 
@@ -3791,6 +3796,7 @@ void Skeleton::autogroupSymmetricPrefixes(
 void Skeleton::setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform)
 {
   mBodyScaleGroups[getScaleGroupIndex(a)].uniformScaling = uniform;
+  updateGroupScaleIndices();
 }
 
 //==============================================================================
@@ -3889,6 +3895,7 @@ void Skeleton::mergeScaleGroupsByIndex(int a, int b)
     // Then erase B
     mBodyScaleGroups.erase(mBodyScaleGroups.begin() + b);
   }
+  updateGroupScaleIndices();
 }
 
 //==============================================================================
@@ -3909,6 +3916,42 @@ int Skeleton::getGroupScaleDim()
     }
   }
   return sum;
+}
+
+//==============================================================================
+BodyScaleGroupAndIndex::BodyScaleGroupAndIndex(BodyScaleGroup& group, int axis)
+  : group(group), axis(axis)
+{
+}
+
+//==============================================================================
+/// This precomputes the array of group scale indices that we need for
+/// getGroupScaleIndexDetails()
+void Skeleton::updateGroupScaleIndices()
+{
+  mGroupScaleIndices.clear();
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), -1);
+    }
+    else
+    {
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 0);
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 1);
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 2);
+    }
+  }
+}
+
+//==============================================================================
+/// This grabs the details for what a group scale index corresponds to
+const BodyScaleGroupAndIndex& Skeleton::getGroupScaleIndexDetails(
+    int index) const
+{
+  return mGroupScaleIndices.at(index);
 }
 
 //==============================================================================

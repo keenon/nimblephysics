@@ -69,6 +69,13 @@ struct BodyScaleGroup
   bool uniformScaling;
 };
 
+struct BodyScaleGroupAndIndex
+{
+  struct BodyScaleGroup& group;
+  int axis;
+  BodyScaleGroupAndIndex(BodyScaleGroup& group, int axis);
+};
+
 /// class Skeleton
 class Skeleton : public virtual common::VersionCounter,
                  public MetaSkeleton,
@@ -980,6 +987,13 @@ public:
 
   /// This returns the dimensions of the grouped scale vector.
   int getGroupScaleDim();
+
+  /// This precomputes the array of group scale indices that we need for
+  /// getGroupScaleIndexDetails()
+  void updateGroupScaleIndices();
+
+  /// This grabs the details for what a group scale index corresponds to
+  const BodyScaleGroupAndIndex& getGroupScaleIndexDetails(int index) const;
 
   /// This produces a human-readable description of the group scale vector index
   std::string debugGroupScaleIndex(int groupIdx);
@@ -2272,6 +2286,9 @@ protected:
 
   /// The groups that constrain the scales of body nodes to be equal
   std::vector<BodyScaleGroup> mBodyScaleGroups;
+
+  /// This is a cache for the data around our group scales
+  std::vector<BodyScaleGroupAndIndex> mGroupScaleIndices;
 
   struct DirtyFlags
   {

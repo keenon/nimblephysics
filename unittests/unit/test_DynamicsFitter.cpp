@@ -445,7 +445,6 @@ bool testMassJacobian(
   skel->setPositions(originalPos);
   skel->setVelocities(originalVel);
   skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
-
   Eigen::MatrixXs dM = skel->getJacobianOfM(acc, wrt);
   Eigen::MatrixXs dM_fd = skel->finiteDifferenceJacobianOfM(acc, wrt);
 
@@ -459,50 +458,59 @@ bool testMassJacobian(
     std::cout << "Diff (" << (dM_fd - dM).minCoeff() << " - "
               << (dM_fd - dM).maxCoeff() << "):" << std::endl
               << (dM_fd - dM).block(0, 0, 6, 6) << std::endl;
+
+    for (int i = 0; i < skel->getNumBodyNodes(); i++)
+    {
+      if (!skel->getBodyNode(i)->debugJacobianOfMForward(wrt, acc))
+      {
+        return false;
+      }
+    }
+    for (int i = skel->getNumBodyNodes() - 1; i >= 0; i--)
+    {
+      if (!skel->getBodyNode(i)->debugJacobianOfMBackward(wrt, acc, dM_fd))
+      {
+        return false;
+      }
+    }
+
     return false;
   }
   return true;
 }
 
-bool testCoriolisJacobianWrtPos(std::shared_ptr<dynamics::Skeleton> skel)
+bool testCoriolisJacobian(
+    std::shared_ptr<dynamics::Skeleton> skel, neural::WithRespectTo* wrt)
 {
   skel->clearExternalForces();
-  Eigen::MatrixXs dC = skel->getJacobianOfC(neural::WithRespectTo::POSITION);
-  Eigen::MatrixXs dC_fd
-      = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::POSITION);
+  Eigen::MatrixXs dC = skel->getJacobianOfC(wrt);
+  Eigen::MatrixXs dC_fd = skel->finiteDifferenceJacobianOfC(wrt);
 
   if (!equals(dC, dC_fd, 1e-8))
   {
-    std::cout << "dC and dC_fd not equal (with respect to POSITION)!"
-              << std::endl;
+    std::cout << "dC and dC_fd not equal (with respect to " << wrt->name()
+              << ")!" << std::endl;
     std::cout << "Analytical:" << std::endl
               << dC.block(0, 0, 6, 6) << std::endl;
     std::cout << "FD:" << std::endl << dC_fd.block(0, 0, 6, 6) << std::endl;
     std::cout << "Diff (" << (dC_fd - dC).minCoeff() << " - "
               << (dC_fd - dC).maxCoeff() << "):" << std::endl
               << (dC_fd - dC).block(0, 0, 6, 6) << std::endl;
-    return false;
-  }
-  return true;
-}
 
-bool testCoriolisJacobianWrtVel(std::shared_ptr<dynamics::Skeleton> skel)
-{
-  skel->clearExternalForces();
-  Eigen::MatrixXs dC = skel->getJacobianOfC(neural::WithRespectTo::VELOCITY);
-  Eigen::MatrixXs dC_fd
-      = skel->finiteDifferenceJacobianOfC(neural::WithRespectTo::VELOCITY);
-
-  if (!equals(dC, dC_fd, 1e-8))
-  {
-    std::cout << "dC and dC_fd not equal (with respect to VELOCITY)!"
-              << std::endl;
-    std::cout << "Analytical:" << std::endl
-              << dC.block(0, 0, 6, 6) << std::endl;
-    std::cout << "FD:" << std::endl << dC_fd.block(0, 0, 6, 6) << std::endl;
-    std::cout << "Diff (" << (dC_fd - dC).minCoeff() << " - "
-              << (dC_fd - dC).maxCoeff() << "):" << std::endl
-              << (dC_fd - dC).block(0, 0, 6, 6) << std::endl;
+    for (int i = 0; i < skel->getNumBodyNodes(); i++)
+    {
+      if (!skel->getBodyNode(i)->debugJacobianOfCForward(wrt))
+      {
+        return false;
+      }
+    }
+    for (int i = skel->getNumBodyNodes() - 1; i >= 0; i--)
+    {
+      if (!skel->getBodyNode(i)->debugJacobianOfCBackward(wrt))
+      {
+        return false;
+      }
+    }
     return false;
   }
   return true;
@@ -695,8 +703,9 @@ TEST(DynamicsFitter, ID_EQNS)
 
   EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::POSITION));
   EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
-  EXPECT_TRUE(testCoriolisJacobianWrtPos(file.skeleton));
-  EXPECT_TRUE(testCoriolisJacobianWrtVel(file.skeleton));
+  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::POSITION));
+  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::VELOCITY));
+  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
   EXPECT_TRUE(
       testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
   EXPECT_TRUE(
