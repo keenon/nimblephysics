@@ -33,7 +33,9 @@
 #include "dart/dynamics/Inertia.hpp"
 
 #include "dart/common/Console.hpp"
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -46,12 +48,28 @@ Inertia::Inertia(
   : mMass(_mass), mCenterOfMass(_com)
 {
   setMoment(_momentOfInertia);
+
+  // Default bounds
+  mCenterOfMassLowerBound << -5, -5, -5;
+  mCenterOfMassUpperBound << 5, 5, 5;
+  mMassLowerBound = 0.01;
+  mMassUpperBound = 20;
+  mMomentLowerBound << 0.1, 0.1, 0.1, -1, -1, -1;
+  mMomentUpperBound << 1, 1, 1, 1, 1, 1;
 }
 
 //==============================================================================
 Inertia::Inertia(const Eigen::Matrix6s& _spatialInertiaTensor)
 {
   setSpatialTensor(_spatialInertiaTensor);
+
+  // Default bounds
+  mCenterOfMassLowerBound << -5, -5, -5;
+  mCenterOfMassUpperBound << 5, 5, 5;
+  mMassLowerBound = 0.01;
+  mMassUpperBound = 20;
+  mMomentLowerBound << 0.1, 0.1, 0.1, -1, -1, -1;
+  mMomentUpperBound << 1, 1, 1, 1, 1, 1;
 }
 
 //==============================================================================
@@ -71,6 +89,14 @@ Inertia::Inertia(
     mMoment({_Ixx, _Iyy, _Izz, _Ixy, _Ixz, _Iyz})
 {
   computeSpatialTensor();
+
+  // Default bounds
+  mCenterOfMassLowerBound << -5, -5, -5;
+  mCenterOfMassUpperBound << 5, 5, 5;
+  mMassLowerBound = 0.01;
+  mMassUpperBound = 20;
+  mMomentLowerBound << 0.1, 0.1, 0.1, -1, -1, -1;
+  mMomentUpperBound << 1, 1, 1, 1, 1, 1;
 }
 
 //==============================================================================
@@ -245,6 +271,8 @@ void Inertia::setMomentVector(Eigen::Vector6s moment)
   mMoment[I_XY - 4] = moment(3);
   mMoment[I_XZ - 4] = moment(4);
   mMoment[I_YZ - 4] = moment(5);
+
+  computeSpatialTensor();
 }
 
 //==============================================================================
@@ -503,6 +531,158 @@ void Inertia::rescale(Eigen::Vector3s ratio)
       ratio * ratio.transpose()); // The MOI is an integral of m*r*r, so needs
                                   // to be scaled twice
   setMoment(scaledMoment);
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to the mass
+Eigen::Matrix6s Inertia::getSpatialTensorGradientWrtMass()
+{
+  Eigen::Matrix3s C = math::makeSkewSymmetric(mCenterOfMass);
+
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+  // Top left
+  result.block<3, 3>(0, 0) = C * C.transpose();
+
+  // Bottom left
+  result.block<3, 3>(3, 0) = C.transpose();
+
+  // Top right
+  result.block<3, 3>(0, 3) = C;
+
+  // Bottom right
+  result.block<3, 3>(3, 3) = Eigen::Matrix3s::Identity();
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to the mass
+Eigen::Matrix6s Inertia::finiteDifferenceSpatialTensorGradientWrtMass()
+{
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+
+  s_t originalMass = getMass();
+
+  math::finiteDifference<Eigen::Matrix6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& out) {
+        setMass(originalMass + eps);
+        out = getSpatialTensor();
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+
+  setMass(originalMass);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to a specific
+/// index in the COM vector
+Eigen::Matrix6s Inertia::getSpatialTensorGradientWrtCOM(int index)
+{
+  Eigen::Matrix3s C = math::makeSkewSymmetric(mCenterOfMass);
+  Eigen::Matrix3s dC = math::makeSkewSymmetric(Eigen::Vector3s::Unit(index));
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+
+  // Top left
+  result.block<3, 3>(0, 0) = mMass * (dC * C.transpose() + C * dC.transpose());
+
+  // Bottom left
+  result.block<3, 3>(3, 0) = mMass * dC.transpose();
+
+  // Top right
+  result.block<3, 3>(0, 3) = mMass * dC;
+
+  // Bottom right
+  result.block<3, 3>(3, 3).setZero();
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to a specific
+/// index in the COM vector
+Eigen::Matrix6s Inertia::finiteDifferenceSpatialTensorGradientWrtCOM(int index)
+{
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+
+  Eigen::Vector3s originalCOM = getLocalCOM();
+
+  math::finiteDifference<Eigen::Matrix6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& out) {
+        Eigen::Vector3s perturbed = originalCOM;
+        perturbed(index) += eps;
+        setLocalCOM(perturbed);
+        out = getSpatialTensor();
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+
+  setLocalCOM(originalCOM);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to a specific
+/// index in the moment vector
+Eigen::Matrix6s Inertia::getSpatialTensorGradientWrtMomentVector(int index)
+{
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+
+  if (index < 3)
+  {
+    result(index, index) = 1;
+  }
+  else if (index == 3)
+  {
+    result(0, 1) = result(1, 0) = 1;
+  }
+  else if (index == 4)
+  {
+    result(0, 2) = result(2, 0) = 1;
+  }
+  else if (index == 5)
+  {
+    result(1, 2) = result(2, 1) = 1;
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the gradient of the spatial tensor with respect to a specific
+/// index in the moment vector
+Eigen::Matrix6s Inertia::finiteDifferenceSpatialTensorGradientWrtMomentVector(
+    int index)
+{
+  Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
+
+  Eigen::Vector6s originalMoment = getMomentVector();
+
+  math::finiteDifference<Eigen::Matrix6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix6s& out) {
+        Eigen::Vector6s perturbed = originalMoment;
+        perturbed(index) += eps;
+        setMomentVector(perturbed);
+        out = getSpatialTensor();
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+
+  setMomentVector(originalMoment);
+
+  return result;
 }
 
 //==============================================================================

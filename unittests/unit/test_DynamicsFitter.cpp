@@ -703,9 +703,18 @@ TEST(DynamicsFitter, ID_EQNS)
 
   EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::POSITION));
   EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
+  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_MASSES));
+  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_COMS));
+  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_INERTIAS));
+
   EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::POSITION));
   EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::VELOCITY));
   EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
+  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_MASSES));
+  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_COMS));
+  EXPECT_TRUE(
+      testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_INERTIAS));
+
   EXPECT_TRUE(
       testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
   EXPECT_TRUE(

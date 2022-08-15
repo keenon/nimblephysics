@@ -33,29 +33,128 @@
 #include <dart/dynamics/Inertia.hpp>
 #include <dart/math/Random.hpp>
 #include <gtest/gtest.h>
+
 #include "TestHelpers.hpp"
 
 using namespace dart;
+
+dynamics::Inertia generateRandomInertia()
+{
+  const auto mass = math::Random::uniform<s_t>(0.1, 10.0);
+  const auto com = math::Random::uniform<Eigen::Vector3s>(-5, 5);
+  const auto i_xx = math::Random::uniform<s_t>(0.1, 1);
+  const auto i_yy = math::Random::uniform<s_t>(0.1, 1);
+  const auto i_zz = math::Random::uniform<s_t>(0.1, 1);
+  const auto i_xy = math::Random::uniform<s_t>(-1, 1);
+  const auto i_xz = math::Random::uniform<s_t>(-1, 1);
+  const auto i_yz = math::Random::uniform<s_t>(-1, 1);
+
+  dynamics::Inertia inertia(
+      mass, com[0], com[1], com[2], i_xx, i_yy, i_zz, i_xy, i_xz, i_yz);
+  return inertia;
+}
 
 //==============================================================================
 TEST(Inertia, Verification)
 {
   const int numIter = 10;
 
+  srand(42);
+
   for (int i = 0; i < numIter; ++i)
   {
-    const auto mass = math::Random::uniform<s_t>(0.1, 10.0);
-    const auto com = math::Random::uniform<Eigen::Vector3s>(-5, 5);
-    const auto i_xx = math::Random::uniform<s_t>(0.1, 1);
-    const auto i_yy = math::Random::uniform<s_t>(0.1, 1);
-    const auto i_zz = math::Random::uniform<s_t>(0.1, 1);
-    const auto i_xy = math::Random::uniform<s_t>(-1, 1);
-    const auto i_xz = math::Random::uniform<s_t>(-1, 1);
-    const auto i_yz = math::Random::uniform<s_t>(-1, 1);
-
-    const dynamics::Inertia inertia(
-        mass, com[0], com[1], com[2], i_xx, i_yy, i_zz, i_xy, i_xz, i_yz);
-
+    dynamics::Inertia inertia = generateRandomInertia();
     EXPECT_TRUE(inertia.verify());
+  }
+}
+
+//==============================================================================
+TEST(Inertia, MassGradients)
+{
+  const int numIter = 10;
+
+  srand(42);
+
+  for (int i = 0; i < numIter; ++i)
+  {
+    dynamics::Inertia inertia = generateRandomInertia();
+
+    Eigen::Matrix6s analytical = inertia.getSpatialTensorGradientWrtMass();
+    Eigen::Matrix6s fd = inertia.finiteDifferenceSpatialTensorGradientWrtMass();
+
+    if (!equals(analytical, fd, 1e-8))
+    {
+      std::cout << "Gradient of spatial inertia wrt mass does not match!"
+                << std::endl;
+      std::cout << "Analytical: " << std::endl << analytical << std::endl;
+      std::cout << "Finite difference: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << fd - analytical << std::endl;
+      EXPECT_TRUE(equals(analytical, fd, 1e-8));
+      return;
+    }
+  }
+}
+
+//==============================================================================
+TEST(Inertia, COMGradients)
+{
+  const int numIter = 10;
+
+  srand(42);
+
+  for (int i = 0; i < numIter; ++i)
+  {
+    dynamics::Inertia inertia = generateRandomInertia();
+
+    for (int index = 0; index < 3; index++)
+    {
+      Eigen::Matrix6s analytical
+          = inertia.getSpatialTensorGradientWrtCOM(index);
+      Eigen::Matrix6s fd
+          = inertia.finiteDifferenceSpatialTensorGradientWrtCOM(index);
+
+      if (!equals(analytical, fd, 1e-8))
+      {
+        std::cout << "Gradient of spatial inertia wrt COM " << index
+                  << " does not match!" << std::endl;
+        std::cout << "Analytical: " << std::endl << analytical << std::endl;
+        std::cout << "Finite difference: " << std::endl << fd << std::endl;
+        std::cout << "Diff: " << std::endl << fd - analytical << std::endl;
+        EXPECT_TRUE(equals(analytical, fd, 1e-8));
+        return;
+      }
+    }
+  }
+}
+
+//==============================================================================
+TEST(Inertia, MomentGradients)
+{
+  const int numIter = 10;
+
+  srand(42);
+
+  for (int i = 0; i < numIter; ++i)
+  {
+    dynamics::Inertia inertia = generateRandomInertia();
+
+    for (int index = 0; index < 6; index++)
+    {
+      Eigen::Matrix6s analytical
+          = inertia.getSpatialTensorGradientWrtMomentVector(index);
+      Eigen::Matrix6s fd
+          = inertia.finiteDifferenceSpatialTensorGradientWrtMomentVector(index);
+
+      if (!equals(analytical, fd, 1e-8))
+      {
+        std::cout << "Gradient of spatial inertia wrt Moment vector " << index
+                  << " does not match!" << std::endl;
+        std::cout << "Analytical: " << std::endl << analytical << std::endl;
+        std::cout << "Finite difference: " << std::endl << fd << std::endl;
+        std::cout << "Diff: " << std::endl << fd - analytical << std::endl;
+        EXPECT_TRUE(equals(analytical, fd, 1e-8));
+        return;
+      }
+    }
   }
 }

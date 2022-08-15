@@ -161,6 +161,29 @@ public:
   /// This rescales the object by "ratio" in each of the specified axis
   void rescale(Eigen::Vector3s ratio);
 
+  /// This gets the gradient of the spatial tensor with respect to the mass
+  Eigen::Matrix6s getSpatialTensorGradientWrtMass();
+
+  /// This gets the gradient of the spatial tensor with respect to the mass
+  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtMass();
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the COM vector
+  Eigen::Matrix6s getSpatialTensorGradientWrtCOM(int index);
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the COM vector
+  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtCOM(int index);
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the moment vector
+  Eigen::Matrix6s getSpatialTensorGradientWrtMomentVector(int index);
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the moment vector
+  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtMomentVector(
+      int index);
+
 protected:
   /// Compute the spatial tensor based on the inertial parameters
   void computeSpatialTensor();

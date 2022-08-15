@@ -1786,7 +1786,10 @@ Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
   else if (
       wrt == neural::WithRespectTo::POSITION
       || wrt == neural::WithRespectTo::VELOCITY
-      || wrt == neural::WithRespectTo::GROUP_SCALES)
+      || wrt == neural::WithRespectTo::GROUP_SCALES
+      || wrt == neural::WithRespectTo::GROUP_MASSES
+      || wrt == neural::WithRespectTo::GROUP_COMS
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS)
   {
     std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
 
@@ -1832,7 +1835,10 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
   }
   else if (
       wrt == neural::WithRespectTo::POSITION
-      || wrt == neural::WithRespectTo::GROUP_SCALES)
+      || wrt == neural::WithRespectTo::GROUP_SCALES
+      || wrt == neural::WithRespectTo::GROUP_COMS
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS
+      || wrt == neural::WithRespectTo::GROUP_MASSES)
   {
     const auto old_ddq = getAccelerations();
     setAccelerations(x);
