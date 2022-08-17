@@ -1,11 +1,18 @@
 #include "dart/biomechanics/DynamicsFitter.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <tuple>
 
+#include <coin/IpIpoptApplication.hpp>
+#include <coin/IpSolveStatistics.hpp>
+#include <coin/IpTNLP.hpp>
+
 #include "dart/biomechanics/C3DForcePlatforms.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
+#include "dart/biomechanics/MarkerFitter.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
 #include "dart/math/FiniteDifference.hpp"
@@ -16,6 +23,8 @@
 
 namespace dart {
 namespace biomechanics {
+
+using namespace Ipopt;
 
 //==============================================================================
 ResidualForceHelper::ResidualForceHelper(
@@ -266,7 +275,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
         return true;
       },
       result,
-      wrt == neural::WithRespectTo::POSITION ? 1e-4 : 1e-2,
+      5e-4,
       true);
 
   wrt->set(mSkel.get(), originalWrt);
@@ -292,7 +301,10 @@ DynamicsFitProblem::DynamicsFitProblem(
     mIncludeInertias(true),
     mIncludeBodyScales(true),
     mIncludePoses(true),
-    mIncludeMarkerOffsets(true)
+    mIncludeMarkerOffsets(true),
+    mResidualWeight(0.1),
+    mMarkerWeight(1.0),
+    mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Set up the markers
 
@@ -384,6 +396,8 @@ DynamicsFitProblem::DynamicsFitProblem(
           GRF.block<6, 1>(footAssignment * 6, t) = worldWrench;
         }
       }
+      std::cout << "Trial " << trial << " t=" << t << ": GRF norm "
+                << GRF.col(t).norm() << std::endl;
     }
     mGRFs.push_back(GRF);
   }
@@ -419,7 +433,7 @@ int DynamicsFitProblem::getProblemSize()
   }
   if (mIncludeMarkerOffsets)
   {
-    size += mMarkerMap.size() * 3;
+    size += mMarkers.size() * 3;
   }
   if (mIncludePoses)
   {
@@ -619,6 +633,13 @@ Eigen::VectorXs DynamicsFitProblem::flattenLowerBound()
 // This reads the problem state out of a flat vector, and into the init object
 void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
 {
+  if (x.size() == mLastX.size() && x == mLastX)
+  {
+    // No need to overwrite the same update twice
+    return;
+  }
+  mLastX = x;
+
   int cursor = 0;
   if (mIncludeMasses)
   {
@@ -692,25 +713,26 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
       mSkeleton->setPositions(mPoses[trial].col(t));
 
       // Add force residual RMS errors
-      sum += mResidualHelper->calculateResidualNorm(
-          mPoses[trial].col(t),
-          mVels[trial].col(t),
-          mAccs[trial].col(t),
-          mGRFs[trial].col(t));
+      sum += mResidualWeight
+             * mResidualHelper->calculateResidualNorm(
+                 mPoses[trial].col(t),
+                 mVels[trial].col(t),
+                 mAccs[trial].col(t),
+                 mGRFs[trial].col(t));
 
-      /*
       // Add marker RMS errors
-      auto markerPoses = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
+      auto markerPoses = mSkeleton->getMarkerWorldPositions(mMarkers);
       auto observedMarkerPoses = mInit->markerObservationTrials[trial][t];
-      for (auto& pair : observedMarkerPoses)
+      for (int i = 0; i < mMarkerNames.size(); i++)
       {
-        if (markerPoses.count(pair.first))
+        Eigen::Vector3s marker = markerPoses.segment<3>(i * 3);
+        if (observedMarkerPoses.count(mMarkerNames[i]))
         {
-          Eigen::Vector3s diff = markerPoses.at(pair.first) - pair.second;
-          sum += diff.squaredNorm();
+          Eigen::Vector3s diff
+              = observedMarkerPoses.at(mMarkerNames[i]) - marker;
+          sum += mMarkerWeight * diff.squaredNorm();
         }
       }
-      */
     }
   }
 
@@ -759,93 +781,127 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   {
     for (int t = 0; t < mAccs[trial].cols(); t++)
     {
+      mSkeleton->setPositions(mPoses[trial].col(t));
+
+      Eigen::VectorXs markerError = Eigen::VectorXs::Zero(mMarkers.size() * 3);
+      auto markerObservations = mInit->markerObservationTrials[trial][t];
+      auto markerMap = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
+      for (int i = 0; i < mMarkers.size(); i++)
+      {
+        if (markerObservations.count(mMarkerNames[i]))
+        {
+          Eigen::Vector3s markerOffset
+              = markerMap.at(mMarkerNames[i])
+                - markerObservations.at(mMarkerNames[i]);
+          markerError.segment<3>(i * 3) = mMarkerWeight * 2 * markerOffset;
+        }
+      }
+
       int cursor = 0;
       if (mIncludeMasses)
       {
         int dim = mSkeleton->getNumScaleGroups();
         grad.segment(cursor, dim)
-            += mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::GROUP_MASSES);
+            += mResidualWeight
+               * mResidualHelper->calculateResidualNormGradientWrt(
+                   mPoses[trial].col(t),
+                   mVels[trial].col(t),
+                   mAccs[trial].col(t),
+                   mGRFs[trial].col(t),
+                   neural::WithRespectTo::GROUP_MASSES);
         cursor += dim;
       }
       if (mIncludeCOMs)
       {
         int dim = mSkeleton->getNumScaleGroups() * 3;
         grad.segment(cursor, dim)
-            += mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::GROUP_COMS);
+            += mResidualWeight
+               * mResidualHelper->calculateResidualNormGradientWrt(
+                   mPoses[trial].col(t),
+                   mVels[trial].col(t),
+                   mAccs[trial].col(t),
+                   mGRFs[trial].col(t),
+                   neural::WithRespectTo::GROUP_COMS);
         cursor += dim;
       }
       if (mIncludeInertias)
       {
         int dim = mSkeleton->getNumScaleGroups() * 6;
         grad.segment(cursor, dim)
-            += mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::GROUP_INERTIAS);
+            += mResidualWeight
+               * mResidualHelper->calculateResidualNormGradientWrt(
+                   mPoses[trial].col(t),
+                   mVels[trial].col(t),
+                   mAccs[trial].col(t),
+                   mGRFs[trial].col(t),
+                   neural::WithRespectTo::GROUP_INERTIAS);
         cursor += dim;
       }
       if (mIncludeBodyScales)
       {
         int dim = mSkeleton->getGroupScaleDim();
         grad.segment(cursor, dim)
-            += mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::GROUP_SCALES);
+            += mResidualWeight
+               * mResidualHelper->calculateResidualNormGradientWrt(
+                   mPoses[trial].col(t),
+                   mVels[trial].col(t),
+                   mAccs[trial].col(t),
+                   mGRFs[trial].col(t),
+                   neural::WithRespectTo::GROUP_SCALES);
+
+        // Record marker gradients
+        grad.segment(cursor, dim)
+            += MarkerFitter::getMarkerLossGradientWrtGroupScales(
+                mSkeleton, mMarkers, markerError);
+
         cursor += dim;
       }
       if (mIncludeMarkerOffsets)
       {
-        for (int i = 0; i < mMarkers.size(); i++)
-        {
-          // Currently this has zero effect on the gradient
-          cursor += 3;
-        }
+        int dim = mMarkers.size() * 3;
+        grad.segment(cursor, dim)
+            += MarkerFitter::getMarkerLossGradientWrtMarkerOffsets(
+                mSkeleton, mMarkers, markerError);
+        cursor += dim;
       }
 
       if (mIncludePoses)
       {
         int dofs = mSkeleton->getNumDofs();
         grad.segment(posesCursor, dofs)
-            = mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::POSITION);
+            = mResidualWeight
+              * mResidualHelper->calculateResidualNormGradientWrt(
+                  mPoses[trial].col(t),
+                  mVels[trial].col(t),
+                  mAccs[trial].col(t),
+                  mGRFs[trial].col(t),
+                  neural::WithRespectTo::POSITION);
+
+        // Record marker gradients
+        grad.segment(posesCursor, dofs)
+            += MarkerFitter::getMarkerLossGradientWrtJoints(
+                mSkeleton, mMarkers, markerError);
 
         posesCursor += dofs;
 
         grad.segment(posesCursor, dofs)
-            = mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::VELOCITY);
+            = mResidualWeight
+              * mResidualHelper->calculateResidualNormGradientWrt(
+                  mPoses[trial].col(t),
+                  mVels[trial].col(t),
+                  mAccs[trial].col(t),
+                  mGRFs[trial].col(t),
+                  neural::WithRespectTo::VELOCITY);
         posesCursor += dofs;
 
         grad.segment(posesCursor, dofs)
-            = mResidualHelper->calculateResidualNormGradientWrt(
-                mPoses[trial].col(t),
-                mVels[trial].col(t),
-                mAccs[trial].col(t),
-                mGRFs[trial].col(t),
-                neural::WithRespectTo::ACCELERATION);
+            = mResidualWeight
+              * mResidualHelper->calculateResidualNormGradientWrt(
+                  mPoses[trial].col(t),
+                  mVels[trial].col(t),
+                  mAccs[trial].col(t),
+                  mGRFs[trial].col(t),
+                  neural::WithRespectTo::ACCELERATION);
         posesCursor += dofs;
       }
     }
@@ -873,10 +929,51 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
         return true;
       },
       result,
-      1e-3,
+#ifdef DART_USE_ARBITRARY_PRECISION
+      1e-5,
+#else
+      1e-4,
+#endif
       true);
 
   return result;
+}
+
+// This gets the number of constraints that the problem requires
+int DynamicsFitProblem::getConstraintSize()
+{
+  return 0;
+}
+
+// This gets the value of the constraints vector. These constraints are only
+// active when we're including positions in the decision variables, and they
+// just enforce that finite differencing is valid to relate velocity,
+// acceleration, and position.
+Eigen::VectorXs DynamicsFitProblem::computeConstraints(Eigen::VectorXs x)
+{
+  unflatten(x);
+  return Eigen::VectorXs::Zero(0);
+}
+
+// This gets the sparse version of the constraints jacobian, returning objects
+// with (row,col,value).
+std::vector<std::tuple<int, int, s_t>>
+DynamicsFitProblem::computeSparseConstraintsJacobian()
+{
+  std::vector<std::tuple<int, int, s_t>> result;
+  return result;
+}
+
+// This gets the jacobian of the constraints vector with respect to x
+Eigen::MatrixXs DynamicsFitProblem::computeConstraintsJacobian()
+{
+  return Eigen::MatrixXs::Zero(0, 0);
+}
+
+// This gets the jacobian of the constraints vector with respect to x
+Eigen::MatrixXs DynamicsFitProblem::finiteDifferenceConstraintsJacobian()
+{
+  return Eigen::MatrixXs::Zero(0, 0);
 }
 
 //==============================================================================
@@ -1028,10 +1125,385 @@ DynamicsFitProblem& DynamicsFitProblem::setIncludeMarkerOffsets(bool value)
 }
 
 //==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setIncludeBodyScales(bool value)
+{
+  mIncludeBodyScales = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setResidualWeight(s_t weight)
+{
+  mResidualWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setMarkerWeight(s_t weight)
+{
+  mMarkerWeight = weight;
+  return *(this);
+}
+
+//------------------------- Ipopt::TNLP --------------------------------------
+
+//==============================================================================
+/// \brief Method to return some info about the nlp
+bool DynamicsFitProblem::get_nlp_info(
+    Ipopt::Index& n,
+    Ipopt::Index& m,
+    Ipopt::Index& nnz_jac_g,
+    Ipopt::Index& nnz_h_lag,
+    Ipopt::TNLP::IndexStyleEnum& index_style)
+{
+  // Set the number of decision variables
+  n = getProblemSize();
+
+  // Set the total number of constraints
+  m = getConstraintSize();
+
+  // Set the number of entries in the constraint Jacobian
+  nnz_jac_g = computeSparseConstraintsJacobian().size();
+
+  // Set the number of entries in the Hessian
+  nnz_h_lag = n * n;
+
+  // use the C style indexing (0-based)
+  index_style = Ipopt::TNLP::C_STYLE;
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the bounds for my problem
+bool DynamicsFitProblem::get_bounds_info(
+    Ipopt::Index n,
+    Ipopt::Number* x_l,
+    Ipopt::Number* x_u,
+    Ipopt::Index m,
+    Ipopt::Number* g_l,
+    Ipopt::Number* g_u)
+{
+  // Lower and upper bounds on X
+  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
+  upperBounds.setConstant(std::numeric_limits<double>::infinity());
+  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
+  lowerBounds.setConstant(-1 * std::numeric_limits<double>::infinity());
+
+  upperBounds = flattenUpperBound().cast<double>();
+  lowerBounds = flattenLowerBound().cast<double>();
+
+  // Our constraint function has to be 0
+  Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
+  constraintUpperBounds.setZero();
+  Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
+  constraintLowerBounds.setZero();
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the starting point for the algorithm
+bool DynamicsFitProblem::get_starting_point(
+    Ipopt::Index n,
+    bool init_x,
+    Ipopt::Number* _x,
+    bool init_z,
+    Ipopt::Number* z_L,
+    Ipopt::Number* z_U,
+    Ipopt::Index m,
+    bool init_lambda,
+    Ipopt::Number* lambda)
+{
+  // Here, we assume we only have starting values for x
+  (void)init_x;
+  assert(init_x == true);
+  (void)init_z;
+  assert(init_z == false);
+  (void)init_lambda;
+  assert(init_lambda == false);
+  // We don't set the lagrange multipliers
+  (void)z_L;
+  (void)z_U;
+  (void)m;
+  (void)lambda;
+
+  if (init_x)
+  {
+    Eigen::Map<Eigen::VectorXd> x(_x, n);
+    x = flatten().cast<double>();
+  }
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the objective value
+bool DynamicsFitProblem::eval_f(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number& _obj_value)
+{
+  (void)_new_x;
+  Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+
+  _obj_value = (double)computeLoss(x.cast<s_t>());
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the gradient of the objective
+bool DynamicsFitProblem::eval_grad_f(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number* _grad_f)
+{
+  (void)_new_x;
+  Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+  Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
+
+  grad = computeGradient(x.cast<s_t>()).cast<double>();
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the constraint residuals
+bool DynamicsFitProblem::eval_g(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Index _m,
+    Ipopt::Number* _g)
+{
+  (void)_new_x;
+  Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+  Eigen::Map<Eigen::VectorXd> g(_g, _m);
+
+  g = computeConstraints(x.cast<s_t>()).cast<double>();
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return:
+///        1) The structure of the jacobian (if "values" is nullptr)
+///        2) The values of the jacobian (if "values" is not nullptr)
+bool DynamicsFitProblem::eval_jac_g(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Index _m,
+    Ipopt::Index _nnzj,
+    Ipopt::Index* _iRow,
+    Ipopt::Index* _jCol,
+    Ipopt::Number* _values)
+{
+  (void)_new_x;
+  (void)_m;
+
+  // If the iRow and jCol arguments are not nullptr, then IPOPT wants you to
+  // fill in the sparsity structure of the Jacobian (the row and column
+  // indices only). At this time, the x argument and the values argument will
+  // be nullptr.
+
+  std::vector<std::tuple<int, int, s_t>> sparse
+      = computeSparseConstraintsJacobian();
+
+  if (nullptr == _x)
+  {
+    Eigen::Map<Eigen::VectorXi> rows(_iRow, _nnzj);
+    Eigen::Map<Eigen::VectorXi> cols(_jCol, _nnzj);
+    for (int i = 0; i < sparse.size(); i++)
+    {
+      rows(i) = (double)std::get<0>(sparse[i]);
+      cols(i) = (double)std::get<1>(sparse[i]);
+    }
+  }
+  else
+  {
+    // Return the concatenated gradient of everything
+    Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+    Eigen::Map<Eigen::VectorXd> vals(_values, _nnzj);
+
+    for (int i = 0; i < sparse.size(); i++)
+    {
+      vals(i) = (double)std::get<2>(sparse[i]);
+    }
+  }
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return:
+///        1) The structure of the hessian of the lagrangian (if "values" is
+///           nullptr)
+///        2) The values of the hessian of the lagrangian (if "values" is not
+///           nullptr)
+bool DynamicsFitProblem::eval_h(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number _obj_factor,
+    Ipopt::Index _m,
+    const Ipopt::Number* _lambda,
+    bool _new_lambda,
+    Ipopt::Index _nele_hess,
+    Ipopt::Index* _iRow,
+    Ipopt::Index* _jCol,
+    Ipopt::Number* _values)
+{
+  (void)_n;
+  (void)_x;
+  (void)_new_x;
+  (void)_obj_factor;
+  (void)_m;
+  (void)_lambda;
+  (void)_new_lambda;
+  (void)_nele_hess;
+  (void)_iRow;
+  (void)_jCol;
+  (void)_values;
+  return false;
+}
+
+//==============================================================================
+/// \brief This method is called when the algorithm is complete so the TNLP
+///        can store/write the solution
+void DynamicsFitProblem::finalize_solution(
+    Ipopt::SolverReturn _status,
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    const Ipopt::Number* _z_L,
+    const Ipopt::Number* _z_U,
+    Ipopt::Index _m,
+    const Ipopt::Number* _g,
+    const Ipopt::Number* _lambda,
+    Ipopt::Number _obj_value,
+    const Ipopt::IpoptData* _ip_data,
+    Ipopt::IpoptCalculatedQuantities* _ip_cq)
+{
+  (void)_status;
+  (void)_n;
+  (void)_x;
+  (void)_z_L;
+  (void)_z_U;
+  (void)_m;
+  (void)_g;
+  (void)_lambda;
+  (void)_obj_value;
+  (void)_ip_data;
+  (void)_ip_cq;
+  // Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+  std::cout << "Recovering state with best loss: iteration "
+            << mBestObjectiveValueIteration << " with " << mBestObjectiveValue
+            << std::endl;
+  Eigen::VectorXs x = mBestObjectiveValueState;
+
+  unflatten(x);
+
+  if (mIncludeBodyScales)
+  {
+    mInit->groupScales = mSkeleton->getGroupScales();
+  }
+  if (mIncludeCOMs)
+  {
+    mInit->bodyCom.resize(3, mSkeleton->getNumBodyNodes());
+    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
+    {
+      mInit->bodyCom.col(i)
+          = mSkeleton->getBodyNode(i)->getInertia().getLocalCOM();
+    }
+  }
+  if (mIncludeInertias)
+  {
+    mInit->bodyInertia.resize(6, mSkeleton->getNumBodyNodes());
+    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
+    {
+      mInit->bodyInertia.col(i)
+          = mSkeleton->getBodyNode(i)->getInertia().getMomentVector();
+    }
+  }
+  if (mIncludeMasses)
+  {
+    mInit->bodyMasses.resize(mSkeleton->getNumBodyNodes());
+    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
+    {
+      mInit->bodyMasses(i) = mSkeleton->getBodyNode(i)->getInertia().getMass();
+    }
+  }
+  if (mIncludePoses)
+  {
+    mInit->poseTrials = mPoses;
+  }
+  if (mIncludeMarkerOffsets)
+  {
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      mInit->markerOffsets[mMarkerNames[i]] = mMarkers[i].second;
+    }
+  }
+}
+
+//==============================================================================
+bool DynamicsFitProblem::intermediate_callback(
+    Ipopt::AlgorithmMode mode,
+    Ipopt::Index iter,
+    Ipopt::Number obj_value,
+    Ipopt::Number inf_pr,
+    Ipopt::Number inf_du,
+    Ipopt::Number mu,
+    Ipopt::Number d_norm,
+    Ipopt::Number regularization_size,
+    Ipopt::Number alpha_du,
+    Ipopt::Number alpha_pr,
+    Ipopt::Index ls_trials,
+    const Ipopt::IpoptData* ip_data,
+    Ipopt::IpoptCalculatedQuantities* ip_cq)
+{
+  (void)mode;
+  (void)iter;
+  (void)obj_value;
+  (void)inf_pr;
+  (void)inf_du;
+  (void)mu;
+  (void)d_norm;
+  (void)regularization_size;
+  (void)alpha_du;
+  (void)alpha_pr;
+  (void)ls_trials;
+  (void)ip_data;
+  (void)ip_cq;
+
+  if (obj_value < mBestObjectiveValue && abs(inf_pr) < 1.0)
+  {
+    mBestObjectiveValueIteration = iter;
+    mBestObjectiveValue = obj_value;
+    mBestObjectiveValueState = mLastX;
+  }
+
+  return true;
+}
+
+//==============================================================================
 DynamicsFitter::DynamicsFitter(
-    std::shared_ptr<dynamics::Skeleton> skeleton, dynamics::MarkerMap markerMap)
+    std::shared_ptr<dynamics::Skeleton> skeleton,
+    std::vector<dynamics::BodyNode*> footNodes,
+    dynamics::MarkerMap markerMap)
   : mSkeleton(skeleton),
-    mMarkerMap(markerMap){
+    mFootNodes(footNodes),
+    mMarkerMap(markerMap),
+    mTolerance(1e-8),
+    mIterationLimit(500),
+    mLBFGSHistoryLength(8),
+    mCheckDerivatives(false),
+    mPrintFrequency(1),
+    mSilenceOutput(false),
+    mDisableLinesearch(false){
 
     };
 
@@ -1040,6 +1512,7 @@ DynamicsFitter::DynamicsFitter(
 // problem around through multiple steps of optimization
 std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::shared_ptr<dynamics::Skeleton> skel,
+    dynamics::MarkerMap markerMap,
     std::vector<std::vector<ForcePlate>> forcePlateTrials,
     std::vector<Eigen::MatrixXs> poseTrials,
     std::vector<int> framesPerSecond,
@@ -1051,6 +1524,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   init->forcePlateTrials = forcePlateTrials;
   init->originalPoseTrials = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
+  init->updatedMarkerMap = markerMap;
   init->bodyMasses = skel->getLinkMasses();
 
   for (int i = 0; i < init->originalPoseTrials.size(); i++)
@@ -1407,9 +1881,9 @@ void DynamicsFitter::estimateLinkMassesFromAcceleration(
 
   for (int i = 0; i < init->bodyMasses.size(); i++)
   {
-    if (init->bodyMasses(i) < 0.001)
+    if (init->bodyMasses(i) < 0.01)
     {
-      init->bodyMasses(i) = 0.001;
+      init->bodyMasses(i) = 0.01;
     }
   }
 
@@ -1421,6 +1895,129 @@ void DynamicsFitter::estimateLinkMassesFromAcceleration(
             << debugMatrix << std::endl;
 
   mSkeleton->setPositions(originalPose);
+}
+
+//==============================================================================
+// 3. Run larger optimization problems to minimize a weighted combination of
+// residuals and marker RMSE, tweaking a controllable set of variables
+void DynamicsFitter::runOptimization(
+    std::shared_ptr<DynamicsInitialization> init,
+    s_t residualWeight,
+    s_t markerWeight,
+    bool includeMasses,
+    bool includeCOMs,
+    bool includeInertias,
+    bool includeBodyScales,
+    bool includePoses,
+    bool includeMarkerOffsets)
+{
+  // Before using Eigen in a multi-threaded environment, we need to explicitly
+  // call this (at least prior to Eigen 3.3)
+  Eigen::initParallel();
+
+  // Create an instance of the IpoptApplication
+  //
+  // We are using the factory, since this allows us to compile this
+  // example with an Ipopt Windows DLL
+  SmartPtr<Ipopt::IpoptApplication> app = IpoptApplicationFactory();
+
+  // Change some options
+  app->Options()->SetNumericValue("tol", static_cast<double>(mTolerance));
+  app->Options()->SetStringValue(
+      "linear_solver",
+      "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps, custom
+
+  app->Options()->SetStringValue(
+      "hessian_approximation", "limited-memory"); // limited-memory, exacty
+
+  /*
+  app->Options()->SetStringValue(
+      "scaling_method", "none"); // none, gradient-based
+  */
+
+  app->Options()->SetIntegerValue("max_iter", mIterationLimit);
+
+  // Disable LBFGS history
+  app->Options()->SetIntegerValue(
+      "limited_memory_max_history", mLBFGSHistoryLength);
+
+  // Just for debugging
+  if (mCheckDerivatives)
+  {
+    app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
+    app->Options()->SetStringValue("derivative_test", "first-order");
+    app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
+  }
+
+  if (mPrintFrequency > 0)
+  {
+    app->Options()->SetIntegerValue("print_frequency_iter", mPrintFrequency);
+  }
+  else
+  {
+    app->Options()->SetIntegerValue(
+        "print_frequency_iter", std::numeric_limits<int>::infinity());
+  }
+  if (mSilenceOutput)
+  {
+    app->Options()->SetIntegerValue("print_level", 0);
+  }
+  if (mDisableLinesearch)
+  {
+    app->Options()->SetIntegerValue("max_soc", 0);
+    app->Options()->SetStringValue("accept_every_trial_step", "yes");
+  }
+  app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
+
+  std::shared_ptr<BilevelFitResult> result
+      = std::make_shared<BilevelFitResult>();
+
+  // Initialize the IpoptApplication and process the options
+  Ipopt::ApplicationReturnStatus status;
+  status = app->Initialize();
+  if (status != Solve_Succeeded)
+  {
+    std::cout << std::endl
+              << std::endl
+              << "*** Error during initialization!" << std::endl;
+    return;
+  }
+
+  // This will automatically free the problem object when finished,
+  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
+  // If you try to leave `problem` on the stack, you'll get invalid free
+  // exceptions when IPOpt attempts to free it.
+  DynamicsFitProblem* problem
+      = new DynamicsFitProblem(init, mSkeleton, mMarkerMap, mFootNodes);
+  problem->setResidualWeight(residualWeight);
+  problem->setMarkerWeight(markerWeight);
+  problem->setIncludeMasses(includeMasses);
+  problem->setIncludeCOMs(includeCOMs);
+  problem->setIncludeInertias(includeInertias);
+  problem->setIncludeBodyScales(includeBodyScales);
+  problem->setIncludePoses(includePoses);
+  problem->setIncludeMarkerOffsets(includeMarkerOffsets);
+
+  SmartPtr<DynamicsFitProblem> problemPtr(problem);
+
+  // This will automatically write results back to `init` on success.
+  status = app->OptimizeTNLP(problemPtr);
+
+  if (status == Solve_Succeeded)
+  {
+    // Retrieve some statistics about the solve
+    Index iter_count = app->Statistics()->IterationCount();
+    std::cout << std::endl
+              << std::endl
+              << "*** The problem solved in " << iter_count << " iterations!"
+              << std::endl;
+
+    Number final_obj = app->Statistics()->FinalObjective();
+    std::cout << std::endl
+              << std::endl
+              << "*** The final value of the objective function is "
+              << final_obj << '.' << std::endl;
+  }
 }
 
 //==============================================================================
@@ -1566,6 +2163,48 @@ void DynamicsFitter::saveDynamicsToGUI(
   mSkeleton->setLinkMasses(originalMasses);
 
   server.writeFramesJson(path);
+}
+
+//==============================================================================
+void DynamicsFitter::setTolerance(double tol)
+{
+  mTolerance = tol;
+}
+
+//==============================================================================
+void DynamicsFitter::setIterationLimit(int limit)
+{
+  mIterationLimit = limit;
+}
+
+//==============================================================================
+void DynamicsFitter::setLBFGSHistoryLength(int len)
+{
+  mLBFGSHistoryLength = len;
+}
+
+//==============================================================================
+void DynamicsFitter::setCheckDerivatives(bool check)
+{
+  mCheckDerivatives = check;
+}
+
+//==============================================================================
+void DynamicsFitter::setPrintFrequency(int freq)
+{
+  mPrintFrequency = freq;
+}
+
+//==============================================================================
+void DynamicsFitter::setSilenceOutput(bool silent)
+{
+  mSilenceOutput = silent;
+}
+
+//==============================================================================
+void DynamicsFitter::setDisableLinesearch(bool disable)
+{
+  mDisableLinesearch = disable;
 }
 
 } // namespace biomechanics

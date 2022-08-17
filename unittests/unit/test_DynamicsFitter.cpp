@@ -553,7 +553,7 @@ bool testResidualJacWrt(
   Eigen::MatrixXs fd = helper.finiteDifferenceResidualJacobianWrt(
       originalPos, originalVel, acc, concatForces, wrt);
 
-  if (!equals(analytical, fd, 2e-8) || true)
+  if (!equals(analytical, fd, 2e-8))
   {
     std::cout << "Jacobian of tau wrt " << wrt->name() << " not equal!"
               << std::endl;
@@ -606,7 +606,7 @@ bool testResidualGradWrt(
   Eigen::VectorXs fd = helper.finiteDifferenceResidualNormGradientWrt(
       originalPos, originalVel, acc, concatForces, wrt);
 
-  if (!equals(analytical, fd, 6e-8) || true)
+  if (!equals(analytical, fd, 6e-8))
   {
     std::cout << "Gradient of norm(tau) wrt " << wrt->name() << " not equal!"
               << std::endl;
@@ -627,6 +627,7 @@ bool testResidualGradWrt(
 
 std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<std::string> footNames,
     std::shared_ptr<DynamicsInitialization> init,
     bool saveGUI = false)
 {
@@ -644,9 +645,18 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   skel->setPositionLowerLimit(2, -M_PI);
   skel->setPositionUpperLimit(2, M_PI);
 
-  DynamicsFitter fitter(skel, init->updatedMarkerMap);
+  std::vector<dynamics::BodyNode*> footNodes;
+  for (std::string& name : footNames)
+  {
+    footNodes.push_back(skel->getBodyNode(name));
+  }
+
+  DynamicsFitter fitter(skel, footNodes, init->updatedMarkerMap);
   fitter.scaleLinkMassesFromGravity(init);
   fitter.estimateLinkMassesFromAcceleration(init);
+  // Try to do the whole masses and COMs and inertias
+  fitter.setIterationLimit(200);
+  fitter.runOptimization(init, 1.0, 0.0, true, true, true, false, false, false);
 
   if (saveGUI)
   {
@@ -664,6 +674,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
 std::shared_ptr<DynamicsInitialization> createInitialization(
     std::shared_ptr<dynamics::Skeleton> skel,
+    MarkerMap markerMap,
     std::vector<std::string> motFiles,
     std::vector<std::string> c3dFiles,
     std::vector<std::string> trcFiles,
@@ -721,6 +732,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
   std::shared_ptr<DynamicsInitialization> init
       = DynamicsFitter::createInitialization(
           skel,
+          markerMap,
           forcePlateTrials,
           poseTrials,
           framesPerSecond,
@@ -730,6 +742,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
 
 std::shared_ptr<DynamicsInitialization> runEngine(
     std::string modelPath,
+    std::vector<std::string> footNames,
     std::vector<std::string> motFiles,
     std::vector<std::string> c3dFiles,
     std::vector<std::string> trcFiles,
@@ -740,13 +753,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       standard.skeleton,
+      standard.markersMap,
       motFiles,
       c3dFiles,
       trcFiles,
       grfFiles,
       limitTrialLength);
 
-  return runEngine(standard.skeleton, init, saveGUI);
+  return runEngine(standard.skeleton, footNames, init, saveGUI);
 }
 
 #ifdef JACOBIAN_TESTS
@@ -820,10 +834,7 @@ TEST(DynamicsFitter, ID_EQNS)
   //     file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
 
   EXPECT_TRUE(
-      testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
-  EXPECT_TRUE(
       testResidualGradWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
-  /*
   EXPECT_TRUE(
       testResidualGradWrt(file.skeleton, worldForces, WithRespectTo::VELOCITY));
   EXPECT_TRUE(testResidualGradWrt(
@@ -836,12 +847,11 @@ TEST(DynamicsFitter, ID_EQNS)
       file.skeleton, worldForces, WithRespectTo::GROUP_COMS));
   EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
-  */
 }
 #endif
 
 #ifdef JACOBIAN_TESTS
-TEST(DynamicsFitter, FIT_PROBLEM_GRAD)
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
 {
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
@@ -865,6 +875,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD)
 
   DynamicsFitProblem problem(
       init, standard.skeleton, init->updatedMarkerMap, footNodes);
+  problem.setMarkerWeight(0.0);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
   Eigen::VectorXs x = problem.flatten();
@@ -878,7 +889,6 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD)
     return;
   }
 
-  /*
   for (int trial = 0; trial < problem.mAccs.size(); trial++)
   {
     for (int t = 0; t < problem.mAccs[trial].cols(); t++)
@@ -899,33 +909,40 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD)
           standard.skeleton, forces, WithRespectTo::ACCELERATION));
     }
   }
-  */
 
   Eigen::VectorXs analytical = problem.computeGradient(x);
   Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
 
-  if (!equals(analytical, fd, 1e-5))
+#ifdef DART_USE_ARBITRARY_PRECISION
+  if (!equals(analytical, fd, 1e-7))
   {
-    std::cout << "Gradient of DynamicsFitProblem not equal!" << std::endl;
-    /*
-    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 3);
-    compare.col(0) = analytical;
-    compare.col(1) = fd;
-    compare.col(2) = (fd - analytical).cwiseQuotient(fd);
-    std::cout << "Analytical - FD - Diff (" << compare.col(2).minCoeff()
-              << " - " << compare.col(2).maxCoeff() << "):" << std::endl
-              << compare << std::endl;
-    */
-    problem.debugErrors(fd, analytical, 1e-5);
-    EXPECT_TRUE(equals(analytical, fd, 1e-5));
+    std::cout
+        << "Gradient of DynamicsFitProblem (only residual RMSE) not equal!"
+        << std::endl;
+    problem.debugErrors(fd, analytical, 1e-7);
+    EXPECT_TRUE(equals(analytical, fd, 1e-7));
 
     return;
   }
+#else
+  /// These gradients are VERY STIFF, and so are super difficult to finite
+  /// difference accurately with 64 bit floating point
+  if (!equals(analytical, fd, 3e-3))
+  {
+    std::cout
+        << "Gradient of DynamicsFitProblem (only residual RMSE) not equal!"
+        << std::endl;
+    problem.debugErrors(fd, analytical, 3e-3);
+    EXPECT_TRUE(equals(analytical, fd, 3e-3));
+
+    return;
+  }
+#endif
 }
 #endif
 
-#ifdef ALL_TESTS
-TEST(DynamicsFitter, MASS_INITIALIZATION)
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS)
 {
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
@@ -936,9 +953,64 @@ TEST(DynamicsFitter, MASS_INITIALIZATION)
   trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
   grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
 
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      6);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, init->updatedMarkerMap, footNodes);
+  problem.setResidualWeight(0.0);
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  if (!equals(analytical, fd, 1e-8))
+  {
+    std::cout << "Gradient of DynamicsFitProblem (only marker RMSE) not equal!"
+              << std::endl;
+    problem.debugErrors(fd, analytical, 1e-8);
+    EXPECT_TRUE(equals(analytical, fd, 1e-8));
+
+    return;
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, END_TO_END)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
   runEngine(
       "dart://sample/grf/Subject4/Models/"
       "optimized_scale_and_markers.osim",
+      footNames,
       motFiles,
       c3dFiles,
       trcFiles,
