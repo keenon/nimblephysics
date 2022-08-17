@@ -75,18 +75,18 @@ public:
   int getSize() const;
   const std::vector<s_t>& getX() const;
   const std::vector<s_t>& getY() const;
-  double getX(int aIndex) const;
-  double getY(int aIndex) const;
-  void setX(int aIndex, double aValue);
-  void setY(int aIndex, double aValue);
+  s_t getX(int aIndex) const;
+  s_t getY(int aIndex) const;
+  void setX(int aIndex, s_t aValue);
+  void setY(int aIndex, s_t aValue);
   bool deletePoint(int aIndex);
-  int addPoint(double aX, double aY);
+  int addPoint(s_t aX, s_t aY);
 
   //--------------------------------------------------------------------------
   // EVALUATION
   //--------------------------------------------------------------------------
-  double calcValue(s_t x) const override;
-  double calcDerivative(int order, s_t x) const override;
+  s_t calcValue(s_t x) const override;
+  s_t calcDerivative(int order, s_t x) const override;
   std::shared_ptr<CustomFunction> offsetBy(s_t y) const override;
 
 private:

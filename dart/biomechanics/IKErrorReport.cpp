@@ -98,8 +98,8 @@ IKErrorReport::IKErrorReport(
     this->maxError.push_back(thisMaxError);
     this->sumSquaredError.push_back(thisTotalSquaredError);
 
-    if (std::isfinite(thisRootMeanSquaredError)
-        && std::isfinite(thisTotalSquaredError) && std::isfinite(thisMaxError))
+    if (isfinite(thisRootMeanSquaredError) && isfinite(thisTotalSquaredError)
+        && isfinite(thisMaxError))
     {
       this->averageRootMeanSquaredError += thisRootMeanSquaredError;
       this->averageSumSquaredError += thisTotalSquaredError;

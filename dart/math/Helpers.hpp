@@ -141,12 +141,14 @@ inline s_t acotanh(s_t _X)
   return log((_X + 1) / (_X - 1)) / 2;
 }
 
+/*
 #ifndef DART_USE_ARBITRARY_PRECISION
 inline s_t round(s_t _x)
 {
   return floor(_x + 0.5);
 }
 #endif
+*/
 
 inline s_t round2(s_t _x)
 {

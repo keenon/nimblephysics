@@ -79,7 +79,7 @@ s_t MarkerTrace::pointToAppendDistance(
   if (extrapolate && mPoints.size() > 1)
   {
     int lastTime = mTimes.at(mTimes.size() - 1);
-    Eigen::Vector3d v = (lastPoint - mPoints.at(mPoints.size() - 2))
+    Eigen::Vector3s v = (lastPoint - mPoints.at(mPoints.size() - 2))
                         / (lastTime - mTimes.at(mTimes.size() - 2));
     Eigen::Vector3s projected = lastPoint + (v * (time - lastTime));
     return (point - projected).norm();

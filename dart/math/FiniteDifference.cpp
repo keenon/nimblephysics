@@ -263,9 +263,15 @@ void riddersMethod(
     return;
 
   s_t originalStepSize = eps;
+#ifdef DART_USE_ARBITRARY_PRECISION
+  const s_t con = 1.1, con2 = (con * con);
+  const s_t safeThreshold = 10.0;
+  const int tabSize = 20;
+#else
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
   const int tabSize = 10;
+#endif
 
   // Run central differences for every column of the result separately
   for (std::size_t dof = 0; dof < result.size(); dof++)

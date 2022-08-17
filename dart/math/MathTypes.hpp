@@ -52,13 +52,17 @@ typedef mpfr::mpreal s_t;
 #else
 typedef double s_t;
 using std::abs;
+using std::acos;
+using std::asin;
 using std::ceil;
 using std::cos;
 using std::floor;
 using std::isfinite;
 using std::isnan;
 using std::max;
+using std::min;
 using std::pow;
+using std::round;
 using std::sin;
 #endif
 

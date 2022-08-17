@@ -28,7 +28,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -553,7 +553,7 @@ bool testResidualJacWrt(
   Eigen::MatrixXs fd = helper.finiteDifferenceResidualJacobianWrt(
       originalPos, originalVel, acc, concatForces, wrt);
 
-  if (!equals(analytical, fd, 2e-8))
+  if (!equals(analytical, fd, 2e-8) || true)
   {
     std::cout << "Jacobian of tau wrt " << wrt->name() << " not equal!"
               << std::endl;
@@ -569,71 +569,126 @@ bool testResidualJacWrt(
   return true;
 }
 
+bool testResidualGradWrt(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  Eigen::Vector6s originalResidual = originalTau.head<6>();
+  (void)originalResidual;
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  Eigen::VectorXs acc = skel->getAccelerations();
+  skel->integrateVelocities(skel->getTimeStep());
+
+  // Reset
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  applyExternalForces(skel, worldForces);
+  skel->clearExternalForces();
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  std::vector<int> forceBodies;
+  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
+  for (auto& pair : worldForces)
+  {
+    concatForces.segment<6>(forceBodies.size() * 6) = pair.second;
+    forceBodies.push_back(pair.first);
+  }
+  ResidualForceHelper helper(skel, forceBodies);
+
+  Eigen::VectorXs analytical = helper.calculateResidualNormGradientWrt(
+      originalPos, originalVel, acc, concatForces, wrt);
+  Eigen::VectorXs fd = helper.finiteDifferenceResidualNormGradientWrt(
+      originalPos, originalVel, acc, concatForces, wrt);
+
+  if (!equals(analytical, fd, 6e-8) || true)
+  {
+    std::cout << "Gradient of norm(tau) wrt " << wrt->name() << " not equal!"
+              << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 4);
+    compare.col(0) = analytical;
+    compare.col(1) = fd;
+    compare.col(2) = fd - analytical;
+    compare.col(3) = wrt->get(skel.get());
+    std::cout << "Analytical - FD - Diff (" << (fd - analytical).minCoeff()
+              << " - " << (fd - analytical).maxCoeff()
+              << ") - Value:" << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 std::shared_ptr<DynamicsInitialization> runEngine(
-    OpenSimFile standard,
-    std::vector<std::vector<ForcePlate>> forcePlateTrials,
-    std::vector<Eigen::MatrixXs> poseTrials,
-    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-        markerObservationTrials,
-    std::vector<int> framesPerSecond,
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::shared_ptr<DynamicsInitialization> init,
     bool saveGUI = false)
 {
-  standard.skeleton->zeroTranslationInCustomFunctions();
-  standard.skeleton->autogroupSymmetricSuffixes();
-  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  skel->zeroTranslationInCustomFunctions();
+  skel->autogroupSymmetricSuffixes();
+  if (skel->getBodyNode("hand_r") != nullptr)
   {
-    standard.skeleton->setScaleGroupUniformScaling(
-        standard.skeleton->getBodyNode("hand_r"));
+    skel->setScaleGroupUniformScaling(skel->getBodyNode("hand_r"));
   }
-  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
-  standard.skeleton->setPositionLowerLimit(0, -M_PI);
-  standard.skeleton->setPositionUpperLimit(0, M_PI);
-  standard.skeleton->setPositionLowerLimit(1, -M_PI);
-  standard.skeleton->setPositionUpperLimit(1, M_PI);
-  standard.skeleton->setPositionLowerLimit(2, -M_PI);
-  standard.skeleton->setPositionUpperLimit(2, M_PI);
+  skel->autogroupSymmetricPrefixes("ulna", "radius");
+  skel->setPositionLowerLimit(0, -M_PI);
+  skel->setPositionUpperLimit(0, M_PI);
+  skel->setPositionLowerLimit(1, -M_PI);
+  skel->setPositionUpperLimit(1, M_PI);
+  skel->setPositionLowerLimit(2, -M_PI);
+  skel->setPositionUpperLimit(2, M_PI);
 
-  DynamicsFitter fitter(standard.skeleton, standard.markersMap);
-
-  std::shared_ptr<DynamicsInitialization> init = fitter.createInitialization(
-      forcePlateTrials, poseTrials, framesPerSecond, markerObservationTrials);
+  DynamicsFitter fitter(skel, init->updatedMarkerMap);
   fitter.scaleLinkMassesFromGravity(init);
   fitter.estimateLinkMassesFromAcceleration(init);
 
   if (saveGUI)
   {
     std::cout << "Saving trajectory..." << std::endl;
-    std::cout << "FPS: " << framesPerSecond[0] << std::endl;
+    std::cout << "FPS: " << 1.0 / init->trialTimesteps[0] << std::endl;
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
         init,
         0,
-        framesPerSecond[0]);
+        (int)round(1.0 / init->trialTimesteps[0]));
   }
 
   return init;
 }
 
-std::shared_ptr<DynamicsInitialization> runEngine(
-    std::string modelPath,
+std::shared_ptr<DynamicsInitialization> createInitialization(
+    std::shared_ptr<dynamics::Skeleton> skel,
     std::vector<std::string> motFiles,
     std::vector<std::string> c3dFiles,
     std::vector<std::string> trcFiles,
     std::vector<std::string> grfFiles,
-    bool saveGUI = false)
+    int limitTrialSizes = -1)
 {
   std::vector<Eigen::MatrixXs> poseTrials;
   std::vector<C3D> c3ds;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
   std::vector<int> framesPerSecond;
-  std::vector<std::vector<ForcePlate>> forcePlates;
+  std::vector<std::vector<ForcePlate>> forcePlateTrials;
 
-  OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   for (int i = 0; i < motFiles.size(); i++)
   {
-    OpenSimMot mot = OpenSimParser::loadMot(standard.skeleton, motFiles[i]);
-    poseTrials.push_back(mot.poses);
+    OpenSimMot mot = OpenSimParser::loadMot(skel, motFiles[i]);
+    if (limitTrialSizes > 0 && mot.poses.cols() > limitTrialSizes)
+    {
+      poseTrials.push_back(
+          mot.poses.block(0, 0, mot.poses.rows(), limitTrialSizes));
+    }
+    else
+    {
+      poseTrials.push_back(mot.poses);
+    }
   }
 
   for (std::string& path : c3dFiles)
@@ -641,7 +696,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     C3D c3d = C3DLoader::loadC3D(path);
     c3ds.push_back(c3d);
     markerObservationTrials.push_back(c3d.markerTimesteps);
-    forcePlates.push_back(c3d.forcePlates);
+    forcePlateTrials.push_back(c3d.forcePlates);
     framesPerSecond.push_back(c3d.framesPerSecond);
   }
 
@@ -655,26 +710,52 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     {
       std::vector<ForcePlate> grf
           = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
-      forcePlates.push_back(grf);
+      forcePlateTrials.push_back(grf);
     }
     else
     {
-      forcePlates.emplace_back();
+      forcePlateTrials.emplace_back();
     }
   }
 
-  return runEngine(
-      standard,
-      forcePlates,
-      poseTrials,
-      markerObservationTrials,
-      framesPerSecond,
-      saveGUI);
+  std::shared_ptr<DynamicsInitialization> init
+      = DynamicsFitter::createInitialization(
+          skel,
+          forcePlateTrials,
+          poseTrials,
+          framesPerSecond,
+          markerObservationTrials);
+  return init;
+}
+
+std::shared_ptr<DynamicsInitialization> runEngine(
+    std::string modelPath,
+    std::vector<std::string> motFiles,
+    std::vector<std::string> c3dFiles,
+    std::vector<std::string> trcFiles,
+    std::vector<std::string> grfFiles,
+    int limitTrialLength = -1,
+    bool saveGUI = false)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      limitTrialLength);
+
+  return runEngine(standard.skeleton, init, saveGUI);
 }
 
 #ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, ID_EQNS)
 {
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
   OpenSimFile file = OpenSimParser::parseOsim(
       "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
   srand(42);
@@ -701,34 +782,145 @@ TEST(DynamicsFitter, ID_EQNS)
     }
   }
 
-  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::POSITION));
-  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
-  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_MASSES));
-  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_COMS));
-  EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_INERTIAS));
+  // If the downstream grad tests fail, uncomment these tests to diagnose root
+  // issue:
 
-  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::POSITION));
-  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::VELOCITY));
-  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
-  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_MASSES));
-  EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_COMS));
-  EXPECT_TRUE(
-      testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_INERTIAS));
+  // EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::POSITION));
+  // EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_SCALES));
+  // EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_MASSES));
+  // EXPECT_TRUE(testMassJacobian(file.skeleton, WithRespectTo::GROUP_COMS));
+  // EXPECT_TRUE(testMassJacobian(file.skeleton,
+  // WithRespectTo::GROUP_INERTIAS));
+
+  // EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::POSITION));
+  // EXPECT_TRUE(testCoriolisJacobian(file.skeleton, WithRespectTo::VELOCITY));
+  // EXPECT_TRUE(testCoriolisJacobian(file.skeleton,
+  // WithRespectTo::GROUP_SCALES));
+  // EXPECT_TRUE(testCoriolisJacobian(file.skeleton,
+  // WithRespectTo::GROUP_MASSES));
+  // EXPECT_TRUE(testCoriolisJacobian(file.skeleton,
+  // WithRespectTo::GROUP_COMS)); EXPECT_TRUE(
+  //     testCoriolisJacobian(file.skeleton, WithRespectTo::GROUP_INERTIAS));
+
+  // EXPECT_TRUE(
+  //     testResidualJacWrt(file.skeleton, worldForces,
+  //     WithRespectTo::POSITION));
+  // EXPECT_TRUE(
+  //     testResidualJacWrt(file.skeleton, worldForces,
+  //     WithRespectTo::VELOCITY));
+  // EXPECT_TRUE(testResidualJacWrt(
+  //     file.skeleton, worldForces, WithRespectTo::ACCELERATION));
+  // EXPECT_TRUE(testResidualJacWrt(
+  //     file.skeleton, worldForces, WithRespectTo::GROUP_SCALES));
+  // EXPECT_TRUE(testResidualJacWrt(
+  //     file.skeleton, worldForces, WithRespectTo::GROUP_MASSES));
+  // EXPECT_TRUE(testResidualJacWrt(
+  //     file.skeleton, worldForces, WithRespectTo::GROUP_COMS));
+  // EXPECT_TRUE(testResidualJacWrt(
+  //     file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
 
   EXPECT_TRUE(
       testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
   EXPECT_TRUE(
-      testResidualJacWrt(file.skeleton, worldForces, WithRespectTo::VELOCITY));
-  EXPECT_TRUE(testResidualJacWrt(
+      testResidualGradWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
+  /*
+  EXPECT_TRUE(
+      testResidualGradWrt(file.skeleton, worldForces, WithRespectTo::VELOCITY));
+  EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::ACCELERATION));
-  EXPECT_TRUE(testResidualJacWrt(
+  EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::GROUP_SCALES));
-  EXPECT_TRUE(testResidualJacWrt(
+  EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::GROUP_MASSES));
-  EXPECT_TRUE(testResidualJacWrt(
+  EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::GROUP_COMS));
-  EXPECT_TRUE(testResidualJacWrt(
+  EXPECT_TRUE(testResidualGradWrt(
       file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
+  */
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton, motFiles, c3dFiles, trcFiles, grfFiles, 10);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, init->updatedMarkerMap, footNodes);
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  problem.unflatten(x);
+  Eigen::VectorXs recovered = problem.flatten();
+
+  if (!equals(x, recovered, 1e-9))
+  {
+    std::cout << "Flatten/unflatten not equal!" << std::endl;
+    EXPECT_TRUE(equals(x, recovered, 1e-9));
+    return;
+  }
+
+  /*
+  for (int trial = 0; trial < problem.mAccs.size(); trial++)
+  {
+    for (int t = 0; t < problem.mAccs[trial].cols(); t++)
+    {
+      std::cout << "Testing timestamp " << t << " / "
+                << problem.mAccs[trial].cols() << std::endl;
+
+      std::map<int, Eigen::Vector6s> forces;
+      for (int j = 0; j < problem.mForceBodyIndices.size(); j++)
+      {
+        forces[problem.mForceBodyIndices[j]]
+            = problem.mGRFs[trial].col(t).segment<6>(j * 6);
+      }
+      standard.skeleton->setPositions(problem.mPoses[trial].col(t));
+      standard.skeleton->setVelocities(problem.mVels[trial].col(t));
+      standard.skeleton->setAccelerations(problem.mAccs[trial].col(t));
+      EXPECT_TRUE(testResidualGradWrt(
+          standard.skeleton, forces, WithRespectTo::ACCELERATION));
+    }
+  }
+  */
+
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  if (!equals(analytical, fd, 1e-5))
+  {
+    std::cout << "Gradient of DynamicsFitProblem not equal!" << std::endl;
+    /*
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 3);
+    compare.col(0) = analytical;
+    compare.col(1) = fd;
+    compare.col(2) = (fd - analytical).cwiseQuotient(fd);
+    std::cout << "Analytical - FD - Diff (" << compare.col(2).minCoeff()
+              << " - " << compare.col(2).maxCoeff() << "):" << std::endl
+              << compare << std::endl;
+    */
+    problem.debugErrors(fd, analytical, 1e-5);
+    EXPECT_TRUE(equals(analytical, fd, 1e-5));
+
+    return;
+  }
 }
 #endif
 
@@ -751,6 +943,7 @@ TEST(DynamicsFitter, MASS_INITIALIZATION)
       c3dFiles,
       trcFiles,
       grfFiles,
+      -1,
       true);
 }
 #endif

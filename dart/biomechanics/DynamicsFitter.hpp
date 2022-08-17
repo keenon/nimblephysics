@@ -5,7 +5,9 @@
 #include <vector>
 
 #include "dart/biomechanics/ForcePlate.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/dynamics/SmartPointer.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/DifferentiableExternalForce.hpp"
@@ -43,7 +45,7 @@ public:
       Eigen::VectorXs forcesConcat);
 
   ///////////////////////////////////////////
-  // Computes the Jacobian of the residual with respect to the first position
+  // Computes the Jacobian of the residual with respect to `wrt`
   Eigen::MatrixXs calculateResidualJacobianWrt(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
@@ -52,8 +54,26 @@ public:
       neural::WithRespectTo* wrt);
 
   ///////////////////////////////////////////
-  // Computes the Jacobian of the residual with respect to the first position
+  // Computes the Jacobian of the residual with respect to `wrt`
   Eigen::MatrixXs finiteDifferenceResidualJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of the residual norm with respect to `wrt`
+  Eigen::VectorXs calculateResidualNormGradientWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of the residual norm with respect to `wrt`
+  Eigen::VectorXs finiteDifferenceResidualNormGradientWrt(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
@@ -103,7 +123,8 @@ public:
   DynamicsFitProblem(
       std::shared_ptr<DynamicsInitialization> init,
       std::shared_ptr<dynamics::Skeleton> skeleton,
-      dynamics::MarkerMap markerMap);
+      dynamics::MarkerMap markerMap,
+      std::vector<dynamics::BodyNode*> footNodes);
 
   // This returns the dimension of the decision variables (the length of the
   // flatten() vector), which depends on which variables we choose to include in
@@ -112,6 +133,12 @@ public:
 
   // This writes the problem state into a flat vector
   Eigen::VectorXs flatten();
+
+  // This writes the upper bounds into a flat vector
+  Eigen::VectorXs flattenUpperBound();
+
+  // This writes the upper bounds into a flat vector
+  Eigen::VectorXs flattenLowerBound();
 
   // This reads the problem state out of a flat vector, and into the init object
   void unflatten(Eigen::VectorXs x);
@@ -124,41 +151,11 @@ public:
   // This gets the gradient of the loss function
   Eigen::VectorXs computeGradient(Eigen::VectorXs x);
 
-  ///////////////////////////////////////////////////////////////////////
-  // Notes:
-  //
-  // Just the linear component:
-  //
-  // Each body acceleration wrt (COMs, poses, body scales)
-  // Then f_implied = sum(m[i]*a[i])
-  // Loss is (f_implied - f_measured).norm()
-  // Vars are: masses, COMs, poses, body scales
-  //
-  // Diff:
-  // 2*(f_implied - f_measured).norm()*(f_implied - f_measured) * d_f_implied
-  // Where d_f_implied:
-  // - wrt Mass: just a[i]
-  // - wrt COMs: m[i]*d_a_wrt_COM[i]
-  //   - relies on d_pos_wrt_COM[i]
-  // - etc
-  //
-  // Just the rotational component;
-  //
-  // Each body rotational acceleration wrt (poses)
-  // Then tau_implied = sum(I[i]*omega[i])
-  // Loss is (tau_implied - tau_measured).norm()
-  ///////////////////////////////////////////////////////////////////////
+  // This gets the gradient of the loss function
+  Eigen::VectorXs finiteDifferenceGradient(Eigen::VectorXs x);
 
-  // Get the concatenated body center-of-mass positions over time. The 3-vec
-  // position of each body is stacked, according to their ordering in the
-  // skeleton->getBodyNode(i), to create each column of the returned matrix.
-  // There is one column per timestep.
-  Eigen::MatrixXs getBodyCOMPositions(Eigen::VectorXs x, int trial);
-
-  // This gets a [3 x T] matrix, which describes the gradient of the body's COM
-  // world position with respect to its local COM position.
-  Eigen::MatrixXs getBodyCOMPositionsGradientWrtCOMs(
-      Eigen::VectorXs x, int trial, int body, int axis);
+  // Print out the errors in a gradient vector in human readable form
+  void debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
 
   DynamicsFitProblem& setIncludeMasses(bool value);
   DynamicsFitProblem& setIncludeCOMs(bool value);
@@ -167,16 +164,29 @@ public:
   DynamicsFitProblem& setIncludeMarkerOffsets(bool value);
   DynamicsFitProblem& setIncludeBodyScales(bool value);
 
-protected:
+public:
   bool mIncludeMasses;
   bool mIncludeCOMs;
   bool mIncludeInertias;
+  bool mIncludeBodyScales;
   bool mIncludePoses;
   bool mIncludeMarkerOffsets;
-  bool mIncludeBodyScales;
   std::shared_ptr<DynamicsInitialization> mInit;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
+
+  std::vector<Eigen::MatrixXs> mPoses;
+  std::vector<Eigen::MatrixXs> mVels;
+  std::vector<Eigen::MatrixXs> mAccs;
+  std::vector<Eigen::MatrixXs> mGRFs;
+  std::vector<dynamics::BodyNode*> mGRFBodyNodes;
+
   dynamics::MarkerMap mMarkerMap;
+  std::vector<std::string> mMarkerNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
+
+  std::vector<dynamics::BodyNode*> mFootNodes;
+  std::vector<int> mForceBodyIndices;
+  std::shared_ptr<ResidualForceHelper> mResidualHelper;
 };
 
 class DynamicsFitter
@@ -188,7 +198,8 @@ public:
 
   // This bundles together the objects we need in order to track a dynamics
   // problem around through multiple steps of optimization
-  std::shared_ptr<DynamicsInitialization> createInitialization(
+  static std::shared_ptr<DynamicsInitialization> createInitialization(
+      std::shared_ptr<dynamics::Skeleton> skel,
       std::vector<std::vector<ForcePlate>> forcePlateTrials,
       std::vector<Eigen::MatrixXs> poseTrials,
       std::vector<int> framesPerSecond,

@@ -1435,7 +1435,7 @@ void MarkerFitter::debugGoldTrajectoryAndMarkersToGUI(
       = std::make_shared<realtime::Ticker>(secondsPerTick);
   ticker->registerTickListener(
       [c3d, server, secondsPerTick, goldOsim, goldPoses, goldColor](long t) {
-        long tick = std::round((s_t)t / (secondsPerTick * 1000));
+        long tick = (long)round((s_t)t / (secondsPerTick * 1000));
         int timestep
             = tick
               % std::min(
@@ -1566,7 +1566,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
           "Joint center: " + init.joints[i]->getName());
       server->createSphere(
           "joint_center_" + std::to_string(i),
-          0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
+          0.01 * min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
           Eigen::Vector4s(
               functionalJointCenterLayerColor(0),
@@ -1583,7 +1583,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
     {
       server->createCapsule(
           "joint_axis_" + std::to_string(i),
-          0.003 * std::min(3.0, (1.0 / init.axisWeights(i))),
+          0.003 * min(3.0, (1.0 / init.axisWeights(i))),
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
@@ -1685,7 +1685,7 @@ void MarkerFitter::debugTrajectoryAndMarkersToGUI(
                                 forcePlateLayerName,
                                 forcePlateLayerColor,
                                 this](long t) {
-    long tick = std::round((s_t)t / (secondsPerTick * 1000));
+    long tick = (long)round((s_t)t / (secondsPerTick * 1000));
     int timestep = tick % init.poses.cols();
     mSkeleton->setPositions(init.poses.col(timestep));
     server->renderSkeleton(
@@ -1982,7 +1982,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           "Joint center: " + init.joints[i]->getName());
       server.createSphere(
           "joint_center_" + std::to_string(i),
-          0.01 * std::min(3.0, (1.0 / init.jointWeights(i))),
+          0.01 * min(3.0, (1.0 / init.jointWeights(i))),
           Eigen::Vector3s::Zero(),
           Eigen::Vector4s(
               functionalJointCenterLayerColor(0),
@@ -1999,7 +1999,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     {
       server.createCapsule(
           "joint_axis_" + std::to_string(i),
-          0.003 * std::min(3.0, (1.0 / init.axisWeights(i))),
+          0.003 * min(3.0, (1.0 / init.axisWeights(i))),
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
@@ -3377,7 +3377,7 @@ MarkerInitialization MarkerFitter::getInitialization(
           && blockStartLoss > 0.01 && !newClip[blockStartIndices[i]])
       {
         s_t lastBlockStartLoss = lastBlockLoss[i];
-        if (std::abs(blockStartLoss - lastBlockStartLoss) < 1e-3)
+        if (abs(blockStartLoss - lastBlockStartLoss) < 1e-3)
         {
           std::cout << "Bad block start at " << i << ": prev block ended at "
                     << result.poseScores(blockStartIndices[i] - 1)
@@ -3694,9 +3694,10 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         originalMarker.second + offset);
     Eigen::Vector3s markerPos = originalMarker.second + offset;
     std::string markerPrefix = "marker " + originalMarker.first->getName()
-                               + " (" + std::to_string(markerPos(0)) + ","
-                               + std::to_string(markerPos(1)) + ","
-                               + std::to_string(markerPos(2)) + ")";
+                               + " (" + std::to_string((double)markerPos(0))
+                               + "," + std::to_string((double)markerPos(1))
+                               + "," + std::to_string((double)markerPos(2))
+                               + ")";
     outputNames.push_back(markerPrefix + " X");
     outputNames.push_back(markerPrefix + " Y");
     outputNames.push_back(markerPrefix + " Z");
@@ -4261,9 +4262,10 @@ void MarkerFitter::fitTrajectory(
             originalMarker.second + offset);
         Eigen::Vector3s markerPos = originalMarker.second + offset;
         std::string markerPrefix = "marker " + originalMarker.first->getName()
-                                   + " (" + std::to_string(markerPos(0)) + ","
-                                   + std::to_string(markerPos(1)) + ","
-                                   + std::to_string(markerPos(2)) + ")";
+                                   + " (" + std::to_string((double)markerPos(0))
+                                   + "," + std::to_string((double)markerPos(1))
+                                   + "," + std::to_string((double)markerPos(2))
+                                   + ")";
         outputNames.push_back(markerPrefix + " X");
         outputNames.push_back(markerPrefix + " Y");
         outputNames.push_back(markerPrefix + " Z");
@@ -7426,19 +7428,19 @@ bool BilevelFitProblem::get_bounds_info(
       == scaleGroupDim + markerOffsetDim + (mMarkerObservations.size() * dofs));
 
   upperBounds.segment(0, scaleGroupDim)
-      = mFitter->mSkeleton->getGroupScalesUpperBound();
+      = mFitter->mSkeleton->getGroupScalesUpperBound().cast<double>();
   lowerBounds.segment(0, scaleGroupDim)
-      = mFitter->mSkeleton->getGroupScalesLowerBound();
+      = mFitter->mSkeleton->getGroupScalesLowerBound().cast<double>();
   upperBounds.segment(scaleGroupDim, markerOffsetDim)
-      .setConstant(mFitter->mMaxMarkerOffset);
+      .setConstant((double)mFitter->mMaxMarkerOffset);
   lowerBounds.segment(scaleGroupDim, markerOffsetDim)
-      .setConstant(-mFitter->mMaxMarkerOffset);
+      .setConstant((double)-mFitter->mMaxMarkerOffset);
   for (int i = 0; i < mMarkerObservations.size(); i++)
   {
     upperBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
-        = mFitter->mSkeleton->getPositionUpperLimits();
+        = mFitter->mSkeleton->getPositionUpperLimits().cast<double>();
     lowerBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
-        = mFitter->mSkeleton->getPositionLowerLimits();
+        = mFitter->mSkeleton->getPositionLowerLimits().cast<double>();
   }
 
   // Our constraint function has to be 0
@@ -7478,7 +7480,7 @@ bool BilevelFitProblem::get_starting_point(
   if (init_x)
   {
     Eigen::Map<Eigen::VectorXd> x(_x, n);
-    x = getInitialization();
+    x = getInitialization().cast<double>();
   }
 
   return true;
@@ -7494,7 +7496,7 @@ bool BilevelFitProblem::eval_f(
   (void)_new_x;
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
 
-  _obj_value = getLoss(x);
+  _obj_value = (double)getLoss(x.cast<s_t>());
 
   return true;
 }
@@ -7510,7 +7512,7 @@ bool BilevelFitProblem::eval_grad_f(
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
 
-  grad = getGradient(x);
+  grad = getGradient(x.cast<s_t>()).cast<double>();
 
   return true;
 }
@@ -7527,7 +7529,7 @@ bool BilevelFitProblem::eval_g(
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
   Eigen::Map<Eigen::VectorXd> g(_g, _m);
 
-  g = getConstraints(x);
+  g = getConstraints(x.cast<s_t>()).cast<double>();
 
   return true;
 }
@@ -7574,14 +7576,14 @@ bool BilevelFitProblem::eval_jac_g(
     Eigen::Map<const Eigen::VectorXd> x(_x, _n);
     Eigen::Map<Eigen::VectorXd> vals(_values, _nnzj);
 
-    Eigen::MatrixXs jac = getConstraintsJacobian(x);
+    Eigen::MatrixXs jac = getConstraintsJacobian(x.cast<s_t>());
 
     int cursor = 0;
     for (int col = 0; col < jac.cols(); col++)
     {
       for (int row = 0; row < jac.rows(); row++)
       {
-        vals(cursor) = jac(row, col);
+        vals(cursor) = (double)jac(row, col);
         cursor++;
       }
     }

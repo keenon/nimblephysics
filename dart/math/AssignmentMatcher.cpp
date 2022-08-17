@@ -28,14 +28,13 @@ Eigen::VectorXi AssignmentMatcher::assignRowsToColumns(
   {
     int maxRowIndex = -1;
     int maxColIndex = -1;
-    double maxScore = -1 * std::numeric_limits<double>::infinity();
+    s_t maxScore = -1 * std::numeric_limits<double>::infinity();
 
     for (int row = 0; row < rowsNeedAssignments.size(); row++)
     {
       for (int col = 0; col < colsNeedAssignments.size(); col++)
       {
-        double score
-            = weights(rowsNeedAssignments[row], colsNeedAssignments[col]);
+        s_t score = weights(rowsNeedAssignments[row], colsNeedAssignments[col]);
         if (score > maxScore)
         {
           maxScore = score;

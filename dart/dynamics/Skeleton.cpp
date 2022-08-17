@@ -2562,7 +2562,7 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
 
   setPositions(originalPose);
 
-  if (std::isfinite(maxUp) && std::isfinite(minUp))
+  if (isfinite(maxUp) && isfinite(minUp))
   {
     return maxUp - minUp;
   }
@@ -2855,20 +2855,28 @@ Eigen::VectorXs Skeleton::getRandomPose()
   Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
   for (int i = 0; i < getNumDofs(); i++)
   {
-    s_t upperLimit = getDof(i)->getPositionUpperLimit();
+    s_t upperLimit = getDof(i)->getPositionUpperLimit() - 0.02;
     if (upperLimit == std::numeric_limits<s_t>::infinity())
     {
       upperLimit = 5.0;
     }
-    s_t lowerLimit = getDof(i)->getPositionLowerLimit();
+    s_t lowerLimit = getDof(i)->getPositionLowerLimit() + 0.02;
     if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
     {
       lowerLimit = -5.0;
     }
-    s_t withinBounds
-        = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
-          + lowerLimit;
-    pose(i) = withinBounds;
+    // If there's no space in the bounds:
+    if (upperLimit < lowerLimit)
+    {
+      pose(i) = getDof(i)->getPositionUpperLimit();
+    }
+    else
+    {
+      s_t withinBounds
+          = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+            + lowerLimit;
+      pose(i) = withinBounds;
+    }
   }
 
   /*
@@ -2892,20 +2900,27 @@ Eigen::VectorXs Skeleton::getRandomVelocity()
   Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
   for (int i = 0; i < getNumDofs(); i++)
   {
-    s_t upperLimit = getDof(i)->getVelocityUpperLimit();
+    s_t upperLimit = getDof(i)->getVelocityUpperLimit() - 0.015;
     if (upperLimit == std::numeric_limits<s_t>::infinity())
     {
       upperLimit = 5.0;
     }
-    s_t lowerLimit = getDof(i)->getVelocityLowerLimit();
+    s_t lowerLimit = getDof(i)->getVelocityLowerLimit() + 0.015;
     if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
     {
       lowerLimit = -5.0;
     }
-    s_t withinBounds
-        = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
-          + lowerLimit;
-    pose(i) = withinBounds;
+    if (upperLimit < lowerLimit)
+    {
+      pose(i) = getDof(i)->getVelocityUpperLimit();
+    }
+    else
+    {
+      s_t withinBounds
+          = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+            + lowerLimit;
+      pose(i) = withinBounds;
+    }
   }
 
   /*

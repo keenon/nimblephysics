@@ -68,7 +68,7 @@ int PiecewiseLinearFunction::getSize() const
  * @return Pointer to the independent variable data points.
  * @see getN();
  */
-const std::vector<double>& PiecewiseLinearFunction::getX() const
+const std::vector<s_t>& PiecewiseLinearFunction::getX() const
 {
   return _x;
 }
@@ -80,12 +80,12 @@ const std::vector<double>& PiecewiseLinearFunction::getX() const
  * @return Pointer to the coefficients.
  * @see getCoefficients();
  */
-const std::vector<double>& PiecewiseLinearFunction::getY() const
+const std::vector<s_t>& PiecewiseLinearFunction::getY() const
 {
   return _y;
 }
 
-double PiecewiseLinearFunction::getX(int aIndex) const
+s_t PiecewiseLinearFunction::getX(int aIndex) const
 {
   if (aIndex >= 0 && aIndex < _x.size())
     return _x[aIndex];
@@ -96,7 +96,7 @@ double PiecewiseLinearFunction::getX(int aIndex) const
   }
 }
 
-double PiecewiseLinearFunction::getY(int aIndex) const
+s_t PiecewiseLinearFunction::getY(int aIndex) const
 {
   if (aIndex >= 0 && aIndex < _y.size())
     return _y[aIndex];
@@ -107,7 +107,7 @@ double PiecewiseLinearFunction::getY(int aIndex) const
   }
 }
 
-void PiecewiseLinearFunction::setX(int aIndex, double aValue)
+void PiecewiseLinearFunction::setX(int aIndex, s_t aValue)
 {
   if (aIndex >= 0 && aIndex < _x.size())
   {
@@ -120,7 +120,7 @@ void PiecewiseLinearFunction::setX(int aIndex, double aValue)
   }
 }
 
-void PiecewiseLinearFunction::setY(int aIndex, double aValue)
+void PiecewiseLinearFunction::setY(int aIndex, s_t aValue)
 {
   if (aIndex >= 0 && aIndex < _y.size())
   {
@@ -149,7 +149,7 @@ bool PiecewiseLinearFunction::deletePoint(int aIndex)
   return false;
 }
 
-int PiecewiseLinearFunction::addPoint(double aX, double aY)
+int PiecewiseLinearFunction::addPoint(s_t aX, s_t aY)
 {
   int i = 0;
   for (i = 0; i < _x.size(); i++)
@@ -179,16 +179,16 @@ void PiecewiseLinearFunction::calcCoefficients()
 
   for (int i = 0; i < n - 1; i++)
   {
-    double range = MAX(TINY_NUMBER, _x[i + 1] - _x[i]);
+    s_t range = MAX(TINY_NUMBER, _x[i + 1] - _x[i]);
     _b[i] = (_y[i + 1] - _y[i]) / range;
   }
   _b[n - 1] = _b[n - 2];
 }
 
-double PiecewiseLinearFunction::calcValue(s_t x) const
+s_t PiecewiseLinearFunction::calcValue(s_t x) const
 {
   int n = _x.size();
-  double aX = x;
+  s_t aX = x;
 
   if (aX < _x[0])
     return _y[0] + (aX - _x[0]) * _b[0];
@@ -221,7 +221,7 @@ double PiecewiseLinearFunction::calcValue(s_t x) const
   return _y[k] + (aX - _x[k]) * _b[k];
 }
 
-double PiecewiseLinearFunction::calcDerivative(int order, s_t x) const
+s_t PiecewiseLinearFunction::calcDerivative(int order, s_t x) const
 {
   if (order == 0)
     return 0.0;
@@ -229,7 +229,7 @@ double PiecewiseLinearFunction::calcDerivative(int order, s_t x) const
     return 0.0;
 
   int n = _x.size();
-  double aX = x;
+  s_t aX = x;
 
   if (aX < _x[0])
   {

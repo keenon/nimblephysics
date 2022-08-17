@@ -140,8 +140,8 @@ Eigen::Vector3s readVec3(tinyxml2::XMLElement* elem)
 
 std::string writeVec3(Eigen::Vector3s vec)
 {
-  return std::to_string(vec(0)) + " " + std::to_string(vec(1)) + " "
-         + std::to_string(vec(2));
+  return std::to_string((double)vec(0)) + " " + std::to_string((double)vec(1))
+         + " " + std::to_string((double)vec(2));
 }
 
 Eigen::Vector6s readVec6(tinyxml2::XMLElement* elem)
@@ -433,9 +433,9 @@ void OpenSimParser::saveOsimScalingXMLFile(
     // This is pretty much the whole point of this XML file - how much we'd like
     // to scale each body element
     Eigen::Vector3s scale = body->getScale();
-    scales->SetText((" " + std::to_string(scale(0)) + " "
-                     + std::to_string(scale(1)) + " "
-                     + std::to_string(scale(2)))
+    scales->SetText((" " + std::to_string((double)scale(0)) + " "
+                     + std::to_string((double)scale(1)) + " "
+                     + std::to_string((double)scale(2)))
                         .c_str());
     scaleBody->InsertEndChild(scales);
 
@@ -918,9 +918,9 @@ void OpenSimParser::updateCustomJointXML(
         T = joint->getTransformFromChildBodyNode();
       }
       framesCursor->FirstChildElement("translation")
-          ->SetText((std::to_string(T.translation()(0)) + " "
-                     + std::to_string(T.translation()(1)) + " "
-                     + std::to_string(T.translation()(2)))
+          ->SetText((std::to_string((double)T.translation()(0)) + " "
+                     + std::to_string((double)T.translation()(1)) + " "
+                     + std::to_string((double)T.translation()(2)))
                         .c_str());
 
       framesCursor = framesCursor->NextSiblingElement();
@@ -1001,9 +1001,9 @@ void OpenSimParser::updateCustomJointXML(
     if (constant != nullptr)
     {
       constant->FirstChildElement("value")->SetText(
-          std::to_string(static_cast<math::ConstantFunction*>(
-                             joint->getCustomFunction(index).get())
-                             ->mValue)
+          std::to_string((double)(static_cast<math::ConstantFunction*>(
+                                      joint->getCustomFunction(index).get())
+                                      ->mValue))
               .c_str());
     }
     else if (linearFunction != nullptr)
@@ -1012,8 +1012,8 @@ void OpenSimParser::updateCustomJointXML(
           joint->getCustomFunction(index).get());
 
       linearFunction->FirstChildElement("coefficients")
-          ->SetText((std::to_string(linear->mSlope) + " "
-                     + std::to_string(linear->mYIntercept))
+          ->SetText((std::to_string((double)linear->mSlope) + " "
+                     + std::to_string((double)linear->mYIntercept))
                         .c_str());
     }
     else if (polynomialFunction != nullptr)
@@ -1027,7 +1027,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           coeffString += " ";
-        coeffString += std::to_string(polynomial->mCoeffs[i]);
+        coeffString += std::to_string((double)polynomial->mCoeffs[i]);
       }
       polynomialFunction->FirstChildElement("coefficients")
           ->SetText(coeffString.c_str());
@@ -1042,7 +1042,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           xString += " ";
-        xString += std::to_string(spline->_x[i]);
+        xString += std::to_string((double)spline->_x[i]);
       }
       simmSpline->FirstChildElement("x")->SetText(xString.c_str());
 
@@ -1051,7 +1051,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           yString += " ";
-        yString += std::to_string(spline->_y[i]);
+        yString += std::to_string((double)spline->_y[i]);
       }
       simmSpline->FirstChildElement("y")->SetText(yString.c_str());
     }
@@ -1066,7 +1066,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           xString += " ";
-        xString += std::to_string(pl->_x[i]);
+        xString += std::to_string((double)pl->_x[i]);
       }
       piecewiseLinear->FirstChildElement("x")->SetText(xString.c_str());
 
@@ -1075,7 +1075,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           yString += " ";
-        yString += std::to_string(pl->_y[i]);
+        yString += std::to_string((double)pl->_y[i]);
       }
       piecewiseLinear->FirstChildElement("y")->SetText(yString.c_str());
     }
@@ -1130,9 +1130,11 @@ void OpenSimParser::updateRootJointLimits(
     if (dofIndex < 3)
     {
       coordinateCursor->FirstChildElement("range")->SetText(
-          (std::to_string(joint->getDof(dofIndex)->getPositionLowerLimit())
+          (std::to_string(
+               (double)joint->getDof(dofIndex)->getPositionLowerLimit())
            + " "
-           + std::to_string(joint->getDof(dofIndex)->getPositionUpperLimit()))
+           + std::to_string(
+               (double)joint->getDof(dofIndex)->getPositionUpperLimit()))
               .c_str());
     }
     coordinateCursor = coordinateCursor->NextSiblingElement("Coordinate");
@@ -1392,9 +1394,9 @@ void OpenSimParser::replaceOsimMarkers(
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
     Eigen::Vector3s markerOffset = pair.second.second;
-    location->SetText((" " + std::to_string(markerOffset(0)) + " "
-                       + std::to_string(markerOffset(1)) + " "
-                       + std::to_string(markerOffset(2)))
+    location->SetText((" " + std::to_string((double)markerOffset(0)) + " "
+                       + std::to_string((double)markerOffset(1)) + " "
+                       + std::to_string((double)markerOffset(2)))
                           .c_str());
 
     tinyxml2::XMLElement* fixed = marker->InsertNewChildElement("fixed");
@@ -1499,9 +1501,9 @@ void OpenSimParser::moveOsimMarkers(
                                       ? bodyScales.at(bodyName)
                                       : Eigen::Vector3s::Ones();
       markerOffset = markerOffset.cwiseProduct(bodyScale);
-      location->SetText((" " + std::to_string(markerOffset(0)) + " "
-                         + std::to_string(markerOffset(1)) + " "
-                         + std::to_string(markerOffset(2)))
+      location->SetText((" " + std::to_string((double)markerOffset(0)) + " "
+                         + std::to_string((double)markerOffset(1)) + " "
+                         + std::to_string((double)markerOffset(2)))
                             .c_str());
     }
     else
@@ -1711,7 +1713,7 @@ OpenSimTRC OpenSimParser::loadTRC(
     int frames = result.timestamps.size();
     s_t elapsed = result.timestamps[result.timestamps.size() - 1]
                   - result.timestamps[0];
-    result.framesPerSecond = std::round(frames / elapsed);
+    result.framesPerSecond = (int)round(frames / elapsed);
   }
 
   return result;
@@ -2120,15 +2122,18 @@ void OpenSimParser::saveGRFMot(
     motFile << timestamps[t];
     for (int i = 0; i < forcePlates.size(); i++)
     {
-      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](0));
-      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](1));
-      motFile << "\t" << zeroIfNan(forcePlates[i].forces[t](2));
-      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](0));
-      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](1));
-      motFile << "\t" << zeroIfNan(forcePlates[i].centersOfPressure[t](2));
-      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](0));
-      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](1));
-      motFile << "\t" << zeroIfNan(forcePlates[i].moments[t](2));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].forces[t](0));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].forces[t](1));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].forces[t](2));
+      motFile << "\t"
+              << zeroIfNan((double)forcePlates[i].centersOfPressure[t](0));
+      motFile << "\t"
+              << zeroIfNan((double)forcePlates[i].centersOfPressure[t](1));
+      motFile << "\t"
+              << zeroIfNan((double)forcePlates[i].centersOfPressure[t](2));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](0));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](1));
+      motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](2));
     }
     motFile << "\n";
   }
@@ -2511,7 +2516,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   {
     int frames = timestamps.size();
     s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
-    int framesPerSecond = std::round(frames / elapsed);
+    int framesPerSecond = (int)round((double)frames / elapsed);
     if (framesPerSecond < targetFramesPerSecond)
     {
       std::cout << "WARNING!!! OpenSimParser is trying to load "
@@ -2944,7 +2949,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           first3Linear = false;
         }
 
-        double value
+        s_t value
             = atof(constant->FirstChildElement("value")->GetText()) * scale;
         if (value != 0)
         {

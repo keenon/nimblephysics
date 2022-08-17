@@ -350,12 +350,12 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
                   (result.forcePlates[0].corners[2]
                    - result.forcePlates[0].corners[1]))
               .normalized();
-    double groundLevel = result.forcePlates[0].corners[0].dot(up);
+    s_t groundLevel = result.forcePlates[0].corners[0].dot(up);
     // Flip the direction of "up" if the markers are showing up as below the
     // ground
     if (result.markerTimesteps.size() > 0)
     {
-      double sumDist = 0.0;
+      s_t sumDist = 0.0;
       for (auto& pair : result.markerTimesteps[(int)std::round(
                result.markerTimesteps.size() / 2)])
       {
@@ -370,15 +370,15 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     // Try to get "up" to point exactly along a unit axis, to make subsequent
     // math more accurate
     up = up.normalized();
-    if (std::abs(up(0)) < 0.01)
+    if (abs(up(0)) < 0.01)
     {
       up(0) = 0;
     }
-    if (std::abs(up(1)) < 0.01)
+    if (abs(up(1)) < 0.01)
     {
       up(1) = 0;
     }
-    if (std::abs(up(2)) < 0.01)
+    if (abs(up(2)) < 0.01)
     {
       up(2) = 0;
     }

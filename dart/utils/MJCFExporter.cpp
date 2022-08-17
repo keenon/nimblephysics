@@ -31,8 +31,8 @@ namespace utils {
 //==============================================================================
 std::string writeVec3(Eigen::Vector3s vec)
 {
-  return std::to_string(vec(0)) + " " + std::to_string(vec(1)) + " "
-         + std::to_string(vec(2));
+  return std::to_string((double)vec(0)) + " " + std::to_string((double)vec(1))
+         + " " + std::to_string((double)vec(2));
 }
 
 //==============================================================================
@@ -67,7 +67,8 @@ void recursivelyWriteJointAndBody(
 
   XMLElement* inertiaXml = xmlDoc.NewElement("inertial");
   inertiaXml->SetAttribute("pos", writeVec3(body->getCOM()).c_str());
-  inertiaXml->SetAttribute("mass", std::to_string(body->getMass()).c_str());
+  inertiaXml->SetAttribute(
+      "mass", std::to_string((double)body->getMass()).c_str());
   // dart::dynamics::Inertia inertia = body->getInertia();
   s_t i_xx = 0;
   s_t i_xy = 0;
@@ -79,9 +80,9 @@ void recursivelyWriteJointAndBody(
   // M(1,1), M(2,2), M(3,3), M(1,2), M(1,3), M(2,3)
   inertiaXml->SetAttribute(
       "fullinertia",
-      (std::to_string(i_xx) + " " + std::to_string(i_yy) + " "
-       + std::to_string(i_zz) + " " + std::to_string(i_xy) + " "
-       + std::to_string(i_xz) + " " + std::to_string(i_yz))
+      (std::to_string((double)i_xx) + " " + std::to_string((double)i_yy) + " "
+       + std::to_string((double)i_zz) + " " + std::to_string((double)i_xy) + " "
+       + std::to_string((double)i_xz) + " " + std::to_string((double)i_yz))
           .c_str());
   bodyXml->InsertEndChild(inertiaXml);
 
@@ -143,8 +144,8 @@ void recursivelyWriteJointAndBody(
         jointXml->SetAttribute("limited", "true");
         jointXml->SetAttribute(
             "range",
-            (std::to_string(revolute->getPositionLowerLimit(0)) + " "
-             + std::to_string(revolute->getPositionUpperLimit(0)))
+            (std::to_string((double)revolute->getPositionLowerLimit(0)) + " "
+             + std::to_string((double)revolute->getPositionUpperLimit(0)))
                 .c_str());
       }
       else
@@ -156,8 +157,8 @@ void recursivelyWriteJointAndBody(
         jointXml->SetAttribute("limited", "true");
         jointXml->SetAttribute(
             "range",
-            (std::to_string(revolute->getPositionUpperLimit(0)) + " "
-             + std::to_string(revolute->getPositionLowerLimit(0)))
+            (std::to_string((double)revolute->getPositionUpperLimit(0)) + " "
+             + std::to_string((double)revolute->getPositionLowerLimit(0)))
                 .c_str());
       }
     }
@@ -199,8 +200,8 @@ void recursivelyWriteJointAndBody(
           jointXml->SetAttribute("limited", "true");
           jointXml->SetAttribute(
               "range",
-              (std::to_string(universal->getPositionLowerLimit(i)) + " "
-               + std::to_string(universal->getPositionUpperLimit(i)))
+              (std::to_string((double)universal->getPositionLowerLimit(i)) + " "
+               + std::to_string((double)universal->getPositionUpperLimit(i)))
                   .c_str());
         }
       }
@@ -258,8 +259,8 @@ void recursivelyWriteJointAndBody(
         jointX->SetAttribute("limited", "true");
         jointX->SetAttribute(
             "range",
-            (std::to_string(euler->getPositionLowerLimit(i)) + " "
-             + std::to_string(euler->getPositionUpperLimit(i)))
+            (std::to_string((double)euler->getPositionLowerLimit(i)) + " "
+             + std::to_string((double)euler->getPositionUpperLimit(i)))
                 .c_str());
       }
     }
@@ -335,8 +336,9 @@ void recursivelyWriteJointAndBody(
         jointX->SetAttribute("limited", "true");
         jointX->SetAttribute(
             "range",
-            (std::to_string(eulerFreeJoint->getPositionLowerLimit(i)) + " "
-             + std::to_string(eulerFreeJoint->getPositionUpperLimit(i)))
+            (std::to_string((double)eulerFreeJoint->getPositionLowerLimit(i))
+             + " "
+             + std::to_string((double)eulerFreeJoint->getPositionUpperLimit(i)))
                 .c_str());
       }
       // damping="0" stiffness="0" armature="0"
@@ -409,7 +411,7 @@ void recursivelyWriteJointAndBody(
           = dynamic_cast<dynamics::SphereShape*>(shape);
 
       geomXml->SetAttribute("type", "sphere");
-      geomXml->SetAttribute("size", sphereShape->getRadius());
+      geomXml->SetAttribute("size", (double)sphereShape->getRadius());
     }
     else if (shape->getType() == "CapsuleShape")
     {
@@ -419,8 +421,8 @@ void recursivelyWriteJointAndBody(
       geomXml->SetAttribute("type", "capsule");
       geomXml->SetAttribute(
           "size",
-          (std::to_string(capsuleShape->getRadius()) + " "
-           + std::to_string(capsuleShape->getHeight()))
+          (std::to_string((double)capsuleShape->getRadius()) + " "
+           + std::to_string((double)capsuleShape->getHeight()))
               .c_str());
     }
     else if (

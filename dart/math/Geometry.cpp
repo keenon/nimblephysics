@@ -722,8 +722,8 @@ Eigen::Vector3s logMap(const Eigen::Matrix3s& _R)
   // v = beta*p + gamma*w + 1 / 2*cross(p, w)
   //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
   //--------------------------------------------------------------------------
-  s_t theta = std::acos(
-      max(std::min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0), -1.0));
+  s_t theta
+      = acos(max(min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0), -1.0));
 
   if (theta > constantsd::pi() - DART_EPSILON)
   {
@@ -784,7 +784,7 @@ Eigen::Vector3s dLogMap(const Eigen::Matrix3s& _R, const Eigen::Matrix3s& dR)
   {
     d_theta = -d_diagSum / sqrt(1 - diagSum * diagSum);
   }
-  s_t theta = std::acos(diagSum);
+  s_t theta = acos(diagSum);
 
   if (theta > constantsd::pi() - DART_EPSILON)
   {
@@ -883,8 +883,8 @@ Eigen::Vector6s logMap(const Eigen::Isometry3s& _T)
   // v = beta*p + gamma*w + 1 / 2*cross(p, w)
   //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
   //--------------------------------------------------------------------------
-  s_t theta = acos(
-      max(std::min(0.5 * (_T(0, 0) + _T(1, 1) + _T(2, 2) - 1.0), 1.0), -1.0));
+  s_t theta
+      = acos(max(min(0.5 * (_T(0, 0) + _T(1, 1) + _T(2, 2) - 1.0), 1.0), -1.0));
   s_t beta;
   s_t gamma;
   Eigen::Vector6s ret;
@@ -1599,7 +1599,7 @@ Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     secondAngle += M_PI;
     secondSign = -secondSign;
   }
-  if (std::abs(secondAngle - (M_PI / 2)) < 1e-4)
+  if (abs((double)secondAngle - (M_PI / 2)) < 1e-4)
   {
     if (axisOrder == dynamics::detail::AxisOrder::ZYX
         || axisOrder == dynamics::detail::AxisOrder::ZYX)

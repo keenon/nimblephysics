@@ -183,22 +183,22 @@ void ArrowShape::configureArrow(
   mProperties = _properties;
 
   mProperties.mHeadLengthScale
-      = std::max(0.0, std::min(1.0, mProperties.mHeadLengthScale));
-  mProperties.mMinHeadLength = std::max(0.0, mProperties.mMinHeadLength);
-  mProperties.mMaxHeadLength = std::max(0.0, mProperties.mMaxHeadLength);
-  mProperties.mHeadRadiusScale = std::max(1.0, mProperties.mHeadRadiusScale);
+      = max(0.0, min(1.0, mProperties.mHeadLengthScale));
+  mProperties.mMinHeadLength = max(0.0, mProperties.mMinHeadLength);
+  mProperties.mMaxHeadLength = max(0.0, mProperties.mMaxHeadLength);
+  mProperties.mHeadRadiusScale = max(1.0, mProperties.mHeadRadiusScale);
 
   s_t length = (mTail - mHead).norm();
 
-  s_t minHeadLength = std::min(
+  s_t minHeadLength = min(
       mProperties.mMinHeadLength,
       mProperties.ms_tArrow ? length / 2.0 : length);
-  s_t maxHeadLength = std::min(
+  s_t maxHeadLength = min(
       mProperties.mMaxHeadLength,
       mProperties.ms_tArrow ? length / 2.0 : length);
 
   s_t headLength = mProperties.mHeadLengthScale * length;
-  headLength = std::min(maxHeadLength, std::max(minHeadLength, headLength));
+  headLength = min(maxHeadLength, max(minHeadLength, headLength));
 
   const aiScene* mesh = getMesh();
 

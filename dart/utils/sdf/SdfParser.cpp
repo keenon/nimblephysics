@@ -351,8 +351,8 @@ dynamics::SkeletonPtr readSkeleton(
 //==============================================================================
 std::string writeVec3(Eigen::Vector3s vec)
 {
-  return std::to_string(vec(0)) + " " + std::to_string(vec(1)) + " "
-         + std::to_string(vec(2));
+  return std::to_string((double)vec(0)) + " " + std::to_string((double)vec(1))
+         + " " + std::to_string((double)vec(2));
 }
 
 //==============================================================================
@@ -466,9 +466,9 @@ void appendShapeNodeToSDF(
     if (shapeNode->hasVisualAspect())
     {
       XMLElement* visualSphere = xmlDoc->NewElement("sphere");
-      visualSphere->SetAttribute("radius", sphereShape->getRadius());
+      visualSphere->SetAttribute("radius", (double)sphereShape->getRadius());
       XMLElement* radius = xmlDoc->NewElement("radius");
-      radius->SetText(std::to_string(sphereShape->getRadius()).c_str());
+      radius->SetText(std::to_string((double)sphereShape->getRadius()).c_str());
       visualSphere->InsertEndChild(radius);
       visualGeometry->InsertEndChild(visualSphere);
     }
@@ -476,7 +476,7 @@ void appendShapeNodeToSDF(
     {
       XMLElement* collisionSphere = xmlDoc->NewElement("sphere");
       XMLElement* radius = xmlDoc->NewElement("radius");
-      radius->SetText(std::to_string(sphereShape->getRadius()).c_str());
+      radius->SetText(std::to_string((double)sphereShape->getRadius()).c_str());
       collisionSphere->InsertEndChild(radius);
       collisionGeometry->InsertEndChild(collisionSphere);
     }
@@ -541,7 +541,7 @@ void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
     // dart::dynamics::Inertia inertia = body->getInertia();
 
     XMLElement* inertialMass = xmlDoc.NewElement("mass");
-    inertialMass->SetText(std::to_string(totalMass).c_str());
+    inertialMass->SetText(std::to_string((double)totalMass).c_str());
     inertial->InsertEndChild(inertialMass);
     XMLElement* inertialPose = xmlDoc.NewElement("pose");
     inertialPose->SetText(
@@ -557,27 +557,27 @@ void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
     s_t i_zz = 0;
     body->getMomentOfInertia(i_xx, i_yy, i_zz, i_xy, i_xz, i_yz);
     XMLElement* inertiaXX = xmlDoc.NewElement("ixx");
-    inertiaXX->SetText(std::to_string(i_xx).c_str());
+    inertiaXX->SetText(std::to_string((double)i_xx).c_str());
     inertialInertia->InsertEndChild(inertiaXX);
 
     XMLElement* inertiaXY = xmlDoc.NewElement("ixy");
-    inertiaXY->SetText(std::to_string(i_xy).c_str());
+    inertiaXY->SetText(std::to_string((double)i_xy).c_str());
     inertialInertia->InsertEndChild(inertiaXY);
 
     XMLElement* inertiaXZ = xmlDoc.NewElement("ixz");
-    inertiaXZ->SetText(std::to_string(i_xz).c_str());
+    inertiaXZ->SetText(std::to_string((double)i_xz).c_str());
     inertialInertia->InsertEndChild(inertiaXZ);
 
     XMLElement* inertiaYY = xmlDoc.NewElement("iyy");
-    inertiaYY->SetText(std::to_string(i_yy).c_str());
+    inertiaYY->SetText(std::to_string((double)i_yy).c_str());
     inertialInertia->InsertEndChild(inertiaYY);
 
     XMLElement* inertiaYZ = xmlDoc.NewElement("iyz");
-    inertiaYZ->SetText(std::to_string(i_yz).c_str());
+    inertiaYZ->SetText(std::to_string((double)i_yz).c_str());
     inertialInertia->InsertEndChild(inertiaYZ);
 
     XMLElement* inertiaZZ = xmlDoc.NewElement("izz");
-    inertiaZZ->SetText(std::to_string(i_zz).c_str());
+    inertiaZZ->SetText(std::to_string((double)i_zz).c_str());
     inertialInertia->InsertEndChild(inertiaZZ);
 
     inertial->InsertEndChild(inertialInertia);
@@ -621,11 +621,11 @@ void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
       XMLElement* lowerLimit = xmlDoc.NewElement("lower");
       limit->InsertEndChild(lowerLimit);
       lowerLimit->SetText(
-          std::to_string(revolute->getPositionLowerLimit(0)).c_str());
+          std::to_string((double)revolute->getPositionLowerLimit(0)).c_str());
       XMLElement* upperLimit = xmlDoc.NewElement("upper");
       limit->InsertEndChild(upperLimit);
       upperLimit->SetText(
-          std::to_string(revolute->getPositionUpperLimit(0)).c_str());
+          std::to_string((double)revolute->getPositionUpperLimit(0)).c_str());
       axis->InsertEndChild(limit);
 
       jointXml->InsertEndChild(axis);

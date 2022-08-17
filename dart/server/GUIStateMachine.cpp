@@ -1016,9 +1016,9 @@ void GUIStateMachine::setObjectPosition(
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
     command->mutable_set_object_position()->set_key(getStringCode(key));
-    command->mutable_set_object_position()->add_data(pos(0));
-    command->mutable_set_object_position()->add_data(pos(1));
-    command->mutable_set_object_position()->add_data(pos(2));
+    command->mutable_set_object_position()->add_data((double)pos(0));
+    command->mutable_set_object_position()->add_data((double)pos(1));
+    command->mutable_set_object_position()->add_data((double)pos(2));
   });
 }
 
@@ -1044,9 +1044,9 @@ void GUIStateMachine::setObjectRotation(
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
     command->mutable_set_object_rotation()->set_key(getStringCode(key));
-    command->mutable_set_object_rotation()->add_data(euler(0));
-    command->mutable_set_object_rotation()->add_data(euler(1));
-    command->mutable_set_object_rotation()->add_data(euler(2));
+    command->mutable_set_object_rotation()->add_data((double)euler(0));
+    command->mutable_set_object_rotation()->add_data((double)euler(1));
+    command->mutable_set_object_rotation()->add_data((double)euler(2));
   });
 }
 
@@ -1080,10 +1080,10 @@ void GUIStateMachine::setObjectColor(
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
     command->mutable_set_object_color()->set_key(getStringCode(key));
-    command->mutable_set_object_color()->add_data(color(0));
-    command->mutable_set_object_color()->add_data(color(1));
-    command->mutable_set_object_color()->add_data(color(2));
-    command->mutable_set_object_color()->add_data(color(3));
+    command->mutable_set_object_color()->add_data((double)color(0));
+    command->mutable_set_object_color()->add_data((double)color(1));
+    command->mutable_set_object_color()->add_data((double)color(2));
+    command->mutable_set_object_color()->add_data((double)color(3));
   });
 }
 
@@ -1110,9 +1110,9 @@ void GUIStateMachine::setObjectScale(
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
     command->mutable_set_object_scale()->set_key(getStringCode(key));
-    command->mutable_set_object_scale()->add_data(scale(0));
-    command->mutable_set_object_scale()->add_data(scale(1));
-    command->mutable_set_object_scale()->add_data(scale(2));
+    command->mutable_set_object_scale()->add_data((double)scale(0));
+    command->mutable_set_object_scale()->add_data((double)scale(1));
+    command->mutable_set_object_scale()->add_data((double)scale(2));
   });
 }
 
@@ -1413,7 +1413,7 @@ void GUIStateMachine::setSliderValue(const std::string& key, s_t value)
     queueCommand([&](proto::CommandList& list) {
       proto::Command* command = list.add_command();
       command->mutable_set_slider_value()->set_key(getStringCode(key));
-      command->mutable_set_slider_value()->set_value(value);
+      command->mutable_set_slider_value()->set_value((double)value);
     });
   }
   else
@@ -1437,7 +1437,7 @@ void GUIStateMachine::setSliderMin(const std::string& key, s_t min)
     queueCommand([&](proto::CommandList& list) {
       proto::Command* command = list.add_command();
       command->mutable_set_slider_min()->set_key(getStringCode(key));
-      command->mutable_set_slider_min()->set_value(min);
+      command->mutable_set_slider_min()->set_value((double)min);
     });
   }
   else
@@ -1461,7 +1461,7 @@ void GUIStateMachine::setSliderMax(const std::string& key, s_t max)
     queueCommand([&](proto::CommandList& list) {
       proto::Command* command = list.add_command();
       command->mutable_set_slider_max()->set_key(getStringCode(key));
-      command->mutable_set_slider_max()->set_value(max);
+      command->mutable_set_slider_max()->set_value((double)max);
     });
   }
   else
@@ -1531,17 +1531,17 @@ void GUIStateMachine::setPlotData(
     queueCommand([&](proto::CommandList& list) {
       proto::Command* command = list.add_command();
       command->mutable_set_plot_data()->set_key(getStringCode(key));
-      command->mutable_set_plot_data()->add_bounds(minX);
-      command->mutable_set_plot_data()->add_bounds(maxX);
-      command->mutable_set_plot_data()->add_bounds(minY);
-      command->mutable_set_plot_data()->add_bounds(maxY);
+      command->mutable_set_plot_data()->add_bounds((double)minX);
+      command->mutable_set_plot_data()->add_bounds((double)maxX);
+      command->mutable_set_plot_data()->add_bounds((double)minY);
+      command->mutable_set_plot_data()->add_bounds((double)maxY);
       for (s_t x : xs)
       {
-        command->mutable_set_plot_data()->add_xs(x);
+        command->mutable_set_plot_data()->add_xs((double)x);
       }
       for (s_t y : ys)
       {
-        command->mutable_set_plot_data()->add_ys(y);
+        command->mutable_set_plot_data()->add_ys((double)y);
       }
     });
   }
@@ -1642,10 +1642,10 @@ void GUIStateMachine::setRichPlotBounds(
     queueCommand([&](proto::CommandList& list) {
       proto::Command* command = list.add_command();
       command->mutable_set_rich_plot_bounds()->set_key(getStringCode(key));
-      command->mutable_set_rich_plot_bounds()->add_bounds(minX);
-      command->mutable_set_rich_plot_bounds()->add_bounds(maxX);
-      command->mutable_set_rich_plot_bounds()->add_bounds(minY);
-      command->mutable_set_rich_plot_bounds()->add_bounds(maxY);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)minX);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)maxX);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)minY);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)maxY);
     });
   }
   else
@@ -1787,10 +1787,10 @@ void GUIStateMachine::encodeCreateLayer(proto::CommandList& list, Layer& layer)
   proto::Command* command = list.add_command();
   command->mutable_layer()->set_key(getStringCode(layer.key));
   command->mutable_layer()->set_name(layer.key);
-  command->mutable_layer()->add_color(layer.color(0));
-  command->mutable_layer()->add_color(layer.color(1));
-  command->mutable_layer()->add_color(layer.color(2));
-  command->mutable_layer()->add_color(layer.color(3));
+  command->mutable_layer()->add_color((double)layer.color(0));
+  command->mutable_layer()->add_color((double)layer.color(1));
+  command->mutable_layer()->add_color((double)layer.color(2));
+  command->mutable_layer()->add_color((double)layer.color(3));
   command->mutable_layer()->set_default_show(layer.defaultShow);
 }
 
@@ -1799,19 +1799,19 @@ void GUIStateMachine::encodeCreateBox(proto::CommandList& list, Box& box)
   proto::Command* command = list.add_command();
   command->mutable_box()->set_key(getStringCode(box.key));
   command->mutable_box()->set_layer(getStringCode(box.layer));
-  command->mutable_box()->add_data(box.size(0));
-  command->mutable_box()->add_data(box.size(1));
-  command->mutable_box()->add_data(box.size(2));
-  command->mutable_box()->add_data(box.pos(0));
-  command->mutable_box()->add_data(box.pos(1));
-  command->mutable_box()->add_data(box.pos(2));
-  command->mutable_box()->add_data(box.euler(0));
-  command->mutable_box()->add_data(box.euler(1));
-  command->mutable_box()->add_data(box.euler(2));
-  command->mutable_box()->add_data(box.color(0));
-  command->mutable_box()->add_data(box.color(1));
-  command->mutable_box()->add_data(box.color(2));
-  command->mutable_box()->add_data(box.color(3));
+  command->mutable_box()->add_data((double)box.size(0));
+  command->mutable_box()->add_data((double)box.size(1));
+  command->mutable_box()->add_data((double)box.size(2));
+  command->mutable_box()->add_data((double)box.pos(0));
+  command->mutable_box()->add_data((double)box.pos(1));
+  command->mutable_box()->add_data((double)box.pos(2));
+  command->mutable_box()->add_data((double)box.euler(0));
+  command->mutable_box()->add_data((double)box.euler(1));
+  command->mutable_box()->add_data((double)box.euler(2));
+  command->mutable_box()->add_data((double)box.color(0));
+  command->mutable_box()->add_data((double)box.color(1));
+  command->mutable_box()->add_data((double)box.color(2));
+  command->mutable_box()->add_data((double)box.color(3));
   command->mutable_box()->set_cast_shadows(box.receiveShadows);
   command->mutable_box()->set_receive_shadows(box.receiveShadows);
 }
@@ -1824,14 +1824,14 @@ void GUIStateMachine::encodeCreateSphere(
   command->mutable_sphere()->set_layer(getStringCode(sphere.layer));
   command->mutable_sphere()->set_cast_shadows(sphere.receiveShadows);
   command->mutable_sphere()->set_receive_shadows(sphere.receiveShadows);
-  command->mutable_sphere()->add_data(sphere.radius);
-  command->mutable_sphere()->add_data(sphere.pos(0));
-  command->mutable_sphere()->add_data(sphere.pos(1));
-  command->mutable_sphere()->add_data(sphere.pos(2));
-  command->mutable_sphere()->add_data(sphere.color(0));
-  command->mutable_sphere()->add_data(sphere.color(1));
-  command->mutable_sphere()->add_data(sphere.color(2));
-  command->mutable_sphere()->add_data(sphere.color(3));
+  command->mutable_sphere()->add_data((double)sphere.radius);
+  command->mutable_sphere()->add_data((double)sphere.pos(0));
+  command->mutable_sphere()->add_data((double)sphere.pos(1));
+  command->mutable_sphere()->add_data((double)sphere.pos(2));
+  command->mutable_sphere()->add_data((double)sphere.color(0));
+  command->mutable_sphere()->add_data((double)sphere.color(1));
+  command->mutable_sphere()->add_data((double)sphere.color(2));
+  command->mutable_sphere()->add_data((double)sphere.color(3));
 
   /*
   json << "{ \"type\": \"create_sphere\", \"key\": \"" << sphere.key
@@ -1856,18 +1856,18 @@ void GUIStateMachine::encodeCreateCapsule(
   command->mutable_capsule()->set_layer(getStringCode(capsule.layer));
   command->mutable_capsule()->set_cast_shadows(capsule.receiveShadows);
   command->mutable_capsule()->set_receive_shadows(capsule.receiveShadows);
-  command->mutable_capsule()->add_data(capsule.radius);
-  command->mutable_capsule()->add_data(capsule.height);
-  command->mutable_capsule()->add_data(capsule.pos(0));
-  command->mutable_capsule()->add_data(capsule.pos(1));
-  command->mutable_capsule()->add_data(capsule.pos(2));
-  command->mutable_capsule()->add_data(capsule.euler(0));
-  command->mutable_capsule()->add_data(capsule.euler(1));
-  command->mutable_capsule()->add_data(capsule.euler(2));
-  command->mutable_capsule()->add_data(capsule.color(0));
-  command->mutable_capsule()->add_data(capsule.color(1));
-  command->mutable_capsule()->add_data(capsule.color(2));
-  command->mutable_capsule()->add_data(capsule.color(3));
+  command->mutable_capsule()->add_data((double)capsule.radius);
+  command->mutable_capsule()->add_data((double)capsule.height);
+  command->mutable_capsule()->add_data((double)capsule.pos(0));
+  command->mutable_capsule()->add_data((double)capsule.pos(1));
+  command->mutable_capsule()->add_data((double)capsule.pos(2));
+  command->mutable_capsule()->add_data((double)capsule.euler(0));
+  command->mutable_capsule()->add_data((double)capsule.euler(1));
+  command->mutable_capsule()->add_data((double)capsule.euler(2));
+  command->mutable_capsule()->add_data((double)capsule.color(0));
+  command->mutable_capsule()->add_data((double)capsule.color(1));
+  command->mutable_capsule()->add_data((double)capsule.color(2));
+  command->mutable_capsule()->add_data((double)capsule.color(3));
 }
 
 void GUIStateMachine::encodeCreateLine(proto::CommandList& list, Line& line)
@@ -1875,15 +1875,15 @@ void GUIStateMachine::encodeCreateLine(proto::CommandList& list, Line& line)
   proto::Command* command = list.add_command();
   command->mutable_line()->set_key(getStringCode(line.key));
   command->mutable_line()->set_layer(getStringCode(line.layer));
-  command->mutable_line()->add_color(line.color(0));
-  command->mutable_line()->add_color(line.color(1));
-  command->mutable_line()->add_color(line.color(2));
-  command->mutable_line()->add_color(line.color(3));
+  command->mutable_line()->add_color((double)line.color(0));
+  command->mutable_line()->add_color((double)line.color(1));
+  command->mutable_line()->add_color((double)line.color(2));
+  command->mutable_line()->add_color((double)line.color(3));
   for (Eigen::Vector3s& point : line.points)
   {
-    command->mutable_line()->add_points(point(0));
-    command->mutable_line()->add_points(point(1));
-    command->mutable_line()->add_points(point(2));
+    command->mutable_line()->add_points((double)point(0));
+    command->mutable_line()->add_points((double)point(1));
+    command->mutable_line()->add_points((double)point(2));
   }
 }
 
@@ -1894,15 +1894,15 @@ void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
   command->mutable_mesh()->set_layer(getStringCode(mesh.layer));
   for (Eigen::Vector3s& vertex : mesh.vertices)
   {
-    command->mutable_mesh()->add_vertex(vertex(0));
-    command->mutable_mesh()->add_vertex(vertex(1));
-    command->mutable_mesh()->add_vertex(vertex(2));
+    command->mutable_mesh()->add_vertex((double)vertex(0));
+    command->mutable_mesh()->add_vertex((double)vertex(1));
+    command->mutable_mesh()->add_vertex((double)vertex(2));
   }
   for (Eigen::Vector3s& normal : mesh.vertexNormals)
   {
-    command->mutable_mesh()->add_vertex_normal(normal(0));
-    command->mutable_mesh()->add_vertex_normal(normal(1));
-    command->mutable_mesh()->add_vertex_normal(normal(2));
+    command->mutable_mesh()->add_vertex_normal((double)normal(0));
+    command->mutable_mesh()->add_vertex_normal((double)normal(1));
+    command->mutable_mesh()->add_vertex_normal((double)normal(2));
   }
   for (Eigen::Vector3i& face : mesh.faces)
   {
@@ -1912,27 +1912,27 @@ void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
   }
   for (Eigen::Vector2s& uv : mesh.uv)
   {
-    command->mutable_mesh()->add_uv(uv(0));
-    command->mutable_mesh()->add_uv(uv(1));
+    command->mutable_mesh()->add_uv((double)uv(0));
+    command->mutable_mesh()->add_uv((double)uv(1));
   }
   for (int i = 0; i < mesh.textures.size(); i++)
   {
     command->mutable_mesh()->add_texture(getStringCode(mesh.textures[i]));
     command->mutable_mesh()->add_texture_start(mesh.textureStartIndices[i]);
   }
-  command->mutable_mesh()->add_data(mesh.scale(0));
-  command->mutable_mesh()->add_data(mesh.scale(1));
-  command->mutable_mesh()->add_data(mesh.scale(2));
-  command->mutable_mesh()->add_data(mesh.pos(0));
-  command->mutable_mesh()->add_data(mesh.pos(1));
-  command->mutable_mesh()->add_data(mesh.pos(2));
-  command->mutable_mesh()->add_data(mesh.euler(0));
-  command->mutable_mesh()->add_data(mesh.euler(1));
-  command->mutable_mesh()->add_data(mesh.euler(2));
-  command->mutable_mesh()->add_data(mesh.color(0));
-  command->mutable_mesh()->add_data(mesh.color(1));
-  command->mutable_mesh()->add_data(mesh.color(2));
-  command->mutable_mesh()->add_data(mesh.color(3));
+  command->mutable_mesh()->add_data((double)mesh.scale(0));
+  command->mutable_mesh()->add_data((double)mesh.scale(1));
+  command->mutable_mesh()->add_data((double)mesh.scale(2));
+  command->mutable_mesh()->add_data((double)mesh.pos(0));
+  command->mutable_mesh()->add_data((double)mesh.pos(1));
+  command->mutable_mesh()->add_data((double)mesh.pos(2));
+  command->mutable_mesh()->add_data((double)mesh.euler(0));
+  command->mutable_mesh()->add_data((double)mesh.euler(1));
+  command->mutable_mesh()->add_data((double)mesh.euler(2));
+  command->mutable_mesh()->add_data((double)mesh.color(0));
+  command->mutable_mesh()->add_data((double)mesh.color(1));
+  command->mutable_mesh()->add_data((double)mesh.color(2));
+  command->mutable_mesh()->add_data((double)mesh.color(3));
   command->mutable_mesh()->set_cast_shadows(mesh.receiveShadows);
   command->mutable_mesh()->set_receive_shadows(mesh.receiveShadows);
 }
@@ -2002,9 +2002,9 @@ void GUIStateMachine::encodeCreateSlider(
   command->mutable_slider()->add_pos(slider.fromTopLeft(1));
   command->mutable_slider()->add_pos(slider.size(0));
   command->mutable_slider()->add_pos(slider.size(1));
-  command->mutable_slider()->add_data(slider.min);
-  command->mutable_slider()->add_data(slider.max);
-  command->mutable_slider()->add_data(slider.value);
+  command->mutable_slider()->add_data((double)slider.min);
+  command->mutable_slider()->add_data((double)slider.max);
+  command->mutable_slider()->add_data((double)slider.value);
   command->mutable_slider()->set_only_ints(slider.onlyInts);
   command->mutable_slider()->set_horizontal(slider.horizontal);
 }
@@ -2019,17 +2019,17 @@ void GUIStateMachine::encodeCreatePlot(proto::CommandList& list, Plot& plot)
   command->mutable_plot()->add_pos(plot.fromTopLeft(1));
   command->mutable_plot()->add_pos(plot.size(0));
   command->mutable_plot()->add_pos(plot.size(1));
-  command->mutable_plot()->add_bounds(plot.minX);
-  command->mutable_plot()->add_bounds(plot.maxX);
-  command->mutable_plot()->add_bounds(plot.minY);
-  command->mutable_plot()->add_bounds(plot.maxY);
+  command->mutable_plot()->add_bounds((double)plot.minX);
+  command->mutable_plot()->add_bounds((double)plot.maxX);
+  command->mutable_plot()->add_bounds((double)plot.minY);
+  command->mutable_plot()->add_bounds((double)plot.maxY);
   for (s_t x : plot.xs)
   {
-    command->mutable_plot()->add_xs(x);
+    command->mutable_plot()->add_xs((double)x);
   }
   for (s_t y : plot.ys)
   {
-    command->mutable_plot()->add_ys(y);
+    command->mutable_plot()->add_ys((double)y);
   }
 }
 
@@ -2043,10 +2043,10 @@ void GUIStateMachine::encodeCreateRichPlot(
   command->mutable_rich_plot()->add_pos(plot.fromTopLeft(1));
   command->mutable_rich_plot()->add_pos(plot.size(0));
   command->mutable_rich_plot()->add_pos(plot.size(1));
-  command->mutable_rich_plot()->add_bounds(plot.minX);
-  command->mutable_rich_plot()->add_bounds(plot.maxX);
-  command->mutable_rich_plot()->add_bounds(plot.minY);
-  command->mutable_rich_plot()->add_bounds(plot.maxY);
+  command->mutable_rich_plot()->add_bounds((double)plot.minX);
+  command->mutable_rich_plot()->add_bounds((double)plot.maxX);
+  command->mutable_rich_plot()->add_bounds((double)plot.minY);
+  command->mutable_rich_plot()->add_bounds((double)plot.maxY);
   command->mutable_rich_plot()->set_title(plot.title);
   command->mutable_rich_plot()->set_x_axis_label(plot.xAxisLabel);
   command->mutable_rich_plot()->set_y_axis_label(plot.yAxisLabel);
@@ -2075,11 +2075,11 @@ void GUIStateMachine::encodeSetRichPlotData(
   command->mutable_set_rich_plot_data()->set_plot_type(data.type);
   for (s_t x : data.xs)
   {
-    command->mutable_set_rich_plot_data()->add_xs(x);
+    command->mutable_set_rich_plot_data()->add_xs((double)x);
   }
   for (s_t y : data.ys)
   {
-    command->mutable_set_rich_plot_data()->add_ys(y);
+    command->mutable_set_rich_plot_data()->add_ys((double)y);
   }
 }
 

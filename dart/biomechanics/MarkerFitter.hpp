@@ -760,7 +760,7 @@ public:
   //////////////////////////////////////////////////////////////////////////
 
   /// This gets the gradient of the objective wrt the joint positions
-  Eigen::VectorXs getMarkerLossGradientWrtJoints(
+  static Eigen::VectorXs getMarkerLossGradientWrtJoints(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
       const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
@@ -775,7 +775,7 @@ public:
           visibleMarkerWorldPoses);
 
   /// This gets the gradient of the objective wrt the group scales
-  Eigen::VectorXs getMarkerLossGradientWrtGroupScales(
+  static Eigen::VectorXs getMarkerLossGradientWrtGroupScales(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
       const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
@@ -790,7 +790,7 @@ public:
           visibleMarkerWorldPoses);
 
   /// This gets the gradient of the objective wrt the marker offsets
-  Eigen::VectorXs getMarkerLossGradientWrtMarkerOffsets(
+  static Eigen::VectorXs getMarkerLossGradientWrtMarkerOffsets(
       const std::shared_ptr<dynamics::Skeleton>& skeleton,
       const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
           markers,
