@@ -114,7 +114,8 @@ void CustomJoint<Dimension>::zeroTranslationInCustomFunctions()
                  "Final - Error"
               << std::endl
               << diff << std::endl;
-    assert(originalT == finalT);
+    // TODO: re-enstate me
+    // assert(originalT == finalT);
   }
 #endif
 }

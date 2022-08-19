@@ -65,6 +65,13 @@ void GUIRecording::writeFramesJson(const std::string& path, int startFrame)
             << std::endl;
 
   FILE* file = fopen(path.c_str(), "wb");
+  if (file == nullptr)
+  {
+    std::cout << "ERROR: Could not open \"" << path << "\" for writing"
+              << std::endl;
+    return;
+  }
+
   if (startFrame < 0)
     startFrame = 0;
   for (int i = startFrame; i < mFrames.size(); i++)

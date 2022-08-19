@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <iostream>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -50,6 +51,77 @@ void applyExternalForces(
           math::dAdT(body->getWorldTransform(), worldForces.at(i)));
     }
   }
+}
+
+bool testApplyWorldForces(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = Eigen::VectorXs::Zero(skel->getNumDofs());
+  skel->setControlForces(originalTau);
+
+  // Compute normal forward dynamics
+  Eigen::Vector6s upwardsForce = Eigen::Vector6s::Unit(5) * 10;
+  Eigen::Vector3s g = skel->getGravity();
+  Eigen::Vector3s totalForce = skel->getGravity() * skel->getMass();
+
+  // skel->setGravity(Eigen::Vector3s::Zero());
+
+  /*
+  skel->getBodyNode(0)->setExtForce(
+      upwardsForce, Eigen::Vector3s::Zero(), false, true);
+  totalForce += upwardsForce;
+
+  Eigen::Vector6s worldWrench = Eigen::Vector6s::Zero();
+  worldWrench.tail<3>() = upwardsForce;
+  Eigen::Vector6s localWrench
+      = math::dAdT(skel->getBodyNode(0)->getWorldTransform(), worldWrench);
+
+  Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+  compare.col(0) = skel->getBodyNode(0)->getExternalForceLocal();
+  compare.col(1) = localWrench;
+  compare.col(2) = skel->getBodyNode(0)->getExternalForceLocal() - localWrench;
+  std::cout << "mFext - computed - diff" << std::endl << compare << std::endl;
+
+  skel->getBodyNode(0)->setExtWrench(localWrench);
+  */
+
+  std::map<int, Eigen::Vector6s> worldForces;
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    worldForces[i] = upwardsForce;
+
+    // auto* body = skel->getBodyNode(i);
+
+    // TODO: compare
+    // Eigen::Vector6s wrench
+    //     = math::dAdT(body->getWorldTransform(), worldForces.at(i));
+
+    // body->setExtForce(
+    //     upwardsForce.tail<3>(), Eigen::Vector3s::Zero(), false, true);
+    totalForce += upwardsForce.tail<3>();
+  }
+  Eigen::Vector3s expectedAcc = totalForce.tail<3>() / skel->getMass();
+
+  applyExternalForces(skel, worldForces);
+  skel->computeForwardDynamics();
+  Eigen::Vector3s realAcc = skel->getCOMLinearAcceleration();
+
+  if (!equals(realAcc, expectedAcc, 1e-8))
+  {
+    Eigen::Matrix3s compare = Eigen::Matrix3s::Zero();
+    compare.col(0) = expectedAcc;
+    compare.col(1) = realAcc;
+    compare.col(2) = expectedAcc - realAcc;
+    std::cout << "F/m - Acc - Diff" << std::endl << compare << std::endl;
+    return false;
+  }
+
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  skel->setControlForces(originalTau);
+
+  return true;
 }
 
 bool testForwardDynamicsFormula(
@@ -625,9 +697,171 @@ bool testResidualGradWrt(
   return true;
 }
 
+bool testWorldWrenchAssignment(std::shared_ptr<DynamicsInitialization> init)
+{
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      // Sum up all the force plate forces
+      Eigen::Vector3s forcePlateSum = Eigen::Vector3s::Zero();
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        Eigen::Vector3s f = init->forcePlateTrials[trial][i].forces[t];
+        Eigen::Vector3s moment = init->forcePlateTrials[trial][i].moments[t];
+        Eigen::Vector3s cop
+            = init->forcePlateTrials[trial][i].centersOfPressure[t];
+        forcePlateSum += f;
+      }
+
+      // Sum up all the wrenches
+      Eigen::Vector3s wrenchForceSum = Eigen::Vector3s::Zero();
+      for (int i = 0; i < init->grfBodyNodes.size(); i++)
+      {
+        Eigen::Vector6s wrench
+            = init->grfTrials[trial].col(t).segment<6>(i * 6);
+        wrenchForceSum += wrench.tail<3>();
+      }
+
+      if (!equals(forcePlateSum, wrenchForceSum))
+      {
+        std::cout << "Got mismatched forces at time " << t << std::endl;
+        Eigen::Matrix3s compare = Eigen::Matrix3s::Zero();
+        compare.col(0) = forcePlateSum;
+        compare.col(1) = wrenchForceSum;
+        compare.col(2) = forcePlateSum - wrenchForceSum;
+        std::cout << "Force plates - Wrenches - Diff" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool testRelationshipBetweenResidualAndLinear(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  skel->setGravity(Eigen::Vector3s(0, -9.81, 0));
+  skel->clearExternalForces();
+
+  DynamicsFitter fitter(skel, init->grfBodyNodes, init->updatedMarkerMap);
+  ResidualForceHelper helper(skel, init->grfBodyIndices);
+
+  DynamicsFitProblem problem(
+      init, skel, init->updatedMarkerMap, init->grfBodyNodes);
+  problem.setMarkerWeight(0);
+  problem.setResidualWeight(1.0);
+  problem.setIncludePoses(false);
+
+  s_t problemLoss = problem.computeLoss(problem.flatten());
+  std::cout << "Problem loss: " << problemLoss << std::endl;
+
+  s_t residualNorm = 0.0;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    std::vector<Eigen::Vector3s> comAccs = fitter.comAccelerations(init, trial);
+    std::vector<Eigen::Vector3s> impliedForces
+        = fitter.impliedCOMForces(init, trial, true);
+    /*
+    std::vector<Eigen::Vector3s> measuredForces
+        = fitter.measuredGRFForces(init, trial);
+    */
+
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      s_t dt = init->trialTimesteps[trial];
+      Eigen::VectorXs q = init->poseTrials[trial].col(t);
+      Eigen::VectorXs dq = (init->poseTrials[trial].col(t + 1)
+                            - init->poseTrials[trial].col(t))
+                           / dt;
+      Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 2)
+                             - 2 * init->poseTrials[trial].col(t + 1)
+                             + init->poseTrials[trial].col(t))
+                            / (dt * dt);
+      Eigen::VectorXs grf = init->grfTrials[trial].col(t);
+
+      Eigen::VectorXs problemQ = problem.mPoses[trial].col(t);
+      if (!equals(problemQ, q, 1e-9))
+      {
+        std::cout << "Poses not equal at time " << t << "!" << std::endl;
+        return false;
+      }
+      Eigen::VectorXs problemDQ = problem.mVels[trial].col(t);
+      if (!equals(problemDQ, dq, 1e-9))
+      {
+        std::cout << "Vels not equal at time " << t << "!" << std::endl;
+        return false;
+      }
+      Eigen::VectorXs problemDDQ = problem.mAccs[trial].col(t);
+      if (!equals(problemDDQ, ddq, 1e-9))
+      {
+        std::cout << "Accs not equal at time " << t << "!" << std::endl;
+        return false;
+      }
+
+      skel->setPositions(q);
+      skel->setVelocities(dq);
+      skel->setAccelerations(ddq);
+      Eigen::Vector3s comAcc = skel->getCOMLinearAcceleration();
+      Eigen::Vector3s impliedCOMAcc = comAccs[t];
+      /*
+      if (!equals(comAcc, impliedCOMAcc, 1e-8))
+      {
+        std::cout << "Got mismatched COM acc's at time " << t << std::endl;
+        Eigen::Matrix3s compare = Eigen::Matrix3s::Zero();
+        compare.col(0) = comAcc;
+        compare.col(1) = impliedCOMAcc;
+        compare.col(2) = comAcc - impliedCOMAcc;
+        std::cout << "Measured - Implied - Diff" << std::endl
+                  << compare << std::endl;
+        // return false;
+      }
+      */
+
+      Eigen::Vector3s totalExternalForce
+          = (comAcc - skel->getGravity()) * skel->getMass();
+
+      Eigen::Vector6s residual = helper.calculateResidual(q, dq, ddq, grf);
+      std::cout << "Test residual t=" << t << ": " << std::endl
+                << residual << std::endl;
+
+      residualNorm += residual.squaredNorm();
+      Eigen::Vector3s residualForce = residual.tail<3>();
+
+      Eigen::Vector3s totalWithResidual = residualForce;
+      for (int i = 0; i < grf.size() / 6; i++)
+      {
+        totalWithResidual += grf.segment<3>(i * 6 + 3);
+      }
+
+      if (!equals(totalWithResidual, totalExternalForce, 1e-8))
+      {
+        std::cout << "Got mismatched forces at time " << t << std::endl;
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(3, 5);
+        compare.col(0) = totalWithResidual;
+        compare.col(1) = totalExternalForce;
+        compare.col(2) = totalWithResidual - totalExternalForce;
+        compare.col(3) = impliedForces[t];
+        compare.col(4) = totalWithResidual - impliedForces[t];
+
+        std::cout << "Fs + Residual : M*(a-g) : Diff : Implied : Diff"
+                  << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+  }
+
+  std::cout << "Residual norm: " << residualNorm << std::endl;
+  EXPECT_EQ(residualNorm, problemLoss);
+
+  return true;
+}
+
 std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<dynamics::Skeleton> skel,
-    std::vector<std::string> footNames,
     std::shared_ptr<DynamicsInitialization> init,
     bool saveGUI = false)
 {
@@ -645,18 +879,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   skel->setPositionLowerLimit(2, -M_PI);
   skel->setPositionUpperLimit(2, M_PI);
 
-  std::vector<dynamics::BodyNode*> footNodes;
-  for (std::string& name : footNames)
-  {
-    footNodes.push_back(skel->getBodyNode(name));
-  }
+  skel->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
-  DynamicsFitter fitter(skel, footNodes, init->updatedMarkerMap);
+  DynamicsFitter fitter(skel, init->grfBodyNodes, init->updatedMarkerMap);
   fitter.scaleLinkMassesFromGravity(init);
-  fitter.estimateLinkMassesFromAcceleration(init);
+  // fitter.estimateLinkMassesFromAcceleration(init);
+
   // Try to do the whole masses and COMs and inertias
   fitter.setIterationLimit(200);
-  fitter.runOptimization(init, 1.0, 0.0, true, true, true, false, false, false);
+  fitter.runOptimization(
+      init, 1.0, 0.0, true, false, true, false, false, false);
 
   if (saveGUI)
   {
@@ -675,6 +907,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 std::shared_ptr<DynamicsInitialization> createInitialization(
     std::shared_ptr<dynamics::Skeleton> skel,
     MarkerMap markerMap,
+    std::vector<std::string> footNames,
     std::vector<std::string> motFiles,
     std::vector<std::string> c3dFiles,
     std::vector<std::string> trcFiles,
@@ -729,10 +962,17 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     }
   }
 
+  std::vector<dynamics::BodyNode*> footNodes;
+  for (std::string& name : footNames)
+  {
+    footNodes.push_back(skel->getBodyNode(name));
+  }
+
   std::shared_ptr<DynamicsInitialization> init
       = DynamicsFitter::createInitialization(
           skel,
           markerMap,
+          footNodes,
           forcePlateTrials,
           poseTrials,
           framesPerSecond,
@@ -754,13 +994,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       standard.skeleton,
       standard.markersMap,
+      footNames,
       motFiles,
       c3dFiles,
       trcFiles,
       grfFiles,
       limitTrialLength);
 
-  return runEngine(standard.skeleton, footNames, init, saveGUI);
+  return runEngine(standard.skeleton, init, saveGUI);
 }
 
 #ifdef JACOBIAN_TESTS
@@ -782,6 +1023,7 @@ TEST(DynamicsFitter, ID_EQNS)
   worldForces[file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton()]
       = Eigen::Vector6s::Random() * 1000;
 
+  EXPECT_TRUE(testApplyWorldForces(file.skeleton));
   EXPECT_TRUE(testForwardDynamicsFormula(file.skeleton, worldForces));
   EXPECT_TRUE(testInverseDynamicsFormula(file.skeleton, worldForces));
   EXPECT_TRUE(testResidualAgainstID(file.skeleton, worldForces));
@@ -866,8 +1108,19 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
       "dart://sample/grf/Subject4/Models/"
       "optimized_scale_and_markers.osim");
 
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
-      standard.skeleton, motFiles, c3dFiles, trcFiles, grfFiles, 10);
+      standard.skeleton,
+      standard.markersMap,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      10);
 
   std::vector<dynamics::BodyNode*> footNodes;
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
@@ -900,7 +1153,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
       for (int j = 0; j < problem.mForceBodyIndices.size(); j++)
       {
         forces[problem.mForceBodyIndices[j]]
-            = problem.mGRFs[trial].col(t).segment<6>(j * 6);
+            = init->grfTrials[trial].col(t).segment<6>(j * 6);
       }
       standard.skeleton->setPositions(problem.mPoses[trial].col(t));
       standard.skeleton->setVelocities(problem.mVels[trial].col(t));
@@ -957,9 +1210,14 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS)
       "dart://sample/grf/Subject4/Models/"
       "optimized_scale_and_markers.osim");
 
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       standard.skeleton,
       standard.markersMap,
+      footNames,
       motFiles,
       c3dFiles,
       trcFiles,
@@ -988,6 +1246,130 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS)
 
     return;
   }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_JAC)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      6);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, init->updatedMarkerMap, footNodes);
+  problem.setIncludePoses(true);
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::MatrixXs analytical = problem.computeConstraintsJacobian();
+  Eigen::MatrixXs fd = problem.finiteDifferenceConstraintsJacobian();
+
+  if (!equals(analytical, fd, 1e-8))
+  {
+    std::cout << "Jacobian of constraints of DynamicsFitProblem not equal!"
+              << std::endl;
+    for (int i = 0; i < fd.rows(); i++)
+    {
+      problem.debugErrors(fd.row(i), analytical.row(i), 1e-8);
+    }
+    EXPECT_TRUE(equals(analytical, fd, 1e-8));
+
+    return;
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, WRENCH_ASSIGNMENT)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles);
+  EXPECT_TRUE(testWorldWrenchAssignment(init));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, RESIDUALS)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      6);
+
+  EXPECT_TRUE(
+      testRelationshipBetweenResidualAndLinear(standard.skeleton, init));
 }
 #endif
 

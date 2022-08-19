@@ -96,12 +96,18 @@ protected:
 struct DynamicsInitialization
 {
   ///////////////////////////////////////////
-  // Inputs
+  // Inputs from files
   std::vector<std::vector<ForcePlate>> forcePlateTrials;
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
   std::vector<s_t> trialTimesteps;
+
+  ///////////////////////////////////////////
+  // Assigning GRFs to specific feet
+  std::vector<Eigen::MatrixXs> grfTrials;
+  std::vector<int> grfBodyIndices;
+  std::vector<dynamics::BodyNode*> grfBodyNodes;
 
   ///////////////////////////////////////////
   // Pure dynamics values
@@ -325,8 +331,6 @@ public:
   std::vector<Eigen::MatrixXs> mPoses;
   std::vector<Eigen::MatrixXs> mVels;
   std::vector<Eigen::MatrixXs> mAccs;
-  std::vector<Eigen::MatrixXs> mGRFs;
-  std::vector<dynamics::BodyNode*> mGRFBodyNodes;
 
   dynamics::MarkerMap mMarkerMap;
   std::vector<std::string> mMarkerNames;
@@ -355,6 +359,7 @@ public:
   static std::shared_ptr<DynamicsInitialization> createInitialization(
       std::shared_ptr<dynamics::Skeleton> skel,
       dynamics::MarkerMap markerMap,
+      std::vector<dynamics::BodyNode*> grfNodes,
       std::vector<std::vector<ForcePlate>> forcePlateTrials,
       std::vector<Eigen::MatrixXs> poseTrials,
       std::vector<int> framesPerSecond,
