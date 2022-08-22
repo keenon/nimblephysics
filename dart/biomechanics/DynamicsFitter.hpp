@@ -125,6 +125,15 @@ struct DynamicsInitialization
   // Convenience objects
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       updatedMarkerMap;
+
+  ///////////////////////////////////////////
+  // To support regularization
+  std::vector<Eigen::MatrixXs> originalPoses;
+  Eigen::VectorXs originalGroupMasses;
+  Eigen::VectorXs originalGroupCOMs;
+  Eigen::VectorXs originalGroupInertias;
+  Eigen::VectorXs originalGroupScales;
+  std::map<std::string, Eigen::Vector3s> originalMarkerOffsets;
 };
 
 /*
@@ -201,6 +210,13 @@ public:
 
   DynamicsFitProblem& setResidualWeight(s_t weight);
   DynamicsFitProblem& setMarkerWeight(s_t weight);
+
+  DynamicsFitProblem& setRegularizeMasses(s_t value);
+  DynamicsFitProblem& setRegularizeCOMs(s_t value);
+  DynamicsFitProblem& setRegularizeInertias(s_t value);
+  DynamicsFitProblem& setRegularizeBodyScales(s_t value);
+  DynamicsFitProblem& setRegularizePoses(s_t value);
+  DynamicsFitProblem& setRegularizeMarkerOffsets(s_t value);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -327,6 +343,13 @@ public:
   bool mIncludeMarkerOffsets;
   std::shared_ptr<DynamicsInitialization> mInit;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
+
+  s_t mRegularizeMasses;
+  s_t mRegularizeCOMs;
+  s_t mRegularizeInertias;
+  s_t mRegularizeBodyScales;
+  s_t mRegularizePoses;
+  s_t mRegularizeMarkerOffsets;
 
   std::vector<Eigen::MatrixXs> mPoses;
   std::vector<Eigen::MatrixXs> mVels;

@@ -305,6 +305,12 @@ DynamicsFitProblem::DynamicsFitProblem(
     mIncludeMarkerOffsets(true),
     mResidualWeight(0.1),
     mMarkerWeight(1.0),
+    mRegularizeMasses(1.0),
+    mRegularizeCOMs(10.0),
+    mRegularizeInertias(1.0),
+    mRegularizeBodyScales(100.0),
+    mRegularizePoses(100.0),
+    mRegularizeMarkerOffsets(100.0),
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Set up the markers
@@ -680,6 +686,33 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
 
   s_t sum = 0.0;
 
+  sum += mRegularizeMasses
+         * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses)
+               .squaredNorm();
+  assert(!isnan(sum));
+  sum += mRegularizeCOMs
+         * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs).squaredNorm();
+  assert(!isnan(sum));
+  sum += mRegularizeInertias
+         * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias)
+               .squaredNorm();
+  assert(!isnan(sum));
+  sum += mRegularizeBodyScales
+         * (mSkeleton->getGroupScales() - mInit->originalGroupScales)
+               .squaredNorm();
+  assert(!isnan(sum));
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (mInit->originalMarkerOffsets.count(mMarkerNames.at(i)))
+    {
+      sum += mRegularizeMarkerOffsets
+             * (mMarkers[i].second
+                - mInit->originalMarkerOffsets.at(mMarkerNames.at(i)))
+                   .squaredNorm();
+    }
+    assert(!isnan(sum));
+  }
+
   Eigen::VectorXs originalPos = mSkeleton->getPositions();
   mSkeleton->clearExternalForces();
 
@@ -698,6 +731,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
                    mVels[trial].col(t),
                    mAccs[trial].col(t),
                    mInit->grfTrials[trial].col(t));
+        assert(!isnan(sum));
       }
 
       // Add marker RMS errors to every timestep
@@ -711,8 +745,15 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
           Eigen::Vector3s diff
               = observedMarkerPoses.at(mMarkerNames[i]) - marker;
           sum += mMarkerWeight * diff.squaredNorm();
+          assert(!isnan(sum));
         }
       }
+
+      // Add regularization
+      sum += mRegularizePoses
+             * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t))
+                   .squaredNorm();
+      assert(!isnan(sum));
     }
   }
 
@@ -732,27 +773,43 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   if (mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
+    grad.segment(posesCursor, dim)
+        += mRegularizeMasses * 2
+           * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
     posesCursor += dim;
   }
   if (mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
+    grad.segment(posesCursor, dim)
+        += mRegularizeCOMs * 2
+           * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs);
     posesCursor += dim;
   }
   if (mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
+    grad.segment(posesCursor, dim)
+        += mRegularizeInertias * 2
+           * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias);
     posesCursor += dim;
   }
   if (mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
+    grad.segment(posesCursor, dim)
+        += mRegularizeBodyScales * 2
+           * (mSkeleton->getGroupScales() - mInit->originalGroupScales);
     posesCursor += dim;
   }
   if (mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
+      grad.segment<3>(posesCursor)
+          += 2 * mRegularizeMarkerOffsets
+             * (mMarkers[i].second
+                - mInit->originalMarkerOffsets[mMarkerNames[i]]);
       // Currently this has zero effect on the gradient
       posesCursor += 3;
     }
@@ -850,38 +907,44 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
         if (mIncludePoses)
         {
           grad.segment(posesCursor, dofs)
-              = mResidualWeight
-                * mResidualHelper->calculateResidualNormGradientWrt(
-                    mPoses[trial].col(t),
-                    mVels[trial].col(t),
-                    mAccs[trial].col(t),
-                    mInit->grfTrials[trial].col(t),
-                    neural::WithRespectTo::POSITION);
+              += mResidualWeight
+                 * mResidualHelper->calculateResidualNormGradientWrt(
+                     mPoses[trial].col(t),
+                     mVels[trial].col(t),
+                     mAccs[trial].col(t),
+                     mInit->grfTrials[trial].col(t),
+                     neural::WithRespectTo::POSITION);
 
           // Record marker gradients
           grad.segment(posesCursor, dofs)
               += MarkerFitter::getMarkerLossGradientWrtJoints(
                   mSkeleton, mMarkers, markerError);
+
+          // Record regularization
+          grad.segment(posesCursor, dofs)
+              += mRegularizePoses * 2
+                 * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
+
           posesCursor += dofs;
 
           grad.segment(posesCursor, dofs)
-              = mResidualWeight
-                * mResidualHelper->calculateResidualNormGradientWrt(
-                    mPoses[trial].col(t),
-                    mVels[trial].col(t),
-                    mAccs[trial].col(t),
-                    mInit->grfTrials[trial].col(t),
-                    neural::WithRespectTo::VELOCITY);
+              += mResidualWeight
+                 * mResidualHelper->calculateResidualNormGradientWrt(
+                     mPoses[trial].col(t),
+                     mVels[trial].col(t),
+                     mAccs[trial].col(t),
+                     mInit->grfTrials[trial].col(t),
+                     neural::WithRespectTo::VELOCITY);
           posesCursor += dofs;
 
           grad.segment(posesCursor, dofs)
-              = mResidualWeight
-                * mResidualHelper->calculateResidualNormGradientWrt(
-                    mPoses[trial].col(t),
-                    mVels[trial].col(t),
-                    mAccs[trial].col(t),
-                    mInit->grfTrials[trial].col(t),
-                    neural::WithRespectTo::ACCELERATION);
+              += mResidualWeight
+                 * mResidualHelper->calculateResidualNormGradientWrt(
+                     mPoses[trial].col(t),
+                     mVels[trial].col(t),
+                     mAccs[trial].col(t),
+                     mInit->grfTrials[trial].col(t),
+                     neural::WithRespectTo::ACCELERATION);
           posesCursor += dofs;
         }
       }
@@ -927,6 +990,11 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           grad.segment(posesCursor, dofs)
               += MarkerFitter::getMarkerLossGradientWrtJoints(
                   mSkeleton, mMarkers, markerError);
+          // Record regularization
+          grad.segment(posesCursor, dofs)
+              += mRegularizePoses * 2
+                 * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
+
           posesCursor += dofs;
 
           // Skip over the velocities at this last timestep where they're
@@ -953,7 +1021,8 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
   Eigen::VectorXs result = Eigen::VectorXs::Zero(getProblemSize());
 
   math::finiteDifference(
-      [&](/* in*/ s_t eps,
+      [this, x](
+          /* in*/ s_t eps,
           /* in*/ int dof,
           /*out*/ s_t& perturbed) {
         Eigen::VectorXs perturbedX = x;
@@ -962,12 +1031,8 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
         return true;
       },
       result,
-#ifdef DART_USE_ARBITRARY_PRECISION
-      1e-5,
-#else
-      1e-4,
-#endif
-      true);
+      1e-3,
+      false);
 
   return result;
 }
@@ -1299,6 +1364,25 @@ void DynamicsFitProblem::debugErrors(
             tol);
         cursor += dofs;
       }
+      int finalT = mAccs[trial].cols();
+      debugVector(
+          fd.segment(cursor, dofs),
+          analytical.segment(cursor, dofs),
+          "poses@t=" + std::to_string(finalT),
+          tol);
+      cursor += dofs;
+      debugVector(
+          fd.segment(cursor, dofs),
+          analytical.segment(cursor, dofs),
+          "vels@t=" + std::to_string(finalT),
+          tol);
+      cursor += dofs;
+      debugVector(
+          fd.segment(cursor, dofs),
+          analytical.segment(cursor, dofs),
+          "poses@t=" + std::to_string(finalT + 1),
+          tol);
+      cursor += dofs;
     }
   }
 }
@@ -1356,6 +1440,48 @@ DynamicsFitProblem& DynamicsFitProblem::setResidualWeight(s_t weight)
 DynamicsFitProblem& DynamicsFitProblem::setMarkerWeight(s_t weight)
 {
   mMarkerWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeMasses(s_t value)
+{
+  mRegularizeMasses = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeCOMs(s_t value)
+{
+  mRegularizeCOMs = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeInertias(s_t value)
+{
+  mRegularizeInertias = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeBodyScales(s_t value)
+{
+  mRegularizeBodyScales = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizePoses(s_t value)
+{
+  mRegularizePoses = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeMarkerOffsets(s_t value)
+{
+  mRegularizeMarkerOffsets = value;
   return *(this);
 }
 
@@ -1740,6 +1866,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   init->originalPoseTrials = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
   init->updatedMarkerMap = markerMap;
+  for (auto& pair : markerMap)
+  {
+    init->markerOffsets[pair.first] = pair.second.second;
+  }
   init->bodyMasses = skel->getLinkMasses();
 
   // Initially smooth the accelerations just a little bit
@@ -1811,6 +1941,17 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
                 << GRF.col(t).norm() << std::endl;
     }
     init->grfTrials.push_back(GRF);
+  }
+
+  // Make copies of data to use for regularization
+  init->originalPoses = init->originalPoseTrials;
+  init->originalGroupMasses = skel->getGroupMasses();
+  init->originalGroupCOMs = skel->getGroupCOMs();
+  init->originalGroupInertias = skel->getGroupInertias();
+  init->originalGroupScales = skel->getGroupScales();
+  for (auto& pair : init->markerOffsets)
+  {
+    init->originalMarkerOffsets[pair.first] = pair.second;
   }
 
   return init;

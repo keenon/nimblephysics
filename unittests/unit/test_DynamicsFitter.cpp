@@ -63,6 +63,7 @@ bool testApplyWorldForces(std::shared_ptr<dynamics::Skeleton> skel)
   // Compute normal forward dynamics
   Eigen::Vector6s upwardsForce = Eigen::Vector6s::Unit(5) * 10;
   Eigen::Vector3s g = skel->getGravity();
+  (void)g;
   Eigen::Vector3s totalForce = skel->getGravity() * skel->getMass();
 
   // skel->setGravity(Eigen::Vector3s::Zero());
@@ -709,8 +710,10 @@ bool testWorldWrenchAssignment(std::shared_ptr<DynamicsInitialization> init)
       {
         Eigen::Vector3s f = init->forcePlateTrials[trial][i].forces[t];
         Eigen::Vector3s moment = init->forcePlateTrials[trial][i].moments[t];
+        (void)moment;
         Eigen::Vector3s cop
             = init->forcePlateTrials[trial][i].centersOfPressure[t];
+        (void)cop;
         forcePlateSum += f;
       }
 
@@ -806,6 +809,7 @@ bool testRelationshipBetweenResidualAndLinear(
       skel->setAccelerations(ddq);
       Eigen::Vector3s comAcc = skel->getCOMLinearAcceleration();
       Eigen::Vector3s impliedCOMAcc = comAccs[t];
+      (void)impliedCOMAcc;
       /*
       if (!equals(comAcc, impliedCOMAcc, 1e-8))
       {
@@ -865,30 +869,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<DynamicsInitialization> init,
     bool saveGUI = false)
 {
-  skel->zeroTranslationInCustomFunctions();
-  skel->autogroupSymmetricSuffixes();
-  if (skel->getBodyNode("hand_r") != nullptr)
-  {
-    skel->setScaleGroupUniformScaling(skel->getBodyNode("hand_r"));
-  }
-  skel->autogroupSymmetricPrefixes("ulna", "radius");
-  skel->setPositionLowerLimit(0, -M_PI);
-  skel->setPositionUpperLimit(0, M_PI);
-  skel->setPositionLowerLimit(1, -M_PI);
-  skel->setPositionUpperLimit(1, M_PI);
-  skel->setPositionLowerLimit(2, -M_PI);
-  skel->setPositionUpperLimit(2, M_PI);
-
-  skel->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->updatedMarkerMap);
-  fitter.scaleLinkMassesFromGravity(init);
+  // fitter.scaleLinkMassesFromGravity(init);
   // fitter.estimateLinkMassesFromAcceleration(init);
 
   // Try to do the whole masses and COMs and inertias
   fitter.setIterationLimit(200);
-  fitter.runOptimization(
-      init, 1.0, 0.0, true, false, true, false, false, false);
+  fitter.runOptimization(init, 1e-3, 1.0, true, false, true, true, true, true);
 
   if (saveGUI)
   {
@@ -991,6 +979,24 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     bool saveGUI = false)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
+  standard.skeleton->zeroTranslationInCustomFunctions();
+  standard.skeleton->autogroupSymmetricSuffixes();
+  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  {
+    standard.skeleton->setScaleGroupUniformScaling(
+        standard.skeleton->getBodyNode("hand_r"));
+  }
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
+  standard.skeleton->setPositionLowerLimit(0, -M_PI);
+  standard.skeleton->setPositionUpperLimit(0, M_PI);
+  standard.skeleton->setPositionLowerLimit(1, -M_PI);
+  standard.skeleton->setPositionUpperLimit(1, M_PI);
+  standard.skeleton->setPositionLowerLimit(2, -M_PI);
+  standard.skeleton->setPositionUpperLimit(2, M_PI);
+  // TODO: limit COM for the centerline bodies
+
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       standard.skeleton,
       standard.markersMap,
@@ -1244,6 +1250,74 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS)
     problem.debugErrors(fd, analytical, 1e-8);
     EXPECT_TRUE(equals(analytical, fd, 1e-8));
 
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_REGULARIZATION)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      6);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, init->updatedMarkerMap, footNodes);
+  problem.setMarkerWeight(0.0);
+  problem.setResidualWeight(0.0);
+
+  srand(42);
+  problem.setRegularizeMasses(1.5);
+  problem.setRegularizeCOMs(2.0);
+  problem.setRegularizeInertias(3.0);
+  problem.setRegularizeBodyScales(4.0);
+  problem.setRegularizePoses(5.0);
+  problem.setRegularizeMarkerOffsets(6.0);
+
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  // Offset from zero to have some gradients
+  x += Eigen::VectorXs::Random(x.size()) * 0.01;
+
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  if (!equals(analytical, fd, 1e-7))
+  {
+    std::cout
+        << "Gradient of DynamicsFitProblem (only regularization) not equal!"
+        << std::endl;
+    problem.debugErrors(fd, analytical, 1e-8);
+    EXPECT_TRUE(equals(analytical, fd, 1e-7));
     return;
   }
 }
