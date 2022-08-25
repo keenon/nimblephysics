@@ -5465,6 +5465,27 @@ TEST(MarkerFitter, SINGLE_TRIAL_HARVARD)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, SINGLE_TRIAL_GIMBAL_LOCK)
+{
+  std::vector<std::string> c3dFiles;
+  // c3dFiles.push_back("dart://sample/osim/Harvard1/standing.c3d");
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/osim/IncompleteIK/MarkerData/markers_smpl.trc");
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/IncompleteIK/Models/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      72.16,
+      1.83,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
 {
   std::vector<std::string> c3dFiles;
