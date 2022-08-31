@@ -3549,6 +3549,92 @@ Eigen::Vector3s fromSkewSymmetric(const Eigen::Matrix3s& _m)
   return ret;
 }
 
+/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// sorted using sortConvex2DShape().
+///
+/// Source:
+/// https://demonstrations.wolfram.com/AnEfficientTestForAPointToBeInAConvexPolygon/
+/// A better source:
+/// https://inginious.org/course/competitive-programming/geometry-pointinconvex
+bool convex2DShapeContains(
+    const Eigen::Vector3s& point,
+    const std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  Eigen::Vector2s point2d = pointInPlane(point, origin, basis2dX, basis2dY);
+
+  int side = 0;
+  for (int i = 0; i < shape.size(); i++)
+  {
+    Eigen::Vector2s a = pointInPlane(shape[i], origin, basis2dX, basis2dY);
+    Eigen::Vector2s b = pointInPlane(
+        shape[(i + 1) % shape.size()], origin, basis2dX, basis2dY);
+    int thisSide = crossProduct2D(point2d - a, b - a) > 0 ? 1 : -1;
+    if (i == 0)
+      side = thisSide;
+    else if (thisSide == 0)
+      continue;
+    else if (side == 0 && thisSide != 0)
+      side = thisSide;
+    else if (side != thisSide && side != 0)
+      return false;
+  }
+
+  return true;
+}
+
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from the
+/// center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  // Sort the shape in clockwise order around some internal point (choose the
+  // average).
+  Eigen::Vector2s avg = Eigen::Vector2s::Zero();
+  for (Eigen::Vector3s pt : shape)
+  {
+    avg += pointInPlane(pt, origin, basis2dX, basis2dY);
+  }
+  avg /= shape.size();
+  std::sort(
+      shape.begin(),
+      shape.end(),
+      [&avg, &origin, &basis2dX, &basis2dY](
+          Eigen::Vector3s& a, Eigen::Vector3s& b) {
+        return angle2D(avg, pointInPlane(a, origin, basis2dX, basis2dY))
+               < angle2D(avg, pointInPlane(b, origin, basis2dX, basis2dY));
+      });
+}
+
+s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to)
+{
+  return atan2(to(1) - from(1), to(0) - from(0));
+}
+
+/// This transforms a 3D point down to a 2D point in the given 3D plane
+Eigen::Vector2s pointInPlane(
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  return Eigen::Vector2s(
+      (point - origin).dot(basis2dX), (point - origin).dot(basis2dY));
+}
+
+// This implements the "2D cross product" as redefined here:
+// https://stackoverflow.com/a/565282/13177487
+inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w)
+{
+  return v(0) * w(1) - v(1) * w(0);
+}
+
 Eigen::Matrix3s makeSkewSymmetric(const Eigen::Vector3s& _v)
 {
   Eigen::Matrix3s result = Eigen::Matrix3s::Zero();

@@ -94,7 +94,7 @@ Inertia::Inertia(
   mCenterOfMassLowerBound << -5, -5, -5;
   mCenterOfMassUpperBound << 5, 5, 5;
   mMassLowerBound = 0.01;
-  mMassUpperBound = 20;
+  mMassUpperBound = 100;
   mMomentLowerBound << 0.1, 0.1, 0.1, -1, -1, -1;
   mMomentUpperBound << 1, 1, 1, 1, 1, 1;
 }

@@ -609,6 +609,12 @@ template void finiteDifference<Eigen::VectorXs>(
     std::function<bool(s_t, int, s_t&)>, Eigen::VectorXs&, s_t, bool);
 template void finiteDifference<Eigen::Vector6s>(
     std::function<bool(s_t, int, s_t&)>, Eigen::Vector6s&, s_t, bool);
+template void finiteDifference<Eigen::Vector4s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector4s&, s_t, bool);
+template void finiteDifference<Eigen::Vector3s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector3s&, s_t, bool);
+template void finiteDifference<Eigen::Vector2s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector2s&, s_t, bool);
 
 } // namespace math
 } // namespace dart

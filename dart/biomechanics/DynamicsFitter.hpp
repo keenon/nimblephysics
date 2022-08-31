@@ -9,6 +9,7 @@
 #include <coin/IpTNLP.hpp>
 
 #include "dart/biomechanics/ForcePlate.hpp"
+#include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
@@ -46,7 +47,8 @@ public:
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
-      Eigen::VectorXs forcesConcat);
+      Eigen::VectorXs forcesConcat,
+      bool useL1 = false);
 
   ///////////////////////////////////////////
   // Computes the Jacobian of the residual with respect to `wrt`
@@ -73,7 +75,8 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
-      neural::WithRespectTo* wrt);
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
 
   ///////////////////////////////////////////
   // Computes the gradient of the residual norm with respect to `wrt`
@@ -82,7 +85,8 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
-      neural::WithRespectTo* wrt);
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
@@ -110,16 +114,40 @@ struct DynamicsInitialization
   std::vector<dynamics::BodyNode*> grfBodyNodes;
 
   ///////////////////////////////////////////
+  // Foot ground contact, and rendering
+  std::vector<s_t> groundHeight;
+  std::vector<bool> flatGround;
+  std::vector<std::vector<dynamics::BodyNode*>> contactBodies;
+  std::vector<std::vector<std::vector<s_t>>> grfBodyContactSphereRadius;
+  std::vector<std::vector<std::vector<bool>>> grfBodyForceActive;
+  std::vector<std::vector<std::vector<bool>>> grfBodySphereInContact;
+  std::vector<std::vector<Eigen::Vector3s>> defaultForcePlateCorners;
+  std::vector<std::vector<std::vector<bool>>> grfBodyOffForcePlate;
+  // This is the critical value, telling us if we think we're receiving support
+  // from off a force plate on this frame
+  std::vector<std::vector<bool>> probablyMissingGRF;
+
+  ///////////////////////////////////////////
   // Pure dynamics values
   Eigen::VectorXs bodyMasses;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyCom;
   Eigen::Matrix<s_t, 6, Eigen::Dynamic> bodyInertia;
 
   ///////////////////////////////////////////
-  // Relevant when trying to get dynamics to agree with movement
+  // Values from the kinematics fitter that are relevant here as well. The key
+  // difference is that the per-trial split is explicit here, because it's so
+  // important for the dynamics and indexing.
   std::vector<Eigen::MatrixXs> poseTrials;
   Eigen::VectorXs groupScales;
   std::map<std::string, Eigen::Vector3s> markerOffsets;
+  std::vector<std::string> trackingMarkers;
+
+  std::vector<dynamics::Joint*> joints;
+  std::vector<std::vector<std::string>> jointsAdjacentMarkers;
+  Eigen::VectorXs jointWeights;
+  std::vector<Eigen::MatrixXs> jointCenters;
+  Eigen::VectorXs axisWeights;
+  std::vector<Eigen::MatrixXs> jointAxis;
 
   ///////////////////////////////////////////
   // Convenience objects
@@ -148,6 +176,7 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       std::shared_ptr<dynamics::Skeleton> skeleton,
       dynamics::MarkerMap markerMap,
+      std::vector<std::string> trackingMarkers,
       std::vector<dynamics::BodyNode*> footNodes);
 
   // This returns the dimension of the decision variables (the length of the
@@ -170,13 +199,14 @@ public:
   // This gets the value of the loss function, as a weighted sum of the
   // discrepancy between measured and expected GRF data and other regularization
   // terms.
-  s_t computeLoss(Eigen::VectorXs x);
+  s_t computeLoss(Eigen::VectorXs x, bool logExplanation = false);
 
   // This gets the gradient of the loss function
   Eigen::VectorXs computeGradient(Eigen::VectorXs x);
 
   // This gets the gradient of the loss function
-  Eigen::VectorXs finiteDifferenceGradient(Eigen::VectorXs x);
+  Eigen::VectorXs finiteDifferenceGradient(
+      Eigen::VectorXs x, bool useRidders = true);
 
   // This gets the number of constraints that the problem requires
   int getConstraintSize();
@@ -199,7 +229,7 @@ public:
   Eigen::MatrixXs finiteDifferenceConstraintsJacobian();
 
   // Print out the errors in a gradient vector in human readable form
-  void debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
+  bool debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
 
   DynamicsFitProblem& setIncludeMasses(bool value);
   DynamicsFitProblem& setIncludeCOMs(bool value);
@@ -210,13 +240,18 @@ public:
 
   DynamicsFitProblem& setResidualWeight(s_t weight);
   DynamicsFitProblem& setMarkerWeight(s_t weight);
+  DynamicsFitProblem& setJointWeight(s_t weight);
+
+  DynamicsFitProblem& setResidualUseL1(bool l1);
+  DynamicsFitProblem& setMarkerUseL1(bool l1);
 
   DynamicsFitProblem& setRegularizeMasses(s_t value);
   DynamicsFitProblem& setRegularizeCOMs(s_t value);
   DynamicsFitProblem& setRegularizeInertias(s_t value);
   DynamicsFitProblem& setRegularizeBodyScales(s_t value);
   DynamicsFitProblem& setRegularizePoses(s_t value);
-  DynamicsFitProblem& setRegularizeMarkerOffsets(s_t value);
+  DynamicsFitProblem& setRegularizeTrackingMarkerOffsets(s_t value);
+  DynamicsFitProblem& setRegularizeAnatomicalMarkerOffsets(s_t value);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -334,6 +369,10 @@ public:
 public:
   s_t mResidualWeight;
   s_t mMarkerWeight;
+  s_t mJointWeight;
+
+  bool mResidualUseL1;
+  bool mMarkerUseL1;
 
   bool mIncludeMasses;
   bool mIncludeCOMs;
@@ -349,7 +388,8 @@ public:
   s_t mRegularizeInertias;
   s_t mRegularizeBodyScales;
   s_t mRegularizePoses;
-  s_t mRegularizeMarkerOffsets;
+  s_t mRegularizeTrackingMarkerOffsets;
+  s_t mRegularizeAnatomicalMarkerOffsets;
 
   std::vector<Eigen::MatrixXs> mPoses;
   std::vector<Eigen::MatrixXs> mVels;
@@ -357,6 +397,7 @@ public:
 
   dynamics::MarkerMap mMarkerMap;
   std::vector<std::string> mMarkerNames;
+  std::vector<bool> mMarkerIsTracking;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
 
   std::vector<dynamics::BodyNode*> mFootNodes;
@@ -375,16 +416,29 @@ public:
   DynamicsFitter(
       std::shared_ptr<dynamics::Skeleton> skeleton,
       std::vector<dynamics::BodyNode*> footNodes,
-      dynamics::MarkerMap markerMap);
+      dynamics::MarkerMap markerMap,
+      std::vector<std::string> trackingMarkers);
 
   // This bundles together the objects we need in order to track a dynamics
   // problem around through multiple steps of optimization
   static std::shared_ptr<DynamicsInitialization> createInitialization(
       std::shared_ptr<dynamics::Skeleton> skel,
       dynamics::MarkerMap markerMap,
+      std::vector<std::string> trackingMarkers,
       std::vector<dynamics::BodyNode*> grfNodes,
       std::vector<std::vector<ForcePlate>> forcePlateTrials,
       std::vector<Eigen::MatrixXs> poseTrials,
+      std::vector<int> framesPerSecond,
+      std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+          markerObservationTrials);
+
+  // This creates an optimization problem from a kinematics initialization
+  static std::shared_ptr<DynamicsInitialization> createInitialization(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      MarkerInitialization* kinematicInit,
+      std::vector<std::string> trackingMarkers,
+      std::vector<dynamics::BodyNode*> grfNodes,
+      std::vector<std::vector<ForcePlate>> forcePlateTrials,
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
           markerObservationTrials);
@@ -410,6 +464,11 @@ public:
   std::vector<Eigen::Vector3s> measuredGRFForces(
       std::shared_ptr<DynamicsInitialization> init, int trial);
 
+  // 0. Estimate when each foot is in contact with the ground, which we can use
+  // to infer when we're missing GRF data on certain timesteps, so we don't let
+  // it mess with our optimization.
+  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
+
   // 1. Scale the total mass of the body (keeping the ratios of body links
   // constant) to get it as close as possible to GRF gravity forces.
   void scaleLinkMassesFromGravity(std::shared_ptr<DynamicsInitialization> init);
@@ -433,6 +492,18 @@ public:
       bool includePoses,
       bool includeMarkerOffsets);
 
+  // Get the average RMSE, in meters, of the markers
+  s_t computeAverageMarkerRMSE(std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average residual force (in newtons) and torque (in newton-meters)
+  std::pair<s_t, s_t> computeAverageResidualForce(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average real measured force (in newtons) and torque (in
+  // newton-meters)
+  std::pair<s_t, s_t> computeAverageRealForce(
+      std::shared_ptr<DynamicsInitialization> init);
+
   // This debugs the current state, along with visualizations of errors where
   // the dynamics do not match the force plate data
   void saveDynamicsToGUI(
@@ -453,6 +524,7 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<dynamics::BodyNode*> mFootNodes;
   dynamics::MarkerMap mMarkerMap;
+  std::vector<std::string> mTrackingMarkers;
   // These are IPOPT settings
   double mTolerance;
   int mIterationLimit;

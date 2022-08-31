@@ -1,0 +1,209 @@
+<OpenSimDocument Version="40000">
+    <InverseKinematicsTool name="DJAsym1">
+        <model_file>Models/manually_scaled.osim</model_file>
+        <IKTaskSet name="IK_tasks">
+            <objects>
+                <IKMarkerTask name="C7">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L.ASIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L.PSIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_5meta">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_HJC">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Shoulder">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Sternum">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_ankle">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_calc">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_elbow_lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_elbow_med">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_knee">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_mankle">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_mknee">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_sh2">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_sh3">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_shank_antsup">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_thigh1">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_thigh2">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_thigh3">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_thigh4">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_toe">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_wrist_radius">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_wrist_ulna">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_HJC">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Shoulder">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Sternum">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_elbow_lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_elbow_med">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_wrist_radius">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_wrist_ulna">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r.ASIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r.PSIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_5meta">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_ankle">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_calc">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_knee">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_mankle">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_mknee">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_sh2">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_sh3">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_sh4">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_shank_antsup">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_thigh1">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_thigh2">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_thigh3">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_thigh4">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_thigh5">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="r_toe">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+            </objects>
+        </IKTaskSet>
+        <marker_file>../MarkerData/DJAsym1.trc</marker_file>
+        <output_motion_file>DJAsym1_ik_on_manual_scaling_by_opensim.mot</output_motion_file>
+        <accuracy>1e-5</accuracy>
+        <report_errors>true</report_errors>
+    </InverseKinematicsTool>
+</OpenSimDocument>

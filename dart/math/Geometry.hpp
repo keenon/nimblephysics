@@ -43,6 +43,37 @@
 namespace dart {
 namespace math {
 
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from
+/// the center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// sorted using prepareConvex2DShape().
+bool convex2DShapeContains(
+    const Eigen::Vector3s& point,
+    const std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+/// This transforms a 3D point down to a 2D point in the given 3D plane
+Eigen::Vector2s pointInPlane(
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to);
+
+// This implements the "2D cross product" as redefined here:
+// https://stackoverflow.com/a/565282/13177487
+inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w);
+
 /// \brief
 Eigen::Matrix3s makeSkewSymmetric(const Eigen::Vector3s& _v);
 

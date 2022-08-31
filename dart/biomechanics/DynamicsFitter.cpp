@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <queue>
 #include <string>
 #include <tuple>
+#include <utility>
 
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
@@ -13,10 +15,12 @@
 #include "dart/biomechanics/C3DForcePlatforms.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
+#include "dart/biomechanics/MarkerLabeller.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/WithRespectTo.hpp"
 #include "dart/server/GUIRecording.hpp"
@@ -80,9 +84,18 @@ s_t ResidualForceHelper::calculateResidualNorm(
     Eigen::VectorXs q,
     Eigen::VectorXs dq,
     Eigen::VectorXs ddq,
-    Eigen::VectorXs forcesConcat)
+    Eigen::VectorXs forcesConcat,
+    bool useL1)
 {
-  return calculateResidual(q, dq, ddq, forcesConcat).squaredNorm();
+  Eigen::Vector6s residual = calculateResidual(q, dq, ddq, forcesConcat);
+  if (useL1)
+  {
+    return residual.head<3>().norm() + residual.tail<3>().norm();
+  }
+  else
+  {
+    return residual.squaredNorm();
+  }
 }
 
 //==============================================================================
@@ -232,12 +245,22 @@ Eigen::VectorXs ResidualForceHelper::calculateResidualNormGradientWrt(
     Eigen::VectorXs dq,
     Eigen::VectorXs ddq,
     Eigen::VectorXs forcesConcat,
-    neural::WithRespectTo* wrt)
+    neural::WithRespectTo* wrt,
+    bool useL1)
 {
   Eigen::Vector6s res = calculateResidual(q, dq, ddq, forcesConcat);
   Eigen::MatrixXs jac
       = calculateResidualJacobianWrt(q, dq, ddq, forcesConcat, wrt);
-  return 2 * jac.transpose() * res;
+  if (useL1)
+  {
+    res.head<3>().normalize();
+    res.tail<3>().normalize();
+    return jac.transpose() * res;
+  }
+  else
+  {
+    return jac.transpose() * 2 * res;
+  }
 }
 
 //==============================================================================
@@ -247,7 +270,8 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
     Eigen::VectorXs dq,
     Eigen::VectorXs ddq,
     Eigen::VectorXs forcesConcat,
-    neural::WithRespectTo* wrt)
+    neural::WithRespectTo* wrt,
+    bool useL1)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(wrt->dim(mSkel.get()));
 
@@ -272,7 +296,8 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
             mSkel->getPositions(),
             mSkel->getVelocities(),
             mSkel->getAccelerations(),
-            forcesConcat);
+            forcesConcat,
+            useL1);
         return true;
       },
       result,
@@ -292,6 +317,7 @@ DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,
     dynamics::MarkerMap markerMap,
+    std::vector<std::string> trackingMarkers,
     std::vector<dynamics::BodyNode*> footNodes)
   : mInit(init),
     mSkeleton(skeleton),
@@ -305,12 +331,16 @@ DynamicsFitProblem::DynamicsFitProblem(
     mIncludeMarkerOffsets(true),
     mResidualWeight(0.1),
     mMarkerWeight(1.0),
+    mJointWeight(1.0),
+    mResidualUseL1(false),
+    mMarkerUseL1(false),
     mRegularizeMasses(1.0),
-    mRegularizeCOMs(10.0),
+    mRegularizeCOMs(1.0),
     mRegularizeInertias(1.0),
-    mRegularizeBodyScales(100.0),
-    mRegularizePoses(100.0),
-    mRegularizeMarkerOffsets(100.0),
+    mRegularizeTrackingMarkerOffsets(0.05),
+    mRegularizeAnatomicalMarkerOffsets(10.0),
+    mRegularizeBodyScales(0.2),
+    mRegularizePoses(0.0),
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Set up the markers
@@ -319,6 +349,15 @@ DynamicsFitProblem::DynamicsFitProblem(
   {
     mMarkerNames.push_back(pair.first);
     mMarkers.push_back(pair.second);
+    if (std::find(trackingMarkers.begin(), trackingMarkers.end(), pair.first)
+        != trackingMarkers.end())
+    {
+      mMarkerIsTracking.push_back(true);
+    }
+    else
+    {
+      mMarkerIsTracking.push_back(false);
+    }
   }
 
   // 2. Set up the q, dq, ddq, and GRF
@@ -680,41 +719,93 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
 // This gets the value of the loss function, as a weighted sum of the
 // discrepancy between measured and expected GRF data and other regularization
 // terms.
-s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
+s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
 {
   unflatten(x);
 
   s_t sum = 0.0;
 
-  sum += mRegularizeMasses
-         * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses)
-               .squaredNorm();
+  /*
+  if (logExplanation)
+  {
+    Eigen::MatrixXs compare
+        = Eigen::MatrixXs::Zero(mSkeleton->getNumScaleGroups(), 5);
+    compare.col(0) = mSkeleton->getGroupMasses();
+    compare.col(1) = mInit->originalGroupMasses;
+    compare.col(2) = mSkeleton->getGroupMassesUpperBound();
+    compare.col(3) = mSkeleton->getGroupMassesLowerBound();
+    compare.col(4) = (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
+    std::cout << "masses - orig - upper - lower - diff" << std::endl
+              << compare << std::endl;
+  }
+  */
+
+  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
+  {
+    std::cout << "Don't ask for loss before you've called "
+                 "DynamicsFitter::estimateFootGroundContacts() with this init "
+                 "object! Killing the process with exit 1."
+              << std::endl;
+    exit(1);
+  }
+
+  s_t massRegularization
+      = mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses)
+              .squaredNorm();
+  sum += massRegularization;
   assert(!isnan(sum));
-  sum += mRegularizeCOMs
-         * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs).squaredNorm();
+  s_t comRegularization
+      = mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs).squaredNorm();
+  sum += comRegularization;
   assert(!isnan(sum));
-  sum += mRegularizeInertias
-         * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias)
-               .squaredNorm();
+  s_t inertiaRegularization
+      = mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias)
+              .squaredNorm();
+  sum += inertiaRegularization;
   assert(!isnan(sum));
-  sum += mRegularizeBodyScales
-         * (mSkeleton->getGroupScales() - mInit->originalGroupScales)
-               .squaredNorm();
+  s_t scaleRegularization
+      = mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupScales() - mInit->originalGroupScales)
+              .squaredNorm();
+  sum += scaleRegularization;
   assert(!isnan(sum));
+  s_t markerRegularization = 0.0;
   for (int i = 0; i < mMarkerNames.size(); i++)
   {
     if (mInit->originalMarkerOffsets.count(mMarkerNames.at(i)))
     {
-      sum += mRegularizeMarkerOffsets
+      markerRegularization
+          += (mMarkerIsTracking[i] ? mRegularizeTrackingMarkerOffsets
+                                   : mRegularizeAnatomicalMarkerOffsets)
+             * (1.0 / mMarkerNames.size())
              * (mMarkers[i].second
                 - mInit->originalMarkerOffsets.at(mMarkerNames.at(i)))
                    .squaredNorm();
     }
-    assert(!isnan(sum));
+    assert(!isnan(markerRegularization));
   }
+  sum += markerRegularization;
 
   Eigen::VectorXs originalPos = mSkeleton->getPositions();
   mSkeleton->clearExternalForces();
+
+  int totalTimesteps = 0;
+  int totalAccTimesteps = 0;
+  for (int trial = 0; trial < mPoses.size(); trial++)
+  {
+    totalTimesteps += mPoses[trial].cols();
+    totalAccTimesteps += mAccs[trial].cols();
+  }
+
+  s_t residualRMS = 0.0;
+  s_t markerRMS = 0.0;
+  s_t poseRegularization = 0.0;
+  s_t jointRMS = 0.0;
+  s_t axisRMS = 0.0;
+  int markerCount = 0;
 
   for (int trial = 0; trial < mPoses.size(); trial++)
   {
@@ -723,15 +814,16 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
       mSkeleton->setPositions(mPoses[trial].col(t));
 
       // Add force residual RMS errors to all but the last 2 timesteps
-      if (t < mAccs[trial].cols())
+      if (t < mAccs[trial].cols() && !mInit->probablyMissingGRF[trial][t])
       {
-        sum += mResidualWeight
-               * mResidualHelper->calculateResidualNorm(
-                   mPoses[trial].col(t),
-                   mVels[trial].col(t),
-                   mAccs[trial].col(t),
-                   mInit->grfTrials[trial].col(t));
-        assert(!isnan(sum));
+        residualRMS += mResidualWeight * (1.0 / totalAccTimesteps)
+                       * mResidualHelper->calculateResidualNorm(
+                           mPoses[trial].col(t),
+                           mVels[trial].col(t),
+                           mAccs[trial].col(t),
+                           mInit->grfTrials[trial].col(t),
+                           mResidualUseL1);
+        assert(!isnan(residualRMS));
       }
 
       // Add marker RMS errors to every timestep
@@ -744,17 +836,77 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x)
         {
           Eigen::Vector3s diff
               = observedMarkerPoses.at(mMarkerNames[i]) - marker;
-          sum += mMarkerWeight * diff.squaredNorm();
-          assert(!isnan(sum));
+          s_t thisMarkerCost;
+          if (mMarkerUseL1)
+          {
+            thisMarkerCost = diff.norm();
+          }
+          else
+          {
+            thisMarkerCost = diff.squaredNorm();
+          }
+          markerRMS += thisMarkerCost;
+          markerCount++;
+          assert(!isnan(markerRMS));
         }
       }
 
+      // Add joints
+      Eigen::VectorXs jointPoses
+          = mSkeleton->getJointWorldPositions(mInit->joints);
+      Eigen::VectorXs jointCenters = mInit->jointCenters[trial].col(t);
+      Eigen::VectorXs jointAxis = mInit->jointAxis[trial].col(t);
+      Eigen::VectorXs jointDiff = jointPoses - jointCenters;
+      for (int i = 0; i < mInit->jointWeights.size(); i++)
+      {
+        jointRMS
+            += (jointPoses.segment<3>(i * 3) - jointCenters.segment<3>(i * 3))
+                   .squaredNorm()
+               * mInit->jointWeights(i);
+      }
+      for (int i = 0; i < mInit->axisWeights.size(); i++)
+      {
+        Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
+        Eigen::Vector3s axisDir = jointAxis.segment<3>(i * 6 + 3).normalized();
+        Eigen::Vector3s actualJointPos = jointPoses.segment<3>(i * 3);
+        // Subtract out any component parallel to the axis
+        Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
+        jointDiff -= jointDiff.dot(axisDir) * axisDir;
+        axisRMS += jointDiff.squaredNorm() * mInit->axisWeights(i);
+      }
+
       // Add regularization
-      sum += mRegularizePoses
+      poseRegularization
+          += mRegularizePoses * (1.0 / totalTimesteps)
              * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t))
                    .squaredNorm();
-      assert(!isnan(sum));
+      assert(!isnan(poseRegularization));
     }
+  }
+  sum += residualRMS;
+  markerRMS *= mMarkerWeight;
+  if (markerCount > 0)
+  {
+    markerRMS /= markerCount;
+  }
+  sum += markerRMS;
+  jointRMS *= mJointWeight;
+  sum += jointRMS;
+  axisRMS *= mJointWeight;
+  sum += axisRMS;
+  sum += poseRegularization;
+  assert(!isnan(sum));
+
+  if (logExplanation)
+  {
+    std::cout << "["
+              << "massR=" << massRegularization << ",comR=" << comRegularization
+              << ",inR=" << inertiaRegularization
+              << ",scR=" << scaleRegularization
+              << ",mkrR=" << markerRegularization << ",jntRMS=" << jointRMS
+              << ",axisRMS=" << axisRMS << ",qR=" << poseRegularization
+              << ",fRMS=" << residualRMS << ",mkRMS=" << markerRMS << "]"
+              << std::endl;
   }
 
   return sum;
@@ -769,12 +921,62 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   Eigen::VectorXs grad = Eigen::VectorXs::Zero(getProblemSize());
   const int dofs = mSkeleton->getNumDofs();
 
+  /*
+  //////////////////////
+  // From flatten():
+  //////////////////////
+
+  int cursor = 0;
+  if (mIncludeMasses)
+  {
+    int dim = mSkeleton->getNumScaleGroups();
+    mSkeleton->setGroupMasses(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeCOMs)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 3;
+    mSkeleton->setGroupCOMs(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeInertias)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 6;
+    mSkeleton->setGroupInertias(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeBodyScales)
+  {
+    int dim = mSkeleton->getGroupScaleDim();
+    mSkeleton->setGroupScales(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeMarkerOffsets)
+  {
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      mMarkers[i].second = x.segment(cursor, 3);
+      cursor += 3;
+    }
+  }
+  if (mIncludePoses)
+  {
+  */
+  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
+  {
+    std::cout << "Don't ask for gradients before you've called "
+                 "DynamicsFitter::estimateFootGroundContacts() with this init "
+                 "object! Killing the process with exit 1."
+              << std::endl;
+    exit(1);
+  }
+
   int posesCursor = 0;
   if (mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     grad.segment(posesCursor, dim)
-        += mRegularizeMasses * 2
+        += mRegularizeMasses * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
     posesCursor += dim;
   }
@@ -782,7 +984,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     grad.segment(posesCursor, dim)
-        += mRegularizeCOMs * 2
+        += mRegularizeCOMs * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs);
     posesCursor += dim;
   }
@@ -790,7 +992,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     grad.segment(posesCursor, dim)
-        += mRegularizeInertias * 2
+        += mRegularizeInertias * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias);
     posesCursor += dim;
   }
@@ -798,7 +1000,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   {
     int dim = mSkeleton->getGroupScaleDim();
     grad.segment(posesCursor, dim)
-        += mRegularizeBodyScales * 2
+        += mRegularizeBodyScales * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupScales() - mInit->originalGroupScales);
     posesCursor += dim;
   }
@@ -807,11 +1009,36 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
     for (int i = 0; i < mMarkers.size(); i++)
     {
       grad.segment<3>(posesCursor)
-          += 2 * mRegularizeMarkerOffsets
+          += 2
+             * (mMarkerIsTracking[i] ? mRegularizeTrackingMarkerOffsets
+                                     : mRegularizeAnatomicalMarkerOffsets)
+             * (1.0 / mMarkerNames.size())
              * (mMarkers[i].second
                 - mInit->originalMarkerOffsets[mMarkerNames[i]]);
-      // Currently this has zero effect on the gradient
       posesCursor += 3;
+    }
+  }
+
+  int totalTimesteps = 0;
+  int totalAccTimesteps = 0;
+  for (int trial = 0; trial < mPoses.size(); trial++)
+  {
+    totalTimesteps += mPoses[trial].cols();
+    totalAccTimesteps += mAccs[trial].cols();
+  }
+  int markerCount = 0;
+  for (int trial = 0; trial < mPoses.size(); trial++)
+  {
+    for (int t = 0; t < mPoses[trial].cols(); t++)
+    {
+      auto& markerObservations = mInit->markerObservationTrials[trial][t];
+      for (int i = 0; i < mMarkers.size(); i++)
+      {
+        if (markerObservations.count(mMarkerNames[i]))
+        {
+          markerCount++;
+        }
+      }
     }
   }
 
@@ -820,8 +1047,9 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
     for (int t = 0; t < mPoses[trial].cols(); t++)
     {
       mSkeleton->setPositions(mPoses[trial].col(t));
-      Eigen::VectorXs markerError = Eigen::VectorXs::Zero(mMarkers.size() * 3);
-      auto markerObservations = mInit->markerObservationTrials[trial][t];
+      Eigen::VectorXs lossGradWrtMarkerError
+          = Eigen::VectorXs::Zero(mMarkers.size() * 3);
+      auto& markerObservations = mInit->markerObservationTrials[trial][t];
       auto markerMap = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
       for (int i = 0; i < mMarkers.size(); i++)
       {
@@ -830,9 +1058,38 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           Eigen::Vector3s markerOffset
               = markerMap.at(mMarkerNames[i])
                 - markerObservations.at(mMarkerNames[i]);
-          markerError.segment<3>(i * 3) = mMarkerWeight * 2 * markerOffset;
+          if (mMarkerUseL1)
+          {
+            markerOffset.normalize();
+          }
+          else
+          {
+            markerOffset *= 2;
+          }
+          lossGradWrtMarkerError.segment<3>(i * 3)
+              = (mMarkerWeight / markerCount) * markerOffset;
         }
       }
+
+      Eigen::VectorXs jointGrad
+          = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
+      Eigen::VectorXs worldJoints
+          = mSkeleton->getJointWorldPositions(mInit->joints);
+      Eigen::VectorXs targetJoints = mInit->jointCenters[trial].col(t);
+      Eigen::VectorXs targetAxis = mInit->jointAxis[trial].col(t);
+      for (int i = 0; i < mInit->joints.size(); i++)
+      {
+        Eigen::Vector3s worldDiff
+            = worldJoints.segment<3>(i * 3) - targetJoints.segment<3>(i * 3);
+        jointGrad.segment<3>(i * 3) += 2 * worldDiff * mInit->jointWeights(i);
+
+        Eigen::Vector3s axisDiff
+            = worldJoints.segment<3>(i * 3) - targetAxis.segment<3>(i * 6);
+        Eigen::Vector3s axis = targetAxis.segment<3>(i * 6 + 3).normalized();
+        axisDiff -= axisDiff.dot(axis) * axis;
+        jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights(i);
+      }
+      jointGrad *= mJointWeight;
 
       if (t < mAccs[trial].cols())
       {
@@ -840,58 +1097,82 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
         if (mIncludeMasses)
         {
           int dim = mSkeleton->getNumScaleGroups();
-          grad.segment(cursor, dim)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::GROUP_MASSES);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(cursor, dim)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::GROUP_MASSES,
+                       mResidualUseL1);
+          }
           cursor += dim;
         }
         if (mIncludeCOMs)
         {
           int dim = mSkeleton->getNumScaleGroups() * 3;
-          grad.segment(cursor, dim)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::GROUP_COMS);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(cursor, dim)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::GROUP_COMS,
+                       mResidualUseL1);
+          }
           cursor += dim;
         }
         if (mIncludeInertias)
         {
           int dim = mSkeleton->getNumScaleGroups() * 6;
-          grad.segment(cursor, dim)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::GROUP_INERTIAS);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(cursor, dim)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::GROUP_INERTIAS,
+                       mResidualUseL1);
+          }
           cursor += dim;
         }
         if (mIncludeBodyScales)
         {
           int dim = mSkeleton->getGroupScaleDim();
-          grad.segment(cursor, dim)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::GROUP_SCALES);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(cursor, dim)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::GROUP_SCALES,
+                       mResidualUseL1);
+          }
 
           // Record marker gradients
           grad.segment(cursor, dim)
               += MarkerFitter::getMarkerLossGradientWrtGroupScales(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
+
+          // Record joint gradients
+          grad.segment(cursor, dim)
+              += mSkeleton
+                     ->getJointWorldPositionsJacobianWrtGroupScales(
+                         mInit->joints)
+                     .transpose()
+                 * jointGrad;
 
           cursor += dim;
         }
@@ -900,51 +1181,71 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mMarkers.size() * 3;
           grad.segment(cursor, dim)
               += MarkerFitter::getMarkerLossGradientWrtMarkerOffsets(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
           cursor += dim;
         }
 
         if (mIncludePoses)
         {
-          grad.segment(posesCursor, dofs)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::POSITION);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(posesCursor, dofs)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::POSITION,
+                       mResidualUseL1);
+          }
 
           // Record marker gradients
           grad.segment(posesCursor, dofs)
               += MarkerFitter::getMarkerLossGradientWrtJoints(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
 
           // Record regularization
           grad.segment(posesCursor, dofs)
-              += mRegularizePoses * 2
+              += mRegularizePoses * 2 * (1.0 / totalTimesteps)
                  * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
 
+          // Record joint gradients
+          grad.segment(posesCursor, dofs)
+              += mSkeleton
+                     ->getJointWorldPositionsJacobianWrtJointPositions(
+                         mInit->joints)
+                     .transpose()
+                 * jointGrad;
+
           posesCursor += dofs;
 
-          grad.segment(posesCursor, dofs)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::VELOCITY);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(posesCursor, dofs)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::VELOCITY,
+                       mResidualUseL1);
+          }
           posesCursor += dofs;
 
-          grad.segment(posesCursor, dofs)
-              += mResidualWeight
-                 * mResidualHelper->calculateResidualNormGradientWrt(
-                     mPoses[trial].col(t),
-                     mVels[trial].col(t),
-                     mAccs[trial].col(t),
-                     mInit->grfTrials[trial].col(t),
-                     neural::WithRespectTo::ACCELERATION);
+          if (!mInit->probablyMissingGRF[trial][t])
+          {
+            grad.segment(posesCursor, dofs)
+                += mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNormGradientWrt(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       neural::WithRespectTo::ACCELERATION,
+                       mResidualUseL1);
+          }
           posesCursor += dofs;
         }
       }
@@ -972,7 +1273,14 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record marker gradients
           grad.segment(cursor, dim)
               += MarkerFitter::getMarkerLossGradientWrtGroupScales(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
+          // Record joint gradients
+          grad.segment(cursor, dim)
+              += mSkeleton
+                     ->getJointWorldPositionsJacobianWrtGroupScales(
+                         mInit->joints)
+                     .transpose()
+                 * jointGrad;
 
           cursor += dim;
         }
@@ -981,7 +1289,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mMarkers.size() * 3;
           grad.segment(cursor, dim)
               += MarkerFitter::getMarkerLossGradientWrtMarkerOffsets(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
           cursor += dim;
         }
         if (mIncludePoses)
@@ -989,11 +1297,18 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record marker gradients
           grad.segment(posesCursor, dofs)
               += MarkerFitter::getMarkerLossGradientWrtJoints(
-                  mSkeleton, mMarkers, markerError);
+                  mSkeleton, mMarkers, lossGradWrtMarkerError);
           // Record regularization
           grad.segment(posesCursor, dofs)
-              += mRegularizePoses * 2
+              += mRegularizePoses * 2 * (1.0 / totalTimesteps)
                  * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
+          // Record joint gradients
+          grad.segment(posesCursor, dofs)
+              += mSkeleton
+                     ->getJointWorldPositionsJacobianWrtJointPositions(
+                         mInit->joints)
+                     .transpose()
+                 * jointGrad;
 
           posesCursor += dofs;
 
@@ -1016,7 +1331,8 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
 //==============================================================================
 // This gets the gradient of the loss function
-Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
+Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(
+    Eigen::VectorXs x, bool useRidders)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(getProblemSize());
 
@@ -1031,8 +1347,8 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(Eigen::VectorXs x)
         return true;
       },
       result,
-      1e-3,
-      false);
+      useRidders ? 1e-3 : 1e-8,
+      useRidders);
 
   return result;
 }
@@ -1256,9 +1572,10 @@ Eigen::MatrixXs DynamicsFitProblem::finiteDifferenceConstraintsJacobian()
 }
 
 //==============================================================================
-void debugVector(
+bool debugVector(
     Eigen::VectorXs fd, Eigen::VectorXs analytical, std::string name, s_t tol)
 {
+  bool anyError = false;
   for (int i = 0; i < fd.size(); i++)
   {
     bool isError = false;
@@ -1281,34 +1598,37 @@ void debugVector(
     {
       std::cout << "Error on " << name << "[" << i << "]: " << fd(i) << " - "
                 << analytical(i) << " = " << error << std::endl;
+      anyError = true;
     }
   }
+  return anyError;
 }
 
 //==============================================================================
 // Print out the errors in a gradient vector in human readable form
-void DynamicsFitProblem::debugErrors(
+bool DynamicsFitProblem::debugErrors(
     Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol)
 {
   int cursor = 0;
+  bool anyError = false;
   if (mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
-    debugVector(
+    anyError |= debugVector(
         fd.segment(cursor, dim), analytical.segment(cursor, dim), "mass", tol);
     cursor += dim;
   }
   if (mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
-    debugVector(
+    anyError |= debugVector(
         fd.segment(cursor, dim), analytical.segment(cursor, dim), "COM", tol);
     cursor += dim;
   }
   if (mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
-    debugVector(
+    anyError |= debugVector(
         fd.segment(cursor, dim),
         analytical.segment(cursor, dim),
         "inertia",
@@ -1318,7 +1638,7 @@ void DynamicsFitProblem::debugErrors(
   if (mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
-    debugVector(
+    anyError |= debugVector(
         fd.segment(cursor, dim),
         analytical.segment(cursor, dim),
         "bodyScales",
@@ -1329,7 +1649,7 @@ void DynamicsFitProblem::debugErrors(
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
-      debugVector(
+      anyError |= debugVector(
           fd.segment(cursor, 3),
           analytical.segment(cursor, 3),
           "marker_" + std::to_string(i),
@@ -1345,19 +1665,19 @@ void DynamicsFitProblem::debugErrors(
     {
       for (int t = 0; t < mAccs[trial].cols(); t++)
       {
-        debugVector(
+        anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
             "poses@t=" + std::to_string(t),
             tol);
         cursor += dofs;
-        debugVector(
+        anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
             "vels@t=" + std::to_string(t),
             tol);
         cursor += dofs;
-        debugVector(
+        anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
             "accs@t=" + std::to_string(t),
@@ -1365,19 +1685,19 @@ void DynamicsFitProblem::debugErrors(
         cursor += dofs;
       }
       int finalT = mAccs[trial].cols();
-      debugVector(
+      anyError |= debugVector(
           fd.segment(cursor, dofs),
           analytical.segment(cursor, dofs),
           "poses@t=" + std::to_string(finalT),
           tol);
       cursor += dofs;
-      debugVector(
+      anyError |= debugVector(
           fd.segment(cursor, dofs),
           analytical.segment(cursor, dofs),
           "vels@t=" + std::to_string(finalT),
           tol);
       cursor += dofs;
-      debugVector(
+      anyError |= debugVector(
           fd.segment(cursor, dofs),
           analytical.segment(cursor, dofs),
           "poses@t=" + std::to_string(finalT + 1),
@@ -1385,6 +1705,7 @@ void DynamicsFitProblem::debugErrors(
       cursor += dofs;
     }
   }
+  return anyError;
 }
 
 //==============================================================================
@@ -1444,6 +1765,27 @@ DynamicsFitProblem& DynamicsFitProblem::setMarkerWeight(s_t weight)
 }
 
 //==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setJointWeight(s_t weight)
+{
+  mJointWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setResidualUseL1(bool l1)
+{
+  mResidualUseL1 = l1;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setMarkerUseL1(bool l1)
+{
+  mMarkerUseL1 = l1;
+  return *(this);
+}
+
+//==============================================================================
 DynamicsFitProblem& DynamicsFitProblem::setRegularizeMasses(s_t value)
 {
   mRegularizeMasses = value;
@@ -1479,9 +1821,18 @@ DynamicsFitProblem& DynamicsFitProblem::setRegularizePoses(s_t value)
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeMarkerOffsets(s_t value)
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeTrackingMarkerOffsets(
+    s_t value)
 {
-  mRegularizeMarkerOffsets = value;
+  mRegularizeTrackingMarkerOffsets = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeAnatomicalMarkerOffsets(
+    s_t value)
+{
+  mRegularizeAnatomicalMarkerOffsets = value;
   return *(this);
 }
 
@@ -1588,7 +1939,7 @@ bool DynamicsFitProblem::eval_f(
   (void)_new_x;
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
 
-  _obj_value = (double)computeLoss(x.cast<s_t>());
+  _obj_value = (double)computeLoss(x.cast<s_t>(), true);
 
   return true;
 }
@@ -1833,10 +2184,12 @@ bool DynamicsFitProblem::intermediate_callback(
 DynamicsFitter::DynamicsFitter(
     std::shared_ptr<dynamics::Skeleton> skeleton,
     std::vector<dynamics::BodyNode*> footNodes,
-    dynamics::MarkerMap markerMap)
+    dynamics::MarkerMap markerMap,
+    std::vector<std::string> trackingMarkers)
   : mSkeleton(skeleton),
     mFootNodes(footNodes),
     mMarkerMap(markerMap),
+    mTrackingMarkers(trackingMarkers),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
@@ -1853,6 +2206,7 @@ DynamicsFitter::DynamicsFitter(
 std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::shared_ptr<dynamics::Skeleton> skel,
     dynamics::MarkerMap markerMap,
+    std::vector<std::string> trackingMarkers,
     std::vector<dynamics::BodyNode*> grfNodes,
     std::vector<std::vector<ForcePlate>> forcePlateTrials,
     std::vector<Eigen::MatrixXs> poseTrials,
@@ -1865,12 +2219,30 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   init->forcePlateTrials = forcePlateTrials;
   init->originalPoseTrials = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
+  init->trackingMarkers = trackingMarkers;
   init->updatedMarkerMap = markerMap;
   for (auto& pair : markerMap)
   {
     init->markerOffsets[pair.first] = pair.second.second;
   }
   init->bodyMasses = skel->getLinkMasses();
+  init->groupScales = skel->getGroupScales();
+  init->bodyCom.resize(3, skel->getNumBodyNodes());
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    init->bodyCom.col(i) = skel->getBodyNode(i)->getInertia().getLocalCOM();
+  }
+  init->bodyInertia.resize(6, skel->getNumBodyNodes());
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    init->bodyInertia.col(i)
+        = skel->getBodyNode(i)->getInertia().getMomentVector();
+  }
+  init->bodyMasses.resize(skel->getNumBodyNodes());
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    init->bodyMasses(i) = skel->getBodyNode(i)->getInertia().getMass();
+  }
 
   // Initially smooth the accelerations just a little bit
 
@@ -1952,6 +2324,73 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   for (auto& pair : init->markerOffsets)
   {
     init->originalMarkerOffsets[pair.first] = pair.second;
+  }
+
+  return init;
+}
+
+//==============================================================================
+// This creates an optimization problem from a kinematics initialization
+std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    MarkerInitialization* kinematicInit,
+    std::vector<std::string> trackingMarkers,
+    std::vector<dynamics::BodyNode*> grfNodes,
+    std::vector<std::vector<ForcePlate>> forcePlateTrials,
+    std::vector<int> framesPerSecond,
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+        markerObservationTrials)
+{
+  // Split the incoming poses into individual trial matrices
+  std::vector<Eigen::MatrixXs> poseTrials;
+  int cursor = 0;
+  for (int trial = 0; trial < markerObservationTrials.size(); trial++)
+  {
+    Eigen::MatrixXs poses = Eigen::MatrixXs(
+        skel->getNumDofs(), markerObservationTrials[trial].size());
+    for (int i = 0; i < markerObservationTrials[trial].size(); i++)
+    {
+      poses.col(i) = kinematicInit->poses.col(cursor);
+      cursor++;
+    }
+    poseTrials.push_back(poses);
+  }
+
+  // Create the basic initialization
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      skel,
+      kinematicInit->updatedMarkerMap,
+      trackingMarkers,
+      grfNodes,
+      forcePlateTrials,
+      poseTrials,
+      framesPerSecond,
+      markerObservationTrials);
+
+  // Copy over the joint data
+  init->joints = kinematicInit->joints;
+  init->jointsAdjacentMarkers = kinematicInit->jointsAdjacentMarkers;
+  init->jointWeights = kinematicInit->jointWeights;
+  init->axisWeights = kinematicInit->axisWeights;
+
+  cursor = 0;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs trialJointCenters = Eigen::MatrixXs::Zero(
+        kinematicInit->jointCenters.rows(), init->poseTrials[trial].cols());
+    Eigen::MatrixXs trialJointAxis = Eigen::MatrixXs::Zero(
+        kinematicInit->jointAxis.rows(), init->poseTrials[trial].cols());
+
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      trialJointCenters.col(t) = kinematicInit->jointCenters.col(cursor);
+      trialJointAxis.col(t) = kinematicInit->jointAxis.col(cursor);
+      cursor++;
+    }
+    // getMarkerWorldPositionsJacobianWrtJointPositions
+
+    init->jointCenters.push_back(trialJointCenters);
+    init->jointAxis.push_back(trialJointAxis);
   }
 
   return init;
@@ -2065,6 +2504,353 @@ std::vector<Eigen::Vector3s> DynamicsFitter::measuredGRFForces(
   }
 
   return forces;
+}
+
+//==============================================================================
+// 0. Estimate when each foot is in contact with the ground, which we can use
+// to infer when we're missing GRF data on certain timesteps, so we don't let
+// it mess with our optimization.
+void DynamicsFitter::estimateFootGroundContacts(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  Eigen::VectorXs originalPose = mSkeleton->getPositions();
+
+  // 0. Expand the set of grf bodies to include any childen that are not already
+  // themselves grf bodies
+  //
+  // Result goes in std::vector<std::vector<dynamics::BodyNode*>> contactBodies
+  // in `init`
+  for (int i = 0; i < init->grfBodyNodes.size(); i++)
+  {
+    dynamics::BodyNode* rootBody = init->grfBodyNodes[i];
+    std::vector<dynamics::BodyNode*> extendedContactBodies;
+
+    std::queue<dynamics::BodyNode*> queue;
+    queue.push(rootBody);
+    while (!queue.empty())
+    {
+      dynamics::BodyNode* cursor = queue.front();
+      queue.pop();
+
+      extendedContactBodies.push_back(cursor);
+      for (int j = 0; j < cursor->getNumChildBodyNodes(); j++)
+      {
+        dynamics::BodyNode* child = cursor->getChildBodyNode(j);
+        if (std::find(
+                init->grfBodyNodes.begin(), init->grfBodyNodes.end(), child)
+            == init->grfBodyNodes.end())
+        {
+          queue.push(child);
+        }
+      }
+    }
+
+    init->contactBodies.push_back(extendedContactBodies);
+  }
+
+  for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
+  {
+    bool noGroundCorners = true;
+
+    // 1.1. First check for the ground level from the force plates
+
+    s_t groundHeight = std::numeric_limits<s_t>::infinity();
+    bool flatGround = true;
+    for (ForcePlate& forcePlate : init->forcePlateTrials[trial])
+    {
+      for (Eigen::Vector3s corner : forcePlate.corners)
+      {
+        if (noGroundCorners)
+        {
+          groundHeight = corner(1);
+          noGroundCorners = false;
+        }
+        else
+        {
+          if (abs(groundHeight - corner(1)) < 1e-8)
+          {
+            flatGround = false;
+          }
+        }
+      }
+    }
+
+    // 1.2. Check the ground level from the GRF data, if we don't have force
+    // plate data
+
+    if (noGroundCorners)
+    {
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        for (ForcePlate& forcePlate : init->forcePlateTrials[trial])
+        {
+          s_t height = forcePlate.centersOfPressure[t](1);
+          if (noGroundCorners)
+          {
+            groundHeight = height;
+            noGroundCorners = false;
+          }
+          else if (height < groundHeight)
+          {
+            groundHeight = height;
+          }
+        }
+      }
+    }
+
+    assert(!isnan(groundHeight));
+
+    // 2.0. Check for the size of the contact spheres to check for contact
+    // Since each grf body actually gets a (potentially) extended set of contact
+    // bodies attached to it, each grf body gets an array of contact sphere
+    // radii, one for each contact sphere.
+
+    std::vector<std::vector<s_t>> grfContactSphereSizes;
+    for (int b = 0; b < init->contactBodies.size(); b++)
+    {
+      grfContactSphereSizes.emplace_back();
+      for (int c = 0; c < init->contactBodies[b].size(); c++)
+      {
+        grfContactSphereSizes[grfContactSphereSizes.size() - 1].push_back(0.0);
+      }
+    }
+
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      mSkeleton->setPositions(init->poseTrials[trial].col(t));
+
+      for (int b = 0; b < init->grfBodyNodes.size(); b++)
+      {
+        bool footActive
+            = (init->grfTrials[trial].col(t).segment<6>(b * 6).squaredNorm()
+               > 1e-3);
+
+        // If this foot is active on this timestep, then we have to resize our
+        // contact spheres to ensure that they show contact on this frame. We do
+        // this by ensuring that the closest sphere is at least large enough to
+        // hit contact.
+        if (footActive)
+        {
+          // Check which of the contact bodies is closest to the ground
+          s_t minDist = std::numeric_limits<s_t>::infinity();
+          int closestBody = -1;
+          for (int c = 0; c < init->contactBodies[b].size(); c++)
+          {
+            auto* body = init->contactBodies[b][c];
+            Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+            s_t dist = worldPos(1) - groundHeight;
+            if (dist < minDist)
+            {
+              minDist = dist;
+              closestBody = c;
+            }
+          }
+
+          // If our closest sphere needs to expand to hit the ground, then
+          // expand it
+          if (minDist > grfContactSphereSizes[b][closestBody])
+          {
+            grfContactSphereSizes[b][closestBody] = minDist;
+          }
+        }
+      }
+    }
+
+    init->grfBodyContactSphereRadius.push_back(grfContactSphereSizes);
+    init->groundHeight.push_back(groundHeight);
+    init->flatGround.push_back(flatGround);
+
+    // 3. Create the default force plate size, if needed.
+
+    // 3.1. We only need a default force plate if any of the force plates in the
+    // trials lack the corners array
+    bool needDefaultForcePlate = false;
+    for (ForcePlate& forcePlate : init->forcePlateTrials[trial])
+    {
+      if (forcePlate.corners.size() == 0)
+      {
+        needDefaultForcePlate = true;
+        break;
+      }
+    }
+    // 3.2. If we need the default force plate, now we want to go create a
+    // rectangle to hold all the GRF data.
+    std::vector<Eigen::Vector3s> defaultCorners;
+    if (needDefaultForcePlate)
+    {
+      s_t minX = std::numeric_limits<s_t>::infinity();
+      s_t maxX = -std::numeric_limits<s_t>::infinity();
+      s_t minZ = std::numeric_limits<s_t>::infinity();
+      s_t maxZ = -std::numeric_limits<s_t>::infinity();
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        for (ForcePlate& forcePlate : init->forcePlateTrials[trial])
+        {
+          if (forcePlate.centersOfPressure[t](0) < minX)
+          {
+            minX = forcePlate.centersOfPressure[t](0);
+          }
+          if (forcePlate.centersOfPressure[t](0) > maxX)
+          {
+            maxX = forcePlate.centersOfPressure[t](0);
+          }
+          if (forcePlate.centersOfPressure[t](2) < minZ)
+          {
+            minZ = forcePlate.centersOfPressure[t](2);
+          }
+          if (forcePlate.centersOfPressure[t](2) > maxZ)
+          {
+            maxZ = forcePlate.centersOfPressure[t](2);
+          }
+        }
+      }
+
+      // Add 10cm to each side, to be very conservative
+      s_t padding = 0.10;
+      minX -= padding;
+      maxX += padding;
+      minZ -= padding;
+      maxZ += padding;
+
+      defaultCorners.push_back(Eigen::Vector3s(minX, groundHeight, minZ));
+      defaultCorners.push_back(Eigen::Vector3s(minX, groundHeight, maxZ));
+      defaultCorners.push_back(Eigen::Vector3s(maxX, groundHeight, maxZ));
+      defaultCorners.push_back(Eigen::Vector3s(maxX, groundHeight, minZ));
+    }
+    init->defaultForcePlateCorners.push_back(defaultCorners);
+
+    // 4. Determine foot-ground contact at each trial, and figure out which
+    // timesteps we think we're receiving force that isn't measured by a force
+    // plate.
+
+    std::vector<std::vector<Eigen::Vector3s>> sortedForcePlateCorners;
+    for (ForcePlate& plate : init->forcePlateTrials[trial])
+    {
+      if (plate.corners.size() > 0)
+      {
+        sortedForcePlateCorners.push_back(plate.corners);
+        math::prepareConvex2DShape(
+            sortedForcePlateCorners[sortedForcePlateCorners.size() - 1],
+            plate.corners[0],
+            Eigen::Vector3s::UnitX(),
+            Eigen::Vector3s::UnitZ());
+      }
+    }
+    if (init->defaultForcePlateCorners[trial].size() > 0)
+    {
+      math::prepareConvex2DShape(
+          init->defaultForcePlateCorners[trial],
+          init->defaultForcePlateCorners[trial][0],
+          Eigen::Vector3s::UnitX(),
+          Eigen::Vector3s::UnitZ());
+    }
+
+    std::vector<std::vector<bool>> trialForceActive;
+    std::vector<std::vector<bool>> trialSphereInContact;
+    std::vector<std::vector<bool>> trialOffForcePlate;
+    std::vector<bool> trialAnyOffForcePlate;
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      mSkeleton->setPositions(init->poseTrials[trial].col(t));
+
+      std::vector<bool> forceActive;
+      std::vector<bool> sphereInContact;
+      std::vector<bool> offForcePlate;
+      bool anyContactIsSus = false;
+      for (int b = 0; b < init->grfBodyNodes.size(); b++)
+      {
+        // 4.1. Check the GRF to see if we are measured as being in contact
+        bool footActive
+            = (init->grfTrials[trial].col(t).segment<6>(b * 6).squaredNorm()
+               > 1e-3);
+        forceActive.push_back(footActive);
+
+        // 4.2. Check all the contact bodies assigned to this GRF node to guess
+        // if we think we might be in contact here
+        bool inContact = false;
+        for (int c = 0; c < init->contactBodies[b].size(); c++)
+        {
+          auto* body = init->contactBodies[b][c];
+          Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+          s_t dist = worldPos(1) - groundHeight;
+          if (dist < grfContactSphereSizes[b][c])
+          {
+            inContact = true;
+          }
+        }
+        sphereInContact.push_back(inContact);
+
+        // 4.3. If we think from the collider heuristic that we might be in
+        // contact, but then we don't actually have any GRF, we need to be
+        // suspicious that this might be a contact outside a force plate, which
+        // would mean that our inverse dynamics should ignore these frames.
+        bool contactIsSus = false;
+        if (inContact && !footActive)
+        {
+          // 4.3.1. Iterate over each contact body, and check if its inside any
+          // of the force plates.
+          bool anyInPlate = false;
+          for (int c = 0; c < init->contactBodies[b].size(); c++)
+          {
+            auto* body = init->contactBodies[b][c];
+            Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+            for (ForcePlate& plate : init->forcePlateTrials[trial])
+            {
+              if (plate.corners.size() > 0)
+              {
+                if (math::convex2DShapeContains(
+                        worldPos,
+                        plate.corners,
+                        plate.worldOrigin,
+                        Eigen::Vector3s::UnitX(),
+                        Eigen::Vector3s::UnitZ()))
+                {
+                  anyInPlate = true;
+                  break;
+                }
+              }
+            }
+            if (init->defaultForcePlateCorners[trial].size() > 0)
+            {
+              if (math::convex2DShapeContains(
+                      worldPos,
+                      init->defaultForcePlateCorners[trial],
+                      init->defaultForcePlateCorners[trial][0],
+                      Eigen::Vector3s::UnitX(),
+                      Eigen::Vector3s::UnitZ()))
+              {
+                anyInPlate = true;
+              }
+            }
+            if (anyInPlate)
+            {
+              break;
+            }
+          }
+
+          // 4.3.2. If we're NOT over a plate, then register this frame as
+          // suspicious
+          if (!anyInPlate)
+          {
+            contactIsSus = true;
+            anyContactIsSus = true;
+          }
+        }
+
+        offForcePlate.push_back(contactIsSus);
+      }
+
+      trialForceActive.push_back(forceActive);
+      trialSphereInContact.push_back(sphereInContact);
+      trialOffForcePlate.push_back(offForcePlate);
+      trialAnyOffForcePlate.push_back(anyContactIsSus);
+    }
+
+    init->grfBodyForceActive.push_back(trialForceActive);
+    init->grfBodySphereInContact.push_back(trialSphereInContact);
+    init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
+    init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
+  }
 }
 
 //==============================================================================
@@ -2404,19 +3190,34 @@ void DynamicsFitter::runOptimization(
   }
 
   // This will automatically free the problem object when finished,
-  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will crash.
-  // If you try to leave `problem` on the stack, you'll get invalid free
-  // exceptions when IPOpt attempts to free it.
-  DynamicsFitProblem* problem
-      = new DynamicsFitProblem(init, mSkeleton, mMarkerMap, mFootNodes);
-  problem->setResidualWeight(residualWeight);
-  problem->setMarkerWeight(markerWeight);
+  // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will
+  // crash. If you try to leave `problem` on the stack, you'll get invalid
+  // free exceptions when IPOpt attempts to free it.
+  DynamicsFitProblem* problem = new DynamicsFitProblem(
+      init, mSkeleton, mMarkerMap, mTrackingMarkers, mFootNodes);
+  problem->setResidualWeight(
+      problem->mResidualUseL1 ? residualWeight
+                              : residualWeight * residualWeight);
+  problem->setMarkerWeight(
+      problem->mMarkerUseL1 ? markerWeight : markerWeight * markerWeight);
   problem->setIncludeMasses(includeMasses);
   problem->setIncludeCOMs(includeCOMs);
   problem->setIncludeInertias(includeInertias);
   problem->setIncludeBodyScales(includeBodyScales);
   problem->setIncludePoses(includePoses);
   problem->setIncludeMarkerOffsets(includeMarkerOffsets);
+
+  /*
+  Eigen::VectorXs x = problem->flatten();
+  Eigen::VectorXs fd = problem->finiteDifferenceGradient(x);
+  Eigen::VectorXs analytical = problem->computeGradient(x);
+  if (problem->debugErrors(fd, analytical, 1e-8))
+  {
+    std::cout << "Detected gradient errors in DynamicsFitter!! Quitting."
+              << std::endl;
+    exit(1);
+  }
+  */
 
   SmartPtr<DynamicsFitProblem> problemPtr(problem);
 
@@ -2441,16 +3242,148 @@ void DynamicsFitter::runOptimization(
 }
 
 //==============================================================================
-// This debugs the current state, along with visualizations of errors where
-// the dynamics do not match the force plate data
+// Get the average RMSE, in meters, of the markers
+s_t DynamicsFitter::computeAverageMarkerRMSE(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+  mSkeleton->setGroupScales(init->groupScales);
+
+  s_t result = 0;
+  int count = 0;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int i = 0; i < init->poseTrials[trial].cols(); i++)
+    {
+      mSkeleton->setPositions(init->poseTrials[trial].col(i));
+      auto simulatedMarkers
+          = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+      auto markers = init->markerObservationTrials[trial][i];
+      for (auto pair : simulatedMarkers)
+      {
+        if (markers.count(pair.first))
+        {
+          result += (markers.at(pair.first) - pair.second).norm();
+          count++;
+        }
+      }
+    }
+  }
+  std::cout << "Marker raw RMS: " << result << std::endl;
+  std::cout << "Count: " << count << std::endl;
+
+  result /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return result;
+}
+
+//==============================================================================
+// Get the average residual force, in newtons, and torque, in
+// newton-meters
+std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+
+  mSkeleton->setGroupScales(init->groupScales);
+
+  std::vector<int> footIndices;
+  for (auto foot : mFootNodes)
+  {
+    footIndices.push_back(foot->getIndexInSkeleton());
+  }
+  ResidualForceHelper helper(mSkeleton, footIndices);
+
+  s_t force = 0;
+  s_t torque = 0;
+  int count = 0;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    s_t dt = init->trialTimesteps[trial];
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        continue;
+      }
+      Eigen::VectorXs q = init->poseTrials[trial].col(t);
+      Eigen::VectorXs dq = (init->poseTrials[trial].col(t + 1)
+                            - init->poseTrials[trial].col(t))
+                           / dt;
+      Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 2)
+                             - 2 * init->poseTrials[trial].col(t + 1)
+                             + init->poseTrials[trial].col(t))
+                            / (dt * dt);
+      Eigen::Vector6s residual
+          = helper.calculateResidual(q, dq, ddq, init->grfTrials[trial].col(t));
+      torque += residual.head<3>().norm();
+      s_t frameForce = residual.tail<3>().norm();
+      // std::cout << t << ": " << frameForce << "N" << std::endl;
+      force += frameForce;
+      count++;
+    }
+  }
+  force /= count;
+  torque /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return std::make_pair(force, torque);
+}
+
+//==============================================================================
+// Get the average real measured force (in newtons) and torque (in
+// newton-meters)
+std::pair<s_t, s_t> DynamicsFitter::computeAverageRealForce(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  s_t force = 0;
+  s_t torque = 0;
+  int count = 0;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        force += init->forcePlateTrials[trial][i].forces[t].norm();
+        torque += init->forcePlateTrials[trial][i].moments[t].norm();
+      }
+      count++;
+    }
+  }
+  force /= count;
+  torque /= count;
+
+  return std::make_pair(force, torque);
+}
+
+//==============================================================================
+// This debugs the current state, along with visualizations of errors
+// where the dynamics do not match the force plate data
 void DynamicsFitter::saveDynamicsToGUI(
     const std::string& path,
     std::shared_ptr<DynamicsInitialization> init,
     int trialIndex,
     int framesPerSecond)
 {
+  std::string skeletonLayerName = "Skeleton";
+  Eigen::Vector4s skeletonLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  std::string originalSkeletonLayerName = "Original Skeleton";
+  Eigen::Vector4s originalSkeletonLayerColor
+      = Eigen::Vector4s(1.0, 0.3, 0.3, 0.3);
+  std::string markerErrorLayerName = "Marker Error";
+  Eigen::Vector4s markerErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
-  Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(0.0, 1.0, 0.0, 1.0);
+  Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string measuredForcesLayerName = "Measured Forces";
   Eigen::Vector4s measuredForcesLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
@@ -2458,6 +3391,15 @@ void DynamicsFitter::saveDynamicsToGUI(
   Eigen::Vector4s residualLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string impliedForcesLayerName = "Implied Forces";
   Eigen::Vector4s impliedForcesLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  std::string functionalJointCenterLayerName = "Functional Joint Centers";
+  Eigen::Vector4s functionalJointCenterLayerColor
+      = Eigen::Vector4s(0.0, 1.0, 0.0, 1.0);
+  std::string groundLayerName = "Ground";
+  Eigen::Vector4s groundLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  std::string groundContactLayerName = "Ground Contact";
+  Eigen::Vector4s groundContactLayerColor = Eigen::Vector4s(1.0, 1.0, 1.0, 0.5);
+  Eigen::Vector4s groundContactActiveColor
+      = Eigen::Vector4s(1.0, 0.5, 0.5, 0.5);
 
   if (trialIndex >= init->poseTrials.size())
   {
@@ -2475,19 +3417,20 @@ void DynamicsFitter::saveDynamicsToGUI(
   // Start actually rendering out results
   server::GUIRecording server;
   server.setFramesPerSecond(framesPerSecond);
-  server.renderSkeleton(mSkeleton);
-
+  server.createLayer(skeletonLayerName, skeletonLayerColor);
+  server.createLayer(originalSkeletonLayerName, originalSkeletonLayerColor);
+  server.createLayer(markerErrorLayerName, markerErrorLayerColor);
   server.createLayer(forcePlateLayerName, forcePlateLayerColor);
   server.createLayer(measuredForcesLayerName, measuredForcesLayerColor);
   server.createLayer(residualLayerName, residualLayerColor);
   server.createLayer(impliedForcesLayerName, impliedForcesLayerColor);
+  server.createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, false);
+  server.createLayer(groundLayerName, groundLayerColor);
+  server.createLayer(groundContactLayerName, groundContactLayerColor, false);
 
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trialIndex];
   Eigen::MatrixXs poses = init->poseTrials[trialIndex];
-
-  server.createSphere(
-      "skel_com", 0.02, Eigen::Vector3s::Zero(), Eigen::Vector4s(0, 0, 1, 0.5));
-  server.setObjectTooltip("skel_com", "Center of Mass");
 
   for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
   {
@@ -2499,6 +3442,34 @@ void DynamicsFitter::saveDynamicsToGUI(
     server.setObjectTooltip(
         "body_com_" + std::to_string(i),
         mSkeleton->getBodyNode(i)->getName() + " Center of Mass");
+  }
+
+  if (init->flatGround[trialIndex])
+  {
+    server.createBox(
+        "ground",
+        Eigen::Vector3s(10, 0.2, 10),
+        Eigen::Vector3s(0, init->groundHeight[trialIndex] - 0.1, 0),
+        Eigen::Vector3s::Zero(),
+        groundLayerColor,
+        groundLayerName,
+        false,
+        true);
+  }
+
+  for (int i = 0; i < init->contactBodies.size(); i++)
+  {
+    for (int j = 0; j < init->contactBodies[i].size(); j++)
+    {
+      server.createSphere(
+          "contact_sphere_" + std::to_string(i) + "_" + std::to_string(j),
+          init->grfBodyContactSphereRadius[trialIndex][i][j],
+          Eigen::Vector3s::Zero(),
+          init->grfBodyOffForcePlate[trialIndex][0][i]
+              ? groundContactActiveColor
+              : groundContactLayerColor,
+          groundContactLayerName);
+    }
   }
 
   // Render the plates as red rectangles
@@ -2521,6 +3492,19 @@ void DynamicsFitter::saveDynamicsToGUI(
     }
   }
 
+  if (init->defaultForcePlateCorners[trialIndex].size() > 0)
+  {
+    std::vector<Eigen::Vector3s> points;
+    for (int j = 0; j < init->defaultForcePlateCorners[trialIndex].size(); j++)
+    {
+      points.push_back(init->defaultForcePlateCorners[trialIndex][j]);
+    }
+    points.push_back(init->defaultForcePlateCorners[trialIndex][0]);
+
+    server.createLine(
+        "default_plate", points, forcePlateLayerColor, forcePlateLayerName);
+  }
+
   std::vector<bool> useForces;
   s_t threshold = 0.1;
   for (int timestep = 0; timestep < poses.cols(); timestep++)
@@ -2534,6 +3518,12 @@ void DynamicsFitter::saveDynamicsToGUI(
         break;
       }
     }
+    // Force ignore frames where we think there's a contact that we're not
+    // measuring
+    if (init->probablyMissingGRF[trialIndex][timestep])
+    {
+      anyForceData = false;
+    }
     useForces.push_back(anyForceData);
   }
 
@@ -2544,6 +3534,10 @@ void DynamicsFitter::saveDynamicsToGUI(
   s_t residualNorm = 0.0;
   for (int timestep = 0; timestep < poses.cols() - 2; timestep++)
   {
+    if (init->probablyMissingGRF[trialIndex][timestep])
+    {
+      continue;
+    }
     s_t dt = init->trialTimesteps[trialIndex];
     Eigen::VectorXs q = poses.col(timestep);
     Eigen::VectorXs dq = (poses.col(timestep + 1) - poses.col(timestep)) / dt;
@@ -2601,18 +3595,89 @@ void DynamicsFitter::saveDynamicsToGUI(
           residualLayerName);
     }
   }
+
+  std::shared_ptr<dynamics::Skeleton> originalSkeleton
+      = mSkeleton->cloneSkeleton();
+  originalSkeleton->setGroupScales(init->originalGroupScales);
+
+  // Render the joints, if we have them
+  int numJoints = init->jointCenters[trialIndex].rows() / 3;
+  server.createLayer(
+      functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
+  for (int i = 0; i < numJoints; i++)
+  {
+    if (init->jointWeights(i) > 0)
+    {
+      server.setObjectTooltip(
+          "joint_center_" + std::to_string(i),
+          "Joint center: " + init->joints[i]->getName());
+      server.createSphere(
+          "joint_center_" + std::to_string(i),
+          0.01 * min(3.0, (1.0 / init->jointWeights(i))),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init->jointWeights(i)),
+          functionalJointCenterLayerName);
+    }
+  }
+  int numAxis = init->jointAxis[trialIndex].rows() / 6;
+  for (int i = 0; i < numAxis; i++)
+  {
+    if (init->axisWeights(i) > 0)
+    {
+      server.createCapsule(
+          "joint_axis_" + std::to_string(i),
+          0.003 * min(3.0, (1.0 / init->axisWeights(i))),
+          0.1,
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector3s::Zero(),
+          Eigen::Vector4s(
+              functionalJointCenterLayerColor(0),
+              functionalJointCenterLayerColor(1),
+              functionalJointCenterLayerColor(2),
+              init->axisWeights(i)),
+          functionalJointCenterLayerName);
+    }
+  }
+
   for (int timestep = 0; timestep < poses.cols(); timestep++)
   {
     mSkeleton->setPositions(poses.col(timestep));
-    server.renderSkeleton(mSkeleton);
+    server.renderSkeleton(
+        mSkeleton, "skel", Eigen::Vector4s::Ones() * -1, skeletonLayerName);
 
-    server.setObjectPosition("skel_com", coms[timestep]);
+    // Render foot-ground contact spheres
+    for (int i = 0; i < init->contactBodies.size(); i++)
+    {
+      for (int j = 0; j < init->contactBodies[i].size(); j++)
+      {
+        server.setObjectPosition(
+            "contact_sphere_" + std::to_string(i) + "_" + std::to_string(j),
+            init->contactBodies[i][j]->getWorldTransform().translation());
+        if (init->grfBodyOffForcePlate[trialIndex][timestep][i])
+        {
+          server.setObjectColor(
+              "contact_sphere_" + std::to_string(i) + "_" + std::to_string(j),
+              groundContactActiveColor);
+        }
+        else
+        {
+          server.setObjectColor(
+              "contact_sphere_" + std::to_string(i) + "_" + std::to_string(j),
+              groundContactLayerColor);
+        }
+      }
+    }
+
+    // Render COMs
     for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
     {
       server.setObjectPosition(
           "body_com_" + std::to_string(i), mSkeleton->getBodyNode(i)->getCOM());
     }
-
     for (int i = 0; i < forcePlates.size(); i++)
     {
       server.deleteObject("force_" + std::to_string(i));
@@ -2630,6 +3695,83 @@ void DynamicsFitter::saveDynamicsToGUI(
             forcePlateLayerName);
       }
     }
+
+    // Render Marker Errors
+    auto simulatedMarkers
+        = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+    auto realMarkers = init->markerObservationTrials[trialIndex][timestep];
+    for (auto pair : simulatedMarkers)
+    {
+      if (realMarkers.count(pair.first))
+      {
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(pair.second);
+        points.push_back(realMarkers.at(pair.first));
+        server.createLine(
+            "error_" + pair.first,
+            points,
+            markerErrorLayerColor,
+            markerErrorLayerName);
+      }
+    }
+
+    // Render virtual joints
+    for (int i = 0; i < numJoints; i++)
+    {
+      if (init->jointWeights(i) > 0)
+      {
+        Eigen::Vector3s inferredJointCenter
+            = init->jointCenters[trialIndex].block<3, 1>(i * 3, timestep);
+        server.setObjectPosition(
+            "joint_center_" + std::to_string(i), inferredJointCenter);
+        if (i < init->jointsAdjacentMarkers.size())
+        {
+          for (std::string marker : init->jointsAdjacentMarkers[i])
+          {
+            if (init->markerObservationTrials[trialIndex][timestep].count(
+                    marker))
+            {
+              std::vector<Eigen::Vector3s> centerToMarker;
+              centerToMarker.push_back(inferredJointCenter);
+              centerToMarker.push_back(
+                  init->markerObservationTrials[trialIndex][timestep][marker]);
+              server.createLine(
+                  "joint_center_" + std::to_string(i) + "_to_marker_" + marker,
+                  centerToMarker,
+                  functionalJointCenterLayerColor,
+                  functionalJointCenterLayerName);
+            }
+          }
+        }
+      }
+    }
+    for (int i = 0; i < numAxis; i++)
+    {
+      if (init->axisWeights(i) > 0)
+      {
+        // Render an axis capsule
+        server.setObjectPosition(
+            "joint_axis_" + std::to_string(i),
+            init->jointAxis[trialIndex].block<3, 1>(i * 6, timestep));
+        Eigen::Vector3s dir
+            = init->jointAxis[trialIndex].block<3, 1>(i * 6 + 3, timestep);
+        Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
+        R.col(2) = dir;
+        R.col(1) = Eigen::Vector3s::UnitZ().cross(dir);
+        R.col(0) = R.col(1).cross(R.col(2));
+        server.setObjectRotation(
+            "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
+      }
+    }
+
+    // Render Original Skeleton
+    originalSkeleton->setPositions(
+        init->originalPoses[trialIndex].col(timestep));
+    server.renderSkeleton(
+        originalSkeleton,
+        "original_skel",
+        originalSkeletonLayerColor,
+        originalSkeletonLayerName);
     server.saveFrame();
   }
 

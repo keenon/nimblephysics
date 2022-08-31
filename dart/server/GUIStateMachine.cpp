@@ -1812,7 +1812,7 @@ void GUIStateMachine::encodeCreateBox(proto::CommandList& list, Box& box)
   command->mutable_box()->add_data((double)box.color(1));
   command->mutable_box()->add_data((double)box.color(2));
   command->mutable_box()->add_data((double)box.color(3));
-  command->mutable_box()->set_cast_shadows(box.receiveShadows);
+  command->mutable_box()->set_cast_shadows(box.castShadows);
   command->mutable_box()->set_receive_shadows(box.receiveShadows);
 }
 
@@ -1822,7 +1822,7 @@ void GUIStateMachine::encodeCreateSphere(
   proto::Command* command = list.add_command();
   command->mutable_sphere()->set_key(getStringCode(sphere.key));
   command->mutable_sphere()->set_layer(getStringCode(sphere.layer));
-  command->mutable_sphere()->set_cast_shadows(sphere.receiveShadows);
+  command->mutable_sphere()->set_cast_shadows(sphere.castShadows);
   command->mutable_sphere()->set_receive_shadows(sphere.receiveShadows);
   command->mutable_sphere()->add_data((double)sphere.radius);
   command->mutable_sphere()->add_data((double)sphere.pos(0));
@@ -1854,7 +1854,7 @@ void GUIStateMachine::encodeCreateCapsule(
   proto::Command* command = list.add_command();
   command->mutable_capsule()->set_key(getStringCode(capsule.key));
   command->mutable_capsule()->set_layer(getStringCode(capsule.layer));
-  command->mutable_capsule()->set_cast_shadows(capsule.receiveShadows);
+  command->mutable_capsule()->set_cast_shadows(capsule.castShadows);
   command->mutable_capsule()->set_receive_shadows(capsule.receiveShadows);
   command->mutable_capsule()->add_data((double)capsule.radius);
   command->mutable_capsule()->add_data((double)capsule.height);
@@ -1933,7 +1933,7 @@ void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
   command->mutable_mesh()->add_data((double)mesh.color(1));
   command->mutable_mesh()->add_data((double)mesh.color(2));
   command->mutable_mesh()->add_data((double)mesh.color(3));
-  command->mutable_mesh()->set_cast_shadows(mesh.receiveShadows);
+  command->mutable_mesh()->set_cast_shadows(mesh.castShadows);
   command->mutable_mesh()->set_receive_shadows(mesh.receiveShadows);
 }
 

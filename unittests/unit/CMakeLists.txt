@@ -102,6 +102,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_OpenSimParser dart-utils)
   target_link_libraries(test_OpenSimParser dart-utils-urdf)
 
+  dart_add_test("unit" test_IKLimits)
+  target_link_libraries(test_IKLimits dart-utils)
+  target_link_libraries(test_IKLimits dart-utils-urdf)
+
   dart_add_test("unit" test_ConstraintSolver)
   target_link_libraries(test_ConstraintSolver dart-utils)
   target_link_libraries(test_ConstraintSolver dart-utils-urdf)

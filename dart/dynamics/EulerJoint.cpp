@@ -408,7 +408,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
   s_t det = luJTJ.determinant();
   if (det < 1e-8)
   {
-    std::cout << "ill-conditioned Jacobian in joint."
+    std::cout << "ill-conditioned Jacobian in joint"
               << " The determinant of the Jacobian is (" << det << ")."
               << std::endl;
     std::cout << "rank is (" << luJTJ.rank() << ")." << std::endl;
