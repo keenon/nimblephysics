@@ -47,6 +47,8 @@
 #include "dart/math/Helpers.hpp"
 
 namespace dart {
+
+using namespace math;
 namespace collision {
 
 // point : world coordinate vector
@@ -3613,44 +3615,6 @@ void keepOnlyConvex2DHull(
   }
 }
 
-/// This is necessary preparation for rapidly checking if another point is
-/// contained within the convex shape. This sorts the shape by angle from the
-/// center, and trims out any points that lie inside the convex polygon.
-void prepareConvex2DShape(
-    std::vector<Eigen::Vector3s>& shape,
-    const Eigen::Vector3s& origin,
-    const Eigen::Vector3s& basis2dX,
-    const Eigen::Vector3s& basis2dY)
-{
-  // Sort the shape in clockwise order around some internal point (choose the
-  // average).
-  Eigen::Vector2s avg = Eigen::Vector2s::Zero();
-  for (Eigen::Vector3s pt : shape)
-  {
-    avg += pointInPlane(pt, origin, basis2dX, basis2dY);
-  }
-  avg /= shape.size();
-  std::sort(
-      shape.begin(),
-      shape.end(),
-      [&avg, &origin, &basis2dX, &basis2dY](
-          Eigen::Vector3s& a, Eigen::Vector3s& b) {
-        return angle2D(avg, pointInPlane(a, origin, basis2dX, basis2dY))
-               < angle2D(avg, pointInPlane(b, origin, basis2dX, basis2dY));
-      });
-}
-
-/// This transforms a 3D point down to a 2D point in the given 3D plane
-Eigen::Vector2s pointInPlane(
-    const Eigen::Vector3s& point,
-    const Eigen::Vector3s& origin,
-    const Eigen::Vector3s& basis2dX,
-    const Eigen::Vector3s& basis2dY)
-{
-  return Eigen::Vector2s(
-      (point - origin).dot(basis2dX), (point - origin).dot(basis2dY));
-}
-
 /*
 /// This is necessary preparation for rapidly checking if another point is
 /// contained within the convex shape.
@@ -3815,11 +3779,6 @@ bool convex2DShapeContains(
   }
 
   return true;
-}
-
-s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to)
-{
-  return atan2(to(1) - from(1), to(0) - from(0));
 }
 
 // Returns 1 if the lines intersect, otherwise 0. In addition, if the lines

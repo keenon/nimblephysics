@@ -414,6 +414,7 @@ void keepOnlyConvex2DHull(
     const Eigen::Vector3s& basis2dX,
     const Eigen::Vector3s& basis2dY);
 
+/*
 /// This is necessary preparation for rapidly checking if another point is
 /// contained within the convex shape. This sorts the shape by angle from
 /// the center, and trims out any points that lie inside the convex polygon.
@@ -444,6 +445,7 @@ s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to);
 // This implements the "2D cross product" as redefined here:
 // https://stackoverflow.com/a/565282/13177487
 inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w);
+*/
 
 /// This returns true if the two line segments defined by (p0,p1) and (q0,q1)
 /// intersect. If they do intersect, this writes the intersection point to
