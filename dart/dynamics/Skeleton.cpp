@@ -3699,6 +3699,7 @@ void Skeleton::ensureBodyScaleGroups()
       mBodyScaleGroups.emplace_back();
       BodyScaleGroup& group = mBodyScaleGroups.back();
       group.nodes.push_back(getBodyNode(i));
+      group.flipAxis.push_back(Eigen::Vector3s::Ones());
       group.uniformScaling = false;
     }
     updateGroupScaleIndices();
@@ -3722,11 +3723,50 @@ int Skeleton::getScaleGroupIndex(dynamics::BodyNode* bodyNode)
 }
 
 //==============================================================================
+/// This returns the axis flips of this body in the scale group that this body
+/// node corresponds to
+Eigen::Vector3s Skeleton::getScaleGroupFlips(dynamics::BodyNode* bodyNode)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
+    {
+      if (mBodyScaleGroups[i].nodes[j]->getName() == bodyNode->getName())
+        return mBodyScaleGroups[i].flipAxis[j];
+    }
+  }
+  return Eigen::Vector3s::Ones();
+}
+
+//==============================================================================
 /// This takes two scale groups and merges their contents into a single group.
 /// After this operation, there is one fewer scale group.
 void Skeleton::mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b)
 {
   mergeScaleGroupsByIndex(getScaleGroupIndex(a), getScaleGroupIndex(b));
+}
+
+//==============================================================================
+/// The scale group axis flips
+void Skeleton::autodetectScaleGroupAxisFlips(int symmetryAxis)
+{
+  for (BodyScaleGroup& group : mBodyScaleGroups)
+  {
+    s_t midPoint = 0.0;
+    for (auto* node : group.nodes)
+    {
+      midPoint += node->getWorldTransform().translation()(symmetryAxis);
+    }
+    midPoint /= group.nodes.size();
+    for (int j = 0; j < group.nodes.size(); j++)
+    {
+      bool positive
+          = midPoint - 1e-8
+            <= group.nodes[j]->getWorldTransform().translation()(symmetryAxis);
+      group.flipAxis[j](symmetryAxis) = positive ? 1.0 : -1.0;
+    }
+  }
 }
 
 //==============================================================================
@@ -3901,6 +3941,8 @@ void Skeleton::mergeScaleGroupsByIndex(int a, int b)
     // Transfer all elems from A to B
     for (dynamics::BodyNode*& node : groupA.nodes)
       groupB.nodes.push_back(node);
+    for (Eigen::Vector3s& flips : groupA.flipAxis)
+      groupB.flipAxis.push_back(flips);
     // If either group has uniform scaling, merged group has it
     groupB.uniformScaling = groupA.uniformScaling || groupB.uniformScaling;
     // Then erase A
@@ -3911,6 +3953,8 @@ void Skeleton::mergeScaleGroupsByIndex(int a, int b)
     // Transfer all elems from B to A
     for (dynamics::BodyNode*& node : groupB.nodes)
       groupA.nodes.push_back(node);
+    for (Eigen::Vector3s& flips : groupB.flipAxis)
+      groupA.flipAxis.push_back(flips);
     // If either group has uniform scaling, merged group has it
     groupA.uniformScaling = groupA.uniformScaling || groupB.uniformScaling;
     // Then erase B
@@ -4524,7 +4568,8 @@ Eigen::VectorXs Skeleton::getGroupCOMs()
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
     groups.segment<3>(i * 3)
-        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOM();
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOM().cwiseProduct(
+            mBodyScaleGroups[i].flipAxis[0]);
   }
   return groups;
 }
@@ -4567,9 +4612,11 @@ void Skeleton::setGroupCOMs(Eigen::VectorXs coms)
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
-    for (auto* node : mBodyScaleGroups[i].nodes)
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
     {
-      node->setLocalCOM(coms.segment<3>(i * 3));
+      auto* node = mBodyScaleGroups[i].nodes[j];
+      node->setLocalCOM(
+          coms.segment<3>(i * 3).cwiseProduct(mBodyScaleGroups[i].flipAxis[j]));
     }
   }
 }
@@ -4583,8 +4630,17 @@ Eigen::VectorXs Skeleton::getGroupInertias()
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
-    groups.segment<6>(i * 6)
-        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentVector();
+    Eigen::Vector3s flips = mBodyScaleGroups[i].flipAxis[0];
+    Eigen::Vector6s dimsAndEulers
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getDimsAndEulerVector();
+    // If we are flipping the Z axis, we want to negate the X and Y rotations,
+    // but leave Z the same
+    if (flips(2) < 0)
+    {
+      dimsAndEulers(3 + 0) *= -1;
+      dimsAndEulers(3 + 1) *= -1;
+    }
+    groups.segment<6>(i * 6) = dimsAndEulers;
   }
   return groups;
 }
@@ -4597,9 +4653,19 @@ void Skeleton::setGroupInertias(Eigen::VectorXs inertias)
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
-    for (auto* node : mBodyScaleGroups[i].nodes)
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
     {
-      node->setMomentVector(inertias.segment<6>(i * 6));
+      auto* node = mBodyScaleGroups[i].nodes[j];
+      Eigen::Vector3s flips = mBodyScaleGroups[i].flipAxis[j];
+      Eigen::Vector6s dimsAndEulers = inertias.segment<6>(i * 6);
+      // If we are flipping the Z axis, we want to negate the X and Y rotations,
+      // but leave Z the same
+      if (flips(2) < 0)
+      {
+        dimsAndEulers(3 + 0) *= -1;
+        dimsAndEulers(3 + 1) *= -1;
+      }
+      node->setDimsAndEulersVector(dimsAndEulers);
     }
   }
 }
@@ -4614,8 +4680,10 @@ Eigen::VectorXs Skeleton::getGroupInertiasUpperBound()
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
-    groups.segment<6>(i * 6)
-        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentUpperBound();
+    groups.segment<6>(i * 6) = mBodyScaleGroups[i]
+                                   .nodes[0]
+                                   ->getInertia()
+                                   .getDimsAndEulerUpperBound();
   }
   return groups;
 }
@@ -4630,8 +4698,10 @@ Eigen::VectorXs Skeleton::getGroupInertiasLowerBound()
   for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
     assert(mBodyScaleGroups[i].nodes.size() > 0);
-    groups.segment<6>(i * 6)
-        = mBodyScaleGroups[i].nodes[0]->getInertia().getMomentLowerBound();
+    groups.segment<6>(i * 6) = mBodyScaleGroups[i]
+                                   .nodes[0]
+                                   ->getInertia()
+                                   .getDimsAndEulerLowerBound();
   }
   return groups;
 }
@@ -5017,6 +5087,10 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
     for (auto body : mBodyScaleGroups[i].nodes)
     {
       group.nodes.push_back(copy->getBodyNode(body->getName()));
+    }
+    for (auto flips : mBodyScaleGroups[i].flipAxis)
+    {
+      group.flipAxis.push_back(flips);
     }
   }
 

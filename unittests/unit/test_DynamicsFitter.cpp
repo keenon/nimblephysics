@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 
+#include <IpAlgTypes.hpp>
 #include <gtest/gtest.h>
 
 #include "dart/biomechanics/DynamicsFitter.hpp"
@@ -695,10 +696,14 @@ bool testResidualGradWrt(
   Eigen::VectorXs fd = helper.finiteDifferenceResidualNormGradientWrt(
       originalPos, originalVel, acc, concatForces, wrt);
 
+  s_t max = fd.cwiseAbs().maxCoeff();
+  analytical /= max;
+  fd /= max;
+
   if (!equals(analytical, fd, 6e-8))
   {
-    std::cout << "Gradient of norm(tau) wrt " << wrt->name() << " not equal!"
-              << std::endl;
+    std::cout << "Gradient of norm(tau) (divided by max coeff=" << max
+              << ") wrt " << wrt->name() << " not equal!" << std::endl;
     Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 4);
     compare.col(0) = analytical;
     compare.col(1) = fd;
@@ -776,11 +781,29 @@ bool testRelationshipBetweenResidualAndLinear(
       init->trackingMarkers,
       init->grfBodyNodes);
   problem.setMarkerWeight(0);
+  problem.setResidualUseL1(false);
   problem.setResidualWeight(1.0);
+  problem.setResidualUseL1(true);
   problem.setIncludePoses(false);
+
+  // Disable regularization
+  problem.setRegularizeAnatomicalMarkerOffsets(0);
+  problem.setRegularizeTrackingMarkerOffsets(0);
+  problem.setRegularizeBodyScales(0);
+  problem.setRegularizeCOMs(0);
+  problem.setRegularizeInertias(0);
+  problem.setRegularizeMasses(0);
+  problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
 
   s_t problemLoss = problem.computeLoss(problem.flatten());
   std::cout << "Problem loss: " << problemLoss << std::endl;
+
+  int totalAccTimesteps = 0;
+  for (int trial = 0; trial < problem.mAccs.size(); trial++)
+  {
+    totalAccTimesteps += problem.mAccs[trial].cols();
+  }
 
   s_t residualNorm = 0.0;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
@@ -795,6 +818,11 @@ bool testRelationshipBetweenResidualAndLinear(
 
     for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
     {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        continue;
+      }
+
       s_t dt = init->trialTimesteps[trial];
       Eigen::VectorXs q = init->poseTrials[trial].col(t);
       Eigen::VectorXs dq = (init->poseTrials[trial].col(t + 1)
@@ -849,10 +877,30 @@ bool testRelationshipBetweenResidualAndLinear(
           = (comAcc - skel->getGravity()) * skel->getMass();
 
       Eigen::Vector6s residual = helper.calculateResidual(q, dq, ddq, grf);
-      std::cout << "Test residual t=" << t << ": " << std::endl
-                << residual << std::endl;
+      // std::cout << "Test residual t=" << t << ": " << std::endl
+      //           << residual << std::endl;
 
-      residualNorm += residual.squaredNorm();
+      s_t otherLoss = helper.calculateResidualNorm(
+          q, dq, ddq, grf, problem.mResidualUseL1);
+      if (problem.mResidualUseL1)
+      {
+        s_t loss = 0.0;
+        loss += residual.head<3>().norm();
+        loss += residual.tail<3>().norm();
+
+        if (abs(loss - otherLoss) > 1e-10)
+        {
+          std::cout << "Different at time " << t << ": " << loss << " vs "
+                    << otherLoss << " (" << (loss - otherLoss) << ")"
+                    << std::endl;
+        }
+
+        residualNorm += loss / totalAccTimesteps;
+      }
+      else
+      {
+        residualNorm += residual.squaredNorm();
+      }
       Eigen::Vector3s residualForce = residual.tail<3>();
 
       Eigen::Vector3s totalWithResidual = residualForce;
@@ -880,7 +928,11 @@ bool testRelationshipBetweenResidualAndLinear(
   }
 
   std::cout << "Residual norm: " << residualNorm << std::endl;
-  EXPECT_EQ(residualNorm, problemLoss);
+  if (abs(residualNorm - problemLoss) > 1e-8)
+  {
+    EXPECT_EQ(residualNorm, problemLoss);
+    return false;
+  }
 
   return true;
 }
@@ -903,21 +955,38 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   std::cout << "Avg Force: " << secondPair.first << " N" << std::endl;
   std::cout << "Avg Torque: " << secondPair.second << " Nm" << std::endl;
 
-  fitter.estimateFootGroundContacts(init);
+  /*
+  if (!testRelationshipBetweenResidualAndLinear(skel, init))
+  {
+    std::cout << "The residual norm doesn't map!" << std::endl;
+    return init;
+  }
+  */
 
+  // skel->setGroupInertias(skel->getGroupInertias());
+
+  // fitter.setCheckDerivatives(true);
   // fitter.setIterationLimit(100);
-  // fitter.runOptimization(init, 2e-2, 100, true, false, true, true, true,
-  // true);
+  // fitter.runOptimization(init, 0, 1, false, false, false, true, false,
+  // false);
 
+  // Just optimize the inertia regularizer
   fitter.setIterationLimit(100);
-  fitter.runOptimization(
-      init, 2e-2, 100, true, false, true, false, false, false);
+  fitter.runOptimization(init, 2e-2, 100, true, true, true, false, true, false);
+
+  // fitter.runOptimization(
+  //     init, 2e-2, 100, true, false, true, false, false, false);
   fitter.setIterationLimit(200);
+  // fitter.setCheckDerivatives(true);
   fitter.runOptimization(
       init, 2e-2, 100, true, false, true, false, true, false);
-  // fitter.setIterationLimit(200);
-  // fitter.runOptimization(init, 2e-2, 100, true, false, true, true, true,
-  // false);
+
+  /*
+  // Fine tune the positions, body scales, and marker offsets
+  fitter.setIterationLimit(100);
+  fitter.runOptimization(
+      init, 2e-2, 100, false, false, false, true, true, true);
+    */
 
   std::cout << "Post optimization mass: " << init->bodyMasses.sum() << " kg"
             << std::endl;
@@ -931,6 +1000,10 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::cout << "  \"" << bodyNode->getName() << "\": " << init->bodyMasses(i)
               << " kg (" << (init->bodyMasses(i) / bodyNode->getMass()) * 100
               << "% of original " << bodyNode->getMass() << " kg)" << std::endl;
+    Eigen::Vector6s m = bodyNode->getInertia().getDimsAndEulerVector();
+    std::cout << "      -> box dims (" << m(0) << "," << m(1) << "," << m(2)
+              << ") and eulers (" << m(3) << "," << m(4) << "," << m(5) << ")"
+              << std::endl;
   }
   skel->setLinkMasses(init->bodyMasses);
 
@@ -1100,6 +1173,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autodetectScaleGroupAxisFlips(2);
   if (standard.skeleton->getBodyNode("hand_r") != nullptr)
   {
     standard.skeleton->setScaleGroupUniformScaling(
@@ -1198,8 +1272,8 @@ TEST(DynamicsFitter, ID_EQNS)
   //     file.skeleton, worldForces, WithRespectTo::GROUP_MASSES));
   // EXPECT_TRUE(testResidualJacWrt(
   //     file.skeleton, worldForces, WithRespectTo::GROUP_COMS));
-  // EXPECT_TRUE(testResidualJacWrt(
-  //     file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
+  EXPECT_TRUE(testResidualJacWrt(
+      file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
 
   EXPECT_TRUE(
       testResidualGradWrt(file.skeleton, worldForces, WithRespectTo::POSITION));
@@ -1219,6 +1293,30 @@ TEST(DynamicsFitter, ID_EQNS)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, IMPLIED_DENSITY_TEST)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+  file.skeleton->setPositions(file.skeleton->getRandomPose());
+  file.skeleton->setVelocities(file.skeleton->getRandomVelocity());
+
+  std::cout << "For reference, water is 997 kg/m^3 (this is not an accident, "
+               "due to definitions)"
+            << std::endl;
+  std::cout << "Average body density is 985 kg/m^3 (slightly less than water)"
+            << std::endl;
+  for (int i = 0; i < file.skeleton->getNumBodyNodes(); i++)
+  {
+    auto* bodyNode = file.skeleton->getBodyNode(i);
+    std::cout << bodyNode->getName() << ": "
+              << bodyNode->getInertia().getImpliedCubeDensity() << " kg/m^3"
+              << std::endl;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
 {
   std::vector<std::string> motFiles;
@@ -1233,6 +1331,8 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
   OpenSimFile standard = OpenSimParser::parseOsim(
       "dart://sample/grf/Subject4/Models/"
       "optimized_scale_and_markers.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autodetectScaleGroupAxisFlips(2);
 
   std::vector<std::string> footNames;
   footNames.push_back("calcn_r");
@@ -1263,7 +1363,9 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
   problem.setMarkerWeight(0.0);
   problem.setMarkerUseL1(false);
 
-  problem.setResidualWeight(1.0);
+  /// The absolute value of the loss function can be very large, which leads to
+  /// numerical precision issues when finite differencing over it.
+  problem.setResidualWeight(1e-4);
   problem.setResidualUseL1(false);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
@@ -1295,7 +1397,6 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
       standard.skeleton->setPositions(problem.mPoses[trial].col(t));
       standard.skeleton->setVelocities(problem.mVels[trial].col(t));
       standard.skeleton->setAccelerations(problem.mAccs[trial].col(t));
-      ;
       bool pos = testResidualGradWrt(
           standard.skeleton,
           forces,
@@ -1324,6 +1425,16 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
       if (!acc)
       {
         EXPECT_TRUE(acc);
+        return;
+      }
+      bool scales = testResidualGradWrt(
+          standard.skeleton,
+          forces,
+          WithRespectTo::GROUP_SCALES,
+          init->grfTrials[trial].col(t));
+      if (!scales)
+      {
+        EXPECT_TRUE(scales);
         return;
       }
       bool mass = testResidualGradWrt(
@@ -1362,31 +1473,17 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
   Eigen::VectorXs analytical = problem.computeGradient(x);
   Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
 
-#ifdef DART_USE_ARBITRARY_PRECISION
-  if (!equals(analytical, fd, 1e-7))
+  s_t tol = 1e-8;
+  if (!equals(analytical, fd, tol))
   {
     std::cout
         << "Gradient of DynamicsFitProblem (only residual RMSE) not equal!"
         << std::endl;
-    problem.debugErrors(fd, analytical, 1e-7);
-    EXPECT_TRUE(equals(analytical, fd, 1e-7));
+    problem.debugErrors(fd, analytical, tol);
+    EXPECT_TRUE(equals(analytical, fd, tol));
 
     return;
   }
-#else
-  /// These gradients are VERY STIFF, and so are super difficult to finite
-  /// difference accurately with 64 bit floating point
-  if (!equals(analytical, fd, 3e-3))
-  {
-    std::cout
-        << "Gradient of DynamicsFitProblem (only residual RMSE) not equal!"
-        << std::endl;
-    problem.debugErrors(fd, analytical, 3e-3);
-    EXPECT_TRUE(equals(analytical, fd, 3e-3));
-
-    return;
-  }
-#endif
 }
 #endif
 
@@ -1443,6 +1540,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
   problem.setRegularizeInertias(0);
   problem.setRegularizeMasses(0);
   problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1455,6 +1553,112 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
   {
     std::cout
         << "Gradient of DynamicsFitProblem (only L2 marker RMSE) not equal!"
+        << std::endl;
+    EXPECT_FALSE(result);
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_DENSITY)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  bool anyBadJoints = false;
+  for (int i = 0; i < standard.skeleton->getNumBodyNodes(); i++)
+  {
+    Eigen::Vector6s analytical
+        = standard.skeleton->getBodyNode(i)
+              ->getInertia()
+              .getImpliedCubeDensityGradientWrtMomentVector();
+    Eigen::Vector6s fd
+        = standard.skeleton->getBodyNode(i)
+              ->getInertia()
+              .clone()
+              .finiteDifferenceImpliedCubeDensityGradientWrtMomentVector();
+    if ((analytical - fd).squaredNorm() > 1e-7)
+    {
+      std::cout << "Inertia grads equal on body \""
+                << standard.skeleton->getBodyNode(i)->getName() << "\" (" << i
+                << " at index [" << i * 6 << "-" << (i + 1) * 6
+                << "]): " << std::endl;
+      std::cout << "Analytical: " << std::endl << analytical << std::endl;
+      std::cout << "FD: " << std::endl << fd << std::endl;
+      std::cout << "Diff: " << std::endl << analytical - fd << std::endl;
+      anyBadJoints = true;
+    }
+  }
+  (void)anyBadJoints;
+  /*
+  if (anyBadJoints)
+  {
+    EXPECT_FALSE(anyBadJoints);
+    return;
+  }
+  */
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init,
+      standard.skeleton,
+      init->updatedMarkerMap,
+      standard.trackingMarkers,
+      footNodes);
+  problem.setResidualWeight(0.0);
+  problem.setMarkerWeight(0.0);
+
+  problem.setRegularizeImpliedDensity(1e-5);
+
+  // Disable regularization
+  problem.setRegularizeAnatomicalMarkerOffsets(0);
+  problem.setRegularizeTrackingMarkerOffsets(0);
+  problem.setRegularizeBodyScales(0);
+  problem.setRegularizeCOMs(0);
+  problem.setRegularizeInertias(0);
+  problem.setRegularizeMasses(0);
+  problem.setRegularizePoses(0);
+
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x, false);
+
+  bool result = problem.debugErrors(fd, analytical, 3e-8);
+  if (result)
+  {
+    std::cout
+        << "Gradient of DynamicsFitProblem (only density gradients) not equal!"
         << std::endl;
     EXPECT_FALSE(result);
     return;
@@ -1553,6 +1757,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L1)
   problem.setRegularizeInertias(0);
   problem.setRegularizeMasses(0);
   problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1699,6 +1904,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_MARKERS_L1_MATCHES_AVG_RMS)
   problem.setRegularizeInertias(0);
   problem.setRegularizeMasses(0);
   problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
 
   s_t loss = problem.computeLoss(problem.flatten());
 
@@ -1766,6 +1972,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_RESIDUAL_L1_MATCHES_AVG_RMS)
   problem.setRegularizeInertias(0);
   problem.setRegularizeMasses(0);
   problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
 
   s_t loss = problem.computeLoss(problem.flatten());
 
@@ -1831,6 +2038,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_REGULARIZATION)
   problem.setRegularizeInertias(3.0);
   problem.setRegularizeBodyScales(4.0);
   problem.setRegularizePoses(5.0);
+  problem.setRegularizeImpliedDensity(0);
   problem.setRegularizeTrackingMarkerOffsets(6.0);
   problem.setRegularizeAnatomicalMarkerOffsets(7.0);
 
@@ -1896,6 +2104,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
       init->updatedMarkerMap,
       standard.trackingMarkers,
       footNodes);
+  problem.setIncludeInertias(true);
   problem.setIncludePoses(true);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1981,6 +2190,134 @@ TEST(DynamicsFitter, RESIDUALS)
 
   EXPECT_TRUE(
       testRelationshipBetweenResidualAndLinear(standard.skeleton, init));
+}
+#endif
+
+#ifdef BLOCKING_GUI_TESTS
+TEST(DynamicsFitter, GROUP_SYMMETRY)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autodetectScaleGroupAxisFlips(2);
+  int index = standard.skeleton->getScaleGroupIndex(
+      standard.skeleton->getBodyNode("hand_l"));
+
+  Eigen::VectorXs groupCOMs = standard.skeleton->getGroupCOMs();
+  groupCOMs.segment<3>(index * 3) += Eigen::Vector3s::UnitZ() * 0.5;
+  standard.skeleton->setGroupCOMs(groupCOMs);
+
+  Eigen::VectorXs groupDimsAndEuler = standard.skeleton->getGroupInertias();
+  Eigen::Vector6s dimsAndEulers = groupDimsAndEuler.segment<6>(index * 6);
+  dimsAndEulers(3) += M_PI / 4; // Rotate X by 45 degrees
+  groupDimsAndEuler.segment<6>(index * 6) = dimsAndEulers;
+  standard.skeleton->setGroupInertias(groupDimsAndEuler);
+
+  const BodyScaleGroup& group = standard.skeleton->getBodyScaleGroup(index);
+  (void)group;
+
+  GUIWebsocketServer server;
+  server.renderBasis();
+  server.renderSkeleton(standard.skeleton);
+  server.renderSkeletonInertiaCubes(standard.skeleton);
+  server.serve(8070);
+  server.blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, RECOVER_X)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init,
+      standard.skeleton,
+      init->updatedMarkerMap,
+      standard.trackingMarkers,
+      footNodes);
+  Eigen::VectorXs x = problem.flatten();
+  x += Eigen::VectorXs::Random(x.size()) * 0.01;
+  problem.unflatten(x);
+  s_t loss = problem.computeLoss(x);
+  problem.intermediate_callback(
+      Ipopt::AlgorithmMode::RegularMode,
+      0,
+      loss,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      nullptr,
+      nullptr);
+  problem.finalize_solution(
+      Ipopt::SolverReturn::SUCCESS,
+      0,
+      nullptr,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr);
+
+  DynamicsFitProblem problem2(
+      init,
+      standard.skeleton,
+      init->updatedMarkerMap,
+      standard.trackingMarkers,
+      footNodes);
+  Eigen::VectorXs x2 = problem2.flatten();
+
+  if (!equals(x, x2, 1e-10))
+  {
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(x.size(), 3);
+    compare.col(0) = x;
+    compare.col(1) = x2;
+    compare.col(2) = x - x2;
+    std::cout << "x - recovered - diff" << std::endl << compare << std::endl;
+    EXPECT_TRUE(equals(x, x2, 1e-10));
+
+    problem.debugErrors(x2, x, 1e-10);
+    return;
+  }
 }
 #endif
 

@@ -18,6 +18,8 @@
 #include "dart/neural/DifferentiableExternalForce.hpp"
 #include "dart/neural/WithRespectTo.hpp"
 
+#define HUMAN_DENSITY_KG_M3 985.0
+
 namespace dart {
 namespace biomechanics {
 
@@ -130,8 +132,10 @@ struct DynamicsInitialization
   ///////////////////////////////////////////
   // Pure dynamics values
   Eigen::VectorXs bodyMasses;
+  Eigen::VectorXs groupMasses;
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> bodyCom;
   Eigen::Matrix<s_t, 6, Eigen::Dynamic> bodyInertia;
+  Eigen::VectorXs groupInertias;
 
   ///////////////////////////////////////////
   // Values from the kinematics fitter that are relevant here as well. The key
@@ -252,6 +256,7 @@ public:
   DynamicsFitProblem& setRegularizePoses(s_t value);
   DynamicsFitProblem& setRegularizeTrackingMarkerOffsets(s_t value);
   DynamicsFitProblem& setRegularizeAnatomicalMarkerOffsets(s_t value);
+  DynamicsFitProblem& setRegularizeImpliedDensity(s_t value);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -390,6 +395,9 @@ public:
   s_t mRegularizePoses;
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
+  s_t mRegularizeImpliedDensity;
+
+  bool mVelAccImplicit;
 
   std::vector<Eigen::MatrixXs> mPoses;
   std::vector<Eigen::MatrixXs> mVels;

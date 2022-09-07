@@ -676,6 +676,15 @@ void BodyNode::setMomentVector(Eigen::Vector6s moment)
 }
 
 //==============================================================================
+/// This sets the inertia vector, in the "box dims and euler angles" format
+void BodyNode::setDimsAndEulersVector(Eigen::Vector6s dimsAndEulers)
+{
+  mAspectProperties.mInertia.setDimsAndEulerVector(dimsAndEulers);
+
+  dirtyArticulatedInertia();
+}
+
+//==============================================================================
 void BodyNode::getMomentOfInertia(
     s_t& _Ixx, s_t& _Iyy, s_t& _Izz, s_t& _Ixy, s_t& _Ixz, s_t& _Iyz) const
 {
@@ -1654,6 +1663,7 @@ BodyNode* BodyNode::clone(
   clonedBn->mScale = mScale;
   clonedBn->mScaleLowerBound = mScaleLowerBound;
   clonedBn->mScaleUpperBound = mScaleUpperBound;
+  clonedBn->setInertia(getInertia().clone());
 
   clonedBn->matchAspects(this);
 
@@ -3294,6 +3304,7 @@ void BodyNode::computeJacobianOfMBackward(
     const Jacobian J = skel->getJacobian(this);
     const int jointNumDofs = static_cast<int>(mParentJoint->getNumDofs());
     const int scaleGroupIndex = skel->getScaleGroupIndex(this);
+    const Eigen::Vector3s scaleGroupFlips = skel->getScaleGroupFlips(this);
 
     // Update mMddq_dV
     mMddq_F = G * mMddq_dV + mAspectState.mFext;
@@ -3318,17 +3329,32 @@ void BodyNode::computeJacobianOfMBackward(
           wrt == neural::WithRespectTo::GROUP_COMS && i >= scaleGroupIndex * 3
           && i < (scaleGroupIndex * 3 + 3))
       {
-        dG = mAspectProperties.mInertia.getSpatialTensorGradientWrtCOM(
-            i - (scaleGroupIndex * 3));
-        mMddq_F_p.col(i) = dG * mMddq_dV;
+        int axis = i - (scaleGroupIndex * 3);
+        dG = mAspectProperties.mInertia.getSpatialTensorGradientWrtCOM(axis);
+        mMddq_F_p.col(i) = dG * mMddq_dV * scaleGroupFlips(axis);
       }
       else if (
           wrt == neural::WithRespectTo::GROUP_INERTIAS
           && i >= scaleGroupIndex * 6 && i < (scaleGroupIndex * 6 + 6))
       {
-        dG = mAspectProperties.mInertia.getSpatialTensorGradientWrtMomentVector(
-            i - (scaleGroupIndex * 6));
-        mMddq_F_p.col(i) = dG * mMddq_dV;
+        int axis = i - (scaleGroupIndex * 6);
+        dG = mAspectProperties.mInertia
+                 .getSpatialTensorGradientWrtDimsAndEulerVector(axis);
+        s_t flip = 1.0;
+        if (axis >= 3)
+        {
+          int eulerAxis = axis - 3;
+          // Look for flips on the other axis, and if we find them, flip this
+          // axis
+          for (int i = 0; i < 3; i++)
+          {
+            if (i != eulerAxis && scaleGroupFlips(i) == -1)
+            {
+              flip *= -1;
+            }
+          }
+        }
+        mMddq_F_p.col(i) = flip * dG * mMddq_dV;
       }
       else
       {
@@ -4028,6 +4054,7 @@ void BodyNode::computeJacobianOfCBackward(
     mCg_g_p.setZero();
 
     const int scaleGroupIndex = skel->getScaleGroupIndex(this);
+    const Eigen::Vector3s scaleGroupFlips = skel->getScaleGroupFlips(this);
     // TODO(JS): Vectorize instead of iterating DOFs
     for (auto i = 0u; i < dims; ++i)
     {
@@ -4040,15 +4067,33 @@ void BodyNode::computeJacobianOfCBackward(
           wrt == neural::WithRespectTo::GROUP_COMS && i >= scaleGroupIndex * 3
           && i < (scaleGroupIndex * 3 + 3))
       {
-        dG = mAspectProperties.mInertia.getSpatialTensorGradientWrtCOM(
-            i - (scaleGroupIndex * 3));
+        int axis = i - (scaleGroupIndex * 3);
+        dG = scaleGroupFlips(axis)
+             * mAspectProperties.mInertia.getSpatialTensorGradientWrtCOM(axis);
       }
       else if (
           wrt == neural::WithRespectTo::GROUP_INERTIAS
           && i >= scaleGroupIndex * 6 && i < (scaleGroupIndex * 6 + 6))
       {
-        dG = mAspectProperties.mInertia.getSpatialTensorGradientWrtMomentVector(
-            i - (scaleGroupIndex * 6));
+        int axis = i - (scaleGroupIndex * 6);
+        s_t flip = 1.0;
+        if (axis >= 3)
+        {
+          int eulerAxis = axis - 3;
+          // Look for flips on the other axis, and if we find them, flip this
+          // axis
+          for (int i = 0; i < 3; i++)
+          {
+            if (i != eulerAxis && scaleGroupFlips(i) == -1)
+            {
+              flip *= -1;
+            }
+          }
+        }
+        dG = flip
+             * mAspectProperties.mInertia
+                   .getSpatialTensorGradientWrtDimsAndEulerVector(
+                       i - (scaleGroupIndex * 6));
       }
 
       // Original:

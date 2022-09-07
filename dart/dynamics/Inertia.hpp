@@ -91,7 +91,7 @@ public:
   s_t getParameter(Param _param) const;
 
   /// Set the mass
-  void setMass(s_t _mass);
+  void setMass(s_t _mass, bool preserveDimsAndEuler = true);
 
   /// Get the mass
   s_t getMass() const;
@@ -134,6 +134,15 @@ public:
   void setMomentUpperBound(Eigen::Vector6s bound);
   const Eigen::Vector6s& getMomentUpperBound() const;
 
+  /// Set the dims and eulers (about the center of mass)
+  void setDimsAndEulerVector(Eigen::Vector6s dimsAndEuler);
+  const Eigen::Vector6s getDimsAndEulerVector() const;
+  /// Set the dims and eulers bounds (about the center of mass)
+  void setDimsAndEulerLowerBound(Eigen::Vector6s bound);
+  const Eigen::Vector6s& getDimsAndEulerLowerBound() const;
+  void setDimsAndEulerUpperBound(Eigen::Vector6s bound);
+  const Eigen::Vector6s& getDimsAndEulerUpperBound() const;
+
   /// Set the spatial tensor
   void setSpatialTensor(const Eigen::Matrix6s& _spatial);
 
@@ -162,10 +171,12 @@ public:
   void rescale(Eigen::Vector3s ratio);
 
   /// This gets the gradient of the spatial tensor with respect to the mass
-  Eigen::Matrix6s getSpatialTensorGradientWrtMass();
+  Eigen::Matrix6s getSpatialTensorGradientWrtMass(
+      bool preserveDimsAndEuler = true);
 
   /// This gets the gradient of the spatial tensor with respect to the mass
-  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtMass();
+  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtMass(
+      bool preserveDimsAndEuler = true);
 
   /// This gets the gradient of the spatial tensor with respect to a specific
   /// index in the COM vector
@@ -183,6 +194,86 @@ public:
   /// index in the moment vector
   Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtMomentVector(
       int index);
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the moment vector
+  Eigen::Matrix6s getSpatialTensorGradientWrtDimsAndEulerVector(int index);
+
+  /// This gets the gradient of the spatial tensor with respect to a specific
+  /// index in the moment vector
+  Eigen::Matrix6s finiteDifferenceSpatialTensorGradientWrtDimsAndEulerVector(
+      int index);
+
+  /// This creates a copy of this inertia object
+  Inertia clone() const;
+
+  /// This computes the moment vector from a the mass, and a concatenated vector
+  /// for the dimensions of a cube, and the euler angles by which to rotate the
+  /// cube.
+  ///
+  /// Notes: We choose euler angles, instead of SO3, because the gradients are
+  /// smoother in the very small rotation values, which is where we expect
+  /// optimizers to spend most of their time.
+  static Eigen::Vector6s computeMomentVector(
+      s_t mass, Eigen::Vector6s dimsAndEuler);
+
+  static Eigen::Matrix6s computeMomentVectorJacWrtDimsAndEuler(
+      s_t mass, Eigen::Vector6s dimsAndEuler);
+
+  static Eigen::Matrix6s finiteDifferenceMomentVectorJacWrtDimsAndEuler(
+      s_t mass, Eigen::Vector6s dimsAndEuler);
+
+  static Eigen::Vector6s computeMomentVectorGradWrtMass(
+      s_t mass, Eigen::Vector6s dimsAndEuler);
+
+  static Eigen::Vector6s finiteDifferenceMomentVectorGradWrtMass(
+      s_t mass, Eigen::Vector6s dimsAndEuler);
+
+  /// This reverses computeMomentVector(), to get into a more interpretable
+  /// space of cube dimensions and rotations. This can then be used to visualize
+  /// inertia in a GUI.
+  static Eigen::Vector6s computeDimsAndEuler(
+      s_t mass, Eigen::Vector6s momentVector);
+
+  /// This creates the inertia for a rectangular prism, from the original
+  /// formula.
+  static Inertia createCubeInertia(s_t mass, Eigen::Vector3s dims);
+
+  /// This computes the size of a rectangular prism, ignoring the off-diagonal
+  /// inertia properties.
+  Eigen::Vector3s getImpliedCubeDimensions() const;
+
+  /// This gives a 3x6 Jacobian that relates changes in the moment vector to
+  /// changes in the implied dimensions.
+  Eigen::Matrix<s_t, 3, 6> getImpliedCubeDimensionsJacobianWrtMomentVector()
+      const;
+
+  /// This gives a 3x6 Jacobian that relates changes in the moment vector to
+  /// changes in the implied dimensions.
+  Eigen::Matrix<s_t, 3, 6>
+  finiteDifferenceImpliedCubeDimensionsJacobianWrtMomentVector();
+
+  /// This gets the gradient of implied dimensions wrt the mass
+  Eigen::Vector3s getImpliedCubeDimensionsGradientWrtMass() const;
+
+  /// This gets the gradient of implied dimensions wrt the mass
+  Eigen::Vector3s finiteDifferenceImpliedCubeDimensionsGradientWrtMass();
+
+  /// This gets the implied rectangular prism density. This is a useful
+  /// constraint
+  s_t getImpliedCubeDensity() const;
+
+  /// This gets the gradient of implied density wrt the moment vector
+  Eigen::Vector6s getImpliedCubeDensityGradientWrtMomentVector() const;
+
+  /// This gets the gradient of implied density wrt the moment vector
+  Eigen::Vector6s finiteDifferenceImpliedCubeDensityGradientWrtMomentVector();
+
+  /// This gets the gradient of implied density wrt the mass
+  s_t getImpliedCubeDensityGradientWrtMass() const;
+
+  /// This gets the gradient of implied density wrt the mass
+  s_t finiteDifferenceImpliedCubeDensityGradientWrtMass();
 
 protected:
   /// Compute the spatial tensor based on the inertial parameters
@@ -205,6 +296,11 @@ protected:
   std::array<s_t, 6> mMoment;
   Eigen::Vector6s mMomentLowerBound;
   Eigen::Vector6s mMomentUpperBound;
+
+  bool mCachedDimsAndEulerDirty;
+  Eigen::Vector6s mCachedDimsAndEuler;
+  Eigen::Vector6s mDimsAndEulerLowerBound;
+  Eigen::Vector6s mDimsAndEulerUpperBound;
 
   /// Cache for generalized spatial inertia of the Body
   Eigen::Matrix6s mSpatialTensor;

@@ -1,6 +1,7 @@
 #include "dart/biomechanics/DynamicsFitter.hpp"
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <queue>
@@ -332,15 +333,17 @@ DynamicsFitProblem::DynamicsFitProblem(
     mResidualWeight(0.1),
     mMarkerWeight(1.0),
     mJointWeight(1.0),
-    mResidualUseL1(false),
-    mMarkerUseL1(false),
-    mRegularizeMasses(1.0),
-    mRegularizeCOMs(1.0),
+    mResidualUseL1(true),
+    mMarkerUseL1(true),
+    mRegularizeMasses(10.0),
+    mRegularizeCOMs(20.0),
     mRegularizeInertias(1.0),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(10.0),
-    mRegularizeBodyScales(0.2),
+    mRegularizeImpliedDensity(1e-5),
+    mRegularizeBodyScales(1.0),
     mRegularizePoses(0.0),
+    mVelAccImplicit(false),
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Set up the markers
@@ -816,13 +819,14 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
       // Add force residual RMS errors to all but the last 2 timesteps
       if (t < mAccs[trial].cols() && !mInit->probablyMissingGRF[trial][t])
       {
-        residualRMS += mResidualWeight * (1.0 / totalAccTimesteps)
-                       * mResidualHelper->calculateResidualNorm(
-                           mPoses[trial].col(t),
-                           mVels[trial].col(t),
-                           mAccs[trial].col(t),
-                           mInit->grfTrials[trial].col(t),
-                           mResidualUseL1);
+        s_t cost = mResidualWeight * (1.0 / totalAccTimesteps)
+                   * mResidualHelper->calculateResidualNorm(
+                       mPoses[trial].col(t),
+                       mVels[trial].col(t),
+                       mAccs[trial].col(t),
+                       mInit->grfTrials[trial].col(t),
+                       mResidualUseL1);
+        residualRMS += cost;
         assert(!isnan(residualRMS));
       }
 
@@ -1050,13 +1054,13 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       Eigen::VectorXs lossGradWrtMarkerError
           = Eigen::VectorXs::Zero(mMarkers.size() * 3);
       auto& markerObservations = mInit->markerObservationTrials[trial][t];
-      auto markerMap = mSkeleton->getMarkerMapWorldPositions(mMarkerMap);
+      auto markerPoses = mSkeleton->getMarkerWorldPositions(mMarkers);
       for (int i = 0; i < mMarkers.size(); i++)
       {
         if (markerObservations.count(mMarkerNames[i]))
         {
           Eigen::Vector3s markerOffset
-              = markerMap.at(mMarkerNames[i])
+              = markerPoses.segment<3>(i * 3)
                 - markerObservations.at(mMarkerNames[i]);
           if (mMarkerUseL1)
           {
@@ -1836,6 +1840,13 @@ DynamicsFitProblem& DynamicsFitProblem::setRegularizeAnatomicalMarkerOffsets(
   return *(this);
 }
 
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeImpliedDensity(s_t value)
+{
+  mRegularizeImpliedDensity = value;
+  return *(this);
+}
+
 //------------------------- Ipopt::TNLP --------------------------------------
 
 //==============================================================================
@@ -2097,9 +2108,14 @@ void DynamicsFitProblem::finalize_solution(
 
   unflatten(x);
 
-  if (mIncludeBodyScales)
+  if (mIncludeMasses)
   {
-    mInit->groupScales = mSkeleton->getGroupScales();
+    mInit->groupMasses = mSkeleton->getGroupMasses();
+    mInit->bodyMasses.resize(mSkeleton->getNumBodyNodes());
+    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
+    {
+      mInit->bodyMasses(i) = mSkeleton->getBodyNode(i)->getInertia().getMass();
+    }
   }
   if (mIncludeCOMs)
   {
@@ -2112,31 +2128,29 @@ void DynamicsFitProblem::finalize_solution(
   }
   if (mIncludeInertias)
   {
+    mInit->groupInertias = mSkeleton->getGroupInertias();
     mInit->bodyInertia.resize(6, mSkeleton->getNumBodyNodes());
     for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
     {
       mInit->bodyInertia.col(i)
-          = mSkeleton->getBodyNode(i)->getInertia().getMomentVector();
+          = mSkeleton->getBodyNode(i)->getInertia().getDimsAndEulerVector();
     }
   }
-  if (mIncludeMasses)
+  if (mIncludeBodyScales)
   {
-    mInit->bodyMasses.resize(mSkeleton->getNumBodyNodes());
-    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
-    {
-      mInit->bodyMasses(i) = mSkeleton->getBodyNode(i)->getInertia().getMass();
-    }
-  }
-  if (mIncludePoses)
-  {
-    mInit->poseTrials = mPoses;
+    mInit->groupScales = mSkeleton->getGroupScales();
   }
   if (mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkerNames.size(); i++)
     {
       mInit->markerOffsets[mMarkerNames[i]] = mMarkers[i].second;
+      mInit->updatedMarkerMap[mMarkerNames[i]] = mMarkers[i];
     }
+  }
+  if (mIncludePoses)
+  {
+    mInit->poseTrials = mPoses;
   }
 }
 
@@ -2226,17 +2240,19 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     init->markerOffsets[pair.first] = pair.second.second;
   }
   init->bodyMasses = skel->getLinkMasses();
+  init->groupMasses = skel->getGroupMasses();
   init->groupScales = skel->getGroupScales();
   init->bodyCom.resize(3, skel->getNumBodyNodes());
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     init->bodyCom.col(i) = skel->getBodyNode(i)->getInertia().getLocalCOM();
   }
+  init->groupInertias = skel->getGroupInertias();
   init->bodyInertia.resize(6, skel->getNumBodyNodes());
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     init->bodyInertia.col(i)
-        = skel->getBodyNode(i)->getInertia().getMomentVector();
+        = skel->getBodyNode(i)->getInertia().getDimsAndEulerVector();
   }
   init->bodyMasses.resize(skel->getNumBodyNodes());
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
@@ -3218,6 +3234,8 @@ void DynamicsFitter::runOptimization(
     exit(1);
   }
   */
+  std::cout << "BEGINNING OPTIMIZATION WITH LOSS: "
+            << problem->computeLoss(problem->flatten()) << std::endl;
 
   SmartPtr<DynamicsFitProblem> problemPtr(problem);
 
@@ -3377,9 +3395,15 @@ void DynamicsFitter::saveDynamicsToGUI(
 {
   std::string skeletonLayerName = "Skeleton";
   Eigen::Vector4s skeletonLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  std::string skeletonInertiaLayerName = "Skeleton Inertia";
+  Eigen::Vector4s skeletonInertiaLayerColor
+      = Eigen::Vector4s(0.0, 0.0, 1.0, 0.5);
   std::string originalSkeletonLayerName = "Original Skeleton";
   Eigen::Vector4s originalSkeletonLayerColor
       = Eigen::Vector4s(1.0, 0.3, 0.3, 0.3);
+  std::string originalSkeletonInertiaLayerName = "Original Skeleton Inertia";
+  Eigen::Vector4s originalSkeletonInertiaLayerColor
+      = Eigen::Vector4s(1.0, 0.0, 0.0, 0.5);
   std::string markerErrorLayerName = "Marker Error";
   Eigen::Vector4s markerErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
@@ -3418,7 +3442,13 @@ void DynamicsFitter::saveDynamicsToGUI(
   server::GUIRecording server;
   server.setFramesPerSecond(framesPerSecond);
   server.createLayer(skeletonLayerName, skeletonLayerColor);
+  server.createLayer(
+      skeletonInertiaLayerName, skeletonInertiaLayerColor, false);
   server.createLayer(originalSkeletonLayerName, originalSkeletonLayerColor);
+  server.createLayer(
+      originalSkeletonInertiaLayerName,
+      originalSkeletonInertiaLayerColor,
+      false);
   server.createLayer(markerErrorLayerName, markerErrorLayerColor);
   server.createLayer(forcePlateLayerName, forcePlateLayerColor);
   server.createLayer(measuredForcesLayerName, measuredForcesLayerColor);
@@ -3431,18 +3461,6 @@ void DynamicsFitter::saveDynamicsToGUI(
 
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trialIndex];
   Eigen::MatrixXs poses = init->poseTrials[trialIndex];
-
-  for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
-  {
-    server.createSphere(
-        "body_com_" + std::to_string(i),
-        0.1 * mSkeleton->getBodyNode(i)->getMass() / mSkeleton->getMass(),
-        Eigen::Vector3s::Zero(),
-        Eigen::Vector4s(0, 0, 1, 0.5));
-    server.setObjectTooltip(
-        "body_com_" + std::to_string(i),
-        mSkeleton->getBodyNode(i)->getName() + " Center of Mass");
-  }
 
   if (init->flatGround[trialIndex])
   {
@@ -3531,6 +3549,7 @@ void DynamicsFitter::saveDynamicsToGUI(
       = ResidualForceHelper(mSkeleton, init->grfBodyIndices);
 
   std::vector<Eigen::Vector3s> residualForces;
+  std::vector<Eigen::Vector3s> residualTorques;
   s_t residualNorm = 0.0;
   for (int timestep = 0; timestep < poses.cols() - 2; timestep++)
   {
@@ -3550,6 +3569,7 @@ void DynamicsFitter::saveDynamicsToGUI(
 
     Eigen::Vector6s residual = helper.calculateResidual(
         q, dq, ddq, init->grfTrials[trialIndex].col(timestep));
+    residualTorques.push_back(residual.head<3>());
     residualForces.push_back(residual.tail<3>());
     residualNorm += residual.squaredNorm();
   }
@@ -3584,14 +3604,23 @@ void DynamicsFitter::saveDynamicsToGUI(
           measuredForcesLayerColor,
           measuredForcesLayerName);
 
-      std::vector<Eigen::Vector3s> residualVector;
-      residualVector.push_back(coms[i] + (measuredForces[i] * 0.001));
-      residualVector.push_back(
+      std::vector<Eigen::Vector3s> residualForceVector;
+      residualForceVector.push_back(coms[i] + (measuredForces[i] * 0.001));
+      residualForceVector.push_back(
           coms[i] + (measuredForces[i] * 0.001) + (residualForces[i] * 0.001));
       server.createLine(
-          "com_residual_" + std::to_string(i),
-          residualVector,
+          "com_residual_force_" + std::to_string(i),
+          residualForceVector,
           residualLayerColor,
+          residualLayerName);
+
+      std::vector<Eigen::Vector3s> residualTorqueVector;
+      residualTorqueVector.push_back(coms[i]);
+      residualTorqueVector.push_back(coms[i] + (residualTorques[i] * 0.01));
+      server.createLine(
+          "com_residual_torque_" + std::to_string(i),
+          residualTorqueVector,
+          Eigen::Vector4s(0, 1, 0, 1),
           residualLayerName);
     }
   }
@@ -3599,6 +3628,9 @@ void DynamicsFitter::saveDynamicsToGUI(
   std::shared_ptr<dynamics::Skeleton> originalSkeleton
       = mSkeleton->cloneSkeleton();
   originalSkeleton->setGroupScales(init->originalGroupScales);
+  originalSkeleton->setGroupMasses(init->originalGroupMasses);
+  originalSkeleton->setGroupCOMs(init->originalGroupCOMs);
+  originalSkeleton->setGroupInertias(init->originalGroupInertias);
 
   // Render the joints, if we have them
   int numJoints = init->jointCenters[trialIndex].rows() / 3;
@@ -3648,6 +3680,11 @@ void DynamicsFitter::saveDynamicsToGUI(
     mSkeleton->setPositions(poses.col(timestep));
     server.renderSkeleton(
         mSkeleton, "skel", Eigen::Vector4s::Ones() * -1, skeletonLayerName);
+    server.renderSkeletonInertiaCubes(
+        mSkeleton,
+        "skel_inertia",
+        skeletonInertiaLayerColor,
+        skeletonInertiaLayerName);
 
     // Render foot-ground contact spheres
     for (int i = 0; i < init->contactBodies.size(); i++)
@@ -3672,12 +3709,6 @@ void DynamicsFitter::saveDynamicsToGUI(
       }
     }
 
-    // Render COMs
-    for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
-    {
-      server.setObjectPosition(
-          "body_com_" + std::to_string(i), mSkeleton->getBodyNode(i)->getCOM());
-    }
     for (int i = 0; i < forcePlates.size(); i++)
     {
       server.deleteObject("force_" + std::to_string(i));
@@ -3772,6 +3803,11 @@ void DynamicsFitter::saveDynamicsToGUI(
         "original_skel",
         originalSkeletonLayerColor,
         originalSkeletonLayerName);
+    server.renderSkeletonInertiaCubes(
+        originalSkeleton,
+        "original_skel_inertia",
+        originalSkeletonInertiaLayerColor,
+        originalSkeletonInertiaLayerName);
     server.saveFrame();
   }
 

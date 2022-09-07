@@ -66,6 +66,7 @@ typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
 struct BodyScaleGroup
 {
   std::vector<dynamics::BodyNode*> nodes;
+  std::vector<Eigen::Vector3s> flipAxis;
   bool uniformScaling;
 };
 
@@ -950,9 +951,16 @@ public:
   /// This returns the index of the group that this body node corresponds to
   int getScaleGroupIndex(dynamics::BodyNode* bodyNode);
 
+  /// This returns the axis flips of this body in the scale group that this body
+  /// node corresponds to
+  Eigen::Vector3s getScaleGroupFlips(dynamics::BodyNode* bodyNode);
+
   /// This takes two scale groups and merges their contents into a single group.
   /// After this operation, there is one fewer scale group.
   void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
+
+  /// The scale group axis flips
+  void autodetectScaleGroupAxisFlips(int symmetryAxis);
 
   /// This finds all the pairs of bodies that share the same prefix, and
   /// different suffixes (for example "a_body_l" and "a_body_r", sharing "_l"

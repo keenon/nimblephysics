@@ -14,6 +14,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CapsuleShape.hpp"
+#include "dart/dynamics/Inertia.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
@@ -417,6 +418,47 @@ void GUIStateMachine::renderSkeleton(
         }
       }
     }
+  }
+}
+
+/// This is a high-level command that creates/updates all the shapes in a
+/// world by calling the lower-level commands
+void GUIStateMachine::renderSkeletonInertiaCubes(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::string& prefix,
+    Eigen::Vector4s color,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  for (int j = 0; j < skel->getNumBodyNodes(); j++)
+  {
+    dynamics::BodyNode* node = skel->getBodyNode(j);
+    if (node == nullptr)
+    {
+      std::cout << "ERROR! GUIStateMachine found a null body node! This "
+                   "isn't supposed to be possible. Proceeding anyways."
+                << std::endl;
+      continue;
+    }
+
+    Eigen::Vector3s com = node->getCOM();
+    Eigen::Vector6s dimsAndEuler = node->getInertia().getDimsAndEulerVector();
+    Eigen::Vector3s dims = dimsAndEuler.head<3>();
+    Eigen::Vector3s euler = dimsAndEuler.tail<3>();
+    Eigen::Matrix3s R = math::eulerXYZToMatrix(euler);
+    std::string name = prefix + node->getName();
+
+    createBox(
+        name,
+        dims,
+        com,
+        math::matrixToEulerXYZ(node->getWorldTransform().linear() * R),
+        color,
+        layer,
+        false,
+        false);
+    setObjectTooltip(name, node->getName() + " Inertia");
   }
 }
 

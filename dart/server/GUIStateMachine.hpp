@@ -78,6 +78,14 @@ public:
       Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones(),
       const std::string& layer = "");
 
+  /// This is a high-level command that creates/updates all the shapes in a
+  /// world by calling the lower-level commands
+  void renderSkeletonInertiaCubes(
+      const std::shared_ptr<dynamics::Skeleton>& skel,
+      const std::string& prefix = "skel_inertia",
+      Eigen::Vector4s overrideColor = Eigen::Vector4s(0, 0, 1, 0.3),
+      const std::string& layer = "");
+
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
   void renderTrajectoryLines(

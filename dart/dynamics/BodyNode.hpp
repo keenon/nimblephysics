@@ -211,6 +211,9 @@ public:
 
   void setMomentVector(Eigen::Vector6s moment);
 
+  /// This sets the inertia vector, in the "box dims and euler angles" format
+  void setDimsAndEulersVector(Eigen::Vector6s dimsAndEulers);
+
   /// Return moment of inertia defined around the center of mass
   void getMomentOfInertia(
       s_t& _Ixx, s_t& _Iyy, s_t& _Izz, s_t& _Ixy, s_t& _Ixz, s_t& _Iyz) const;
