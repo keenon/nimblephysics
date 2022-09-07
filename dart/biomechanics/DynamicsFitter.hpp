@@ -179,7 +179,6 @@ public:
   DynamicsFitProblem(
       std::shared_ptr<DynamicsInitialization> init,
       std::shared_ptr<dynamics::Skeleton> skeleton,
-      dynamics::MarkerMap markerMap,
       std::vector<std::string> trackingMarkers,
       std::vector<dynamics::BodyNode*> footNodes);
 
@@ -257,6 +256,8 @@ public:
   DynamicsFitProblem& setRegularizeTrackingMarkerOffsets(s_t value);
   DynamicsFitProblem& setRegularizeAnatomicalMarkerOffsets(s_t value);
   DynamicsFitProblem& setRegularizeImpliedDensity(s_t value);
+
+  DynamicsFitProblem& setVelAccImplicit(bool implicit);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -403,7 +404,6 @@ public:
   std::vector<Eigen::MatrixXs> mVels;
   std::vector<Eigen::MatrixXs> mAccs;
 
-  dynamics::MarkerMap mMarkerMap;
   std::vector<std::string> mMarkerNames;
   std::vector<bool> mMarkerIsTracking;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
@@ -424,7 +424,6 @@ public:
   DynamicsFitter(
       std::shared_ptr<dynamics::Skeleton> skeleton,
       std::vector<dynamics::BodyNode*> footNodes,
-      dynamics::MarkerMap markerMap,
       std::vector<std::string> trackingMarkers);
 
   // This bundles together the objects we need in order to track a dynamics
@@ -488,8 +487,31 @@ public:
       s_t regularizationWeight = 50.0);
 
   // 3. Run larger optimization problems to minimize a weighted combination of
-  // residuals and marker RMSE, tweaking a controllable set of variables
-  void runOptimization(
+  // residuals and marker RMSE, tweaking a controllable set of variables. This
+  // includes the velocity and acceleration as explicit decision variables,
+  // constrained by linear constraint equations. That means it needs to be
+  // solved with IPOPT, using the interior point method.
+  //
+  // WARNING: DOES NOT PERFORM WELL WITH WARM STARTS! Becaus it uses the
+  // interior point method, this doesn't warm start well. See
+  // runImplicitVelAccOptimization() instead.
+  void runExplicitVelAccOptimization(
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t residualWeight,
+      s_t markerWeight,
+      bool includeMasses,
+      bool includeCOMs,
+      bool includeInertias,
+      bool includeBodyScales,
+      bool includePoses,
+      bool includeMarkerOffsets);
+
+  // 4. This runs the same optimization problem as
+  // runExplicitVelAccOptimization(), but holds velocity and acc as implicit
+  // functions of the position values, and removes any constraints. That means
+  // we can optimize this using simple gradient descent with line search, and
+  // can warm start.
+  Eigen::VectorXs runImplicitVelAccOptimization(
       std::shared_ptr<DynamicsInitialization> init,
       s_t residualWeight,
       s_t markerWeight,
@@ -531,7 +553,6 @@ public:
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<dynamics::BodyNode*> mFootNodes;
-  dynamics::MarkerMap mMarkerMap;
   std::vector<std::string> mTrackingMarkers;
   // These are IPOPT settings
   double mTolerance;

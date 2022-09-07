@@ -317,12 +317,10 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
 DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,
-    dynamics::MarkerMap markerMap,
     std::vector<std::string> trackingMarkers,
     std::vector<dynamics::BodyNode*> footNodes)
   : mInit(init),
     mSkeleton(skeleton),
-    mMarkerMap(markerMap),
     mFootNodes(footNodes),
     mIncludeMasses(true),
     mIncludeCOMs(true),
@@ -348,7 +346,7 @@ DynamicsFitProblem::DynamicsFitProblem(
 {
   // 1. Set up the markers
 
-  for (auto& pair : markerMap)
+  for (auto& pair : init->updatedMarkerMap)
   {
     mMarkerNames.push_back(pair.first);
     mMarkers.push_back(pair.second);
@@ -432,12 +430,23 @@ int DynamicsFitProblem::getProblemSize()
   if (mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
-    for (int trial = 0; trial < mPoses.size(); trial++)
+
+    if (mVelAccImplicit)
     {
-      // Add pos + vel + acc
-      size += mAccs[trial].cols() * dofs * 3;
-      // Add last two q's, last dq
-      size += dofs * 3;
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        size += mPoses[trial].cols() * dofs;
+      }
+    }
+    else
+    {
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        // Add pos + vel + acc
+        size += mAccs[trial].cols() * dofs * 3;
+        // Add last two q's, last dq
+        size += dofs * 3;
+      }
     }
   }
   return size;
@@ -485,25 +494,39 @@ Eigen::VectorXs DynamicsFitProblem::flatten()
   {
     int dofs = mSkeleton->getNumDofs();
 
-    for (int trial = 0; trial < mPoses.size(); trial++)
+    if (mVelAccImplicit)
     {
-      for (int t = 0; t < mAccs[trial].cols(); t++)
+      for (int trial = 0; trial < mPoses.size(); trial++)
       {
-        flat.segment(cursor, dofs) = mPoses[trial].col(t);
+        for (int t = 0; t < mPoses[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mPoses[trial].col(t);
+          cursor += dofs;
+        }
+      }
+    }
+    else
+    {
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mPoses[trial].col(t);
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mVels[trial].col(t);
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mAccs[trial].col(t);
+          cursor += dofs;
+        }
+        // Get the last two q's, and last dq
+        int lastAccT = mAccs[trial].cols() - 1;
+        flat.segment(cursor, dofs) = mPoses[trial].col(lastAccT + 1);
         cursor += dofs;
-        flat.segment(cursor, dofs) = mVels[trial].col(t);
+        flat.segment(cursor, dofs) = mVels[trial].col(lastAccT + 1);
         cursor += dofs;
-        flat.segment(cursor, dofs) = mAccs[trial].col(t);
+        flat.segment(cursor, dofs) = mPoses[trial].col(lastAccT + 2);
         cursor += dofs;
       }
-      // Get the last two q's, and last dq
-      int lastAccT = mAccs[trial].cols() - 1;
-      flat.segment(cursor, dofs) = mPoses[trial].col(lastAccT + 1);
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mVels[trial].col(lastAccT + 1);
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mPoses[trial].col(lastAccT + 2);
-      cursor += dofs;
     }
   }
 
@@ -554,24 +577,38 @@ Eigen::VectorXs DynamicsFitProblem::flattenUpperBound()
   {
     int dofs = mSkeleton->getNumDofs();
 
-    for (int trial = 0; trial < mPoses.size(); trial++)
+    if (mVelAccImplicit)
     {
-      for (int t = 0; t < mAccs[trial].cols(); t++)
+      for (int trial = 0; trial < mPoses.size(); trial++)
       {
+        for (int t = 0; t < mPoses[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
+          cursor += dofs;
+        }
+      }
+    }
+    else
+    {
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mSkeleton->getVelocityUpperLimits();
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mSkeleton->getAccelerationUpperLimits();
+          cursor += dofs;
+        }
+        // Get the last two q's, and last dq
         flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
         cursor += dofs;
         flat.segment(cursor, dofs) = mSkeleton->getVelocityUpperLimits();
         cursor += dofs;
-        flat.segment(cursor, dofs) = mSkeleton->getAccelerationUpperLimits();
+        flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
         cursor += dofs;
       }
-      // Get the last two q's, and last dq
-      flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mSkeleton->getVelocityUpperLimits();
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mSkeleton->getPositionUpperLimits();
-      cursor += dofs;
     }
   }
 
@@ -621,24 +658,39 @@ Eigen::VectorXs DynamicsFitProblem::flattenLowerBound()
   if (mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
-    for (int trial = 0; trial < mPoses.size(); trial++)
+
+    if (mVelAccImplicit)
     {
-      for (int t = 0; t < mAccs[trial].cols(); t++)
+      for (int trial = 0; trial < mPoses.size(); trial++)
       {
+        for (int t = 0; t < mPoses[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
+          cursor += dofs;
+        }
+      }
+    }
+    else
+    {
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mSkeleton->getVelocityLowerLimits();
+          cursor += dofs;
+          flat.segment(cursor, dofs) = mSkeleton->getAccelerationLowerLimits();
+          cursor += dofs;
+        }
+        // Get the last two q's, and last dq
         flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
         cursor += dofs;
         flat.segment(cursor, dofs) = mSkeleton->getVelocityLowerLimits();
         cursor += dofs;
-        flat.segment(cursor, dofs) = mSkeleton->getAccelerationLowerLimits();
+        flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
         cursor += dofs;
       }
-      // Get the last two q's, and last dq
-      flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mSkeleton->getVelocityLowerLimits();
-      cursor += dofs;
-      flat.segment(cursor, dofs) = mSkeleton->getPositionLowerLimits();
-      cursor += dofs;
     }
   }
 
@@ -694,24 +746,52 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
   if (mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
-    for (int trial = 0; trial < mPoses.size(); trial++)
+    if (mVelAccImplicit)
     {
-      for (int t = 0; t < mAccs[trial].cols(); t++)
+      for (int trial = 0; trial < mPoses.size(); trial++)
       {
-        mPoses[trial].col(t) = x.segment(cursor, dofs);
+        s_t dt = mInit->trialTimesteps[trial];
+
+        for (int t = 0; t < mPoses[trial].cols(); t++)
+        {
+          mPoses[trial].col(t) = x.segment(cursor, dofs);
+          cursor += dofs;
+        }
+        for (int t = 0; t < mVels[trial].cols(); t++)
+        {
+          mVels[trial].col(t)
+              = (mPoses[trial].col(t + 1) - mPoses[trial].col(t)) / dt;
+        }
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          mAccs[trial].col(t)
+              = (mPoses[trial].col(t + 2) - 2 * mPoses[trial].col(t + 1)
+                 + mPoses[trial].col(t))
+                / (dt * dt);
+        }
+      }
+    }
+    else
+    {
+      for (int trial = 0; trial < mPoses.size(); trial++)
+      {
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          mPoses[trial].col(t) = x.segment(cursor, dofs);
+          cursor += dofs;
+          mVels[trial].col(t) = x.segment(cursor, dofs);
+          cursor += dofs;
+          mAccs[trial].col(t) = x.segment(cursor, dofs);
+          cursor += dofs;
+        }
+        int lastAccT = mAccs[trial].cols() - 1;
+        mPoses[trial].col(lastAccT + 1) = x.segment(cursor, dofs);
         cursor += dofs;
-        mVels[trial].col(t) = x.segment(cursor, dofs);
+        mVels[trial].col(lastAccT + 1) = x.segment(cursor, dofs);
         cursor += dofs;
-        mAccs[trial].col(t) = x.segment(cursor, dofs);
+        mPoses[trial].col(lastAccT + 2) = x.segment(cursor, dofs);
         cursor += dofs;
       }
-      int lastAccT = mAccs[trial].cols() - 1;
-      mPoses[trial].col(lastAccT + 1) = x.segment(cursor, dofs);
-      cursor += dofs;
-      mVels[trial].col(lastAccT + 1) = x.segment(cursor, dofs);
-      cursor += dofs;
-      mPoses[trial].col(lastAccT + 2) = x.segment(cursor, dofs);
-      cursor += dofs;
     }
   }
 
@@ -1048,6 +1128,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
   for (int trial = 0; trial < mPoses.size(); trial++)
   {
+    s_t dt = mInit->trialTimesteps[trial];
     for (int t = 0; t < mPoses[trial].cols(); t++)
     {
       mSkeleton->setPositions(mPoses[trial].col(t));
@@ -1191,18 +1272,41 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
         if (mIncludePoses)
         {
+          Eigen::VectorXs posResidualGrad = Eigen::VectorXs::Zero(dofs);
+          Eigen::VectorXs velResidualGrad = Eigen::VectorXs::Zero(dofs);
+          Eigen::VectorXs accResidualGrad = Eigen::VectorXs::Zero(dofs);
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            grad.segment(posesCursor, dofs)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::POSITION,
-                       mResidualUseL1);
+            posResidualGrad
+                = mResidualWeight * (1.0 / totalAccTimesteps)
+                  * mResidualHelper->calculateResidualNormGradientWrt(
+                      mPoses[trial].col(t),
+                      mVels[trial].col(t),
+                      mAccs[trial].col(t),
+                      mInit->grfTrials[trial].col(t),
+                      neural::WithRespectTo::POSITION,
+                      mResidualUseL1);
+            velResidualGrad
+                = mResidualWeight * (1.0 / totalAccTimesteps)
+                  * mResidualHelper->calculateResidualNormGradientWrt(
+                      mPoses[trial].col(t),
+                      mVels[trial].col(t),
+                      mAccs[trial].col(t),
+                      mInit->grfTrials[trial].col(t),
+                      neural::WithRespectTo::VELOCITY,
+                      mResidualUseL1);
+            accResidualGrad
+                = mResidualWeight * (1.0 / totalAccTimesteps)
+                  * mResidualHelper->calculateResidualNormGradientWrt(
+                      mPoses[trial].col(t),
+                      mVels[trial].col(t),
+                      mAccs[trial].col(t),
+                      mInit->grfTrials[trial].col(t),
+                      neural::WithRespectTo::ACCELERATION,
+                      mResidualUseL1);
           }
+
+          grad.segment(posesCursor, dofs) += posResidualGrad;
 
           // Record marker gradients
           grad.segment(posesCursor, dofs)
@@ -1222,34 +1326,42 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                      .transpose()
                  * jointGrad;
 
-          posesCursor += dofs;
-
-          if (!mInit->probablyMissingGRF[trial][t])
+          if (mVelAccImplicit)
           {
-            grad.segment(posesCursor, dofs)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::VELOCITY,
-                       mResidualUseL1);
-          }
-          posesCursor += dofs;
+            // v = (t+1 - t) / dt
+            // dv/dt = -I / dt
+            // dv/dt+1 = I / dt
+            // dv-1/dt = I / dt
+            grad.segment(posesCursor, dofs) -= velResidualGrad / dt;
+            if (t < mPoses[trial].cols() - 1)
+            {
+              grad.segment(posesCursor + dofs, dofs) += velResidualGrad / dt;
+            }
 
-          if (!mInit->probablyMissingGRF[trial][t])
-          {
-            grad.segment(posesCursor, dofs)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::ACCELERATION,
-                       mResidualUseL1);
+            // a = (t+2 - 2*(t+1) + t) / dt*dt
+            grad.segment(posesCursor, dofs) += accResidualGrad / (dt * dt);
+            if (t < mPoses[trial].cols() - 1)
+            {
+              grad.segment(posesCursor + dofs, dofs)
+                  -= 2 * accResidualGrad / (dt * dt);
+            }
+            if (t < mPoses[trial].cols() - 2)
+            {
+              grad.segment(posesCursor + (2 * dofs), dofs)
+                  += accResidualGrad / (dt * dt);
+            }
           }
+          else
+          {
+            // Record Vel gradients
+            posesCursor += dofs;
+            grad.segment(posesCursor, dofs) += velResidualGrad;
+
+            // Record Acc gradients
+            posesCursor += dofs;
+            grad.segment(posesCursor, dofs) += accResidualGrad;
+          }
+
           posesCursor += dofs;
         }
       }
@@ -1316,11 +1428,14 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
           posesCursor += dofs;
 
-          // Skip over the velocities at this last timestep where they're
-          // available, they don't do anything
-          if (t < mVels[trial].cols())
+          if (!mVelAccImplicit)
           {
-            posesCursor += dofs;
+            // Skip over the velocities at this last timestep where they're
+            // available, they don't do anything
+            if (t < mVels[trial].cols())
+            {
+              posesCursor += dofs;
+            }
           }
         }
       }
@@ -1360,7 +1475,7 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(
 // This gets the number of constraints that the problem requires
 int DynamicsFitProblem::getConstraintSize()
 {
-  if (mIncludePoses)
+  if (mIncludePoses && !mVelAccImplicit)
   {
     int numConstraints = 0;
     int dofs = mSkeleton->getNumDofs();
@@ -1383,7 +1498,7 @@ int DynamicsFitProblem::getConstraintSize()
 // acceleration, and position.
 Eigen::VectorXs DynamicsFitProblem::computeConstraints(Eigen::VectorXs x)
 {
-  if (mIncludePoses)
+  if (mIncludePoses && !mVelAccImplicit)
   {
     unflatten(x);
     int dim = getConstraintSize();
@@ -1461,7 +1576,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 #endif
 
   std::vector<std::tuple<int, int, s_t>> result;
-  if (mIncludePoses)
+  if (mIncludePoses && !mVelAccImplicit)
   {
     int dofs = mSkeleton->getNumDofs();
 
@@ -1534,7 +1649,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 // This gets the jacobian of the constraints vector with respect to x
 Eigen::MatrixXs DynamicsFitProblem::computeConstraintsJacobian()
 {
-  if (!mIncludePoses)
+  if (!mIncludePoses || mVelAccImplicit)
   {
     return Eigen::MatrixXs::Zero(0, 0);
   }
@@ -1667,46 +1782,61 @@ bool DynamicsFitProblem::debugErrors(
 
     for (int trial = 0; trial < mPoses.size(); trial++)
     {
-      for (int t = 0; t < mAccs[trial].cols(); t++)
+      if (mVelAccImplicit)
       {
+        for (int t = 0; t < mPoses[trial].cols(); t++)
+        {
+          anyError |= debugVector(
+              fd.segment(cursor, dofs),
+              analytical.segment(cursor, dofs),
+              "poses@t=" + std::to_string(t),
+              tol);
+          cursor += dofs;
+        }
+      }
+      else
+      {
+        for (int t = 0; t < mAccs[trial].cols(); t++)
+        {
+          anyError |= debugVector(
+              fd.segment(cursor, dofs),
+              analytical.segment(cursor, dofs),
+              "poses@t=" + std::to_string(t),
+              tol);
+          cursor += dofs;
+          anyError |= debugVector(
+              fd.segment(cursor, dofs),
+              analytical.segment(cursor, dofs),
+              "vels@t=" + std::to_string(t),
+              tol);
+          cursor += dofs;
+          anyError |= debugVector(
+              fd.segment(cursor, dofs),
+              analytical.segment(cursor, dofs),
+              "accs@t=" + std::to_string(t),
+              tol);
+          cursor += dofs;
+        }
+        int finalT = mAccs[trial].cols();
         anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
-            "poses@t=" + std::to_string(t),
+            "poses@t=" + std::to_string(finalT),
             tol);
         cursor += dofs;
         anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
-            "vels@t=" + std::to_string(t),
+            "vels@t=" + std::to_string(finalT),
             tol);
         cursor += dofs;
         anyError |= debugVector(
             fd.segment(cursor, dofs),
             analytical.segment(cursor, dofs),
-            "accs@t=" + std::to_string(t),
+            "poses@t=" + std::to_string(finalT + 1),
             tol);
         cursor += dofs;
       }
-      int finalT = mAccs[trial].cols();
-      anyError |= debugVector(
-          fd.segment(cursor, dofs),
-          analytical.segment(cursor, dofs),
-          "poses@t=" + std::to_string(finalT),
-          tol);
-      cursor += dofs;
-      anyError |= debugVector(
-          fd.segment(cursor, dofs),
-          analytical.segment(cursor, dofs),
-          "vels@t=" + std::to_string(finalT),
-          tol);
-      cursor += dofs;
-      anyError |= debugVector(
-          fd.segment(cursor, dofs),
-          analytical.segment(cursor, dofs),
-          "poses@t=" + std::to_string(finalT + 1),
-          tol);
-      cursor += dofs;
     }
   }
   return anyError;
@@ -1844,6 +1974,13 @@ DynamicsFitProblem& DynamicsFitProblem::setRegularizeAnatomicalMarkerOffsets(
 DynamicsFitProblem& DynamicsFitProblem::setRegularizeImpliedDensity(s_t value)
 {
   mRegularizeImpliedDensity = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setVelAccImplicit(bool implicit)
+{
+  mVelAccImplicit = implicit;
   return *(this);
 }
 
@@ -2198,11 +2335,9 @@ bool DynamicsFitProblem::intermediate_callback(
 DynamicsFitter::DynamicsFitter(
     std::shared_ptr<dynamics::Skeleton> skeleton,
     std::vector<dynamics::BodyNode*> footNodes,
-    dynamics::MarkerMap markerMap,
     std::vector<std::string> trackingMarkers)
   : mSkeleton(skeleton),
     mFootNodes(footNodes),
-    mMarkerMap(markerMap),
     mTrackingMarkers(trackingMarkers),
     mTolerance(1e-8),
     mIterationLimit(500),
@@ -3121,8 +3256,15 @@ void DynamicsFitter::estimateLinkMassesFromAcceleration(
 
 //==============================================================================
 // 3. Run larger optimization problems to minimize a weighted combination of
-// residuals and marker RMSE, tweaking a controllable set of variables
-void DynamicsFitter::runOptimization(
+// residuals and marker RMSE, tweaking a controllable set of variables. This
+// includes the velocity and acceleration as explicit decision variables,
+// constrained by linear constraint equations. That means it needs to be
+// solved with IPOPT, using the interior point method.
+//
+// WARNING: DOES NOT PERFORM WELL WITH WARM STARTS! Becaus it uses the
+// interior point method, this doesn't warm start well. See
+// runImplicitVelAccOptimization() instead.
+void DynamicsFitter::runExplicitVelAccOptimization(
     std::shared_ptr<DynamicsInitialization> init,
     s_t residualWeight,
     s_t markerWeight,
@@ -3209,8 +3351,8 @@ void DynamicsFitter::runOptimization(
   // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will
   // crash. If you try to leave `problem` on the stack, you'll get invalid
   // free exceptions when IPOpt attempts to free it.
-  DynamicsFitProblem* problem = new DynamicsFitProblem(
-      init, mSkeleton, mMarkerMap, mTrackingMarkers, mFootNodes);
+  DynamicsFitProblem* problem
+      = new DynamicsFitProblem(init, mSkeleton, mTrackingMarkers, mFootNodes);
   problem->setResidualWeight(
       problem->mResidualUseL1 ? residualWeight
                               : residualWeight * residualWeight);
@@ -3222,6 +3364,7 @@ void DynamicsFitter::runOptimization(
   problem->setIncludeBodyScales(includeBodyScales);
   problem->setIncludePoses(includePoses);
   problem->setIncludeMarkerOffsets(includeMarkerOffsets);
+  problem->setVelAccImplicit(false);
 
   /*
   Eigen::VectorXs x = problem->flatten();
@@ -3257,6 +3400,110 @@ void DynamicsFitter::runOptimization(
               << "*** The final value of the objective function is "
               << final_obj << '.' << std::endl;
   }
+}
+
+//==============================================================================
+// 4. This runs the same optimization problem as
+// runExplicitVelAccOptimization(), but holds velocity and acc as implicit
+// functions of the position values, and removes any constraints. That means
+// we can optimize this using simple gradient descent with line search, and
+// can warm start.
+Eigen::VectorXs DynamicsFitter::runImplicitVelAccOptimization(
+    std::shared_ptr<DynamicsInitialization> init,
+    s_t residualWeight,
+    s_t markerWeight,
+    bool includeMasses,
+    bool includeCOMs,
+    bool includeInertias,
+    bool includeBodyScales,
+    bool includePoses,
+    bool includeMarkerOffsets)
+{
+  // Create a problem object on the stack
+  DynamicsFitProblem problem(init, mSkeleton, mTrackingMarkers, mFootNodes);
+  problem.setResidualWeight(
+      problem.mResidualUseL1 ? residualWeight
+                             : residualWeight * residualWeight);
+  problem.setMarkerWeight(
+      problem.mMarkerUseL1 ? markerWeight : markerWeight * markerWeight);
+  problem.setIncludeMasses(includeMasses);
+  problem.setIncludeCOMs(includeCOMs);
+  problem.setIncludeInertias(includeInertias);
+  problem.setIncludeBodyScales(includeBodyScales);
+  problem.setIncludeMarkerOffsets(includeMarkerOffsets);
+  problem.setVelAccImplicit(true);
+
+  // Guarantee that even if we aren't including the poses in our optimization,
+  // the velocities and accelerations are still exactly consistent with the pose
+  // data.
+  problem.setIncludePoses(true);
+  problem.unflatten(problem.flatten());
+  problem.setIncludePoses(includePoses);
+
+  Eigen::VectorXs x = problem.flatten();
+  s_t lastLoss = problem.computeLoss(x);
+
+  s_t stepSize = 1e-7;
+  for (int i = 0; i < mIterationLimit; i++)
+  {
+    std::cout << "Step " << i << ": " << lastLoss << std::endl;
+    Eigen::VectorXs grad = problem.computeGradient(x);
+
+    bool firstTry = true;
+    do
+    {
+      Eigen::VectorXs testX = x - grad * stepSize;
+      s_t testLoss = problem.computeLoss(testX, true);
+      if (testLoss < lastLoss)
+      {
+        x = testX;
+        lastLoss = testLoss;
+        problem.intermediate_callback(
+            Ipopt::AlgorithmMode::RegularMode,
+            i,
+            lastLoss,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            nullptr,
+            nullptr);
+        if (firstTry)
+        {
+          // If we hit a success on our first try, then grow the step size
+          stepSize *= 2;
+        }
+        break;
+      }
+      else
+      {
+        std::cout << "    Step size " << stepSize << " too large! Test loss "
+                  << testLoss << " > " << lastLoss << std::endl;
+      }
+      firstTry = false;
+      stepSize *= 0.5;
+    } while (stepSize > 1e-12);
+  }
+
+  // Save the result back to the problem init
+  problem.finalize_solution(
+      Ipopt::SolverReturn::SUCCESS,
+      mIterationLimit,
+      nullptr,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr);
+
+  return x;
 }
 
 //==============================================================================
