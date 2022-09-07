@@ -966,16 +966,20 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   // Just optimize the inertia regularizer
   fitter.setIterationLimit(100);
-  fitter.runExplicitVelAccOptimization(
-      init, 2e-2, 50, true, false, true, false, true, false);
+  fitter.runIPOPTOptimization(
+      init, 2e-2, 50, true, false, true, false, true, false, false);
 
   fitter.setIterationLimit(100);
-  Eigen::VectorXs x = fitter.runImplicitVelAccOptimization(
+  fitter.runSGDOptimization(
       init, 2e-2, 50, true, true, true, true, false, true);
 
   fitter.setIterationLimit(200);
-  fitter.runImplicitVelAccOptimization(
-      init, 2e-2, 50, true, true, true, true, true, true);
+  fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
+
+  // Try an explicit optimization at the end
+  // fitter.setIterationLimit(100);
+  // fitter.runIPOPTOptimization(
+  //     init, 2e-2, 50, true, true, true, true, true, true, true);
 
   /*
   // Fine tune the positions, body scales, and marker offsets
@@ -1826,7 +1830,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_DENSITY)
 
   Eigen::VectorXs x = problem.flatten();
   Eigen::VectorXs analytical = problem.computeGradient(x);
-  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x, false);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
 
   bool result = problem.debugErrors(fd, analytical, 3e-8);
   if (result)

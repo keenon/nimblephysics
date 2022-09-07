@@ -338,7 +338,7 @@ DynamicsFitProblem::DynamicsFitProblem(
     mRegularizeInertias(1.0),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(10.0),
-    mRegularizeImpliedDensity(1e-5),
+    mRegularizeImpliedDensity(3e-8),
     mRegularizeBodyScales(1.0),
     mRegularizePoses(0.0),
     mVelAccImplicit(false),
@@ -872,6 +872,20 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   }
   sum += markerRegularization;
 
+  s_t densityRegularization = 0.0;
+  Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+  Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+  for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+  {
+    s_t mass = masses(i);
+    Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+    s_t volume = dims(0) * dims(1) * dims(2);
+    s_t density = mass / volume;
+    s_t error = HUMAN_DENSITY_KG_M3 - density;
+    densityRegularization += mRegularizeImpliedDensity * error * error;
+  }
+  sum += densityRegularization;
+
   Eigen::VectorXs originalPos = mSkeleton->getPositions();
   mSkeleton->clearExternalForces();
 
@@ -986,6 +1000,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     std::cout << "["
               << "massR=" << massRegularization << ",comR=" << comRegularization
               << ",inR=" << inertiaRegularization
+              << ",dnsR=" << densityRegularization
               << ",scR=" << scaleRegularization
               << ",mkrR=" << markerRegularization << ",jntRMS=" << jointRMS
               << ",axisRMS=" << axisRMS << ",qR=" << poseRegularization
@@ -1062,6 +1077,19 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
     grad.segment(posesCursor, dim)
         += mRegularizeMasses * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
+
+    Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+    Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+    for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+    {
+      s_t mass = masses(i);
+      Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+      s_t volume = dims(0) * dims(1) * dims(2);
+      grad(posesCursor + i) += mRegularizeImpliedDensity
+                               * (2 * mass - 2 * volume * HUMAN_DENSITY_KG_M3)
+                               / (volume * volume);
+    }
+
     posesCursor += dim;
   }
   if (mIncludeCOMs)
@@ -1078,6 +1106,23 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
     grad.segment(posesCursor, dim)
         += mRegularizeInertias * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias);
+
+    Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+    Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+    for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+    {
+      s_t mass = masses(i);
+      Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+      s_t volume = dims(0) * dims(1) * dims(2);
+      s_t constant
+          = mRegularizeImpliedDensity
+            * (2 * mass * HUMAN_DENSITY_KG_M3 * volume - 2 * mass * mass)
+            / (volume * volume);
+      grad(posesCursor + i * 6 + 0) += constant / dims(0);
+      grad(posesCursor + i * 6 + 1) += constant / dims(1);
+      grad(posesCursor + i * 6 + 2) += constant / dims(2);
+    }
+
     posesCursor += dim;
   }
   if (mIncludeBodyScales)
@@ -3264,7 +3309,7 @@ void DynamicsFitter::estimateLinkMassesFromAcceleration(
 // WARNING: DOES NOT PERFORM WELL WITH WARM STARTS! Becaus it uses the
 // interior point method, this doesn't warm start well. See
 // runImplicitVelAccOptimization() instead.
-void DynamicsFitter::runExplicitVelAccOptimization(
+void DynamicsFitter::runIPOPTOptimization(
     std::shared_ptr<DynamicsInitialization> init,
     s_t residualWeight,
     s_t markerWeight,
@@ -3273,7 +3318,8 @@ void DynamicsFitter::runExplicitVelAccOptimization(
     bool includeInertias,
     bool includeBodyScales,
     bool includePoses,
-    bool includeMarkerOffsets)
+    bool includeMarkerOffsets,
+    bool implicitVelAcc)
 {
   // Before using Eigen in a multi-threaded environment, we need to explicitly
   // call this (at least prior to Eigen 3.3)
@@ -3364,7 +3410,7 @@ void DynamicsFitter::runExplicitVelAccOptimization(
   problem->setIncludeBodyScales(includeBodyScales);
   problem->setIncludePoses(includePoses);
   problem->setIncludeMarkerOffsets(includeMarkerOffsets);
-  problem->setVelAccImplicit(false);
+  problem->setVelAccImplicit(implicitVelAcc);
 
   /*
   Eigen::VectorXs x = problem->flatten();
@@ -3408,7 +3454,7 @@ void DynamicsFitter::runExplicitVelAccOptimization(
 // functions of the position values, and removes any constraints. That means
 // we can optimize this using simple gradient descent with line search, and
 // can warm start.
-Eigen::VectorXs DynamicsFitter::runImplicitVelAccOptimization(
+Eigen::VectorXs DynamicsFitter::runSGDOptimization(
     std::shared_ptr<DynamicsInitialization> init,
     s_t residualWeight,
     s_t markerWeight,

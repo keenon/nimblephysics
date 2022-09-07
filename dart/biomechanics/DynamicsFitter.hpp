@@ -495,7 +495,7 @@ public:
   // WARNING: DOES NOT PERFORM WELL WITH WARM STARTS! Becaus it uses the
   // interior point method, this doesn't warm start well. See
   // runImplicitVelAccOptimization() instead.
-  void runExplicitVelAccOptimization(
+  void runIPOPTOptimization(
       std::shared_ptr<DynamicsInitialization> init,
       s_t residualWeight,
       s_t markerWeight,
@@ -504,14 +504,15 @@ public:
       bool includeInertias,
       bool includeBodyScales,
       bool includePoses,
-      bool includeMarkerOffsets);
+      bool includeMarkerOffsets,
+      bool implicitVelAcc);
 
   // 4. This runs the same optimization problem as
   // runExplicitVelAccOptimization(), but holds velocity and acc as implicit
   // functions of the position values, and removes any constraints. That means
   // we can optimize this using simple gradient descent with line search, and
   // can warm start.
-  Eigen::VectorXs runImplicitVelAccOptimization(
+  Eigen::VectorXs runSGDOptimization(
       std::shared_ptr<DynamicsInitialization> init,
       s_t residualWeight,
       s_t markerWeight,
