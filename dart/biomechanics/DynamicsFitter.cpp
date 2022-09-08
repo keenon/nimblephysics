@@ -338,7 +338,8 @@ DynamicsFitProblem::DynamicsFitProblem(
     mRegularizeInertias(1.0),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(10.0),
-    mRegularizeImpliedDensity(3e-8),
+    // mRegularizeImpliedDensity(3e-8),
+    mRegularizeImpliedDensity(0),
     mRegularizeBodyScales(1.0),
     mRegularizePoses(0.0),
     mVelAccImplicit(false),
@@ -1885,6 +1886,254 @@ bool DynamicsFitProblem::debugErrors(
     }
   }
   return anyError;
+}
+
+//==============================================================================
+// This attempts to perfect the physical consistency of the data, and writes
+// them back to the problem
+void DynamicsFitProblem::computePerfectGRFs()
+{
+  mInit->perfectGrfTrials.clear();
+  mInit->perfectForcePlateTrials.clear();
+  for (int trial = 0; trial < mPoses.size(); trial++)
+  {
+    mSkeleton->setTimeStep(mInit->trialTimesteps[trial]);
+    s_t groundHeight = mInit->groundHeight[trial];
+
+    Eigen::MatrixXs perfectGrfTrial = Eigen::MatrixXs::Zero(
+        mInit->grfTrials[trial].rows(), mInit->grfTrials[trial].cols());
+    std::vector<ForcePlate> perfectForcePlates;
+    for (int i = 0; i < mInit->forcePlateTrials[trial].size(); i++)
+    {
+      ForcePlate& originalPlate = mInit->forcePlateTrials[trial][i];
+      perfectForcePlates.emplace_back();
+      ForcePlate& perfectPlate
+          = perfectForcePlates[perfectForcePlates.size() - 1];
+
+      perfectPlate.worldOrigin = originalPlate.worldOrigin;
+      perfectPlate.corners = originalPlate.corners;
+    }
+    for (int t = 0; t < mAccs[trial].cols(); t++)
+    {
+      mSkeleton->setPositions(mPoses[trial].col(t));
+      mSkeleton->setVelocities(mVels[trial].col(t));
+      mSkeleton->setAccelerations(mAccs[trial].col(t));
+
+      int activeFootIndex = -1;
+      bool onlyOneActive = false;
+      for (int i = 0; i < mInit->grfBodyForceActive[trial][t].size(); i++)
+      {
+        bool active = mInit->grfBodyForceActive[trial][t][i];
+        if (active)
+        {
+          if (activeFootIndex == -1)
+          {
+            activeFootIndex = i;
+            onlyOneActive = true;
+          }
+          else
+          {
+            onlyOneActive = false;
+          }
+        }
+      }
+
+      int activeForcePlateIndex = -1;
+      bool onlyOneForcePlateActive = false;
+      for (int i = 0; i < mInit->forcePlateTrials[trial].size(); i++)
+      {
+        if (mInit->forcePlateTrials[trial][i].forces[t].norm() > 1e-3)
+        {
+          if (activeForcePlateIndex == -1)
+          {
+            activeForcePlateIndex = i;
+            onlyOneForcePlateActive = true;
+          }
+          else
+          {
+            onlyOneForcePlateActive = false;
+          }
+        }
+      }
+
+      if (onlyOneActive && onlyOneForcePlateActive)
+      {
+        auto result = mSkeleton->getContactInverseDynamics(
+            mVels[trial].col(t + 1), mFootNodes[activeFootIndex]);
+        Eigen::Vector6s worldWrench = math::dAdInvT(
+            mFootNodes[activeFootIndex]->getWorldTransform(),
+            result.contactWrench);
+        perfectGrfTrial.block<6, 1>(activeFootIndex * 6, t) = worldWrench;
+
+#ifndef NDEBUG
+        Eigen::Vector6s residual = mResidualHelper->calculateResidual(
+            mPoses[trial].col(t),
+            mVels[trial].col(t),
+            mAccs[trial].col(t),
+            perfectGrfTrial.col(t));
+        s_t norm = residual.squaredNorm();
+        std::cout << "Residual norm t=" << t << ": " << norm << std::endl;
+        assert(norm < 1e-10);
+#endif
+
+        Eigen::Vector3s worldTau = worldWrench.head<3>();
+        Eigen::Vector3s worldF = worldWrench.tail<3>();
+        Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+
+        // To get COP, solve for k and p, where we know the y-coordinate of p in
+        // advance:
+        //
+        // k * worldF = worldTau - worldF.cross(p);
+        // k * worldF - crossF * p_unknown = worldTau - worldF.cross(p_known);
+
+        Eigen::Vector3s rightSide = worldTau - crossF.col(1) * groundHeight;
+        Eigen::Matrix3s leftSide = -crossF;
+        leftSide.col(1) = worldF;
+        Eigen::Vector3s p
+            = leftSide.completeOrthogonalDecomposition().solve(rightSide);
+
+        s_t k = p(1);
+        p(1) = 0;
+        Eigen::Vector3s expectedTau = worldF * k;
+        Eigen::Vector3s cop = p;
+        cop(1) = groundHeight;
+
+        // add to a force plate
+        for (int i = 0; i < perfectForcePlates.size(); i++)
+        {
+          if (i == activeForcePlateIndex)
+          {
+            perfectForcePlates[i].centersOfPressure.push_back(cop);
+            perfectForcePlates[i].forces.push_back(worldF);
+            perfectForcePlates[i].moments.push_back(expectedTau);
+          }
+          else
+          {
+            perfectForcePlates[i].centersOfPressure.push_back(
+                Eigen::Vector3s::Zero());
+            perfectForcePlates[i].forces.push_back(Eigen::Vector3s::Zero());
+            perfectForcePlates[i].moments.push_back(Eigen::Vector3s::Zero());
+          }
+        }
+
+#ifndef NDEBUG
+        Eigen::Isometry3s testT = Eigen::Isometry3s::Identity();
+        testT.translation() = p;
+        Eigen::Vector6s localTau = math::dAdT(testT, worldWrench);
+        Eigen::Vector3s diff = localTau.head<3>() - expectedTau;
+        if (diff.norm() > 1e-8)
+        {
+          std::cout << "Resulting tau didn't match expectations!" << std::endl;
+          std::cout << "Expected: " << std::endl << expectedTau << std::endl;
+          std::cout << "Real: " << std::endl << localTau << std::endl;
+          assert(diff.norm() < 1e-8);
+        }
+#endif
+      }
+      else
+      {
+        Eigen::VectorXs sensorWorldGRF = mInit->grfTrials[trial].col(t);
+        std::vector<Eigen::Vector6s> localWrenches;
+        std::vector<const dynamics::BodyNode*> constFootNodes;
+        for (int i = 0; i < mFootNodes.size(); i++)
+        {
+          constFootNodes.push_back(mFootNodes[i]);
+          localWrenches.push_back(math::dAdT(
+              mFootNodes[i]->getWorldTransform(),
+              sensorWorldGRF.segment<6>(i * 6)));
+        }
+        auto result = mSkeleton->getMultipleContactInverseDynamics(
+            mVels[trial].col(t + 1), constFootNodes, localWrenches);
+
+        std::vector<Eigen::Vector6s> worldWrenches;
+        Eigen::VectorXs perfectGRF
+            = Eigen::VectorXs::Zero(mFootNodes.size() * 6);
+        for (int i = 0; i < mFootNodes.size(); i++)
+        {
+          Eigen::Vector6s worldWrench = math::dAdInvT(
+              mFootNodes[i]->getWorldTransform(), result.contactWrenches[i]);
+          worldWrenches.push_back(worldWrench);
+          perfectGRF.segment<6>(i * 6) = worldWrench;
+        }
+        perfectGrfTrial.col(t) = perfectGRF;
+
+#ifndef NDEBUG
+        Eigen::Vector6s residual = mResidualHelper->calculateResidual(
+            mPoses[trial].col(t),
+            mVels[trial].col(t),
+            mAccs[trial].col(t),
+            perfectGrfTrial.col(t));
+        s_t norm = residual.squaredNorm();
+        std::cout << "Residual norm t=" << t << ": " << norm << std::endl;
+        assert(norm < 1e-10);
+#endif
+
+        std::vector<Eigen::Vector3s> forces;
+        std::vector<Eigen::Vector3s> cops;
+        std::vector<Eigen::Vector3s> taus;
+
+        Eigen::MatrixXs platesToFeet = Eigen::MatrixXs::Zero(
+            mFootNodes.size(), mInit->forcePlateTrials[trial].size());
+        for (int i = 0; i < mFootNodes.size(); i++)
+        {
+          Eigen::Vector6s worldWrench = worldWrenches[i];
+
+          // Find the center of pressure, using the copy-pasted method from
+          // above in the single-footed case
+          // TODO: factor out into a utility method
+          Eigen::Vector3s worldTau = worldWrench.head<3>();
+          Eigen::Vector3s worldF = worldWrench.tail<3>();
+          Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+          Eigen::Vector3s rightSide = worldTau - crossF.col(1) * groundHeight;
+          Eigen::Matrix3s leftSide = -crossF;
+          leftSide.col(1) = worldF;
+          Eigen::Vector3s p
+              = leftSide.completeOrthogonalDecomposition().solve(rightSide);
+          s_t k = p(1);
+          p(1) = 0;
+          Eigen::Vector3s expectedTau = worldF * k;
+          Eigen::Vector3s cop = p;
+          cop(1) = groundHeight;
+
+          forces.push_back(worldF);
+          cops.push_back(cop);
+          taus.push_back(expectedTau);
+
+          for (int j = 0; j < mInit->forcePlateTrials[trial].size(); j++)
+          {
+            platesToFeet(j, i)
+                = 1.0
+                  / (cop
+                     - mInit->forcePlateTrials[trial][j].centersOfPressure[t])
+                        .norm();
+          }
+        }
+        Eigen::VectorXi platesToFeetAssignment
+            = math::AssignmentMatcher::assignRowsToColumns(platesToFeet);
+        for (int i = 0; i < perfectForcePlates.size(); i++)
+        {
+          if (platesToFeetAssignment(i) == -1)
+          {
+            perfectForcePlates[i].centersOfPressure.push_back(
+                Eigen::Vector3s::Zero());
+            perfectForcePlates[i].forces.push_back(Eigen::Vector3s::Zero());
+            perfectForcePlates[i].moments.push_back(Eigen::Vector3s::Zero());
+          }
+          else if (perfectForcePlates[i].centersOfPressure.size() <= t)
+          {
+            perfectForcePlates[i].centersOfPressure.push_back(
+                cops[platesToFeetAssignment(i)]);
+            perfectForcePlates[i].forces.push_back(
+                forces[platesToFeetAssignment(i)]);
+            perfectForcePlates[i].moments.push_back(
+                taus[platesToFeetAssignment(i)]);
+          }
+        }
+      }
+    }
+    mInit->perfectGrfTrials.push_back(perfectGrfTrial);
+    mInit->perfectForcePlateTrials.push_back(perfectForcePlates);
+  }
 }
 
 //==============================================================================
@@ -3454,7 +3703,7 @@ void DynamicsFitter::runIPOPTOptimization(
 // functions of the position values, and removes any constraints. That means
 // we can optimize this using simple gradient descent with line search, and
 // can warm start.
-Eigen::VectorXs DynamicsFitter::runSGDOptimization(
+void DynamicsFitter::runSGDOptimization(
     std::shared_ptr<DynamicsInitialization> init,
     s_t residualWeight,
     s_t markerWeight,
@@ -3548,8 +3797,17 @@ Eigen::VectorXs DynamicsFitter::runSGDOptimization(
       0,
       nullptr,
       nullptr);
+}
 
-  return x;
+//==============================================================================
+// 5. This attempts to perfect the physical consistency of the data
+void DynamicsFitter::computePerfectGRFs(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  // Create a problem object on the stack
+  DynamicsFitProblem problem(init, mSkeleton, mTrackingMarkers, mFootNodes);
+  // Compute the perfect GRF data
+  problem.computePerfectGRFs();
 }
 
 //==============================================================================
@@ -3678,6 +3936,94 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageRealForce(
 }
 
 //==============================================================================
+// Get the average change in the center of pressure point (in meters) after
+// "perfecting" the GRF data
+s_t DynamicsFitter::computeAverageCOPChange(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    if (init->forcePlateTrials[trial].size()
+        == init->perfectForcePlateTrials[trial].size())
+    {
+      for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+      {
+        if (init->probablyMissingGRF[trial][t])
+        {
+          continue;
+        }
+        for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+        {
+          if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+          {
+            s_t distNow = (init->forcePlateTrials[trial][i].centersOfPressure[t]
+                           - init->perfectForcePlateTrials[trial][i]
+                                 .centersOfPressure[t])
+                              .norm();
+            std::cout << "CoP moved " << distNow << " at time " << t
+                      << std::endl;
+            if (distNow > 0.1)
+            {
+              std::cout << "'Perfect' CoP [" << i << "]:" << std::endl
+                        << init->perfectForcePlateTrials[trial][i]
+                               .centersOfPressure[t]
+                        << std::endl;
+              std::cout << "Measured CoP [" << i << "]:" << std::endl
+                        << init->forcePlateTrials[trial][i].centersOfPressure[t]
+                        << std::endl;
+            }
+            dist += distNow;
+            count++;
+          }
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
+// Get the average change in the force vector (in Newtons) after "perfecting"
+// the GRF data
+s_t DynamicsFitter::computeAverageForceMagnitudeChange(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        continue;
+      }
+      if (init->forcePlateTrials[trial].size()
+          == init->perfectForcePlateTrials[trial].size())
+      {
+        for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+        {
+          if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+          {
+            dist += (init->forcePlateTrials[trial][i].forces[t]
+                     - init->perfectForcePlateTrials[trial][i].forces[t])
+                        .norm();
+            count++;
+          }
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
 // This debugs the current state, along with visualizations of errors
 // where the dynamics do not match the force plate data
 void DynamicsFitter::saveDynamicsToGUI(
@@ -3701,6 +4047,9 @@ void DynamicsFitter::saveDynamicsToGUI(
   Eigen::Vector4s markerErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
   Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  std::string perfectForcePlateLayerName = "Perfect Force Plates";
+  Eigen::Vector4s perfectForcePlateLayerColor
+      = Eigen::Vector4s(1.0, 0.0, 1.0, 1.0);
   std::string measuredForcesLayerName = "Measured Forces";
   Eigen::Vector4s measuredForcesLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
@@ -3744,6 +4093,7 @@ void DynamicsFitter::saveDynamicsToGUI(
       false);
   server.createLayer(markerErrorLayerName, markerErrorLayerColor);
   server.createLayer(forcePlateLayerName, forcePlateLayerColor);
+  server.createLayer(perfectForcePlateLayerName, perfectForcePlateLayerColor);
   server.createLayer(measuredForcesLayerName, measuredForcesLayerColor);
   server.createLayer(residualLayerName, residualLayerColor);
   server.createLayer(impliedForcesLayerName, impliedForcesLayerColor);
@@ -3753,6 +4103,8 @@ void DynamicsFitter::saveDynamicsToGUI(
   server.createLayer(groundContactLayerName, groundContactLayerColor, false);
 
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trialIndex];
+  std::vector<ForcePlate> perfectForcePlates
+      = init->perfectForcePlateTrials[trialIndex];
   Eigen::MatrixXs poses = init->poseTrials[trialIndex];
 
   if (init->flatGround[trialIndex])
@@ -4017,6 +4369,25 @@ void DynamicsFitter::saveDynamicsToGUI(
             forcePoints,
             forcePlateLayerColor,
             forcePlateLayerName);
+      }
+    }
+
+    for (int i = 0; i < perfectForcePlates.size(); i++)
+    {
+      server.deleteObject("perfect_force_" + std::to_string(i));
+      if (perfectForcePlates[i].forces[timestep].squaredNorm() > 0)
+      {
+        std::vector<Eigen::Vector3s> forcePoints;
+        forcePoints.push_back(
+            perfectForcePlates[i].centersOfPressure[timestep]);
+        forcePoints.push_back(
+            perfectForcePlates[i].centersOfPressure[timestep]
+            + (perfectForcePlates[i].forces[timestep] * 0.001));
+        server.createLine(
+            "perfect_force_" + std::to_string(i),
+            forcePoints,
+            perfectForcePlateLayerColor,
+            perfectForcePlateLayerName);
       }
     }
 

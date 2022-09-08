@@ -116,6 +116,13 @@ struct DynamicsInitialization
   std::vector<dynamics::BodyNode*> grfBodyNodes;
 
   ///////////////////////////////////////////
+  // After the pipeline runs, these hold GRF forces that are perfectly
+  // consistent with physics equations. These are the same format as `grfTrials`
+  std::vector<Eigen::MatrixXs> perfectGrfTrials;
+  // These are corrected copy of `forcePlateTrials`
+  std::vector<std::vector<ForcePlate>> perfectForcePlateTrials;
+
+  ///////////////////////////////////////////
   // Foot ground contact, and rendering
   std::vector<s_t> groundHeight;
   std::vector<bool> flatGround;
@@ -233,6 +240,10 @@ public:
 
   // Print out the errors in a gradient vector in human readable form
   bool debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
+
+  // This attempts to perfect the physical consistency of the data, and writes
+  // them back to the problem
+  void computePerfectGRFs();
 
   DynamicsFitProblem& setIncludeMasses(bool value);
   DynamicsFitProblem& setIncludeCOMs(bool value);
@@ -512,7 +523,7 @@ public:
   // functions of the position values, and removes any constraints. That means
   // we can optimize this using simple gradient descent with line search, and
   // can warm start.
-  Eigen::VectorXs runSGDOptimization(
+  void runSGDOptimization(
       std::shared_ptr<DynamicsInitialization> init,
       s_t residualWeight,
       s_t markerWeight,
@@ -522,6 +533,9 @@ public:
       bool includeBodyScales,
       bool includePoses,
       bool includeMarkerOffsets);
+
+  // 5. This attempts to perfect the physical consistency of the data
+  void computePerfectGRFs(std::shared_ptr<DynamicsInitialization> init);
 
   // Get the average RMSE, in meters, of the markers
   s_t computeAverageMarkerRMSE(std::shared_ptr<DynamicsInitialization> init);
@@ -533,6 +547,15 @@ public:
   // Get the average real measured force (in newtons) and torque (in
   // newton-meters)
   std::pair<s_t, s_t> computeAverageRealForce(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average change in the center of pressure point (in meters) after
+  // "perfecting" the GRF data
+  s_t computeAverageCOPChange(std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average change in the force vector (in Newtons) after "perfecting"
+  // the GRF data
+  s_t computeAverageForceMagnitudeChange(
       std::shared_ptr<DynamicsInitialization> init);
 
   // This debugs the current state, along with visualizations of errors where

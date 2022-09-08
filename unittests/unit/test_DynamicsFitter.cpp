@@ -973,8 +973,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runSGDOptimization(
       init, 2e-2, 50, true, true, true, true, false, true);
 
-  fitter.setIterationLimit(200);
-  fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
+  fitter.setIterationLimit(50);
+  fitter.runSGDOptimization(
+      init, 2e-2, 100, true, true, true, true, true, true);
+
+  fitter.computePerfectGRFs(init);
 
   // Try an explicit optimization at the end
   // fitter.setIterationLimit(100);
@@ -1017,6 +1020,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   std::cout << "Avg Residual Torque: " << pair.second << " Nm ("
             << (pair.second / secondPair.second) * 100 << "% of original "
             << secondPair.second << " Nm)" << std::endl;
+  std::cout << "Avg CoP movement in 'perfect' GRFs: "
+            << fitter.computeAverageCOPChange(init) << " m" << std::endl;
+  std::cout << "Avg force change in 'perfect' GRFs: "
+            << fitter.computeAverageForceMagnitudeChange(init) << " N"
+            << std::endl;
 
   if (saveGUI)
   {
