@@ -24,6 +24,7 @@
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
+#include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/UniversalLoader.hpp"
 #include "dart/utils/sdf/sdf.hpp"
 #include "dart/utils/urdf/urdf.hpp"
@@ -978,6 +979,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       init, 2e-2, 100, true, true, true, true, true, true);
 
   fitter.computePerfectGRFs(init);
+  bool consistent = fitter.checkPhysicalConsistency(init);
+  if (!consistent)
+  {
+    std::cout << "ERROR: Physical consistency failed" << std::endl;
+    // return init;
+  }
 
   // Try an explicit optimization at the end
   // fitter.setIterationLimit(100);
@@ -1036,6 +1043,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         0,
         (int)round(1.0 / init->trialTimesteps[0]));
   }
+
+  // Attempt writing out the data
+  fitter.writeCSVData("../../../data/grf/Subject4/gold.csv", init, 0);
+  MJCFExporter exporter;
+  exporter.writeSkeleton("../../../data/grf/Subject4/fitted.mjcf", skel);
 
   return init;
 }

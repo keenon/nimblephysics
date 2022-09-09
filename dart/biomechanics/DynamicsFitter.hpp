@@ -119,6 +119,8 @@ struct DynamicsInitialization
   // After the pipeline runs, these hold GRF forces that are perfectly
   // consistent with physics equations. These are the same format as `grfTrials`
   std::vector<Eigen::MatrixXs> perfectGrfTrials;
+  std::vector<Eigen::MatrixXs> perfectTorques;
+  std::vector<Eigen::MatrixXs> perfectGrfAsCopTorqueForces;
   // These are corrected copy of `forcePlateTrials`
   std::vector<std::vector<ForcePlate>> perfectForcePlateTrials;
 
@@ -536,6 +538,17 @@ public:
 
   // 5. This attempts to perfect the physical consistency of the data
   void computePerfectGRFs(std::shared_ptr<DynamicsInitialization> init);
+
+  // This plays the simulation forward in Nimble, using the existing GRFs and
+  // torques, and checks that everything matches what we expect to see
+  bool checkPhysicalConsistency(std::shared_ptr<DynamicsInitialization> init);
+
+  // This writes a unified CSV with a ton of different columns in it, describing
+  // the selected trial
+  void writeCSVData(
+      std::string path,
+      std::shared_ptr<DynamicsInitialization> init,
+      int trial);
 
   // Get the average RMSE, in meters, of the markers
   s_t computeAverageMarkerRMSE(std::shared_ptr<DynamicsInitialization> init);

@@ -245,6 +245,8 @@ void World::step(bool _resetCommand)
   mConstraintSolver->setFallbackConstraintForceMixingConstant(
       mFallbackConstraintForceMixingConstant);
   runConstraintEngine(_resetCommand);
+
+  // Integrate positions forward
   integratePositions(initialVelocity);
 
   mTime += mTimeStep;
