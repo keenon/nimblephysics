@@ -1578,6 +1578,55 @@ public:
       std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector6s> bodyWrenchGuesses);
 
+  struct MultipleContactCoPProblem
+  {
+    std::vector<const dynamics::BodyNode*> bodies;
+    Eigen::VectorXs massTorques;
+    Eigen::VectorXs coriolisAndGravity;
+    Eigen::MatrixXs jacs;
+    Eigen::MatrixXs jacBlock;
+    Eigen::FullPivLU<Eigen::MatrixXs> lu;
+    Eigen::MatrixXs J_null_space;
+    Eigen::Vector6s rootTorque;
+    std::vector<Eigen::Vector9s> copWrenchGuesses;
+    s_t groundHeight;
+    int verticalAxis;
+
+    s_t weightForceToMeters;
+
+    Eigen::VectorXs getInitialGuess();
+    s_t getLoss(const Eigen::VectorXs& x);
+    s_t getAvgCoPDistance(const Eigen::VectorXs& x);
+    Eigen::VectorXs getUnconstrainedGradient(const Eigen::VectorXs& x);
+    Eigen::VectorXs finiteDifferenceUnconstrainedGradient(
+        const Eigen::VectorXs& x);
+    Eigen::VectorXs projectToNullSpace(const Eigen::VectorXs& x);
+    Eigen::VectorXs clampToNearestLegalValues(const Eigen::VectorXs& x);
+    Eigen::Vector6s getConstraintErrors(const Eigen::VectorXs& x);
+  };
+
+  /// This is just broken out to make testing easier, this creates an
+  /// optimization problem object that can be used by
+  /// getMultipleContactInverseDynamicsNearCoP()
+  MultipleContactCoPProblem createMultipleContactInverseDynamicsNearCoPProblem(
+      const Eigen::VectorXs& nextVel,
+      std::vector<const dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector9s> copWrenchGuesses,
+      s_t groundHeight,
+      int verticalAxis);
+
+  /// This performs a similar task to getMultipleContactInverseDynamics(), but
+  /// it resolves ambiguity by attempting to find contact forces that are as
+  /// closes as possible to the center-of-pressure (CoP) guesses.
+  MultipleContactInverseDynamicsResult getMultipleContactInverseDynamicsNearCoP(
+      const Eigen::VectorXs& nextVel,
+      std::vector<const dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector6s> bodyWrenchGuesses,
+      s_t groundHeight,
+      int verticalAxis,
+      s_t weightForceToMeters = 0.001,
+      bool logOutput = false);
+
   struct MultipleContactInverseDynamicsOverTimeResult
   {
     dynamics::Skeleton* skel;

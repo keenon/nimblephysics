@@ -1045,9 +1045,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   }
 
   // Attempt writing out the data
-  fitter.writeCSVData("../../../data/grf/Subject4/gold.csv", init, 0);
+  fitter.writeCSVData("../../../data/grf/Subject4/motion.csv", init, 0);
   MJCFExporter exporter;
-  exporter.writeSkeleton("../../../data/grf/Subject4/fitted.mjcf", skel);
+  exporter.writeSkeleton("../../../data/grf/Subject4/model.mjcf", skel);
 
   return init;
 }

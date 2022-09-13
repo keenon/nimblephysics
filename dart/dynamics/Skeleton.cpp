@@ -48,6 +48,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
@@ -7497,6 +7498,426 @@ Skeleton::getMultipleContactInverseDynamics(
   }
   Eigen::VectorXs contactTorques = jacs.transpose() * correctedForces;
   result.jointTorques = massTorques + coriolisAndGravity - contactTorques;
+  result.jointTorques.head<6>().setZero();
+
+  return result;
+}
+
+Skeleton::MultipleContactCoPProblem
+Skeleton::createMultipleContactInverseDynamicsNearCoPProblem(
+    const Eigen::VectorXs& nextVel,
+    std::vector<const dynamics::BodyNode*> bodies,
+    std::vector<Eigen::Vector9s> copWrenchGuesses,
+    s_t groundHeight,
+    int verticalAxis)
+{
+  // This is the Jacobian in local body space. We're going to end up applying
+  // our contact force in local body space, so this works out.
+  Eigen::MatrixXs jacs = Eigen::MatrixXs::Zero(6 * bodies.size(), getNumDofs());
+  assert(bodies.size() > 0);
+
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    // jacs.block(6 * i, 0, 6, getNumDofs())
+    //     = getJacobian(bodies[i], Frame::World());
+
+    jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
+  }
+  Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
+      (nextVel - getVelocities()) / getTimeStep());
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                       - getExternalForces() + getDampingForce()
+                                       + getSpringForce();
+  Eigen::Vector6s rootTorque
+      = massTorques.head<6>() + coriolisAndGravity.head<6>();
+
+  // Precompute matrix factorization
+  Eigen::FullPivLU<Eigen::MatrixXs> lu(jacBlock);
+  assert(lu.rank() <= 6);
+  Eigen::MatrixXs J_null_space = lu.kernel();
+  for (int i = 0; i < J_null_space.cols(); i++)
+  {
+    J_null_space.col(i).normalize();
+  }
+
+  Skeleton::MultipleContactCoPProblem problem;
+  problem.massTorques = massTorques;
+  problem.coriolisAndGravity = coriolisAndGravity;
+  problem.copWrenchGuesses = copWrenchGuesses;
+  problem.jacs = jacs;
+  problem.jacBlock = jacBlock;
+  problem.lu = lu;
+  problem.J_null_space = J_null_space;
+  problem.rootTorque = rootTorque;
+  problem.groundHeight = groundHeight;
+  problem.verticalAxis = verticalAxis;
+  problem.bodies = bodies;
+  problem.weightForceToMeters = 0.001;
+
+  return problem;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::getInitialGuess()
+{
+  return jacBlock.completeOrthogonalDecomposition().solve(rootTorque);
+  /*
+  Eigen::VectorXs xLocal
+      = jacBlock.completeOrthogonalDecomposition().solve(rootTorque);
+  // std::cout << "Initial guess: " << std::endl << x << std::endl;
+  Eigen::VectorXs xGlobal = Eigen::VectorXs::Zero(xLocal.size());
+  for (int i = 0; i < xLocal.size(); i++)
+  {
+    xGlobal.segment<6>(i * 6) = math::dAdInvT(
+        bodies[i]->getWorldTransform(), xLocal.segment<6>(i * 6));
+  }
+  return xGlobal;
+  */
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactCoPProblem::getLoss(const Eigen::VectorXs& x)
+{
+  s_t loss = 0.0;
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    assert(!copWrenchGuesses[i].hasNaN());
+    assert(!x.segment<6>(i * 6).hasNaN());
+
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    assert(!copWrench.hasNaN());
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = copWrenchGuesses[i].head<3>() - cop;
+    loss += copError.norm();
+
+    Eigen::Vector3s f = copWrench.tail<3>();
+    Eigen::Vector3s fError = copWrenchGuesses[i].tail<3>() - f;
+    loss += fError.norm() * weightForceToMeters;
+  }
+  return loss;
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactCoPProblem::getAvgCoPDistance(
+    const Eigen::VectorXs& x)
+{
+  s_t loss = 0.0;
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    assert(!copWrenchGuesses[i].hasNaN());
+    assert(!x.segment<6>(i * 6).hasNaN());
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    assert(!copWrench.hasNaN());
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = copWrenchGuesses[i].head<3>() - cop;
+    loss += copError.norm();
+  }
+  return loss;
+}
+
+//==============================================================================
+Eigen::Vector6s Skeleton::MultipleContactCoPProblem::getConstraintErrors(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs contactTorques = jacs.transpose() * x;
+  Eigen::VectorXs jointTorques
+      = massTorques + coriolisAndGravity - contactTorques;
+  return jointTorques.head<6>();
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::getUnconstrainedGradient(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs unconstrained = Eigen::VectorXs::Zero(x.size());
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    // Eigen::Matrix6s invT = math::dAdTMatrix(bodies[i]->getWorldTransform());
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = cop - copWrenchGuesses[i].head<3>();
+    Eigen::Vector3s f = copWrench.tail<3>();
+    Eigen::Vector3s fError = f - copWrenchGuesses[i].tail<3>();
+
+    Eigen::Vector9s copWrenchGrad = Eigen::Vector9s::Zero();
+    copWrenchGrad.head<3>() = copError.normalized();
+    copWrenchGrad.tail<3>() = fError.normalized() * weightForceToMeters;
+
+    Eigen::Vector6s globalWrenchGrad
+        = math::getProjectWrenchToCoPJacobian(
+              math::dAdInvT(
+                  bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+              groundHeight,
+              verticalAxis)
+              .transpose()
+          * copWrenchGrad;
+    Eigen::Vector6s wrenchGrad
+        = math::dAdInvTMatrix(bodies[i]->getWorldTransform()).transpose()
+          * globalWrenchGrad;
+    unconstrained.segment<6>(i * 6) = wrenchGrad;
+  }
+  return unconstrained;
+}
+
+//==============================================================================
+Eigen::VectorXs
+Skeleton::MultipleContactCoPProblem::finiteDifferenceUnconstrainedGradient(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(x.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = x;
+        perturbed(i) += eps;
+
+        out = getLoss(perturbed);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::projectToNullSpace(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs dx = Eigen::VectorXs::Zero(x.size());
+  for (int i = 0; i < J_null_space.cols(); i++)
+  {
+    dx += J_null_space.col(i) * J_null_space.col(i).dot(x);
+  }
+  return dx;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::clampToNearestLegalValues(
+    const Eigen::VectorXs& x)
+{
+  return lu.solve(rootTorque - jacBlock * x) + x;
+}
+
+//==============================================================================
+/// This performs a similar task to getMultipleContactInverseDynamics(), but
+/// it resolves ambiguity by attempting to find contact forces that are as
+/// closes as possible to the center-of-pressure (CoP) guesses.
+Skeleton::MultipleContactInverseDynamicsResult
+Skeleton::getMultipleContactInverseDynamicsNearCoP(
+    const Eigen::VectorXs& nextVel,
+    std::vector<const dynamics::BodyNode*> bodies,
+    std::vector<Eigen::Vector6s> bodyWrenchGuesses,
+    s_t groundHeight,
+    int verticalAxis,
+    s_t weightForceToMeters,
+    bool logOutput)
+{
+  MultipleContactInverseDynamicsResult result;
+  result.skel = this;
+  result.contactBodies = bodies;
+  result.pos = getPositions();
+  result.vel = getVelocities();
+  result.nextVel = nextVel;
+
+  dynamics::Joint* joint = getRootJoint();
+  const dynamics::FreeJoint* freeJoint
+      = dynamic_cast<const dynamics::FreeJoint*>(joint);
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
+  {
+    std::cout
+        << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
+           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "it's neither, this function won't work and we're returning zeros."
+        << std::endl;
+    result.contactWrenches = std::vector<Eigen::Vector6s>();
+    for (int i = 0; i < bodies.size(); i++)
+      result.contactWrenches.push_back(Eigen::Vector6s::Zero());
+    result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
+    return result;
+  }
+  std::vector<Eigen::Vector9s> copWrenchGuesses;
+  for (int i = 0; i < bodyWrenchGuesses.size(); i++)
+  {
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), bodyWrenchGuesses[i]),
+        groundHeight,
+        verticalAxis);
+    /*
+#ifndef NDEBUG
+    if ((copWrench.head<3>() - copGuesses[i]).norm() > 1e-8)
+    {
+      std::cout << "Failed to recover CoP complete wrench!";
+      std::cout << "Original guess:" << std::endl << copGuesses[i] << std::endl;
+      std::cout << "Wrench guess:" << std::endl
+                << copWrench.head<3>() << std::endl;
+      std::cout << "Diff:" << std::endl
+                << copWrench.head<3>() - copGuesses[i] << std::endl;
+      assert((copWrench.head<3>() - copGuesses[i]).norm() < 1e-8);
+    }
+#endif
+    */
+    copWrenchGuesses.push_back(copWrench);
+  }
+
+  MultipleContactCoPProblem problem
+      = createMultipleContactInverseDynamicsNearCoPProblem(
+          nextVel, bodies, copWrenchGuesses, groundHeight, verticalAxis);
+  problem.weightForceToMeters = weightForceToMeters;
+
+  // Eigen::VectorXs x = problem.getInitialGuess();
+
+  auto initialResult
+      = getMultipleContactInverseDynamics(nextVel, bodies, bodyWrenchGuesses);
+
+  // Find an initial guess that's legal, and we'll only take legal steps from
+  // here
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(bodies.size() * 6);
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    x.segment<6>(i * 6) = initialResult.contactWrenches[i];
+  }
+
+#ifndef NDEBUG
+  Eigen::VectorXs constraintErrors = problem.getConstraintErrors(x);
+  if (constraintErrors.norm() > 1e-10)
+  {
+    std::cout << "Got an initial constraint error!" << std::endl
+              << constraintErrors << std::endl;
+    assert(constraintErrors.norm() <= 1e-10);
+  }
+#endif
+
+  // 1.5. Compute initial loss
+  s_t lastLoss = problem.getLoss(x);
+  assert(!isnan(lastLoss));
+
+#ifndef NDEBUG
+  std::cout << "Initial dist " << problem.getAvgCoPDistance(x) << std::endl;
+#endif
+
+#ifndef NDEBUG
+  s_t lastDist = problem.getAvgCoPDistance(x);
+#endif
+
+  s_t alpha = 0.01;
+  for (int t = 0; t < 400; t++)
+  {
+    if (logOutput)
+      std::cout << "Iteration " << t << ": " << lastLoss << std::endl;
+    // 1.2. Arive at an unconstrained grad x
+    Eigen::VectorXs unconstrained = problem.getUnconstrainedGradient(x);
+
+    // 1.3. Constrain grad x to only operate in the null space of J
+    Eigen::VectorXs dx = problem.projectToNullSpace(unconstrained);
+
+    // 1.4. Update x
+    Eigen::VectorXs proposedX = x - dx * alpha;
+
+#ifndef NDEBUG
+    Eigen::VectorXs constraintErrors = problem.getConstraintErrors(proposedX);
+    if (constraintErrors.norm() > 1e-10)
+    {
+      std::cout << "Got a constraint violation!" << std::endl
+                << constraintErrors << std::endl;
+      assert(constraintErrors.norm() <= 1e-10);
+    }
+#endif
+
+    /*
+    Eigen::VectorXs proposedX
+        = problem.clampToNearestLegalValues(x - unconstrained * alpha);
+        */
+
+    // 1.5. Compute loss
+    s_t loss = problem.getLoss(proposedX);
+    assert(!isnan(loss));
+
+    if (loss < lastLoss)
+    {
+      if (logOutput)
+        std::cout << "Decreased loss by " << (lastLoss - loss) << std::endl;
+      lastLoss = loss;
+      x = proposedX;
+      alpha *= 1.2;
+#ifndef NDEBUG
+      if (logOutput)
+      {
+        s_t newDist = problem.getAvgCoPDistance(x);
+        std::cout << "New dist " << newDist << ", decreased by "
+                  << (lastDist - newDist) << std::endl;
+        lastDist = newDist;
+      }
+#endif
+    }
+    else
+    {
+      if (logOutput)
+        std::cout << "   Cutting back step size to " << alpha << std::endl;
+      alpha *= 0.5;
+      if (alpha < 1e-15)
+      {
+        if (logOutput)
+        {
+          std::cout << "Step size got below 1e-15! This suggests we stalled! "
+                       "Exiting optimizer."
+                    << std::endl;
+          std::cout << "Latest x: " << std::endl << x << std::endl;
+          std::cout << "Latest grad: " << std::endl
+                    << unconstrained << std::endl;
+        }
+        break;
+      }
+    }
+  }
+
+  // Polish the final solution back into legal space (take a least-squares
+  // closest approx)
+  Eigen::VectorXs clampedX = problem.clampToNearestLegalValues(x);
+#ifndef NDEBUG
+  if ((clampedX - x).squaredNorm() > 1e-10)
+  {
+    std::cout << "Ended up with a very different final x!" << std::endl;
+    assert(false);
+  }
+#endif
+  x = clampedX;
+
+#ifndef NDEBUG
+  std::cout << "Final dist " << problem.getAvgCoPDistance(x) << std::endl;
+#endif
+
+  /////////////////////////////////////////////////////
+  // 2. Write out the results
+  result.contactWrenches = std::vector<Eigen::Vector6s>();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    // result.contactWrenches.push_back(
+    //     math::dAdT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)));
+    result.contactWrenches.push_back(x.segment<6>(i * 6));
+  }
+  Eigen::VectorXs contactTorques = problem.jacs.transpose() * x;
+  result.jointTorques
+      = problem.massTorques + problem.coriolisAndGravity - contactTorques;
+  assert(result.jointTorques.head<6>().norm() < 1e-10);
   result.jointTorques.head<6>().setZero();
 
   return result;

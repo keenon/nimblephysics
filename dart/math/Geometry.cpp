@@ -43,6 +43,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 #define DART_EPSILON 1e-6
 
@@ -3531,6 +3532,140 @@ bool verifyTransform(const Eigen::Isometry3s& _T)
 {
   return !isNan(_T.matrix().topRows<3>())
          && abs(_T.linear().determinant() - 1.0) <= DART_EPSILON;
+}
+
+/// This projects a global wrench to a [CoP, tau, f] vector
+Eigen::Vector9s projectWrenchToCoP(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  // To get COP, solve for k and p, where we know the y-coordinate of p in
+  // advance:
+  //
+  // k * worldF = worldTau - worldF.cross(p);
+  // k * worldF + crossF * p_unknown = worldTau - worldF.cross(p_known);
+  // [worldF, crossF] * [k, p_unknown] = worldTau - worldF.cross(p_known);
+  Eigen::Vector3s worldTau = worldWrench.head<3>();
+  Eigen::Vector3s worldF = worldWrench.tail<3>();
+
+  Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+  assert(!crossF.hasNaN());
+  Eigen::Vector3s rightSide
+      = worldTau + crossF.col(verticalAxis) * groundHeight;
+  assert(!rightSide.hasNaN());
+  Eigen::Matrix3s leftSide = -crossF;
+  leftSide.col(verticalAxis) = worldF;
+  assert(!leftSide.hasNaN());
+  Eigen::Vector3s p
+      = leftSide.completeOrthogonalDecomposition().solve(rightSide);
+  assert(!p.hasNaN());
+  s_t k = p(verticalAxis);
+  p(verticalAxis) = groundHeight;
+  Eigen::Vector3s expectedTau = worldF * k;
+  Eigen::Vector3s cop = p;
+
+#ifndef NDEBUG
+  Eigen::Vector3s recoveredTau
+      = worldWrench.head<3>() + worldWrench.tail<3>().cross(cop);
+  if ((recoveredTau - expectedTau).norm() > 1e-8)
+  {
+    std::cout << "World wrench: " << std::endl << worldWrench << std::endl;
+    std::cout << "Recovered tau doesn't match expected tau ("
+              << (recoveredTau - expectedTau).norm() << ")!" << std::endl;
+    std::cout << "Expected tau: " << std::endl << expectedTau << std::endl;
+    std::cout << "Recovered tau: " << std::endl << recoveredTau << std::endl;
+    assert((recoveredTau - expectedTau).norm() <= 1e-8);
+  }
+#endif
+
+  Eigen::Vector9s result;
+  result.segment<3>(0) = cop;
+  result.segment<3>(3) = expectedTau;
+  result.segment<3>(6) = worldF;
+
+  return result;
+}
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> getProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  Eigen::Vector3s worldTau = worldWrench.head<3>();
+  Eigen::Vector3s worldF = worldWrench.tail<3>();
+
+  Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+  Eigen::Vector3s rightSide
+      = worldTau + crossF.col(verticalAxis) * groundHeight;
+  Eigen::Matrix3s leftSide = -crossF;
+  leftSide.col(verticalAxis) = worldF;
+  auto leftSideFactored = leftSide.completeOrthogonalDecomposition();
+  Eigen::Vector3s p = leftSideFactored.solve(rightSide);
+  s_t k = p(verticalAxis);
+
+  Eigen::Matrix<s_t, 9, 6> J = Eigen::Matrix<s_t, 9, 6>::Zero();
+  for (int i = 0; i < 6; i++)
+  {
+    if (i < 3)
+    {
+      Eigen::Vector3s dRightSide = Eigen::Vector3s::Unit(i);
+      Eigen::Vector3s dp = leftSideFactored.solve(dRightSide);
+
+      s_t dk = dp(verticalAxis);
+      dp(verticalAxis) = 0;
+      Eigen::Vector3s dExpectedTau = worldF * dk;
+      Eigen::Vector3s dCop = dp;
+      J.block<3, 1>(0, i) = dCop;
+      J.block<3, 1>(3, i) = dExpectedTau;
+    }
+    else
+    {
+      Eigen::Vector3s dF = Eigen::Vector3s::Unit(i - 3);
+      Eigen::Matrix3s dCrossF = math::makeSkewSymmetric(dF);
+      Eigen::Vector3s dRightSide = dCrossF.col(verticalAxis) * groundHeight;
+      Eigen::Matrix3s dLeftSide = -dCrossF;
+      dLeftSide.col(verticalAxis) = dF;
+
+      // d(A^{-1}) = -1 * A^{-1} * dA * A^{-1}
+      Eigen::Vector3s dp = -(leftSideFactored.solve(
+                               dLeftSide * leftSideFactored.solve(rightSide)))
+                           + leftSideFactored.solve(dRightSide);
+      s_t dk = dp(verticalAxis);
+      dp(verticalAxis) = 0;
+      Eigen::Vector3s dExpectedTau = worldF * dk + dF * k;
+      Eigen::Vector3s dCop = dp;
+      J.block<3, 1>(0, i) = dCop;
+      J.block<3, 1>(3, i) = dExpectedTau;
+      J.block<3, 1>(6, i) = dF;
+    }
+  }
+  return J;
+}
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> finiteDifferenceProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  Eigen::Matrix<s_t, 9, 6> J = Eigen::Matrix<s_t, 9, 6>::Zero();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(9, 6);
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::Vector6s tweaked = worldWrench;
+        tweaked(dof) += eps;
+        perturbed = projectWrenchToCoP(tweaked, groundHeight, verticalAxis);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  J = result;
+
+  return J;
 }
 
 Eigen::Vector3s fromSkewSymmetric(const Eigen::Matrix3s& _m)

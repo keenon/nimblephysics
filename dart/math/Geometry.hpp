@@ -715,6 +715,20 @@ bool verifyRotation(const Eigen::Matrix3s& _R);
 /// all the elements are not NaN values.
 bool verifyTransform(const Eigen::Isometry3s& _T);
 
+/// This projects a global wrench to a [CoP, tau, f] vector
+Eigen::Vector9s projectWrenchToCoP(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> getProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> finiteDifferenceProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
 /// Compute the angle (in the range of -pi to +pi) which ignores any full
 /// rotations
 #ifdef DART_USE_ARBITRARY_PRECISION

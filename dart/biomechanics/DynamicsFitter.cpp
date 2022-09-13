@@ -1996,42 +1996,19 @@ void DynamicsFitProblem::computePerfectGRFs()
         assert(norm < 1e-10);
 #endif
 
-        Eigen::Vector3s worldTau = worldWrench.head<3>();
-        Eigen::Vector3s worldF = worldWrench.tail<3>();
-        Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
-
-        // To get COP, solve for k and p, where we know the y-coordinate of p in
-        // advance:
-        //
-        // k * worldF = worldTau - worldF.cross(p);
-        // k * worldF - crossF * p_unknown = worldTau - worldF.cross(p_known);
-
-        Eigen::Vector3s rightSide = worldTau - crossF.col(1) * groundHeight;
-        Eigen::Matrix3s leftSide = -crossF;
-        leftSide.col(1) = worldF;
-        Eigen::Vector3s p
-            = leftSide.completeOrthogonalDecomposition().solve(rightSide);
-
-        s_t k = p(1);
-        p(1) = 0;
-        Eigen::Vector3s expectedTau = worldF * k;
-        Eigen::Vector3s cop = p;
-        cop(1) = groundHeight;
-
-        perfectGrfAsCopTorqueForce.block<3, 1>(9 * activeFootIndex, t) = cop;
-        perfectGrfAsCopTorqueForce.block<3, 1>(9 * activeFootIndex + 3, t)
-            = expectedTau;
-        perfectGrfAsCopTorqueForce.block<3, 1>(9 * activeFootIndex + 6, t)
-            = worldF;
-
+        Eigen::Vector9s copWrench
+            = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+        perfectGrfAsCopTorqueForce.block<9, 1>(9 * activeFootIndex, t)
+            = copWrench;
         // add to a force plate
         for (int i = 0; i < perfectForcePlates.size(); i++)
         {
           if (i == activeForcePlateIndex)
           {
-            perfectForcePlates[i].centersOfPressure.push_back(cop);
-            perfectForcePlates[i].forces.push_back(worldF);
-            perfectForcePlates[i].moments.push_back(expectedTau);
+            perfectForcePlates[i].centersOfPressure.push_back(
+                copWrench.head<3>());
+            perfectForcePlates[i].moments.push_back(copWrench.segment<3>(3));
+            perfectForcePlates[i].forces.push_back(copWrench.segment<3>(6));
           }
           else
           {
@@ -2041,20 +2018,6 @@ void DynamicsFitProblem::computePerfectGRFs()
             perfectForcePlates[i].moments.push_back(Eigen::Vector3s::Zero());
           }
         }
-
-#ifndef NDEBUG
-        Eigen::Isometry3s testT = Eigen::Isometry3s::Identity();
-        testT.translation() = p;
-        Eigen::Vector6s localTau = math::dAdT(testT, worldWrench);
-        Eigen::Vector3s diff = localTau.head<3>() - expectedTau;
-        if (diff.norm() > 1e-8)
-        {
-          std::cout << "Resulting tau didn't match expectations!" << std::endl;
-          std::cout << "Expected: " << std::endl << expectedTau << std::endl;
-          std::cout << "Real: " << std::endl << localTau << std::endl;
-          assert(diff.norm() < 1e-8);
-        }
-#endif
       }
       else
       {
@@ -2068,9 +2031,59 @@ void DynamicsFitProblem::computePerfectGRFs()
               mFootNodes[i]->getWorldTransform(),
               sensorWorldGRF.segment<6>(i * 6)));
         }
+        auto resultCops = mSkeleton->getMultipleContactInverseDynamicsNearCoP(
+            mVels[trial].col(t + 1),
+            constFootNodes,
+            localWrenches,
+            mInit->groundHeight[trial],
+            1,
+            0.1,
+            false);
+#ifndef NDEBUG
         auto result = mSkeleton->getMultipleContactInverseDynamics(
             mVels[trial].col(t + 1), constFootNodes, localWrenches);
-        perfectTorques.col(t) = result.jointTorques;
+        for (int i = 0; i < mFootNodes.size(); i++)
+        {
+          Eigen::Vector6s leastSquaresWorldWrench = math::dAdInvT(
+              mFootNodes[i]->getWorldTransform(), result.contactWrenches[i]);
+          Eigen::Vector6s copWorldWrench = math::dAdInvT(
+              mFootNodes[i]->getWorldTransform(),
+              resultCops.contactWrenches[i]);
+          /*
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+          compare.col(0) = leastSquaresWorldWrench;
+          compare.col(1) = copWorldWrench;
+          compare.col(2) = leastSquaresWorldWrench - copWorldWrench;
+          std::cout << "LS wrench - Cop wrench - Diff" << std::endl
+                    << compare << std::endl;
+          */
+
+          Eigen::Vector3s leastSquaresWorldCop
+              = math::projectWrenchToCoP(
+                    leastSquaresWorldWrench, mInit->groundHeight[trial], 1)
+                    .head<3>();
+          Eigen::Vector3s copWorldCop
+              = math::projectWrenchToCoP(
+                    copWorldWrench, mInit->groundHeight[trial], 1)
+                    .head<3>();
+          Eigen::Vector3s cop = sensorWorldCops.segment<3>(3 * i);
+
+          Eigen::MatrixXs compare2 = Eigen::MatrixXs::Zero(3, 5);
+          compare2.col(0) = cop;
+          compare2.col(1) = leastSquaresWorldCop;
+          compare2.col(2) = leastSquaresWorldCop - cop;
+          compare2.col(3) = copWorldCop;
+          compare2.col(4) = copWorldCop - cop;
+          std::cout << "Foot " << i << std::endl;
+          std::cout << "Goal CoP - LS CoPwrench - Diff ("
+                    << (leastSquaresWorldCop - cop).norm()
+                    << ") - Cop CoPwrench - Diff ("
+                    << (copWorldCop - cop).norm() << ")" << std::endl
+                    << compare2 << std::endl;
+        }
+#endif
+
+        perfectTorques.col(t) = resultCops.jointTorques;
 
         std::vector<Eigen::Vector6s> worldWrenches;
         Eigen::VectorXs perfectGRF
@@ -2078,7 +2091,8 @@ void DynamicsFitProblem::computePerfectGRFs()
         for (int i = 0; i < mFootNodes.size(); i++)
         {
           Eigen::Vector6s worldWrench = math::dAdInvT(
-              mFootNodes[i]->getWorldTransform(), result.contactWrenches[i]);
+              mFootNodes[i]->getWorldTransform(),
+              resultCops.contactWrenches[i]);
           worldWrenches.push_back(worldWrench);
           perfectGRF.segment<6>(i * 6) = worldWrench;
         }
@@ -2104,7 +2118,15 @@ void DynamicsFitProblem::computePerfectGRFs()
         for (int i = 0; i < mFootNodes.size(); i++)
         {
           Eigen::Vector6s worldWrench = worldWrenches[i];
+          Eigen::Vector9s copWrench
+              = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+          perfectGrfAsCopTorqueForce.block<9, 1>(9 * i, t) = copWrench;
 
+          cops.push_back(copWrench.segment<3>(0));
+          taus.push_back(copWrench.segment<3>(3));
+          forces.push_back(copWrench.segment<3>(6));
+
+          /*
           // Find the center of pressure, using the copy-pasted method from
           // above in the single-footed case
           // TODO: factor out into a utility method
@@ -2129,7 +2151,9 @@ void DynamicsFitProblem::computePerfectGRFs()
           perfectGrfAsCopTorqueForce.block<3, 1>(9 * i, t) = cop;
           perfectGrfAsCopTorqueForce.block<3, 1>(9 * i + 3, t) = expectedTau;
           perfectGrfAsCopTorqueForce.block<3, 1>(9 * i + 6, t) = worldF;
+          */
 
+          Eigen::Vector3s cop = copWrench.segment<3>(0);
           for (int j = 0; j < mInit->forcePlateTrials[trial].size(); j++)
           {
             platesToFeet(j, i)
@@ -4372,17 +4396,19 @@ void DynamicsFitter::saveDynamicsToGUI(
   server.createLayer(skeletonLayerName, skeletonLayerColor);
   server.createLayer(
       skeletonInertiaLayerName, skeletonInertiaLayerColor, false);
-  server.createLayer(originalSkeletonLayerName, originalSkeletonLayerColor);
+  server.createLayer(
+      originalSkeletonLayerName, originalSkeletonLayerColor, false);
   server.createLayer(
       originalSkeletonInertiaLayerName,
       originalSkeletonInertiaLayerColor,
       false);
-  server.createLayer(markerErrorLayerName, markerErrorLayerColor);
-  server.createLayer(forcePlateLayerName, forcePlateLayerColor);
-  server.createLayer(perfectForcePlateLayerName, perfectForcePlateLayerColor);
-  server.createLayer(measuredForcesLayerName, measuredForcesLayerColor);
-  server.createLayer(residualLayerName, residualLayerColor);
-  server.createLayer(impliedForcesLayerName, impliedForcesLayerColor);
+  server.createLayer(markerErrorLayerName, markerErrorLayerColor, false);
+  server.createLayer(forcePlateLayerName, forcePlateLayerColor, true);
+  server.createLayer(
+      perfectForcePlateLayerName, perfectForcePlateLayerColor, false);
+  server.createLayer(measuredForcesLayerName, measuredForcesLayerColor, false);
+  server.createLayer(residualLayerName, residualLayerColor, false);
+  server.createLayer(impliedForcesLayerName, impliedForcesLayerColor, false);
   server.createLayer(
       functionalJointCenterLayerName, functionalJointCenterLayerColor, false);
   server.createLayer(groundLayerName, groundLayerColor);
