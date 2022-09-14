@@ -2057,49 +2057,6 @@ void DynamicsFitProblem::computePerfectGRFs()
             1,
             0.1,
             false);
-#ifndef NDEBUG
-        auto result = mSkeleton->getMultipleContactInverseDynamics(
-            mVels[trial].col(t + 1), constFootNodes, localWrenches);
-        for (int i = 0; i < mFootNodes.size(); i++)
-        {
-          Eigen::Vector6s leastSquaresWorldWrench = math::dAdInvT(
-              mFootNodes[i]->getWorldTransform(), result.contactWrenches[i]);
-          Eigen::Vector6s copWorldWrench = math::dAdInvT(
-              mFootNodes[i]->getWorldTransform(),
-              resultCops.contactWrenches[i]);
-          /*
-          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
-          compare.col(0) = leastSquaresWorldWrench;
-          compare.col(1) = copWorldWrench;
-          compare.col(2) = leastSquaresWorldWrench - copWorldWrench;
-          std::cout << "LS wrench - Cop wrench - Diff" << std::endl
-                    << compare << std::endl;
-          */
-
-          Eigen::Vector3s leastSquaresWorldCop
-              = math::projectWrenchToCoP(
-                    leastSquaresWorldWrench, mInit->groundHeight[trial], 1)
-                    .head<3>();
-          Eigen::Vector3s copWorldCop
-              = math::projectWrenchToCoP(
-                    copWorldWrench, mInit->groundHeight[trial], 1)
-                    .head<3>();
-          Eigen::Vector3s cop = sensorWorldCops.segment<3>(3 * i);
-
-          Eigen::MatrixXs compare2 = Eigen::MatrixXs::Zero(3, 5);
-          compare2.col(0) = cop;
-          compare2.col(1) = leastSquaresWorldCop;
-          compare2.col(2) = leastSquaresWorldCop - cop;
-          compare2.col(3) = copWorldCop;
-          compare2.col(4) = copWorldCop - cop;
-          std::cout << "Foot " << i << std::endl;
-          std::cout << "Goal CoP - LS CoPwrench - Diff ("
-                    << (leastSquaresWorldCop - cop).norm()
-                    << ") - Cop CoPwrench - Diff ("
-                    << (copWorldCop - cop).norm() << ")" << std::endl
-                    << compare2 << std::endl;
-        }
-#endif
 
         perfectTorques.col(t) = resultCops.jointTorques;
 

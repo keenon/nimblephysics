@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -86,6 +87,20 @@ std::string trim(const std::string& s)
   return rtrim(ltrim(s));
 }
 
+std::string to_string(double d)
+{
+  // Create an output string stream
+  std::ostringstream ss;
+  // Set Fixed -Point Notation
+  ss << std::fixed;
+  // Set precision to 10 digits
+  ss << std::setprecision(10);
+  // Add double to stream
+  ss << d;
+  // Get string from output string stream
+  return ss.str();
+}
+
 //==============================================================================
 OpenSimFile::OpenSimFile(
     dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
@@ -140,8 +155,15 @@ Eigen::Vector3s readVec3(tinyxml2::XMLElement* elem)
 
 std::string writeVec3(Eigen::Vector3s vec)
 {
-  return std::to_string((double)vec(0)) + " " + std::to_string((double)vec(1))
-         + " " + std::to_string((double)vec(2));
+  return to_string((double)vec(0)) + " " + to_string((double)vec(1)) + " "
+         + to_string((double)vec(2));
+}
+
+std::string writeVec6(Eigen::Vector6s vec)
+{
+  return to_string((double)vec(0)) + " " + to_string((double)vec(1)) + " "
+         + to_string((double)vec(2)) + " " + to_string((double)vec(3)) + " "
+         + to_string((double)vec(4)) + " " + to_string((double)vec(5));
 }
 
 Eigen::Vector6s readVec6(tinyxml2::XMLElement* elem)
@@ -372,11 +394,11 @@ void OpenSimParser::saveOsimScalingXMLFile(
   openSimRoot->InsertEndChild(scaleToolRoot);
 
   XMLElement* mass = xmlDoc.NewElement("mass");
-  mass->SetText(std::to_string(massKg).c_str());
+  mass->SetText(to_string(massKg).c_str());
   scaleToolRoot->InsertEndChild(mass);
 
   XMLElement* height = xmlDoc.NewElement("height");
-  height->SetText(std::to_string(heightM).c_str());
+  height->SetText(to_string(heightM).c_str());
   scaleToolRoot->InsertEndChild(height);
 
   XMLElement* age = xmlDoc.NewElement("age");
@@ -433,9 +455,9 @@ void OpenSimParser::saveOsimScalingXMLFile(
     // This is pretty much the whole point of this XML file - how much we'd like
     // to scale each body element
     Eigen::Vector3s scale = body->getScale();
-    scales->SetText((" " + std::to_string((double)scale(0)) + " "
-                     + std::to_string((double)scale(1)) + " "
-                     + std::to_string((double)scale(2)))
+    scales->SetText((" " + to_string((double)scale(0)) + " "
+                     + to_string((double)scale(1)) + " "
+                     + to_string((double)scale(2)))
                         .c_str());
     scaleBody->InsertEndChild(scales);
 
@@ -918,9 +940,9 @@ void OpenSimParser::updateCustomJointXML(
         T = joint->getTransformFromChildBodyNode();
       }
       framesCursor->FirstChildElement("translation")
-          ->SetText((std::to_string((double)T.translation()(0)) + " "
-                     + std::to_string((double)T.translation()(1)) + " "
-                     + std::to_string((double)T.translation()(2)))
+          ->SetText((to_string((double)T.translation()(0)) + " "
+                     + to_string((double)T.translation()(1)) + " "
+                     + to_string((double)T.translation()(2)))
                         .c_str());
 
       framesCursor = framesCursor->NextSiblingElement();
@@ -1001,9 +1023,9 @@ void OpenSimParser::updateCustomJointXML(
     if (constant != nullptr)
     {
       constant->FirstChildElement("value")->SetText(
-          std::to_string((double)(static_cast<math::ConstantFunction*>(
-                                      joint->getCustomFunction(index).get())
-                                      ->mValue))
+          to_string((double)(static_cast<math::ConstantFunction*>(
+                                 joint->getCustomFunction(index).get())
+                                 ->mValue))
               .c_str());
     }
     else if (linearFunction != nullptr)
@@ -1012,8 +1034,8 @@ void OpenSimParser::updateCustomJointXML(
           joint->getCustomFunction(index).get());
 
       linearFunction->FirstChildElement("coefficients")
-          ->SetText((std::to_string((double)linear->mSlope) + " "
-                     + std::to_string((double)linear->mYIntercept))
+          ->SetText((to_string((double)linear->mSlope) + " "
+                     + to_string((double)linear->mYIntercept))
                         .c_str());
     }
     else if (polynomialFunction != nullptr)
@@ -1027,7 +1049,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           coeffString += " ";
-        coeffString += std::to_string((double)polynomial->mCoeffs[i]);
+        coeffString += to_string((double)polynomial->mCoeffs[i]);
       }
       polynomialFunction->FirstChildElement("coefficients")
           ->SetText(coeffString.c_str());
@@ -1042,7 +1064,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           xString += " ";
-        xString += std::to_string((double)spline->_x[i]);
+        xString += to_string((double)spline->_x[i]);
       }
       simmSpline->FirstChildElement("x")->SetText(xString.c_str());
 
@@ -1051,7 +1073,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           yString += " ";
-        yString += std::to_string((double)spline->_y[i]);
+        yString += to_string((double)spline->_y[i]);
       }
       simmSpline->FirstChildElement("y")->SetText(yString.c_str());
     }
@@ -1066,7 +1088,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           xString += " ";
-        xString += std::to_string((double)pl->_x[i]);
+        xString += to_string((double)pl->_x[i]);
       }
       piecewiseLinear->FirstChildElement("x")->SetText(xString.c_str());
 
@@ -1075,7 +1097,7 @@ void OpenSimParser::updateCustomJointXML(
       {
         if (i > 0)
           yString += " ";
-        yString += std::to_string((double)pl->_y[i]);
+        yString += to_string((double)pl->_y[i]);
       }
       piecewiseLinear->FirstChildElement("y")->SetText(yString.c_str());
     }
@@ -1130,10 +1152,9 @@ void OpenSimParser::updateRootJointLimits(
     if (dofIndex < 3)
     {
       coordinateCursor->FirstChildElement("range")->SetText(
-          (std::to_string(
-               (double)joint->getDof(dofIndex)->getPositionLowerLimit())
+          (to_string((double)joint->getDof(dofIndex)->getPositionLowerLimit())
            + " "
-           + std::to_string(
+           + to_string(
                (double)joint->getDof(dofIndex)->getPositionUpperLimit()))
               .c_str());
     }
@@ -1394,9 +1415,9 @@ void OpenSimParser::replaceOsimMarkers(
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
     Eigen::Vector3s markerOffset = pair.second.second;
-    location->SetText((" " + std::to_string((double)markerOffset(0)) + " "
-                       + std::to_string((double)markerOffset(1)) + " "
-                       + std::to_string((double)markerOffset(2)))
+    location->SetText((" " + to_string((double)markerOffset(0)) + " "
+                       + to_string((double)markerOffset(1)) + " "
+                       + to_string((double)markerOffset(2)))
                           .c_str());
 
     tinyxml2::XMLElement* fixed = marker->InsertNewChildElement("fixed");
@@ -1501,9 +1522,9 @@ void OpenSimParser::moveOsimMarkers(
                                       ? bodyScales.at(bodyName)
                                       : Eigen::Vector3s::Ones();
       markerOffset = markerOffset.cwiseProduct(bodyScale);
-      location->SetText((" " + std::to_string((double)markerOffset(0)) + " "
-                         + std::to_string((double)markerOffset(1)) + " "
-                         + std::to_string((double)markerOffset(2)))
+      location->SetText((" " + to_string((double)markerOffset(0)) + " "
+                         + to_string((double)markerOffset(1)) + " "
+                         + to_string((double)markerOffset(2)))
                             .c_str());
     }
     else
@@ -1516,6 +1537,154 @@ void OpenSimParser::moveOsimMarkers(
     marker = marker->NextSiblingElement("Marker");
   }
 
+  newFile.SaveFile(outputPath.c_str());
+}
+
+//==============================================================================
+/// Read an *.osim file, change the mass/COM/MOI for everything, and write it
+/// out to a new *.osim file
+void OpenSimParser::replaceOsimInertia(
+    const common::Uri& uri,
+    const std::shared_ptr<dynamics::Skeleton> skel,
+    const std::string& outputPath,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  //--------------------------------------------------------------------------
+  // Load xml and create Document
+  tinyxml2::XMLDocument originalFile;
+  try
+  {
+    openXMLFile(originalFile, uri, retriever);
+  }
+  catch (std::exception const& e)
+  {
+    std::cout << "LoadFile [" << uri.toString() << "] Fails: " << e.what()
+              << std::endl;
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Deep copy document
+
+  tinyxml2::XMLDocument newFile;
+  originalFile.DeepCopy(&newFile);
+
+  //--------------------------------------------------------------------------
+  tinyxml2::XMLElement* docElement
+      = newFile.FirstChildElement("OpenSimDocument");
+  if (docElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <OpenSimDocument> as the root element.\n";
+    return;
+  }
+  tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
+  if (modelElement == nullptr)
+  {
+    dterr << "OpenSim file[" << uri.toString()
+          << "] does not contain <Model> as the child of the root "
+             "<OpenSimDocument> element.\n";
+    return;
+  }
+
+  //--------------------------------------------------------------------------
+  // Go through and adjust the custom joints
+
+  tinyxml2::XMLElement* bodySet = modelElement->FirstChildElement("BodySet");
+  tinyxml2::XMLElement* bodySetList = bodySet->FirstChildElement("objects");
+  tinyxml2::XMLElement* bodyCursor = bodySetList->FirstChildElement("Body");
+  while (bodyCursor)
+  {
+    const char* name_c = bodyCursor->Attribute("name");
+    if (name_c != nullptr)
+    {
+      std::string name(name_c);
+
+      dynamics::BodyNode* correspondingBody = skel->getBodyNode(name);
+      if (correspondingBody != nullptr)
+      {
+        tinyxml2::XMLElement* mass = bodyCursor->FirstChildElement("mass");
+        if (mass != nullptr)
+        {
+          mass->SetText(to_string(correspondingBody->getMass()).c_str());
+        }
+
+        tinyxml2::XMLElement* massCenter
+            = bodyCursor->FirstChildElement("mass_center");
+        if (massCenter != nullptr)
+        {
+          massCenter->SetText(
+              writeVec3(correspondingBody->getLocalCOM()).c_str());
+        }
+
+        tinyxml2::XMLElement* inertia
+            = bodyCursor->FirstChildElement("inertia");
+        if (inertia != nullptr)
+        {
+          inertia->SetText(
+              writeVec6(correspondingBody->getInertia().getMomentVector())
+                  .c_str());
+        }
+
+        tinyxml2::XMLElement* inertiaXX
+            = bodyCursor->FirstChildElement("inertia_xx");
+        if (inertiaXX != nullptr)
+        {
+          inertiaXX->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(0))
+                  .c_str());
+        }
+        tinyxml2::XMLElement* inertiaYY
+            = bodyCursor->FirstChildElement("inertia_yy");
+        if (inertiaYY != nullptr)
+        {
+          inertiaYY->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(1))
+                  .c_str());
+        }
+        tinyxml2::XMLElement* inertiaZZ
+            = bodyCursor->FirstChildElement("inertia_zz");
+        if (inertiaZZ != nullptr)
+        {
+          inertiaZZ->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(2))
+                  .c_str());
+        }
+        tinyxml2::XMLElement* inertiaXY
+            = bodyCursor->FirstChildElement("inertia_xy");
+        if (inertiaXY != nullptr)
+        {
+          inertiaXY->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(3))
+                  .c_str());
+        }
+        tinyxml2::XMLElement* inertiaXZ
+            = bodyCursor->FirstChildElement("inertia_xz");
+        if (inertiaXZ != nullptr)
+        {
+          inertiaXZ->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(4))
+                  .c_str());
+        }
+        tinyxml2::XMLElement* inertiaYZ
+            = bodyCursor->FirstChildElement("inertia_yz");
+        if (inertiaYZ != nullptr)
+        {
+          inertiaYZ->SetText(
+              to_string(correspondingBody->getInertia().getMomentVector()(5))
+                  .c_str());
+        }
+      }
+    }
+
+    bodyCursor = bodyCursor->NextSiblingElement();
+  }
+
+  //--------------------------------------------------------------------------
+  // Save out the result
   newFile.SaveFile(outputPath.c_str());
 }
 

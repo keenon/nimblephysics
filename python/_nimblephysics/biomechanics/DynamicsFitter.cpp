@@ -37,6 +37,7 @@ void DynamicsFitter(py::module& m)
           ::py::arg("dq"),
           ::py::arg("ddq"),
           ::py::arg("forcesConcat"),
+          ::py::arg("torquesMultiple"),
           ::py::arg("useL1") = false)
       .def(
           "calculateResidualJacobianWrt",
@@ -56,6 +57,7 @@ void DynamicsFitter(py::module& m)
           ::py::arg("ddq"),
           ::py::arg("forcesConcat"),
           ::py::arg("wrt"),
+          ::py::arg("torquesMultiple"),
           ::py::arg("useL1") = false);
 
   ::py::class_<dart::biomechanics::DynamicsInitialization>(
@@ -206,11 +208,9 @@ protected:
           ::py::init<
               std::shared_ptr<dynamics::Skeleton>,
               std::vector<dynamics::BodyNode*>,
-              dynamics::MarkerMap,
               std::vector<std::string>>(),
           ::py::arg("skeleton"),
           ::py::arg("footNodes"),
-          ::py::arg("markerMap"),
           ::py::arg("trackingMarkers"))
       .def_static(
           "createInitialization",
@@ -307,8 +307,21 @@ protected:
           ::py::arg("init"),
           ::py::arg("regularizationWeight") = 50.0)
       .def(
-          "runOptimization",
-          &dart::biomechanics::DynamicsFitter::runOptimization,
+          "runIPOPTOptimization",
+          &dart::biomechanics::DynamicsFitter::runIPOPTOptimization,
+          ::py::arg("init"),
+          ::py::arg("residualWeight"),
+          ::py::arg("markerWeight"),
+          ::py::arg("includeMasses"),
+          ::py::arg("includeCOMs"),
+          ::py::arg("includeInertias"),
+          ::py::arg("includeBodyScales"),
+          ::py::arg("includePoses"),
+          ::py::arg("includeMarkerOffsets"),
+          ::py::arg("implicitVelAcc"))
+      .def(
+          "runSGDOptimization",
+          &dart::biomechanics::DynamicsFitter::runSGDOptimization,
           ::py::arg("init"),
           ::py::arg("residualWeight"),
           ::py::arg("markerWeight"),
@@ -318,6 +331,10 @@ protected:
           ::py::arg("includeBodyScales"),
           ::py::arg("includePoses"),
           ::py::arg("includeMarkerOffsets"))
+      .def(
+          "computePerfectGRFs",
+          &dart::biomechanics::DynamicsFitter::computePerfectGRFs,
+          ::py::arg("init"))
       .def(
           "computeAverageMarkerRMSE",
           &dart::biomechanics::DynamicsFitter::computeAverageMarkerRMSE,

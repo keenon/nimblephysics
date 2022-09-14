@@ -157,6 +157,14 @@ public:
       const std::string& outputPath,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// Read an *.osim file, change the mass/COM/MOI for everything, and write it
+  /// out to a new *.osim file
+  static void replaceOsimInertia(
+      const common::Uri& uri,
+      const std::shared_ptr<dynamics::Skeleton> skel,
+      const std::string& outputPath,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
   /// Read an *.osim file, then save just the markers to a new *.osim file
   static void filterJustMarkers(
       const common::Uri& uri,

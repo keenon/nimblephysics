@@ -247,6 +247,18 @@ void OpenSimParser(py::module& m)
       ::py::arg("outputPath"));
 
   sm.def(
+      "replaceOsimInertia",
+      +[](const common::Uri& uri,
+          const std::shared_ptr<dynamics::Skeleton> skel,
+          const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::replaceOsimInertia(
+            uri, skel, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("skel"),
+      ::py::arg("outputPath"));
+
+  sm.def(
       "filterJustMarkers",
       +[](const common::Uri& uri, const std::string& outputPath) {
         return dart::biomechanics::OpenSimParser::filterJustMarkers(

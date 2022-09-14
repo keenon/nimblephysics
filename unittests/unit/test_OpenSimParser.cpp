@@ -9,6 +9,7 @@
 #include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/MJCFExporter.hpp"
@@ -665,6 +666,69 @@ TEST(OpenSimParser, OVERWRITE_OUTPUT_MARKERS)
   EXPECT_EQ(file.anatomicalMarkers.size(), 1);
   EXPECT_EQ(file.anatomicalMarkers[0], "TEST1");
   EXPECT_EQ(file.trackingMarkers.size(), 2);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, OVERWRITE_INERTIA_VALUES)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+
+  std::shared_ptr<dynamics::Skeleton> clone
+      = standard.skeleton->cloneSkeleton();
+  srand(42);
+  for (int i = 0; i < clone->getNumBodyNodes(); i++)
+  {
+    auto* bodyNode = clone->getBodyNode(i);
+    dynamics::Inertia inertia = bodyNode->getInertia().clone();
+    inertia.setMass((double)rand() / RAND_MAX, false);
+    inertia.setLocalCOM(Eigen::Vector3s::Random());
+    inertia.setDimsAndEulerVector(Eigen::Vector6s::Random());
+    bodyNode->setInertia(inertia);
+  }
+
+  OpenSimParser::replaceOsimInertia(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      clone,
+      "../../../data/osim/Rajagopal2015/Rajagopal2015_inertiaReplaced.osim");
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015_inertiaReplaced.osim");
+
+  Eigen::VectorXs outMasses = clone->getLinkMasses();
+  Eigen::VectorXs recoveredMasses = file.skeleton->getLinkMasses();
+  if (!equals(recoveredMasses, outMasses, 1e-8))
+  {
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(outMasses.size(), 3);
+    compare.col(0) = outMasses;
+    compare.col(1) = recoveredMasses;
+    compare.col(2) = outMasses - recoveredMasses;
+    std::cout << "masses not recovered!" << std::endl
+              << "out - recovered - diff" << std::endl
+              << compare << std::endl;
+
+    EXPECT_TRUE(equals(recoveredMasses, outMasses, 1e-8));
+    return;
+  }
+  EXPECT_TRUE(equals(file.skeleton->getLinkCOMs(), clone->getLinkCOMs(), 1e-8));
+
+  Eigen::VectorXs outMOIs = clone->getLinkMOIs();
+  Eigen::VectorXs recoveredMOIs = file.skeleton->getLinkMOIs();
+  if (!equals(recoveredMOIs, outMOIs, 1e-8))
+  {
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(outMOIs.size(), 3);
+    compare.col(0) = outMOIs;
+    compare.col(1) = recoveredMOIs;
+    compare.col(2) = outMOIs - recoveredMOIs;
+    std::cout << "MOIs not recovered!" << std::endl
+              << "out - recovered - diff" << std::endl
+              << compare << std::endl;
+
+    EXPECT_TRUE(equals(recoveredMOIs, outMOIs, 1e-8));
+    return;
+  }
+  EXPECT_TRUE(equals(file.skeleton->getLinkMOIs(), clone->getLinkMOIs(), 1e-8));
 }
 #endif
 
