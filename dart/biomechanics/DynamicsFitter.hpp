@@ -50,6 +50,7 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
+      s_t torquesMultiple,
       bool useL1 = false);
 
   ///////////////////////////////////////////
@@ -78,6 +79,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
+      s_t torquesMultiple,
       bool useL1 = false);
 
   ///////////////////////////////////////////
@@ -88,6 +90,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
+      s_t torquesMultiple,
       bool useL1 = false);
 
 protected:
@@ -261,6 +264,7 @@ public:
   DynamicsFitProblem& setResidualUseL1(bool l1);
   DynamicsFitProblem& setMarkerUseL1(bool l1);
 
+  DynamicsFitProblem& setResidualTorqueMultiple(s_t value);
   DynamicsFitProblem& setRegularizeMasses(s_t value);
   DynamicsFitProblem& setRegularizeCOMs(s_t value);
   DynamicsFitProblem& setRegularizeInertias(s_t value);
@@ -402,6 +406,7 @@ public:
   std::shared_ptr<DynamicsInitialization> mInit;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
 
+  s_t mResidualTorqueMultiple;
   s_t mRegularizeMasses;
   s_t mRegularizeCOMs;
   s_t mRegularizeInertias;

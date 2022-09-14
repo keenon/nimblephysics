@@ -87,12 +87,14 @@ s_t ResidualForceHelper::calculateResidualNorm(
     Eigen::VectorXs dq,
     Eigen::VectorXs ddq,
     Eigen::VectorXs forcesConcat,
+    s_t torquesMultiple,
     bool useL1)
 {
   Eigen::Vector6s residual = calculateResidual(q, dq, ddq, forcesConcat);
   if (useL1)
   {
-    return residual.head<3>().norm() + residual.tail<3>().norm();
+    return residual.head<3>().norm() * torquesMultiple
+           + residual.tail<3>().norm();
   }
   else
   {
@@ -248,6 +250,7 @@ Eigen::VectorXs ResidualForceHelper::calculateResidualNormGradientWrt(
     Eigen::VectorXs ddq,
     Eigen::VectorXs forcesConcat,
     neural::WithRespectTo* wrt,
+    s_t torquesMultiple,
     bool useL1)
 {
   Eigen::Vector6s res = calculateResidual(q, dq, ddq, forcesConcat);
@@ -256,6 +259,7 @@ Eigen::VectorXs ResidualForceHelper::calculateResidualNormGradientWrt(
   if (useL1)
   {
     res.head<3>().normalize();
+    res.head<3>() *= torquesMultiple;
     res.tail<3>().normalize();
     return jac.transpose() * res;
   }
@@ -273,6 +277,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
     Eigen::VectorXs ddq,
     Eigen::VectorXs forcesConcat,
     neural::WithRespectTo* wrt,
+    s_t torquesMultiple,
     bool useL1)
 {
   Eigen::VectorXs result = Eigen::VectorXs::Zero(wrt->dim(mSkel.get()));
@@ -299,6 +304,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
             mSkel->getVelocities(),
             mSkel->getAccelerations(),
             forcesConcat,
+            torquesMultiple,
             useL1);
         return true;
       },
@@ -334,13 +340,17 @@ DynamicsFitProblem::DynamicsFitProblem(
     mJointWeight(1.0),
     mResidualUseL1(true),
     mMarkerUseL1(true),
+    mResidualTorqueMultiple(3.0),
     mRegularizeMasses(10.0),
     mRegularizeCOMs(20.0),
     mRegularizeInertias(1.0),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(10.0),
-    // mRegularizeImpliedDensity(3e-8),
-    mRegularizeImpliedDensity(0),
+    mRegularizeImpliedDensity(3e-8),
+    // mRegularizeImpliedDensity(1e-7),
+    // mRegularizeImpliedDensity(1e-6),
+    // mRegularizeImpliedDensity(7e-5), // <- works surprisingly well!
+    // mRegularizeImpliedDensity(0),
     mRegularizeBodyScales(1.0),
     mRegularizePoses(0.0),
     mVelAccImplicit(false),
@@ -933,6 +943,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
                        mVels[trial].col(t),
                        mAccs[trial].col(t),
                        mInit->grfTrials[trial].col(t),
+                       mResidualTorqueMultiple,
                        mResidualUseL1);
         residualRMS += cost;
         assert(!isnan(residualRMS));
@@ -1253,6 +1264,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                        mAccs[trial].col(t),
                        mInit->grfTrials[trial].col(t),
                        neural::WithRespectTo::GROUP_MASSES,
+                       mResidualTorqueMultiple,
                        mResidualUseL1);
           }
           cursor += dim;
@@ -1270,6 +1282,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                        mAccs[trial].col(t),
                        mInit->grfTrials[trial].col(t),
                        neural::WithRespectTo::GROUP_COMS,
+                       mResidualTorqueMultiple,
                        mResidualUseL1);
           }
           cursor += dim;
@@ -1287,6 +1300,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                        mAccs[trial].col(t),
                        mInit->grfTrials[trial].col(t),
                        neural::WithRespectTo::GROUP_INERTIAS,
+                       mResidualTorqueMultiple,
                        mResidualUseL1);
           }
           cursor += dim;
@@ -1304,6 +1318,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                        mAccs[trial].col(t),
                        mInit->grfTrials[trial].col(t),
                        neural::WithRespectTo::GROUP_SCALES,
+                       mResidualTorqueMultiple,
                        mResidualUseL1);
           }
 
@@ -1346,6 +1361,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                       mAccs[trial].col(t),
                       mInit->grfTrials[trial].col(t),
                       neural::WithRespectTo::POSITION,
+                      mResidualTorqueMultiple,
                       mResidualUseL1);
             velResidualGrad
                 = mResidualWeight * (1.0 / totalAccTimesteps)
@@ -1355,6 +1371,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                       mAccs[trial].col(t),
                       mInit->grfTrials[trial].col(t),
                       neural::WithRespectTo::VELOCITY,
+                      mResidualTorqueMultiple,
                       mResidualUseL1);
             accResidualGrad
                 = mResidualWeight * (1.0 / totalAccTimesteps)
@@ -1364,6 +1381,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                       mAccs[trial].col(t),
                       mInit->grfTrials[trial].col(t),
                       neural::WithRespectTo::ACCELERATION,
+                      mResidualTorqueMultiple,
                       mResidualUseL1);
           }
 
@@ -2239,6 +2257,13 @@ DynamicsFitProblem& DynamicsFitProblem::setIncludeBodyScales(bool value)
 DynamicsFitProblem& DynamicsFitProblem::setResidualWeight(s_t weight)
 {
   mResidualWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setResidualTorqueMultiple(s_t value)
+{
+  mResidualTorqueMultiple = value;
   return *(this);
 }
 
@@ -4272,8 +4297,8 @@ s_t DynamicsFitter::computeAverageCOPChange(
                            - init->perfectForcePlateTrials[trial][i]
                                  .centersOfPressure[t])
                               .norm();
-            // std::cout << "CoP moved " << distNow << " at time " << t
-            //           << std::endl;
+            std::cout << "CoP moved " << distNow << " at time " << t
+                      << std::endl;
             // if (distNow > 0.1)
             // {
             //   std::cout << "'Perfect' CoP [" << i << "]:" << std::endl
@@ -4285,8 +4310,11 @@ s_t DynamicsFitter::computeAverageCOPChange(
             //             init->forcePlateTrials[trial][i].centersOfPressure[t]
             //             << std::endl;
             // }
-            dist += distNow;
-            count++;
+            if (distNow < 0.5)
+            {
+              dist += distNow;
+              count++;
+            }
           }
         }
       }
@@ -4320,9 +4348,12 @@ s_t DynamicsFitter::computeAverageForceMagnitudeChange(
         {
           if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
           {
-            dist += (init->forcePlateTrials[trial][i].forces[t]
-                     - init->perfectForcePlateTrials[trial][i].forces[t])
-                        .norm();
+            s_t thisDist = (init->forcePlateTrials[trial][i].forces[t]
+                            - init->perfectForcePlateTrials[trial][i].forces[t])
+                               .norm();
+            std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
+                      << "N diff" << std::endl;
+            dist += thisDist;
             count++;
           }
         }
@@ -4357,7 +4388,7 @@ void DynamicsFitter::saveDynamicsToGUI(
   Eigen::Vector4s markerErrorLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
   std::string forcePlateLayerName = "Force Plates";
   Eigen::Vector4s forcePlateLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
-  std::string perfectForcePlateLayerName = "Perfect Force Plates";
+  std::string perfectForcePlateLayerName = "'Zero Residual' Force Plates";
   Eigen::Vector4s perfectForcePlateLayerColor
       = Eigen::Vector4s(1.0, 0.0, 1.0, 1.0);
   std::string measuredForcesLayerName = "Measured Forces";

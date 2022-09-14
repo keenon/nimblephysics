@@ -692,10 +692,11 @@ bool testResidualGradWrt(
   }
   ResidualForceHelper helper(skel, forceBodies);
 
+  s_t residualTorqueMultiple = 10.0;
   Eigen::VectorXs analytical = helper.calculateResidualNormGradientWrt(
-      originalPos, originalVel, acc, concatForces, wrt);
+      originalPos, originalVel, acc, concatForces, wrt, residualTorqueMultiple);
   Eigen::VectorXs fd = helper.finiteDifferenceResidualNormGradientWrt(
-      originalPos, originalVel, acc, concatForces, wrt);
+      originalPos, originalVel, acc, concatForces, wrt, residualTorqueMultiple);
 
   s_t max = fd.cwiseAbs().maxCoeff();
   analytical /= max;
@@ -966,17 +967,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // false);
 
   // Just optimize the inertia regularizer
-  fitter.setIterationLimit(100);
+  fitter.setIterationLimit(200);
   fitter.runIPOPTOptimization(
       init, 2e-2, 50, true, false, true, false, true, false, false);
 
-  fitter.setIterationLimit(100);
+  fitter.setIterationLimit(200);
   fitter.runSGDOptimization(
       init, 2e-2, 50, true, true, true, true, false, true);
 
   fitter.setIterationLimit(50);
-  fitter.runSGDOptimization(
-      init, 2e-2, 100, true, true, true, true, true, true);
+  fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
 
   fitter.computePerfectGRFs(init);
   bool consistent = fitter.checkPhysicalConsistency(init);
@@ -2141,6 +2141,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_RESIDUAL_L1_MATCHES_AVG_RMS)
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setMarkerWeight(0.0);
   problem.setResidualWeight(1.0);
+  problem.setResidualTorqueMultiple(1.0);
   problem.setJointWeight(0.0);
   problem.setResidualUseL1(true);
   // Disable regularization

@@ -1259,14 +1259,14 @@ Eigen::Vector3s Inertia::finiteDifferenceImpliedCubeDimensionsGradientWrtMass()
   math::finiteDifference<Eigen::Vector3s>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::Vector3s& perturbed) {
-        setMass(original + eps);
+        setMass(original + eps, false);
         perturbed = getImpliedCubeDimensions();
         return true;
       },
       result,
       1e-3,
       true);
-  setMass(original);
+  setMass(original, false);
   return result;
 }
 
@@ -1346,14 +1346,14 @@ s_t Inertia::finiteDifferenceImpliedCubeDensityGradientWrtMass()
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /*out*/ s_t& perturbed) {
-        setMass(original + eps);
+        setMass(original + eps, false);
         perturbed = getImpliedCubeDensity();
         return true;
       },
       result,
       1e-3,
       true);
-  setMass(original);
+  setMass(original, false);
   return result;
 }
 
