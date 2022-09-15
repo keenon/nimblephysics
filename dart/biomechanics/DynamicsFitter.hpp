@@ -460,7 +460,7 @@ public:
   // This creates an optimization problem from a kinematics initialization
   static std::shared_ptr<DynamicsInitialization> createInitialization(
       std::shared_ptr<dynamics::Skeleton> skel,
-      MarkerInitialization* kinematicInit,
+      std::vector<MarkerInitialization> kinematicInit,
       std::vector<std::string> trackingMarkers,
       std::vector<dynamics::BodyNode*> grfNodes,
       std::vector<std::vector<ForcePlate>> forcePlateTrials,

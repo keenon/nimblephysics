@@ -2817,7 +2817,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 // This creates an optimization problem from a kinematics initialization
 std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::shared_ptr<dynamics::Skeleton> skel,
-    MarkerInitialization* kinematicInit,
+    std::vector<MarkerInitialization> kinematicInit,
     std::vector<std::string> trackingMarkers,
     std::vector<dynamics::BodyNode*> grfNodes,
     std::vector<std::vector<ForcePlate>> forcePlateTrials,
@@ -2825,25 +2825,35 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
         markerObservationTrials)
 {
+  if (markerObservationTrials.size() != kinematicInit.size())
+  {
+    std::cout
+        << "ERROR: Passed a different number of markerObservationTrials ("
+        << markerObservationTrials.size() << ") than kinematic inits ("
+        << kinematicInit.size()
+        << ") to DynamicsFitter::createInitialization()! Exiting with code 1."
+        << std::endl;
+    exit(1);
+  }
   // Split the incoming poses into individual trial matrices
   std::vector<Eigen::MatrixXs> poseTrials;
-  int cursor = 0;
   for (int trial = 0; trial < markerObservationTrials.size(); trial++)
   {
-    Eigen::MatrixXs poses = Eigen::MatrixXs(
-        skel->getNumDofs(), markerObservationTrials[trial].size());
-    for (int i = 0; i < markerObservationTrials[trial].size(); i++)
-    {
-      poses.col(i) = kinematicInit->poses.col(cursor);
-      cursor++;
-    }
-    poseTrials.push_back(poses);
+    poseTrials.push_back(kinematicInit[trial].poses);
+  }
+
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+      translatedMarkerMap;
+  for (auto& pair : kinematicInit[0].updatedMarkerMap)
+  {
+    translatedMarkerMap[pair.first] = std::make_pair(
+        skel->getBodyNode(pair.second.first->getName()), pair.second.second);
   }
 
   // Create the basic initialization
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       skel,
-      kinematicInit->updatedMarkerMap,
+      translatedMarkerMap,
       trackingMarkers,
       grfNodes,
       forcePlateTrials,
@@ -2852,29 +2862,20 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       markerObservationTrials);
 
   // Copy over the joint data
-  init->joints = kinematicInit->joints;
-  init->jointsAdjacentMarkers = kinematicInit->jointsAdjacentMarkers;
-  init->jointWeights = kinematicInit->jointWeights;
-  init->axisWeights = kinematicInit->axisWeights;
+  init->joints.clear();
+  for (int i = 0; i < kinematicInit[0].joints.size(); i++)
+  {
+    init->joints.push_back(
+        skel->getJoint(kinematicInit[0].joints[i]->getName()));
+  }
+  init->jointsAdjacentMarkers = kinematicInit[0].jointsAdjacentMarkers;
+  init->jointWeights = kinematicInit[0].jointWeights;
+  init->axisWeights = kinematicInit[0].axisWeights;
 
-  cursor = 0;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    Eigen::MatrixXs trialJointCenters = Eigen::MatrixXs::Zero(
-        kinematicInit->jointCenters.rows(), init->poseTrials[trial].cols());
-    Eigen::MatrixXs trialJointAxis = Eigen::MatrixXs::Zero(
-        kinematicInit->jointAxis.rows(), init->poseTrials[trial].cols());
-
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
-    {
-      trialJointCenters.col(t) = kinematicInit->jointCenters.col(cursor);
-      trialJointAxis.col(t) = kinematicInit->jointAxis.col(cursor);
-      cursor++;
-    }
-    // getMarkerWorldPositionsJacobianWrtJointPositions
-
-    init->jointCenters.push_back(trialJointCenters);
-    init->jointAxis.push_back(trialJointAxis);
+    init->jointCenters.push_back(kinematicInit[trial].jointCenters);
+    init->jointAxis.push_back(kinematicInit[trial].jointAxis);
   }
 
   return init;

@@ -60,7 +60,9 @@ void DynamicsFitter(py::module& m)
           ::py::arg("torquesMultiple"),
           ::py::arg("useL1") = false);
 
-  ::py::class_<dart::biomechanics::DynamicsInitialization>(
+  ::py::class_<
+      dart::biomechanics::DynamicsInitialization,
+      std::shared_ptr<dart::biomechanics::DynamicsInitialization>>(
       m, "DynamicsInitialization")
       .def_readwrite(
           "forcePlateTrials",
@@ -246,7 +248,8 @@ protected:
       .def_static(
           "createInitialization",
           +[](std::shared_ptr<dynamics::Skeleton> skel,
-              dart::biomechanics::MarkerInitialization* kinematicInit,
+              std::vector<dart::biomechanics::MarkerInitialization>
+                  kinematicInits,
               std::vector<std::string> trackingMarkers,
               std::vector<dynamics::BodyNode*> grfNodes,
               std::vector<std::vector<dart::biomechanics::ForcePlate>>
@@ -257,7 +260,7 @@ protected:
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
-                kinematicInit,
+                kinematicInits,
                 trackingMarkers,
                 grfNodes,
                 forcePlateTrials,
@@ -265,7 +268,7 @@ protected:
                 markerObservationTrials);
           },
           ::py::arg("skel"),
-          ::py::arg("kinematicInit"),
+          ::py::arg("kinematicInits"),
           ::py::arg("trackingMarkers"),
           ::py::arg("grfNodes"),
           ::py::arg("forcePlateTrials"),
@@ -336,6 +339,10 @@ protected:
           &dart::biomechanics::DynamicsFitter::computePerfectGRFs,
           ::py::arg("init"))
       .def(
+          "checkPhysicalConsistency",
+          &dart::biomechanics::DynamicsFitter::checkPhysicalConsistency,
+          ::py::arg("init"))
+      .def(
           "computeAverageMarkerRMSE",
           &dart::biomechanics::DynamicsFitter::computeAverageMarkerRMSE,
           ::py::arg("init"))
@@ -354,6 +361,12 @@ protected:
           ::py::arg("init"),
           ::py::arg("trialIndex"),
           ::py::arg("framesPerSecond"))
+      .def(
+          "writeCSVData",
+          &dart::biomechanics::DynamicsFitter::writeCSVData,
+          ::py::arg("path"),
+          ::py::arg("init"),
+          ::py::arg("trialIndex"))
       .def(
           "setTolerance",
           &dart::biomechanics::DynamicsFitter::setTolerance,

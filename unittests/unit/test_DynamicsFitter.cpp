@@ -1070,7 +1070,6 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
   std::vector<int> framesPerSecond;
   std::vector<std::vector<ForcePlate>> forcePlateTrials;
 
-  int totalTimesteps = 0;
   for (int i = 0; i < motFiles.size(); i++)
   {
     OpenSimMot mot = OpenSimParser::loadMot(skel, motFiles[i]);
@@ -1078,12 +1077,10 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     {
       poseTrials.push_back(
           mot.poses.block(0, 0, mot.poses.rows(), limitTrialSizes));
-      totalTimesteps += limitTrialSizes;
     }
     else
     {
       poseTrials.push_back(mot.poses);
-      totalTimesteps += mot.poses.cols();
     }
   }
 
@@ -1135,38 +1132,35 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
 
   // Run the joints engine
   MarkerFitter fitter(skel, markerMap);
-  Eigen::MatrixXs initPoses
-      = Eigen::MatrixXs::Zero(skel->getNumDofs(), totalTimesteps);
-  std::vector<std::map<std::string, Eigen::Vector3s>>
-      mergedMarkerObservationTrials;
-  std::vector<bool> newClip;
-  int cursor = 0;
+
+  std::vector<MarkerInitialization> kinematicInits;
   for (int trial = 0; trial < poseTrials.size(); trial++)
   {
+    // 1. Find the initial scaling + IK
+    MarkerInitialization fitterInit;
+    fitterInit.poses = poseTrials[trial];
+    fitterInit.groupScales = skel->getGroupScales();
+    fitterInit.updatedMarkerMap = markerMap;
+
+    std::vector<bool> newClip;
     for (int t = 0; t < poseTrials[trial].cols(); t++)
     {
-      initPoses.col(cursor) = poseTrials[trial].col(t);
-      cursor++;
-      mergedMarkerObservationTrials.push_back(
-          markerObservationTrials[trial][t]);
       newClip.push_back(t == 0);
     }
+
+    // 2. Find the joint centers
+    fitter.findJointCenters(
+        fitterInit, newClip, markerObservationTrials[trial]);
+    fitter.findAllJointAxis(
+        fitterInit, newClip, markerObservationTrials[trial]);
+    fitter.computeJointConfidences(fitterInit, markerObservationTrials[trial]);
+    kinematicInits.push_back(fitterInit);
   }
-  assert(cursor == initPoses.cols());
-  // 1. Find the initial scaling + IK
-  MarkerInitialization fitterInit;
-  fitterInit.poses = initPoses;
-  fitterInit.groupScales = skel->getGroupScales();
-  fitterInit.updatedMarkerMap = markerMap;
-  // 2. Find the joint centers
-  fitter.findJointCenters(fitterInit, newClip, mergedMarkerObservationTrials);
-  fitter.findAllJointAxis(fitterInit, newClip, mergedMarkerObservationTrials);
-  fitter.computeJointConfidences(fitterInit, mergedMarkerObservationTrials);
 
   std::shared_ptr<DynamicsInitialization> init
       = DynamicsFitter::createInitialization(
           skel,
-          &fitterInit,
+          kinematicInits,
           trackingMarkers,
           footNodes,
           forcePlateTrials,
