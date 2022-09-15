@@ -546,7 +546,10 @@ public:
 
   // This plays the simulation forward in Nimble, using the existing GRFs and
   // torques, and checks that everything matches what we expect to see
-  bool checkPhysicalConsistency(std::shared_ptr<DynamicsInitialization> init);
+  bool checkPhysicalConsistency(
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t maxAcceptableErrors = 1e-3,
+      int maxTimestepsToTest = 50);
 
   // This writes a unified CSV with a ton of different columns in it, describing
   // the selected trial

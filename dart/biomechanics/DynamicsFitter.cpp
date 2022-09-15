@@ -3854,7 +3854,9 @@ void DynamicsFitter::computePerfectGRFs(
 // This plays the simulation forward in Nimble, using the existing GRFs and
 // torques, and checks that everything matches what we expect to see
 bool DynamicsFitter::checkPhysicalConsistency(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init,
+    s_t maxAcceptableErrors,
+    int maxTimestepsToTest)
 {
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->setGravity(mSkeleton->getGravity());
@@ -3874,9 +3876,6 @@ bool DynamicsFitter::checkPhysicalConsistency(
         = (init->poseTrials[trial].col(1) - init->poseTrials[trial].col(0))
           / dt;
     mSkeleton->setVelocities(dq);
-
-    s_t maxAcceptableErrors = 1e-3;
-    int maxTimestepsToTest = 50;
 
     int timestepsSinceReset = 0;
 
@@ -4255,8 +4254,8 @@ s_t DynamicsFitter::computeAverageCOPChange(
                            - init->perfectForcePlateTrials[trial][i]
                                  .centersOfPressure[t])
                               .norm();
-            std::cout << "CoP moved " << distNow << " at time " << t
-                      << std::endl;
+            // std::cout << "CoP moved " << distNow << " at time " << t
+            //           << std::endl;
             // if (distNow > 0.1)
             // {
             //   std::cout << "'Perfect' CoP [" << i << "]:" << std::endl
@@ -4309,8 +4308,8 @@ s_t DynamicsFitter::computeAverageForceMagnitudeChange(
             s_t thisDist = (init->forcePlateTrials[trial][i].forces[t]
                             - init->perfectForcePlateTrials[trial][i].forces[t])
                                .norm();
-            std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
-                      << "N diff" << std::endl;
+            // std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
+            //           << "N diff" << std::endl;
             dist += thisDist;
             count++;
           }

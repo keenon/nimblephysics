@@ -341,7 +341,9 @@ protected:
       .def(
           "checkPhysicalConsistency",
           &dart::biomechanics::DynamicsFitter::checkPhysicalConsistency,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("maxAcceptableErrors") = 1e-3,
+          ::py::arg("maxTimestepsToTest") = 50)
       .def(
           "computeAverageMarkerRMSE",
           &dart::biomechanics::DynamicsFitter::computeAverageMarkerRMSE,
@@ -353,6 +355,15 @@ protected:
       .def(
           "computeAverageRealForce",
           &dart::biomechanics::DynamicsFitter::computeAverageRealForce,
+          ::py::arg("init"))
+      .def(
+          "computeAverageCOPChange",
+          &dart::biomechanics::DynamicsFitter::computeAverageCOPChange,
+          ::py::arg("init"))
+      .def(
+          "computeAverageForceMagnitudeChange",
+          &dart::biomechanics::DynamicsFitter::
+              computeAverageForceMagnitudeChange,
           ::py::arg("init"))
       .def(
           "saveDynamicsToGUI",
