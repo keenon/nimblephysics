@@ -23,6 +23,7 @@
 #include "dart/neural/WithRespectTo.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
+#include "dart/utils/AccelerationSmoother.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/UniversalLoader.hpp"
@@ -941,8 +942,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 {
 
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
-  // fitter.scaleLinkMassesFromGravity(init);
-  // fitter.estimateLinkMassesFromAcceleration(init);
+  fitter.scaleLinkMassesFromGravity(init);
+  fitter.estimateLinkMassesFromAcceleration(init);
 
   std::cout << "Initial mass: " << skel->getMass() << " kg" << std::endl;
   std::cout << "What we'd expect average ~GRF to be (Mass * 9.8): "
@@ -967,6 +968,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // false);
 
   // Just optimize the inertia regularizer
+  fitter.setIterationLimit(500);
+  fitter.runSGDOptimization(
+      init, 2e-2, 50, false, false, false, false, true, false);
+
+  /*
   fitter.setIterationLimit(200);
   fitter.runIPOPTOptimization(
       init, 2e-2, 50, true, false, true, false, true, false, false);
@@ -977,6 +983,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   fitter.setIterationLimit(50);
   fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
+  */
 
   fitter.computePerfectGRFs(init);
   bool consistent = fitter.checkPhysicalConsistency(init);
@@ -2507,7 +2514,7 @@ TEST(DynamicsFitter, RECOVER_X)
 #endif
 
 #ifdef ALL_TESTS
-TEST(DynamicsFitter, END_TO_END)
+TEST(DynamicsFitter, END_TO_END_SUBJECT4)
 {
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
@@ -2524,6 +2531,34 @@ TEST(DynamicsFitter, END_TO_END)
 
   runEngine(
       "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, END_TO_END_SPRINTER)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Sprinter/IK/JA1Gait35_ik.mot");
+  c3dFiles.push_back("dart://sample/grf/Sprinter/C3D/JA1Gait35.c3d");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/Sprinter/Models/"
       "optimized_scale_and_markers.osim",
       footNames,
       motFiles,

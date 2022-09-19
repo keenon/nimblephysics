@@ -149,6 +149,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_DynamicsFitter dart-utils)
   target_link_libraries(test_DynamicsFitter dart-utils-urdf)
 
+  dart_add_test("unit" test_BodySpatialTranslation)
+  target_link_libraries(test_BodySpatialTranslation dart-utils)
+  target_link_libraries(test_BodySpatialTranslation dart-utils-urdf)
+
   dart_add_test("unit" test_DifferentiableExternalForce)
   target_link_libraries(test_DifferentiableExternalForce dart-utils)
   target_link_libraries(test_DifferentiableExternalForce dart-utils-urdf)

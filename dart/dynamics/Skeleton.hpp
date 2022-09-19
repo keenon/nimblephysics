@@ -1474,6 +1474,34 @@ public:
       Eigen::Vector3s axis);
 
   //----------------------------------------------------------------------------
+  // Handling translation of velocities and accelerations into body space
+  //----------------------------------------------------------------------------
+
+  /// This returns the spatial velocities (6 vecs) of the bodies in world space,
+  /// concatenated
+  Eigen::VectorXs getBodyWorldVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the bodies in world
+  /// space, concatenated
+  Eigen::VectorXs getBodyWorldAccelerations();
+
+  /// This computes the jacobian of the world velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyWorldVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world velocities jacobian
+  Eigen::MatrixXs finiteDifferenceBodyWorldVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the world accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyWorldAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceBodyWorldAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
 

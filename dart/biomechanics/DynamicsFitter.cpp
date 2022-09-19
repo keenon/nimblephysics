@@ -2089,7 +2089,7 @@ void DynamicsFitProblem::computePerfectGRFs()
         std::vector<Eigen::Vector3s> taus;
 
         Eigen::MatrixXs platesToFeet = Eigen::MatrixXs::Zero(
-            mFootNodes.size(), mInit->forcePlateTrials[trial].size());
+            mInit->forcePlateTrials[trial].size(), mFootNodes.size());
         for (int i = 0; i < mFootNodes.size(); i++)
         {
           Eigen::Vector6s worldWrench = worldWrenches[i];
@@ -2765,6 +2765,12 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       {
         Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
         Eigen::Vector3s force = forcePlates[i].forces[t];
+        // Ignore timesteps where the force plate has a 0 force, those don't
+        // need to be assigned to anything
+        if (force.norm() == 0 || cop.hasNaN())
+        {
+          continue;
+        }
         Eigen::Vector3s moments = forcePlates[i].moments[t];
         Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
         wrench.head<3>() = moments;
@@ -2860,6 +2866,9 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       poseTrials,
       framesPerSecond,
       markerObservationTrials);
+
+  // Copy over the initial body scaling
+  init->groupScales = kinematicInit[0].groupScales;
 
   // Copy over the joint data
   init->joints.clear();

@@ -7062,6 +7062,217 @@ Skeleton::finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
 }
 
 //==============================================================================
+/// This returns the spatial velocities (6 vecs) of the bodies in world space,
+/// concatenated
+Eigen::VectorXs Skeleton::getBodyWorldVelocities()
+{
+  Eigen::VectorXs vels = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    vels.segment<6>(i * 6)
+        = getBodyNode(i)->getSpatialVelocity(Frame::World(), Frame::World());
+  }
+  return vels;
+}
+
+//==============================================================================
+/// This returns the spatial accelerations (6 vecs) of the bodies in world
+/// space, concatenated
+Eigen::VectorXs Skeleton::getBodyWorldAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    accs.segment<6>(i * 6) = getBodyNode(i)->getSpatialAcceleration(
+        Frame::World(), Frame::World());
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world velocities for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_V_p);
+    }
+    // We need to account for the relative rotation, wrt the world frame,
+    // because that's an extra step that isn't accounted for in the featherstone
+    // algo. We can use the product rule, and add the cross product of the
+    // current vel and the rotation axis for each joint.
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      const Eigen::MatrixXi& jointParent = getJointParentMap();
+      for (int i = 0; i < getNumDofs(); i++)
+      {
+        int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+        Eigen::Vector6s worldScrew
+            = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+                getDof(i)->getIndexInJoint());
+        Eigen::Vector3s worldRot = worldScrew.head<3>();
+        for (int b = 0; b < getNumBodyNodes(); b++)
+        {
+          int bodyJointIndex
+              = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+          if (bodyJointIndex == jointIndex
+              || jointParent(jointIndex, bodyJointIndex) == 1)
+          {
+            Eigen::Vector6s spatialVel = getBodyNode(b)->getSpatialVelocity(
+                Frame::World(), Frame::World());
+            jac.block<3, 1>(b * 6, i) -= spatialVel.head<3>().cross(worldRot);
+            jac.block<3, 1>(b * 6 + 3, i)
+                -= spatialVel.tail<3>().cross(worldRot);
+          }
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world velocities jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyWorldVelocities();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world accelerations for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      jac.block(i * 6, 0, 6, dim) = getJacobian(bodyNodes[i], Frame::World());
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_dV_p);
+    }
+  }
+  // We need to account for the relative rotation, wrt the world frame,
+  // because that's an extra step that isn't accounted for in the featherstone
+  // algo. We can use the product rule, and add the cross product of the
+  // current acc and the rotation axis for each joint.
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    const Eigen::MatrixXi& jointParent = getJointParentMap();
+    for (int i = 0; i < getNumDofs(); i++)
+    {
+      int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+      Eigen::Vector6s worldScrew
+          = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+              getDof(i)->getIndexInJoint());
+      Eigen::Vector3s worldRot = worldScrew.head<3>();
+      for (int b = 0; b < getNumBodyNodes(); b++)
+      {
+        int bodyJointIndex
+            = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+        if (bodyJointIndex == jointIndex
+            || jointParent(jointIndex, bodyJointIndex) == 1)
+        {
+          Eigen::Vector6s spatialAcc = getBodyNode(b)->getSpatialAcceleration(
+              Frame::World(), Frame::World());
+          jac.block<3, 1>(b * 6, i) -= spatialAcc.head<3>().cross(worldRot);
+          jac.block<3, 1>(b * 6 + 3, i) -= spatialAcc.tail<3>().cross(worldRot);
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyWorldAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
 void Skeleton::integratePositions(s_t _dt)
 {
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)

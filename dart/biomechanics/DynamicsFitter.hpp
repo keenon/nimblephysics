@@ -494,6 +494,10 @@ public:
   // it mess with our optimization.
   void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
 
+  // 0. Make tiny tweaks to the position data to try to get the body
+  // accelerations to be as small as possible
+  void smoothBodyAccelerations(std::shared_ptr<DynamicsInitialization> init);
+
   // 1. Scale the total mass of the body (keeping the ratios of body links
   // constant) to get it as close as possible to GRF gravity forces.
   void scaleLinkMassesFromGravity(std::shared_ptr<DynamicsInitialization> init);
