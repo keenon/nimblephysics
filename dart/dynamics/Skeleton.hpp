@@ -1501,6 +1501,30 @@ public:
   Eigen::MatrixXs finiteDifferenceBodyWorldAccelerationsJacobian(
       neural::WithRespectTo* wrt);
 
+  /// This returns the spatial velocities (6 vecs) of the COMs of each body in
+  /// world space, concatenated
+  Eigen::VectorXs getCOMWorldVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the COMs of each body
+  /// in world space, concatenated
+  Eigen::VectorXs getCOMWorldAccelerations();
+
+  /// This computes the jacobian of the world velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getCOMWorldVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world velocities jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the world accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getCOMWorldAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
   //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------

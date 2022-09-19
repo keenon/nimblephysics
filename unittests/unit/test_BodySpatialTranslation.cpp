@@ -43,6 +43,48 @@ bool verifySpatialJacobians(
     skel->setPositions(Eigen::VectorXs::Random(skel->getNumDofs()));
     skel->setVelocities(Eigen::VectorXs::Random(skel->getNumDofs()));
 
+    Eigen::MatrixXs comVelJ_fd
+        = skel->finiteDifferenceCOMWorldVelocitiesJacobian(wrt);
+    Eigen::MatrixXs comVelJ = skel->getCOMWorldVelocitiesJacobian(wrt);
+
+    if (!equals(comVelJ, comVelJ_fd, 1e-8))
+    {
+      std::cout << "COM Vel wrt " << wrt->name() << " error!" << std::endl;
+      for (int body = 0; body < comVelJ.rows() / 6; body++)
+      {
+        for (int dof = 0; dof < comVelJ.cols(); dof++)
+        {
+          Eigen::Vector6s analytical = comVelJ.block<6, 1>(body * 6, dof);
+          Eigen::Vector6s fd = comVelJ_fd.block<6, 1>(body * 6, dof);
+          if (!equals(analytical, fd, 1e-8))
+          {
+            std::cout << "Body \"" << skel->getBodyNode(body)->getName()
+                      << "\" disagrees on DOF \""
+                      << skel->getDof(dof)->getName() << "\"" << std::endl;
+            Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+            compare.col(0) = fd;
+            compare.col(1) = analytical;
+            compare.col(2) = analytical - fd;
+            std::cout << "FD - Analytical - Diff:" << std::endl
+                      << compare << std::endl;
+          }
+        }
+      }
+      return false;
+    }
+
+    Eigen::MatrixXs comAccJ = skel->getCOMWorldAccelerationsJacobian(wrt);
+    Eigen::MatrixXs comAccJ_fd
+        = skel->finiteDifferenceCOMWorldAccelerationsJacobian(wrt);
+    if (!equals(comAccJ, comAccJ_fd, 1e-8))
+    {
+      std::cout << "COM acc wrt " << wrt->name() << " error!" << std::endl;
+      std::cout << "Analytical: " << std::endl << comAccJ << std::endl;
+      std::cout << "FD: " << std::endl << comAccJ_fd << std::endl;
+      std::cout << "Diff: " << std::endl << comAccJ - comAccJ_fd << std::endl;
+      return false;
+    }
+
     Eigen::MatrixXs velJ_fd
         = skel->finiteDifferenceBodyWorldVelocitiesJacobian(wrt);
     Eigen::MatrixXs velJ = skel->getBodyWorldVelocitiesJacobian(wrt);
@@ -110,6 +152,11 @@ bool verifySpatialJacobians(std::shared_ptr<dynamics::Skeleton> skel)
     return false;
   }
   std::cout << "Passed ACCELERATION" << std::endl;
+  if (!verifySpatialJacobians(skel, neural::WithRespectTo::GROUP_COMS))
+  {
+    return false;
+  }
+  std::cout << "Passed GROUP_COMS" << std::endl;
   return true;
 }
 
@@ -117,6 +164,7 @@ bool verifySpatialJacobians(std::shared_ptr<dynamics::Skeleton> skel)
 TEST(BODY_SPATIAL_TRANSLATION, BOX)
 {
   std::shared_ptr<dynamics::Skeleton> skel = createBox(Eigen::Vector3s::Ones());
+  skel->getBodyNode(0)->setLocalCOM(Eigen::Vector3s::Random());
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
 #endif
@@ -128,6 +176,7 @@ TEST(BODY_SPATIAL_TRANSLATION, BOX_WITH_CHILD_TRANSFORM)
   Eigen::Isometry3s fromChild = Eigen::Isometry3s::Identity();
   fromChild.translation() = Eigen::Vector3s::Random();
   skel->getJoint(0)->setTransformFromChildBodyNode(fromChild);
+  skel->getBodyNode(0)->setLocalCOM(Eigen::Vector3s::Random());
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
 #endif
@@ -136,6 +185,8 @@ TEST(BODY_SPATIAL_TRANSLATION, BOX_WITH_CHILD_TRANSFORM)
 TEST(BODY_SPATIAL_TRANSLATION, CARTPOLE)
 {
   std::shared_ptr<dynamics::Skeleton> skel = createCartpole();
+  skel->getBodyNode(0)->setLocalCOM(Eigen::Vector3s::Random());
+  skel->getBodyNode(1)->setLocalCOM(Eigen::Vector3s::Random());
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
 #endif
@@ -148,6 +199,9 @@ TEST(BODY_SPATIAL_TRANSLATION, TWO_LINK)
       TypeOfDOF::DOF_ROLL,
       Eigen::Vector3s::Random().cwiseAbs(),
       TypeOfDOF::DOF_PITCH);
+  skel->getBodyNode(0)->setLocalCOM(Eigen::Vector3s::Random());
+  skel->getBodyNode(1)->setLocalCOM(Eigen::Vector3s::Random());
+  skel->getBodyNode(2)->setLocalCOM(Eigen::Vector3s::Random());
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
 #endif
@@ -162,11 +216,14 @@ TEST(BODY_SPATIAL_TRANSLATION, THREE_LINK)
       TypeOfDOF::DOF_ROLL,
       Eigen::Vector3s::Random().cwiseAbs(),
       TypeOfDOF::DOF_PITCH);
+  skel->getBodyNode(0)->setLocalCOM(Eigen::Vector3s::Random());
+  skel->getBodyNode(1)->setLocalCOM(Eigen::Vector3s::Random());
+  skel->getBodyNode(2)->setLocalCOM(Eigen::Vector3s::Random());
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(BODY_SPATIAL_TRANSLATION, EULER_FREE_JOINT)
 {
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
@@ -176,12 +233,14 @@ TEST(BODY_SPATIAL_TRANSLATION, EULER_FREE_JOINT)
   (void)eulerJoint;
   dynamics::BodyNode* rootBody = eulerJointPair.second;
   rootBody->setName("root");
+  rootBody->setLocalCOM(Eigen::Vector3s::Random());
 
   auto revoluteJointPair
       = rootBody->createChildJointAndBodyNodePair<dynamics::RevoluteJoint>();
   dynamics::Joint* childJoint = revoluteJointPair.first;
   dynamics::BodyNode* childBody = revoluteJointPair.second;
   childBody->setName("child");
+  childBody->setLocalCOM(Eigen::Vector3s::Random());
 
   Eigen::Isometry3s T_rc = Eigen::Isometry3s::Identity();
   T_rc.translation() = Eigen::Vector3s::UnitX();
@@ -190,7 +249,7 @@ TEST(BODY_SPATIAL_TRANSLATION, EULER_FREE_JOINT)
 
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(BODY_SPATIAL_TRANSLATION, RAJAGOPAL)
