@@ -1108,7 +1108,7 @@ protected:
       Eigen::VectorXs& _g, const Eigen::Vector3s& _gravity);
 
   ///
-  virtual void updateCombinedVector();
+  virtual void updateCombinedVector(bool includeExplicitAcc = false);
   virtual void aggregateCombinedVector(
       Eigen::VectorXs& _Cg, const Eigen::Vector3s& _gravity);
 
@@ -1152,7 +1152,8 @@ protected:
   void computeJacobianOfMBackward(
       neural::WithRespectTo* wrt, Eigen::MatrixXs& dCg);
 
-  void computeJacobianOfCForward(neural::WithRespectTo* wrt);
+  void computeJacobianOfCForward(
+      neural::WithRespectTo* wrt, bool includeExplicitAcc = false);
   void computeJacobianOfCBackward(
       neural::WithRespectTo* wrt,
       Eigen::MatrixXs& dCg,

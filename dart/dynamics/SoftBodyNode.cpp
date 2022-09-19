@@ -1150,9 +1150,9 @@ void SoftBodyNode::aggregateGravityForceVector(
 }
 
 //==============================================================================
-void SoftBodyNode::updateCombinedVector()
+void SoftBodyNode::updateCombinedVector(bool includeExplicitAcc)
 {
-  BodyNode::updateCombinedVector();
+  BodyNode::updateCombinedVector(includeExplicitAcc);
 
   //  for (std::size_t i = 0; i < mPointMasses.size(); ++i)
   //    mPointMasses.at(i)->updateCombinedVector();

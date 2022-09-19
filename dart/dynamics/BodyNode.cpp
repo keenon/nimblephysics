@@ -2419,7 +2419,7 @@ void BodyNode::aggregateGravityForceVector(
 }
 
 //==============================================================================
-void BodyNode::updateCombinedVector()
+void BodyNode::updateCombinedVector(bool includeExplicitAcc)
 {
   if (mParentBodyNode)
   {
@@ -2430,6 +2430,11 @@ void BodyNode::updateCombinedVector()
   else
   {
     mCg_dV = getPartialAcceleration();
+  }
+
+  if (includeExplicitAcc)
+  {
+    mCg_dV += getPrimaryRelativeAcceleration();
   }
 }
 
@@ -3399,7 +3404,8 @@ void BodyNode::computeJacobianOfMBackward(
 }
 
 //==============================================================================
-void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
+void BodyNode::computeJacobianOfCForward(
+    neural::WithRespectTo* wrt, bool includeExplicitAcc)
 {
   using math::ad;
   using math::AdInvT;
@@ -3408,12 +3414,14 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
   const auto skel = getSkeleton();
 
   // To update mCg_dV
-  updateCombinedVector();
+  updateCombinedVector(includeExplicitAcc);
 
   const Eigen::Isometry3s& T = mParentJoint->getRelativeTransform();
   const Jacobian& S = mParentJoint->getRelativeJacobian();
   const Jacobian& dS = mParentJoint->getRelativeJacobianTimeDeriv();
   const Eigen::VectorXs& dq = mParentJoint->getVelocities();
+  // This is assumed to be zero unless includeExplicitAcc is set to true
+  const Eigen::VectorXs& ddq = mParentJoint->getAccelerations();
   const Eigen::Vector6s& V = getSpatialVelocity();
 
 #ifdef DART_DEBUG_ANALYTICAL_DERIV
@@ -3472,6 +3480,10 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
           mCg_V_p.col(i) = DS_Dq * dq;
           mCg_dV_p.col(i)
               = ad(mCg_V_p.col(i), S * dq) + ad(V, DS_Dq * dq) + DdS_Dq * dq;
+        }
+        if (includeExplicitAcc)
+        {
+          mCg_dV_p.col(i) += DS_Dq * ddq;
         }
       }
       else
@@ -3621,6 +3633,10 @@ void BodyNode::computeJacobianOfCForward(neural::WithRespectTo* wrt)
           mCg_V_p.col(i) = DS_Dp * dq;
           mCg_dV_p.col(i)
               = ad(mCg_V_p.col(i), S * dq) + ad(V, DS_Dp * dq) + DdS_Dp * dq;
+        }
+        if (includeExplicitAcc)
+        {
+          mCg_dV_p.col(i) += DS_Dp * ddq;
         }
       }
       else

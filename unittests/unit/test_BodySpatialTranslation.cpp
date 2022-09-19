@@ -42,6 +42,7 @@ bool verifySpatialJacobians(
   {
     skel->setPositions(Eigen::VectorXs::Random(skel->getNumDofs()));
     skel->setVelocities(Eigen::VectorXs::Random(skel->getNumDofs()));
+    skel->setAccelerations(Eigen::VectorXs::Random(skel->getNumDofs()));
 
     Eigen::MatrixXs comVelJ_fd
         = skel->finiteDifferenceCOMWorldVelocitiesJacobian(wrt);

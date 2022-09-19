@@ -321,6 +321,201 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
 }
 
 //==============================================================================
+SpatialNewtonHelper::SpatialNewtonHelper(
+    std::shared_ptr<dynamics::Skeleton> skeleton)
+  : mSkel(skeleton)
+{
+}
+
+//==============================================================================
+// Computes the f=m*a (in linear components only) difference from observed
+// forces, and presents that in 3-axis form (X,Y,Z world coordinates) in
+// Newtons.
+Eigen::Vector3s SpatialNewtonHelper::calculateLinearForceGap(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::Vector3s f = Eigen::Vector3s::Zero();
+  for (int i = 0; i < forcesConcat.size() / 6; i++)
+  {
+    f += forcesConcat.segment<3>(i * 6 + 3);
+  }
+
+  Eigen::Vector3s linearF = Eigen::Vector3s::Zero();
+  Eigen::VectorXs worldAccs = mSkel->getCOMWorldAccelerations();
+  for (int i = 0; i < worldAccs.size() / 6; i++)
+  {
+    Eigen::Vector3s a = worldAccs.segment<3>(i * 6 + 3);
+    a -= mSkel->getGravity();
+    s_t m = mSkel->getBodyNode(i)->getMass();
+    linearF += m * a;
+  }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+
+  return linearF - f;
+}
+
+//==============================================================================
+// Computes the f=m*a (in linear components only) difference from observed
+// forces, and presents that in 3-axis form (X,Y,Z world coordinates) in
+// Newtons.
+s_t SpatialNewtonHelper::calculateLinearForceGapNorm(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    bool useL1)
+{
+  Eigen::Vector3s diff = calculateLinearForceGap(q, dq, ddq, forcesConcat);
+  if (useL1)
+  {
+    return diff.norm();
+  }
+  else
+  {
+    return diff.squaredNorm();
+  }
+}
+
+//==============================================================================
+// Computes the gradient of gap norm with respect to `wrt`
+Eigen::VectorXs SpatialNewtonHelper::calculateLinearForceGapNormGradientWrt(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    neural::WithRespectTo* wrt,
+    bool useL1)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::Vector3s diff = calculateLinearForceGap(q, dq, ddq, forcesConcat);
+
+  Eigen::Vector3s gradDiff;
+  if (useL1)
+  {
+    gradDiff = diff.normalized();
+  }
+  else
+  {
+    gradDiff = diff * 2;
+  }
+
+  Eigen::VectorXs worldAccs;
+  Eigen::MatrixXs jac;
+  if (wrt == neural::WithRespectTo::GROUP_MASSES)
+  {
+    worldAccs = mSkel->getCOMWorldAccelerations();
+  }
+  else
+  {
+    jac = mSkel->getCOMWorldAccelerationsJacobian(wrt);
+  }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+
+  if (wrt == neural::WithRespectTo::GROUP_MASSES)
+  {
+    Eigen::VectorXs grad = Eigen::VectorXs::Zero(mSkel->getNumScaleGroups());
+
+    for (int i = 0; i < mSkel->getNumScaleGroups(); i++)
+    {
+      dynamics::BodyScaleGroup group = mSkel->getBodyScaleGroup(i);
+      for (int j = 0; j < group.nodes.size(); j++)
+      {
+        int b = group.nodes[j]->getIndexInSkeleton();
+        Eigen::Vector3s a = worldAccs.segment<3>(b * 6 + 3);
+        a -= mSkel->getGravity();
+        grad(i) += a.dot(gradDiff);
+      }
+    }
+
+    return grad;
+  }
+  else
+  {
+    Eigen::MatrixXs condensedJac = Eigen::MatrixXs::Zero(3, jac.cols());
+    for (int i = 0; i < mSkel->getNumBodyNodes(); i++)
+    {
+      condensedJac += mSkel->getBodyNode(i)->getMass()
+                      * jac.block(i * 6 + 3, 0, 3, jac.cols());
+    }
+    return condensedJac.transpose() * gradDiff;
+  }
+}
+
+//==============================================================================
+// Computes the gradient of gap norm with respect to `wrt`
+Eigen::VectorXs
+SpatialNewtonHelper::finiteDifferenceLinearForceGapNormGradientWrt(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    neural::WithRespectTo* wrt,
+    bool useL1)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(wrt->dim(mSkel.get()));
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::VectorXs originalWrt = wrt->get(mSkel.get());
+
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs newWrt = originalWrt;
+        newWrt(dof) += eps;
+        wrt->set(mSkel.get(), newWrt);
+        perturbed = calculateLinearForceGapNorm(
+            mSkel->getPositions(),
+            mSkel->getVelocities(),
+            mSkel->getAccelerations(),
+            forcesConcat,
+            useL1);
+        return true;
+      },
+      result,
+      5e-4,
+      true);
+
+  wrt->set(mSkel.get(), originalWrt);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+  return result;
+}
+
+//==============================================================================
 DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,
@@ -336,8 +531,10 @@ DynamicsFitProblem::DynamicsFitProblem(
     mIncludePoses(true),
     mIncludeMarkerOffsets(true),
     mResidualWeight(0.1),
+    mLinearNewtonWeight(0.1),
     mMarkerWeight(1.0),
     mJointWeight(1.0),
+    mLinearNewtonUseL1(true),
     mResidualUseL1(true),
     mMarkerUseL1(true),
     mResidualTorqueMultiple(3.0),
@@ -410,6 +607,7 @@ DynamicsFitProblem::DynamicsFitProblem(
 
   mResidualHelper
       = std::make_shared<ResidualForceHelper>(mSkeleton, mForceBodyIndices);
+  mSpatialNewtonHelper = std::make_shared<SpatialNewtonHelper>(mSkeleton);
 }
 
 //==============================================================================
@@ -920,6 +1118,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     totalAccTimesteps += mPoses[trial].cols() - 2;
   }
 
+  s_t linearNewtonError = 0.0;
   s_t residualRMS = 0.0;
   s_t markerRMS = 0.0;
   s_t poseRegularization = 0.0;
@@ -937,16 +1136,31 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
       if (t > 0 && t < mPoses[trial].cols() - 1
           && !mInit->probablyMissingGRF[trial][t])
       {
-        s_t cost = mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNorm(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       mResidualTorqueMultiple,
-                       mResidualUseL1);
-        residualRMS += cost;
-        assert(!isnan(residualRMS));
+        if (mLinearNewtonWeight > 0)
+        {
+          s_t cost = mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateLinearForceGapNorm(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         mLinearNewtonUseL1);
+          linearNewtonError += cost;
+          assert(!isnan(linearNewtonError));
+        }
+        if (mResidualWeight > 0)
+        {
+          s_t cost = mResidualWeight * (1.0 / totalAccTimesteps)
+                     * mResidualHelper->calculateResidualNorm(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         mResidualTorqueMultiple,
+                         mResidualUseL1);
+          residualRMS += cost;
+          assert(!isnan(residualRMS));
+        }
       }
 
       // Add marker RMS errors to every timestep
@@ -1006,6 +1220,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
       assert(!isnan(poseRegularization));
     }
   }
+  sum += linearNewtonError;
   sum += residualRMS;
   markerRMS *= mMarkerWeight;
   if (markerCount > 0)
@@ -1029,8 +1244,8 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
               << ",scR=" << scaleRegularization
               << ",mkrR=" << markerRegularization << ",jntRMS=" << jointRMS
               << ",axisRMS=" << axisRMS << ",qR=" << poseRegularization
-              << ",fRMS=" << residualRMS << ",mkRMS=" << markerRMS << "]"
-              << std::endl;
+              << ",fRMS=" << residualRMS << ",linF=" << linearNewtonError
+              << ",mkRMS=" << markerRMS << "]" << std::endl;
   }
 
   return sum;
@@ -1256,16 +1471,32 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mSkeleton->getNumScaleGroups();
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            grad.segment(cursor, dim)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::GROUP_MASSES,
-                       mResidualTorqueMultiple,
-                       mResidualUseL1);
+            if (mResidualWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                     * mResidualHelper->calculateResidualNormGradientWrt(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         neural::WithRespectTo::GROUP_MASSES,
+                         mResidualTorqueMultiple,
+                         mResidualUseL1);
+            }
+            if (mLinearNewtonWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper
+                           ->calculateLinearForceGapNormGradientWrt(
+                               mPoses[trial].col(t),
+                               mVels[trial].col(t),
+                               mAccs[trial].col(t),
+                               mInit->grfTrials[trial].col(t),
+                               neural::WithRespectTo::GROUP_MASSES,
+                               mLinearNewtonUseL1);
+            }
           }
           cursor += dim;
         }
@@ -1274,16 +1505,32 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mSkeleton->getNumScaleGroups() * 3;
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            grad.segment(cursor, dim)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::GROUP_COMS,
-                       mResidualTorqueMultiple,
-                       mResidualUseL1);
+            if (mResidualWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                     * mResidualHelper->calculateResidualNormGradientWrt(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         neural::WithRespectTo::GROUP_COMS,
+                         mResidualTorqueMultiple,
+                         mResidualUseL1);
+            }
+            if (mLinearNewtonWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper
+                           ->calculateLinearForceGapNormGradientWrt(
+                               mPoses[trial].col(t),
+                               mVels[trial].col(t),
+                               mAccs[trial].col(t),
+                               mInit->grfTrials[trial].col(t),
+                               neural::WithRespectTo::GROUP_COMS,
+                               mLinearNewtonUseL1);
+            }
           }
           cursor += dim;
         }
@@ -1292,16 +1539,36 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mSkeleton->getNumScaleGroups() * 6;
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            grad.segment(cursor, dim)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::GROUP_INERTIAS,
-                       mResidualTorqueMultiple,
-                       mResidualUseL1);
+            if (mResidualWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                     * mResidualHelper->calculateResidualNormGradientWrt(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         neural::WithRespectTo::GROUP_INERTIAS,
+                         mResidualTorqueMultiple,
+                         mResidualUseL1);
+            }
+            /*
+            // This should always be 0, and therefore not necessary
+
+            if (mLinearNewtonWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper
+                           ->calculateLinearForceGapNormGradientWrt(
+                               mPoses[trial].col(t),
+                               mVels[trial].col(t),
+                               mAccs[trial].col(t),
+                               mInit->grfTrials[trial].col(t),
+                               neural::WithRespectTo::GROUP_INERTIAS,
+                               mLinearNewtonUseL1);
+            }
+            */
           }
           cursor += dim;
         }
@@ -1310,16 +1577,32 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           int dim = mSkeleton->getGroupScaleDim();
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            grad.segment(cursor, dim)
-                += mResidualWeight * (1.0 / totalAccTimesteps)
-                   * mResidualHelper->calculateResidualNormGradientWrt(
-                       mPoses[trial].col(t),
-                       mVels[trial].col(t),
-                       mAccs[trial].col(t),
-                       mInit->grfTrials[trial].col(t),
-                       neural::WithRespectTo::GROUP_SCALES,
-                       mResidualTorqueMultiple,
-                       mResidualUseL1);
+            if (mResidualWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                     * mResidualHelper->calculateResidualNormGradientWrt(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mInit->grfTrials[trial].col(t),
+                         neural::WithRespectTo::GROUP_SCALES,
+                         mResidualTorqueMultiple,
+                         mResidualUseL1);
+            }
+            if (mLinearNewtonWeight > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper
+                           ->calculateLinearForceGapNormGradientWrt(
+                               mPoses[trial].col(t),
+                               mVels[trial].col(t),
+                               mAccs[trial].col(t),
+                               mInit->grfTrials[trial].col(t),
+                               neural::WithRespectTo::GROUP_SCALES,
+                               mLinearNewtonUseL1);
+            }
           }
 
           // Record marker gradients
@@ -1348,44 +1631,74 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
         if (mIncludePoses)
         {
-          Eigen::VectorXs posResidualGrad = Eigen::VectorXs::Zero(dofs);
-          Eigen::VectorXs velResidualGrad = Eigen::VectorXs::Zero(dofs);
-          Eigen::VectorXs accResidualGrad = Eigen::VectorXs::Zero(dofs);
+          Eigen::VectorXs posGrad = Eigen::VectorXs::Zero(dofs);
+          Eigen::VectorXs velGrad = Eigen::VectorXs::Zero(dofs);
+          Eigen::VectorXs accGrad = Eigen::VectorXs::Zero(dofs);
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            posResidualGrad
-                = mResidualWeight * (1.0 / totalAccTimesteps)
-                  * mResidualHelper->calculateResidualNormGradientWrt(
-                      mPoses[trial].col(t),
-                      mVels[trial].col(t),
-                      mAccs[trial].col(t),
-                      mInit->grfTrials[trial].col(t),
-                      neural::WithRespectTo::POSITION,
-                      mResidualTorqueMultiple,
-                      mResidualUseL1);
-            velResidualGrad
-                = mResidualWeight * (1.0 / totalAccTimesteps)
-                  * mResidualHelper->calculateResidualNormGradientWrt(
-                      mPoses[trial].col(t),
-                      mVels[trial].col(t),
-                      mAccs[trial].col(t),
-                      mInit->grfTrials[trial].col(t),
-                      neural::WithRespectTo::VELOCITY,
-                      mResidualTorqueMultiple,
-                      mResidualUseL1);
-            accResidualGrad
-                = mResidualWeight * (1.0 / totalAccTimesteps)
-                  * mResidualHelper->calculateResidualNormGradientWrt(
-                      mPoses[trial].col(t),
-                      mVels[trial].col(t),
-                      mAccs[trial].col(t),
-                      mInit->grfTrials[trial].col(t),
-                      neural::WithRespectTo::ACCELERATION,
-                      mResidualTorqueMultiple,
-                      mResidualUseL1);
+            if (mResidualWeight > 0)
+            {
+              posGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mResidualHelper->calculateResidualNormGradientWrt(
+                             mPoses[trial].col(t),
+                             mVels[trial].col(t),
+                             mAccs[trial].col(t),
+                             mInit->grfTrials[trial].col(t),
+                             neural::WithRespectTo::POSITION,
+                             mResidualTorqueMultiple,
+                             mResidualUseL1);
+              velGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mResidualHelper->calculateResidualNormGradientWrt(
+                             mPoses[trial].col(t),
+                             mVels[trial].col(t),
+                             mAccs[trial].col(t),
+                             mInit->grfTrials[trial].col(t),
+                             neural::WithRespectTo::VELOCITY,
+                             mResidualTorqueMultiple,
+                             mResidualUseL1);
+              accGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mResidualHelper->calculateResidualNormGradientWrt(
+                             mPoses[trial].col(t),
+                             mVels[trial].col(t),
+                             mAccs[trial].col(t),
+                             mInit->grfTrials[trial].col(t),
+                             neural::WithRespectTo::ACCELERATION,
+                             mResidualTorqueMultiple,
+                             mResidualUseL1);
+            }
+            if (mLinearNewtonWeight > 0)
+            {
+              posGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   mPoses[trial].col(t),
+                                   mVels[trial].col(t),
+                                   mAccs[trial].col(t),
+                                   mInit->grfTrials[trial].col(t),
+                                   neural::WithRespectTo::POSITION,
+                                   mLinearNewtonUseL1);
+              velGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   mPoses[trial].col(t),
+                                   mVels[trial].col(t),
+                                   mAccs[trial].col(t),
+                                   mInit->grfTrials[trial].col(t),
+                                   neural::WithRespectTo::VELOCITY,
+                                   mLinearNewtonUseL1);
+              accGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   mPoses[trial].col(t),
+                                   mVels[trial].col(t),
+                                   mAccs[trial].col(t),
+                                   mInit->grfTrials[trial].col(t),
+                                   neural::WithRespectTo::ACCELERATION,
+                                   mLinearNewtonUseL1);
+            }
           }
 
-          grad.segment(posesCursor, dofs) += posResidualGrad;
+          grad.segment(posesCursor, dofs) += posGrad;
 
           // Record marker gradients
           grad.segment(posesCursor, dofs)
@@ -1410,28 +1723,26 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
             // v = (t - t-1) / dt
             // dv/dt = I / dt
             // dv/dt-1 = -I / dt
-            grad.segment(posesCursor, dofs) += velResidualGrad / dt;
+            grad.segment(posesCursor, dofs) += velGrad / dt;
             assert(t > 0);
-            grad.segment(posesCursor - dofs, dofs) -= velResidualGrad / dt;
+            grad.segment(posesCursor - dofs, dofs) -= velGrad / dt;
 
             // a = ((t+1) - 2*t + (t-1)) / dt*dt
-            grad.segment(posesCursor, dofs) -= 2 * accResidualGrad / (dt * dt);
+            grad.segment(posesCursor, dofs) -= 2 * accGrad / (dt * dt);
             assert(t < mPoses[trial].cols());
-            grad.segment(posesCursor + dofs, dofs)
-                += accResidualGrad / (dt * dt);
+            grad.segment(posesCursor + dofs, dofs) += accGrad / (dt * dt);
             assert(t > 0);
-            grad.segment(posesCursor - dofs, dofs)
-                += accResidualGrad / (dt * dt);
+            grad.segment(posesCursor - dofs, dofs) += accGrad / (dt * dt);
           }
           else
           {
             // Record Vel gradients wrt pos
             posesCursor += dofs;
-            grad.segment(posesCursor, dofs) += velResidualGrad;
+            grad.segment(posesCursor, dofs) += velGrad;
 
             // Record Acc gradients wrt pos
             posesCursor += dofs;
-            grad.segment(posesCursor, dofs) += accResidualGrad;
+            grad.segment(posesCursor, dofs) += accGrad;
           }
 
           posesCursor += dofs;
@@ -2211,6 +2522,13 @@ DynamicsFitProblem& DynamicsFitProblem::setIncludeBodyScales(bool value)
 }
 
 //==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setLinearNewtonWeight(s_t weight)
+{
+  mLinearNewtonWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
 DynamicsFitProblem& DynamicsFitProblem::setResidualWeight(s_t weight)
 {
   mResidualWeight = weight;
@@ -2235,6 +2553,13 @@ DynamicsFitProblem& DynamicsFitProblem::setMarkerWeight(s_t weight)
 DynamicsFitProblem& DynamicsFitProblem::setJointWeight(s_t weight)
 {
   mJointWeight = weight;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setLinearNewtonUseL1(bool l1)
+{
+  mLinearNewtonUseL1 = l1;
   return *(this);
 }
 

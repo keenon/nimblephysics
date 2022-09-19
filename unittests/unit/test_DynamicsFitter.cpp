@@ -335,6 +335,52 @@ bool testResidualAgainstID(
   return true;
 }
 
+bool testSpatialNewtonGrad(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
+  int i = 0;
+  for (auto& pair : worldForces)
+  {
+    concatForces.segment<6>(i * 6) = pair.second;
+    i++;
+  }
+
+  SpatialNewtonHelper helper(skel);
+
+  Eigen::VectorXs analytical = helper.calculateLinearForceGapNormGradientWrt(
+      skel->getPositions(),
+      skel->getVelocities(),
+      skel->getAccelerations(),
+      concatForces,
+      wrt,
+      true);
+  Eigen::VectorXs fd = helper.finiteDifferenceLinearForceGapNormGradientWrt(
+      skel->getPositions(),
+      skel->getVelocities(),
+      skel->getAccelerations(),
+      concatForces,
+      wrt,
+      true);
+
+  if (!equals(analytical, fd, 1e-8))
+  {
+    std::cout << "Linear force gap gradient wrt " << wrt->name() << " failed!"
+              << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 3);
+    compare.col(0) = fd;
+    compare.col(1) = analytical;
+    compare.col(2) = fd - analytical;
+    std::cout << "FD - Analytical - Diff: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 bool testBodyScaleJointJacobians(
     std::shared_ptr<dynamics::Skeleton> skel, int joint)
 {
@@ -780,6 +826,7 @@ bool testRelationshipBetweenResidualAndLinear(
       init, skel, init->trackingMarkers, init->grfBodyNodes);
   problem.setMarkerWeight(0);
   problem.setResidualUseL1(false);
+  problem.setLinearNewtonWeight(0.0);
   problem.setResidualWeight(1.0);
   problem.setResidualUseL1(true);
   problem.setIncludePoses(false);
@@ -1314,6 +1361,62 @@ TEST(DynamicsFitter, ID_EQNS)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, SPATIAL_NEWTON_GRAD)
+{
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+  for (int i = 0; i < 10; i++)
+  {
+    file.skeleton->setPositions(file.skeleton->getRandomPose());
+    file.skeleton->setVelocities(file.skeleton->getRandomVelocity());
+    file.skeleton->setAccelerations(file.skeleton->getRandomVelocity());
+
+    std::map<int, Eigen::Vector6s> worldForces;
+    worldForces[file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton()]
+        = Eigen::Vector6s::Random() * 1000;
+    worldForces[file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton()]
+        = Eigen::Vector6s::Random() * 1000;
+
+    bool pos = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::POSITION);
+    EXPECT_TRUE(pos);
+    if (!pos)
+      return;
+    bool vel = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::VELOCITY);
+    EXPECT_TRUE(vel);
+    if (!vel)
+      return;
+    bool acc = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::ACCELERATION);
+    EXPECT_TRUE(acc);
+    if (!acc)
+      return;
+    bool mass = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::GROUP_MASSES);
+    EXPECT_TRUE(mass);
+    if (!mass)
+      return;
+    bool com = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::GROUP_COMS);
+    EXPECT_TRUE(com);
+    if (!com)
+      return;
+    bool scales = testSpatialNewtonGrad(
+        file.skeleton, worldForces, neural::WithRespectTo::GROUP_SCALES);
+    EXPECT_TRUE(scales);
+    if (!scales)
+      return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, IMPLIED_DENSITY_TEST)
 {
   OpenSimFile file = OpenSimParser::parseOsim(
@@ -1377,6 +1480,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
 
+  problem.setLinearNewtonWeight(0.0);
   problem.setMarkerWeight(0.0);
   problem.setMarkerUseL1(false);
 
@@ -1544,6 +1648,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS_IMPLICIT_VEL_POS)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
 
+  problem.setLinearNewtonWeight(0.0);
   problem.setMarkerWeight(0.0);
   problem.setMarkerUseL1(false);
 
@@ -1695,6 +1800,77 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS_IMPLICIT_VEL_POS)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_LINEAR_NEWTON)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes);
+  problem.setLinearNewtonWeight(1.0);
+  problem.setLinearNewtonUseL1(true);
+  problem.setMarkerUseL1(false);
+  problem.setResidualWeight(0.0);
+  problem.setMarkerWeight(0);
+  problem.setMarkerUseL1(false);
+
+  // Disable regularization
+  problem.setRegularizeAnatomicalMarkerOffsets(0);
+  problem.setRegularizeTrackingMarkerOffsets(0);
+  problem.setRegularizeBodyScales(0);
+  problem.setRegularizeCOMs(0);
+  problem.setRegularizeInertias(0);
+  problem.setRegularizeMasses(0);
+  problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
+
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  bool result = problem.debugErrors(fd, analytical, 3e-8);
+  if (result)
+  {
+    std::cout << "Gradient of DynamicsFitProblem linear Newton not equal!"
+              << std::endl;
+    EXPECT_FALSE(result);
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
 {
   std::vector<std::string> motFiles;
@@ -1732,6 +1908,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setResidualWeight(0.0);
+  problem.setLinearNewtonWeight(0.0);
   problem.setMarkerWeight(1);
   problem.setMarkerUseL1(false);
 
@@ -1835,6 +2012,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_DENSITY)
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setResidualWeight(0.0);
   problem.setMarkerWeight(0.0);
+  problem.setLinearNewtonWeight(0.0);
 
   problem.setRegularizeImpliedDensity(1e-5);
 
@@ -1943,6 +2121,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L1)
   problem.setResidualWeight(0.0);
   problem.setMarkerUseL1(true);
   problem.setMarkerWeight(100.0);
+  problem.setLinearNewtonWeight(0.0);
 
   // Disable regularization
   problem.setRegularizeAnatomicalMarkerOffsets(0);
@@ -2024,6 +2203,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_JOINTS_AND_AXIS)
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setResidualWeight(0.0);
   problem.setMarkerWeight(0.0);
+  problem.setLinearNewtonWeight(0.0);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
   Eigen::VectorXs x = problem.flatten();
@@ -2080,6 +2260,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_MARKERS_L1_MATCHES_AVG_RMS)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setMarkerWeight(1.0);
+  problem.setLinearNewtonWeight(0.0);
   problem.setResidualWeight(0.0);
   problem.setJointWeight(0.0);
   problem.setMarkerUseL1(true);
@@ -2141,6 +2322,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_RESIDUAL_L1_MATCHES_AVG_RMS)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setMarkerWeight(0.0);
+  problem.setLinearNewtonWeight(0.0);
   problem.setResidualWeight(1.0);
   problem.setResidualTorqueMultiple(1.0);
   problem.setJointWeight(0.0);
@@ -2204,6 +2386,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_REGULARIZATION)
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes);
   problem.setMarkerWeight(0.0);
+  problem.setLinearNewtonWeight(0.0);
   problem.setResidualWeight(0.0);
 
   srand(42);

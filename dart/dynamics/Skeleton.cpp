@@ -7106,7 +7106,7 @@ Eigen::MatrixXs Skeleton::getBodyWorldVelocitiesJacobian(
 
     for (int i = 0; i < bodyNodes.size(); i++)
     {
-      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
       jac.block(i * 6, 0, 6, dim) = math::AdRJac(
           bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_V_p);
     }
@@ -7203,7 +7203,7 @@ Eigen::MatrixXs Skeleton::getBodyWorldAccelerationsJacobian(
 
     for (int i = 0; i < bodyNodes.size(); i++)
     {
-      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
       jac.block(i * 6, 0, 6, dim) = math::AdRJac(
           bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_dV_p);
     }
@@ -7338,7 +7338,7 @@ Eigen::MatrixXs Skeleton::getCOMWorldVelocitiesJacobian(
 
     for (int i = 0; i < bodyNodes.size(); i++)
     {
-      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
       jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_V_p;
       for (int j = 0; j < dim; j++)
       {
@@ -7468,7 +7468,7 @@ Eigen::MatrixXs Skeleton::getCOMWorldAccelerationsJacobian(
 
     for (int i = 0; i < bodyNodes.size(); i++)
     {
-      bodyNodes[i]->computeJacobianOfCForward(wrt);
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
       jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_dV_p;
       for (int j = 0; j < dim; j++)
       {

@@ -99,6 +99,60 @@ protected:
 };
 
 /**
+ * This class factors out the logistics for mapping spatial accelerations back
+ * to ground reaction forces.
+ */
+class SpatialNewtonHelper
+{
+public:
+  SpatialNewtonHelper(std::shared_ptr<dynamics::Skeleton> skeleton);
+
+  ///////////////////////////////////////////
+  // Computes the f=m*a (in linear components only) difference from observed
+  // forces, and presents that in 3-axis form (X,Y,Z world coordinates) in
+  // Newtons.
+  Eigen::Vector3s calculateLinearForceGap(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ///////////////////////////////////////////
+  // Computes the f=m*a (in linear components only) difference from observed
+  // forces, and presents that in 3-axis form (X,Y,Z world coordinates) in
+  // Newtons.
+  s_t calculateLinearForceGapNorm(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      bool useL1 = false);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of gap norm with respect to `wrt`
+  Eigen::VectorXs calculateLinearForceGapNormGradientWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of gap norm with respect to `wrt`
+  Eigen::VectorXs finiteDifferenceLinearForceGapNormGradientWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
+
+protected:
+  std::shared_ptr<dynamics::Skeleton> mSkel;
+};
+
+/**
  * We create a single initialization object, and pass it around to optimization
  * problems to re-use, because it's not super cheap to construct.
  */
@@ -257,10 +311,12 @@ public:
   DynamicsFitProblem& setIncludeMarkerOffsets(bool value);
   DynamicsFitProblem& setIncludeBodyScales(bool value);
 
+  DynamicsFitProblem& setLinearNewtonWeight(s_t weight);
   DynamicsFitProblem& setResidualWeight(s_t weight);
   DynamicsFitProblem& setMarkerWeight(s_t weight);
   DynamicsFitProblem& setJointWeight(s_t weight);
 
+  DynamicsFitProblem& setLinearNewtonUseL1(bool l1);
   DynamicsFitProblem& setResidualUseL1(bool l1);
   DynamicsFitProblem& setMarkerUseL1(bool l1);
 
@@ -390,10 +446,12 @@ public:
       Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
 public:
+  s_t mLinearNewtonWeight;
   s_t mResidualWeight;
   s_t mMarkerWeight;
   s_t mJointWeight;
 
+  bool mLinearNewtonUseL1;
   bool mResidualUseL1;
   bool mMarkerUseL1;
 
@@ -429,6 +487,7 @@ public:
   std::vector<dynamics::BodyNode*> mFootNodes;
   std::vector<int> mForceBodyIndices;
   std::shared_ptr<ResidualForceHelper> mResidualHelper;
+  std::shared_ptr<SpatialNewtonHelper> mSpatialNewtonHelper;
 
   int mBestObjectiveValueIteration;
   s_t mBestObjectiveValue;
