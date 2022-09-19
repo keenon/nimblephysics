@@ -40,6 +40,19 @@
 namespace dart {
 namespace constraint {
 
+struct LcpResult
+{
+  // This is the solution to the LCP, a matrix of impulses with shape
+  // (numContacts, 3).
+  Eigen::MatrixXs impulses;
+
+  // Whether Nimble says that it succeeded at solving the LCP.
+  bool success;
+
+  // Whether we fell back to solving a frictionless LCP.
+  bool hadToIgnoreFrictionToSolve;
+};
+
 class BoxedLcpConstraintSolver : public ConstraintSolver
 {
 public:
@@ -114,13 +127,16 @@ public:
   virtual void setCachedLCPSolution(Eigen::VectorXs X) override;
 
   // Documentation inherited.
-  std::vector<s_t*> solveConstrainedGroup(ConstrainedGroup& group) override;
+  Eigen::MatrixXs solveConstrainedGroup(ConstrainedGroup& group) override;
 
   /// Build the inputs to the LCP from the constraint group.
   LcpInputs buildLcpInputs(ConstrainedGroup& group);
 
   /// Setup and solve an LCP to enforce the constraints on the ConstrainedGroup.
-  std::vector<s_t*> solveLcp(LcpInputs lcpInputs, ConstrainedGroup& group);
+  LcpResult solveLcp(
+      LcpInputs lcpInputs,
+      ConstrainedGroup& group,
+      bool disableFrictionlessFallback = false);
 
 protected:
   /// Boxed LCP solver

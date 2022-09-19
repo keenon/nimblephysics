@@ -302,7 +302,7 @@ void BallJointConstraint::unexcite()
 }
 
 //==============================================================================
-void BallJointConstraint::applyImpulse(s_t* _lambda)
+void BallJointConstraint::applyImpulse(Eigen::VectorXs _lambda)
 {
   mOldX[0] = _lambda[0];
   mOldX[1] = _lambda[1];

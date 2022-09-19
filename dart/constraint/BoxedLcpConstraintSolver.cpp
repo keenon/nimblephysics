@@ -349,8 +349,10 @@ LcpInputs BoxedLcpConstraintSolver::buildLcpInputs(ConstrainedGroup& group)
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
-    LcpInputs lcpInputs, ConstrainedGroup& group)
+LcpResult BoxedLcpConstraintSolver::solveLcp(
+    LcpInputs lcpInputs,
+    ConstrainedGroup& group,
+    bool disableFrictionlessFallback)
 {
   const std::size_t numConstraints = group.getNumConstraints();
   const std::size_t n = group.getTotalDimension();
@@ -603,77 +605,80 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   // like the best we can do, given the limitations of boxed LCP solvers. In the
   // long run, we should probably reformulate the LCP problem to guarantee
   // solvability.
-  if (!success)
+  if (!disableFrictionlessFallback)
   {
-    hadToIgnoreFrictionToSolve = true;
-
-    Eigen::MatrixXs mAReduced = mABackup.block(0, 0, n, n);
-    Eigen::VectorXs mXReduced = mXBackup;
-    Eigen::VectorXs mBReduced = mBBackup;
-    Eigen::VectorXs mHiReduced = mHiBackup;
-    Eigen::VectorXs mLoReduced = mLoBackup;
-    Eigen::VectorXi mFIndexReduced = mFIndexBackup;
-    Eigen::MatrixXs mapOut = LCPUtils::removeFriction(
-        mAReduced,
-        mXReduced,
-        mBReduced,
-        mHiReduced,
-        mLoReduced,
-        mFIndexReduced);
-
-    mXReduced.setZero();
-
-    int reducedN = mXReduced.size();
-    Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-        reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
-    reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
-    // Prefer using PGS to Dantzig at this point, if it's available
-    if (mSecondaryBoxedLcpSolver)
-    {
-      success = mSecondaryBoxedLcpSolver->solve(
-          reducedN,
-          reducedAPadded.data(),
-          mXReduced.data(),
-          mBReduced.data(),
-          0,
-          mLoReduced.data(),
-          mHiReduced.data(),
-          mFIndexReduced.data(),
-          false);
-    }
-    else
-    {
-      success = mBoxedLcpSolver->solve(
-          reducedN,
-          reducedAPadded.data(),
-          mXReduced.data(),
-          mBReduced.data(),
-          0,
-          mLoReduced.data(),
-          mHiReduced.data(),
-          mFIndexReduced.data(),
-          true);
-    }
-    mX = mapOut * mXReduced;
-    // Don't bother checking validity at this point, because we know the
-    // solution is invalid with friction constraints, and that's ok.
-
-    /*
-#ifndef NDEBUG
-    // If we still haven't succeeded, let's debug
     if (!success)
     {
-      std::cout << "Failed to solve LCP, even after disabling friction!"
-                << std::endl;
-      std::cout << "mAReduced: " << std::endl << mAReduced << std::endl;
-      std::cout << "mBReduced: " << std::endl << mBReduced << std::endl;
-      std::cout << "mFIndexReduced: " << std::endl
-                << mFIndexReduced << std::endl;
-      std::cout << "eigenvalues: " << std::endl
-                << mAReduced.eigenvalues() << std::endl;
+      hadToIgnoreFrictionToSolve = true;
+
+      Eigen::MatrixXs mAReduced = mABackup.block(0, 0, n, n);
+      Eigen::VectorXs mXReduced = mXBackup;
+      Eigen::VectorXs mBReduced = mBBackup;
+      Eigen::VectorXs mHiReduced = mHiBackup;
+      Eigen::VectorXs mLoReduced = mLoBackup;
+      Eigen::VectorXi mFIndexReduced = mFIndexBackup;
+      Eigen::MatrixXs mapOut = LCPUtils::removeFriction(
+          mAReduced,
+          mXReduced,
+          mBReduced,
+          mHiReduced,
+          mLoReduced,
+          mFIndexReduced);
+
+      mXReduced.setZero();
+
+      int reducedN = mXReduced.size();
+      Eigen::Matrix<s_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+          reducedAPadded = Eigen::MatrixXs::Zero(reducedN, dPAD(reducedN));
+      reducedAPadded.block(0, 0, reducedN, reducedN) = mAReduced;
+      // Prefer using PGS to Dantzig at this point, if it's available
+      if (mSecondaryBoxedLcpSolver)
+      {
+        success = mSecondaryBoxedLcpSolver->solve(
+            reducedN,
+            reducedAPadded.data(),
+            mXReduced.data(),
+            mBReduced.data(),
+            0,
+            mLoReduced.data(),
+            mHiReduced.data(),
+            mFIndexReduced.data(),
+            false);
+      }
+      else
+      {
+        success = mBoxedLcpSolver->solve(
+            reducedN,
+            reducedAPadded.data(),
+            mXReduced.data(),
+            mBReduced.data(),
+            0,
+            mLoReduced.data(),
+            mHiReduced.data(),
+            mFIndexReduced.data(),
+            true);
+      }
+      mX = mapOut * mXReduced;
+      // Don't bother checking validity at this point, because we know the
+      // solution is invalid with friction constraints, and that's ok.
+
+      /*
+  #ifndef NDEBUG
+      // If we still haven't succeeded, let's debug
+      if (!success)
+      {
+        std::cout << "Failed to solve LCP, even after disabling friction!"
+                  << std::endl;
+        std::cout << "mAReduced: " << std::endl << mAReduced << std::endl;
+        std::cout << "mBReduced: " << std::endl << mBReduced << std::endl;
+        std::cout << "mFIndexReduced: " << std::endl
+                  << mFIndexReduced << std::endl;
+        std::cout << "eigenvalues: " << std::endl
+                  << mAReduced.eigenvalues() << std::endl;
+      }
+  #endif
+      */
     }
-#endif
-    */
   }
 
   if (mX.hasNaN())
@@ -736,9 +741,7 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
   }
 
   // Initialize the vector of constraint impulses we will eventually return.
-  // Each ith element of the vector will contain a pointer to the constraint
-  // impulse to be applied for the ith constraint.
-  std::vector<s_t*> constraintImpulses;
+  Eigen::MatrixXs constraintImpulses = Eigen::MatrixXs::Zero(numConstraints, 3);
 
   // Collect the final solved constraint impulses to apply per constraint.
   // TODO(mguo): Make impulse magnitudes all have 3 elements regardless of
@@ -748,6 +751,8 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
     const ConstraintBasePtr& constraint = group.getConstraint(i);
     if (constraint->isContactConstraint())
     {
+      s_t* lambda = mX.data() + mOffset[i];
+      constraintImpulses(i, 0) = lambda[0];
       std::shared_ptr<ContactConstraint> contactConstraint
           = std::static_pointer_cast<ContactConstraint>(constraint);
       // getContact() returns a const, which is generally what we want, but in
@@ -766,12 +771,14 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
           = contactConstraint->isFrictionOn();
       if (contactConstraint->isFrictionOn())
       {
+        constraintImpulses(i, 1) = lambda[1];
+        constraintImpulses(i, 2) = lambda[2];
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent1
-            = mX(mOffset[i] + 1);
+            = lambda[1];
         const_cast<collision::Contact*>(&contactConstraint->getContact())
             ->lcpResultTangent2
-            = mX(mOffset[i] + 2);
+            = lambda[2];
         const ContactConstraint::TangentBasisMatrix D
             = contactConstraint->getTangentBasisMatrixODE(
                 contactConstraint->getContact().normal);
@@ -783,17 +790,21 @@ std::vector<s_t*> BoxedLcpConstraintSolver::solveLcp(
             = D.col(1);
       }
     }
-    constraintImpulses.push_back(mX.data() + mOffset[i]);
   }
-  return constraintImpulses;
+  LcpResult result;
+  result.success = success;
+  result.impulses = constraintImpulses;
+  result.hadToIgnoreFrictionToSolve = hadToIgnoreFrictionToSolve;
+  return result;
 }
 
 //==============================================================================
-std::vector<s_t*> BoxedLcpConstraintSolver::solveConstrainedGroup(
+Eigen::MatrixXs BoxedLcpConstraintSolver::solveConstrainedGroup(
     ConstrainedGroup& group)
 {
   LcpInputs lcpInputs = buildLcpInputs(group);
-  return solveLcp(lcpInputs, group);
+  LcpResult result = solveLcp(lcpInputs, group);
+  return result.impulses;
 }
 
 //==============================================================================

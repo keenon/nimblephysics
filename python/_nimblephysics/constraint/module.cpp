@@ -51,10 +51,7 @@ void BoxedLcpConstraintSolver(py::module& sm);
 void ConstrainedGroup(py::module& sm);
 
 void LcpInputs(py::module& sm);
-
-// void ConstraintBase(py::module& sm);
-// void ConstraintBase(py::module& sm);
-// void ConstraintBase(py::module& sm);
+void LCPUtils(py::module& sm);
 
 void dart_constraint(py::module& m)
 {
@@ -74,14 +71,7 @@ void dart_constraint(py::module& m)
   ConstrainedGroup(sm);
 
   LcpInputs(sm);
-
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
-  // ConstraintBase(sm);
+  LCPUtils(sm);
 }
 
 } // namespace python
