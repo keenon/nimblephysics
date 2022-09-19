@@ -516,6 +516,139 @@ SpatialNewtonHelper::finiteDifferenceLinearForceGapNormGradientWrt(
 }
 
 //==============================================================================
+// Computes the norm of the spatial acceleration vector for each body
+s_t SpatialNewtonHelper::calculateAccelerationNorm(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs weightBodies,
+    bool useL1)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  s_t sum = 0.0;
+  Eigen::VectorXs worldAccs = mSkel->getCOMWorldAccelerations();
+  for (int i = 0; i < worldAccs.size() / 6; i++)
+  {
+    Eigen::Vector6s a = worldAccs.segment<6>(i * 6);
+    if (useL1)
+    {
+      sum += weightBodies(i) * a.head<3>().norm();
+      sum += weightBodies(i) * a.tail<3>().norm();
+    }
+    else
+    {
+      sum += weightBodies(i) * a.squaredNorm();
+    }
+  }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+
+  return sum;
+}
+
+//==============================================================================
+// Computes the gradient of the norm of the spatial acceleration vector for
+// each body
+Eigen::VectorXs SpatialNewtonHelper::calculateAccelerationNormGradient(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs weightBodies,
+    neural::WithRespectTo* wrt,
+    bool useL1)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::VectorXs worldAccs = mSkel->getCOMWorldAccelerations();
+  for (int i = 0; i < worldAccs.size() / 6; i++)
+  {
+    if (useL1)
+    {
+      worldAccs.segment<3>(i * 6)
+          = weightBodies(i) * worldAccs.segment<3>(i * 6).normalized();
+      worldAccs.segment<3>(i * 6 + 3)
+          = weightBodies(i) * worldAccs.segment<3>(i * 6 + 3).normalized();
+    }
+    else
+    {
+      worldAccs.segment<6>(i * 6) *= 2 * weightBodies(i);
+    }
+  }
+  Eigen::MatrixXs jac = mSkel->getCOMWorldAccelerationsJacobian(wrt);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+
+  return jac.transpose() * worldAccs;
+}
+
+//==============================================================================
+// Computes the gradient of the norm of the spatial acceleration vector for
+// each body
+Eigen::VectorXs SpatialNewtonHelper::finiteDifferenceAccelerationNormGradient(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs weightBodies,
+    neural::WithRespectTo* wrt,
+    bool useL1)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(wrt->dim(mSkel.get()));
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::VectorXs originalWrt = wrt->get(mSkel.get());
+
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs newWrt = originalWrt;
+        newWrt(dof) += eps;
+        wrt->set(mSkel.get(), newWrt);
+        perturbed = calculateAccelerationNorm(
+            mSkel->getPositions(),
+            mSkel->getVelocities(),
+            mSkel->getAccelerations(),
+            weightBodies,
+            useL1);
+        return true;
+      },
+      result,
+      5e-4,
+      true);
+
+  wrt->set(mSkel.get(), originalWrt);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+  return result;
+}
+
+//==============================================================================
 DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,
@@ -538,6 +671,10 @@ DynamicsFitProblem::DynamicsFitProblem(
     mResidualUseL1(true),
     mMarkerUseL1(true),
     mResidualTorqueMultiple(3.0),
+    mRegularizeAcc(0.01),
+    mRegularizeAccBodyWeights(
+        Eigen::VectorXs::Ones(skeleton->getNumBodyNodes())),
+    mRegularizeAccUseL1(false),
     mRegularizeMasses(10.0),
     mRegularizeCOMs(20.0),
     mRegularizeInertias(1.0),
@@ -1122,6 +1259,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   s_t residualRMS = 0.0;
   s_t markerRMS = 0.0;
   s_t poseRegularization = 0.0;
+  s_t accRegularization = 0.0;
   s_t jointRMS = 0.0;
   s_t axisRMS = 0.0;
   int markerCount = 0;
@@ -1160,6 +1298,18 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
                          mResidualUseL1);
           residualRMS += cost;
           assert(!isnan(residualRMS));
+        }
+        if (mRegularizeAcc > 0)
+        {
+          s_t cost = mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNorm(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         mRegularizeAccUseL1);
+          accRegularization += cost;
+          assert(!isnan(accRegularization));
         }
       }
 
@@ -1222,6 +1372,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   }
   sum += linearNewtonError;
   sum += residualRMS;
+  sum += accRegularization;
   markerRMS *= mMarkerWeight;
   if (markerCount > 0)
   {
@@ -1497,6 +1648,21 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                neural::WithRespectTo::GROUP_MASSES,
                                mLinearNewtonUseL1);
             }
+            /*
+            // This should always be 0, and therefore not necessary
+            if (mRegularizeAcc > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::GROUP_MASSES,
+                         mRegularizeAccUseL1);
+            }
+            */
           }
           cursor += dim;
         }
@@ -1530,6 +1696,18 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                mInit->grfTrials[trial].col(t),
                                neural::WithRespectTo::GROUP_COMS,
                                mLinearNewtonUseL1);
+            }
+            if (mRegularizeAcc > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::GROUP_COMS,
+                         mRegularizeAccUseL1);
             }
           }
           cursor += dim;
@@ -1568,6 +1746,18 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                neural::WithRespectTo::GROUP_INERTIAS,
                                mLinearNewtonUseL1);
             }
+            if (mRegularizeAcc > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::GROUP_INERTIAS,
+                         mRegularizeAccUseL1);
+            }
             */
           }
           cursor += dim;
@@ -1602,6 +1792,18 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                mInit->grfTrials[trial].col(t),
                                neural::WithRespectTo::GROUP_SCALES,
                                mLinearNewtonUseL1);
+            }
+            if (mRegularizeAcc > 0)
+            {
+              grad.segment(cursor, dim)
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::GROUP_SCALES,
+                         mRegularizeAccUseL1);
             }
           }
 
@@ -1695,6 +1897,36 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                    mInit->grfTrials[trial].col(t),
                                    neural::WithRespectTo::ACCELERATION,
                                    mLinearNewtonUseL1);
+            }
+            if (mRegularizeAcc > 0)
+            {
+              posGrad
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::POSITION,
+                         mRegularizeAccUseL1);
+              velGrad
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::VELOCITY,
+                         mRegularizeAccUseL1);
+              accGrad
+                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                     * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                         mPoses[trial].col(t),
+                         mVels[trial].col(t),
+                         mAccs[trial].col(t),
+                         mRegularizeAccBodyWeights,
+                         neural::WithRespectTo::ACCELERATION,
+                         mRegularizeAccUseL1);
             }
           }
 
@@ -2574,6 +2806,28 @@ DynamicsFitProblem& DynamicsFitProblem::setResidualUseL1(bool l1)
 DynamicsFitProblem& DynamicsFitProblem::setMarkerUseL1(bool l1)
 {
   mMarkerUseL1 = l1;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAcc(s_t value)
+{
+  mRegularizeAcc = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAccBodyWeights(
+    Eigen::VectorXs bodyWeights)
+{
+  mRegularizeAccBodyWeights = bodyWeights;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAccUseL1(bool l1)
+{
+  mRegularizeAccUseL1 = l1;
   return *(this);
 }
 

@@ -148,6 +148,37 @@ public:
       neural::WithRespectTo* wrt,
       bool useL1 = false);
 
+  ///////////////////////////////////////////
+  // Computes the norm of the spatial acceleration vector for each body
+  s_t calculateAccelerationNorm(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs weightBodies,
+      bool useL1 = false);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of the norm of the spatial acceleration vector for
+  // each body
+  Eigen::VectorXs calculateAccelerationNormGradient(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs weightBodies,
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
+
+  ///////////////////////////////////////////
+  // Computes the gradient of the norm of the spatial acceleration vector for
+  // each body
+  Eigen::VectorXs finiteDifferenceAccelerationNormGradient(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs weightBodies,
+      neural::WithRespectTo* wrt,
+      bool useL1 = false);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
 };
@@ -320,6 +351,11 @@ public:
   DynamicsFitProblem& setResidualUseL1(bool l1);
   DynamicsFitProblem& setMarkerUseL1(bool l1);
 
+  DynamicsFitProblem& setRegularizeSpatialAcc(s_t value);
+  DynamicsFitProblem& setRegularizeSpatialAccBodyWeights(
+      Eigen::VectorXs bodyWeights);
+  DynamicsFitProblem& setRegularizeSpatialAccUseL1(bool l1);
+
   DynamicsFitProblem& setResidualTorqueMultiple(s_t value);
   DynamicsFitProblem& setRegularizeMasses(s_t value);
   DynamicsFitProblem& setRegularizeCOMs(s_t value);
@@ -463,6 +499,10 @@ public:
   bool mIncludeMarkerOffsets;
   std::shared_ptr<DynamicsInitialization> mInit;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
+
+  s_t mRegularizeAcc;
+  Eigen::VectorXs mRegularizeAccBodyWeights;
+  bool mRegularizeAccUseL1;
 
   s_t mResidualTorqueMultiple;
   s_t mRegularizeMasses;

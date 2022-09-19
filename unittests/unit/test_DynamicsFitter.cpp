@@ -350,29 +350,60 @@ bool testSpatialNewtonGrad(
 
   SpatialNewtonHelper helper(skel);
 
-  Eigen::VectorXs analytical = helper.calculateLinearForceGapNormGradientWrt(
+  Eigen::VectorXs accWeights = Eigen::VectorXs::Random(skel->getNumBodyNodes());
+
+  Eigen::VectorXs acc = helper.calculateAccelerationNormGradient(
       skel->getPositions(),
       skel->getVelocities(),
       skel->getAccelerations(),
-      concatForces,
+      accWeights,
       wrt,
       true);
-  Eigen::VectorXs fd = helper.finiteDifferenceLinearForceGapNormGradientWrt(
+  Eigen::VectorXs acc_fd = helper.finiteDifferenceAccelerationNormGradient(
       skel->getPositions(),
       skel->getVelocities(),
       skel->getAccelerations(),
-      concatForces,
+      accWeights,
       wrt,
       true);
 
-  if (!equals(analytical, fd, 1e-8))
+  if (!equals(acc, acc_fd, 1e-8))
+  {
+    std::cout << "Acceleration regularization gradient wrt " << wrt->name()
+              << " failed!" << std::endl;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(acc.size(), 3);
+    compare.col(0) = acc_fd;
+    compare.col(1) = acc;
+    compare.col(2) = acc_fd - acc;
+    std::cout << "FD - Analytical - Diff: " << std::endl
+              << compare << std::endl;
+    return false;
+  }
+
+  Eigen::VectorXs linForce = helper.calculateLinearForceGapNormGradientWrt(
+      skel->getPositions(),
+      skel->getVelocities(),
+      skel->getAccelerations(),
+      concatForces,
+      wrt,
+      true);
+  Eigen::VectorXs linForce_fd
+      = helper.finiteDifferenceLinearForceGapNormGradientWrt(
+          skel->getPositions(),
+          skel->getVelocities(),
+          skel->getAccelerations(),
+          concatForces,
+          wrt,
+          true);
+
+  if (!equals(linForce, linForce_fd, 1e-8))
   {
     std::cout << "Linear force gap gradient wrt " << wrt->name() << " failed!"
               << std::endl;
-    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(analytical.size(), 3);
-    compare.col(0) = fd;
-    compare.col(1) = analytical;
-    compare.col(2) = fd - analytical;
+    Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(linForce.size(), 3);
+    compare.col(0) = linForce_fd;
+    compare.col(1) = linForce;
+    compare.col(2) = linForce_fd - linForce;
     std::cout << "FD - Analytical - Diff: " << std::endl
               << compare << std::endl;
     return false;
@@ -832,6 +863,7 @@ bool testRelationshipBetweenResidualAndLinear(
   problem.setIncludePoses(false);
 
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -1844,6 +1876,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_LINEAR_NEWTON)
   problem.setMarkerUseL1(false);
 
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -1860,6 +1893,79 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_LINEAR_NEWTON)
   Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
 
   bool result = problem.debugErrors(fd, analytical, 3e-8);
+  if (result)
+  {
+    std::cout << "Gradient of DynamicsFitProblem linear Newton not equal!"
+              << std::endl;
+    EXPECT_FALSE(result);
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_SPATIAL_ACC_REG)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes);
+  problem.setLinearNewtonWeight(0.0);
+  problem.setLinearNewtonUseL1(true);
+  problem.setMarkerUseL1(false);
+  problem.setResidualWeight(0.0);
+  problem.setMarkerWeight(0);
+  problem.setMarkerUseL1(false);
+
+  problem.setRegularizeSpatialAcc(1);
+
+  // Disable regularization
+  problem.setRegularizeAnatomicalMarkerOffsets(0);
+  problem.setRegularizeTrackingMarkerOffsets(0);
+  problem.setRegularizeBodyScales(0);
+  problem.setRegularizeCOMs(0);
+  problem.setRegularizeInertias(0);
+  problem.setRegularizeMasses(0);
+  problem.setRegularizePoses(0);
+  problem.setRegularizeImpliedDensity(0);
+
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  bool result = problem.debugErrors(fd, analytical, 1e-7);
   if (result)
   {
     std::cout << "Gradient of DynamicsFitProblem linear Newton not equal!"
@@ -1913,6 +2019,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
   problem.setMarkerUseL1(false);
 
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -2017,6 +2124,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_DENSITY)
   problem.setRegularizeImpliedDensity(1e-5);
 
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -2124,6 +2232,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L1)
   problem.setLinearNewtonWeight(0.0);
 
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -2265,6 +2374,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_MARKERS_L1_MATCHES_AVG_RMS)
   problem.setJointWeight(0.0);
   problem.setMarkerUseL1(true);
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
@@ -2328,6 +2438,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_RESIDUAL_L1_MATCHES_AVG_RMS)
   problem.setJointWeight(0.0);
   problem.setResidualUseL1(true);
   // Disable regularization
+  problem.setRegularizeSpatialAcc(0);
   problem.setRegularizeAnatomicalMarkerOffsets(0);
   problem.setRegularizeTrackingMarkerOffsets(0);
   problem.setRegularizeBodyScales(0);
