@@ -853,25 +853,27 @@ bool testRelationshipBetweenResidualAndLinear(
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   ResidualForceHelper helper(skel, init->grfBodyIndices);
 
-  DynamicsFitProblem problem(
-      init, skel, init->trackingMarkers, init->grfBodyNodes);
-  problem.setMarkerWeight(0);
-  problem.setResidualUseL1(false);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setResidualWeight(1.0);
-  problem.setResidualUseL1(true);
-  problem.setIncludePoses(false);
+  DynamicsFitProblemConfig config(skel);
+  config.setMarkerWeight(0);
+  config.setResidualUseL1(false);
+  config.setLinearNewtonWeight(0.0);
+  config.setResidualWeight(1.0);
+  config.setResidualUseL1(true);
+  config.setIncludePoses(false);
 
   // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+  config.setRegularizeSpatialAcc(0);
+  config.setRegularizeAnatomicalMarkerOffsets(0);
+  config.setRegularizeTrackingMarkerOffsets(0);
+  config.setRegularizeBodyScales(0);
+  config.setRegularizeCOMs(0);
+  config.setRegularizeInertias(0);
+  config.setRegularizeMasses(0);
+  config.setRegularizePoses(0);
+  config.setRegularizeImpliedDensity(0);
+
+  DynamicsFitProblem problem(
+      init, skel, init->trackingMarkers, init->grfBodyNodes, config);
 
   s_t problemLoss = problem.computeLoss(problem.flatten());
   std::cout << "Problem loss: " << problemLoss << std::endl;
@@ -958,8 +960,8 @@ bool testRelationshipBetweenResidualAndLinear(
       //           << residual << std::endl;
 
       s_t otherLoss = helper.calculateResidualNorm(
-          q, dq, ddq, grf, problem.mResidualUseL1);
-      if (problem.mResidualUseL1)
+          q, dq, ddq, grf, config.mResidualUseL1);
+      if (config.mResidualUseL1)
       {
         s_t loss = 0.0;
         loss += residual.head<3>().norm();
@@ -1047,9 +1049,23 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // false);
 
   // Just optimize the inertia regularizer
-  fitter.setIterationLimit(500);
-  fitter.runSGDOptimization(
-      init, 2e-2, 50, false, false, false, false, true, false);
+  // Seems to converge in 50-100 iters
+  fitter.setIterationLimit(100);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          // .setVelAccImplicit(true)
+          .setMarkerWeight(1e4)
+          .setMarkerUseL1(false)
+          .setResidualWeight(1e-5)
+          .setResidualUseL1(false)
+          .setLinearNewtonWeight(1e-7)
+          .setLinearNewtonUseL1(false)
+          .setRegularizeSpatialAcc(1e-8)
+          .setRegularizeSpatialAccUseL1(false)
+          .setRegularizeCOMs(1e3)
+          .setIncludePoses(true)
+          .setIncludeCOMs(true));
 
   /*
   fitter.setIterationLimit(200);
@@ -1509,17 +1525,14 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-
-  problem.setLinearNewtonWeight(0.0);
-  problem.setMarkerWeight(0.0);
-  problem.setMarkerUseL1(false);
-
+  DynamicsFitProblemConfig config(standard.skeleton);
   /// The absolute value of the loss function can be very large, which leads to
   /// numerical precision issues when finite differencing over it.
-  problem.setResidualWeight(1e-4);
-  problem.setResidualUseL1(false);
+  config.setResidualWeight(1e-4);
+  config.setResidualUseL1(false);
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1677,18 +1690,15 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS_IMPLICIT_VEL_POS)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-
-  problem.setLinearNewtonWeight(0.0);
-  problem.setMarkerWeight(0.0);
-  problem.setMarkerUseL1(false);
-
+  DynamicsFitProblemConfig config(standard.skeleton);
   /// The absolute value of the loss function can be very large, which leads to
   /// numerical precision issues when finite differencing over it.
-  problem.setResidualWeight(1e-4);
-  problem.setResidualUseL1(false);
-  problem.setVelAccImplicit(true);
+  config.setResidualWeight(1e-4);
+  config.setResidualUseL1(false);
+  config.setVelAccImplicit(true);
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1703,7 +1713,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS_IMPLICIT_VEL_POS)
     return;
   }
 
-  problem.setVelAccImplicit(false);
+  problem.mConfig.setVelAccImplicit(false);
   Eigen::VectorXs explicitX = problem.flatten();
   Eigen::VectorXs constraints = problem.computeConstraints(explicitX);
   if (constraints.norm() >= 1e-10)
@@ -1713,7 +1723,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_RESIDUALS_IMPLICIT_VEL_POS)
     return;
   }
 
-  problem.setVelAccImplicit(true);
+  problem.mConfig.setVelAccImplicit(true);
   Eigen::VectorXs recovered2 = problem.flatten();
   if (!equals(x, recovered2, 1e-9))
   {
@@ -1866,25 +1876,12 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_LINEAR_NEWTON)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setLinearNewtonWeight(1.0);
-  problem.setLinearNewtonUseL1(true);
-  problem.setMarkerUseL1(false);
-  problem.setResidualWeight(0.0);
-  problem.setMarkerWeight(0);
-  problem.setMarkerUseL1(false);
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setLinearNewtonWeight(1.0);
+  config.setLinearNewtonUseL1(true);
 
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -1938,26 +1935,11 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_SPATIAL_ACC_REG)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setRegularizeSpatialAcc(1);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setLinearNewtonUseL1(true);
-  problem.setMarkerUseL1(false);
-  problem.setResidualWeight(0.0);
-  problem.setMarkerWeight(0);
-  problem.setMarkerUseL1(false);
-
-  problem.setRegularizeSpatialAcc(1);
-
-  // Disable regularization
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -2011,23 +1993,12 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setResidualWeight(0.0);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setMarkerWeight(1);
-  problem.setMarkerUseL1(false);
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setMarkerWeight(1);
+  config.setMarkerUseL1(false);
 
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -2115,23 +2086,11 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_DENSITY)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setRegularizeImpliedDensity(1e-5);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setResidualWeight(0.0);
-  problem.setMarkerWeight(0.0);
-  problem.setLinearNewtonWeight(0.0);
-
-  problem.setRegularizeImpliedDensity(1e-5);
-
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -2224,23 +2183,12 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L1)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setResidualWeight(0.0);
-  problem.setMarkerUseL1(true);
-  problem.setMarkerWeight(100.0);
-  problem.setLinearNewtonWeight(0.0);
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setMarkerUseL1(true);
+  config.setMarkerWeight(100.0);
 
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -2308,11 +2256,11 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_JOINTS_AND_AXIS)
   }
   */
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setJointWeight(1);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setResidualWeight(0.0);
-  problem.setMarkerWeight(0.0);
-  problem.setLinearNewtonWeight(0.0);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
   Eigen::VectorXs x = problem.flatten();
@@ -2366,23 +2314,12 @@ TEST(DynamicsFitter, FIT_PROBLEM_MARKERS_L1_MATCHES_AVG_RMS)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setMarkerWeight(1);
+  config.setMarkerUseL1(true);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setMarkerWeight(1.0);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setResidualWeight(0.0);
-  problem.setJointWeight(0.0);
-  problem.setMarkerUseL1(true);
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   s_t loss = problem.computeLoss(problem.flatten());
 
@@ -2429,24 +2366,13 @@ TEST(DynamicsFitter, FIT_PROBLEM_RESIDUAL_L1_MATCHES_AVG_RMS)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setResidualWeight(1.0);
+  config.setResidualTorqueMultiple(1.0);
+  config.setResidualUseL1(true);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setMarkerWeight(0.0);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setResidualWeight(1.0);
-  problem.setResidualTorqueMultiple(1.0);
-  problem.setJointWeight(0.0);
-  problem.setResidualUseL1(true);
-  // Disable regularization
-  problem.setRegularizeSpatialAcc(0);
-  problem.setRegularizeAnatomicalMarkerOffsets(0);
-  problem.setRegularizeTrackingMarkerOffsets(0);
-  problem.setRegularizeBodyScales(0);
-  problem.setRegularizeCOMs(0);
-  problem.setRegularizeInertias(0);
-  problem.setRegularizeMasses(0);
-  problem.setRegularizePoses(0);
-  problem.setRegularizeImpliedDensity(0);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
 
   s_t loss = problem.computeLoss(problem.flatten());
 
@@ -2494,21 +2420,19 @@ TEST(DynamicsFitter, FIT_PROBLEM_REGULARIZATION)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
-  DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setMarkerWeight(0.0);
-  problem.setLinearNewtonWeight(0.0);
-  problem.setResidualWeight(0.0);
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setRegularizeMasses(1.5);
+  config.setRegularizeCOMs(2.0);
+  config.setRegularizeInertias(3.0);
+  config.setRegularizeBodyScales(4.0);
+  config.setRegularizePoses(5.0);
+  config.setRegularizeImpliedDensity(0);
+  config.setRegularizeTrackingMarkerOffsets(6.0);
+  config.setRegularizeAnatomicalMarkerOffsets(7.0);
 
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
   srand(42);
-  problem.setRegularizeMasses(1.5);
-  problem.setRegularizeCOMs(2.0);
-  problem.setRegularizeInertias(3.0);
-  problem.setRegularizeBodyScales(4.0);
-  problem.setRegularizePoses(5.0);
-  problem.setRegularizeImpliedDensity(0);
-  problem.setRegularizeTrackingMarkerOffsets(6.0);
-  problem.setRegularizeAnatomicalMarkerOffsets(7.0);
 
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
@@ -2566,10 +2490,12 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setIncludeInertias(true);
+  config.setIncludePoses(true);
+
   DynamicsFitProblem problem(
-      init, standard.skeleton, standard.trackingMarkers, footNodes);
-  problem.setIncludeInertias(true);
-  problem.setIncludePoses(true);
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
 
   Eigen::MatrixXs analytical = problem.computeConstraintsJacobian();

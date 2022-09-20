@@ -265,6 +265,79 @@ struct DynamicsInitialization
   std::map<std::string, Eigen::Vector3s> originalMarkerOffsets;
 };
 
+class DynamicsFitProblemConfig
+{
+public:
+  DynamicsFitProblemConfig(std::shared_ptr<dynamics::Skeleton> skeleton);
+  DynamicsFitProblemConfig& setIncludeMasses(bool value);
+  DynamicsFitProblemConfig& setIncludeCOMs(bool value);
+  DynamicsFitProblemConfig& setIncludeInertias(bool value);
+  DynamicsFitProblemConfig& setIncludePoses(bool value);
+  DynamicsFitProblemConfig& setIncludeMarkerOffsets(bool value);
+  DynamicsFitProblemConfig& setIncludeBodyScales(bool value);
+
+  DynamicsFitProblemConfig& setLinearNewtonWeight(s_t weight);
+  DynamicsFitProblemConfig& setResidualWeight(s_t weight);
+  DynamicsFitProblemConfig& setMarkerWeight(s_t weight);
+  DynamicsFitProblemConfig& setJointWeight(s_t weight);
+
+  DynamicsFitProblemConfig& setLinearNewtonUseL1(bool l1);
+  DynamicsFitProblemConfig& setResidualUseL1(bool l1);
+  DynamicsFitProblemConfig& setMarkerUseL1(bool l1);
+
+  DynamicsFitProblemConfig& setRegularizeSpatialAcc(s_t value);
+  DynamicsFitProblemConfig& setRegularizeSpatialAccBodyWeights(
+      Eigen::VectorXs bodyWeights);
+  DynamicsFitProblemConfig& setRegularizeSpatialAccUseL1(bool l1);
+
+  DynamicsFitProblemConfig& setResidualTorqueMultiple(s_t value);
+  DynamicsFitProblemConfig& setRegularizeMasses(s_t value);
+  DynamicsFitProblemConfig& setRegularizeCOMs(s_t value);
+  DynamicsFitProblemConfig& setRegularizeInertias(s_t value);
+  DynamicsFitProblemConfig& setRegularizeBodyScales(s_t value);
+  DynamicsFitProblemConfig& setRegularizePoses(s_t value);
+  DynamicsFitProblemConfig& setRegularizeTrackingMarkerOffsets(s_t value);
+  DynamicsFitProblemConfig& setRegularizeAnatomicalMarkerOffsets(s_t value);
+  DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
+
+  DynamicsFitProblemConfig& setVelAccImplicit(bool implicit);
+
+public:
+  friend class DynamicsFitProblem;
+  friend class DynamicsFitter;
+  s_t mLinearNewtonWeight;
+  s_t mResidualWeight;
+  s_t mMarkerWeight;
+  s_t mJointWeight;
+
+  bool mLinearNewtonUseL1;
+  bool mResidualUseL1;
+  bool mMarkerUseL1;
+
+  bool mIncludeMasses;
+  bool mIncludeCOMs;
+  bool mIncludeInertias;
+  bool mIncludeBodyScales;
+  bool mIncludePoses;
+  bool mIncludeMarkerOffsets;
+
+  s_t mRegularizeAcc;
+  Eigen::VectorXs mRegularizeAccBodyWeights;
+  bool mRegularizeAccUseL1;
+
+  s_t mResidualTorqueMultiple;
+  s_t mRegularizeMasses;
+  s_t mRegularizeCOMs;
+  s_t mRegularizeInertias;
+  s_t mRegularizeBodyScales;
+  s_t mRegularizePoses;
+  s_t mRegularizeTrackingMarkerOffsets;
+  s_t mRegularizeAnatomicalMarkerOffsets;
+  s_t mRegularizeImpliedDensity;
+
+  bool mVelAccImplicit;
+};
+
 /*
  * Reminder: IPOPT will want to free this object when it's done with
  * optimization. This is responsible for actually transcribing the problem into
@@ -277,7 +350,8 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       std::shared_ptr<dynamics::Skeleton> skeleton,
       std::vector<std::string> trackingMarkers,
-      std::vector<dynamics::BodyNode*> footNodes);
+      std::vector<dynamics::BodyNode*> footNodes,
+      DynamicsFitProblemConfig config);
 
   // This returns the dimension of the decision variables (the length of the
   // flatten() vector), which depends on which variables we choose to include in
@@ -334,39 +408,6 @@ public:
   // This attempts to perfect the physical consistency of the data, and writes
   // them back to the problem
   void computePerfectGRFs();
-
-  DynamicsFitProblem& setIncludeMasses(bool value);
-  DynamicsFitProblem& setIncludeCOMs(bool value);
-  DynamicsFitProblem& setIncludeInertias(bool value);
-  DynamicsFitProblem& setIncludePoses(bool value);
-  DynamicsFitProblem& setIncludeMarkerOffsets(bool value);
-  DynamicsFitProblem& setIncludeBodyScales(bool value);
-
-  DynamicsFitProblem& setLinearNewtonWeight(s_t weight);
-  DynamicsFitProblem& setResidualWeight(s_t weight);
-  DynamicsFitProblem& setMarkerWeight(s_t weight);
-  DynamicsFitProblem& setJointWeight(s_t weight);
-
-  DynamicsFitProblem& setLinearNewtonUseL1(bool l1);
-  DynamicsFitProblem& setResidualUseL1(bool l1);
-  DynamicsFitProblem& setMarkerUseL1(bool l1);
-
-  DynamicsFitProblem& setRegularizeSpatialAcc(s_t value);
-  DynamicsFitProblem& setRegularizeSpatialAccBodyWeights(
-      Eigen::VectorXs bodyWeights);
-  DynamicsFitProblem& setRegularizeSpatialAccUseL1(bool l1);
-
-  DynamicsFitProblem& setResidualTorqueMultiple(s_t value);
-  DynamicsFitProblem& setRegularizeMasses(s_t value);
-  DynamicsFitProblem& setRegularizeCOMs(s_t value);
-  DynamicsFitProblem& setRegularizeInertias(s_t value);
-  DynamicsFitProblem& setRegularizeBodyScales(s_t value);
-  DynamicsFitProblem& setRegularizePoses(s_t value);
-  DynamicsFitProblem& setRegularizeTrackingMarkerOffsets(s_t value);
-  DynamicsFitProblem& setRegularizeAnatomicalMarkerOffsets(s_t value);
-  DynamicsFitProblem& setRegularizeImpliedDensity(s_t value);
-
-  DynamicsFitProblem& setVelAccImplicit(bool implicit);
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -482,39 +523,9 @@ public:
       Ipopt::IpoptCalculatedQuantities* ip_cq) override;
 
 public:
-  s_t mLinearNewtonWeight;
-  s_t mResidualWeight;
-  s_t mMarkerWeight;
-  s_t mJointWeight;
-
-  bool mLinearNewtonUseL1;
-  bool mResidualUseL1;
-  bool mMarkerUseL1;
-
-  bool mIncludeMasses;
-  bool mIncludeCOMs;
-  bool mIncludeInertias;
-  bool mIncludeBodyScales;
-  bool mIncludePoses;
-  bool mIncludeMarkerOffsets;
   std::shared_ptr<DynamicsInitialization> mInit;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
-
-  s_t mRegularizeAcc;
-  Eigen::VectorXs mRegularizeAccBodyWeights;
-  bool mRegularizeAccUseL1;
-
-  s_t mResidualTorqueMultiple;
-  s_t mRegularizeMasses;
-  s_t mRegularizeCOMs;
-  s_t mRegularizeInertias;
-  s_t mRegularizeBodyScales;
-  s_t mRegularizePoses;
-  s_t mRegularizeTrackingMarkerOffsets;
-  s_t mRegularizeAnatomicalMarkerOffsets;
-  s_t mRegularizeImpliedDensity;
-
-  bool mVelAccImplicit;
+  DynamicsFitProblemConfig mConfig;
 
   std::vector<Eigen::MatrixXs> mPoses;
   std::vector<Eigen::MatrixXs> mVels;
@@ -618,15 +629,7 @@ public:
   // runImplicitVelAccOptimization() instead.
   void runIPOPTOptimization(
       std::shared_ptr<DynamicsInitialization> init,
-      s_t residualWeight,
-      s_t markerWeight,
-      bool includeMasses,
-      bool includeCOMs,
-      bool includeInertias,
-      bool includeBodyScales,
-      bool includePoses,
-      bool includeMarkerOffsets,
-      bool implicitVelAcc);
+      DynamicsFitProblemConfig config);
 
   // 4. This runs the same optimization problem as
   // runExplicitVelAccOptimization(), but holds velocity and acc as implicit
@@ -635,14 +638,7 @@ public:
   // can warm start.
   void runSGDOptimization(
       std::shared_ptr<DynamicsInitialization> init,
-      s_t residualWeight,
-      s_t markerWeight,
-      bool includeMasses,
-      bool includeCOMs,
-      bool includeInertias,
-      bool includeBodyScales,
-      bool includePoses,
-      bool includeMarkerOffsets);
+      DynamicsFitProblemConfig config);
 
   // 5. This attempts to perfect the physical consistency of the data
   void computePerfectGRFs(std::shared_ptr<DynamicsInitialization> init);

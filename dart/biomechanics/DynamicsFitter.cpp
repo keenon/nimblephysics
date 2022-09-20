@@ -653,41 +653,12 @@ DynamicsFitProblem::DynamicsFitProblem(
     std::shared_ptr<DynamicsInitialization> init,
     std::shared_ptr<dynamics::Skeleton> skeleton,
     std::vector<std::string> trackingMarkers,
-    std::vector<dynamics::BodyNode*> footNodes)
+    std::vector<dynamics::BodyNode*> footNodes,
+    DynamicsFitProblemConfig config)
   : mInit(init),
     mSkeleton(skeleton),
     mFootNodes(footNodes),
-    mIncludeMasses(true),
-    mIncludeCOMs(true),
-    mIncludeInertias(true),
-    mIncludeBodyScales(true),
-    mIncludePoses(true),
-    mIncludeMarkerOffsets(true),
-    mResidualWeight(0.1),
-    mLinearNewtonWeight(0.1),
-    mMarkerWeight(1.0),
-    mJointWeight(1.0),
-    mLinearNewtonUseL1(true),
-    mResidualUseL1(true),
-    mMarkerUseL1(true),
-    mResidualTorqueMultiple(3.0),
-    mRegularizeAcc(0.01),
-    mRegularizeAccBodyWeights(
-        Eigen::VectorXs::Ones(skeleton->getNumBodyNodes())),
-    mRegularizeAccUseL1(false),
-    mRegularizeMasses(10.0),
-    mRegularizeCOMs(20.0),
-    mRegularizeInertias(1.0),
-    mRegularizeTrackingMarkerOffsets(0.05),
-    mRegularizeAnatomicalMarkerOffsets(10.0),
-    mRegularizeImpliedDensity(3e-8),
-    // mRegularizeImpliedDensity(1e-7),
-    // mRegularizeImpliedDensity(1e-6),
-    // mRegularizeImpliedDensity(7e-5), // <- works surprisingly well!
-    // mRegularizeImpliedDensity(0),
-    mRegularizeBodyScales(1.0),
-    mRegularizePoses(0.0),
-    mVelAccImplicit(false),
+    mConfig(config),
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Set up the markers
@@ -754,31 +725,31 @@ DynamicsFitProblem::DynamicsFitProblem(
 int DynamicsFitProblem::getProblemSize()
 {
   int size = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     size += mSkeleton->getNumScaleGroups();
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     size += mSkeleton->getNumScaleGroups() * 3;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     size += mSkeleton->getNumScaleGroups() * 6;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     size += mSkeleton->getGroupScaleDim();
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     size += mMarkers.size() * 3;
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
 
-    if (mVelAccImplicit)
+    if (mConfig.mVelAccImplicit)
     {
       for (int trial = 0; trial < mPoses.size(); trial++)
       {
@@ -807,31 +778,31 @@ Eigen::VectorXs DynamicsFitProblem::flatten()
 {
   Eigen::VectorXs flat = Eigen::VectorXs::Zero(getProblemSize());
   int cursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     flat.segment(cursor, dim) = mSkeleton->getGroupMasses();
     cursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     flat.segment(cursor, dim) = mSkeleton->getGroupCOMs();
     cursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     flat.segment(cursor, dim) = mSkeleton->getGroupInertias();
     cursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     flat.segment(cursor, dim) = mSkeleton->getGroupScales();
     cursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
@@ -839,11 +810,11 @@ Eigen::VectorXs DynamicsFitProblem::flatten()
       cursor += 3;
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
 
-    if (mVelAccImplicit)
+    if (mConfig.mVelAccImplicit)
     {
       for (int trial = 0; trial < mPoses.size(); trial++)
       {
@@ -892,31 +863,31 @@ Eigen::VectorXs DynamicsFitProblem::flattenUpperBound()
 {
   Eigen::VectorXs flat = Eigen::VectorXs::Zero(getProblemSize());
   int cursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     flat.segment(cursor, dim) = mSkeleton->getGroupMassesUpperBound();
     cursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     flat.segment(cursor, dim) = mSkeleton->getGroupCOMUpperBound();
     cursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     flat.segment(cursor, dim) = mSkeleton->getGroupInertiasUpperBound();
     cursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     flat.segment(cursor, dim) = mSkeleton->getGroupScalesUpperBound();
     cursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
@@ -924,11 +895,11 @@ Eigen::VectorXs DynamicsFitProblem::flattenUpperBound()
       cursor += 3;
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
 
-    if (mVelAccImplicit)
+    if (mConfig.mVelAccImplicit)
     {
       for (int trial = 0; trial < mPoses.size(); trial++)
       {
@@ -976,31 +947,31 @@ Eigen::VectorXs DynamicsFitProblem::flattenLowerBound()
 {
   Eigen::VectorXs flat = Eigen::VectorXs::Zero(getProblemSize());
   int cursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     flat.segment(cursor, dim) = mSkeleton->getGroupMassesLowerBound();
     cursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     flat.segment(cursor, dim) = mSkeleton->getGroupCOMLowerBound();
     cursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     flat.segment(cursor, dim) = mSkeleton->getGroupInertiasLowerBound();
     cursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     flat.segment(cursor, dim) = mSkeleton->getGroupScalesLowerBound();
     cursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
@@ -1008,11 +979,11 @@ Eigen::VectorXs DynamicsFitProblem::flattenLowerBound()
       cursor += 3;
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
 
-    if (mVelAccImplicit)
+    if (mConfig.mVelAccImplicit)
     {
       for (int trial = 0; trial < mPoses.size(); trial++)
       {
@@ -1066,31 +1037,31 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
   mLastX = x;
 
   int cursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     mSkeleton->setGroupMasses(x.segment(cursor, dim));
     cursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     mSkeleton->setGroupCOMs(x.segment(cursor, dim));
     cursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     mSkeleton->setGroupInertias(x.segment(cursor, dim));
     cursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     mSkeleton->setGroupScales(x.segment(cursor, dim));
     cursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
@@ -1098,10 +1069,10 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
       cursor += 3;
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
-    if (mVelAccImplicit)
+    if (mConfig.mVelAccImplicit)
     {
       for (int trial = 0; trial < mPoses.size(); trial++)
       {
@@ -1191,24 +1162,24 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   }
 
   s_t massRegularization
-      = mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
+      = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
         * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses)
               .squaredNorm();
   sum += massRegularization;
   assert(!isnan(sum));
   s_t comRegularization
-      = mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
+      = mConfig.mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
         * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs).squaredNorm();
   sum += comRegularization;
   assert(!isnan(sum));
   s_t inertiaRegularization
-      = mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
+      = mConfig.mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
         * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias)
               .squaredNorm();
   sum += inertiaRegularization;
   assert(!isnan(sum));
   s_t scaleRegularization
-      = mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
+      = mConfig.mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
         * (mSkeleton->getGroupScales() - mInit->originalGroupScales)
               .squaredNorm();
   sum += scaleRegularization;
@@ -1219,8 +1190,8 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     if (mInit->originalMarkerOffsets.count(mMarkerNames.at(i)))
     {
       markerRegularization
-          += (mMarkerIsTracking[i] ? mRegularizeTrackingMarkerOffsets
-                                   : mRegularizeAnatomicalMarkerOffsets)
+          += (mMarkerIsTracking[i] ? mConfig.mRegularizeTrackingMarkerOffsets
+                                   : mConfig.mRegularizeAnatomicalMarkerOffsets)
              * (1.0 / mMarkerNames.size())
              * (mMarkers[i].second
                 - mInit->originalMarkerOffsets.at(mMarkerNames.at(i)))
@@ -1240,7 +1211,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     s_t volume = dims(0) * dims(1) * dims(2);
     s_t density = mass / volume;
     s_t error = HUMAN_DENSITY_KG_M3 - density;
-    densityRegularization += mRegularizeImpliedDensity * error * error;
+    densityRegularization += mConfig.mRegularizeImpliedDensity * error * error;
   }
   sum += densityRegularization;
 
@@ -1274,40 +1245,40 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
       if (t > 0 && t < mPoses[trial].cols() - 1
           && !mInit->probablyMissingGRF[trial][t])
       {
-        if (mLinearNewtonWeight > 0)
+        if (mConfig.mLinearNewtonWeight > 0)
         {
-          s_t cost = mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+          s_t cost = mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateLinearForceGapNorm(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
-                         mLinearNewtonUseL1);
+                         mConfig.mLinearNewtonUseL1);
           linearNewtonError += cost;
           assert(!isnan(linearNewtonError));
         }
-        if (mResidualWeight > 0)
+        if (mConfig.mResidualWeight > 0)
         {
-          s_t cost = mResidualWeight * (1.0 / totalAccTimesteps)
+          s_t cost = mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                      * mResidualHelper->calculateResidualNorm(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
-                         mResidualTorqueMultiple,
-                         mResidualUseL1);
+                         mConfig.mResidualTorqueMultiple,
+                         mConfig.mResidualUseL1);
           residualRMS += cost;
           assert(!isnan(residualRMS));
         }
-        if (mRegularizeAcc > 0)
+        if (mConfig.mRegularizeAcc > 0)
         {
-          s_t cost = mRegularizeAcc * (1.0 / totalAccTimesteps)
+          s_t cost = mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNorm(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccUseL1);
           accRegularization += cost;
           assert(!isnan(accRegularization));
         }
@@ -1324,7 +1295,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
           Eigen::Vector3s diff
               = observedMarkerPoses.at(mMarkerNames[i]) - marker;
           s_t thisMarkerCost;
-          if (mMarkerUseL1)
+          if (mConfig.mMarkerUseL1)
           {
             thisMarkerCost = diff.norm();
           }
@@ -1364,7 +1335,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
 
       // Add regularization
       poseRegularization
-          += mRegularizePoses * (1.0 / totalTimesteps)
+          += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
              * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t))
                    .squaredNorm();
       assert(!isnan(poseRegularization));
@@ -1373,15 +1344,15 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   sum += linearNewtonError;
   sum += residualRMS;
   sum += accRegularization;
-  markerRMS *= mMarkerWeight;
+  markerRMS *= mConfig.mMarkerWeight;
   if (markerCount > 0)
   {
     markerRMS /= markerCount;
   }
   sum += markerRMS;
-  jointRMS *= mJointWeight;
+  jointRMS *= mConfig.mJointWeight;
   sum += jointRMS;
-  axisRMS *= mJointWeight;
+  axisRMS *= mConfig.mJointWeight;
   sum += axisRMS;
   sum += poseRegularization;
   assert(!isnan(sum));
@@ -1393,7 +1364,8 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
               << ",inR=" << inertiaRegularization
               << ",dnsR=" << densityRegularization
               << ",scR=" << scaleRegularization
-              << ",mkrR=" << markerRegularization << ",jntRMS=" << jointRMS
+              << ",mkrR=" << markerRegularization
+              << ",accR=" << accRegularization << ",jntRMS=" << jointRMS
               << ",axisRMS=" << axisRMS << ",qR=" << poseRegularization
               << ",fRMS=" << residualRMS << ",linF=" << linearNewtonError
               << ",mkRMS=" << markerRMS << "]" << std::endl;
@@ -1462,11 +1434,12 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   }
 
   int posesCursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     grad.segment(posesCursor, dim)
-        += mRegularizeMasses * 2 * (1.0 / mSkeleton->getNumScaleGroups())
+        += mConfig.mRegularizeMasses * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
 
     Eigen::VectorXs masses = mSkeleton->getGroupMasses();
@@ -1476,26 +1449,27 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       s_t mass = masses(i);
       Eigen::Vector3s dims = inertias.segment<3>(i * 6);
       s_t volume = dims(0) * dims(1) * dims(2);
-      grad(posesCursor + i) += mRegularizeImpliedDensity
+      grad(posesCursor + i) += mConfig.mRegularizeImpliedDensity
                                * (2 * mass - 2 * volume * HUMAN_DENSITY_KG_M3)
                                / (volume * volume);
     }
 
     posesCursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     grad.segment(posesCursor, dim)
-        += mRegularizeCOMs * 2 * (1.0 / mSkeleton->getNumScaleGroups())
+        += mConfig.mRegularizeCOMs * 2 * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs);
     posesCursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     grad.segment(posesCursor, dim)
-        += mRegularizeInertias * 2 * (1.0 / mSkeleton->getNumScaleGroups())
+        += mConfig.mRegularizeInertias * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias);
 
     Eigen::VectorXs masses = mSkeleton->getGroupMasses();
@@ -1506,7 +1480,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       Eigen::Vector3s dims = inertias.segment<3>(i * 6);
       s_t volume = dims(0) * dims(1) * dims(2);
       s_t constant
-          = mRegularizeImpliedDensity
+          = mConfig.mRegularizeImpliedDensity
             * (2 * mass * HUMAN_DENSITY_KG_M3 * volume - 2 * mass * mass)
             / (volume * volume);
       grad(posesCursor + i * 6 + 0) += constant / dims(0);
@@ -1516,22 +1490,24 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
     posesCursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     grad.segment(posesCursor, dim)
-        += mRegularizeBodyScales * 2 * (1.0 / mSkeleton->getNumScaleGroups())
+        += mConfig.mRegularizeBodyScales * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
            * (mSkeleton->getGroupScales() - mInit->originalGroupScales);
     posesCursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
       grad.segment<3>(posesCursor)
           += 2
-             * (mMarkerIsTracking[i] ? mRegularizeTrackingMarkerOffsets
-                                     : mRegularizeAnatomicalMarkerOffsets)
+             * (mMarkerIsTracking[i]
+                    ? mConfig.mRegularizeTrackingMarkerOffsets
+                    : mConfig.mRegularizeAnatomicalMarkerOffsets)
              * (1.0 / mMarkerNames.size())
              * (mMarkers[i].second
                 - mInit->originalMarkerOffsets[mMarkerNames[i]]);
@@ -1579,7 +1555,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           Eigen::Vector3s markerOffset
               = markerPoses.segment<3>(i * 3)
                 - markerObservations.at(mMarkerNames[i]);
-          if (mMarkerUseL1)
+          if (mConfig.mMarkerUseL1)
           {
             markerOffset.normalize();
           }
@@ -1588,7 +1564,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
             markerOffset *= 2;
           }
           lossGradWrtMarkerError.segment<3>(i * 3)
-              = (mMarkerWeight / markerCount) * markerOffset;
+              = (mConfig.mMarkerWeight / markerCount) * markerOffset;
         }
       }
 
@@ -1610,35 +1586,35 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
         axisDiff -= axisDiff.dot(axis) * axis;
         jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights(i);
       }
-      jointGrad *= mJointWeight;
+      jointGrad *= mConfig.mJointWeight;
 
       // We only compute the residual on middle t's, since we can't finite
       // difference acceleration at the edges of the clip
       if (t > 0 && t < mPoses[trial].cols() - 1)
       {
         int cursor = 0;
-        if (mIncludeMasses)
+        if (mConfig.mIncludeMasses)
         {
           int dim = mSkeleton->getNumScaleGroups();
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            if (mResidualWeight > 0)
+            if (mConfig.mResidualWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                      * mResidualHelper->calculateResidualNormGradientWrt(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
                          neural::WithRespectTo::GROUP_MASSES,
-                         mResidualTorqueMultiple,
-                         mResidualUseL1);
+                         mConfig.mResidualTorqueMultiple,
+                         mConfig.mResidualUseL1);
             }
-            if (mLinearNewtonWeight > 0)
+            if (mConfig.mLinearNewtonWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper
                            ->calculateLinearForceGapNormGradientWrt(
                                mPoses[trial].col(t),
@@ -1646,7 +1622,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                mAccs[trial].col(t),
                                mInit->grfTrials[trial].col(t),
                                neural::WithRespectTo::GROUP_MASSES,
-                               mLinearNewtonUseL1);
+                               mConfig.mLinearNewtonUseL1);
             }
             /*
             // This should always be 0, and therefore not necessary
@@ -1666,28 +1642,28 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           }
           cursor += dim;
         }
-        if (mIncludeCOMs)
+        if (mConfig.mIncludeCOMs)
         {
           int dim = mSkeleton->getNumScaleGroups() * 3;
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            if (mResidualWeight > 0)
+            if (mConfig.mResidualWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                      * mResidualHelper->calculateResidualNormGradientWrt(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
                          neural::WithRespectTo::GROUP_COMS,
-                         mResidualTorqueMultiple,
-                         mResidualUseL1);
+                         mConfig.mResidualTorqueMultiple,
+                         mConfig.mResidualUseL1);
             }
-            if (mLinearNewtonWeight > 0)
+            if (mConfig.mLinearNewtonWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper
                            ->calculateLinearForceGapNormGradientWrt(
                                mPoses[trial].col(t),
@@ -1695,40 +1671,40 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                mAccs[trial].col(t),
                                mInit->grfTrials[trial].col(t),
                                neural::WithRespectTo::GROUP_COMS,
-                               mLinearNewtonUseL1);
+                               mConfig.mLinearNewtonUseL1);
             }
-            if (mRegularizeAcc > 0)
+            if (mConfig.mRegularizeAcc > 0)
             {
               grad.segment(cursor, dim)
-                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                  += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNormGradient(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::GROUP_COMS,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccUseL1);
             }
           }
           cursor += dim;
         }
-        if (mIncludeInertias)
+        if (mConfig.mIncludeInertias)
         {
           int dim = mSkeleton->getNumScaleGroups() * 6;
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            if (mResidualWeight > 0)
+            if (mConfig.mResidualWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                      * mResidualHelper->calculateResidualNormGradientWrt(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
                          neural::WithRespectTo::GROUP_INERTIAS,
-                         mResidualTorqueMultiple,
-                         mResidualUseL1);
+                         mConfig.mResidualTorqueMultiple,
+                         mConfig.mResidualUseL1);
             }
             /*
             // This should always be 0, and therefore not necessary
@@ -1762,28 +1738,28 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           }
           cursor += dim;
         }
-        if (mIncludeBodyScales)
+        if (mConfig.mIncludeBodyScales)
         {
           int dim = mSkeleton->getGroupScaleDim();
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            if (mResidualWeight > 0)
+            if (mConfig.mResidualWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mResidualWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                      * mResidualHelper->calculateResidualNormGradientWrt(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
                          mInit->grfTrials[trial].col(t),
                          neural::WithRespectTo::GROUP_SCALES,
-                         mResidualTorqueMultiple,
-                         mResidualUseL1);
+                         mConfig.mResidualTorqueMultiple,
+                         mConfig.mResidualUseL1);
             }
-            if (mLinearNewtonWeight > 0)
+            if (mConfig.mLinearNewtonWeight > 0)
             {
               grad.segment(cursor, dim)
-                  += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                  += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper
                            ->calculateLinearForceGapNormGradientWrt(
                                mPoses[trial].col(t),
@@ -1791,19 +1767,19 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                mAccs[trial].col(t),
                                mInit->grfTrials[trial].col(t),
                                neural::WithRespectTo::GROUP_SCALES,
-                               mLinearNewtonUseL1);
+                               mConfig.mLinearNewtonUseL1);
             }
-            if (mRegularizeAcc > 0)
+            if (mConfig.mRegularizeAcc > 0)
             {
               grad.segment(cursor, dim)
-                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                  += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNormGradient(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::GROUP_SCALES,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccUseL1);
             }
           }
 
@@ -1822,7 +1798,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
           cursor += dim;
         }
-        if (mIncludeMarkerOffsets)
+        if (mConfig.mIncludeMarkerOffsets)
         {
           int dim = mMarkers.size() * 3;
           grad.segment(cursor, dim)
@@ -1831,46 +1807,46 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           cursor += dim;
         }
 
-        if (mIncludePoses)
+        if (mConfig.mIncludePoses)
         {
           Eigen::VectorXs posGrad = Eigen::VectorXs::Zero(dofs);
           Eigen::VectorXs velGrad = Eigen::VectorXs::Zero(dofs);
           Eigen::VectorXs accGrad = Eigen::VectorXs::Zero(dofs);
           if (!mInit->probablyMissingGRF[trial][t])
           {
-            if (mResidualWeight > 0)
+            if (mConfig.mResidualWeight > 0)
             {
-              posGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+              posGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                          * mResidualHelper->calculateResidualNormGradientWrt(
                              mPoses[trial].col(t),
                              mVels[trial].col(t),
                              mAccs[trial].col(t),
                              mInit->grfTrials[trial].col(t),
                              neural::WithRespectTo::POSITION,
-                             mResidualTorqueMultiple,
-                             mResidualUseL1);
-              velGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+                             mConfig.mResidualTorqueMultiple,
+                             mConfig.mResidualUseL1);
+              velGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                          * mResidualHelper->calculateResidualNormGradientWrt(
                              mPoses[trial].col(t),
                              mVels[trial].col(t),
                              mAccs[trial].col(t),
                              mInit->grfTrials[trial].col(t),
                              neural::WithRespectTo::VELOCITY,
-                             mResidualTorqueMultiple,
-                             mResidualUseL1);
-              accGrad += mResidualWeight * (1.0 / totalAccTimesteps)
+                             mConfig.mResidualTorqueMultiple,
+                             mConfig.mResidualUseL1);
+              accGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
                          * mResidualHelper->calculateResidualNormGradientWrt(
                              mPoses[trial].col(t),
                              mVels[trial].col(t),
                              mAccs[trial].col(t),
                              mInit->grfTrials[trial].col(t),
                              neural::WithRespectTo::ACCELERATION,
-                             mResidualTorqueMultiple,
-                             mResidualUseL1);
+                             mConfig.mResidualTorqueMultiple,
+                             mConfig.mResidualUseL1);
             }
-            if (mLinearNewtonWeight > 0)
+            if (mConfig.mLinearNewtonWeight > 0)
             {
-              posGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+              posGrad += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                          * mSpatialNewtonHelper
                                ->calculateLinearForceGapNormGradientWrt(
                                    mPoses[trial].col(t),
@@ -1878,8 +1854,8 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                    mAccs[trial].col(t),
                                    mInit->grfTrials[trial].col(t),
                                    neural::WithRespectTo::POSITION,
-                                   mLinearNewtonUseL1);
-              velGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                                   mConfig.mLinearNewtonUseL1);
+              velGrad += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                          * mSpatialNewtonHelper
                                ->calculateLinearForceGapNormGradientWrt(
                                    mPoses[trial].col(t),
@@ -1887,8 +1863,8 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                    mAccs[trial].col(t),
                                    mInit->grfTrials[trial].col(t),
                                    neural::WithRespectTo::VELOCITY,
-                                   mLinearNewtonUseL1);
-              accGrad += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                                   mConfig.mLinearNewtonUseL1);
+              accGrad += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
                          * mSpatialNewtonHelper
                                ->calculateLinearForceGapNormGradientWrt(
                                    mPoses[trial].col(t),
@@ -1896,37 +1872,37 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                                    mAccs[trial].col(t),
                                    mInit->grfTrials[trial].col(t),
                                    neural::WithRespectTo::ACCELERATION,
-                                   mLinearNewtonUseL1);
+                                   mConfig.mLinearNewtonUseL1);
             }
-            if (mRegularizeAcc > 0)
+            if (mConfig.mRegularizeAcc > 0)
             {
               posGrad
-                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                  += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNormGradient(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::POSITION,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccUseL1);
               velGrad
-                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                  += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNormGradient(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::VELOCITY,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccUseL1);
               accGrad
-                  += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                  += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
                      * mSpatialNewtonHelper->calculateAccelerationNormGradient(
                          mPoses[trial].col(t),
                          mVels[trial].col(t),
                          mAccs[trial].col(t),
-                         mRegularizeAccBodyWeights,
+                         mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::ACCELERATION,
-                         mRegularizeAccUseL1);
+                         mConfig.mRegularizeAccUseL1);
             }
           }
 
@@ -1939,7 +1915,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
           // Record regularization
           grad.segment(posesCursor, dofs)
-              += mRegularizePoses * 2 * (1.0 / totalTimesteps)
+              += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                  * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
 
           // Record joint gradients
@@ -1950,7 +1926,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                      .transpose()
                  * jointGrad;
 
-          if (mVelAccImplicit)
+          if (mConfig.mVelAccImplicit)
           {
             // v = (t - t-1) / dt
             // dv/dt = I / dt
@@ -1983,22 +1959,22 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       else
       {
         int cursor = 0;
-        if (mIncludeMasses)
+        if (mConfig.mIncludeMasses)
         {
           int dim = mSkeleton->getNumScaleGroups();
           cursor += dim;
         }
-        if (mIncludeCOMs)
+        if (mConfig.mIncludeCOMs)
         {
           int dim = mSkeleton->getNumScaleGroups() * 3;
           cursor += dim;
         }
-        if (mIncludeInertias)
+        if (mConfig.mIncludeInertias)
         {
           int dim = mSkeleton->getNumScaleGroups() * 6;
           cursor += dim;
         }
-        if (mIncludeBodyScales)
+        if (mConfig.mIncludeBodyScales)
         {
           int dim = mSkeleton->getGroupScaleDim();
           // Record marker gradients
@@ -2015,7 +1991,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
           cursor += dim;
         }
-        if (mIncludeMarkerOffsets)
+        if (mConfig.mIncludeMarkerOffsets)
         {
           int dim = mMarkers.size() * 3;
           grad.segment(cursor, dim)
@@ -2023,7 +1999,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                   mSkeleton, mMarkers, lossGradWrtMarkerError);
           cursor += dim;
         }
-        if (mIncludePoses)
+        if (mConfig.mIncludePoses)
         {
           // Record marker gradients
           grad.segment(posesCursor, dofs)
@@ -2031,7 +2007,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                   mSkeleton, mMarkers, lossGradWrtMarkerError);
           // Record regularization
           grad.segment(posesCursor, dofs)
-              += mRegularizePoses * 2 * (1.0 / totalTimesteps)
+              += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                  * (mPoses[trial].col(t) - mInit->originalPoses[trial].col(t));
           // Record joint gradients
           grad.segment(posesCursor, dofs)
@@ -2043,7 +2019,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
 
           posesCursor += dofs;
 
-          if (!mVelAccImplicit && t == mPoses[trial].cols() - 1)
+          if (!mConfig.mVelAccImplicit && t == mPoses[trial].cols() - 1)
           {
             // Skip over the velocities at this last timestep where they're
             // available, they don't do anything
@@ -2086,7 +2062,7 @@ Eigen::VectorXs DynamicsFitProblem::finiteDifferenceGradient(
 // This gets the number of constraints that the problem requires
 int DynamicsFitProblem::getConstraintSize()
 {
-  if (mIncludePoses && !mVelAccImplicit)
+  if (mConfig.mIncludePoses && !mConfig.mVelAccImplicit)
   {
     int numConstraints = 0;
     int dofs = mSkeleton->getNumDofs();
@@ -2112,7 +2088,7 @@ int DynamicsFitProblem::getConstraintSize()
 // acceleration, and position.
 Eigen::VectorXs DynamicsFitProblem::computeConstraints(Eigen::VectorXs x)
 {
-  if (mIncludePoses && !mVelAccImplicit)
+  if (mConfig.mIncludePoses && !mConfig.mVelAccImplicit)
   {
     unflatten(x);
     int dim = getConstraintSize();
@@ -2162,27 +2138,27 @@ std::vector<std::tuple<int, int, s_t>>
 DynamicsFitProblem::computeSparseConstraintsJacobian()
 {
   int colCursor = 0;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     colCursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     colCursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     colCursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     colCursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     colCursor += 3 * mMarkers.size();
   }
@@ -2192,7 +2168,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 #endif
 
   std::vector<std::tuple<int, int, s_t>> result;
-  if (mIncludePoses && !mVelAccImplicit)
+  if (mConfig.mIncludePoses && !mConfig.mVelAccImplicit)
   {
     int dofs = mSkeleton->getNumDofs();
 
@@ -2267,7 +2243,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 // This gets the jacobian of the constraints vector with respect to x
 Eigen::MatrixXs DynamicsFitProblem::computeConstraintsJacobian()
 {
-  if (!mIncludePoses || mVelAccImplicit)
+  if (!mConfig.mIncludePoses || mConfig.mVelAccImplicit)
   {
     return Eigen::MatrixXs::Zero(0, 0);
   }
@@ -2348,21 +2324,21 @@ bool DynamicsFitProblem::debugErrors(
 {
   int cursor = 0;
   bool anyError = false;
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     int dim = mSkeleton->getNumScaleGroups();
     anyError |= debugVector(
         fd.segment(cursor, dim), analytical.segment(cursor, dim), "mass", tol);
     cursor += dim;
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     anyError |= debugVector(
         fd.segment(cursor, dim), analytical.segment(cursor, dim), "COM", tol);
     cursor += dim;
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     anyError |= debugVector(
@@ -2372,7 +2348,7 @@ bool DynamicsFitProblem::debugErrors(
         tol);
     cursor += dim;
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     anyError |= debugVector(
@@ -2382,7 +2358,7 @@ bool DynamicsFitProblem::debugErrors(
         tol);
     cursor += dim;
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
@@ -2394,13 +2370,13 @@ bool DynamicsFitProblem::debugErrors(
       cursor += 3;
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     int dofs = mSkeleton->getNumDofs();
 
     for (int trial = 0; trial < mPoses.size(); trial++)
     {
-      if (mVelAccImplicit)
+      if (mConfig.mVelAccImplicit)
       {
         for (int t = 0; t < mPoses[trial].cols(); t++)
         {
@@ -2712,112 +2688,175 @@ void DynamicsFitProblem::computePerfectGRFs()
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludeMasses(bool value)
+DynamicsFitProblemConfig::DynamicsFitProblemConfig(
+    std::shared_ptr<dynamics::Skeleton> skeleton)
+  : mIncludeMasses(false),
+    mIncludeCOMs(false),
+    mIncludeInertias(false),
+    mIncludeBodyScales(false),
+    mIncludePoses(false),
+    mIncludeMarkerOffsets(false),
+    mResidualWeight(0),
+    mLinearNewtonWeight(0),
+    mMarkerWeight(0.0),
+    mJointWeight(0.0),
+    mLinearNewtonUseL1(true),
+    mResidualUseL1(true),
+    mMarkerUseL1(true),
+    mResidualTorqueMultiple(0.0),
+    mRegularizeAcc(0.0),
+    mRegularizeAccBodyWeights(
+        Eigen::VectorXs::Ones(skeleton->getNumBodyNodes())),
+    mRegularizeAccUseL1(false),
+    mRegularizeMasses(0.0),
+    mRegularizeCOMs(0.0),
+    mRegularizeInertias(0.0),
+    mRegularizeTrackingMarkerOffsets(0.0),
+    mRegularizeAnatomicalMarkerOffsets(0.0),
+    mRegularizeImpliedDensity(0),
+    mRegularizeBodyScales(0.0),
+    mRegularizePoses(0.0),
+    mVelAccImplicit(false)
+// mResidualWeight(0.1),
+// mLinearNewtonWeight(0.1),
+// mMarkerWeight(1.0),
+// mJointWeight(1.0),
+// mLinearNewtonUseL1(true),
+// mResidualUseL1(true),
+// mMarkerUseL1(true),
+// mResidualTorqueMultiple(3.0),
+// mRegularizeAcc(0.01),
+// mRegularizeAccBodyWeights(
+//     Eigen::VectorXs::Ones(skeleton->getNumBodyNodes())),
+// mRegularizeAccUseL1(false),
+// mRegularizeMasses(10.0),
+// mRegularizeCOMs(20.0),
+// mRegularizeInertias(1.0),
+// mRegularizeTrackingMarkerOffsets(0.05),
+// mRegularizeAnatomicalMarkerOffsets(10.0),
+// mRegularizeImpliedDensity(3e-8),
+// mRegularizeBodyScales(1.0),
+// mRegularizePoses(0.0),
+// mVelAccImplicit(false)
+{
+}
+
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludeMasses(bool value)
 {
   mIncludeMasses = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludeCOMs(bool value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludeCOMs(bool value)
 {
   mIncludeCOMs = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludeInertias(bool value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludeInertias(
+    bool value)
 {
   mIncludeInertias = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludePoses(bool value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludePoses(bool value)
 {
   mIncludePoses = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludeMarkerOffsets(bool value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludeMarkerOffsets(
+    bool value)
 {
   mIncludeMarkerOffsets = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setIncludeBodyScales(bool value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setIncludeBodyScales(
+    bool value)
 {
   mIncludeBodyScales = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setLinearNewtonWeight(s_t weight)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setLinearNewtonWeight(
+    s_t weight)
 {
   mLinearNewtonWeight = weight;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setResidualWeight(s_t weight)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setResidualWeight(
+    s_t weight)
 {
   mResidualWeight = weight;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setResidualTorqueMultiple(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setResidualTorqueMultiple(
+    s_t value)
 {
   mResidualTorqueMultiple = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setMarkerWeight(s_t weight)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMarkerWeight(s_t weight)
 {
   mMarkerWeight = weight;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setJointWeight(s_t weight)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setJointWeight(s_t weight)
 {
   mJointWeight = weight;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setLinearNewtonUseL1(bool l1)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setLinearNewtonUseL1(
+    bool l1)
 {
   mLinearNewtonUseL1 = l1;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setResidualUseL1(bool l1)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setResidualUseL1(bool l1)
 {
   mResidualUseL1 = l1;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setMarkerUseL1(bool l1)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMarkerUseL1(bool l1)
 {
   mMarkerUseL1 = l1;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAcc(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeSpatialAcc(
+    s_t value)
 {
   mRegularizeAcc = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAccBodyWeights(
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setRegularizeSpatialAccBodyWeights(
     Eigen::VectorXs bodyWeights)
 {
   mRegularizeAccBodyWeights = bodyWeights;
@@ -2825,72 +2864,79 @@ DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAccBodyWeights(
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeSpatialAccUseL1(bool l1)
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setRegularizeSpatialAccUseL1(bool l1)
 {
   mRegularizeAccUseL1 = l1;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeMasses(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeMasses(
+    s_t value)
 {
   mRegularizeMasses = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeCOMs(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeCOMs(s_t value)
 {
   mRegularizeCOMs = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeInertias(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeInertias(
+    s_t value)
 {
   mRegularizeInertias = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeBodyScales(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeBodyScales(
+    s_t value)
 {
   mRegularizeBodyScales = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizePoses(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizePoses(
+    s_t value)
 {
   mRegularizePoses = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeTrackingMarkerOffsets(
-    s_t value)
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setRegularizeTrackingMarkerOffsets(s_t value)
 {
   mRegularizeTrackingMarkerOffsets = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeAnatomicalMarkerOffsets(
-    s_t value)
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setRegularizeAnatomicalMarkerOffsets(s_t value)
 {
   mRegularizeAnatomicalMarkerOffsets = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setRegularizeImpliedDensity(s_t value)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeImpliedDensity(
+    s_t value)
 {
   mRegularizeImpliedDensity = value;
   return *(this);
 }
 
 //==============================================================================
-DynamicsFitProblem& DynamicsFitProblem::setVelAccImplicit(bool implicit)
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setVelAccImplicit(
+    bool implicit)
 {
   mVelAccImplicit = implicit;
   return *(this);
@@ -3157,7 +3203,7 @@ void DynamicsFitProblem::finalize_solution(
 
   unflatten(x);
 
-  if (mIncludeMasses)
+  if (mConfig.mIncludeMasses)
   {
     mInit->groupMasses = mSkeleton->getGroupMasses();
     mInit->bodyMasses.resize(mSkeleton->getNumBodyNodes());
@@ -3166,7 +3212,7 @@ void DynamicsFitProblem::finalize_solution(
       mInit->bodyMasses(i) = mSkeleton->getBodyNode(i)->getInertia().getMass();
     }
   }
-  if (mIncludeCOMs)
+  if (mConfig.mIncludeCOMs)
   {
     mInit->bodyCom.resize(3, mSkeleton->getNumBodyNodes());
     for (int i = 0; i < mSkeleton->getNumBodyNodes(); i++)
@@ -3175,7 +3221,7 @@ void DynamicsFitProblem::finalize_solution(
           = mSkeleton->getBodyNode(i)->getInertia().getLocalCOM();
     }
   }
-  if (mIncludeInertias)
+  if (mConfig.mIncludeInertias)
   {
     mInit->groupInertias = mSkeleton->getGroupInertias();
     mInit->bodyInertia.resize(6, mSkeleton->getNumBodyNodes());
@@ -3185,11 +3231,11 @@ void DynamicsFitProblem::finalize_solution(
           = mSkeleton->getBodyNode(i)->getInertia().getDimsAndEulerVector();
     }
   }
-  if (mIncludeBodyScales)
+  if (mConfig.mIncludeBodyScales)
   {
     mInit->groupScales = mSkeleton->getGroupScales();
   }
-  if (mIncludeMarkerOffsets)
+  if (mConfig.mIncludeMarkerOffsets)
   {
     for (int i = 0; i < mMarkerNames.size(); i++)
     {
@@ -3197,7 +3243,7 @@ void DynamicsFitProblem::finalize_solution(
       mInit->updatedMarkerMap[mMarkerNames[i]] = mMarkers[i];
     }
   }
-  if (mIncludePoses)
+  if (mConfig.mIncludePoses)
   {
     mInit->poseTrials = mPoses;
   }
@@ -4188,15 +4234,7 @@ void DynamicsFitter::estimateLinkMassesFromAcceleration(
 // runImplicitVelAccOptimization() instead.
 void DynamicsFitter::runIPOPTOptimization(
     std::shared_ptr<DynamicsInitialization> init,
-    s_t residualWeight,
-    s_t markerWeight,
-    bool includeMasses,
-    bool includeCOMs,
-    bool includeInertias,
-    bool includeBodyScales,
-    bool includePoses,
-    bool includeMarkerOffsets,
-    bool implicitVelAcc)
+    DynamicsFitProblemConfig config)
 {
   // Before using Eigen in a multi-threaded environment, we need to explicitly
   // call this (at least prior to Eigen 3.3)
@@ -4274,20 +4312,8 @@ void DynamicsFitter::runIPOPTOptimization(
   // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will
   // crash. If you try to leave `problem` on the stack, you'll get invalid
   // free exceptions when IPOpt attempts to free it.
-  DynamicsFitProblem* problem
-      = new DynamicsFitProblem(init, mSkeleton, mTrackingMarkers, mFootNodes);
-  problem->setResidualWeight(
-      problem->mResidualUseL1 ? residualWeight
-                              : residualWeight * residualWeight);
-  problem->setMarkerWeight(
-      problem->mMarkerUseL1 ? markerWeight : markerWeight * markerWeight);
-  problem->setIncludeMasses(includeMasses);
-  problem->setIncludeCOMs(includeCOMs);
-  problem->setIncludeInertias(includeInertias);
-  problem->setIncludeBodyScales(includeBodyScales);
-  problem->setIncludePoses(includePoses);
-  problem->setIncludeMarkerOffsets(includeMarkerOffsets);
-  problem->setVelAccImplicit(implicitVelAcc);
+  DynamicsFitProblem* problem = new DynamicsFitProblem(
+      init, mSkeleton, mTrackingMarkers, mFootNodes, config);
 
   /*
   Eigen::VectorXs x = problem->flatten();
@@ -4333,35 +4359,20 @@ void DynamicsFitter::runIPOPTOptimization(
 // can warm start.
 void DynamicsFitter::runSGDOptimization(
     std::shared_ptr<DynamicsInitialization> init,
-    s_t residualWeight,
-    s_t markerWeight,
-    bool includeMasses,
-    bool includeCOMs,
-    bool includeInertias,
-    bool includeBodyScales,
-    bool includePoses,
-    bool includeMarkerOffsets)
+    DynamicsFitProblemConfig config)
 {
+  config.setVelAccImplicit(true);
+
   // Create a problem object on the stack
-  DynamicsFitProblem problem(init, mSkeleton, mTrackingMarkers, mFootNodes);
-  problem.setResidualWeight(
-      problem.mResidualUseL1 ? residualWeight
-                             : residualWeight * residualWeight);
-  problem.setMarkerWeight(
-      problem.mMarkerUseL1 ? markerWeight : markerWeight * markerWeight);
-  problem.setIncludeMasses(includeMasses);
-  problem.setIncludeCOMs(includeCOMs);
-  problem.setIncludeInertias(includeInertias);
-  problem.setIncludeBodyScales(includeBodyScales);
-  problem.setIncludeMarkerOffsets(includeMarkerOffsets);
-  problem.setVelAccImplicit(true);
+  DynamicsFitProblem problem(
+      init, mSkeleton, mTrackingMarkers, mFootNodes, config);
 
   // Guarantee that even if we aren't including the poses in our optimization,
   // the velocities and accelerations are still exactly consistent with the pose
   // data.
-  problem.setIncludePoses(true);
+  problem.mConfig.setIncludePoses(true);
   problem.unflatten(problem.flatten());
-  problem.setIncludePoses(includePoses);
+  problem.mConfig.setIncludePoses(config.mIncludePoses);
 
   Eigen::VectorXs x = problem.flatten();
   s_t lastLoss = problem.computeLoss(x);
@@ -4433,7 +4444,12 @@ void DynamicsFitter::computePerfectGRFs(
     std::shared_ptr<DynamicsInitialization> init)
 {
   // Create a problem object on the stack
-  DynamicsFitProblem problem(init, mSkeleton, mTrackingMarkers, mFootNodes);
+  DynamicsFitProblem problem(
+      init,
+      mSkeleton,
+      mTrackingMarkers,
+      mFootNodes,
+      DynamicsFitProblemConfig(mSkeleton));
   // Compute the perfect GRF data
   problem.computePerfectGRFs();
 }

@@ -202,6 +202,160 @@ protected:
   bool mDisableLinesearch;
 };
   */
+  /*
+  DynamicsFitProblemConfig(std::shared_ptr<dynamics::Skeleton> skeleton);
+  DynamicsFitProblemConfig& setIncludeMasses(bool value);
+  DynamicsFitProblemConfig& setIncludeCOMs(bool value);
+  DynamicsFitProblemConfig& setIncludeInertias(bool value);
+  DynamicsFitProblemConfig& setIncludePoses(bool value);
+  DynamicsFitProblemConfig& setIncludeMarkerOffsets(bool value);
+  DynamicsFitProblemConfig& setIncludeBodyScales(bool value);
+
+  DynamicsFitProblemConfig& setLinearNewtonWeight(s_t weight);
+  DynamicsFitProblemConfig& setResidualWeight(s_t weight);
+  DynamicsFitProblemConfig& setMarkerWeight(s_t weight);
+  DynamicsFitProblemConfig& setJointWeight(s_t weight);
+
+  DynamicsFitProblemConfig& setLinearNewtonUseL1(bool l1);
+  DynamicsFitProblemConfig& setResidualUseL1(bool l1);
+  DynamicsFitProblemConfig& setMarkerUseL1(bool l1);
+
+  DynamicsFitProblemConfig& setRegularizeSpatialAcc(s_t value);
+  DynamicsFitProblemConfig& setRegularizeSpatialAccBodyWeights(
+      Eigen::VectorXs bodyWeights);
+  DynamicsFitProblemConfig& setRegularizeSpatialAccUseL1(bool l1);
+
+  DynamicsFitProblemConfig& setResidualTorqueMultiple(s_t value);
+  DynamicsFitProblemConfig& setRegularizeMasses(s_t value);
+  DynamicsFitProblemConfig& setRegularizeCOMs(s_t value);
+  DynamicsFitProblemConfig& setRegularizeInertias(s_t value);
+  DynamicsFitProblemConfig& setRegularizeBodyScales(s_t value);
+  DynamicsFitProblemConfig& setRegularizePoses(s_t value);
+  DynamicsFitProblemConfig& setRegularizeTrackingMarkerOffsets(s_t value);
+  DynamicsFitProblemConfig& setRegularizeAnatomicalMarkerOffsets(s_t value);
+  DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
+
+  DynamicsFitProblemConfig& setVelAccImplicit(bool implicit);
+  */
+  ::py::class_<dart::biomechanics::DynamicsFitProblemConfig>(
+      m, "DynamicsFitProblemConfig")
+      .def(
+          ::py::init<std::shared_ptr<dynamics::Skeleton>>(),
+          ::py::arg("skeleton"))
+      .def(
+          "setIncludeMasses",
+          &dart::biomechanics::DynamicsFitProblemConfig::setIncludeMasses,
+          ::py::arg("value"))
+      .def(
+          "setIncludeCOMs",
+          &dart::biomechanics::DynamicsFitProblemConfig::setIncludeCOMs,
+          ::py::arg("value"))
+      .def(
+          "setIncludeInertias",
+          &dart::biomechanics::DynamicsFitProblemConfig::setIncludeInertias,
+          ::py::arg("value"))
+      .def(
+          "setIncludePoses",
+          &dart::biomechanics::DynamicsFitProblemConfig::setIncludePoses,
+          ::py::arg("value"))
+      .def(
+          "setIncludeMarkerOffsets",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setIncludeMarkerOffsets,
+          ::py::arg("value"))
+      .def(
+          "setIncludeBodyScales",
+          &dart::biomechanics::DynamicsFitProblemConfig::setIncludeBodyScales,
+          ::py::arg("value"))
+      .def(
+          "setLinearNewtonWeight",
+          &dart::biomechanics::DynamicsFitProblemConfig::setLinearNewtonWeight,
+          ::py::arg("value"))
+      .def(
+          "setResidualWeight",
+          &dart::biomechanics::DynamicsFitProblemConfig::setResidualWeight,
+          ::py::arg("value"))
+      .def(
+          "setMarkerWeight",
+          &dart::biomechanics::DynamicsFitProblemConfig::setMarkerWeight,
+          ::py::arg("value"))
+      .def(
+          "setJointWeight",
+          &dart::biomechanics::DynamicsFitProblemConfig::setJointWeight,
+          ::py::arg("value"))
+      .def(
+          "setLinearNewtonUseL1",
+          &dart::biomechanics::DynamicsFitProblemConfig::setLinearNewtonUseL1,
+          ::py::arg("value"))
+      .def(
+          "setResidualUseL1",
+          &dart::biomechanics::DynamicsFitProblemConfig::setResidualUseL1,
+          ::py::arg("value"))
+      .def(
+          "setMarkerUseL1",
+          &dart::biomechanics::DynamicsFitProblemConfig::setMarkerUseL1,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeSpatialAcc",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeSpatialAcc,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeSpatialAccUseL1",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeSpatialAccUseL1,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeSpatialAccBodyWeights",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeSpatialAccBodyWeights,
+          ::py::arg("bodyWeights"))
+      .def(
+          "setResidualTorqueMultiple",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setResidualTorqueMultiple,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeMasses",
+          &dart::biomechanics::DynamicsFitProblemConfig::setRegularizeMasses,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeCOMs",
+          &dart::biomechanics::DynamicsFitProblemConfig::setRegularizeCOMs,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeInertias",
+          &dart::biomechanics::DynamicsFitProblemConfig::setRegularizeInertias,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeBodyScales",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeBodyScales,
+          ::py::arg("value"))
+      .def(
+          "setRegularizePoses",
+          &dart::biomechanics::DynamicsFitProblemConfig::setRegularizePoses,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeTrackingMarkerOffsets",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeTrackingMarkerOffsets,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeAnatomicalMarkerOffsets",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeAnatomicalMarkerOffsets,
+          ::py::arg("value"))
+      .def(
+          "setRegularizeImpliedDensity",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeImpliedDensity,
+          ::py::arg("value"))
+      .def(
+          "setVelAccImplicit",
+          &dart::biomechanics::DynamicsFitProblemConfig::setVelAccImplicit,
+          ::py::arg("implicit"));
+  ;
 
   ::py::class_<
       dart::biomechanics::DynamicsFitter,
@@ -313,27 +467,12 @@ protected:
           "runIPOPTOptimization",
           &dart::biomechanics::DynamicsFitter::runIPOPTOptimization,
           ::py::arg("init"),
-          ::py::arg("residualWeight"),
-          ::py::arg("markerWeight"),
-          ::py::arg("includeMasses"),
-          ::py::arg("includeCOMs"),
-          ::py::arg("includeInertias"),
-          ::py::arg("includeBodyScales"),
-          ::py::arg("includePoses"),
-          ::py::arg("includeMarkerOffsets"),
-          ::py::arg("implicitVelAcc"))
+          ::py::arg("config"))
       .def(
           "runSGDOptimization",
           &dart::biomechanics::DynamicsFitter::runSGDOptimization,
           ::py::arg("init"),
-          ::py::arg("residualWeight"),
-          ::py::arg("markerWeight"),
-          ::py::arg("includeMasses"),
-          ::py::arg("includeCOMs"),
-          ::py::arg("includeInertias"),
-          ::py::arg("includeBodyScales"),
-          ::py::arg("includePoses"),
-          ::py::arg("includeMarkerOffsets"))
+          ::py::arg("config"))
       .def(
           "computePerfectGRFs",
           &dart::biomechanics::DynamicsFitter::computePerfectGRFs,
