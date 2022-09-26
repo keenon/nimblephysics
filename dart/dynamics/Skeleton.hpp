@@ -1509,6 +1509,10 @@ public:
   /// in world space, concatenated
   Eigen::VectorXs getCOMWorldAccelerations();
 
+  /// This returns the linear accelerations (3 vecs) of the COMs of each body in
+  /// world space.
+  Eigen::VectorXs getCOMWorldLinearAccelerations();
+
   /// This computes the jacobian of the world velocities for each body with
   /// respect to `wrt`
   Eigen::MatrixXs getCOMWorldVelocitiesJacobian(neural::WithRespectTo* wrt);
@@ -1523,6 +1527,13 @@ public:
 
   /// This brute forces our world accelerations jacobian
   Eigen::MatrixXs finiteDifferenceCOMWorldAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  Eigen::MatrixXs getCOMWorldLinearAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This brute forces our world linear accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldLinearAccelerationsJacobian(
       neural::WithRespectTo* wrt);
 
   //----------------------------------------------------------------------------

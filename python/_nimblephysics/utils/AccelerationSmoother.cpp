@@ -42,7 +42,11 @@ namespace python {
 void AccelerationSmoother(py::module& m)
 {
   ::py::class_<dart::utils::AccelerationSmoother>(m, "AccelerationSmoother")
-      .def(::py::init<int, s_t>(), ::py::arg("timesteps"), ::py::arg("alpha"))
+      .def(
+          ::py::init<int, s_t, s_t>(),
+          ::py::arg("timesteps"),
+          ::py::arg("smoothingWeight"),
+          ::py::arg("regularizationWeight"))
       .def(
           "smooth",
           &dart::utils::AccelerationSmoother::smooth,

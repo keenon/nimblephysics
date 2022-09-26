@@ -156,13 +156,19 @@ s_t Inertia::getParameter(Param _param) const
 //==============================================================================
 void Inertia::setMass(s_t _mass, bool preserveDimsAndEuler)
 {
-  Eigen::Vector6s dimsAndEuler;
-  if (preserveDimsAndEuler)
+  if (mMass == _mass)
+  {
+    return;
+  }
+
+  Eigen::Vector6s dimsAndEuler = Eigen::Vector6s::Ones() * -1;
+  if (preserveDimsAndEuler && mMass > 0
+      && getMomentVector() != Eigen::Vector6s::Zero())
   {
     dimsAndEuler = getDimsAndEulerVector();
   }
   mMass = _mass;
-  if (preserveDimsAndEuler)
+  if (preserveDimsAndEuler && dimsAndEuler != Eigen::Vector6s::Ones() * -1)
   {
     bool oldCachedDirty = mCachedDimsAndEulerDirty;
     setMomentVector(computeMomentVector(mMass, dimsAndEuler));
@@ -1051,7 +1057,7 @@ Eigen::Vector6s Inertia::computeDimsAndEuler(
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3s> eigensolver(inertia);
   if (eigensolver.info() != Eigen::Success)
   {
-    std::cout << "Error!! Could not recovery eigenvectors from inertia matrix, "
+    std::cout << "Error!! Could not recover eigenvectors from inertia matrix, "
                  "so unable to find rotation"
               << std::endl;
   }

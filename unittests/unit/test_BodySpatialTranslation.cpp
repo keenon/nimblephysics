@@ -127,6 +127,21 @@ bool verifySpatialJacobians(
       std::cout << "Diff: " << std::endl << accJ - accJ_fd << std::endl;
       return false;
     }
+
+    Eigen::MatrixXs comLinAccJ
+        = skel->getCOMWorldLinearAccelerationsJacobian(wrt);
+    Eigen::MatrixXs comLinAccJ_fd
+        = skel->finiteDifferenceCOMWorldLinearAccelerationsJacobian(wrt);
+    if (!equals(comLinAccJ, comLinAccJ_fd, 1e-8))
+    {
+      std::cout << "COM linear acc wrt " << wrt->name() << " error!"
+                << std::endl;
+      std::cout << "Analytical: " << std::endl << comLinAccJ << std::endl;
+      std::cout << "FD: " << std::endl << comLinAccJ_fd << std::endl;
+      std::cout << "Diff: " << std::endl
+                << comLinAccJ - comLinAccJ_fd << std::endl;
+      return false;
+    }
   }
   return true;
 }

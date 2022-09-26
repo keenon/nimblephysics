@@ -51,7 +51,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
       s_t torquesMultiple,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the Jacobian of the residual with respect to `wrt`
@@ -80,7 +80,7 @@ public:
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
       s_t torquesMultiple,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the gradient of the residual norm with respect to `wrt`
@@ -91,7 +91,7 @@ public:
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
       s_t torquesMultiple,
-      bool useL1 = false);
+      bool useL1);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
@@ -126,7 +126,7 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the gradient of gap norm with respect to `wrt`
@@ -136,7 +136,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the gradient of gap norm with respect to `wrt`
@@ -146,7 +146,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat,
       neural::WithRespectTo* wrt,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the norm of the spatial acceleration vector for each body
@@ -155,7 +155,7 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs weightBodies,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the gradient of the norm of the spatial acceleration vector for
@@ -166,7 +166,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs weightBodies,
       neural::WithRespectTo* wrt,
-      bool useL1 = false);
+      bool useL1);
 
   ///////////////////////////////////////////
   // Computes the gradient of the norm of the spatial acceleration vector for
@@ -177,7 +177,7 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs weightBodies,
       neural::WithRespectTo* wrt,
-      bool useL1 = false);
+      bool useL1);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
@@ -269,6 +269,8 @@ class DynamicsFitProblemConfig
 {
 public:
   DynamicsFitProblemConfig(std::shared_ptr<dynamics::Skeleton> skeleton);
+  DynamicsFitProblemConfig& setDefaults(bool l1 = false);
+
   DynamicsFitProblemConfig& setIncludeMasses(bool value);
   DynamicsFitProblemConfig& setIncludeCOMs(bool value);
   DynamicsFitProblemConfig& setIncludeInertias(bool value);
@@ -593,7 +595,7 @@ public:
   std::vector<Eigen::Vector3s> impliedCOMForces(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
-      bool includeGravity = true);
+      Eigen::Vector3s gravity = Eigen::Vector3s::Zero());
 
   // This returns a list of the total GRF force on the body at each timestep
   std::vector<Eigen::Vector3s> measuredGRFForces(
@@ -604,9 +606,8 @@ public:
   // it mess with our optimization.
   void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
 
-  // 0. Make tiny tweaks to the position data to try to get the body
-  // accelerations to be as small as possible
-  void smoothBodyAccelerations(std::shared_ptr<DynamicsInitialization> init);
+  // 0. Smooth the accelerations.
+  void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
 
   // 1. Scale the total mass of the body (keeping the ratios of body links
   // constant) to get it as close as possible to GRF gravity forces.

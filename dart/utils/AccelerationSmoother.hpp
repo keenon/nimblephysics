@@ -12,11 +12,9 @@ public:
   /**
    * Create (and pre-factor) a smoother that can remove the "jerk" from a time
    * seriese of data.
-   *
-   * The alpha value will determine how much smoothing to apply. A value of 0
-   * corresponds to no smoothing.
    */
-  AccelerationSmoother(int timesteps, s_t alpha);
+  AccelerationSmoother(
+      int timesteps, s_t smoothingWeight, s_t regularizationWeight);
 
   /**
    * Adjust a time series of points to minimize the jerk (d/dt of acceleration)
@@ -35,7 +33,9 @@ public:
    * set of perturbations `delta` to the time series.
    */
   s_t getLoss(
-      Eigen::VectorXs series, Eigen::VectorXs deltas, bool debug = false);
+      Eigen::MatrixXs series,
+      Eigen::MatrixXs originalSeries,
+      bool debug = false);
 
   /**
    * This prints the stats for a time-series of data, with pos, vel, accel, and
@@ -45,8 +45,9 @@ public:
 
 private:
   int mTimesteps;
-  s_t mAlpha;
-  Eigen::Matrix4s mPosMap;
+  int mSmoothedTimesteps;
+  s_t mSmoothingWeight;
+  s_t mRegularizationWeight;
   Eigen::MatrixXs mB;
   Eigen::HouseholderQR<Eigen::MatrixXs> mFactoredB;
 };

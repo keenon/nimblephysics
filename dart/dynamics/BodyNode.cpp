@@ -630,6 +630,9 @@ void checkMass(const BodyNode& bodyNode, const s_t mass)
 //==============================================================================
 void BodyNode::setMass(const s_t mass)
 {
+  if (mass == getMass())
+    return;
+
   checkMass(*this, mass);
 
   mAspectProperties.mInertia.setMass(mass);

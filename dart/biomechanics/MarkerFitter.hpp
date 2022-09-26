@@ -344,7 +344,8 @@ public:
   /// produce fixes where possible.
   MarkersErrorReport generateDataErrorsReport(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          markerObservations);
+          markerObservations,
+      s_t dt);
 
   /// After we've finished our initialization, it may become clear that markers
   /// in some of the files should be reversed. This method will do that check,

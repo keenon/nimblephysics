@@ -1,10 +1,14 @@
 #include "dart/biomechanics/MarkerFixer.hpp"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 #include "dart/math/AssignmentMatcher.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/server/GUIRecording.hpp"
+#include "dart/utils/AccelerationSmoother.hpp"
 
 namespace dart {
 
@@ -276,6 +280,32 @@ std::vector<std::string> LabeledMarkerTrace::emitWarningsAboutLabelChange(
 }
 
 //==============================================================================
+/// This computes the timesteps to drop, based on which points have too much
+/// acceleration.
+void LabeledMarkerTrace::filterTimestepsBasedOnAcc(s_t dt, s_t accThreshold)
+{
+  for (int i = 0; i < mPoints.size(); i++)
+  {
+    bool shouldDrop = false;
+
+    if (i > 0 && i < mPoints.size() - 1)
+    {
+      Eigen::Vector3s acc
+          = (mPoints[i + 1] - 2 * mPoints[i] + mPoints[i - 1]) / (dt * dt);
+      s_t accNorm = acc.norm();
+      mAccNorm.push_back(accNorm);
+      shouldDrop = accNorm > accThreshold;
+    }
+    else
+    {
+      mAccNorm.push_back(0);
+    }
+
+    mDropPoint.push_back(shouldDrop);
+  }
+}
+
+//==============================================================================
 /// This merges point clouds over time, to create a set of raw MarkerTraces
 /// over time. These traces can then be intelligently merged using any desired
 /// algorithm.
@@ -363,12 +393,294 @@ std::vector<LabeledMarkerTrace> LabeledMarkerTrace::createRawTraces(
 }
 
 //==============================================================================
+RippleReductionProblem::RippleReductionProblem(
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations)
+{
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (auto& pair : markerObservations[t])
+    {
+      if (std::find(mMarkerNames.begin(), mMarkerNames.end(), pair.first)
+          == mMarkerNames.end())
+      {
+        mMarkerNames.push_back(pair.first);
+      }
+    }
+  }
+
+  for (std::string& markerName : mMarkerNames)
+  {
+    mObserved[markerName] = Eigen::VectorXs::Zero(markerObservations.size());
+    mOriginalMarkers[markerName] = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+        3, markerObservations.size());
+    mMarkers[markerName] = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+        3, markerObservations.size());
+
+    for (int t = 0; t < markerObservations.size(); t++)
+    {
+      if (markerObservations[t].count(markerName))
+      {
+        mObserved[markerName](t) = 1.0;
+        mOriginalMarkers[markerName].col(t)
+            = markerObservations[t].at(markerName);
+        mMarkers[markerName].col(t) = markerObservations[t].at(markerName);
+      }
+    }
+
+    // Start with all support planes facing upwards
+    mSupportPlanes[markerName] = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+        3, markerObservations.size());
+    mSupportPlanes[markerName].row(2).setConstant(1.0);
+  }
+}
+
+//==============================================================================
+void RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
+{
+  for (std::string markerName : mMarkerNames)
+  {
+    std::vector<int> observedTimesteps;
+    for (int t = 0; t < mMarkers[markerName].cols(); t++)
+    {
+      if (mObserved[markerName](t) == 1)
+      {
+        observedTimesteps.push_back(t);
+      }
+    }
+    for (int i = 0; i < observedTimesteps.size(); i++)
+    {
+      // Drop looking backwards
+      if (i > 1)
+      {
+        Eigen::Vector3s vLast
+            = (mMarkers[markerName].col(observedTimesteps[i - 1])
+               - mMarkers[markerName].col(observedTimesteps[i - 2]))
+              / (observedTimesteps[i - 1] - observedTimesteps[i - 2]);
+        Eigen::Vector3s vNow
+            = (mMarkers[markerName].col(observedTimesteps[i])
+               - mMarkers[markerName].col(observedTimesteps[i - 1]))
+              / (observedTimesteps[i] - observedTimesteps[i - 1]);
+        if ((vNow - vLast).norm() > vNow.norm())
+        {
+          // Drop this frame
+          mObserved[markerName](observedTimesteps[i]) = 0;
+          if (report != nullptr)
+          {
+            report->warnings.push_back(
+                "Dropping marker " + markerName
+                + " for suspicious acceleration on frame " + std::to_string(i));
+          }
+        }
+      }
+    }
+
+    /*
+    for (int t = 0; t < mMarkers.cols() - 2; t++)
+    {
+      if (mObserved(t) && mObserved(t + 1) && mObserved(t + 2))
+      {
+        Eigen::Vector3s vNow = mMarkers.col(t + 1) - mMarkers.col(t);
+        Eigen::Vector3s vNext = mMarkers.col(t + 2) - mMarkers.col(t + 1);
+        if ((vNext - vNow).norm() > vNow.norm())
+        {
+          // Drop this frame
+          mObserved(t) = 0;
+        }
+      }
+    }
+    // Drop looking backward
+    for (int t = 2; t < mMarkers.cols(); t++)
+    {
+      if (mObserved(t) && mObserved(t - 1) && mObserved(t - 2))
+      {
+        Eigen::Vector3s vNow = mMarkers.col(t) - mMarkers.col(t - 1);
+        Eigen::Vector3s vLast = mMarkers.col(t - 1) - mMarkers.col(t - 2);
+        if ((vNow - vLast).norm() > vNow.norm())
+        {
+          // Drop this frame
+          mObserved(t) = 0;
+        }
+      }
+    }
+    */
+  }
+}
+
+//==============================================================================
+void RippleReductionProblem::interpolateMissingPoints()
+{
+  for (std::string markerName : mMarkerNames)
+  {
+    int startUnobserved = -1;
+    for (int t = 0; t < mMarkers[markerName].cols(); t++)
+    {
+      if (mObserved[markerName](t) == 0 && startUnobserved == -1)
+      {
+        startUnobserved = t;
+      }
+      else if (mObserved[markerName](t) == 1 && startUnobserved != -1)
+      {
+        if (startUnobserved > 0)
+        {
+          int beforeStartTimestep = startUnobserved - 1;
+          Eigen::Vector3s start = mMarkers[markerName].col(beforeStartTimestep);
+          int afterEndTimestep = t;
+          Eigen::Vector3s end = mMarkers[markerName].col(afterEndTimestep);
+
+          int duration = afterEndTimestep - beforeStartTimestep;
+
+          for (int j = 1; j < duration; j++)
+          {
+            Eigen::Vector3s blend = start + (end - start) * ((s_t)j / duration);
+            mMarkers[markerName].col(beforeStartTimestep + j) = blend;
+          }
+        }
+        startUnobserved = -1;
+      }
+    }
+  }
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>
+RippleReductionProblem::smooth(MarkersErrorReport* report)
+{
+  dropSuspiciousPoints(report);
+  interpolateMissingPoints();
+  for (std::string markerName : mMarkerNames)
+  {
+    AccelerationSmoother smoother(mMarkers[markerName].cols(), 0.3, 1.0);
+    mMarkers[markerName] = smoother.smooth(mMarkers[markerName]);
+  }
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> markers;
+  for (int t = 0; t < mMarkers[mMarkerNames[0]].cols(); t++)
+  {
+    markers.emplace_back();
+    for (std::string& markerName : mMarkerNames)
+    {
+      // markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+      if (mObserved[markerName](t) == 1)
+      {
+        markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+      }
+    }
+  }
+  return markers;
+}
+
+//==============================================================================
+void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
+{
+  server::GUIRecording server;
+
+  std::string originalLayerName = "Original Path";
+  Eigen::Vector4s originalLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  server.createLayer(originalLayerName, originalLayerColor);
+  std::string smoothedLayerName = "De-rippled Path";
+  Eigen::Vector4s smoothedLayerColor = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
+  server.createLayer(smoothedLayerName, smoothedLayerColor);
+  std::string planesLayerName = "Support Planes";
+  Eigen::Vector4s planesLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+  server.createLayer(planesLayerName, planesLayerColor, false);
+  std::string timestampLayerName = "Timestamps";
+  Eigen::Vector4s timestampLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  server.createLayer(timestampLayerName, timestampLayerColor, false);
+  std::string smoothTimestampLayerName = "Smooth Timestamps";
+  Eigen::Vector4s smoothTimestampLayerColor
+      = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  server.createLayer(
+      smoothTimestampLayerName, smoothTimestampLayerColor, false);
+
+  std::vector<Eigen::Vector3s> originalPath;
+  std::vector<Eigen::Vector3s> smoothedPath;
+  for (int t = 0; t < mMarkers[markerName].cols(); t++)
+  {
+    smoothedPath.push_back(mMarkers[markerName].col(t));
+    server.createBox(
+        "smooth_timestamp_" + std::to_string(t),
+        0.02 * Eigen::Vector3s::Ones(),
+        mMarkers[markerName].col(t),
+        Eigen::Vector3s::Zero(),
+        smoothTimestampLayerColor,
+        smoothTimestampLayerName);
+    server.setObjectTooltip(
+        "smooth_timestamp_" + std::to_string(t), std::to_string(t));
+
+    if (mObserved[markerName](t) == 1)
+    {
+      originalPath.push_back(mOriginalMarkers[markerName].col(t));
+
+      std::vector<Eigen::Vector3s> planePoints;
+      planePoints.push_back(mOriginalMarkers[markerName].col(t));
+      planePoints.push_back(
+          mOriginalMarkers[markerName].col(t)
+          + mSupportPlanes[markerName].col(t) * 0.03);
+      server.createLine(
+          "support_at_" + std::to_string(t),
+          planePoints,
+          planesLayerColor,
+          planesLayerName);
+
+      server.createBox(
+          "timestamp_" + std::to_string(t),
+          0.02 * Eigen::Vector3s::Ones(),
+          mOriginalMarkers[markerName].col(t),
+          Eigen::Vector3s::Zero(),
+          timestampLayerColor,
+          timestampLayerName);
+      server.setObjectTooltip(
+          "timestamp_" + std::to_string(t), std::to_string(t));
+    }
+    else
+    {
+      if (originalPath.size() > 0)
+      {
+        server.createLine(
+            "original_end_at_" + std::to_string(t),
+            originalPath,
+            originalLayerColor,
+            originalLayerName);
+        originalPath.clear();
+      }
+      /*
+      if (smoothedPath.size() > 0)
+      {
+        server.createLine(
+            "smoothed_end_at_" + std::to_string(t),
+            smoothedPath,
+            smoothedLayerColor,
+            smoothedLayerName);
+        smoothedPath.clear();
+      }
+      */
+    }
+  }
+  if (originalPath.size() > 0)
+  {
+    server.createLine(
+        "original_end", originalPath, originalLayerColor, originalLayerName);
+    originalPath.clear();
+  }
+  if (smoothedPath.size() > 0)
+  {
+    server.createLine(
+        "smoothed_end", smoothedPath, smoothedLayerColor, smoothedLayerName);
+    smoothedPath.clear();
+  }
+  server.saveFrame();
+
+  server.writeFramesJson(path);
+}
+
+//==============================================================================
 /// This will go through original marker data and attempt to detect common
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
 MarkersErrorReport MarkerFixer::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        immutableMarkerObservations)
+        immutableMarkerObservations,
+    s_t dt)
 {
   MarkersErrorReport report;
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
@@ -393,6 +705,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
       }
     }
     std::string bestLabel = traces[i].getBestLabel(alreadyTakenLabels);
+    traces[i].filterTimestepsBasedOnAcc(dt, 1000.0);
     traceLabels.push_back(bestLabel);
   }
 
@@ -407,12 +720,31 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
       int index = traces[j].getIndexForTimestep(t);
       if (index != -1)
       {
+        /*
+        // Ignore points that we specifically asked to drop
+        if (index < traces[j].mDropPoint.size() && traces[j].mDropPoint[index])
+        {
+          report.warnings.push_back(
+              "Marker " + traceLabels[j]
+              + " dropped for accelerating too fast ("
+              + std::to_string((double)traces[j].mAccNorm[index])
+              + " m/s^2) on frame " + std::to_string(t));
+        }
+        else
+        {
+          Eigen::Vector3s point = traces[j].mPoints[index];
+          frame[traceLabels[j]] = point;
+        }
+        */
         Eigen::Vector3s point = traces[j].mPoints[index];
         frame[traceLabels[j]] = point;
       }
     }
     correctedObservations.push_back(frame);
   }
+
+  RippleReductionProblem rippleReduction(correctedObservations);
+  correctedObservations = rippleReduction.smooth(&report);
 
   // 3. Emit warnings based on any traces that include markers that are not
   // labelled correctly during part of the trace

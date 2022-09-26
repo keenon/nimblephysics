@@ -69,6 +69,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_MarkerFitter)
   target_link_libraries(test_MarkerFitter dart-utils)
 
+  dart_add_test("unit" test_MarkerFixer)
+  target_link_libraries(test_MarkerFixer dart-utils)
+
   dart_add_test("unit" test_MarkerOffsetPrior)
   target_link_libraries(test_MarkerOffsetPrior dart-utils)
 

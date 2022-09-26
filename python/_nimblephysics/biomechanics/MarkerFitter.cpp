@@ -278,7 +278,8 @@ void MarkerFitter(py::module& m)
       .def(
           "generateDataErrorsReport",
           &dart::biomechanics::MarkerFitter::generateDataErrorsReport,
-          ::py::arg("markerObservations"))
+          ::py::arg("markerObservations"),
+          ::py::arg("dt"))
       .def(
           "checkForFlippedMarkers",
           &dart::biomechanics::MarkerFitter::checkForFlippedMarkers,

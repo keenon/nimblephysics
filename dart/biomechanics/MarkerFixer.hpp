@@ -30,12 +30,6 @@ namespace biomechanics {
 class LabeledMarkerTrace
 {
 public:
-  int mMinTime;
-  int mMaxTime;
-  std::vector<int> mTimes;
-  std::vector<Eigen::Vector3s> mPoints;
-  std::vector<std::string> mMarkerLabels;
-
   LabeledMarkerTrace();
 
   /// This is the constructor for when a MarkerTrace is first created, before we
@@ -91,6 +85,19 @@ public:
   /// Generate warnings about how we changed the labels of markers to keep them
   /// continuous
   std::vector<std::string> emitWarningsAboutLabelChange(std::string finalLabel);
+
+  /// This computes the timesteps to drop, based on which points have too much
+  /// acceleration.
+  void filterTimestepsBasedOnAcc(s_t dt, s_t accThreshold);
+
+public:
+  int mMinTime;
+  int mMaxTime;
+  std::vector<int> mTimes;
+  std::vector<Eigen::Vector3s> mPoints;
+  std::vector<s_t> mAccNorm;
+  std::vector<bool> mDropPoint;
+  std::vector<std::string> mMarkerLabels;
 };
 
 struct MarkersErrorReport
@@ -101,12 +108,36 @@ struct MarkersErrorReport
       markerObservationsAttemptedFixed;
 };
 
+class RippleReductionProblem
+{
+public:
+  RippleReductionProblem(
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
+
+  void dropSuspiciousPoints(MarkersErrorReport* report = nullptr);
+
+  void interpolateMissingPoints();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> smooth(
+      MarkersErrorReport* report = nullptr);
+
+  void saveToGUI(std::string markerName, std::string path);
+
+public:
+  std::vector<std::string> mMarkerNames;
+  std::map<std::string, Eigen::VectorXs> mObserved;
+  std::map<std::string, Eigen::Matrix<s_t, 3, Eigen::Dynamic>> mOriginalMarkers;
+  std::map<std::string, Eigen::Matrix<s_t, 3, Eigen::Dynamic>> mMarkers;
+  std::map<std::string, Eigen::Matrix<s_t, 3, Eigen::Dynamic>> mSupportPlanes;
+};
+
 class MarkerFixer
 {
 public:
   static MarkersErrorReport generateDataErrorsReport(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          markerObservations);
+          markerObservations,
+      s_t dt);
 };
 
 } // namespace biomechanics

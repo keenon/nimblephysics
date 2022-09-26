@@ -1452,8 +1452,8 @@ std::vector<MarkerInitialization> runEngine(
   std::vector<MarkersErrorReport> reports;
   for (int i = 0; i < markerObservationTrials.size(); i++)
   {
-    MarkersErrorReport report
-        = fitter.generateDataErrorsReport(markerObservationTrials[i]);
+    MarkersErrorReport report = fitter.generateDataErrorsReport(
+        markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
     for (std::string& warning : report.warnings)
     {
       std::cout << "DATA WARNING: " << warning << std::endl;
@@ -1552,17 +1552,23 @@ std::vector<MarkerInitialization> runEngine(
   }
   for (int i = 0; i < results.size(); i++)
   {
+    std::cout << "Saving IK Mot " << i << std::endl;
+    OpenSimParser::saveMot(
+        standard.skeleton,
+        "./_ik" + std::to_string(i) + ".mot",
+        timestamps[i],
+        results[i].poses);
     std::cout << "Saving GRF Mot " << i << std::endl;
-    OpenSimParser::saveGRFMot("./_grf.mot", timestamps[i], forcePlates[i]);
-  }
-  for (int i = 0; i < results.size(); i++)
-  {
+    OpenSimParser::saveGRFMot(
+        "./_grf" + std::to_string(i) + ".mot", timestamps[i], forcePlates[i]);
     std::cout << "Saving TRC " << i << std::endl;
     std::cout << "timestamps[i]: " << timestamps[i].size() << std::endl;
     std::cout << "markerObservationTrials[i]: "
               << markerObservationTrials[i].size() << std::endl;
     OpenSimParser::saveTRC(
-        "./test.trc", timestamps[i], markerObservationTrials[i]);
+        "./_markers" + std::to_string(i) + ".trc",
+        timestamps[i],
+        markerObservationTrials[i]);
   }
   std::vector<std::string> markerNames;
   for (auto& pair : standard.markersMap)
@@ -3616,7 +3622,10 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
       newClip,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
-              init.joints, init.jointCenters, init.jointWeights)
+              init.joints,
+              init.jointCenters,
+              init.jointsAdjacentMarkers,
+              init.jointWeights)
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses));
 
@@ -3666,7 +3675,10 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
       bilevelFit,
       InitialMarkerFitParams()
           .setJointCentersAndWeights(
-              reinit.joints, reinit.jointCenters, reinit.jointWeights)
+              reinit.joints,
+              reinit.jointCenters,
+              reinit.jointsAdjacentMarkers,
+              reinit.jointWeights)
           .setJointAxisAndWeights(reinit.jointAxis, reinit.axisWeights)
           .setInitPoses(reinit.poses)
           .setDontRescaleBodies(true)
@@ -5940,6 +5952,27 @@ TEST(MarkerFitter, HIGH_BMI)
       1.65,
       "female",
       false,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  c3dFiles.push_back("dart://sample/osim/Test_Output/JA1Gait35.c3d");
+
+  runEngine(
+      "dart://sample/osim/Test_Output/rescaled.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      79.4,
+      1.85,
+      "male",
       true);
 }
 #endif

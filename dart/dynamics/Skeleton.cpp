@@ -7301,6 +7301,20 @@ Eigen::VectorXs Skeleton::getCOMWorldAccelerations()
 }
 
 //==============================================================================
+/// This returns the linear accelerations (3 vecs) of the COMs of each body in
+/// world space.
+Eigen::VectorXs Skeleton::getCOMWorldLinearAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 3);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    accs.segment<3>(i * 3) = getBodyNode(i)->getCOMLinearAcceleration(
+        Frame::World(), Frame::World());
+  }
+  return accs;
+}
+
+//==============================================================================
 /// This computes the jacobian of the world velocities for each body with
 /// respect to `wrt`
 Eigen::MatrixXs Skeleton::getCOMWorldVelocitiesJacobian(
@@ -7534,6 +7548,63 @@ Eigen::MatrixXs Skeleton::finiteDifferenceCOMWorldAccelerationsJacobian(
         tweaked(dof) += eps;
         wrt->set(this, tweaked);
         perturbed = getCOMWorldAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::getCOMWorldLinearAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+
+  Eigen::MatrixXs spatialAccJac = getCOMWorldAccelerationsJacobian(wrt);
+  Eigen::MatrixXs spatialVelJac = getCOMWorldVelocitiesJacobian(wrt);
+  Eigen::VectorXs spatialVel = getCOMWorldVelocities();
+
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 3, dim);
+  for (int i = 0; i < dim; i++)
+  {
+    for (int b = 0; b < getNumBodyNodes(); b++)
+    {
+      Eigen::Vector6s vel = spatialVel.segment<6>(b * 6);
+      jac.block<3, 1>(b * 3, i)
+          = spatialAccJac.block<3, 1>(b * 6 + 3, i)
+            + (vel.head<3>().cross(spatialVelJac.block<3, 1>(b * 6 + 3, i))
+               - vel.tail<3>().cross(spatialVelJac.block<3, 1>(b * 6, i)));
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world linear accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceCOMWorldLinearAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getCOMWorldLinearAccelerations();
         return true;
       },
       result,

@@ -778,10 +778,11 @@ bool MarkerFitter::checkForEnoughMarkers(
 /// produce fixes where possible.
 MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        immutableMarkerObservations)
+        immutableMarkerObservations,
+    s_t dt)
 {
   MarkersErrorReport report
-      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations);
+      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations, dt);
 
   // 1. Generate a list of the markers we observe in this clip
 

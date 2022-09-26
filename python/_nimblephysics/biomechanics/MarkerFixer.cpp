@@ -59,7 +59,8 @@ void MarkerFixer(py::module& m)
       .def_static(
           "generateDataErrorsReport",
           &dart::biomechanics::MarkerFixer::generateDataErrorsReport,
-          ::py::arg("immutableMarkerObservations"));
+          ::py::arg("immutableMarkerObservations"),
+          ::py::arg("dt"));
 }
 
 } // namespace python
