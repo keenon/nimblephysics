@@ -29,7 +29,7 @@
 #include "TestHelpers.hpp"
 #include "stdio.h"
 
-//#define iLQR_MPC_TEST
+#define iLQR_MPC_TEST
 
 using namespace dart;
 using namespace math;
@@ -186,7 +186,7 @@ std::shared_ptr<LossFn> getSSIDVelLoss()
 WorldPtr createWorld(s_t timestep)
 {
   WorldPtr world = dart::utils::UniversalLoader::loadWorld("dart://sample/skel/cartpole.skel");
-  world->setState(Eigen::Vector4s(0, 170.0 / 180 * 3.14, 0, 0));
+  world->setState(Eigen::Vector4s(0, 175.0 / 180 * 3.14, 0, 0));
   world->removeDofFromActionSpace(1);
   
   world->setTimeStep(timestep);
@@ -273,13 +273,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   // For add noise in measurement
   std::mt19937 rand_gen = initializeRandom();
-  s_t noise_scale = 1.0 / 180 * 3.14;
+  s_t noise_scale = 1. / 180 * 3.14;
 
   // For SSID
   s_t scale = 1.0;
   size_t ssid_index = 0;
   size_t ssid_index2 = 1;
-  int inferenceSteps = 5;
+  int inferenceSteps = 10;
   int inferenceHistoryMillis = inferenceSteps * millisPerTimestep;
 
   std::shared_ptr<simulation::World> ssidWorld = world->clone();
@@ -294,6 +294,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     WrtMassBodyNodeEntryType::INERTIA_MASS,
     Eigen::VectorXs::Ones(1) * 5.0,
     Eigen::VectorXs::Ones(1) * 0.2);
+  
+  ssidWorld->tuneDamping(
+    world->getJointIndex(1),
+    WrtDampingJointEntryType::DAMPING,
+    Eigen::VectorXi::Ones(1),
+    Eigen::VectorXs::Ones(1),
+    Eigen::VectorXs::Ones(1) * 0.01);
 
   Eigen::Vector2s sensorDims(world->getNumDofs(), world->getNumDofs());
   Eigen::Vector2i ssid_idx(0,1);
@@ -309,10 +316,13 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.attachMutex(lock);
   ssid.attachParamMutex(param_lock);
   ssid.setSSIDMassIndex(Eigen::Vector2i(0, 1)); 
-  //ssid.useConfidence();
-  //ssid.useHeuristicWeight();
-  //ssid.useSmoothing();
-  ssid.setTemperature(Eigen::Vector2s(0.5,0.5));
+  ssid.setSSIDDampIndex(Eigen::VectorXi::Ones(1));
+  ssid.useConfidence();
+  ssid.useHeuristicWeight();
+  ssid.useSmoothing();
+  ssid.setTemperature(Eigen::Vector3s(0.5, 5, 2));
+  // ssid.setThreshs(0.1, 0.5); // As in paper
+  ssid.setEWiseThreshs(Eigen::Vector3s(0.1, 0.1, 0.02), 0.5);
   
 
   ssid.setInitialPosEstimator(
@@ -364,6 +374,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   mpcLocal.setEnableOptimizationGuards(true);
   mpcLocal.setActionBound(20.0);
   mpcLocal.setAlpha(1);
+
   //mpcLocal.disableAdaptiveTime();
 
   // bool init_flag = true;
@@ -371,10 +382,11 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   ssid.registerInferListener([&](long,
                                  Eigen::VectorXs,
                                  Eigen::VectorXs,
-                                 Eigen::VectorXs mass,
+                                 Eigen::VectorXs params,
                                  long, 
                                  bool steadyFound){
     // mpcLocal.recordGroundTruthState(time, pos, vel, mass); //TODO: This will cause problem ... But Why
+    // If there are more than one type of parameters will this work?
     if(steadyFound)
     {
       mpcLocal.setCandidateHorizon(planningHorizonMillis);
@@ -383,8 +395,10 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     {
       mpcLocal.setCandidateHorizon((size_t)(1*planningHorizonMillis));
     }
-    world->setLinkMassIndex(mass(0), ssid_index);
-    world->setLinkMassIndex(mass(1), ssid_index2);
+    world->setLinkMassIndex(params(0), ssid_index);
+    world->setLinkMassIndex(params(1), ssid_index2);
+    // The rest of segment should be damping
+    world->setJointDampingCoeffIndex(params.segment(2,1), 1);
   });
 
 
@@ -393,7 +407,7 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
 
   server.createSphere("goal", 0.1,
                       Eigen::Vector3s(goal(0), 0.7, 0),
-                      Eigen::Vector3s(1.0, 0.0, 0.0));
+                      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
   server.registerDragListener("goal", [&](Eigen::Vector3s dragTo){
     goal(0) = dragTo(0);
     dragTo(1) = 0.3;
@@ -413,15 +427,18 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
   Eigen::Vector3s originalColor = sledBodyVisual->getColor();
   long total_steps = 0;
 
-  Eigen::Vector2s masses(1.0, 0.5);
-  Eigen::Vector2s id_masses(1.5, 1.0);
+  Eigen::Vector3s params(1.0, 0.5, 0.2);
+  Eigen::Vector3s id_params(1.5, 1.0, 0.4);
 
-  realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-  realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
-  ssidWorld->setLinkMassIndex(id_masses(0), ssid_index);
-  ssidWorld->setLinkMassIndex(id_masses(1), ssid_index2);
-  world->setLinkMassIndex(id_masses(0), ssid_index);
-  world->setLinkMassIndex(id_masses(1), ssid_index2);
+  realtimeUnderlyingWorld->setLinkMassIndex(params(0), ssid_index);
+  realtimeUnderlyingWorld->setLinkMassIndex(params(1), ssid_index2);
+  realtimeUnderlyingWorld->setJointDampingCoeffIndex(params.segment(2,1), 1);
+  ssidWorld->setLinkMassIndex(id_params(0), ssid_index);
+  ssidWorld->setLinkMassIndex(id_params(1), ssid_index2);
+  ssidWorld->setJointDampingCoeffIndex(id_params.segment(2,1),1);
+  world->setLinkMassIndex(id_params(0), ssid_index);
+  world->setLinkMassIndex(id_params(1), ssid_index2);
+  world->setJointDampingCoeffIndex(id_params.segment(2,1),1);
 
   int cnt = 0;
   int filecnt = 0;
@@ -459,18 +476,18 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     if (server.getKeysDown().count(",") || cnt == 150)
     {
       // Increase mass
-      masses(0) = 3.0;
-      masses(1) = 2.5;
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+      params(0) = 3.0;
+      params(1) = 2.5;
+      realtimeUnderlyingWorld->setLinkMassIndex(params(0), ssid_index);
+      realtimeUnderlyingWorld->setLinkMassIndex(params(1), ssid_index2);
     }
     else if (server.getKeysDown().count("o") || cnt == 600)
     {
       // Decrease mass
-      masses(0) = 1.0;
-      masses(1) = 0.5;
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(0), ssid_index);
-      realtimeUnderlyingWorld->setLinkMassIndex(masses(1), ssid_index2);
+      params(0) = 1.0;
+      params(2) = 0.1;
+      realtimeUnderlyingWorld->setLinkMassIndex(params(0), ssid_index);
+      realtimeUnderlyingWorld->setJointDampingCoeffIndex(params.segment(2,1), 1);
     }
     else if(server.getKeysDown().count("s"))
     {
@@ -492,8 +509,8 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
         Eigen::MatrixXs real_params = std2eigen(real_record);
         Eigen::MatrixXs sysid_params = std2eigen(id_record);
         std::cout << "Converted!" << std::endl;
-        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_naive_real_"+std::to_string(filecnt)+".csv", real_params);
-        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_naive_identified_"+std::to_string(filecnt)+".csv", sysid_params);
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_10_real_"+std::to_string(filecnt)+".csv", real_params);
+        ssid.saveCSVMatrix("/workspaces/nimblephysics/dart/realtime/saved_data/timeplots/cartpole_10_identified_"+std::to_string(filecnt)+".csv", sysid_params);
         filecnt ++;
       }
       record = false;
@@ -506,34 +523,38 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
         std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
         std::cout << "Target Reached in: " << cnt << " Steps" << std::endl;
         std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
+        //ssid.stop();
+        //mpcLocal.stop();
+        //exit(1);
       }
       recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
       realtimeUnderlyingWorld->step();
       cnt++;
     }
-    id_masses(0) = world->getLinkMassIndex(ssid_index);
-    id_masses(1) = world->getLinkMassIndex(ssid_index2);
+    id_params(0) = world->getLinkMassIndex(ssid_index);
+    id_params(1) = world->getLinkMassIndex(ssid_index2);
+    id_params(2) = world->getJointDampingCoeffIndex(1)(0);
     if(renderIsReady)
     {
       mpcLocal.recordGroundTruthState(
         now,
         realtimeUnderlyingWorld->getPositions(),
         realtimeUnderlyingWorld->getVelocities(),
-        realtimeUnderlyingWorld->getMasses());
+        realtimeUnderlyingWorld->getMasses()); // TODO: Why only mass
     }
   
     if(total_steps % 5 == 0)
     {
       server.renderWorld(realtimeUnderlyingWorld);
-      // server.createText(key,
-      //                   "Current Masses: "+std::to_string(id_masses(0))+" "+std::to_string(id_masses(1))
-      //                   +"Real Masses: "+std::to_string(masses(0))+" "+std::to_string(masses(1)),
-      //                   Eigen::Vector2i(100,100),
-      //                   Eigen::Vector2i(200,200));
+      server.createText(key,
+                        "Cur Params: "+std::to_string(id_params(0))+" "+std::to_string(id_params(1))+" "+std::to_string(id_params(2))
+                        +"Real Params: "+std::to_string(params(0))+" "+std::to_string(params(1))+" "+std::to_string(params(2)),
+                        Eigen::Vector2i(100,100),
+                        Eigen::Vector2i(200,200));
       if(record && renderIsReady)
       {
-        id_record.push_back(id_masses);
-        real_record.push_back(masses);
+        id_record.push_back(id_params);
+        real_record.push_back(params);
       }
       total_steps = 0;
     }

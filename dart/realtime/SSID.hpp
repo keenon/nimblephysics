@@ -175,6 +175,10 @@ public:
   // Also, for fast thread, the initial guess can be provided by slow thread
   bool detectChangeParams();
 
+  std::pair<std::vector<bool>, bool> detectEWiseChangeParams();
+
+  std::pair<std::vector<bool>, bool> detectEWiseStable(Eigen::VectorXs current, Eigen::VectorXs reference, Eigen::VectorXs confidence);
+
   void updateFastThreadBuffer(Eigen::VectorXs new_solution, Eigen::VectorXs new_weight);
 
   Eigen::VectorXs estimateSolution();
@@ -185,20 +189,22 @@ public:
 
   void setThreshs(s_t param_change, s_t conf);
 
+  void setEWiseThreshs(Eigen::VectorXs param_changes, s_t conf);
+
   void useConfidence();
 
   void useHeuristicWeight();
 
   void useSmoothing();
 
+  void setVerbose(bool verbose);
+
 protected:
   /// This is the function for the optimization thread to run when we're live
   void optimizationThreadLoop();
 
-  void slowOptimizationThreadLoop();
-
   bool mRunning;
-  bool mRunningSlow;
+  bool mVerbose;
   
   std::shared_ptr<simulation::World> mWorld;
   // The World for Slow SSID may be there are some thread safety problems
@@ -225,6 +231,10 @@ protected:
   Eigen::VectorXs mParam_Steady;
   s_t mParam_change_thresh = 0.05;
   s_t mConfidence_thresh = 0.5;
+
+  // For elementwise
+  Eigen::VectorXs mEwise_params_change_thresh;
+
   Eigen::VectorXs mTemperature;
   size_t mRobotSkelIndex = 0;
   Eigen::VectorXi mSSIDMassNodeIndices;

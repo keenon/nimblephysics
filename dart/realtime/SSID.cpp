@@ -24,7 +24,7 @@ SSID::SSID(
     int steps,
     s_t scale)
   : mRunning(false),
-    mRunningSlow(false),
+    mVerbose(false),
     mParamChanged(true),
     mSteadySolutionFound(false),
     mWorld(world),
@@ -184,15 +184,6 @@ void SSID::start()
   mOptimizationThread = std::thread(&SSID::optimizationThreadLoop, this);
 }
 
-void SSID::startSlow()
-{
-  if(mRunningSlow)
-    return;
-  mRunningSlow = true;
-  std::cout << "Start Slow Thread" << std::endl;
-  mOptimizationThreadSlow = std::thread(&SSID::slowOptimizationThreadLoop, this);
-}
-
 /// This stops our main thread, waits for it to finish, and then returns
 void SSID::stop()
 {
@@ -200,15 +191,6 @@ void SSID::stop()
     return;
   mRunning = false;
   mOptimizationThread.join();
-}
-
-void SSID::stopSlow()
-{
-  if(!mRunningSlow)
-    return;
-  mRunningSlow = false;
-  mOptimizationThreadSlow.join();
-
 }
 
 /// This runs inference to find mutable values, starting at `startTime`
@@ -260,58 +242,6 @@ void SSID::runInference(long startTime)
   for (auto listener : mInferListeners)
   {
     listener(startTime, pos, vel, param, computeDurationWallTime, mSteadySolutionFound); 
-  }
-}
-
-void SSID::runSlowInference(long startTime)
-{
-  long startComputeWallTime = timeSinceEpochMillis();
-  int millisPerStep = static_cast<int>(ceil(mScale*mWorldSlow->getTimeStep() * 1000.0));
-  int steps = static_cast<int>(
-      ceil(static_cast<s_t>(mPlanningHistoryMillisSlow) / millisPerStep));
-
-  if (!mProblemSlow)
-  {
-    std::shared_ptr<SingleShot> singleshot
-        = std::make_shared<SingleShot>(mWorldSlow, *mLoss.get(), steps, true);
-    mProblemSlow = singleshot;
-    // Perhaps need multishot problem but let's see
-  }
-  registerLock();
-  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
-    startTime, steps+1);
-  for (int i = 0; i < steps; i++)
-  {
-    mProblemSlow->pinForce(i, forceHistory.col(i));
-  }
-
-  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
-  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
-  registerUnlock();
-  mProblemSlow->setMetadata("forces", forceHistory);
-  mProblemSlow->setMetadata("sensors", poseHistory);
-  mProblemSlow->setMetadata("velocities",velHistory);
-  mProblemSlow->setStartPos(mInitialPosEstimator(poseHistory, startTime));
-  mProblemSlow->setStartVel(mInitialVelEstimator(velHistory, startTime));
-  // Then actually run the optimization
-  mSolutionSlow = mOptimizerSlow->optimize(mProblemSlow.get());
-
-  long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
-
-  const trajectory::TrajectoryRollout* cache
-      = mProblemSlow->getRolloutCache(mWorldSlow);
-
-  Eigen::VectorXs pos = cache->getPosesConst().col(steps - 1);
-  Eigen::VectorXs vel = cache->getVelsConst().col(steps - 1);
-  // Here the masses should be the concatenation of all registered mass nodes
-  Eigen::VectorXs mass = mWorldSlow->getMasses();
-  Eigen::VectorXs damp = mWorldSlow->getDampings();
-  Eigen::VectorXs spring = mWorldSlow->getSprings();
-
-  // TODO: Listeners may be different
-  for (auto listener : mInferListenersSlow)
-  {
-    listener(startTime, pos, vel, mass, computeDurationWallTime);
   }
 }
 
@@ -502,6 +432,7 @@ void SSID::optimizationThreadLoop()
       paramMutexLock();
       if(mInitialize)
       {
+        // NOTE: Parameter solution by design support different types of parameters
         mParam_Solution.segment(0, mMassDim) = mWorld->getMasses();
         mParam_Solution.segment(mMassDim, mDampingDim) = mWorld->getDampings();
         mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim) = mWorld->getSprings();
@@ -527,11 +458,14 @@ void SSID::optimizationThreadLoop()
       // We have a stable solution, then detect changes
       if(mSteadySolutionFound && mUseConfidence)
       {
-        if(detectChangeParams()) // Cmp with previous believed solution TODO: May be need isolated debug
+        if(detectEWiseChangeParams().second)
         {
+          
           std::cout << "+++++++++++++++" << std::endl;
           std::cout << "Change Detected" << std::endl;
           std::cout << "+++++++++++++++" << std::endl;
+          
+          
           mParamChanged = true;
           mSteadySolutionFound = false;
           paramMutexLock();
@@ -557,31 +491,45 @@ void SSID::optimizationThreadLoop()
       {
         // Estimate the result by weighted average
         paramMutexLock();
-        std::cout << "Param Changed Use Fast Result!" << mPrev_solutions[mPrev_solutions.size()-1](0) 
-                  <<" " << mPrev_solutions[mPrev_solutions.size()-1](1) << std::endl;
+        if(mVerbose)
+        {
+          std::cout << "Param Changed Use Fast Result!" 
+                  << mPrev_solutions[mPrev_solutions.size()-1](0) <<" " 
+                  << mPrev_solutions[mPrev_solutions.size()-1](1) <<" "
+                  << mPrev_solutions[mPrev_solutions.size()-1](2) << std::endl;
+        }
         if(!mInitialize)
         {
           // Sliding weighted average 
-          // TODO: Think about ablation
           Eigen::VectorXs conf = computeConfidenceFromValue(mValue);
-          std::cout << "Confidence: \n" << conf(2) << std::endl;
+          if(mVerbose || true) // TODO: remove the override
+          {
+            std::cout << "Confidence: \n" << conf << std::endl;
+          }
           Eigen::VectorXs prev_solution = mParam_Solution;
           if(mUseConfidence)
           {
-            if(conf.mean()>mConfidence_thresh)
+            if(conf.mean()>mConfidence_thresh) // Confidence score is not a sensitive hyper-param, we can use one for all parameters
             {
               mParam_Solution = (mValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(new_solution) 
                               + (mCumValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(mParam_Solution);
               mCumValue += mValue;
             }
-            // TODO: Use delta value to determine the stability
-            if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
+            // TODO : Need to use different mParam_change_thresh
+            // If a parameter is detected to change, the other parameter is in its low confidence area. Then we should change the parameter that detected to change
+            // with high confidence score while maintain the same other parameters
+            // if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
+            if(detectEWiseStable(mParam_Solution, prev_solution, conf).second)
             {
               mSteadySolutionFound = true;
               mParamChanged = false;
-              std::cout << "=====================" << std::endl;
-              std::cout << "Steady Solution Found" << std::endl;
-              std::cout << "=====================" << std::endl;
+              if(mVerbose)
+              {
+                std::cout << "=====================" << std::endl;
+                std::cout << "Steady Solution Found" << std::endl;
+                std::cout << "=====================" << std::endl;
+              }
+              
             }
           }
           
@@ -607,53 +555,9 @@ void SSID::optimizationThreadLoop()
   }
 }
 
-void SSID::slowOptimizationThreadLoop()
+void SSID::setVerbose(bool verbose)
 {
-  sigset_t sigset;
-  sigemptyset(&sigset);
-  sigaddset(&sigset, SIGINT);
-  sigaddset(&sigset, SIGTERM);
-  pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-  while (mRunningSlow)
-  {
-    long startTime = timeSinceEpochMillis();
-    // Need to be sensitive to change
-    if(mParamChanged)
-    {
-      // std::cout << "Slow Thread is Running" << std::endl;
-      registerLock();
-      mSteadySolutionFound = false;
-      mParamChanged = false;
-      mControlLog.discardBefore(startTime);
-      for(int i = 0; i < mSensorLogs.size(); i++)
-      {
-        mSensorLogs[i].discardBefore(startTime);
-      }
-      registerUnlock();
-    }
-    if(mControlLog.availableStepsBefore(startTime) > mPlanningStepsSlow+1 && !mSteadySolutionFound)
-    {
-      // TODO: Implement inference for slow thread
-      // Which ideally need to solve a separate optimization problem with different settings
-      // It may be need to receive some flags from other thread
-      runSlowInference(startTime);
-      // Assume runSlowInference Given long enough trajectory can definitely solve the trajectory
-      paramMutexLock();
-      mParam_Solution.segment(0, mMassDim) = mWorldSlow->getMasses();
-      mParam_Solution.segment(mMassDim, mDampingDim) = mWorldSlow->getDampings();
-      mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim) = mWorldSlow->getSprings();
-
-      // mParam_Slow.segment(0, mMassDim) = mWorldSlow->getMasses();
-      // mParam_Slow.segment(mMassDim, mDampingDim) = mWorldSlow->getDampings();
-      // mParam_Slow.segment(mMassDim+mDampingDim, mSpringDim) = mWorldSlow->getSprings();
-      std::cout << "Result From Slow Thread: "
-                << mParam_Solution << std::endl;
-      paramMutexUnlock();
-      mParamChanged = false;
-      mSteadySolutionFound = true;
-    }
-    
-  }
+  mVerbose = verbose;
 }
 
 /// The Change of Parameter should be handled independently for each degree of freedom
@@ -662,7 +566,10 @@ bool SSID::detectChangeParams()
 {
   Eigen::VectorXs mean_params = estimateSolution();
   Eigen::VectorXs confidence = estimateConfidence();
-  std::cout << "Confidence: " << confidence.mean() << std::endl;
+  if(mVerbose)
+  {
+    std::cout << "Confidence: " << confidence.mean() << std::endl;
+  }
   paramMutexLock();
   if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
     (confidence.mean() > mConfidence_thresh|| !mUseConfidence))
@@ -672,6 +579,60 @@ bool SSID::detectChangeParams()
   }
   paramMutexUnlock();
   return false;
+}
+
+std::pair<std::vector<bool>, bool> SSID::detectEWiseChangeParams()
+{
+  Eigen::VectorXs mean_params = estimateSolution();
+  Eigen::VectorXs confidence = estimateConfidence();
+  if(mVerbose)
+  {
+    std::cout << "Confidences:\n" << confidence << std::endl;
+  }
+  paramMutexLock();
+  Eigen::VectorXs params_diff = (mean_params - mParam_Solution).cwiseAbs();
+  std::vector<bool> params_change_flag;
+  bool param_changed = false;
+  for(int i=0;i < params_diff.size();i++)
+  {
+    // NOTE: Since confience score is relatively not sensitive, we use one threshold for all
+    if(params_diff(i) > mEwise_params_change_thresh(i) 
+        && (confidence(i) > mConfidence_thresh || !mUseConfidence))
+    {
+      params_change_flag.push_back(true);
+      param_changed = true;
+    }
+    else
+    {
+      params_change_flag.push_back(false);
+    }
+  }
+  paramMutexUnlock();
+  return std::pair<std::vector<bool>, bool>(params_change_flag, param_changed);
+}
+
+std::pair<std::vector<bool>, bool> SSID::detectEWiseStable(
+  Eigen::VectorXs current, 
+  Eigen::VectorXs reference, 
+  Eigen::VectorXs confidence)
+{
+  Eigen::VectorXs diff = (current - reference).cwiseAbs();
+  std::vector<bool> stable_flags;
+  bool stable_flag = true;
+  for(int i=0;i<diff.size();i++)
+  {
+    // NOTE: There should have one confidence threshld at approximately 0.5
+    if(diff(i) > mEwise_params_change_thresh(i) || confidence(i) <= mConfidence_thresh)
+    {
+      stable_flags.push_back(false);
+      stable_flag = false;
+    }
+    else
+    {
+      stable_flags.push_back(true);
+    }
+  }
+  return std::pair<std::vector<bool>, bool>(stable_flags, stable_flag);
 }
 
 /// The condition number is with respect to a particular node
@@ -784,10 +745,10 @@ s_t SSID::getTrajConditionNumberOfSpringIndex(Eigen::MatrixXs poses, size_t inde
   return cond/steps;
 }
 
-/// TODO: This function need huge modifications to adapt to different type of system parameters
+// NOTE: This function can adapt to elementwise different type of parameters, with fixed order
 Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::MatrixXs vels)
 {
-  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mMassDim + mDampingDim+mSpringDim);
+  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
   int cur = 0;
   for(int i = 0; i < mSSIDMassNodeIndices.size(); i++)
   {
@@ -831,6 +792,7 @@ void SSID::attachParamMutex(std::mutex &mutex_lock)
 
 
 // This will use previous solutions to detect the change
+// NOTE: Since mPrev_values is evaluated element-wisely it should be fine
 Eigen::VectorXs SSID::estimateSolution()
 {
   Eigen::VectorXs solution = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
@@ -862,6 +824,7 @@ Eigen::VectorXs SSID::estimateSolution()
 }
 
 // Here confidence should be not related to trajectory length since it is a relative value
+// Should be group-wise
 Eigen::VectorXs SSID::estimateConfidence()
 {
   Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
@@ -872,6 +835,7 @@ Eigen::VectorXs SSID::estimateConfidence()
   return computeConfidenceFromValue(totalValue/mPrev_values.size());
 }
 
+// NOTE: This is already element-wise, need to customize on temperature side
 Eigen::VectorXs SSID::computeConfidenceFromValue(Eigen::VectorXs value)
 {
   Eigen::VectorXs confidence = Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim);
@@ -955,6 +919,12 @@ Eigen::VectorXs SSID::getTemperature()
 void SSID::setThreshs(s_t param_change, s_t conf)
 {
   mParam_change_thresh = param_change;
+  mConfidence_thresh = conf;
+}
+
+void SSID::setEWiseThreshs(Eigen::VectorXs param_changes, s_t conf)
+{
+  mEwise_params_change_thresh = param_changes;
   mConfidence_thresh = conf;
 }
 
