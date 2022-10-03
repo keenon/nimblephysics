@@ -3271,7 +3271,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         bool isUnit = false;
         for (int j = 0; j < 3; j++)
         {
-          if (eulerAxisOrder[i] == Eigen::Vector3s::Unit(j))
+          if (eulerAxisOrder[i] == Eigen::Vector3s::Unit(j)
+              || eulerAxisOrder[i] == -Eigen::Vector3s::Unit(j))
           {
             isUnit = true;
             break;

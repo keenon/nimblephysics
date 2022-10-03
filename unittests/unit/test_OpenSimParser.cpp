@@ -24,7 +24,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 /*
 // This leads to a hard exit
@@ -445,7 +445,7 @@ TEST(OpenSimParser, LOAD_WEIRD_GRF)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(OpenSimParser, RAJAGOPAL_GET_CONFIGURATION)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(
@@ -460,6 +460,7 @@ TEST(OpenSimParser, RAJAGOPAL_GET_CONFIGURATION)
 
   OpenSimFile scaled = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015_v3_scaled/Rajagopal_scaled.osim");
+
   OpenSimScaleAndMarkerOffsets config
       = OpenSimParser::getScaleAndMarkerOffsets(standard, scaled);
   EXPECT_TRUE(config.success);
@@ -525,7 +526,7 @@ TEST(OpenSimParser, RAJAGOPAL_GET_CONFIGURATION)
   server.blockWhileServing();
   */
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, DELP_1990)

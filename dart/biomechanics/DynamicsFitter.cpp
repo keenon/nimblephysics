@@ -292,6 +292,17 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
 
   Eigen::VectorXs originalWrt = wrt->get(mSkel.get());
 
+  s_t stepSize = 1e-7;
+  if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    stepSize = 5e-4;
+  }
+  if (wrt == neural::WithRespectTo::GROUP_MASSES
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS)
+  {
+    stepSize = 1e-6;
+  }
+
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -310,7 +321,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
       },
       result,
       // 5e-4,
-      wrt == neural::WithRespectTo::ACCELERATION ? 5e-4 : 1e-6,
+      stepSize,
       true);
 
   wrt->set(mSkel.get(), originalWrt);
@@ -1221,7 +1232,14 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   for (int trial = 0; trial < mPoses.size(); trial++)
   {
     totalTimesteps += mPoses[trial].cols();
-    totalAccTimesteps += mPoses[trial].cols() - 2;
+    for (int t = 1; t < mPoses[trial].cols() - 1; t++)
+    {
+      // Add force residual RMS errors to all the middle timesteps
+      if (!mInit->probablyMissingGRF[trial][t])
+      {
+        totalAccTimesteps++;
+      }
+    }
   }
 
   s_t linearNewtonError = 0.0;
@@ -1518,7 +1536,14 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   for (int trial = 0; trial < mPoses.size(); trial++)
   {
     totalTimesteps += mPoses[trial].cols();
-    totalAccTimesteps += mPoses[trial].cols() - 2;
+    for (int t = 1; t < mPoses[trial].cols() - 1; t++)
+    {
+      // Add force residual RMS errors to all the middle timesteps
+      if (!mInit->probablyMissingGRF[trial][t])
+      {
+        totalAccTimesteps++;
+      }
+    }
   }
   int markerCount = 0;
   for (int trial = 0; trial < mPoses.size(); trial++)
@@ -4891,11 +4916,11 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
           = helper.calculateResidual(q, dq, ddq, init->grfTrials[trial].col(t));
       torque += residual.head<3>().norm();
       s_t frameForce = residual.tail<3>().norm();
-      // std::cout << t << ": " << frameForce << "N" << std::endl;
       force += frameForce;
       count++;
     }
   }
+  std::cout << "count: " << count << std::endl;
   force /= count;
   torque /= count;
 

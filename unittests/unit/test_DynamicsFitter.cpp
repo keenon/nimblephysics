@@ -793,7 +793,7 @@ bool testResidualGradWrt(
   analytical /= max;
   fd /= max;
 
-  if (!equals(analytical, fd, 2e-7))
+  if (!equals(analytical, fd, 5e-7))
   {
     std::cout << "Gradient of norm(tau) (divided by max coeff=" << max
               << ") wrt " << wrt->name() << " not equal!" << std::endl;
