@@ -399,6 +399,14 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
   J.col(1) = math::AdT(childBodyToJoint, J1) * flipAxisMap(1);
   J.col(2) = math::AdT(childBodyToJoint, J2) * flipAxisMap(2);
 
+#ifndef NDEBUG
+  if (math::isNan(J))
+  {
+    std::cout << "Got EulerJoint with NaN jacobian: " << std::endl
+              << J << std::endl;
+  }
+#endif
+
   assert(!math::isNan(J));
 
 #ifndef NDEBUG

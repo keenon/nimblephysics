@@ -3325,7 +3325,6 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
             R.col(1) = tmp;
           }
 
-          Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
           // assert(!flips[0] && !flips[1] && !flips[2]);
 
           // Create an EulerJoint
@@ -3348,9 +3347,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
             eulerJoint = pair.first;
             childBody = pair.second;
           }
-          eulerJoint->setFlipAxisMap(flips);
+          eulerJoint->setFlipAxisMap(Eigen::Vector3s::Ones());
           eulerJoint->setAxisOrder(axisOrder);
-          Eigen::Isometry3s inFrame;
+          Eigen::Isometry3s inFrame = Eigen::Isometry3s::Identity();
           inFrame.linear() = R;
           eulerJoint->setTransformFromChildBodyNode(inFrame);
           eulerJoint->setTransformFromParentBodyNode(
