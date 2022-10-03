@@ -38,6 +38,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "dart/math/MathTypes.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -73,9 +75,19 @@ void GUIStateMachine(py::module& m)
           ::py::arg("receiveShadows") = false)
       .def(
           "createSphere",
-          &dart::server::GUIStateMachine::createSphere,
+          +[](dart::server::GUIStateMachine* self,
+              std::string key,
+              Eigen::Vector3s radii,
+              Eigen::Vector3s pos,
+              Eigen::Vector4s color,
+              std::string layer,
+              bool castShadows,
+              bool receiveShadows) {
+            self->createSphere(
+                key, radii, pos, color, layer, castShadows, receiveShadows);
+          },
           ::py::arg("key"),
-          ::py::arg("radius") = 0.5,
+          ::py::arg("radii") = Eigen::Vector3s::Ones() * 0.5,
           ::py::arg("pos") = Eigen::Vector3s::Zero(),
           ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
           ::py::arg("layer") = "",

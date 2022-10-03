@@ -1314,6 +1314,7 @@ void GenericJoint(py::module& m)
   DARTPY_DEFINE_GENERICJOINT(R1, ::dart::math::RealVectorSpace<1>);
   DARTPY_DEFINE_GENERICJOINT(R2, ::dart::math::RealVectorSpace<2>);
   DARTPY_DEFINE_GENERICJOINT(R3, ::dart::math::RealVectorSpace<3>);
+  DARTPY_DEFINE_GENERICJOINT(R4, ::dart::math::RealVectorSpace<4>);
   DARTPY_DEFINE_GENERICJOINT(R6, ::dart::math::RealVectorSpace<6>);
   DARTPY_DEFINE_GENERICJOINT(SO3, ::dart::math::SO3Space);
   DARTPY_DEFINE_GENERICJOINT(SE3, ::dart::math::SE3Space);

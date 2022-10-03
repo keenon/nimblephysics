@@ -65,6 +65,7 @@ void TranslationalJoint2D(py::module& sm);
 void PlanarJoint(py::module& sm);
 void EulerJoint(py::module& sm);
 void EulerFreeJoint(py::module& sm);
+void ScapulathoracicJoint(py::module& sm);
 void CustomJoint(py::module& sm);
 void BallJoint(py::module& sm);
 void TranslationalJoint(py::module& sm);
@@ -108,6 +109,7 @@ void dart_dynamics(py::module& m)
   PlanarJoint(sm);
   EulerJoint(sm);
   EulerFreeJoint(sm);
+  ScapulathoracicJoint(sm);
   CustomJoint(sm);
   BallJoint(sm);
   TranslationalJoint(sm);
