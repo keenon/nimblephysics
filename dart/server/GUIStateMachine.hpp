@@ -20,6 +20,7 @@
 
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/MeshShape.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/proto/GUI.pb.h"
 #include "dart/server/WebsocketServer.hpp"
 
@@ -143,6 +144,16 @@ public:
   void createSphere(
       std::string key,
       s_t radius,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a sphere in the web GUI under a specified key
+  void createSphere(
+      std::string key,
+      Eigen::Vector3s radii,
       const Eigen::Vector3s& pos,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
       const std::string& layer = "",
@@ -434,7 +445,7 @@ protected:
   {
     std::string key;
     std::string layer;
-    s_t radius;
+    Eigen::Vector3s radii;
     Eigen::Vector3s pos;
     Eigen::Vector4s color;
     bool castShadows;

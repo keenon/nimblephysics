@@ -30,6 +30,7 @@
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
+#include "dart/dynamics/ScapulathoracicJoint.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -3264,32 +3265,134 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         first3Linear && !anySpline
         && (dofNames.size() == 3 || dofNames.size() == 6))
     {
-      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
-      Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
-      // assert(!flips[0] && !flips[1] && !flips[2]);
-
-      // Create an EulerJoint
-      dynamics::EulerJoint* eulerJoint = nullptr;
-      dynamics::EulerJoint::Properties props;
-      props.mName = jointName;
-      if (parentBody == nullptr)
+      bool anyNonUnit = false;
+      for (int i = 0; i < 3; i++)
       {
-        auto pair = skel->createJointAndBodyNodePair<dynamics::EulerJoint>(
-            nullptr, props, bodyProps);
-        eulerJoint = pair.first;
-        childBody = pair.second;
+        bool isUnit = false;
+        for (int j = 0; j < 3; j++)
+        {
+          if (eulerAxisOrder[i] == Eigen::Vector3s::Unit(j))
+          {
+            isUnit = true;
+            break;
+          }
+        }
+        if (!isUnit)
+        {
+          anyNonUnit = true;
+          break;
+        }
+      }
+      if (anyNonUnit)
+      {
+        s_t xDotY = abs(eulerAxisOrder[0].dot(eulerAxisOrder[1]));
+        s_t yDotZ = abs(eulerAxisOrder[1].dot(eulerAxisOrder[2]));
+        s_t zDotX = abs(eulerAxisOrder[2].dot(eulerAxisOrder[0]));
+        if (xDotY < 1e-4 && yDotZ < 1e-4 && zDotX < 1e-4)
+        {
+          // Construct a rotation matrix to get these rotations back to normal
+          // euler angles
+          Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
+          R.col(0) = eulerAxisOrder[0].normalized();
+          R.col(1) = eulerAxisOrder[1].normalized();
+          R.col(2) = eulerAxisOrder[2].normalized();
+          for (int i = 0; i < 10; i++)
+          {
+            R.col(0) = R.col(0) - (R.col(0).dot(R.col(1)) * R.col(1))
+                       - (R.col(0).dot(R.col(2)) * R.col(2));
+            R.col(1) = R.col(1) - (R.col(1).dot(R.col(0)) * R.col(0))
+                       - (R.col(1).dot(R.col(2)) * R.col(2));
+            R.col(2) = R.col(2) - (R.col(2).dot(R.col(0)) * R.col(0))
+                       - (R.col(2).dot(R.col(1)) * R.col(1));
+          }
+          // Now R contains an approximately orthonormal basis to the euler axis
+          // we were originally passed.
+          s_t errorOfCross = (R.col(0).cross(R.col(1)) - R.col(2)).norm();
+
+          // We need to check the "handedness" of R
+          dynamics::EulerJoint::AxisOrder axisOrder;
+          if (errorOfCross < 1e-4)
+          {
+            axisOrder = dynamics::EulerJoint::AxisOrder::XYZ;
+          }
+          else
+          {
+            axisOrder = dynamics::EulerJoint::AxisOrder::XZY;
+            // Flip the order of the columns to make the handed-ness work
+            Eigen::Vector3s tmp = R.col(2);
+            R.col(2) = R.col(1);
+            R.col(1) = tmp;
+          }
+
+          Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+          // assert(!flips[0] && !flips[1] && !flips[2]);
+
+          // Create an EulerJoint
+          dynamics::EulerJoint* eulerJoint = nullptr;
+          dynamics::EulerJoint::Properties props;
+          props.mName = jointName;
+          if (parentBody == nullptr)
+          {
+            auto pair = skel->createJointAndBodyNodePair<dynamics::EulerJoint>(
+                nullptr, props, bodyProps);
+            eulerJoint = pair.first;
+            childBody = pair.second;
+          }
+          else
+          {
+            auto pair
+                = parentBody
+                      ->createChildJointAndBodyNodePair<dynamics::EulerJoint>(
+                          props, bodyProps);
+            eulerJoint = pair.first;
+            childBody = pair.second;
+          }
+          eulerJoint->setFlipAxisMap(flips);
+          eulerJoint->setAxisOrder(axisOrder);
+          Eigen::Isometry3s inFrame;
+          inFrame.linear() = R;
+          eulerJoint->setTransformFromChildBodyNode(inFrame);
+          eulerJoint->setTransformFromParentBodyNode(
+              inFrame); // this is inFrame.inverse().inverse()
+
+          joint = eulerJoint;
+        }
+        else
+        {
+          assert(false && "3 rotation axis are not mutually orthogonal");
+        }
       }
       else
       {
-        auto pair
-            = parentBody->createChildJointAndBodyNodePair<dynamics::EulerJoint>(
-                props, bodyProps);
-        eulerJoint = pair.first;
-        childBody = pair.second;
+        dynamics::EulerJoint::AxisOrder axisOrder
+            = getAxisOrder(eulerAxisOrder);
+        Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
+        // assert(!flips[0] && !flips[1] && !flips[2]);
+
+        // Create an EulerJoint
+        dynamics::EulerJoint* eulerJoint = nullptr;
+        dynamics::EulerJoint::Properties props;
+        props.mName = jointName;
+        if (parentBody == nullptr)
+        {
+          auto pair = skel->createJointAndBodyNodePair<dynamics::EulerJoint>(
+              nullptr, props, bodyProps);
+          eulerJoint = pair.first;
+          childBody = pair.second;
+        }
+        else
+        {
+          auto pair
+              = parentBody
+                    ->createChildJointAndBodyNodePair<dynamics::EulerJoint>(
+                        props, bodyProps);
+          eulerJoint = pair.first;
+          childBody = pair.second;
+        }
+        eulerJoint->setFlipAxisMap(flips);
+        eulerJoint->setAxisOrder(axisOrder);
+        joint = eulerJoint;
       }
-      eulerJoint->setFlipAxisMap(flips);
-      eulerJoint->setAxisOrder(axisOrder);
-      joint = eulerJoint;
     }
     else if (numLinear == 1 && numConstant == 5 && !anySpline)
     {
@@ -3533,6 +3636,49 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     joint = universalJoint;
   }
+  else if (jointType == "ScapulothoracicJoint")
+  {
+    // Create a ScapulathorasicJoint
+    dynamics::ScapulathoracicJoint* scapulothoracicJoint = nullptr;
+    dynamics::ScapulathoracicJoint::Properties props;
+    props.mName = jointName;
+    if (parentBody == nullptr)
+    {
+      auto pair
+          = skel->createJointAndBodyNodePair<dynamics::ScapulathoracicJoint>(
+              nullptr, props, bodyProps);
+      scapulothoracicJoint = pair.first;
+      childBody = pair.second;
+    }
+    else
+    {
+      auto pair = parentBody->createChildJointAndBodyNodePair<
+          dynamics::ScapulathoracicJoint>(props, bodyProps);
+      scapulothoracicJoint = pair.first;
+      childBody = pair.second;
+    }
+    auto* radiiElem
+        = jointDetail->FirstChildElement("thoracic_ellipsoid_radii_x_y_z");
+    if (radiiElem != nullptr)
+    {
+      scapulothoracicJoint->setEllipsoidRadii(readVec3(radiiElem));
+    }
+    auto* wingingOffsetElem
+        = jointDetail->FirstChildElement("scapula_winging_axis_origin");
+    if (wingingOffsetElem != nullptr)
+    {
+      scapulothoracicJoint->setWingingAxisOffset(readVec2(wingingOffsetElem));
+    }
+    auto* wingingNeutralDirectionElem
+        = jointDetail->FirstChildElement("scapula_winging_axis_direction");
+    if (wingingNeutralDirectionElem != nullptr)
+    {
+      scapulothoracicJoint->setWingingAxisDirection(
+          atof(wingingNeutralDirectionElem->GetText()));
+    }
+
+    joint = scapulothoracicJoint;
+  }
   else
   {
     std::cout << "ERROR: Nimble OpenSimParser doesn't yet support joint type \""
@@ -3547,8 +3693,14 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   assert(childBody != nullptr);
   joint->setName(jointName);
   // std::cout << jointName << std::endl;
-  joint->setTransformFromChildBodyNode(transformFromChild);
-  joint->setTransformFromParentBodyNode(transformFromParent);
+
+  // If there's a non-zero tranformation from the parent or child, it's almost
+  // certainly because we're compensating for some squirrely specification of a
+  // EulerJoint in a different frame, so we want to preserve that offset.
+  joint->setTransformFromChildBodyNode(
+      transformFromChild * joint->getTransformFromChildBodyNode());
+  joint->setTransformFromParentBodyNode(
+      transformFromParent * joint->getTransformFromParentBodyNode());
 
   // Rename the DOFs for each joint
 
@@ -3865,6 +4017,13 @@ OpenSimFile OpenSimParser::readOsim40(
       if (universalJoint)
       {
         jointDetail = universalJoint;
+      }
+      // ScapulathoracicJoint
+      tinyxml2::XMLElement* scapulothoracicJoint
+          = joint->FirstChildElement("ScapulothoracicJoint");
+      if (scapulothoracicJoint)
+      {
+        jointDetail = scapulothoracicJoint;
       }
 
       if (jointDetail != nullptr)

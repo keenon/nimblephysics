@@ -458,18 +458,35 @@ class DARTView {
     }
     else if (command.sphere != null) {
       const data = command.sphere.data;
-      const radius: number = data[0];
-      const pos: number[] = [data[1], data[2], data[3]];
-      const color: number[] = [data[4], data[5], data[6], data[7]];
-      this.createSphere(
-        command.sphere.key,
-        radius,
-        pos,
-        color,
-        command.sphere.layer,
-        command.sphere.cast_shadows === true,
-        command.sphere.receive_shadows === true
-      );
+      // For backwards compatibility
+      if (data.length == 8) {
+        const radii: number[] = [data[0], data[0], data[0]];
+        const pos: number[] = [data[1], data[2], data[3]];
+        const color: number[] = [data[4], data[5], data[6], data[7]];
+        this.createSphere(
+          command.sphere.key,
+          radii,
+          pos,
+          color,
+          command.sphere.layer,
+          command.sphere.cast_shadows === true,
+          command.sphere.receive_shadows === true
+        );
+      }
+      else {
+        const radii: number[] = [data[0], data[1], data[2]];
+        const pos: number[] = [data[3], data[4], data[5]];
+        const color: number[] = [data[6], data[7], data[8], data[9]];
+        this.createSphere(
+          command.sphere.key,
+          radii,
+          pos,
+          color,
+          command.sphere.layer,
+          command.sphere.cast_shadows === true,
+          command.sphere.receive_shadows === true
+        );
+      }
     }
     else if (command.capsule != null) {
       const data = command.capsule.data;
@@ -886,7 +903,7 @@ class DARTView {
    */
   createSphere = (
     key: number,
-    radius: number,
+    radii: number[],
     pos: number[],
     color: number[],
     layer: number | undefined,
@@ -910,7 +927,7 @@ class DARTView {
     mesh.position.z = pos[2] * SCALE_FACTOR;
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
-    mesh.scale.set(radius, radius, radius);
+    mesh.scale.set(radii[0], radii[1], radii[2]);
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {

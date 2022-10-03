@@ -247,13 +247,13 @@ public:
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index) const override;
 
+  /// Constructor called by Skeleton class
+  EulerJoint(const Properties& properties);
+
 protected:
   /// This contains 1's and -1's to indicate whether we should flip a given
   /// input axis.
   Eigen::Vector3s mFlipAxisMap;
-
-  /// Constructor called by Skeleton class
-  EulerJoint(const Properties& properties);
 
   // Documentation inherited
   Joint* clone() const override;

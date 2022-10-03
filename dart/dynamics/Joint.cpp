@@ -814,25 +814,96 @@ Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(int axis)
 }
 
 //==============================================================================
-Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
+/// This gets the relative spatial velocity of the joint, with finite
+/// differencing
+Eigen::Vector6s Joint::finiteDifferenceRelativeSpatialVelocity()
 {
-  Eigen::MatrixXs result(6, getNumDofs());
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
 
-  bool useRidders = false;
-  s_t eps = 1e-5;
-  math::finiteDifference(
+  bool useRidders = true;
+  s_t eps = 1e-2;
+  Eigen::Isometry3s originalT = getRelativeTransform();
+
+  Eigen::Vector6s result;
+  math::finiteDifference<Eigen::Vector6s>(
       [&](/* in*/ s_t eps,
-          /* in*/ int dof,
-          /*out*/ Eigen::VectorXs& perturbed) {
-        s_t original = getVelocity(dof);
-        setVelocity(dof, original + eps);
-        perturbed = getRelativeSpatialVelocity();
-        setVelocity(dof, original);
+          /*out*/ Eigen::Vector6s& perturbed) {
+        setPositions(pos + (vel * eps));
+        perturbed = math::logMap(originalT.inverse() * getRelativeTransform());
         return true;
       },
       result,
       eps,
       useRidders);
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs originalVelocity = getVelocities();
+
+  // Changes in velocity should be linearly related to changes in speed
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    setVelocities(Eigen::VectorXs::Unit(getNumDofs(), i));
+    result.col(i) = finiteDifferenceRelativeSpatialVelocity();
+  }
+
+  // This should be equivalent
+  // bool useRidders = true;
+  // s_t eps = 1e-3;
+  // math::finiteDifference(
+  //     [&](/* in*/ s_t eps,
+  //         /* in*/ int dof,
+  //         /*out*/ Eigen::VectorXs& perturbed) {
+  //       s_t original = getVelocity(dof);
+  //       setVelocity(dof, original + eps);
+  //       perturbed = finiteDifferenceRelativeSpatialVelocity();
+  //       setVelocity(dof, original);
+  //       return true;
+  //     },
+  //     result,
+  //     eps,
+  //     useRidders);
+
+  setVelocities(originalVelocity);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian derivative
+/// wrt the position of `dof`
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianDerivWrtPosition(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos;
+        tweaked(dof) += eps;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
   return result;
 }
 
@@ -861,6 +932,68 @@ Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianTimeDeriv()
       useRidders);
 
   setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative, derivative wrt position of `dof`
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos;
+        tweaked(dof) += eps;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative, derivative wrt velocity of `dof`
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = vel;
+        tweaked(dof) += eps;
+        setVelocities(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setVelocities(vel);
 
   return result;
 }

@@ -21,6 +21,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SphereShape.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
 #include "dart/proto/GUI.pb.h"
 #include "dart/server/RawJsonUtils.hpp"
@@ -682,11 +683,25 @@ void GUIStateMachine::createSphere(
     bool castShadows,
     bool receiveShadows)
 {
+  Eigen::Vector3s radii = Eigen::Vector3s::Constant(radius);
+  createSphere(key, radii, pos, color, layer, castShadows, receiveShadows);
+}
+
+/// This creates a sphere in the web GUI under a specified key
+void GUIStateMachine::createSphere(
+    std::string key,
+    Eigen::Vector3s radii,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   Sphere& sphere = mSpheres[key];
   sphere.key = key;
-  sphere.radius = radius;
+  sphere.radii = radii;
   sphere.pos = pos;
   sphere.color = color;
   sphere.layer = layer;
@@ -1026,7 +1041,7 @@ Eigen::Vector3s GUIStateMachine::getObjectScale(const std::string& key)
   if (mBoxes.find(key) != mBoxes.end())
     return mBoxes[key].size;
   if (mSpheres.find(key) != mSpheres.end())
-    return Eigen::Vector3s::Ones() * mSpheres[key].radius;
+    return mSpheres[key].radii;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].scale;
   return Eigen::Vector3s::Zero();
@@ -1142,7 +1157,7 @@ void GUIStateMachine::setObjectScale(
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].radius = scale(0);
+    mSpheres[key].radii = scale;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
@@ -1866,7 +1881,9 @@ void GUIStateMachine::encodeCreateSphere(
   command->mutable_sphere()->set_layer(getStringCode(sphere.layer));
   command->mutable_sphere()->set_cast_shadows(sphere.castShadows);
   command->mutable_sphere()->set_receive_shadows(sphere.receiveShadows);
-  command->mutable_sphere()->add_data((double)sphere.radius);
+  command->mutable_sphere()->add_data((double)sphere.radii(0));
+  command->mutable_sphere()->add_data((double)sphere.radii(1));
+  command->mutable_sphere()->add_data((double)sphere.radii(2));
   command->mutable_sphere()->add_data((double)sphere.pos(0));
   command->mutable_sphere()->add_data((double)sphere.pos(1));
   command->mutable_sphere()->add_data((double)sphere.pos(2));

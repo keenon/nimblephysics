@@ -855,13 +855,31 @@ public:
   virtual void updateRelativeJacobianInPositionSpace(
       bool mandatory = true) const = 0;
 
+  /// This gets the relative spatial velocity of the joint, with finite
+  /// differencing
+  Eigen::Vector6s finiteDifferenceRelativeSpatialVelocity();
+
   /// This uses finite differencing to compute the relative Jacobian in velocity
   /// space
   Eigen::MatrixXs finiteDifferenceRelativeJacobian();
 
+  /// This uses finite differencing to compute the relative Jacobian derivative
+  /// wrt the position of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtPosition(int dof);
+
   /// This uses finite differencing to compute the relative Jacobian time
   /// derivative
   Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDeriv();
+
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative, derivative wrt position of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
+      int dof);
+
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative, derivative wrt velocity of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
+      int dof);
 
   /// This uses finite differencing to compute the relative Jacobian in position
   /// space
