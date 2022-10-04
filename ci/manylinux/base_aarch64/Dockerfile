@@ -166,7 +166,7 @@ RUN git clone https://github.com/robotology-dependencies/tinyxml.git && \
     rm -rf tinyxml
 
 # Install urdfdom_headers
-RUN git clone https://github.com/ros/urdfdom_headers.git && \
+RUN git clone https://github.com/OneShotMimic/urdfdom_headers.git && \
     pushd urdfdom_headers && \
     mkdir build && \
     pushd build && \
@@ -188,7 +188,7 @@ RUN git clone https://github.com/ros/console_bridge.git && \
     rm -rf console_bridge
 
 # Install urdfdom
-RUN git clone https://github.com/ros/urdfdom.git && \
+RUN git clone https://github.com/OneShotMimic/urdfdom.git && \
     pushd urdfdom && \
     mkdir build && \
     pushd build && \

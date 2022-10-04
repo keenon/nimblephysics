@@ -42,6 +42,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CylinderShape.hpp"
+#include "dart/dynamics/CapsuleShape.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
@@ -643,6 +644,10 @@ dynamics::ShapePtr DartLoader::createShape(
   {
     shape = dynamics::ShapePtr(new dynamics::BoxShape(
         Eigen::Vector3s(box->dim.x, box->dim.y, box->dim.z)));
+  }
+  else if (urdf::Capsule* capsule = dynamic_cast<urdf::Capsule*>(_vizOrCol->geometry.get()))
+  {
+    shape = dynamics::ShapePtr(new dynamics::CapsuleShape(capsule->radius, capsule->length));
   }
   // Cylinder
   else if (

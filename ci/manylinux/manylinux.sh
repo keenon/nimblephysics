@@ -162,7 +162,7 @@ popd
 rm -rf tinyxml
 
 # Install urdfdom_headers
-git clone https://github.com/ros/urdfdom_headers.git
+git clone https://github.com/OneShotMimic/urdfdom_headers.git
 pushd urdfdom_headers
 mkdir build
 pushd build
@@ -184,7 +184,7 @@ popd
 rm -rf console_bridge
 
 # Install urdfdom
-git clone https://github.com/ros/urdfdom.git
+git clone https://github.com/OneShotMimic/urdfdom.git
 pushd urdfdom
 mkdir build
 pushd build
