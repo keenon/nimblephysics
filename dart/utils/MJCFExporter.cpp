@@ -453,6 +453,9 @@ void MJCFExporter::writeSkeleton(
   (void)path;
   (void)skel;
 
+  Eigen::VectorXs originalPos = skel->getPositions();
+  skel->setPositions(Eigen::VectorXs::Zero(originalPos.size()));
+
   using namespace tinyxml2;
 
   tinyxml2::XMLDocument xmlDoc;
@@ -620,6 +623,8 @@ void MJCFExporter::writeSkeleton(
 
   std::cout << "Saving MJCF file to " << path << std::endl;
   xmlDoc.SaveFile(path.c_str());
+
+  skel->setPositions(originalPos);
 };
 
 } // namespace utils

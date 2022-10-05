@@ -881,7 +881,14 @@ bool testRelationshipBetweenResidualAndLinear(
   int totalAccTimesteps = 0;
   for (int trial = 0; trial < problem.mPoses.size(); trial++)
   {
-    totalAccTimesteps += problem.mPoses[trial].cols() - 2;
+    for (int t = 1; t < problem.mPoses[trial].cols() - 1; t++)
+    {
+      // Add force residual RMS errors to all the middle timesteps
+      if (!init->probablyMissingGRF[trial][t])
+      {
+        totalAccTimesteps++;
+      }
+    }
   }
 
   s_t residualNorm = 0.0;
@@ -1434,7 +1441,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::vector<std::string> grfFiles,
     int limitTrialLength = -1,
     int trialStartOffset = 0,
-    bool saveGUI = false)
+    bool saveGUI = false,
+    bool simplify = false)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
@@ -1468,7 +1476,23 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       limitTrialLength,
       trialStartOffset);
 
-  return runEngine(standard.skeleton, init, saveGUI);
+  std::shared_ptr<DynamicsInitialization> complexInit
+      = runEngine(standard.skeleton, init, saveGUI);
+
+  if (simplify)
+  {
+    std::map<std::string, std::string> mergeBodiesInto;
+    std::shared_ptr<dynamics::Skeleton> simplified
+        = standard.skeleton->simplifySkeleton("simplified", mergeBodiesInto);
+    std::shared_ptr<DynamicsInitialization> simplifiedInit
+        = DynamicsFitter::retargetInitialization(
+            standard.skeleton, simplified, complexInit);
+    return runEngine(simplified, simplifiedInit, saveGUI);
+  }
+  else
+  {
+    return complexInit;
+  }
 }
 
 #ifdef JACOBIAN_TESTS

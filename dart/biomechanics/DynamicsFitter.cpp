@@ -17,6 +17,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/MarkerLabeller.hpp"
+#include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
@@ -2791,7 +2792,7 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   if (!l1)
   {
     // mMarkerWeight = 500;
-    mMarkerWeight = 1500;
+    mMarkerWeight = 2500;
     mResidualWeight = 1e-5;
     mLinearNewtonWeight = 5e-4;
     mResidualUseL1 = false;
@@ -3381,7 +3382,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   std::shared_ptr<DynamicsInitialization> init
       = std::make_shared<DynamicsInitialization>();
   init->forcePlateTrials = forcePlateTrials;
-  init->originalPoseTrials = poseTrials;
+  init->originalPoses = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
   init->trackingMarkers = trackingMarkers;
   init->updatedMarkerMap = markerMap;
@@ -3415,9 +3416,9 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   // Initially smooth the accelerations just a little bit
 
-  for (int i = 0; i < init->originalPoseTrials.size(); i++)
+  for (int i = 0; i < init->originalPoses.size(); i++)
   {
-    init->poseTrials.push_back(init->originalPoseTrials[i]);
+    init->poseTrials.push_back(init->originalPoses[i]);
     init->trialTimesteps.push_back(1.0 / framesPerSecond[i]);
   }
 
@@ -3490,7 +3491,6 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   }
 
   // Make copies of data to use for regularization
-  init->originalPoses = init->originalPoseTrials;
   init->originalGroupMasses = skel->getGroupMasses();
   init->originalGroupCOMs = skel->getGroupCOMs();
   init->originalGroupInertias = skel->getGroupInertias();
@@ -3572,6 +3572,119 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   }
 
   return init;
+}
+
+//==============================================================================
+// This retargets a dynamics initialization to another skeleton
+std::shared_ptr<DynamicsInitialization> DynamicsFitter::retargetInitialization(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::shared_ptr<dynamics::Skeleton> simplifiedSkel,
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  std::shared_ptr<DynamicsInitialization> retargeted
+      = std::make_shared<DynamicsInitialization>();
+  retargeted->probablyMissingGRF = init->probablyMissingGRF;
+
+  for (int i = 0; i < init->joints.size(); i++)
+  {
+    retargeted->joints.push_back(
+        simplifiedSkel->getJoint(init->joints[i]->getName()));
+  }
+  for (int i = 0; i < init->grfBodyNodes.size(); i++)
+  {
+    retargeted->grfBodyNodes.push_back(
+        simplifiedSkel->getBodyNode(init->grfBodyNodes[i]->getName()));
+  }
+  for (int i = 0; i < init->contactBodies.size(); i++)
+  {
+    std::vector<dynamics::BodyNode*> bodySet;
+    for (int j = 0; j < init->contactBodies[i].size(); j++)
+    {
+      bodySet.push_back(
+          simplifiedSkel->getBodyNode(init->contactBodies[i][j]->getName()));
+    }
+    retargeted->contactBodies.push_back(bodySet);
+  }
+
+  // Inputs from files
+  retargeted->forcePlateTrials = init->forcePlateTrials;
+  retargeted->markerObservationTrials = init->markerObservationTrials;
+  retargeted->trialTimesteps = init->trialTimesteps;
+
+  // Assigning GRFs to specific feet
+  retargeted->grfTrials = init->grfTrials;
+  retargeted->grfBodyIndices = init->grfBodyIndices;
+
+  // Pure dynamics values
+  retargeted->bodyMasses = simplifiedSkel->getLinkMasses();
+  retargeted->groupMasses = simplifiedSkel->getGroupMasses();
+  retargeted->groupInertias = simplifiedSkel->getGroupInertias();
+  retargeted->bodyCom = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(
+      3, simplifiedSkel->getNumBodyNodes());
+  retargeted->bodyInertia = Eigen::Matrix<s_t, 6, Eigen::Dynamic>::Zero(
+      6, simplifiedSkel->getNumBodyNodes());
+  for (int i = 0; i < simplifiedSkel->getNumBodyNodes(); i++)
+  {
+    retargeted->bodyCom.col(i) = simplifiedSkel->getBodyNode(i)->getLocalCOM();
+    retargeted->bodyInertia.col(i)
+        = simplifiedSkel->getBodyNode(i)->getInertia().getMomentVector();
+  }
+
+  // Values from the kinematics fitter that are relevant here as well. The key
+  // difference is that the per-trial split is explicit here, because it's so
+  // important for the dynamics and indexing.
+  retargeted->groupScales = simplifiedSkel->getGroupScales();
+  retargeted->markerOffsets = init->markerOffsets;
+  retargeted->trackingMarkers = init->trackingMarkers;
+
+  // TODO: we may need to recalculate this for simplified skeletons
+  retargeted->jointsAdjacentMarkers = init->jointsAdjacentMarkers;
+  retargeted->jointWeights = init->jointWeights;
+  retargeted->jointCenters = init->jointCenters;
+  retargeted->axisWeights = init->axisWeights;
+  retargeted->jointAxis = init->jointAxis;
+
+  // Convenience objects
+  for (auto& pair : init->updatedMarkerMap)
+  {
+    retargeted->updatedMarkerMap[pair.first]
+        = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+            simplifiedSkel->getBodyNode(pair.second.first->getName()),
+            pair.second.second);
+  }
+
+  // To support regularization
+  retargeted->originalGroupMasses = simplifiedSkel->getGroupMasses();
+  retargeted->originalGroupCOMs = simplifiedSkel->getGroupCOMs();
+  retargeted->originalGroupInertias = simplifiedSkel->getGroupInertias();
+  retargeted->originalGroupScales = simplifiedSkel->getGroupScales();
+  retargeted->originalMarkerOffsets = init->originalMarkerOffsets;
+
+  Eigen::VectorXs originalSkelPos = skel->getPositions();
+  Eigen::VectorXs originalSimplifiedSkelPos = simplifiedSkel->getPositions();
+
+  skel->setPositions(Eigen::VectorXs::Zero(originalSkelPos.size()));
+  simplifiedSkel->setPositions(
+      Eigen::VectorXs::Zero(originalSimplifiedSkelPos.size()));
+
+  SkeletonConverter converter(simplifiedSkel, skel);
+  converter.createVirtualMarkers();
+  for (int trial = 0; trial < init->originalPoses.size(); trial++)
+  {
+    retargeted->originalPoses.push_back(
+        converter.convertMotion(init->originalPoses[trial]));
+    retargeted->poseTrials.push_back(
+        converter.convertMotion(init->poseTrials[trial]));
+  }
+
+  skel->setPositions(originalSkelPos);
+  simplifiedSkel->setPositions(originalSimplifiedSkelPos);
+
+  DynamicsFitter fitter(
+      simplifiedSkel, retargeted->grfBodyNodes, retargeted->trackingMarkers);
+  fitter.estimateFootGroundContacts(retargeted);
+
+  return retargeted;
 }
 
 //==============================================================================
@@ -4058,7 +4171,9 @@ void DynamicsFitter::scaleLinkMassesFromGravity(
     std::vector<Eigen::Vector3s> accs = comAccelerations(init, i);
     for (int t = 0; t < grfs.size(); t++)
     {
-      if (!init->probablyMissingGRF[i][t])
+      if (i >= init->probablyMissingGRF.size()
+          || t >= init->probablyMissingGRF[i].size()
+          || !init->probablyMissingGRF[i][t])
       {
         totalGRFs += grfs[t](1);
         totalAccs += gravity; // accs[t](1) + gravity;

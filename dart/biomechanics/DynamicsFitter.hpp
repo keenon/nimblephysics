@@ -192,7 +192,7 @@ struct DynamicsInitialization
   ///////////////////////////////////////////
   // Inputs from files
   std::vector<std::vector<ForcePlate>> forcePlateTrials;
-  std::vector<Eigen::MatrixXs> originalPoseTrials;
+  std::vector<Eigen::MatrixXs> originalPoses;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
   std::vector<s_t> trialTimesteps;
@@ -257,7 +257,6 @@ struct DynamicsInitialization
 
   ///////////////////////////////////////////
   // To support regularization
-  std::vector<Eigen::MatrixXs> originalPoses;
   Eigen::VectorXs originalGroupMasses;
   Eigen::VectorXs originalGroupCOMs;
   Eigen::VectorXs originalGroupInertias;
@@ -579,6 +578,12 @@ public:
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
           markerObservationTrials);
+
+  // This retargets a dynamics initialization to another skeleton
+  static std::shared_ptr<DynamicsInitialization> retargetInitialization(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      std::shared_ptr<dynamics::Skeleton> simplifiedSkel,
+      std::shared_ptr<DynamicsInitialization> init);
 
   // This computes and returns the positions of the center of mass at each
   // frame
