@@ -85,7 +85,7 @@ void ScapulathoracicJoint::setEllipsoidRadii(Eigen::Vector3s radii)
 }
 
 //==============================================================================
-Eigen::Vector3s ScapulathoracicJoint::getEllipsoidRadii()
+Eigen::Vector3s ScapulathoracicJoint::getEllipsoidRadii() const
 {
   return mEllipsoidRadii;
 }
@@ -97,7 +97,7 @@ void ScapulathoracicJoint::setWingingAxisOffset(Eigen::Vector2s offset)
 }
 
 //==============================================================================
-Eigen::Vector2s ScapulathoracicJoint::getWingingAxisOffset()
+Eigen::Vector2s ScapulathoracicJoint::getWingingAxisOffset() const
 {
   return mWingingAxisOffset;
 }
@@ -109,7 +109,7 @@ void ScapulathoracicJoint::setWingingAxisDirection(s_t radians)
 }
 
 //==============================================================================
-s_t ScapulathoracicJoint::getWingingAxisDirection()
+s_t ScapulathoracicJoint::getWingingAxisDirection() const
 {
   return mWingingAxisDirection;
 }
@@ -123,6 +123,9 @@ dart::dynamics::Joint* ScapulathoracicJoint::clone() const
   joint->setFlipAxisMap(getFlipAxisMap());
   joint->setAxisOrder(getAxisOrder());
   joint->setName(this->getName());
+  joint->setEllipsoidRadii(this->getEllipsoidRadii());
+  joint->setWingingAxisDirection(this->getWingingAxisDirection());
+  joint->setWingingAxisOffset(this->getWingingAxisOffset());
   joint->setPositionUpperLimits(this->getPositionUpperLimits());
   joint->setPositionLowerLimits(this->getPositionLowerLimits());
   joint->setVelocityUpperLimits(this->getVelocityUpperLimits());

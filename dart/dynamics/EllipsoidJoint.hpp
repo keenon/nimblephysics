@@ -30,8 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DART_DYNAMICS_SCAPULATHORASICJOINT_HPP_
-#define DART_DYNAMICS_SCAPULATHORASICJOINT_HPP_
+#ifndef DART_DYNAMICS_ELLIPSOIDJOINT_HPP_
+#define DART_DYNAMICS_ELLIPSOIDJOINT_HPP_
 
 #include <memory>
 #include <string>
@@ -49,27 +49,26 @@ namespace dynamics {
 
 /**
  * This class is an effort to reproduce enough of OpenSim's custom joint
- * behavior in Nimble to load the Rajagopal model, without sacrificing
- * performance or differentiability.
+ * behavior in Nimble.
  */
-class ScapulathoracicJoint : public GenericJoint<math::RealVectorSpace<4>>
+class EllipsoidJoint : public GenericJoint<math::RealVectorSpace<3>>
 {
-  static constexpr std::size_t NumDofs = 4;
-  static constexpr int NumDofsEigen = static_cast<int>(4);
+  static constexpr std::size_t NumDofs = 3;
+  static constexpr int NumDofsEigen = static_cast<int>(3);
 
-  using TangentSpace = typename math::RealVectorSpace<4>::TangentSpace;
+  using TangentSpace = typename math::RealVectorSpace<3>::TangentSpace;
 
-  using Point = typename math::RealVectorSpace<4>::Point;
-  using EuclideanPoint = typename math::RealVectorSpace<4>::EuclideanPoint;
-  using Vector = typename math::RealVectorSpace<4>::Vector;
-  using Matrix = typename math::RealVectorSpace<4>::Matrix;
-  using JacobianMatrix = typename math::RealVectorSpace<4>::JacobianMatrix;
+  using Point = typename math::RealVectorSpace<3>::Point;
+  using EuclideanPoint = typename math::RealVectorSpace<3>::EuclideanPoint;
+  using Vector = typename math::RealVectorSpace<3>::Vector;
+  using Matrix = typename math::RealVectorSpace<3>::Matrix;
+  using JacobianMatrix = typename math::RealVectorSpace<3>::JacobianMatrix;
 
 public:
   friend class Skeleton;
 
-  ScapulathoracicJoint(
-      const detail::GenericJointProperties<math::RealVectorSpace<4>>& props);
+  EllipsoidJoint(
+      const detail::GenericJointProperties<math::RealVectorSpace<3>>& props);
 
   const std::string& getType() const override;
 
@@ -89,21 +88,13 @@ public:
 
   /// This takes a vector of 1's and -1's to indicate which entries to flip, if
   /// any
-  void setFlipAxisMap(Eigen::Vector4s map);
+  void setFlipAxisMap(Eigen::Vector3s map);
 
-  Eigen::Vector4s getFlipAxisMap() const;
+  Eigen::Vector3s getFlipAxisMap() const;
 
   void setEllipsoidRadii(Eigen::Vector3s radii);
 
   Eigen::Vector3s getEllipsoidRadii() const;
-
-  void setWingingAxisOffset(Eigen::Vector2s offset);
-
-  Eigen::Vector2s getWingingAxisOffset() const;
-
-  void setWingingAxisDirection(s_t radians);
-
-  s_t getWingingAxisDirection() const;
 
   dart::dynamics::Joint* clone() const override;
 
@@ -152,12 +143,10 @@ protected:
   dynamics::EulerJoint::AxisOrder mAxisOrder;
 
   Eigen::Vector3s mEllipsoidRadii;
-  Eigen::Vector2s mWingingAxisOffset;
-  s_t mWingingAxisDirection;
 
   /// This contains 1's and -1's to indicate whether we should flip a given
   /// input axis.
-  Eigen::Vector4s mFlipAxisMap;
+  Eigen::Vector3s mFlipAxisMap;
 };
 
 }; // namespace dynamics
