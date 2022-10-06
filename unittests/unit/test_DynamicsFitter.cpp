@@ -1476,9 +1476,6 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       limitTrialLength,
       trialStartOffset);
 
-  std::shared_ptr<DynamicsInitialization> complexInit
-      = runEngine(standard.skeleton, init, saveGUI);
-
   if (simplify)
   {
     std::map<std::string, std::string> mergeBodiesInto;
@@ -1486,12 +1483,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         = standard.skeleton->simplifySkeleton("simplified", mergeBodiesInto);
     std::shared_ptr<DynamicsInitialization> simplifiedInit
         = DynamicsFitter::retargetInitialization(
-            standard.skeleton, simplified, complexInit);
+            standard.skeleton, simplified, init);
     return runEngine(simplified, simplifiedInit, saveGUI);
   }
   else
   {
-    return complexInit;
+    return runEngine(standard.skeleton, init, saveGUI);
   }
 }
 
@@ -3246,6 +3243,7 @@ TEST(DynamicsFitter, END_TO_END_SUBJECT4)
       grfFiles,
       -1,
       0,
+      true,
       true);
 }
 #endif

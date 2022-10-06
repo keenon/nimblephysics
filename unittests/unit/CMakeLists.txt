@@ -63,6 +63,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkeletonToBallJoints)
   target_link_libraries(test_SkeletonToBallJoints dart-utils)
 
+  dart_add_test("unit" test_SkeletonSimplification)
+  target_link_libraries(test_SkeletonSimplification dart-utils)
+
   dart_add_test("unit" test_SkeletonMarkers)
   target_link_libraries(test_SkeletonMarkers dart-utils)
 

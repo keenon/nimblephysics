@@ -3668,6 +3668,15 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::retargetInitialization(
       Eigen::VectorXs::Zero(originalSimplifiedSkelPos.size()));
 
   SkeletonConverter converter(simplifiedSkel, skel);
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    auto* simplifiedJoint
+        = simplifiedSkel->getJoint(skel->getJoint(i)->getName());
+    if (simplifiedJoint != nullptr)
+    {
+      converter.linkJoints(simplifiedJoint, skel->getJoint(i));
+    }
+  }
   converter.createVirtualMarkers();
   for (int trial = 0; trial < init->originalPoses.size(); trial++)
   {

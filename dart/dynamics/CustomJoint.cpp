@@ -708,11 +708,20 @@ dart::dynamics::Joint* CustomJoint<1>::simplifiedClone() const
       getEulerPositions(Eigen::Vector1s(getPositionUpperLimit(0))),
       mAxisOrder,
       mFlipAxisMap);
-  Eigen::Isometry3s relative = (T_lower.inverse() * T_upper);
+  (void)T_upper;
+  Eigen::Isometry3s T_half_lower = EulerJoint::convertToTransform(
+      getEulerPositions(Eigen::Vector1s(getPositionLowerLimit(0) / 2)),
+      mAxisOrder,
+      mFlipAxisMap);
+  Eigen::Isometry3s T_half_upper = EulerJoint::convertToTransform(
+      getEulerPositions(Eigen::Vector1s(getPositionUpperLimit(0) / 2)),
+      mAxisOrder,
+      mFlipAxisMap);
+  Eigen::Isometry3s relative = (T_half_lower.inverse() * T_half_upper);
   Eigen::Vector3s axisDir = math::logMap(relative.linear()).normalized();
-  Eigen::Isometry3s T_upperLimit = (T_zero.inverse() * T_upper);
+  Eigen::Isometry3s T_upperLimit = (T_zero.inverse() * T_half_upper);
   Eigen::Vector3s upperLimitRot = math::logMap(T_upperLimit.linear());
-  s_t upperLimitVal = axisDir.dot(upperLimitRot);
+  s_t upperLimitVal = axisDir.dot(upperLimitRot) * 2;
   Eigen::Isometry3s T_lowerLimit = (T_zero.inverse() * T_lower);
   Eigen::Vector3s lowerLimitRot = math::logMap(T_lowerLimit.linear());
   s_t lowerLimitVal = axisDir.dot(lowerLimitRot);
