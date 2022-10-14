@@ -1,6 +1,7 @@
 #include "dart/server/GUIStateMachine.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -14,6 +15,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CapsuleShape.hpp"
+#include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
 #include "dart/dynamics/Inertia.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
@@ -223,6 +225,45 @@ void GUIStateMachine::renderSkeleton(
 
   bool useOriginalColor = overrideColor == -1 * Eigen::Vector4s::Ones();
 
+  for (int j = 0; j < skel->getNumJoints(); j++)
+  {
+    dynamics::Joint* joint = skel->getJoint(j);
+    if (joint->getType()
+        == dynamics::ConstantCurveIncompressibleJoint::getStaticType())
+    {
+      dynamics::ConstantCurveIncompressibleJoint* curveJoint
+          = static_cast<dynamics::ConstantCurveIncompressibleJoint*>(joint);
+      Eigen::Isometry3s parentT
+          = curveJoint->getParentBodyNode() != nullptr
+                ? curveJoint->getParentBodyNode()->getWorldTransform()
+                : Eigen::Isometry3s::Identity();
+
+      std::vector<Eigen::Vector3s> points;
+      int numPoints = 10;
+      for (int i = 0; i <= numPoints; i++)
+      {
+        s_t frac = ((s_t)(i) / (s_t)numPoints);
+        Eigen::Isometry3s localT = parentT
+                                   * curveJoint->getRelativeTransformAt(
+                                       frac * curveJoint->getPositionsStatic(),
+                                       frac * curveJoint->getLength());
+        points.push_back(localT.translation());
+      }
+
+      std::stringstream jointNameStream;
+      jointNameStream << prefix << "_";
+      jointNameStream << skel->getName();
+      jointNameStream << "_";
+      jointNameStream << joint->getName();
+      std::string jointName = jointNameStream.str();
+
+      createLine(
+          jointName,
+          points,
+          useOriginalColor ? Eigen::Vector4s(1, 0, 0, 1) : overrideColor,
+          layer);
+    }
+  }
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
     dynamics::BodyNode* node = skel->getBodyNode(j);
