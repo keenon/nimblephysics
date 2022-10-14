@@ -7,8 +7,8 @@
 #include "dart/dart.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/ConstantCurveJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
-#include "dart/dynamics/ScapulathoracicJoint.hpp"
 #include "dart/dynamics/detail/BodyNodePtr.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/LinearFunction.hpp"
@@ -19,7 +19,7 @@
 
 using namespace dart;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 // #define GUI_TESTS
 
 //==============================================================================
@@ -46,11 +46,40 @@ bool verifyJacobianFiniteDifferencing(dynamics::Joint* shoulder)
 }
 
 //==============================================================================
-bool verifyScapulathoracicJoint(
-    dynamics::ScapulathoracicJoint* shoulder, s_t TEST_THRESHOLD)
+bool verifyConstantCurveJoint(
+    dynamics::ConstantCurveJoint* shoulder, s_t TEST_THRESHOLD)
 {
   Eigen::VectorXs pos = shoulder->getPositions();
   Eigen::VectorXs vel = shoulder->getVelocities();
+
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 4; j++)
+    {
+      Eigen::MatrixXs scratch = shoulder->analyticalScratch(i, j);
+      Eigen::MatrixXs scratch_fd = shoulder->finiteDifferenceScratch(i, j);
+      if (scratch.hasNaN())
+      {
+        std::cout << "Scatch failed for Jac wrt " << i << " wrt " << j
+                  << std::endl;
+        std::cout << "Analytical scratch: " << std::endl
+                  << scratch << std::endl;
+        EXPECT_FALSE(scratch.hasNaN());
+        return false;
+      }
+      if (!equals(scratch, scratch_fd, TEST_THRESHOLD))
+      {
+        std::cout << "Scatch failed for Jac wrt " << i << " wrt " << j
+                  << std::endl;
+        std::cout << "Analytical scratch: " << std::endl
+                  << scratch << std::endl;
+        std::cout << "FD scratch: " << std::endl << scratch_fd << std::endl;
+        std::cout << "Diff: " << std::endl << scratch - scratch_fd << std::endl;
+        EXPECT_TRUE(equals(scratch, scratch_fd, TEST_THRESHOLD));
+        return false;
+      }
+    }
+  }
 
   math::Jacobian j = shoulder->getRelativeJacobian();
   math::Jacobian j_fd = shoulder->finiteDifferenceRelativeJacobian();
@@ -67,23 +96,6 @@ bool verifyScapulathoracicJoint(
 
   for (int i = 0; i < 4; i++)
   {
-    for (int j = 0; j < 4; j++)
-    {
-      Eigen::MatrixXs scratch = shoulder->analyticalScratch(i, j);
-      Eigen::MatrixXs scratch_fd = shoulder->finiteDifferenceScratch(i, j);
-      if (!equals(scratch, scratch_fd, TEST_THRESHOLD))
-      {
-        std::cout << "Scatch failed for Jac wrt " << i << " wrt " << j
-                  << std::endl;
-        std::cout << "Analytical scratch: " << std::endl
-                  << scratch << std::endl;
-        std::cout << "FD scratch: " << std::endl << scratch_fd << std::endl;
-        std::cout << "Diff: " << std::endl << scratch - scratch_fd << std::endl;
-        EXPECT_TRUE(equals(scratch, scratch_fd, TEST_THRESHOLD));
-        return false;
-      }
-    }
-
     math::Jacobian dj = shoulder->getRelativeJacobianDerivWrtPositionStatic(i);
     math::Jacobian dj_fd
         = shoulder->finiteDifferenceRelativeJacobianDerivWrtPosition(i);
@@ -163,132 +175,53 @@ bool verifyScapulathoracicJoint(
 
 //==============================================================================
 #ifdef GUI_TESTS
-TEST(ScapulathoracicJoint, LOAD_RAJAGOPAL_OPENSIM)
-{
-  auto osim = biomechanics::OpenSimParser::parseOsim(
-      "dart://sample/osim/Rajagopal_ThoracoscapularShoulder/"
-      "Rajagopal2015_CMUMarkerSet_neck_manual_v2_ThoracoscapularShoulder_"
-      "torquedriven_ball_shoulders.osim");
-  server::GUIRecording server;
-  server.setFramesPerSecond(20);
-  server.renderBasis();
-  server.renderSkeleton(osim.skeleton);
-  server.saveFrame();
-  server.writeFramesJson("../../../javascript/src/data/movement2.bin");
-}
-#endif
-
-//==============================================================================
-#ifdef GUI_TESTS
-TEST(ScapulathoracicJoint, LOAD_SHOULDER_OPENSIM)
-{
-  auto osim = biomechanics::OpenSimParser::parseOsim(
-      "dart://sample/osim/ScapulaModel/"
-      "ScapulothoracicJoint_Shoulder_NoConstraints_Offset.osim");
-
-  server::GUIRecording server;
-  server.setFramesPerSecond(20);
-  server.renderBasis();
-  osim.skeleton->getDof("scapula_abduction")->setPosition(M_PI / 4);
-  // osim.skeleton->getDof("scapula_elevation")->setPosition(M_PI / 4);
-  // osim.skeleton->getDof("scapula_upward_rot")->setPosition(M_PI / 4);
-  // osim.skeleton->getDof("scapula_winging")->setPosition(M_PI / 4);
-  osim.skeleton->getDof("scapula_winging")->setPosition(10.0 * M_PI / 180.0);
-  // osim.skeleton->getDof("shoulder_elv")->setPosition(1.5);
-  // osim.skeleton->getDof("plane_of_elev")->setPosition(1.5);
-  // osim.skeleton->getDof("axial_rot")->setPosition(1.5);
-  server.renderSkeleton(osim.skeleton);
-  for (int i = 0; i < osim.skeleton->getNumJoints(); i++)
-  {
-    auto* joint = osim.skeleton->getJoint(i);
-    if (joint->getType() == ScapulathorasicJoint::getStaticType())
-    {
-      dynamics::ScapulathorasicJoint* scap
-          = static_cast<dynamics::ScapulathorasicJoint*>(joint);
-      Eigen::Vector3s radii = scap->getEllipsoidRadii();
-      Eigen::Vector3s worldPos = osim.skeleton->getJointWorldPosition(i);
-      (void)worldPos;
-      Eigen::Isometry3s worldT = scap->getParentBodyNode()->getWorldTransform()
-                                 * scap->getTransformFromParentBodyNode();
-      (void)worldT;
-      server.createSphere(
-          "joint" + std::to_string(i),
-          radii,
-          worldT.translation(),
-          Eigen::Vector4s(1, 0, 0, 0.3));
-      server.setObjectRotation(
-          "joint" + std::to_string(i), math::matrixToEulerXYZ(worldT.linear()));
-      server.renderBasis(
-          0.1,
-          "joint" + std::to_string(i),
-          worldT.translation(),
-          math::matrixToEulerXYZ(worldT.linear()));
-    }
-    if (joint->getType() == EulerJoint::getStaticType())
-    {
-      Eigen::Isometry3s worldT = joint->getParentBodyNode()->getWorldTransform()
-                                 * joint->getTransformFromParentBodyNode();
-      server.renderBasis(
-          0.1,
-          "joint" + std::to_string(i),
-          worldT.translation(),
-          math::matrixToEulerXYZ(worldT.linear()));
-    }
-  }
-  server.saveFrame();
-  server.writeFramesJson("../../../javascript/src/data/movement2.bin");
-}
-#endif
-
-/*
-//==============================================================================
-TEST(ScapulathoracicJoint, DEBUG_RANGE_OF_MOTION_TO_GUI)
+TEST(ConstantCurveJoint, DEBUG_RANGE_OF_MOTION_TO_GUI)
 {
   server::GUIRecording server;
   server.setFramesPerSecond(20);
 
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
-  auto pair
-      = skel->createJointAndBodyNodePair<dynamics::ScapulathorasicJoint>();
-  ScapulathorasicJoint* joint = pair.first;
+  auto pair = skel->createJointAndBodyNodePair<dynamics::ConstantCurveJoint>();
+  ConstantCurveJoint* joint = pair.first;
   joint->setAxisOrder(EulerJoint::AxisOrder::XZY);
   BodyNode* body = pair.second;
   std::shared_ptr<dynamics::BoxShape> boxShape
-      = std::make_shared<dynamics::BoxShape>(Eigen::Vector3s(0.1, 0.1, 0.01));
+      = std::make_shared<dynamics::BoxShape>(Eigen::Vector3s(0.01, 0.01, 0.01));
   body->createShapeNodeWith<dynamics::VisualAspect>(boxShape);
 
   // Render the ellipse that we'll be sliding the scapula along the top of
-  server.createSphere(
-      "scapula_ellipse",
-      joint->getEllipsoidRadii(),
-      Eigen::Vector3s::Zero(),
-      Eigen::Vector4s(0.5, 0.5, 1.0, 0.5),
-      "",
-      false,
-      false);
+  server.renderBasis();
 
   // Do the whole range of motion
   for (int i = -10; i < 10; i++)
   {
     for (int j = -10; j < 10; j++)
     {
-      for (int k = -10; k < 10; k++)
+      Eigen::Vector4s pos
+          = Eigen::Vector4s(i * 0.1, j * 0.1, i * j * 0.01, 0.0);
+      skel->setPositions(pos);
+      server.renderSkeleton(skel);
+
+      for (int frac = 0; frac < 20; frac++)
       {
-        Eigen::Vector3s pos = Eigen::Vector3s(i * 0.1, j * 0.1, k * 0.1);
-        skel->setPositions(pos);
-        server.renderSkeleton(skel);
-        server.saveFrame();
+        s_t percentage = (s_t)frac / 20;
+        Eigen::Vector4s localPos = pos * percentage;
+        localPos(3) = -1 + percentage;
+        skel->setPositions(localPos);
+        server.renderSkeleton(skel, "frac_" + std::to_string(frac));
       }
+
+      server.saveFrame();
     }
   }
 
-  server.writeFramesJson("../../../javascript/src/data/scapula_test.bin");
+  server.writeFramesJson("../../../javascript/src/data/movement2.bin");
 }
-*/
+#endif
 
 //==============================================================================
 #ifdef ALL_TESTS
-TEST(ScapulathoracicJoint, EulerJacobian)
+TEST(ConstantCurveJoint, EulerJacobian)
 {
   EulerJoint::Properties props;
   EulerJoint joint(props);
@@ -316,18 +249,14 @@ TEST(ScapulathoracicJoint, EulerJacobian)
 #endif
 
 //==============================================================================
-#ifdef ALL_TESTS
-TEST(ScapulathorasicJoint, ScapulothorasicJacobians)
+// #ifdef ALL_TESTS
+TEST(ConstantCurveJoint, ConstantCurveJacobians)
 {
-  ScapulathoracicJoint::Properties props;
-  ScapulathoracicJoint joint(props);
+  ConstantCurveJoint::Properties props;
+  ConstantCurveJoint joint(props);
   joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
 
-  // TODO: special case around body scaling changing the ellipse scaling
-
   // Set the parameters of the example shoulder
-  joint.setEllipsoidRadii(Eigen::Vector3s(0.07, 0.15, 0.07));
-  // joint.setEllipsoidRadii(Eigen::Vector3s::Ones());
   Eigen::Isometry3s transformFromParent = Eigen::Isometry3s::Identity();
   transformFromParent.translation() = Eigen::Vector3s(-0.02, -0.0173, 0.07);
   transformFromParent.linear()
@@ -339,33 +268,22 @@ TEST(ScapulathorasicJoint, ScapulothorasicJacobians)
   transformFromChild.linear()
       = math::eulerXYZToMatrix(Eigen::Vector3s(-0.5181, -1.1416, -0.2854));
 
-  // joint.setWingingAxisDirection(1);
-  // joint.setWingingAxisOffset(Eigen::Vector2s::Ones());
-
   joint.setPositions(Eigen::Vector4s::Zero());
   joint.setVelocities(Eigen::Vector4s::Zero());
   std::cout << "Testing zero pos and zero vel, with _no_ child transform"
             << std::endl;
 
-  if (!verifyScapulathoracicJoint(&joint, 1e-9))
+  if (!verifyConstantCurveJoint(&joint, 1e-9))
   {
     return;
   }
 
-  joint.setPositions(Eigen::Vector4s::Unit(3));
-  std::cout << "Testing winging pos and zero vel, with _no_ child transform"
-            << std::endl;
-  if (!verifyScapulathoracicJoint(&joint, 1e-9))
-  {
-    return;
-  }
-
-  for (int i = 0; i < 3; i++)
+  for (int i = 0; i <= 3; i++)
   {
     joint.setPositions(Eigen::Vector4s::Unit(i));
     std::cout << "Testing euler pos(" << std::to_string(i)
               << ")=1, zero vel, with _no_ child transform" << std::endl;
-    if (!verifyScapulathoracicJoint(&joint, 1e-9))
+    if (!verifyConstantCurveJoint(&joint, 1e-9))
     {
       return;
     }
@@ -377,15 +295,7 @@ TEST(ScapulathorasicJoint, ScapulothorasicJacobians)
   std::cout << "Testing zero pos and zero vel, _with_ a child transform"
             << std::endl;
 
-  if (!verifyScapulathoracicJoint(&joint, 1e-9))
-  {
-    return;
-  }
-
-  joint.setPositions(Eigen::Vector4s::Unit(3));
-  std::cout << "Testing winging pos and zero vel, _with_ a child transform"
-            << std::endl;
-  if (!verifyScapulathoracicJoint(&joint, 1e-9))
+  if (!verifyConstantCurveJoint(&joint, 1e-9))
   {
     return;
   }
@@ -394,22 +304,27 @@ TEST(ScapulathorasicJoint, ScapulothorasicJacobians)
   for (int i = 0; i < 10; i++)
   {
     joint.setPositions(Eigen::Vector4s::Random());
-    joint.setVelocities(Eigen::Vector4s::Random());
-    // Eigen::Vector4s vel = Eigen::Vector4s::Random();
-    // vel(3) = 0;
-    // joint.setVelocities(vel);
+    Eigen::Vector4s vel = Eigen::Vector4s::Random();
+    vel(3) = 0;
+    joint.setVelocities(vel);
 
-    /*
-    joint.setPosition(0, 0.0);
-    joint.setVelocity(0, 1.0);
-    */
     std::cout << "Testing: " << joint.getPositions() << ".."
               << joint.getVelocities() << std::endl;
 
-    if (!verifyScapulathoracicJoint(&joint, 1e-9))
+    if (!verifyConstantCurveJoint(&joint, 1e-9))
+    {
+      return;
+    }
+
+    vel = Eigen::Vector4s::Unit(3);
+    joint.setVelocities(vel);
+    std::cout << "Testing: " << joint.getPositions() << ".."
+              << joint.getVelocities() << std::endl;
+
+    if (!verifyConstantCurveJoint(&joint, 1e-9))
     {
       return;
     }
   }
 }
-#endif
+// #endif

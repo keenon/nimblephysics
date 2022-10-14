@@ -2102,7 +2102,7 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(1, 2) = -cy * (cx) + (-sx) * sy * sz;
     ret(2, 2) = (-sx) * cy + (cx)*sy * sz;
   }
-  if (index == 1)
+  else if (index == 1)
   {
     ret(0, 0) = cy * (-sz);
     ret(1, 0) = cx * cy * (cz);
@@ -2116,7 +2116,7 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(1, 2) = cx * sy * (cz);
     ret(2, 2) = sx * sy * (cz);
   }
-  if (index == 2)
+  else if (index == 2)
   {
     ret(0, 0) = (-sy) * cz;
     ret(1, 0) = sx * (cy) + cx * (-sy) * sz;
@@ -2129,6 +2129,10 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(0, 2) = cz * (cy);
     ret(1, 2) = -(-sy) * sx + cx * (cy)*sz;
     ret(2, 2) = cx * (-sy) + sx * (cy)*sz;
+  }
+  else
+  {
+    assert(false);
   }
 
   return ret;
