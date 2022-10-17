@@ -172,6 +172,42 @@ bool verifyConstantCurveIncompressibleJoint(
     }
   }
 
+  for (int i = -1; i < 3; i++)
+  {
+    math::Jacobian dj_dp = shoulder->getRelativeJacobianDerivWrtChildScale(i);
+    math::Jacobian dj_dp_fd
+        = shoulder->finiteDifferenceRelativeJacobianDerivWrtChildScale(i);
+
+    if (!equals(dj_dp, dj_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianDerivWrtChildScale (axis=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj_dp: " << std::endl << dj_dp << std::endl;
+      std::cout << "FD dj_dp: " << std::endl << dj_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dp - dj_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dp, dj_dp_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dj_dt_dp
+        = shoulder->getRelativeJacobianTimeDerivDerivWrtChildScale(i);
+    math::Jacobian dj_dt_dp_fd
+        = shoulder->finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(
+            i);
+
+    if (!equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianTimeDerivDerivWrtChildScale (axis=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dp: " << std::endl
+                << dj_dt_dp << std::endl;
+      std::cout << "FD dj dt dp: " << std::endl << dj_dt_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dt_dp - dj_dt_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD));
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -347,6 +383,8 @@ TEST(ConstantCurveIncompressibleJoint, ConstantCurveJacobians)
       = Eigen::Vector3s(-0.05982, -0.03904, -0.056);
   transformFromChild.linear()
       = math::eulerXYZToMatrix(Eigen::Vector3s(-0.5181, -1.1416, -0.2854));
+
+  joint.setChildScale(Eigen::Vector3s::Ones() * 0.4);
 
   joint.setPositions(Eigen::Vector3s::Zero());
   joint.setVelocities(Eigen::Vector3s::Zero());

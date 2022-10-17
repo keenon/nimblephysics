@@ -816,7 +816,7 @@ public:
   /// specific axis.
   ///
   /// Use axis = -1 for uniform scaling of all the axis.
-  math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
+  virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
       int /*axis*/) const;
 
   /// This uses finite differencing to compute the changes to the time deriv of

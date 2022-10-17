@@ -77,15 +77,6 @@ public:
 
   bool isCyclic(std::size_t) const override;
 
-  /// Set the axis order
-  /// \param[in] _order Axis order
-  /// \param[in] _renameDofs If true, the names of dofs in this joint will be
-  /// renmaed according to the axis order.
-  void setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs = true);
-
-  /// Return the axis order
-  EulerJoint::AxisOrder getAxisOrder() const;
-
   /// This takes a vector of 1's and -1's to indicate which entries to flip, if
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);
@@ -111,8 +102,38 @@ public:
   JacobianMatrix getRelativeJacobianDerivWrtPositionStatic(
       std::size_t index) const override;
 
+  static JacobianMatrix getRelativeJacobianDerivWrtSegmentLengthStatic(
+      s_t len,
+      s_t dLen,
+      s_t scaleLen,
+      Eigen::Vector3s pos,
+      Eigen::Vector3s neutralPos,
+      Eigen::Vector3s flipAxisMap,
+      Eigen::Isometry3s childTransform);
+
   JacobianMatrix getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
       std::size_t firstIndex, std::size_t secondIndex) const;
+
+  static JacobianMatrix
+  getRelativeJacobianDerivWrtPositionDerivWrtSegmentLengthStatic(
+      std::size_t firstIndex,
+      s_t len,
+      s_t dLen,
+      s_t scaleLen,
+      Eigen::Vector3s pos,
+      Eigen::Vector3s neutralPos,
+      Eigen::Vector3s flipAxisMap,
+      Eigen::Isometry3s childTransform);
+
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the child body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  math::Jacobian getRelativeJacobianDerivWrtChildScale(int axis) const override;
+
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
+      int axis) const override;
 
   void updateRelativeJacobian(bool) const override;
 
@@ -140,8 +161,6 @@ public:
   Eigen::MatrixXs finiteDifferenceScratch(int firstIndex, int secondIndex);
 
 protected:
-  dynamics::EulerJoint::AxisOrder mAxisOrder;
-
   Eigen::Vector4s mNeutralPos;
 
   /// This contains 1's and -1's to indicate whether we should flip a given

@@ -121,6 +121,16 @@ public:
   JacobianMatrix getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
       std::size_t firstIndex, std::size_t secondIndex) const;
 
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the child body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  math::Jacobian getRelativeJacobianDerivWrtChildScale(int axis) const override;
+
+  math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
+      int axis) const override;
+
   void updateRelativeJacobian(bool) const override;
 
   void updateRelativeJacobianTimeDeriv() const override;

@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 
+#include "dart/dynamics/ConstantCurveJoint.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
@@ -188,7 +189,8 @@ Eigen::Isometry3s ConstantCurveIncompressibleJoint::getRelativeTransformAt(
 void ConstantCurveIncompressibleJoint::updateRelativeTransform() const
 {
   Eigen::Vector3s pos = this->getPositionsStatic() + mNeutralPos;
-  s_t d = mLength;
+  s_t scale = this->getChildScale()(1);
+  s_t d = mLength * scale;
 
   // 1. Do the euler rotation
   Eigen::Isometry3s rot
@@ -253,7 +255,8 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianStatic(
   J.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianStatic(
       pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
 
-  s_t d = mLength;
+  s_t scale = this->getChildScale()(1);
+  s_t d = mLength * scale;
 
   // Remember, this is X,*Z*,Y
 
@@ -368,7 +371,8 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtPositionStatic(
   J_dFirst.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianDerivWrtPos(
       index, pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
 
-  const s_t d = mLength;
+  s_t scale = this->getChildScale()(1);
+  const s_t d = mLength * scale;
 
   // Remember, this is X,*Z*,Y
 
@@ -642,7 +646,8 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
           mFlipAxisMap.head<3>(),
           identity);
 
-  const s_t d = mLength;
+  s_t scale = this->getChildScale()(1);
+  const s_t d = mLength * scale;
 
   // Remember, this is X,*Z*,Y
 
@@ -1415,6 +1420,120 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
 
   /////////// HERE - analytical
   return J_dFirst_dSecond;
+}
+
+//==============================================================================
+/// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+/// to the parent BodyNode expressed in the child BodyNode frame, with respect
+/// to the scaling of the child body along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian
+ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtChildScale(
+    int axis) const
+{
+  math::Jacobian J = getRelativeJacobian();
+
+  /*
+  //--------------------------------------------------------------------------
+  // w' = R*w
+  // v' = p x R*w + R*v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6s res;
+  res.head<3>().noalias() = _T.linear() * _V.head<3>();
+  res.tail<3>().noalias()
+      = _T.linear() * _V.tail<3>() + _T.translation().cross(res.head<3>());
+  */
+
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromChildBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+
+  for (int i = 0; i < J.cols(); i++)
+  {
+    J.block<3, 1>(3, i) = dTrans.cross(J.block<3, 1>(0, i));
+    J.block<3, 1>(0, i).setZero();
+  }
+
+  if (axis == 1 || axis == -1)
+  {
+    s_t scale = this->getChildScale()(1);
+    s_t d = mLength * scale;
+    J += ConstantCurveJoint::getRelativeJacobianDerivWrtSegmentLengthStatic(
+             d,
+             mLength,
+             scale,
+             getPositionsStatic().head<3>(),
+             mNeutralPos.head<3>(),
+             mFlipAxisMap,
+             getTransformFromChildBodyNode())
+             .block(0, 0, 6, 3);
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// Gets the derivative of the time derivative of the spatial Jacobian of the
+/// child BodyNode relative to the parent BodyNode expressed in the child
+/// BodyNode frame, with respect to the scaling of the child body along a
+/// specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian ConstantCurveIncompressibleJoint::
+    getRelativeJacobianTimeDerivDerivWrtChildScale(int axis) const
+{
+  math::Jacobian J = getRelativeJacobianTimeDeriv();
+
+  /*
+  //--------------------------------------------------------------------------
+  // w' = R*w
+  // v' = p x R*w + R*v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6s res;
+  res.head<3>().noalias() = _T.linear() * _V.head<3>();
+  res.tail<3>().noalias()
+      = _T.linear() * _V.tail<3>() + _T.translation().cross(res.head<3>());
+  */
+
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromChildBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+
+  for (int i = 0; i < J.cols(); i++)
+  {
+    J.block<3, 1>(3, i) = dTrans.cross(J.block<3, 1>(0, i));
+    J.block<3, 1>(0, i).setZero();
+  }
+
+  if (axis == 1 || axis == -1)
+  {
+    Eigen::Vector3s vel = getVelocitiesStatic();
+    s_t originalD = mLength;
+    s_t scale = this->getChildScale()(1);
+    s_t d = originalD * scale;
+    for (int i = 0; i < 3; i++)
+    {
+      J += vel(i)
+           * ConstantCurveJoint::
+                 getRelativeJacobianDerivWrtPositionDerivWrtSegmentLengthStatic(
+                     i,
+                     d,
+                     originalD,
+                     scale,
+                     getPositionsStatic().head<3>(),
+                     mNeutralPos.head<3>(),
+                     mFlipAxisMap,
+                     getTransformFromChildBodyNode())
+                     .block(0, 0, 6, 3);
+    }
+  }
+
+  return J;
 }
 
 //==============================================================================
