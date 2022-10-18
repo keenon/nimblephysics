@@ -67,7 +67,7 @@ bool verifyEllipsoidJoint(
 
   for (int i = 0; i < 3; i++)
   {
-    for (int j = 0; j < 3; j++)
+    for (int j = -1; j < 3; j++)
     {
       Eigen::MatrixXs scratch = shoulder->analyticalScratch(i, j);
       Eigen::MatrixXs scratch_fd = shoulder->finiteDifferenceScratch(i, j);
@@ -154,6 +154,42 @@ bool verifyEllipsoidJoint(
       std::cout << "FD dj dt dv: " << std::endl << dj_dt_dv_fd << std::endl;
       std::cout << "Diff: " << std::endl << dj_dt_dv - dj_dt_dv_fd << std::endl;
       EXPECT_TRUE(equals(dj_dt_dv, dj_dt_dv_fd, TEST_THRESHOLD));
+      return false;
+    }
+  }
+
+  for (int i = -1; i < 3; i++)
+  {
+    math::Jacobian dj_dp = shoulder->getRelativeJacobianDerivWrtParentScale(i);
+    math::Jacobian dj_dp_fd
+        = shoulder->finiteDifferenceRelativeJacobianDerivWrtParentScale(i);
+
+    if (!equals(dj_dp, dj_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianDerivWrtParentScale (axis=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj_dp: " << std::endl << dj_dp << std::endl;
+      std::cout << "FD dj_dp: " << std::endl << dj_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dp - dj_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dp, dj_dp_fd, TEST_THRESHOLD));
+      return false;
+    }
+
+    math::Jacobian dj_dt_dp
+        = shoulder->getRelativeJacobianTimeDerivDerivWrtParentScale(i);
+    math::Jacobian dj_dt_dp_fd
+        = shoulder
+              ->finiteDifferenceRelativeJacobianTimeDerivDerivWrtParentScale(i);
+
+    if (!equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD))
+    {
+      std::cout << "getRelativeJacobianTimeDerivDerivWrtParentScale (axis=" << i
+                << "): " << std::endl;
+      std::cout << "Analytical dj dt dp: " << std::endl
+                << dj_dt_dp << std::endl;
+      std::cout << "FD dj dt dp: " << std::endl << dj_dt_dp_fd << std::endl;
+      std::cout << "Diff: " << std::endl << dj_dt_dp - dj_dt_dp_fd << std::endl;
+      EXPECT_TRUE(equals(dj_dt_dp, dj_dt_dp_fd, TEST_THRESHOLD));
       return false;
     }
   }
@@ -300,7 +336,7 @@ TEST(EllipsoidJoint, EulerJacobian)
 
 //==============================================================================
 // #ifdef ALL_TESTS
-TEST(EllipsoidJoint, ScapulothorasicJacobians)
+TEST(EllipsoidJoint, EllipsoidJacobians)
 {
   EllipsoidJoint::Properties props;
   EllipsoidJoint joint(props);
@@ -310,6 +346,8 @@ TEST(EllipsoidJoint, ScapulothorasicJacobians)
 
   // Set the parameters of the example shoulder
   joint.setEllipsoidRadii(Eigen::Vector3s(0.07, 0.15, 0.07));
+  joint.setParentScale(Eigen::Vector3s(0.6, 0.7, 0.8));
+
   // joint.setEllipsoidRadii(Eigen::Vector3s::Ones());
   Eigen::Isometry3s transformFromParent = Eigen::Isometry3s::Identity();
   transformFromParent.translation() = Eigen::Vector3s(-0.02, -0.0173, 0.07);
@@ -335,14 +373,6 @@ TEST(EllipsoidJoint, ScapulothorasicJacobians)
     return;
   }
 
-  joint.setPositions(Eigen::Vector3s::Unit(3));
-  std::cout << "Testing winging pos and zero vel, with _no_ child transform"
-            << std::endl;
-  if (!verifyEllipsoidJoint(&joint, 1e-9))
-  {
-    return;
-  }
-
   for (int i = 0; i < 3; i++)
   {
     joint.setPositions(Eigen::Vector3s::Unit(i));
@@ -360,14 +390,6 @@ TEST(EllipsoidJoint, ScapulothorasicJacobians)
   std::cout << "Testing zero pos and zero vel, _with_ a child transform"
             << std::endl;
 
-  if (!verifyEllipsoidJoint(&joint, 1e-9))
-  {
-    return;
-  }
-
-  joint.setPositions(Eigen::Vector3s::Unit(3));
-  std::cout << "Testing winging pos and zero vel, _with_ a child transform"
-            << std::endl;
   if (!verifyEllipsoidJoint(&joint, 1e-9))
   {
     return;

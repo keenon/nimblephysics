@@ -147,9 +147,12 @@ void EllipsoidJoint::updateRelativeTransform() const
   ballSurface.translation() = Eigen::Vector3s::UnitZ();
   ballSurface = rot * ballSurface;
 
+  Eigen::Vector3s parentScale = getParentScale();
+
   // 2.3. Scale the translation to make the sphere into an ellipsoid
-  ballSurface.translation()
-      = ballSurface.translation().cwiseProduct(mEllipsoidRadii);
+  ballSurface.translation() = ballSurface.translation()
+                                  .cwiseProduct(mEllipsoidRadii)
+                                  .cwiseProduct(parentScale);
 
   // 3. Situate relative to parent and child joints
   this->mT = Joint::mAspectProperties.mT_ParentBodyToJoint * ballSurface
@@ -187,8 +190,10 @@ Eigen::Matrix<s_t, 6, 3> EllipsoidJoint::getRelativeJacobianStatic(
   Eigen::Isometry3s rot = EulerJoint::convertToTransform(
       pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
   rot.linear() = eulerR.transpose() * rot.linear() * eulerR;
+  Eigen::Vector3s parentScale = getParentScale();
   Eigen::Matrix3s scaleInParentSpace
-      = rot.linear().transpose() * mEllipsoidRadii.asDiagonal() * rot.linear();
+      = rot.linear().transpose() * mEllipsoidRadii.asDiagonal()
+        * parentScale.asDiagonal() * rot.linear();
   J.block<3, 3>(3, 0) = scaleInParentSpace * J.block<3, 3>(3, 0);
 
   // Finally, take into account the transform to the child body node
@@ -237,8 +242,10 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionStatic(
                             pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>())
                             .linear();
   rot = eulerR.transpose() * rot * eulerR;
-  Eigen::Matrix3s scaleInParentSpace
-      = rot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+  Eigen::Vector3s parentScale = getParentScale();
+  Eigen::Matrix3s scaleInParentSpace = rot.transpose()
+                                       * mEllipsoidRadii.asDiagonal()
+                                       * parentScale.asDiagonal() * rot;
 
   if (index < 3)
   {
@@ -246,8 +253,9 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionStatic(
         = rot
           * math::makeSkewSymmetric(
               eulerR.transpose() * eulerJ.block<3, 1>(0, index));
-    Eigen::Matrix3s dScaleInParentSpace
-        = dRot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+    Eigen::Matrix3s dScaleInParentSpace = dRot.transpose()
+                                          * mEllipsoidRadii.asDiagonal()
+                                          * parentScale.asDiagonal() * rot;
     dScaleInParentSpace += dScaleInParentSpace.transpose().eval();
     dJ.block<3, 3>(3, 0) = scaleInParentSpace * dJ.block<3, 3>(3, 0)
                            + dScaleInParentSpace * J.block<3, 3>(3, 0);
@@ -340,16 +348,20 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
                             pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>())
                             .linear();
   rot = eulerR.transpose() * rot * eulerR;
-  Eigen::Matrix3s scaleInParentSpace
-      = rot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+
+  Eigen::Vector3s parentScale = getParentScale();
+  Eigen::Matrix3s scaleInParentSpace = rot.transpose()
+                                       * mEllipsoidRadii.asDiagonal()
+                                       * parentScale.asDiagonal() * rot;
 
   // euler wrt euler
   Eigen::Matrix3s dRot_dFirst
       = rot
         * math::makeSkewSymmetric(
             eulerR.transpose() * eulerJ.block<3, 1>(0, firstIndex));
-  Eigen::Matrix3s dScaleInParentSpace_dFirst
-      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+  Eigen::Matrix3s dScaleInParentSpace_dFirst = dRot_dFirst.transpose()
+                                               * mEllipsoidRadii.asDiagonal()
+                                               * parentScale.asDiagonal() * rot;
   dScaleInParentSpace_dFirst += dScaleInParentSpace_dFirst.transpose().eval();
 
   Eigen::Matrix3s dRot_dSecond
@@ -357,7 +369,8 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
         * math::makeSkewSymmetric(
             eulerR.transpose() * eulerJ.block<3, 1>(0, secondIndex));
   Eigen::Matrix3s dScaleInParentSpace_dSecond
-      = dRot_dSecond.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+      = dRot_dSecond.transpose() * mEllipsoidRadii.asDiagonal()
+        * parentScale.asDiagonal() * rot;
   dScaleInParentSpace_dSecond += dScaleInParentSpace_dSecond.transpose().eval();
 
   Eigen::Matrix3s dRot_dFirst_dSecond
@@ -370,8 +383,10 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
                   * euler_dJ_dFirst.block<3, 1>(0, secondIndex));
 
   Eigen::Matrix3s ddScaleInParentSpace_dFirst_dSecond
-      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal() * dRot_dSecond
-        + dRot_dFirst_dSecond.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal()
+            * parentScale.asDiagonal() * dRot_dSecond
+        + dRot_dFirst_dSecond.transpose() * mEllipsoidRadii.asDiagonal()
+              * parentScale.asDiagonal() * rot;
   ddScaleInParentSpace_dFirst_dSecond
       += ddScaleInParentSpace_dFirst_dSecond.transpose().eval();
 
@@ -393,6 +408,182 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
       = math::AdTJacFixed(getTransformFromChildBodyNode(), ddJ_dFirst_dSecond);
 
   return ddJ_dFirst_dSecond;
+}
+
+//==============================================================================
+/// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+/// to the parent BodyNode expressed in the child BodyNode frame, with respect
+/// to the scaling of the parent body along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian EllipsoidJoint::getRelativeJacobianDerivWrtParentScale(
+    int axis) const
+{
+  math::Jacobian J = math::Jacobian::Zero(6, 3);
+  Eigen::Vector3s pos = getPositionsStatic();
+
+  // Think in terms of the child frame
+
+  // 1. Compute the Jacobian of the Euler transformation
+  Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
+  Eigen::Matrix<s_t, 6, 3> eulerJ = EulerJoint::computeRelativeJacobianStatic(
+      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+  Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
+  eulerR(1, 0) = -1.0;
+  eulerR(0, 1) = 1.0;
+  eulerR(2, 2) = 1.0;
+  J.block<3, 3>(0, 0) = eulerR.transpose() * eulerJ.topRows(3);
+
+  // Get the spherical velocity from the euler joints in local space (this has
+  // not yet been scaled by the ellipsoid radii)
+  const Eigen::Vector3s localSphericalOffset = Eigen::Vector3s::UnitZ();
+  J.block<3, 1>(3, 0) = J.block<3, 1>(0, 0).cross(localSphericalOffset);
+  J.block<3, 1>(3, 1) = J.block<3, 1>(0, 1).cross(localSphericalOffset);
+  J.block<3, 1>(3, 2) = J.block<3, 1>(0, 2).cross(localSphericalOffset);
+
+  J.block<3, 3>(0, 0).setZero();
+
+  // 2. The euler transform will generate some linear velocities, based on the
+  // offset that the ellipse generates. We can first compute the velocities we
+  // would get if we were on a perfect sphere, and then scale those velocities.
+  Eigen::Isometry3s rot = EulerJoint::convertToTransform(
+      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
+  rot.linear() = eulerR.transpose() * rot.linear() * eulerR;
+
+  Eigen::Vector3s dParentScale;
+  if (axis == -1)
+  {
+    dParentScale = Eigen::Vector3s::Ones();
+  }
+  else
+  {
+    dParentScale = Eigen::Vector3s::Unit(axis);
+  }
+
+  Eigen::Matrix3s scaleInParentSpace
+      = rot.linear().transpose() * mEllipsoidRadii.asDiagonal()
+        * dParentScale.asDiagonal() * rot.linear();
+  J.block<3, 3>(3, 0) = scaleInParentSpace * J.block<3, 3>(3, 0);
+
+  // Finally, take into account the transform to the child body node
+  J = math::AdTJac(getTransformFromChildBodyNode(), J);
+  return J;
+}
+
+//==============================================================================
+Eigen::Matrix<s_t, 6, 3>
+EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtParentScale(
+    std::size_t firstIndex, int axis) const
+{
+  Eigen::VectorXs pos = this->getPositions();
+  Eigen::Matrix<s_t, 6, 3> J = Eigen::Matrix<s_t, 6, 3>::Zero();
+  Eigen::Matrix<s_t, 6, 3> dJ_dFirst = Eigen::Matrix<s_t, 6, 3>::Zero();
+  Eigen::Matrix<s_t, 6, 3> dJ_dSecond = Eigen::Matrix<s_t, 6, 3>::Zero();
+  Eigen::Matrix<s_t, 6, 3> ddJ_dFirst_dSecond
+      = Eigen::Matrix<s_t, 6, 3>::Zero();
+
+  Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
+  Eigen::Matrix<s_t, 6, 3> eulerJ = EulerJoint::computeRelativeJacobianStatic(
+      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+  Eigen::Matrix<s_t, 6, 3> euler_dJ_dFirst
+      = EulerJoint::computeRelativeJacobianDerivWrtPos(
+          firstIndex,
+          pos.head<3>(),
+          mAxisOrder,
+          mFlipAxisMap.head<3>(),
+          identity);
+
+  Eigen::Vector3s parentScale = getParentScale();
+  Eigen::Vector3s dParentScale;
+  if (axis == -1)
+  {
+    dParentScale = Eigen::Vector3s::Ones();
+  }
+  else
+  {
+    dParentScale = Eigen::Vector3s::Unit(axis);
+  }
+
+  Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
+  eulerR(1, 0) = -1.0;
+  eulerR(0, 1) = 1.0;
+  eulerR(2, 2) = 1.0;
+  dJ_dFirst.block<3, 3>(0, 0) = eulerR.transpose() * euler_dJ_dFirst.topRows(3);
+  J.block<3, 3>(0, 0) = eulerR.transpose() * eulerJ.topRows(3);
+
+  // Get the spherical velocity from the euler joints in local space (this has
+  // not yet been scaled by the ellipsoid radii)
+  const Eigen::Vector3s localSphericalOffset = Eigen::Vector3s::UnitZ();
+  dJ_dFirst.block<3, 1>(3, 0)
+      = dJ_dFirst.block<3, 1>(0, 0).cross(localSphericalOffset);
+  dJ_dFirst.block<3, 1>(3, 1)
+      = dJ_dFirst.block<3, 1>(0, 1).cross(localSphericalOffset);
+  dJ_dFirst.block<3, 1>(3, 2)
+      = dJ_dFirst.block<3, 1>(0, 2).cross(localSphericalOffset);
+  J.block<3, 1>(3, 0) = J.block<3, 1>(0, 0).cross(localSphericalOffset);
+  J.block<3, 1>(3, 1) = J.block<3, 1>(0, 1).cross(localSphericalOffset);
+  J.block<3, 1>(3, 2) = J.block<3, 1>(0, 2).cross(localSphericalOffset);
+
+  // 2. The euler transform will generate some linear velocities, based on the
+  // offset that the ellipse generates. We can first compute the velocities we
+  // would get if we were on a perfect sphere, and then scale those velocities.
+  Eigen::Matrix3s rot = EulerJoint::convertToTransform(
+                            pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>())
+                            .linear();
+  rot = eulerR.transpose() * rot * eulerR;
+  Eigen::Matrix3s scaleInParentSpace
+      = rot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+
+  // euler wrt euler
+  Eigen::Matrix3s dRot_dFirst
+      = rot
+        * math::makeSkewSymmetric(
+            eulerR.transpose() * eulerJ.block<3, 1>(0, firstIndex));
+  Eigen::Matrix3s dScaleInParentSpace_dFirst = dRot_dFirst.transpose()
+                                               * mEllipsoidRadii.asDiagonal()
+                                               * parentScale.asDiagonal() * rot;
+  dScaleInParentSpace_dFirst += dScaleInParentSpace_dFirst.transpose().eval();
+
+  Eigen::Matrix3s dScaleInParentSpace_dSecond
+      = rot.transpose() * mEllipsoidRadii.asDiagonal()
+        * dParentScale.asDiagonal() * rot;
+
+  Eigen::Matrix3s ddScaleInParentSpace_dFirst_dSecond
+      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal()
+        * dParentScale.asDiagonal() * rot;
+  ddScaleInParentSpace_dFirst_dSecond
+      += ddScaleInParentSpace_dFirst_dSecond.transpose().eval();
+
+  ddJ_dFirst_dSecond.block<3, 3>(3, 0)
+      = dScaleInParentSpace_dSecond * dJ_dFirst.block<3, 3>(3, 0)
+        + scaleInParentSpace * ddJ_dFirst_dSecond.block<3, 3>(3, 0)
+        + ddScaleInParentSpace_dFirst_dSecond * J.block<3, 3>(3, 0)
+        + dScaleInParentSpace_dFirst * dJ_dSecond.block<3, 3>(3, 0);
+  ddJ_dFirst_dSecond.block<3, 3>(0, 0).setZero();
+
+  // Finally, take into account the transform to the child body node
+  ddJ_dFirst_dSecond
+      = math::AdTJacFixed(getTransformFromChildBodyNode(), ddJ_dFirst_dSecond);
+  return ddJ_dFirst_dSecond;
+}
+
+//==============================================================================
+/// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+/// to the parent BodyNode expressed in the child BodyNode frame, with respect
+/// to the scaling of the child body along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian EllipsoidJoint::getRelativeJacobianTimeDerivDerivWrtParentScale(
+    int axis) const
+{
+  (void)axis;
+  math::Jacobian J = math::Jacobian::Zero(6, 3);
+  Eigen::Vector3s v = getVelocitiesStatic();
+  for (int i = 0; i < 3; i++)
+  {
+    J += v(i) * getRelativeJacobianDerivWrtPositionDerivWrtParentScale(i, axis);
+  }
+  return J;
 }
 
 //==============================================================================
@@ -473,20 +664,14 @@ Eigen::MatrixXs EllipsoidJoint::getScratch(int firstIndex)
   Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
   Eigen::Matrix<s_t, 6, 3> eulerJ = EulerJoint::computeRelativeJacobianStatic(
       pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
-  Eigen::Matrix<s_t, 6, 3> euler_dJ;
-  if (firstIndex < 3)
-  {
-    euler_dJ = EulerJoint::computeRelativeJacobianDerivWrtPos(
-        firstIndex,
-        pos.head<3>(),
-        mAxisOrder,
-        mFlipAxisMap.head<3>(),
-        identity);
-  }
-  else
-  {
-    euler_dJ.setZero();
-  }
+  Eigen::Matrix<s_t, 6, 3> euler_dJ
+      = EulerJoint::computeRelativeJacobianDerivWrtPos(
+          firstIndex,
+          pos.head<3>(),
+          mAxisOrder,
+          mFlipAxisMap.head<3>(),
+          identity);
+
   Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
   eulerR(1, 0) = -1.0;
   eulerR(0, 1) = 1.0;
@@ -511,26 +696,24 @@ Eigen::MatrixXs EllipsoidJoint::getScratch(int firstIndex)
                             pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>())
                             .linear();
   rot = eulerR.transpose() * rot * eulerR;
-  Eigen::Matrix3s scaleInParentSpace
-      = rot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+  Eigen::Vector3s parentScale = getParentScale();
 
-  if (firstIndex < 3)
-  {
-    Eigen::Matrix3s dRot
-        = rot
-          * math::makeSkewSymmetric(
-              eulerR.transpose() * eulerJ.block<3, 1>(0, firstIndex));
-    Eigen::Matrix3s dScaleInParentSpace
-        = dRot.transpose() * mEllipsoidRadii.asDiagonal() * rot;
-    dScaleInParentSpace += dScaleInParentSpace.transpose().eval();
-    dJ.block<3, 3>(3, 0) = scaleInParentSpace * dJ.block<3, 3>(3, 0)
-                           + dScaleInParentSpace * J.block<3, 3>(3, 0);
-  }
-  else
-  {
-    dJ.block<3, 3>(3, 0) = scaleInParentSpace * dJ.block<3, 3>(3, 0);
-    J.block<3, 3>(3, 0) = scaleInParentSpace * J.block<3, 3>(3, 0);
-  }
+  Eigen::Matrix3s scaleInParentSpace = rot.transpose()
+                                       * mEllipsoidRadii.asDiagonal()
+                                       * parentScale.asDiagonal() * rot;
+
+  Eigen::Matrix3s dRot
+      = rot
+        * math::makeSkewSymmetric(
+            eulerR.transpose() * eulerJ.block<3, 1>(0, firstIndex));
+
+  Eigen::Matrix3s dScaleInParentSpace = dRot.transpose()
+                                        * mEllipsoidRadii.asDiagonal()
+                                        * parentScale.asDiagonal() * rot;
+  dScaleInParentSpace += dScaleInParentSpace.transpose().eval();
+
+  dJ.block<3, 3>(3, 0) = scaleInParentSpace * dJ.block<3, 3>(3, 0)
+                         + dScaleInParentSpace * J.block<3, 3>(3, 0);
 
   // Finally, take into account the transform to the child body node
   dJ = math::AdTJacFixed(getTransformFromChildBodyNode(), dJ);
@@ -538,13 +721,11 @@ Eigen::MatrixXs EllipsoidJoint::getScratch(int firstIndex)
   return dJ;
 }
 
-Eigen::MatrixXs EllipsoidJoint::analyticalScratch(
-    int firstIndex, int secondIndex)
+Eigen::MatrixXs EllipsoidJoint::analyticalScratch(int firstIndex, int axis)
 {
   Eigen::VectorXs pos = this->getPositions();
   (void)pos;
   (void)firstIndex;
-  (void)secondIndex;
   Eigen::Matrix<s_t, 6, 3> J = Eigen::Matrix<s_t, 6, 3>::Zero();
   Eigen::Matrix<s_t, 6, 3> dJ_dFirst = Eigen::Matrix<s_t, 6, 3>::Zero();
   Eigen::Matrix<s_t, 6, 3> dJ_dSecond = Eigen::Matrix<s_t, 6, 3>::Zero();
@@ -554,82 +735,42 @@ Eigen::MatrixXs EllipsoidJoint::analyticalScratch(
   Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
   Eigen::Matrix<s_t, 6, 3> eulerJ = EulerJoint::computeRelativeJacobianStatic(
       pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
-  Eigen::Matrix<s_t, 6, 3> euler_dJ_dFirst;
-  Eigen::Matrix<s_t, 6, 3> euler_dJ_dSecond;
-  Eigen::Matrix<s_t, 6, 3> euler_ddJ_dFirst_dSecond;
-  if (firstIndex < 3)
+  (void)eulerJ;
+  Eigen::Matrix<s_t, 6, 3> euler_dJ_dFirst
+      = EulerJoint::computeRelativeJacobianDerivWrtPos(
+          firstIndex,
+          pos.head<3>(),
+          mAxisOrder,
+          mFlipAxisMap.head<3>(),
+          identity);
+
+  Eigen::Vector3s parentScale = getParentScale();
+  Eigen::Vector3s dParentScale;
+  if (axis == -1)
   {
-    euler_dJ_dFirst = EulerJoint::computeRelativeJacobianDerivWrtPos(
-        firstIndex,
-        pos.head<3>(),
-        mAxisOrder,
-        mFlipAxisMap.head<3>(),
-        identity);
+    dParentScale = Eigen::Vector3s::Ones();
   }
   else
   {
-    euler_dJ_dFirst.setZero();
+    dParentScale = Eigen::Vector3s::Unit(axis);
   }
-  if (secondIndex < 3)
-  {
-    euler_dJ_dSecond = EulerJoint::computeRelativeJacobianDerivWrtPos(
-        secondIndex,
-        pos.head<3>(),
-        mAxisOrder,
-        mFlipAxisMap.head<3>(),
-        identity);
-  }
-  else
-  {
-    euler_dJ_dSecond.setZero();
-  }
-  if (firstIndex < 3 && secondIndex < 3)
-  {
-    euler_ddJ_dFirst_dSecond
-        = EulerJoint::computeRelativeJacobianTimeDerivDerivWrtPos(
-            secondIndex,
-            pos.head<3>(),
-            Eigen::Vector3s::Unit(firstIndex),
-            mAxisOrder,
-            mFlipAxisMap.head<3>(),
-            identity);
-  }
-  else
-  {
-    euler_ddJ_dFirst_dSecond.setZero();
-  }
+
   Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
   eulerR(1, 0) = -1.0;
   eulerR(0, 1) = 1.0;
   eulerR(2, 2) = 1.0;
-  ddJ_dFirst_dSecond.block<3, 3>(0, 0)
-      = eulerR.transpose() * euler_ddJ_dFirst_dSecond.topRows(3);
-  dJ_dSecond.block<3, 3>(0, 0)
-      = eulerR.transpose() * euler_dJ_dSecond.topRows(3);
   dJ_dFirst.block<3, 3>(0, 0) = eulerR.transpose() * euler_dJ_dFirst.topRows(3);
   J.block<3, 3>(0, 0) = eulerR.transpose() * eulerJ.topRows(3);
 
   // Get the spherical velocity from the euler joints in local space (this has
   // not yet been scaled by the ellipsoid radii)
   const Eigen::Vector3s localSphericalOffset = Eigen::Vector3s::UnitZ();
-  ddJ_dFirst_dSecond.block<3, 1>(3, 0)
-      = ddJ_dFirst_dSecond.block<3, 1>(0, 0).cross(localSphericalOffset);
-  ddJ_dFirst_dSecond.block<3, 1>(3, 1)
-      = ddJ_dFirst_dSecond.block<3, 1>(0, 1).cross(localSphericalOffset);
-  ddJ_dFirst_dSecond.block<3, 1>(3, 2)
-      = ddJ_dFirst_dSecond.block<3, 1>(0, 2).cross(localSphericalOffset);
   dJ_dFirst.block<3, 1>(3, 0)
       = dJ_dFirst.block<3, 1>(0, 0).cross(localSphericalOffset);
   dJ_dFirst.block<3, 1>(3, 1)
       = dJ_dFirst.block<3, 1>(0, 1).cross(localSphericalOffset);
   dJ_dFirst.block<3, 1>(3, 2)
       = dJ_dFirst.block<3, 1>(0, 2).cross(localSphericalOffset);
-  dJ_dSecond.block<3, 1>(3, 0)
-      = dJ_dSecond.block<3, 1>(0, 0).cross(localSphericalOffset);
-  dJ_dSecond.block<3, 1>(3, 1)
-      = dJ_dSecond.block<3, 1>(0, 1).cross(localSphericalOffset);
-  dJ_dSecond.block<3, 1>(3, 2)
-      = dJ_dSecond.block<3, 1>(0, 2).cross(localSphericalOffset);
   J.block<3, 1>(3, 0) = J.block<3, 1>(0, 0).cross(localSphericalOffset);
   J.block<3, 1>(3, 1) = J.block<3, 1>(0, 1).cross(localSphericalOffset);
   J.block<3, 1>(3, 2) = J.block<3, 1>(0, 2).cross(localSphericalOffset);
@@ -649,68 +790,63 @@ Eigen::MatrixXs EllipsoidJoint::analyticalScratch(
       = rot
         * math::makeSkewSymmetric(
             eulerR.transpose() * eulerJ.block<3, 1>(0, firstIndex));
-  Eigen::Matrix3s dScaleInParentSpace_dFirst
-      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+  Eigen::Matrix3s dScaleInParentSpace_dFirst = dRot_dFirst.transpose()
+                                               * mEllipsoidRadii.asDiagonal()
+                                               * parentScale.asDiagonal() * rot;
   dScaleInParentSpace_dFirst += dScaleInParentSpace_dFirst.transpose().eval();
 
-  Eigen::Matrix3s dRot_dSecond
-      = rot
-        * math::makeSkewSymmetric(
-            eulerR.transpose() * eulerJ.block<3, 1>(0, secondIndex));
   Eigen::Matrix3s dScaleInParentSpace_dSecond
-      = dRot_dSecond.transpose() * mEllipsoidRadii.asDiagonal() * rot;
-  dScaleInParentSpace_dSecond += dScaleInParentSpace_dSecond.transpose().eval();
-
-  Eigen::Matrix3s dRot_dFirst_dSecond
-      = dRot_dFirst
-            * math::makeSkewSymmetric(
-                eulerR.transpose() * eulerJ.block<3, 1>(0, secondIndex))
-        + rot
-              * math::makeSkewSymmetric(
-                  eulerR.transpose()
-                  * euler_dJ_dFirst.block<3, 1>(0, secondIndex));
+      = rot.transpose() * mEllipsoidRadii.asDiagonal()
+        * dParentScale.asDiagonal() * rot;
 
   Eigen::Matrix3s ddScaleInParentSpace_dFirst_dSecond
-      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal() * dRot_dSecond
-        + dRot_dFirst_dSecond.transpose() * mEllipsoidRadii.asDiagonal() * rot;
+      = dRot_dFirst.transpose() * mEllipsoidRadii.asDiagonal()
+        * dParentScale.asDiagonal() * rot;
   ddScaleInParentSpace_dFirst_dSecond
       += ddScaleInParentSpace_dFirst_dSecond.transpose().eval();
 
   ddJ_dFirst_dSecond.block<3, 3>(3, 0)
-      = (ddScaleInParentSpace_dFirst_dSecond * J.block<3, 3>(3, 0)
-         + dScaleInParentSpace_dFirst * dJ_dSecond.block<3, 3>(3, 0))
-        + (scaleInParentSpace * ddJ_dFirst_dSecond.block<3, 3>(3, 0)
-           + dScaleInParentSpace_dSecond * dJ_dFirst.block<3, 3>(3, 0));
+      = dScaleInParentSpace_dSecond * dJ_dFirst.block<3, 3>(3, 0)
+        + scaleInParentSpace * ddJ_dFirst_dSecond.block<3, 3>(3, 0)
+        + ddScaleInParentSpace_dFirst_dSecond * J.block<3, 3>(3, 0)
+        + dScaleInParentSpace_dFirst * dJ_dSecond.block<3, 3>(3, 0);
+  ddJ_dFirst_dSecond.block<3, 3>(0, 0).setZero();
 
   dJ_dFirst.block<3, 3>(3, 0)
       = scaleInParentSpace * dJ_dFirst.block<3, 3>(3, 0)
         + dScaleInParentSpace_dFirst * J.block<3, 3>(3, 0);
   dJ_dSecond.block<3, 3>(3, 0)
       = scaleInParentSpace * dJ_dSecond.block<3, 3>(3, 0)
-        + dScaleInParentSpace_dFirst * J.block<3, 3>(3, 0);
+        + dScaleInParentSpace_dSecond * J.block<3, 3>(3, 0);
 
   // Finally, take into account the transform to the child body node
   ddJ_dFirst_dSecond
       = math::AdTJacFixed(getTransformFromChildBodyNode(), ddJ_dFirst_dSecond);
-
   return ddJ_dFirst_dSecond;
 }
 
 Eigen::MatrixXs EllipsoidJoint::finiteDifferenceScratch(
-    int firstIndex, int secondIndex)
+    int firstIndex, int axis)
 {
   Eigen::MatrixXs result = getScratch(firstIndex);
 
-  Eigen::VectorXs originalPoses = getPositions();
+  Eigen::Vector3s originalParentScale = getParentScale();
 
   s_t eps = 1e-3;
 
   math::finiteDifference<Eigen::MatrixXs>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::MatrixXs& out) {
-        Eigen::VectorXs tweaked = originalPoses;
-        tweaked(secondIndex) += eps;
-        setPositions(tweaked);
+        Eigen::VectorXs tweaked = originalParentScale;
+        if (axis == -1)
+        {
+          tweaked += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          tweaked(axis) += eps;
+        }
+        setParentScale(tweaked);
         out = getScratch(firstIndex);
         return true;
       },
@@ -718,7 +854,7 @@ Eigen::MatrixXs EllipsoidJoint::finiteDifferenceScratch(
       eps,
       true);
 
-  setPositions(originalPoses);
+  setParentScale(originalParentScale);
 
   return result;
 }
