@@ -19,7 +19,6 @@ namespace dynamics {
 ConstantCurveIncompressibleJoint::ConstantCurveIncompressibleJoint(
     const detail::GenericJointProperties<math::RealVectorSpace<3>>& props)
   : GenericJoint<math::RealVectorSpace<3>>(props),
-    mAxisOrder(EulerJoint::AxisOrder::XYZ), // we want YXZ
     mFlipAxisMap(Eigen::Vector3s::Ones()),
     mNeutralPos(Eigen::Vector3s::Zero()),
     mLength(1.0)
@@ -43,25 +42,6 @@ const std::string& ConstantCurveIncompressibleJoint::getStaticType()
 bool ConstantCurveIncompressibleJoint::isCyclic(std::size_t) const
 {
   return false;
-}
-
-//==============================================================================
-void ConstantCurveIncompressibleJoint::setAxisOrder(
-    EulerJoint::AxisOrder _order, bool _renameDofs)
-{
-  mAxisOrder = _order;
-  if (_renameDofs)
-    updateDegreeOfFreedomNames();
-
-  Joint::notifyPositionUpdated();
-  updateRelativeJacobian(true);
-  Joint::incrementVersion();
-}
-
-//==============================================================================
-EulerJoint::AxisOrder ConstantCurveIncompressibleJoint::getAxisOrder() const
-{
-  return mAxisOrder;
 }
 
 //==============================================================================
@@ -109,7 +89,6 @@ dart::dynamics::Joint* ConstantCurveIncompressibleJoint::clone() const
       = new ConstantCurveIncompressibleJoint(this->getJointProperties());
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(getFlipAxisMap());
-  joint->setAxisOrder(getAxisOrder());
   joint->setName(this->getName());
   joint->setNeutralPos(this->getNeutralPos());
   joint->setPositionUpperLimits(this->getPositionUpperLimits());
@@ -142,8 +121,8 @@ Eigen::Isometry3s ConstantCurveIncompressibleJoint::getRelativeTransformAt(
   Eigen::Vector3s pos = inPos + mNeutralPos;
 
   // 1. Do the euler rotation
-  Eigen::Isometry3s rot
-      = EulerJoint::convertToTransform(pos, mAxisOrder, mFlipAxisMap);
+  Eigen::Isometry3s rot = EulerJoint::convertToTransform(
+      pos, EulerJoint::AxisOrder::XZY, mFlipAxisMap);
 
   // 2. Computing translation from vertical
   Eigen::Isometry3s bentRod = Eigen::Isometry3s::Identity();
@@ -193,8 +172,8 @@ void ConstantCurveIncompressibleJoint::updateRelativeTransform() const
   s_t d = mLength * scale;
 
   // 1. Do the euler rotation
-  Eigen::Isometry3s rot
-      = EulerJoint::convertToTransform(pos, mAxisOrder, mFlipAxisMap);
+  Eigen::Isometry3s rot = EulerJoint::convertToTransform(
+      pos, EulerJoint::AxisOrder::XZY, mFlipAxisMap);
 
   // 2. Computing translation from vertical
   Eigen::Isometry3s bentRod = Eigen::Isometry3s::Identity();
@@ -247,13 +226,16 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianStatic(
 
   // 1. Do the euler rotation
   Eigen::Isometry3s rot = EulerJoint::convertToTransform(
-      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
+      pos.head<3>(), EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
   Eigen::Matrix<s_t, 6, 3> J = Eigen::Matrix<s_t, 6, 3>::Zero();
 
   // 2. Compute the Jacobian of the Euler transformation
   Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
   J.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianStatic(
-      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+      pos.head<3>(),
+      EulerJoint::AxisOrder::XZY,
+      mFlipAxisMap.head<3>(),
+      identity);
 
   s_t scale = this->getChildScale()(1);
   s_t d = mLength * scale;
@@ -281,7 +263,7 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianStatic(
 
     // 1. Do the euler rotation
     Eigen::Isometry3s rot = EulerJoint::convertToTransform(
-        pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
+        pos.head<3>(), EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
 
     // 2. Computing translation from vertical
     Eigen::Isometry3s bentRod = Eigen::Isometry3s::Identity();
@@ -360,7 +342,7 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtPositionStatic(
 
   // 1. Do the euler rotation
   const Eigen::Isometry3s rot = EulerJoint::convertToTransform(
-      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
+      pos.head<3>(), EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
   const Eigen::Matrix3s rot_dFirst
       = math::eulerXZYToMatrixGrad(pos.head<3>(), index);
 
@@ -369,7 +351,11 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtPositionStatic(
   // 2. Compute the Jacobian of the Euler transformation
   const Eigen::Isometry3s identity = Eigen::Isometry3s::Identity();
   J_dFirst.block<6, 3>(0, 0) = EulerJoint::computeRelativeJacobianDerivWrtPos(
-      index, pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+      index,
+      pos.head<3>(),
+      EulerJoint::AxisOrder::XZY,
+      mFlipAxisMap.head<3>(),
+      identity);
 
   s_t scale = this->getChildScale()(1);
   const s_t d = mLength * scale;
@@ -415,7 +401,10 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtPositionStatic(
     // with an euler joint
     const Eigen::Matrix<s_t, 6, 3> J
         = EulerJoint::computeRelativeJacobianStatic(
-            pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+            pos.head<3>(),
+            EulerJoint::AxisOrder::XZY,
+            mFlipAxisMap.head<3>(),
+            identity);
 
     // 2. Computing translation from vertical
     Eigen::Isometry3s bentRod = Eigen::Isometry3s::Identity();
@@ -612,7 +601,7 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
 
   // 1. Do the euler rotation
   const Eigen::Isometry3s rot = EulerJoint::convertToTransform(
-      pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>());
+      pos.head<3>(), EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
   const Eigen::Matrix3s rot_dFirst
       = math::eulerXZYToMatrixGrad(pos.head<3>(), firstIndex);
   const Eigen::Matrix3s rot_dSecond
@@ -627,14 +616,14 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
       = EulerJoint::computeRelativeJacobianDerivWrtPos(
           firstIndex,
           pos.head<3>(),
-          mAxisOrder,
+          EulerJoint::AxisOrder::XZY,
           mFlipAxisMap.head<3>(),
           identity);
   Eigen::Matrix<s_t, 6, 3> J_dSecond
       = EulerJoint::computeRelativeJacobianDerivWrtPos(
           secondIndex,
           pos.head<3>(),
-          mAxisOrder,
+          EulerJoint::AxisOrder::XZY,
           mFlipAxisMap.head<3>(),
           identity);
   Eigen::Matrix<s_t, 6, 3> J_dFirst_dSecond
@@ -642,7 +631,7 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
           secondIndex,
           pos.head<3>(),
           Eigen::Vector3s::Unit(firstIndex),
-          mAxisOrder,
+          EulerJoint::AxisOrder::XZY,
           mFlipAxisMap.head<3>(),
           identity);
 
@@ -741,7 +730,10 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
     // with an euler joint
     const Eigen::Matrix<s_t, 6, 3> J
         = EulerJoint::computeRelativeJacobianStatic(
-            pos.head<3>(), mAxisOrder, mFlipAxisMap.head<3>(), identity);
+            pos.head<3>(),
+            EulerJoint::AxisOrder::XZY,
+            mFlipAxisMap.head<3>(),
+            identity);
 
     // 2. Computing translation from vertical
     Eigen::Isometry3s bentRod = Eigen::Isometry3s::Identity();

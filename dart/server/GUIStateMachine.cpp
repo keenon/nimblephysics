@@ -238,17 +238,27 @@ void GUIStateMachine::renderSkeleton(
                 ? curveJoint->getParentBodyNode()->getWorldTransform()
                 : Eigen::Isometry3s::Identity();
 
+      Eigen::Vector3s neutralPos = curveJoint->getNeutralPos();
+      Eigen::Vector3s totalPos = neutralPos + curveJoint->getPositionsStatic();
+      curveJoint->setNeutralPos(Eigen::Vector3s::Zero());
       std::vector<Eigen::Vector3s> points;
       int numPoints = 10;
       for (int i = 0; i <= numPoints; i++)
       {
         s_t frac = ((s_t)(i) / (s_t)numPoints);
-        Eigen::Isometry3s localT = parentT
-                                   * curveJoint->getRelativeTransformAt(
-                                       frac * curveJoint->getPositionsStatic(),
-                                       frac * curveJoint->getLength());
+        Eigen::Isometry3s localT
+            = parentT
+              * curveJoint->getRelativeTransformAt(
+                  frac * totalPos, frac * curveJoint->getLength());
         points.push_back(localT.translation());
       }
+      curveJoint->setNeutralPos(neutralPos);
+      Eigen::Isometry3s T = curveJoint->getChildBodyNode()->getWorldTransform();
+      renderBasis(
+          0.05,
+          curveJoint->getName(),
+          T.translation(),
+          math::matrixToEulerXYZ(T.linear()));
 
       std::stringstream jointNameStream;
       jointNameStream << prefix << "_";

@@ -21,7 +21,9 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CapsuleShape.hpp"
+#include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
 #include "dart/dynamics/CustomJoint.hpp"
+#include "dart/dynamics/EllipsoidJoint.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
@@ -2962,6 +2964,78 @@ bool OpenSimParser::convertOsimToMJCF(
   }
 }
 
+void readAttachedGeometry(
+    tinyxml2::XMLElement* attachedGeometry,
+    dynamics::BodyNode* childBody,
+    Eigen::Isometry3s relativeT,
+    const common::Uri& uri,
+    const common::ResourceRetrieverPtr& retriever)
+{
+  tinyxml2::XMLElement* meshCursor
+      = attachedGeometry->FirstChildElement("Mesh");
+  while (meshCursor)
+  {
+    if (meshCursor->FirstChildElement("mesh_file")->GetText() == nullptr)
+    {
+      std::cout << "Body Node " << childBody->getName()
+                << " has an attached <Mesh> object where <mesh_file> is "
+                   "empty. Ignoring."
+                << std::endl;
+      meshCursor = meshCursor->NextSiblingElement("Mesh");
+      continue;
+    }
+
+    std::string mesh_file(
+        meshCursor->FirstChildElement("mesh_file")->GetText());
+    Eigen::Vector3s scale
+        = readVec3(meshCursor->FirstChildElement("scale_factors"));
+
+    common::Uri meshUri = common::Uri::createFromRelativeUri(
+        uri, "./Geometry/" + mesh_file + ".ply");
+    std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+        = dynamics::MeshShape::loadMesh(meshUri, retriever);
+
+    if (meshPtr)
+    {
+      std::shared_ptr<dynamics::MeshShape> meshShape
+          = std::make_shared<dynamics::MeshShape>(
+              scale, meshPtr, meshUri, retriever);
+
+      dynamics::ShapeNode* meshShapeNode
+          = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
+
+      Eigen::Isometry3s localT = Eigen::Isometry3s::Identity();
+      tinyxml2::XMLElement* transformElem
+          = meshCursor->FirstChildElement("transform");
+      if (transformElem != nullptr)
+      {
+        Eigen::Vector6s transformVec = readVec6(transformElem);
+        localT.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+        localT.translation() = transformVec.tail<3>();
+      }
+
+      meshShapeNode->setRelativeTransform(relativeT * localT);
+
+      dynamics::VisualAspect* meshVisualAspect
+          = meshShapeNode->getVisualAspect();
+
+      tinyxml2::XMLElement* appearance
+          = meshCursor->FirstChildElement("Appearance");
+      if (appearance != nullptr)
+      {
+        Eigen::Vector3s colors
+            = readVec3(appearance->FirstChildElement("color")) * 0.7;
+        double opacity
+            = atof(appearance->FirstChildElement("opacity")->GetText());
+        meshVisualAspect->setColor(colors);
+        meshVisualAspect->setAlpha(opacity);
+      }
+    }
+
+    meshCursor = meshCursor->NextSiblingElement("Mesh");
+  }
+}
+
 //==============================================================================
 std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     dynamics::SkeletonPtr skel,
@@ -3636,6 +3710,36 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     joint = universalJoint;
   }
+  else if (jointType == "EllipsoidJoint")
+  {
+    // Create a EllipsoidJoint
+    dynamics::EllipsoidJoint* ellipsoidJoint = nullptr;
+    dynamics::EllipsoidJoint::Properties props;
+    props.mName = jointName;
+    if (parentBody == nullptr)
+    {
+      auto pair = skel->createJointAndBodyNodePair<dynamics::EllipsoidJoint>(
+          nullptr, props, bodyProps);
+      ellipsoidJoint = pair.first;
+      childBody = pair.second;
+    }
+    else
+    {
+      auto pair
+          = parentBody
+                ->createChildJointAndBodyNodePair<dynamics::EllipsoidJoint>(
+                    props, bodyProps);
+      ellipsoidJoint = pair.first;
+      childBody = pair.second;
+    }
+    auto* radiiElem = jointDetail->FirstChildElement("radii_x_y_z");
+    if (radiiElem != nullptr)
+    {
+      ellipsoidJoint->setEllipsoidRadii(readVec3(radiiElem));
+    }
+
+    joint = ellipsoidJoint;
+  }
   else if (jointType == "ScapulothoracicJoint")
   {
     // Create a ScapulathorasicJoint
@@ -3678,6 +3782,45 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
 
     joint = scapulothoracicJoint;
+  }
+  else if (jointType == "ConstantCurvatureJoint")
+  {
+    // Create a ConstantCurvatureJoint
+    dynamics::ConstantCurveIncompressibleJoint* curveJoint = nullptr;
+    dynamics::ConstantCurveIncompressibleJoint::Properties props;
+    props.mName = jointName;
+    if (parentBody == nullptr)
+    {
+      auto pair = skel->createJointAndBodyNodePair<
+          dynamics::ConstantCurveIncompressibleJoint>(
+          nullptr, props, bodyProps);
+      curveJoint = pair.first;
+      childBody = pair.second;
+    }
+    else
+    {
+      auto pair = parentBody->createChildJointAndBodyNodePair<
+          dynamics::ConstantCurveIncompressibleJoint>(props, bodyProps);
+      curveJoint = pair.first;
+      childBody = pair.second;
+    }
+    auto* lengthElem = jointDetail->FirstChildElement("length");
+    if (lengthElem != nullptr)
+    {
+      s_t len = atof(lengthElem->GetText());
+      std::cout << "Setting len to " << len << std::endl;
+      curveJoint->setLength(len);
+    }
+    auto* neutralPos = jointDetail->FirstChildElement("neutral_angle_x_z_y");
+    if (neutralPos != nullptr)
+    {
+      Eigen::Vector3s neutralVec = readVec3(neutralPos);
+      std::cout << "Setting neutral pos to " << neutralVec << std::endl;
+      curveJoint->setNeutralPos(neutralVec);
+      curveJoint->setPositions(neutralVec);
+    }
+
+    joint = curveJoint;
   }
   else
   {
@@ -3857,71 +4000,53 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       }
     }
   }
+  // OpenSim v4 files can also specify visible geometry this way
+  tinyxml2::XMLElement* componentsElem
+      = bodyCursor->FirstChildElement("components");
+  if (componentsElem != nullptr)
+  {
+    tinyxml2::XMLElement* frameCursor
+        = componentsElem->FirstChildElement("PhysicalOffsetFrame");
+    while (frameCursor != nullptr)
+    {
+      Eigen::Isometry3s relativeT = Eigen::Isometry3s::Identity();
+
+      tinyxml2::XMLElement* frameTranslationElem
+          = frameCursor->FirstChildElement("translation");
+      if (frameTranslationElem != nullptr)
+      {
+        relativeT.translation() = readVec3(frameTranslationElem);
+      }
+      tinyxml2::XMLElement* frameOrientationElem
+          = frameCursor->FirstChildElement("orientation");
+      if (frameOrientationElem != nullptr)
+      {
+        relativeT.linear()
+            = math::eulerXYZToMatrix(readVec3(frameOrientationElem));
+      }
+      // OpenSim v3 files specify visible geometry this way
+      tinyxml2::XMLElement* frameAttachedGeometry
+          = frameCursor->FirstChildElement("attached_geometry");
+      if (frameAttachedGeometry && childBody != nullptr)
+      {
+        readAttachedGeometry(
+            frameAttachedGeometry, childBody, relativeT, uri, retriever);
+      }
+
+      frameCursor = frameCursor->NextSiblingElement("PhysicalOffsetFrame");
+    }
+  }
   // OpenSim v3 files specify visible geometry this way
   tinyxml2::XMLElement* attachedGeometry
       = bodyCursor->FirstChildElement("attached_geometry");
   if (attachedGeometry && childBody != nullptr)
   {
-    tinyxml2::XMLElement* meshCursor
-        = attachedGeometry->FirstChildElement("Mesh");
-    while (meshCursor)
-    {
-      if (meshCursor->FirstChildElement("mesh_file")->GetText() == nullptr)
-      {
-        std::cout << "Body Node " << bodyName
-                  << " has an attached <Mesh> object where <mesh_file> is "
-                     "empty. Ignoring."
-                  << std::endl;
-        meshCursor = meshCursor->NextSiblingElement("Mesh");
-        continue;
-      }
-
-      std::string mesh_file(
-          meshCursor->FirstChildElement("mesh_file")->GetText());
-      Eigen::Vector3s scale
-          = readVec3(meshCursor->FirstChildElement("scale_factors"));
-
-      common::Uri meshUri = common::Uri::createFromRelativeUri(
-          uri, "./Geometry/" + mesh_file + ".ply");
-      std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
-          = dynamics::MeshShape::loadMesh(meshUri, retriever);
-
-      if (meshPtr)
-      {
-        std::shared_ptr<dynamics::MeshShape> meshShape
-            = std::make_shared<dynamics::MeshShape>(
-                scale, meshPtr, meshUri, retriever);
-
-        dynamics::ShapeNode* meshShapeNode
-            = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
-
-        /*
-        Eigen::Vector6s transformVec
-            = readVec6(displayGeometryCursor->FirstChildElement("transform"));
-        Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
-        transform.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-        transform.translation() = transformVec.tail<3>();
-        meshShapeNode->setRelativeTransform(transform);
-        */
-
-        dynamics::VisualAspect* meshVisualAspect
-            = meshShapeNode->getVisualAspect();
-
-        tinyxml2::XMLElement* appearance
-            = meshCursor->FirstChildElement("Appearance");
-        if (appearance != nullptr)
-        {
-          Eigen::Vector3s colors
-              = readVec3(appearance->FirstChildElement("color")) * 0.7;
-          double opacity
-              = atof(appearance->FirstChildElement("opacity")->GetText());
-          meshVisualAspect->setColor(colors);
-          meshVisualAspect->setAlpha(opacity);
-        }
-      }
-
-      meshCursor = meshCursor->NextSiblingElement("Mesh");
-    }
+    readAttachedGeometry(
+        attachedGeometry,
+        childBody,
+        Eigen::Isometry3s::Identity(),
+        uri,
+        retriever);
   }
 
   assert(childBody != nullptr);

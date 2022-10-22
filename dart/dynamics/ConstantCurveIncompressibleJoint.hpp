@@ -78,15 +78,6 @@ public:
 
   bool isCyclic(std::size_t) const override;
 
-  /// Set the axis order
-  /// \param[in] _order Axis order
-  /// \param[in] _renameDofs If true, the names of dofs in this joint will be
-  /// renmaed according to the axis order.
-  void setAxisOrder(EulerJoint::AxisOrder _order, bool _renameDofs = true);
-
-  /// Return the axis order
-  EulerJoint::AxisOrder getAxisOrder() const;
-
   /// This takes a vector of 1's and -1's to indicate which entries to flip, if
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);
@@ -157,8 +148,6 @@ public:
   Eigen::MatrixXs finiteDifferenceScratch(int firstIndex, int secondIndex);
 
 protected:
-  dynamics::EulerJoint::AxisOrder mAxisOrder;
-
   Eigen::Vector3s mNeutralPos;
 
   s_t mLength;

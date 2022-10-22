@@ -182,6 +182,10 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_RotationalGradients)
   target_link_libraries(test_RotationalGradients dart-utils)
   target_link_libraries(test_RotationalGradients dart-utils-urdf)
+
+  dart_add_test("unit" test_CompleteHumanModel)
+  target_link_libraries(test_CompleteHumanModel dart-utils)
+  target_link_libraries(test_CompleteHumanModel dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)
