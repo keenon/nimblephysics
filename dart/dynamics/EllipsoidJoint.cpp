@@ -411,6 +411,47 @@ EllipsoidJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
 }
 
 //==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s EllipsoidJoint::getWorldTranslationOfChildBodyWrtParentScale(
+    int axis) const
+{
+  const dynamics::BodyNode* parentBody = getParentBodyNode();
+  if (parentBody == nullptr)
+  {
+    return Eigen::Vector3s::Zero();
+  }
+
+  Eigen::Matrix3s R = parentBody->getWorldTransform().linear();
+  Eigen::Isometry3s T_jj = getTransformFromParentBodyNode().inverse()
+                           * getRelativeTransform()
+                           * getTransformFromChildBodyNode();
+  if (axis == -1)
+  {
+    Eigen::Vector3s dT_jj
+        = getTransformFromParentBodyNode().linear()
+          * T_jj.translation().cwiseQuotient(getParentScale());
+    Eigen::Vector3s parentOffset
+        = getTransformFromParentBodyNode().translation().cwiseQuotient(
+            getParentScale());
+    return R * (parentOffset + dT_jj);
+  }
+  else
+  {
+    Eigen::Vector3s dT_jj
+        = getTransformFromParentBodyNode().linear()
+          * (Eigen::Vector3s::Unit(axis) * T_jj.translation()(axis)
+             / getParentScale()(axis));
+    Eigen::Vector3s parentOffset
+        = Eigen::Vector3s::Unit(axis)
+          * (getTransformFromParentBodyNode().translation()(axis)
+             / getParentScale()(axis));
+    return R * (parentOffset + dT_jj);
+  }
+}
+
+//==============================================================================
 /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
 /// to the parent BodyNode expressed in the child BodyNode frame, with respect
 /// to the scaling of the parent body along a specific axis.

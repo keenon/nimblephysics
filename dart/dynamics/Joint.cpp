@@ -35,8 +35,13 @@
 #include <string>
 
 #include "dart/common/Console.hpp"
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/dynamics/EllipsoidJoint.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
@@ -542,6 +547,122 @@ Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianDerivWrtChildScale(
   setChildScale(originalChildScale);
 
   return result;
+}
+
+//==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtParentScale(
+    int axis) const
+{
+  const dynamics::BodyNode* parentBody = getParentBodyNode();
+  if (parentBody == nullptr)
+  {
+    return Eigen::Vector3s::Zero();
+  }
+
+  Eigen::Matrix3s R = parentBody->getWorldTransform().linear();
+  Eigen::Vector3s parentOffset = getTransformFromParentBodyNode().translation();
+  if (axis == -1)
+  {
+    return (R * parentOffset).cwiseQuotient(getParentScale());
+  }
+  else
+  {
+    return (R.col(axis) * parentOffset(axis)) / getParentScale()(axis);
+  }
+}
+
+//==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of child scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtChildScale(
+    int axis) const
+{
+  Eigen::Matrix3s R = getChildBodyNode()->getWorldTransform().linear();
+  Eigen::Vector3s parentOffset = getTransformFromChildBodyNode().translation();
+  if (axis == -1)
+  {
+    return -(R * parentOffset).cwiseQuotient(getChildScale());
+  }
+  else
+  {
+    return -(R.col(axis) * parentOffset(axis)) / getChildScale()(axis);
+  }
+}
+
+//==============================================================================
+Eigen::Vector3s
+Joint::finiteDifferenceWorldTranslationOfChildBodyWrtParentScale(int axis)
+{
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  Eigen::Vector3s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        updateRelativeTransform();
+        perturbed = getChildBodyNode()->getWorldTransform().translation();
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return dT;
+}
+
+//==============================================================================
+Eigen::Vector3s Joint::finiteDifferenceWorldTranslationOfChildBodyWrtChildScale(
+    int axis)
+{
+  Eigen::Vector3s originalChildScale = getChildScale();
+
+  Eigen::Vector3s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+
+        updateRelativeTransform();
+
+        perturbed = getChildBodyNode()->getWorldTransform().translation();
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return dT;
 }
 
 //==============================================================================
@@ -1064,6 +1185,9 @@ Eigen::Vector6s Joint::getWorldAxisScrewForVelocity(int dof) const
 Eigen::Vector6s Joint::getScrewAxisGradientForPosition(
     int axisDof, int rotateDof)
 {
+  // TODO: check if this works
+  // getRelativeJacobianDerivWrtPosition(rotateDof).col(axisDof);
+
   // Defaults to Finite Differencing - this is slow, but at least it's
   // approximately correct. Child joints should override with a faster
   // implementation.
@@ -1118,6 +1242,124 @@ Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientForForce(
   setPosition(rotateDof, original);
 
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the child body
+Eigen::Vector6s Joint::getScrewAxisGradientWrtChildBodyScale(
+    int axisDof, int axis)
+{
+  // if (getType() == ConstantCurveIncompressibleJoint::getStaticType()
+  //     || getType() == EllipsoidJoint::getStaticType())
+  // {
+  //   return getRelativeJacobianDerivWrtChildScale(axis).col(axisDof);
+  // }
+  return finiteDifferenceScrewAxisGradientWrtChildBodyScale(axisDof, axis);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the parent body
+Eigen::Vector6s Joint::getScrewAxisGradientWrtParentBodyScale(
+    int axisDof, int axis)
+{
+  // if (getType() == ConstantCurveIncompressibleJoint::getStaticType()
+  //     || getType() == EllipsoidJoint::getStaticType())
+  // {
+  //   return getRelativeJacobianDerivWrtParentScale(axis).col(axisDof);
+  // }
+  return finiteDifferenceScrewAxisGradientWrtParentBodyScale(axisDof, axis);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the child body
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientWrtChildBodyScale(
+    int axisDof, int axis)
+{
+  Eigen::Vector3s originalChildScale = getChildScale();
+
+  Eigen::Isometry3s childT = getChildBodyNode()->getWorldTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+        updateRelativeTransform();
+
+        // perturbed = getWorldAxisScrewForPosition(axisDof);
+        // perturbed = math::AdR(
+        //     getChildBodyNode()->getWorldTransform(),
+        //     getRelativeJacobianInPositionSpace().col(axisDof));
+        perturbed = math::AdR(
+            childT, getRelativeJacobianInPositionSpace().col(axisDof));
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return dT;
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the parent body
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientWrtParentBodyScale(
+    int axisDof, int axis)
+{
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  Eigen::Isometry3s childT = getChildBodyNode()->getWorldTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        updateRelativeTransform();
+
+        // perturbed = getWorldAxisScrewForPosition(axisDof);
+        // perturbed = math::AdR(
+        //     getChildBodyNode()->getWorldTransform(),
+        //     getRelativeJacobianInPositionSpace().col(axisDof));
+        perturbed = math::AdR(
+            childT, getRelativeJacobianInPositionSpace().col(axisDof));
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return dT;
 }
 
 //==============================================================================

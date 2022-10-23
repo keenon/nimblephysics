@@ -391,6 +391,15 @@ Eigen::Vector6s logMap(const Eigen::Isometry3s& _T);
 Eigen::Vector3s gradientWrtTheta(
     const Eigen::Vector6s& screwAxis, const Eigen::Vector3s& point, s_t theta);
 
+/// This takes a screw axis and a point, and gives us the direction that the
+/// point will move if we increase theta by an infinitesimal amount.
+Eigen::Vector3s gradientWrtThetaSecondGrad(
+    const Eigen::Vector6s& screwAxis,
+    const Eigen::Vector6s& dScrewAxis,
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& dPoint,
+    s_t theta);
+
 /// This takes a rotation axis and a point, and gives us the direction that the
 /// point will move if we increase the theta by an infinitesimal amount.
 Eigen::Vector3s gradientWrtThetaPureRotation(

@@ -765,6 +765,24 @@ public:
     return math::Jacobian::Zero(6, getNumDofs());
   }
 
+  /// This gets the change in world translation of the child body, with respect
+  /// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+  /// axis.
+  virtual Eigen::Vector3s getWorldTranslationOfChildBodyWrtParentScale(
+      int axis) const;
+
+  /// This gets the change in world translation of the child body, with respect
+  /// to an axis of child scaling. Use axis = -1 for uniform scaling of all the
+  /// axis.
+  virtual Eigen::Vector3s getWorldTranslationOfChildBodyWrtChildScale(
+      int axis) const;
+
+  Eigen::Vector3s finiteDifferenceWorldTranslationOfChildBodyWrtParentScale(
+      int axis);
+
+  Eigen::Vector3s finiteDifferenceWorldTranslationOfChildBodyWrtChildScale(
+      int axis);
+
   /// This gets the column of "H" for the GEAR paper derivations, which is
   /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
   /// the scalar value we are changing.
@@ -918,6 +936,24 @@ public:
   /// `axisDof` as we rotate `rotateDof`.
   Eigen::Vector6s finiteDifferenceScrewAxisGradientForForce(
       int axisDof, int rotateDof);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the child body
+  Eigen::Vector6s getScrewAxisGradientWrtChildBodyScale(int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the parent body
+  Eigen::Vector6s getScrewAxisGradientWrtParentBodyScale(int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the child body
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientWrtChildBodyScale(
+      int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the parent body
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientWrtParentBodyScale(
+      int axisDof, int axis);
 
   /// Get constraint wrench expressed in body node frame
   virtual Eigen::Vector6s getBodyConstraintWrench() const = 0;

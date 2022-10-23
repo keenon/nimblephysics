@@ -48,6 +48,7 @@
 #include "dart/server/GUIRecording.hpp"
 #include "dart/utils/utils.hpp"
 
+#include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
 using namespace dart;
@@ -69,6 +70,19 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
     std::cout << "Found shape: " << shapeNode->getName() << " - "
               << shape->getType() << std::endl;
   }
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerList;
+  for (auto pair : osim.markersMap)
+  {
+    markerList.push_back(pair.second);
+  }
+
+  bool markersVerified
+      = verifySkeletonMarkerJacobians(osim.skeleton, markerList);
+  EXPECT_TRUE(markersVerified);
+  if (!markersVerified)
+  {
+    return;
+  }
 
   server::GUIRecording server;
   server.setFramesPerSecond(20);
@@ -81,6 +95,21 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
     server.createSphere(pair.first, 0.01, pair.second);
     server.setObjectTooltip(pair.first, pair.first);
   }
+
+  /*
+  auto sprinter = biomechanics::OpenSimParser::parseOsim(
+      "dart://sample/osim/Sprinter/sprinter.osim");
+
+  server.renderSkeleton(sprinter.skeleton);
+  auto sprinterLocation
+      = sprinter.skeleton->getMarkerMapWorldPositions(sprinter.markersMap);
+  for (auto& pair : sprinterLocation)
+  {
+    server.createSphere(
+        pair.first, 0.01, pair.second, Eigen::Vector4s(1, 0, 0, 1));
+    server.setObjectTooltip(pair.first, pair.first);
+  }
+  */
 
   // TODO: Transfer markers to the thorax / scapula / lumbar / neck, instead of
   // the torso

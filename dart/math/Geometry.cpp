@@ -987,6 +987,41 @@ Eigen::Vector3s gradientWrtTheta(
   }
 }
 
+/// This takes a screw axis and a point, and gives us the direction that the
+/// point will move if we increase theta by an infinitesimal amount.
+Eigen::Vector3s gradientWrtThetaSecondGrad(
+    const Eigen::Vector6s& _S,
+    const Eigen::Vector6s& d_S,
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& dPoint,
+    s_t theta)
+{
+
+  const Eigen::Vector3s& w = _S.head<3>();
+  const Eigen::Vector3s& dw = d_S.head<3>();
+  const Eigen::Vector3s& v = _S.tail<3>();
+  const Eigen::Vector3s& dv = d_S.tail<3>();
+
+  s_t normW = w.norm();
+  if (normW > DART_EPSILON)
+  {
+    const s_t cos_t = cos(theta);
+    const s_t sin_t = sin(theta);
+    const Eigen::Vector3s wp = w.cross(point);
+    const Eigen::Vector3s dwp = dw.cross(point) + w.cross(dPoint);
+    const Eigen::Vector3s dwwp = dw.cross(wp) + w.cross(dwp);
+    const Eigen::Vector3s wv = w.cross(v);
+    const Eigen::Vector3s dwv = dw.cross(v) + w.cross(dv);
+    const Eigen::Vector3s dwwv = dw.cross(wv) + w.cross(dwv);
+    return cos_t * (dwp - dwwv) + sin_t * (dwwp + dwv) + dv + dwwv;
+  }
+  else
+  {
+    // This means we don't rotate, so it's pure linear motion
+    return dv;
+  }
+}
+
 Eigen::Vector3s gradientWrtThetaPureRotation(
     const Eigen::Vector3s& w, const Eigen::Vector3s& point, s_t theta)
 {

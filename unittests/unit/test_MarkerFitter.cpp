@@ -5956,7 +5956,7 @@ TEST(MarkerFitter, HIGH_BMI)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
 {
   std::vector<std::string> c3dFiles;
@@ -5966,7 +5966,7 @@ TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
   c3dFiles.push_back("dart://sample/osim/Test_Output/JA1Gait35.c3d");
 
   runEngine(
-      "dart://sample/osim/Test_Output/rescaled.osim",
+      "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim",
       c3dFiles,
       trcFiles,
       grfFiles,
@@ -5975,7 +5975,7 @@ TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
       "male",
       true);
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)

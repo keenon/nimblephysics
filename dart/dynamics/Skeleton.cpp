@@ -5465,37 +5465,46 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
     dynamics::BodyNode* bodyNode = getBodyNode(i);
-    Eigen::Matrix3s R = bodyNode->getWorldTransform().linear();
 
-    Eigen::Vector3s parentOffset = bodyNode->getParentJoint()
-                                       ->getTransformFromChildBodyNode()
-                                       .translation();
-
+    // Each body can scale along 3 distinct axis
     for (int axis = 0; axis < 3; axis++)
     {
-      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+      Eigen::Vector3s worldOffsetDueToParentJoint
+          = bodyNode->getParentJoint()
+                ->getWorldTranslationOfChildBodyWrtChildScale(axis);
 
+      // Now begin iterating rows, for each joint
       for (int j = 0; j < joints.size(); j++)
       {
         int sourceJointIndex = getJointIndex(joints[j]);
-        for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+        if (joints[j]->getName() == bodyNode->getParentJoint()->getName())
         {
-          dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
-          if (childJoint == joints[j]
-              || parentMap(getJointIndex(childJoint), sourceJointIndex))
+          jac.block(j * 3, i * 3 + axis, 3, 1)
+              = worldOffsetDueToParentJoint
+                // Ignore any translation of the child body due to simply
+                // scaling the child offset, since the joint isn't attached to
+                // the child offset
+                - bodyNode->getParentJoint()
+                      ->Joint::getWorldTranslationOfChildBodyWrtChildScale(
+                          axis);
+        }
+        else
+        {
+          for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
           {
-            // This is the child joint
-
-            Eigen::Vector3s childOffset
-                = Eigen::Vector3s::Unit(axis)
-                  * childJoint->getTransformFromParentBodyNode().translation()(
+            dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
+            if (childJoint->getName() == joints[j]->getName()
+                || parentMap(getJointIndex(childJoint), sourceJointIndex))
+            {
+              Eigen::Vector3s worldOffsetDueToChildJoint
+                  = childJoint->getWorldTranslationOfChildBodyWrtParentScale(
                       axis);
-            Eigen::Vector3s worldChildOffset = R * childOffset;
-            jac.block(j * 3, i * 3 + axis, 3, 1)
-                = (worldParentOffset + worldChildOffset)
-                  / bodyNode->getScale()(axis);
 
-            break;
+              jac.block(j * 3, i * 3 + axis, 3, 1)
+                  = worldOffsetDueToParentJoint + worldOffsetDueToChildJoint;
+
+              break;
+            }
           }
         }
       }
@@ -5673,14 +5682,12 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
     dynamics::BodyNode* bodyNode = getBodyNode(i);
     Eigen::Matrix3s R = bodyNode->getWorldTransform().linear();
 
-    Eigen::Vector3s parentOffset = bodyNode->getParentJoint()
-                                       ->getTransformFromChildBodyNode()
-                                       .translation();
-
     // Each body can scale along 3 distinct axis
     for (int axis = 0; axis < 3; axis++)
     {
-      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+      Eigen::Vector3s worldOffsetDueToParentJoint
+          = bodyNode->getParentJoint()
+                ->getWorldTranslationOfChildBodyWrtChildScale(axis);
 
       // Now begin iterating rows, for each marker
       for (int j = 0; j < markers.size(); j++)
@@ -5693,8 +5700,8 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
         if (markers[j].first == bodyNode)
         {
           jac.block(j * 3, i * 3 + axis, 3, 1)
-              = R.col(axis) * markers[j].second(axis)
-                + (worldParentOffset / bodyNode->getScale()(axis));
+              = (R.col(axis) * markers[j].second(axis))
+                + worldOffsetDueToParentJoint;
         }
         else
         {
@@ -5705,16 +5712,12 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
             if (childJoint == markers[j].first->getParentJoint()
                 || parentMap(getJointIndex(childJoint), sourceJointIndex))
             {
-              // This is the child joint
-              Eigen::Vector3s childOffset
-                  = Eigen::Vector3s::Unit(axis)
-                    * childJoint->getTransformFromParentBodyNode()
-                          .translation()(axis);
+              Eigen::Vector3s worldOffsetDueToChildJoint
+                  = childJoint->getWorldTranslationOfChildBodyWrtParentScale(
+                      axis);
 
-              Eigen::Vector3s worldChildOffset = R * childOffset;
               jac.block(j * 3, i * 3 + axis, 3, 1)
-                  = (worldParentOffset + worldChildOffset)
-                    / bodyNode->getScale()(axis);
+                  = worldOffsetDueToParentJoint + worldOffsetDueToChildJoint;
 
               break;
             }
@@ -5875,6 +5878,16 @@ Eigen::MatrixXs
 Skeleton::getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
     const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers)
 {
+  // HERE
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
@@ -6251,20 +6264,47 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
     const Eigen::MatrixXs& markerWrtScaleJac)
 {
   dynamics::BodyNode* scaleBody = getBodyNode(index);
-  dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
-  int scaleJointIndex = getJointIndex(scaleJoint);
-  int markerGradCol = index * 3 + axis;
+  dynamics::Joint* scaleBodyParentJoint = scaleBody->getParentJoint();
+  int scaleBodyParentJointIndex = getJointIndex(scaleBodyParentJoint);
+  (void)scaleBodyParentJointIndex;
+  int gradCol = index * 3 + axis;
 
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
   const Eigen::MatrixXi& parentMap = getJointParentMap();
 
+  Eigen::MatrixXs jointChangeInPos
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
+
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
+
+    // Find the change in the velocity due to the joint
+    Eigen::Vector6s dScrew = Eigen::Vector6s::Zero();
+    if (parentJoint->getParentBodyNode() != nullptr
+        && parentJoint->getParentBodyNode()->getName() == scaleBody->getName())
+    {
+      dScrew = parentJoint->getRelativeJacobianDerivWrtParentScale(axis).col(
+          getDof(j)->getIndexInJoint());
+    }
+    if (parentJoint->getChildBodyNode()->getName() == scaleBody->getName())
+    {
+      // Get only the portion of the derivative that is not due to scaling the
+      // child transform
+      dScrew = parentJoint->getRelativeJacobianDerivWrtChildScale(axis).col(
+                   getDof(j)->getIndexInJoint())
+               - parentJoint->Joint::getRelativeJacobianDerivWrtChildScale(axis)
+                     .col(getDof(j)->getIndexInJoint());
+    }
+    assert(dScrew.head().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+    Eigen::Isometry3s childT
+        = parentJoint->getChildBodyNode()->getWorldTransform();
+    dScrew = math::AdT(childT, dScrew);
+
     int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
@@ -6276,23 +6316,84 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
       if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
-        bool isScalingBodyParentOfMarker
-            = (parentMap(scaleJointIndex, sourceJointIndex) == 1
-               || scaleBody == markers[i].first);
-        bool isScalingBodyParentOfAxisJoint
-            = parentMap(scaleJointIndex, parentJointIndex) == 1;
-        if (isScalingBodyParentOfMarker && !isScalingBodyParentOfAxisJoint)
-        {
-          Eigen::Vector3s markerGrad
-              = markerWrtScaleJac.block<3, 1>(i * 3, markerGradCol);
-          jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
-              screw.head<3>(), markerGrad, 0.0);
-        }
+        Eigen::Vector3s markerGrad
+            = markerWrtScaleJac.block<3, 1>(i * 3, gradCol);
+        Eigen::Vector3s jointGrad
+            = jointChangeInPos.block<3, 1>(parentJointIndex * 3, gradCol);
+        // We're interested in relative motion of the marker wrt the joint
+        jac.block<3, 1>(i * 3, j)
+            = screw.head<3>().cross(markerGrad - jointGrad) + dScrew.tail<3>();
       }
     }
   }
 
   return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratch(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers)
+{
+  (void)markers;
+  Eigen::VectorXs worldJoints = getJointWorldPositions(getJoints());
+
+  return worldJoints;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratchAnalytical(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+    int index,
+    int axis)
+{
+  dynamics::BodyNode* scaleBody = getBodyNode(index);
+  (void)scaleBody;
+
+  const Eigen::MatrixXs markerWrtScaleJac
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  const Eigen::MatrixXs jointsWrtScaleJac
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
+  int gradCol = index * 3 + axis;
+  (void)gradCol;
+
+  return jointsWrtScaleJac.col(gradCol);
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratchFd(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+    int index,
+    int axis)
+{
+  Eigen::Vector3s originalScale = getBodyNode(index)->getScale();
+  const s_t EPS = 1e-3;
+
+  Eigen::MatrixXs result(markers.size() * 3, getNumDofs());
+
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweakedScale = originalScale;
+        if (axis == -1)
+        {
+          tweakedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          tweakedScale(axis) += eps;
+        }
+        getBodyNode(index)->setScale(tweakedScale);
+        perturbed = scratch(markers);
+        return true;
+      },
+      result,
+      EPS,
+      false);
+
+  // Reset everything how we left it
+  getBodyNode(index)->setScale(originalScale);
+
+  return result;
 }
 
 //==============================================================================
@@ -6306,23 +6407,34 @@ Eigen::MatrixXs Skeleton::
         int axis)
 {
   Eigen::Vector3s originalScale = getBodyNode(index)->getScale();
-  const s_t EPS = 1e-7;
+  const s_t EPS = 1e-3;
 
-  Eigen::Vector3s perturbed = originalScale;
-  perturbed(axis) += EPS;
-  getBodyNode(index)->setScale(perturbed);
-  Eigen::MatrixXs plus
-      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  Eigen::MatrixXs result(markers.size() * 3, getNumDofs());
 
-  perturbed = originalScale;
-  perturbed(axis) -= EPS;
-  getBodyNode(index)->setScale(perturbed);
-  Eigen::MatrixXs minus
-      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweakedScale = originalScale;
+        if (axis == -1)
+        {
+          tweakedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          tweakedScale(axis) += eps;
+        }
+        getBodyNode(index)->setScale(tweakedScale);
+        perturbed = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+        return true;
+      },
+      result,
+      EPS,
+      false);
 
+  // Reset everything how we left it
   getBodyNode(index)->setScale(originalScale);
 
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 //==============================================================================
@@ -6341,8 +6453,10 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
   // column vector, and building a Jacobian of how that vector changes as we
   // change body scales.
 
-  Eigen::MatrixXs scaleJac
+  Eigen::MatrixXs markerJacWrtScales
       = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  Eigen::MatrixXs jointJacWrtScales
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
 
   // We're creating these caches outside of the inner loops, to avoid calling
   // these getter's a bazillion times in the hot inner loops
@@ -6371,8 +6485,6 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
     // in the inner axis loop
     const int index = body;
     dynamics::BodyNode* scaleBody = getBodyNode(index);
-    dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
-    int scaleJointIndex = getJointIndex(scaleJoint);
 
     for (int axis = 0; axis < 3; axis++)
     {
@@ -6390,7 +6502,7 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
       // lookups in Skeleton, so instead we can cache so data outside of the
       // loop
 
-      int markerGradCol = index * 3 + axis;
+      int gradCol = index * 3 + axis;
 
       Eigen::MatrixXs jac
           = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
@@ -6403,6 +6515,32 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
         dynamics::Joint* parentJoint = parentJoints[j];
         Eigen::Vector6s screw = screws[j];
         int parentJointIndex = parentJointIndices[j];
+
+        // Find the change in the velocity due to the joint
+        Eigen::Vector6s dScrew = Eigen::Vector6s::Zero();
+        if (parentJoint->getParentBodyNode() != nullptr
+            && parentJoint->getParentBodyNode()->getName()
+                   == scaleBody->getName())
+        {
+          dScrew
+              = parentJoint->getRelativeJacobianDerivWrtParentScale(axis).col(
+                  getDof(j)->getIndexInJoint());
+        }
+        if (parentJoint->getChildBodyNode()->getName() == scaleBody->getName())
+        {
+          // Get only the portion of the derivative that is not due to scaling
+          // the child transform
+          dScrew = parentJoint->getRelativeJacobianDerivWrtChildScale(axis).col(
+                       getDof(j)->getIndexInJoint())
+                   - parentJoint
+                         ->Joint::getRelativeJacobianDerivWrtChildScale(axis)
+                         .col(getDof(j)->getIndexInJoint());
+        }
+        assert(dScrew.head().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+        Eigen::Isometry3s childT
+            = parentJoint->getChildBodyNode()->getWorldTransform();
+        dScrew = math::AdT(childT, dScrew);
+
         for (int i = 0; i < markers.size(); i++)
         {
           dynamics::Joint* sourceJoint = markerSourceJoints[i];
@@ -6413,18 +6551,14 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
           if (parentMap(parentJointIndex, sourceJointIndex) == 1
               || sourceJoint == parentJoint)
           {
-            bool isScalingBodyParentOfMarker
-                = (parentMap(scaleJointIndex, sourceJointIndex) == 1
-                   || scaleBody == markers[i].first);
-            bool isScalingBodyParentOfAxisJoint
-                = parentMap(scaleJointIndex, parentJointIndex) == 1;
-            if (isScalingBodyParentOfMarker && !isScalingBodyParentOfAxisJoint)
-            {
-              Eigen::Vector3s markerGrad
-                  = scaleJac.block<3, 1>(i * 3, markerGradCol);
-              jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
-                  screw.head<3>(), markerGrad, 0.0);
-            }
+            Eigen::Vector3s markerGrad
+                = markerJacWrtScales.block<3, 1>(i * 3, gradCol);
+            Eigen::Vector3s jointGrad
+                = jointJacWrtScales.block<3, 1>(parentJointIndex * 3, gradCol);
+            // We're interested in relative motion of the marker wrt the joint
+            jac.block<3, 1>(i * 3, j)
+                = screw.head<3>().cross(markerGrad - jointGrad)
+                  + dScrew.tail<3>();
           }
         }
       }

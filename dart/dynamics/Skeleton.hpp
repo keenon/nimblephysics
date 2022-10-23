@@ -1351,6 +1351,22 @@ public:
       int axis,
       const Eigen::MatrixXs& markerWrtScaleJac);
 
+  Eigen::MatrixXs scratch(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  Eigen::MatrixXs scratchAnalytical(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis);
+
+  Eigen::MatrixXs scratchFd(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis);
+
   /// This gets the derivative of the Jacobian of the markers wrt joint
   /// positions, with respect to a single body scaling
   Eigen::MatrixXs
