@@ -104,6 +104,15 @@ public:
 
   void updateRelativeTransform() const override;
 
+  static Eigen::Isometry3s getRelativeTransformStatic(
+      Eigen::Isometry3s parentTransform,
+      Eigen::Isometry3s childTransform,
+      Eigen::Vector3s parentScale,
+      Eigen::Vector3s ellipsoidScale,
+      EulerJoint::AxisOrder axisOrder,
+      Eigen::Vector3s position,
+      Eigen::Vector3s flipAxisMap);
+
   /// Fixed-size version of getRelativeJacobian(positions)
   JacobianMatrix getRelativeJacobianStatic(
       const Vector& position) const override;

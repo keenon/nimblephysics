@@ -123,6 +123,12 @@ public:
   JacobianMatrix getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
       std::size_t firstIndex, std::size_t secondIndex) const;
 
+  /// This gets the change in world translation of the child body, with respect
+  /// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+  /// axis.
+  Eigen::Vector3s getWorldTranslationOfChildBodyWrtParentScale(
+      int axis) const override;
+
   void updateRelativeJacobian(bool) const override;
 
   void updateRelativeJacobianTimeDeriv() const override;

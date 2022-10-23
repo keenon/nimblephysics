@@ -160,6 +160,40 @@ void EllipsoidJoint::updateRelativeTransform() const
 }
 
 //==============================================================================
+Eigen::Isometry3s EllipsoidJoint::getRelativeTransformStatic(
+    Eigen::Isometry3s parentTransform,
+    Eigen::Isometry3s childTransform,
+    Eigen::Vector3s parentScale,
+    Eigen::Vector3s ellipsoidScale,
+    EulerJoint::AxisOrder axisOrder,
+    Eigen::Vector3s position,
+    Eigen::Vector3s flipAxisMap)
+{
+  // 2.1. Do this XYZ rotation in +90Z space
+  Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
+  eulerR(1, 0) = -1.0;
+  eulerR(0, 1) = 1.0;
+  eulerR(2, 2) = 1.0;
+  Eigen::Isometry3s rot
+      = EulerJoint::convertToTransform(position, axisOrder, flipAxisMap);
+  rot.linear() = eulerR.transpose() * rot.linear() * eulerR;
+
+  // 2.2. Now that we have a rotation in `rot`, we need to rotate a unit vector.
+  // We will end up with a translation on the surface of a unit sphere.
+  Eigen::Isometry3s ballSurface = Eigen::Isometry3s::Identity();
+  ballSurface.translation() = Eigen::Vector3s::UnitZ();
+  ballSurface = rot * ballSurface;
+
+  // 2.3. Scale the translation to make the sphere into an ellipsoid
+  ballSurface.translation() = ballSurface.translation()
+                                  .cwiseProduct(ellipsoidScale)
+                                  .cwiseProduct(parentScale);
+
+  // 3. Situate relative to parent and child joints
+  return parentTransform * ballSurface * childTransform.inverse();
+}
+
+//==============================================================================
 Eigen::Matrix<s_t, 6, 3> EllipsoidJoint::getRelativeJacobianStatic(
     const Eigen::Vector3s& pos) const
 {

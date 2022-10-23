@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 
+#include "dart/dynamics/EllipsoidJoint.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/ConstantFunction.hpp"
@@ -35,7 +36,7 @@ const std::string& ScapulathoracicJoint::getType() const
 //==============================================================================
 const std::string& ScapulathoracicJoint::getStaticType()
 {
-  static const std::string name = "EllipsoidJoint";
+  static const std::string name = "ScapulathoracicJoint";
   return name;
 }
 
@@ -619,6 +620,54 @@ ScapulathoracicJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
       = math::AdTJacFixed(getTransformFromChildBodyNode(), ddJ_dFirst_dSecond);
 
   return ddJ_dFirst_dSecond;
+}
+
+//==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s
+ScapulathoracicJoint::getWorldTranslationOfChildBodyWrtParentScale(
+    int axis) const
+{
+  const dynamics::BodyNode* parentBody = getParentBodyNode();
+  if (parentBody == nullptr)
+  {
+    return Eigen::Vector3s::Zero();
+  }
+
+  Eigen::Matrix3s R = parentBody->getWorldTransform().linear();
+  Eigen::Isometry3s T_jj = EllipsoidJoint::getRelativeTransformStatic(
+      Eigen::Isometry3s::Identity(),
+      Eigen::Isometry3s::Identity(),
+      getParentScale(),
+      getEllipsoidRadii(),
+      mAxisOrder,
+      getPositionsStatic().head<3>(),
+      mFlipAxisMap.head<3>());
+
+  if (axis == -1)
+  {
+    Eigen::Vector3s dT_jj
+        = getTransformFromParentBodyNode().linear()
+          * T_jj.translation().cwiseQuotient(getParentScale());
+    Eigen::Vector3s parentOffset
+        = getTransformFromParentBodyNode().translation().cwiseQuotient(
+            getParentScale());
+    return R * (parentOffset + dT_jj);
+  }
+  else
+  {
+    Eigen::Vector3s dT_jj
+        = getTransformFromParentBodyNode().linear()
+          * (Eigen::Vector3s::Unit(axis) * T_jj.translation()(axis)
+             / getParentScale()(axis));
+    Eigen::Vector3s parentOffset
+        = Eigen::Vector3s::Unit(axis)
+          * (getTransformFromParentBodyNode().translation()(axis)
+             / getParentScale()(axis));
+    return R * (parentOffset + dT_jj);
+  }
 }
 
 //==============================================================================

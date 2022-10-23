@@ -1783,6 +1783,30 @@ ConstantCurveJoint::getRelativeJacobianDerivWrtPositionDerivWrtPositionStatic(
 }
 
 //==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of child scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s ConstantCurveJoint::getWorldTranslationOfChildBodyWrtChildScale(
+    int axis) const
+{
+  if (axis == -1 || axis == 1)
+  {
+    Eigen::Matrix3s R_wc = getChildBodyNode()->getWorldTransform().linear();
+    Eigen::Isometry3s T_jj = getTransformFromParentBodyNode().inverse()
+                             * getRelativeTransform()
+                             * getTransformFromChildBodyNode();
+    Eigen::Vector3s p_cj = getTransformFromChildBodyNode().linear()
+                           * T_jj.linear().transpose() * T_jj.translation();
+    return ((R_wc * p_cj) / getChildScale()(1))
+           + Joint::getWorldTranslationOfChildBodyWrtChildScale(axis);
+  }
+  else
+  {
+    return Joint::getWorldTranslationOfChildBodyWrtChildScale(axis);
+  }
+}
+
+//==============================================================================
 Eigen::Matrix<s_t, 6, 4> ConstantCurveJoint::
     getRelativeJacobianDerivWrtPositionDerivWrtSegmentLengthStatic(
         std::size_t firstIndex,
