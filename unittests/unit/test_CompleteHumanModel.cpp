@@ -64,10 +64,10 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
 {
   auto osim = biomechanics::OpenSimParser::parseOsim(
       "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim");
-  for (int i = 0; i < osim.skeleton->getBodyNode("torso")->getNumShapeNodes();
+  for (int i = 0; i < osim.skeleton->getBodyNode("thorax")->getNumShapeNodes();
        i++)
   {
-    auto* shapeNode = osim.skeleton->getBodyNode("torso")->getShapeNode(i);
+    auto* shapeNode = osim.skeleton->getBodyNode("thorax")->getShapeNode(i);
     auto shape = shapeNode->getShape();
     std::cout << "Found shape: " << shapeNode->getName() << " - "
               << shape->getType() << std::endl;
@@ -229,24 +229,23 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
   //////////////////////////////////////////////////////////////
   */
 
-  /*
   std::vector<std::string> names;
-  names.push_back("scapula_abduction_r");
-  names.push_back("scapula_elevation_r");
-  names.push_back("scapula_upward_rot_r");
-  names.push_back("scapula_abduction_l");
-  names.push_back("scapula_elevation_l");
-  names.push_back("scapula_upward_rot_l");
+  // names.push_back("scapula_abduction_r");
+  // names.push_back("scapula_elevation_r");
+  // names.push_back("scapula_upward_rot_r");
+  // names.push_back("scapula_abduction_l");
+  // names.push_back("scapula_elevation_l");
+  // names.push_back("scapula_upward_rot_l");
 
-  // names.push_back("lumbar_bending");
-  // names.push_back("lumbar_extension");
-  // names.push_back("lumbar_twist");
-  // names.push_back("thorax_bending");
-  // names.push_back("thorax_extension");
-  // names.push_back("thorax_twist");
-  // names.push_back("head_bending");
-  // names.push_back("head_extension");
-  // names.push_back("head_twist");
+  names.push_back("lumbar_bending");
+  names.push_back("lumbar_extension");
+  names.push_back("lumbar_twist");
+  names.push_back("thorax_bending");
+  names.push_back("thorax_extension");
+  names.push_back("thorax_twist");
+  names.push_back("head_bending");
+  names.push_back("head_extension");
+  names.push_back("head_twist");
 
   for (auto& name : names)
   {
@@ -271,6 +270,5 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
         osim.skeleton->getDof(name)->getInitialPosition());
   }
 
-  */
   server.writeFramesJson("../../../javascript/src/data/movement2.bin");
 }
