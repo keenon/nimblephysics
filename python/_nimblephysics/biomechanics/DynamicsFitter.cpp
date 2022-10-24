@@ -68,9 +68,6 @@ void DynamicsFitter(py::module& m)
           "forcePlateTrials",
           &dart::biomechanics::DynamicsInitialization::forcePlateTrials)
       .def_readwrite(
-          "originalPoseTrials",
-          &dart::biomechanics::DynamicsInitialization::originalPoseTrials)
-      .def_readwrite(
           "markerObservationTrials",
           &dart::biomechanics::DynamicsInitialization::markerObservationTrials)
       .def_readwrite(
