@@ -3104,7 +3104,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
     int numLinear = 0;
     int numConstant = 0;
-    int firstLinearIndex = 0;
+    int firstLinearIndex = -1;
     int lastLinearIndex = 0;
 
     int dofIndex = 0;
@@ -3205,7 +3205,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       else if (linearFunction != nullptr)
       {
         numLinear++;
-        if (firstLinearIndex == 0)
+        if (firstLinearIndex == -1)
         {
           firstLinearIndex = dofIndex;
         }
@@ -3732,6 +3732,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       ellipsoidJoint = pair.first;
       childBody = pair.second;
     }
+    ellipsoidJoint->setAxisOrder(dynamics::EulerJoint::AxisOrder::XYZ);
     auto* radiiElem = jointDetail->FirstChildElement("radii_x_y_z");
     if (radiiElem != nullptr)
     {
@@ -3891,6 +3892,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       double defaultValue = atof(
           coordinateCursor->FirstChildElement("default_value")->GetText());
       dof->setPosition(defaultValue);
+      dof->setInitialPosition(defaultValue);
     }
 
     if (coordinateCursor->FirstChildElement("default_speed_value"))

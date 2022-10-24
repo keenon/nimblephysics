@@ -2524,6 +2524,96 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
 #endif
 
 #ifdef FUNCTIONAL_TESTS
+TEST(MarkerFitter, DERIVATIVES_COMPLETE_HUMAN)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim")
+            .skeleton;
+  (void)osim;
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(osim);
+  osim->setPosition(2, -3.14159 / 2);
+  osim->setPosition(4, -0.2);
+  osim->setPosition(5, 1.0);
+
+  osim->getBodyNode("tibia_l")->setScale(Eigen::Vector3s(1.1, 1.2, 1.3));
+  // osim->autogroupSymmetricSuffixes();
+
+  srand(42);
+
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+      markers;
+  markers["0"] = std::make_pair(
+      osim->getBodyNode("radius_l"), Eigen::Vector3s::Random());
+  markers["1"] = std::make_pair(
+      osim->getBodyNode("radius_r"), Eigen::Vector3s::Random());
+  markers["2"]
+      = std::make_pair(osim->getBodyNode("tibia_l"), Eigen::Vector3s::Random());
+  markers["3"]
+      = std::make_pair(osim->getBodyNode("tibia_r"), Eigen::Vector3s::Random());
+  markers["4"]
+      = std::make_pair(osim->getBodyNode("ulna_l"), Eigen::Vector3s::Random());
+  markers["5"]
+      = std::make_pair(osim->getBodyNode("ulna_r"), Eigen::Vector3s::Random());
+
+  MarkerFitter fitter(osim, markers);
+  fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setInitialIKMaxRestarts(2);
+  fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
+    (void)state;
+    return 0.0;
+  });
+
+  srand(42);
+
+  std::map<std::string, Eigen::Vector3s> observedMarkers;
+  observedMarkers["0"] = Eigen::Vector3s::Random();
+  observedMarkers["1"] = Eigen::Vector3s::Random();
+  // Skip 2
+  observedMarkers["3"] = Eigen::Vector3s::Random();
+  observedMarkers["4"] = Eigen::Vector3s::Random();
+  observedMarkers["5"] = Eigen::Vector3s::Random();
+
+  /*
+  Eigen::VectorXs pose = Eigen::VectorXs(37);
+  pose << 1.28514, 0.599806, 0.709412, -3.31116, 1.96564, 2.61346, -0.363238,
+      -0.504149, 0.373617, 0.501634, 0.057355, -0.0944415, -0.13486, 1.04532,
+      -0.434462, -0.298656, 1.19568, -0.0831732, 0.262512, -0.165874, 0.20991,
+      0.354704, 0.826636, -0.942666, -2.07926, 0.864076, 1.32979, 0.0207049,
+      -0.0381907, -0.231821, 1.32794, -0.652347, 1.21334, 1.6978, 0.883303,
+      0.915727, 0.175323;
+  debugIKInitializationToGUI(osim, pose, 0.0);
+  */
+
+  std::vector<dynamics::Joint*> joints;
+  joints.push_back(osim->getJoint("walker_knee_l"));
+  joints.push_back(osim->getJoint("walker_knee_r"));
+
+  EXPECT_TRUE(testBilevelFitProblemGradients(
+      fitter, 3, 0.02, true, osim, joints, markers));
+
+  EXPECT_TRUE(testBilevelFitProblemGradients(
+      fitter, 3, 0.02, false, osim, joints, markers));
+
+  EXPECT_TRUE(testFitterGradients(fitter, osim, markers, observedMarkers));
+
+  // EXPECT_TRUE(testSolveBilevelFitProblem(osim, 20, 0.01, 0.001, 0.1));
+}
+#endif
+
+#ifdef BLOCKING_TESTS
+TEST(MarkerFitter, COMPLETE_HUMAN_IK_INIT)
+{
+  std::shared_ptr<dynamics::Skeleton> osim
+      = OpenSimParser::parseOsim(
+            "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim")
+            .skeleton;
+  debugIKInitializationToGUI(osim, osim->getRandomPose(), 0.0);
+}
+#endif
+
+#ifdef FUNCTIONAL_TESTS
 TEST(MarkerFitter, DERIVATIVES_ARNOLD)
 {
   std::shared_ptr<dynamics::Skeleton> osim
@@ -5956,8 +6046,8 @@ TEST(MarkerFitter, HIGH_BMI)
 }
 #endif
 
-// #ifdef ALL_TESTS
-TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
+#ifdef ALL_TESTS
+TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_SPRINTING)
 {
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;
@@ -5975,7 +6065,7 @@ TEST(MarkerFitter, SPRINTER_DETECT_MARKER_VIBRATIONS)
       "male",
       true);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)

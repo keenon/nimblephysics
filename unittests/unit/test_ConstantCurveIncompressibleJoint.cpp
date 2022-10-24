@@ -370,7 +370,6 @@ TEST(ConstantCurveIncompressibleJoint, ConstantCurveJacobians)
 {
   ConstantCurveIncompressibleJoint::Properties props;
   ConstantCurveIncompressibleJoint joint(props);
-  joint.setAxisOrder(EulerJoint::AxisOrder::XZY);
 
   // Set the parameters of the example shoulder
   Eigen::Isometry3s transformFromParent = Eigen::Isometry3s::Identity();

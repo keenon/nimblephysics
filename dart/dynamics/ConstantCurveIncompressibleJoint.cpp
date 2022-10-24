@@ -91,6 +91,8 @@ dart::dynamics::Joint* ConstantCurveIncompressibleJoint::clone() const
   joint->setFlipAxisMap(getFlipAxisMap());
   joint->setName(this->getName());
   joint->setNeutralPos(this->getNeutralPos());
+  joint->setLength(this->getLength());
+  joint->setPositionsStatic(this->getPositionsStatic());
   joint->setPositionUpperLimits(this->getPositionUpperLimits());
   joint->setPositionLowerLimits(this->getPositionLowerLimits());
   joint->setVelocityUpperLimits(this->getVelocityUpperLimits());

@@ -1627,6 +1627,8 @@ GenericJoint<ConfigSpaceT>::getRelativeJacobianStatic() const
     this->mIsRelativeJacobianDirty = false;
   }
 
+  assert(mJacobian.norm() != 0.0);
+
   return mJacobian;
 }
 
@@ -1851,6 +1853,7 @@ GenericJoint<ConfigSpaceT>::getInvProjArtInertia() const
 {
   Joint::updateArticulatedInertia();
 
+  assert(!math::isInf(mInvProjArtInertia));
   return mInvProjArtInertia;
 }
 
@@ -2165,9 +2168,13 @@ template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addChildArtInertiaToDynamic(
     Eigen::Matrix6s& parentArtInertia, const Eigen::Matrix6s& childArtInertia)
 {
+  assert(!math::isNan(getRelativeJacobianStatic()));
   // Child body's articulated inertia
   JacobianMatrix AIS = childArtInertia * getRelativeJacobianStatic();
+  assert(!math::isNan(AIS));
   Eigen::Matrix6s PI = childArtInertia;
+  assert(!math::isNan(PI));
+  assert(!math::isInf(mInvProjArtInertia));
   PI.noalias() -= AIS * mInvProjArtInertia * AIS.transpose();
   assert(!math::isNan(PI));
 
@@ -2271,13 +2278,26 @@ void GenericJoint<ConfigSpaceT>::updateInvProjArtInertiaDynamic(
 {
   // Projected articulated inertia
   const JacobianMatrix& Jacobian = getRelativeJacobianStatic();
-  const Matrix projAI = Jacobian.transpose() * artInertia * Jacobian;
+  const Matrix projAI = Jacobian.transpose().eval() * artInertia * Jacobian;
 
   // Inversion of projected articulated inertia
   mInvProjArtInertia = math::inverse<ConfigSpaceT>(projAI);
 
   // Verification
   assert(!math::isNan(mInvProjArtInertia));
+#ifndef NDEBUG
+  if (math::isInf(mInvProjArtInertia))
+  {
+    for (int i = 0; i < getNumDofs(); i++)
+    {
+      std::cout << "Dof[" << i << "]: " << getDof(i)->getName() << std::endl;
+    }
+    std::cout << "Pos: " << std::endl << getPositions() << std::endl;
+    std::cout << "Jac: " << std::endl << Jacobian << std::endl;
+    std::cout << "Proj AI: " << std::endl << projAI << std::endl;
+  }
+#endif
+  assert(!math::isInf(mInvProjArtInertia));
 }
 
 //==============================================================================

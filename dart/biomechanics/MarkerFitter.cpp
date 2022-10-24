@@ -23,6 +23,7 @@
 #include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
+#include "dart/server/GUIStateMachine.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
@@ -3230,8 +3231,10 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.axisWeights,
         params.dontRescaleBodies,
         i,
-        false));
-        */
+        true,
+        true));
+    exit(1);
+    */
     posesAndScalesFutures.push_back(std::async(
         &MarkerFitter::scaleAndFit,
         this,
@@ -3246,6 +3249,7 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.axisWeights,
         params.dontRescaleBodies,
         i,
+        false,
         false));
   }
 
@@ -3624,7 +3628,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     Eigen::VectorXs axisWeights,
     bool dontScale,
     int debugIndex,
-    bool debug)
+    bool debug,
+    bool saveToGUI)
 {
   // 0. To make this thread safe, we're going to clone the fitter skeleton
   std::shared_ptr<dynamics::Skeleton> skeleton;
@@ -3716,6 +3721,12 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     inputNames.push_back("dof " + skeletonBallJoints->getDof(i)->getName());
   }
 
+  server::GUIRecording server;
+  if (saveToGUI)
+  {
+    server.setFramesPerSecond(10);
+  }
+
   ScaleAndFitResult result;
   if (dontScale)
   {
@@ -3752,7 +3763,14 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         skeletonBallJoints->getPositionLowerLimits(),
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
-        [&skeletonBallJoints, &skeleton](
+        [&skeletonBallJoints,
+         &skeleton,
+         saveToGUI,
+         &server,
+         &markerPoses,
+         &markerVector,
+         &jointsForSkeletonBallJoints,
+         &jointCenters](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(pos);
           if (clamp)
@@ -3766,6 +3784,38 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             skeletonBallJoints->setPositions(
                 skeleton->convertPositionsToBallSpace(
                     skeleton->getPositions()));
+          }
+          if (saveToGUI)
+          {
+            server.renderSkeleton(skeletonBallJoints);
+
+            Eigen::VectorXs currentMarkerPoses
+                = skeletonBallJoints->getMarkerWorldPositions(markerVector);
+            for (int i = 0; i < markerVector.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentMarkerPoses.segment<3>(i * 3));
+              points.push_back(markerPoses.segment<3>(i * 3));
+              server.createLine(
+                  "marker_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(1, 0, 0, 1));
+            }
+            Eigen::VectorXs currentJointPoses
+                = skeletonBallJoints->getJointWorldPositions(
+                    jointsForSkeletonBallJoints);
+            for (int i = 0; i < jointsForSkeletonBallJoints.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentJointPoses.segment<3>(i * 3));
+              points.push_back(jointCenters.segment<3>(i * 3));
+              server.createLine(
+                  "joint_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(0, 1, 0, 1));
+            }
+
+            server.saveFrame();
           }
 
           // Return the clamped position
@@ -3923,7 +3973,14 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         lowerBound,
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
-        [&skeletonBallJoints, &skeleton](
+        [&skeletonBallJoints,
+         &skeleton,
+         saveToGUI,
+         &server,
+         &markerPoses,
+         &markerVector,
+         &jointsForSkeletonBallJoints,
+         &jointCenters](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
               pos.segment(0, skeletonBallJoints->getNumDofs()));
@@ -3995,6 +4052,39 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           newScales = newScales.cwiseMin(scalesUpperBound);
           skeleton->setGroupScales(newScales);
           skeletonBallJoints->setGroupScales(newScales);
+
+          if (saveToGUI)
+          {
+            server.renderSkeleton(skeletonBallJoints);
+
+            Eigen::VectorXs currentMarkerPoses
+                = skeletonBallJoints->getMarkerWorldPositions(markerVector);
+            for (int i = 0; i < markerVector.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentMarkerPoses.segment<3>(i * 3));
+              points.push_back(markerPoses.segment<3>(i * 3));
+              server.createLine(
+                  "marker_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(1, 0, 0, 1));
+            }
+            Eigen::VectorXs currentJointPoses
+                = skeletonBallJoints->getJointWorldPositions(
+                    jointsForSkeletonBallJoints);
+            for (int i = 0; i < jointsForSkeletonBallJoints.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentJointPoses.segment<3>(i * 3));
+              points.push_back(jointCenters.segment<3>(i * 3));
+              server.createLine(
+                  "joint_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(0, 1, 0, 1));
+            }
+
+            server.saveFrame();
+          }
 
           // Return the clamped position
           Eigen::VectorXs clampedPos = Eigen::VectorXs::Zero(pos.size());
@@ -4121,6 +4211,11 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
   result.pose = skeleton->getPositions();
   result.scale = skeleton->getGroupScales();
   std::cout << "Best result: " << result.score << std::endl;
+
+  if (saveToGUI)
+  {
+    server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+  }
 
   /*
   if (result.score > 0.15)

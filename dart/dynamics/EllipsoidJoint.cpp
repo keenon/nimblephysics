@@ -99,6 +99,8 @@ dart::dynamics::Joint* EllipsoidJoint::clone() const
   joint->setAxisOrder(getAxisOrder());
   joint->setName(this->getName());
   joint->setEllipsoidRadii(this->getEllipsoidRadii());
+  joint->setPositionsStatic(this->getPositionsStatic());
+  joint->setInitialPositions(this->getInitialPositions());
   joint->setPositionUpperLimits(this->getPositionUpperLimits());
   joint->setPositionLowerLimits(this->getPositionLowerLimits());
   joint->setVelocityUpperLimits(this->getVelocityUpperLimits());

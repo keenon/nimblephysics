@@ -6300,7 +6300,7 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
                - parentJoint->Joint::getRelativeJacobianDerivWrtChildScale(axis)
                      .col(getDof(j)->getIndexInJoint());
     }
-    assert(dScrew.head().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+    assert(dScrew.head<3>().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
     Eigen::Isometry3s childT
         = parentJoint->getChildBodyNode()->getWorldTransform();
     dScrew = math::AdT(childT, dScrew);
@@ -6368,7 +6368,7 @@ Eigen::MatrixXs Skeleton::scratchFd(
   Eigen::Vector3s originalScale = getBodyNode(index)->getScale();
   const s_t EPS = 1e-3;
 
-  Eigen::MatrixXs result(markers.size() * 3, getNumDofs());
+  Eigen::MatrixXs result(getJoints().size() * 3, getNumDofs());
 
   math::finiteDifference<Eigen::MatrixXs>(
       [&](/* in*/ s_t eps,
@@ -6536,7 +6536,7 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
                          ->Joint::getRelativeJacobianDerivWrtChildScale(axis)
                          .col(getDof(j)->getIndexInJoint());
         }
-        assert(dScrew.head().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+        assert(dScrew.head<3>().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
         Eigen::Isometry3s childT
             = parentJoint->getChildBodyNode()->getWorldTransform();
         dScrew = math::AdT(childT, dScrew);

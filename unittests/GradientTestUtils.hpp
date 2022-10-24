@@ -4241,10 +4241,13 @@ bool verifySkeletonMarkerJacobians(
                   << "\" does not correctly report "
                      "getWorldTranslationOfChildBodyWrtParentScale(axis="
                   << axis << ")!" << std::endl;
+        std::cout << "Parent scale: " << std::endl
+                  << joint->getParentScale() << std::endl;
         std::cout << "Analytical: " << std::endl << wrtParent << std::endl;
         std::cout << "FD: " << std::endl << wrtParent_fd << std::endl;
         std::cout << "Diff: " << std::endl
                   << wrtParent - wrtParent_fd << std::endl;
+        joint->getWorldTranslationOfChildBodyWrtParentScale(axis);
         return false;
       }
       // else

@@ -31,6 +31,7 @@
  */
 
 #include <iostream>
+#include <memory>
 
 #include <gtest/gtest.h>
 
@@ -46,6 +47,7 @@
 #include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/server/GUIRecording.hpp"
+#include "dart/simulation/World.hpp"
 #include "dart/utils/utils.hpp"
 
 #include "GradientTestUtils.hpp"
@@ -75,11 +77,21 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
   {
     markerList.push_back(pair.second);
   }
+  // osim.skeleton->getBodyNode("thorax")->setScale(
+  //     Eigen::Vector3s(0.8, 1.1, 1.4));
 
   bool markersVerified
       = verifySkeletonMarkerJacobians(osim.skeleton, markerList);
   EXPECT_TRUE(markersVerified);
   if (!markersVerified)
+  {
+    return;
+  }
+  std::shared_ptr<simulation::World> world = simulation::World::create();
+  world->addSkeleton(osim.skeleton);
+  bool jacobiansVerified = verifyFeatherstoneJacobians(world);
+  EXPECT_TRUE(jacobiansVerified);
+  if (!jacobiansVerified)
   {
     return;
   }
@@ -151,18 +163,90 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
     }
   }
   */
+
   server.saveFrame();
 
+  /*
+  //////////////////////////////////////////////////////////////
+  Eigen::Vector3s originalScale
+      = osim.skeleton->getBodyNode("thorax")->getScale();
+  osim.skeleton->getJoint("scapulothoracic_r")
+      ->setPositions(osim.skeleton->getJoint("scapulothoracic_r")
+                         ->getPositionLowerLimits());
+  osim.skeleton->getJoint("scapulothoracic_l")
+      ->setPositions(osim.skeleton->getJoint("scapulothoracic_l")
+                         ->getPositionUpperLimits());
+  for (int axis = 0; axis < 3; axis++)
+  {
+    for (s_t scale = 0.8; scale < 1.2; scale += 0.01)
+    {
+      Eigen::Vector3s newScale = originalScale;
+      newScale(axis) = scale;
+      osim.skeleton->getBodyNode("thorax")->setScale(newScale);
+
+      server.renderSkeleton(osim.skeleton);
+      for (int i = 0; i < osim.skeleton->getNumJoints(); i++)
+      {
+        auto* joint = osim.skeleton->getJoint(i);
+        if (joint->getType() == EllipsoidJoint::getStaticType())
+        {
+          dynamics::EllipsoidJoint* scap
+              = static_cast<dynamics::EllipsoidJoint*>(joint);
+          Eigen::Vector3s radii
+              = scap->getEllipsoidRadii().cwiseProduct(joint->getParentScale());
+          Eigen::Isometry3s worldT
+              = scap->getParentBodyNode()->getWorldTransform()
+                * scap->getTransformFromParentBodyNode();
+          server.createSphere(
+              "joint" + std::to_string(i),
+              radii,
+              worldT.translation(),
+              Eigen::Vector4s(1, 0, 0, 0.3));
+          server.setObjectRotation(
+              "joint" + std::to_string(i),
+              math::matrixToEulerXYZ(worldT.linear()));
+          server.renderBasis(
+              0.1,
+              "joint" + std::to_string(i),
+              worldT.translation(),
+              math::matrixToEulerXYZ(worldT.linear()));
+        }
+        if (joint->getType() == EulerJoint::getStaticType())
+        {
+          Eigen::Isometry3s worldT
+              = joint->getParentBodyNode()->getWorldTransform()
+                * joint->getTransformFromParentBodyNode();
+          server.renderBasis(
+              0.1,
+              "joint" + std::to_string(i),
+              worldT.translation(),
+              math::matrixToEulerXYZ(worldT.linear()));
+        }
+      }
+      server.saveFrame();
+    }
+  }
+  //////////////////////////////////////////////////////////////
+  */
+
+  /*
   std::vector<std::string> names;
-  names.push_back("lumbar_bending");
-  names.push_back("lumbar_extension");
-  names.push_back("lumbar_twist");
-  names.push_back("thorax_bending");
-  names.push_back("thorax_extension");
-  names.push_back("thorax_twist");
-  names.push_back("head_bending");
-  names.push_back("head_extension");
-  names.push_back("head_twist");
+  names.push_back("scapula_abduction_r");
+  names.push_back("scapula_elevation_r");
+  names.push_back("scapula_upward_rot_r");
+  names.push_back("scapula_abduction_l");
+  names.push_back("scapula_elevation_l");
+  names.push_back("scapula_upward_rot_l");
+
+  // names.push_back("lumbar_bending");
+  // names.push_back("lumbar_extension");
+  // names.push_back("lumbar_twist");
+  // names.push_back("thorax_bending");
+  // names.push_back("thorax_extension");
+  // names.push_back("thorax_twist");
+  // names.push_back("head_bending");
+  // names.push_back("head_extension");
+  // names.push_back("head_twist");
 
   for (auto& name : names)
   {
@@ -183,8 +267,10 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
       }
       server.saveFrame();
     }
-    osim.skeleton->getDof(name)->setPosition(0.0);
+    osim.skeleton->getDof(name)->setPosition(
+        osim.skeleton->getDof(name)->getInitialPosition());
   }
 
+  */
   server.writeFramesJson("../../../javascript/src/data/movement2.bin");
 }

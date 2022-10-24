@@ -477,7 +477,8 @@ public:
       Eigen::VectorXs axisWeights,
       bool dontScale = false,
       int debugIndex = 0,
-      bool debug = false);
+      bool debug = false,
+      bool saveToGUI = false);
 
   /// Pipeline step 1, 3, and 5:
   /// This fits IK to the given trajectory, without scaling

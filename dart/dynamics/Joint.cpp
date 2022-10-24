@@ -566,7 +566,7 @@ Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtParentScale(
   Eigen::Vector3s parentOffset = getTransformFromParentBodyNode().translation();
   if (axis == -1)
   {
-    return (R * parentOffset).cwiseQuotient(getParentScale());
+    return R * parentOffset.cwiseQuotient(getParentScale());
   }
   else
   {
@@ -585,7 +585,7 @@ Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtChildScale(
   Eigen::Vector3s parentOffset = getTransformFromChildBodyNode().translation();
   if (axis == -1)
   {
-    return -(R * parentOffset).cwiseQuotient(getChildScale());
+    return -R * parentOffset.cwiseQuotient(getChildScale());
   }
   else
   {
