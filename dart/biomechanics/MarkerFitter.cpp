@@ -603,21 +603,6 @@ MarkerFitter::MarkerFitter(
     mMarkersBallJoints.emplace_back(
         mSkeletonBallJoints->getBodyNode(pair.second.first->getName()),
         Eigen::Vector3s(pair.second.second));
-
-    // Traverse up the parent list looking for all the joints that effect this
-    // node
-    dynamics::BodyNode* cursor = pair.second.first;
-    while (cursor != nullptr)
-    {
-      dynamics::Joint* parentJoint = cursor->getParentJoint();
-      assert(parentJoint != nullptr);
-      if (std::find(mObservedJoints.begin(), mObservedJoints.end(), parentJoint)
-          == mObservedJoints.end())
-      {
-        mObservedJoints.push_back(parentJoint);
-      }
-      cursor = parentJoint->getParentBodyNode();
-    }
   }
   mMarkerMap = filteredMarkers;
 
@@ -2606,6 +2591,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
         params.jointWeights,
         jointAxisArr,
         params.axisWeights,
+        result.observedJoints,
         forwardPoses.block(
             0, thisIndex, mSkeleton->getNumDofs(), segmentLength),
         forwardScores.segment(thisIndex, segmentLength),
@@ -2690,6 +2676,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
         params.jointWeights,
         jointAxisArr,
         params.axisWeights,
+        result.observedJoints,
         backwardPoses.block(
             0, prevIndexExclusive + 1, mSkeleton->getNumDofs(), segmentLength),
         backwardScores.segment(prevIndexExclusive + 1, segmentLength),
@@ -2715,6 +2702,13 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
     {
       result.poses.col(i) = backwardPoses.col(i);
       result.poseScores(i) = backwardScores(i);
+    }
+    // Set the unobserved joints to default angles
+    for (auto* joint : result.unobservedJoints)
+    {
+      result.poses.col(i).segment(
+          joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+          = joint->getInitialPositions();
     }
   }
   // Overwrite with the poses from the solution
@@ -2948,6 +2942,7 @@ MarkerInitialization MarkerFitter::fineTuneIK(
         initialization.jointWeights,
         jointAxisBlocks[i],
         initialization.axisWeights,
+        result.observedJoints,
         result.poses.block(
             0,
             blockStartIndices[i],
@@ -3076,6 +3071,17 @@ MarkerInitialization MarkerFitter::smoothOutIK(
     ikFutures[i].get();
   }
 
+  // Set the unobserved joints to default angles
+  for (int i = 0; i < smoothed.poses.cols(); i++)
+  {
+    for (auto* joint : smoothed.unobservedJoints)
+    {
+      smoothed.poses.col(i).segment(
+          joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+          = joint->getInitialPositions();
+    }
+  }
+
   return smoothed;
 }
 
@@ -3123,6 +3129,73 @@ MarkerInitialization MarkerFitter::getInitialization(
     // if (!mMarkerIsTracking[j])
     anatomicalMarkerNames.push_back(mMarkerNames[j]);
   }
+
+  // Construct the observedMarkers list, for markers that appear in both the
+  // data and the model
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (auto& pair : markerObservations[t])
+    {
+      if (mMarkerMap.count(pair.first) > 0)
+      {
+        if (std::find(
+                result.observedMarkers.begin(),
+                result.observedMarkers.end(),
+                pair.first)
+            == result.observedMarkers.end())
+        {
+          result.observedMarkers.push_back(pair.first);
+        }
+      }
+    }
+  }
+
+  for (auto& pair : mMarkerMap)
+  {
+    if (std::find(
+            result.observedMarkers.begin(),
+            result.observedMarkers.end(),
+            pair.first)
+        != result.observedMarkers.end())
+    {
+      // Traverse up the parent list looking for all the joints that effect this
+      // node
+      dynamics::BodyNode* cursor = pair.second.first;
+      while (cursor != nullptr)
+      {
+        dynamics::Joint* parentJoint = cursor->getParentJoint();
+        assert(parentJoint != nullptr);
+        if (std::find(
+                result.observedJoints.begin(),
+                result.observedJoints.end(),
+                parentJoint)
+            == result.observedJoints.end())
+        {
+          result.observedJoints.push_back(parentJoint);
+        }
+        cursor = parentJoint->getParentBodyNode();
+      }
+    }
+  }
+
+  for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+  {
+    if (std::find(
+            result.observedJoints.begin(),
+            result.observedJoints.end(),
+            mSkeleton->getJoint(i))
+        == result.observedJoints.end())
+    {
+      result.unobservedJoints.push_back(mSkeleton->getJoint(i));
+      std::cout << "Unobserved Joint: " << mSkeleton->getJoint(i)->getName()
+                << std::endl;
+    }
+  }
+  std::cout << "Size of unobserved joints: " << result.unobservedJoints.size()
+            << std::endl;
+  assert(
+      result.observedJoints.size() + result.unobservedJoints.size()
+      == mSkeleton->getNumJoints());
 
   // 1. Divide the marker observations into N sequential blocks.
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> blocks;
@@ -3247,6 +3320,7 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.jointWeights,
         jointAxisBlocks[i][0],
         params.axisWeights,
+        result.observedJoints,
         params.dontRescaleBodies,
         i,
         false,
@@ -3353,6 +3427,7 @@ MarkerInitialization MarkerFitter::getInitialization(
             params.jointWeights,
             jointAxisBlocks[i],
             params.axisWeights,
+            result.observedJoints,
             result.poses.block(
                 0,
                 blockStartIndices[i],
@@ -3626,6 +3701,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     Eigen::VectorXs jointWeights,
     Eigen::VectorXs jointAxis,
     Eigen::VectorXs axisWeights,
+    std::vector<dynamics::Joint*> initObservedJoints,
     bool dontScale,
     int debugIndex,
     bool debug,
@@ -3642,7 +3718,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 
   // 0.1. Translate over the observedJoints array to the cloned skeleton
   std::vector<dynamics::Joint*> observedJoints;
-  for (auto joint : fitter->mObservedJoints)
+  for (auto joint : initObservedJoints)
   {
     observedJoints.push_back(skeleton->getJoint(joint->getName()));
   }
@@ -4257,6 +4333,7 @@ void MarkerFitter::fitTrajectory(
     Eigen::VectorXs jointWeights,
     std::vector<Eigen::VectorXs> jointAxis,
     Eigen::VectorXs axisWeights,
+    std::vector<dynamics::Joint*> initObservedJoints,
     Eigen::Ref<Eigen::MatrixXs> result,
     Eigen::Ref<Eigen::VectorXs> resultScores,
     bool backwards)
@@ -4272,7 +4349,7 @@ void MarkerFitter::fitTrajectory(
 
   // 0.1. Translate over the observedJoints array to the cloned skeleton
   std::vector<dynamics::Joint*> observedJoints;
-  for (auto joint : fitter->mObservedJoints)
+  for (auto joint : initObservedJoints)
   {
     observedJoints.push_back(skeleton->getJoint(joint->getName()));
   }

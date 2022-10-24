@@ -2947,6 +2947,11 @@ Eigen::VectorXs Skeleton::getRandomPoseForJoints(
   Eigen::VectorXs randomPose = getRandomPose();
   Eigen::VectorXs pose = Eigen::VectorXs::Zero(getNumDofs());
 
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    pose(i) = getDof(i)->getInitialPosition();
+  }
+
   for (auto joint : joints)
   {
     if (joint->getNumDofs() > 0)

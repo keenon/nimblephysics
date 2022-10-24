@@ -1,5 +1,7 @@
 #include "dart/biomechanics/Anthropometrics.hpp"
 
+#include <algorithm>
+
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -182,6 +184,10 @@ void Anthropometrics::debugToGUI(
     Eigen::Vector4s colorTransparent = Eigen::Vector4s(
         colors[i](0) / 255.0, colors[i](1) / 255.0, colors[i](2) / 255.0, 0.4);
 
+    if (skel->getBodyNode(metric.bodyA) == nullptr
+        || skel->getBodyNode(metric.bodyB) == nullptr)
+      continue;
+
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
     markers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
         skel->getBodyNode(metric.bodyA), metric.offsetA));
@@ -270,7 +276,12 @@ std::vector<std::string> Anthropometrics::getMetricNames()
 {
   std::vector<std::string> names;
   for (auto m : mMetrics)
-    names.push_back(m.name);
+  {
+    if (std::find(names.begin(), names.end(), m.name) == names.end())
+    {
+      names.push_back(m.name);
+    }
+  }
   return names;
 }
 
@@ -366,7 +377,10 @@ std::map<std::string, s_t> Anthropometrics::measure(
     if (skel->getBodyNode(metric.bodyA) == nullptr
         || skel->getBodyNode(metric.bodyB) == nullptr)
     {
-      result[metric.name] = 0.0;
+      if (result.count(metric.name) == 0)
+      {
+        result[metric.name] = mDist->getMean(metric.name);
+      }
     }
     else
     {

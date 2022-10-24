@@ -127,6 +127,10 @@ struct MarkerInitialization
   Eigen::VectorXs axisWeights;
   Eigen::VectorXs axisLoss;
   Eigen::MatrixXs jointAxis;
+
+  std::vector<std::string> observedMarkers;
+  std::vector<dynamics::Joint*> observedJoints;
+  std::vector<dynamics::Joint*> unobservedJoints;
 };
 
 /**
@@ -475,6 +479,7 @@ public:
       Eigen::VectorXs jointWeights,
       Eigen::VectorXs jointAxis,
       Eigen::VectorXs axisWeights,
+      std::vector<dynamics::Joint*> initObservedJoints,
       bool dontScale = false,
       int debugIndex = 0,
       bool debug = false,
@@ -494,6 +499,7 @@ public:
       Eigen::VectorXs jointWeights,
       std::vector<Eigen::VectorXs> jointAxis,
       Eigen::VectorXs axisWeights,
+      std::vector<dynamics::Joint*> initObservedJoints,
       Eigen::Ref<Eigen::MatrixXs> result,
       Eigen::Ref<Eigen::VectorXs> resultScores,
       bool backwards = false);
@@ -933,7 +939,6 @@ protected:
   std::mutex mGlobalLock;
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
-  std::vector<dynamics::Joint*> mObservedJoints;
   dynamics::MarkerMap mMarkerMap;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;

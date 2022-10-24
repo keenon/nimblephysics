@@ -107,7 +107,7 @@ TEST(ANTHROPOMETRICS, GUI)
 {
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Age");
@@ -115,7 +115,7 @@ TEST(ANTHROPOMETRICS, GUI)
   cols.push_back("Heightin");
   std::shared_ptr<MultivariateGaussian> gauss
       = MultivariateGaussian::loadFromCSV(
-          "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+          "dart://sample/osim/ANSUR/ANSUR_II_BOTH_Public.csv",
           cols,
           0.001); // mm -> m
 
@@ -135,8 +135,10 @@ TEST(ANTHROPOMETRICS, GUI)
   anthropometrics->setDistribution(gauss);
 
   OpenSimFile file = OpenSimParser::parseOsim(
-      "dart://sample/osim/LaiArnoldSubject5/"
-      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
+      "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim");
+  // OpenSimFile file = OpenSimParser::parseOsim(
+  //     "dart://sample/osim/LaiArnoldSubject5/"
+  //     "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");
   std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   skel->autogroupSymmetricSuffixes();
   skel->setScaleGroupUniformScaling(skel->getBodyNode("hand_r"));
@@ -160,7 +162,7 @@ TEST(ANTHROPOMETRICS, GUI)
   compare.col(2) = x - mu;
   std::cout << "x - mu - diff" << std::endl << compare << std::endl;
 
-  realtime::Ticker ticker = realtime::Ticker(0.01);
+  realtime::Ticker ticker = realtime::Ticker(0.3);
 
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
@@ -172,8 +174,18 @@ TEST(ANTHROPOMETRICS, GUI)
   int step = 0;
   ticker.registerTickListener([&](long) {
     step++;
+    auto measurements = anthropometrics->measure(skel);
+    auto means = gauss->convertToMap(gauss->getMu());
+    for (auto pair : measurements)
+    {
+      std::cout << "   " << pair.first << ": " << pair.second
+                << " (mu=" << means[pair.first] << ")" << std::endl;
+    }
+
     scales += 1e-4 * anthropometrics->getGradientOfLogPDFWrtGroupScales(skel);
     skel->setGroupScales(scales, false);
+    scales = skel->getGroupScales();
+
     s_t newLogProb = anthropometrics->getLogPDF(skel);
     std::cout << "Step " << step << ": " << newLogProb << std::endl;
 
@@ -183,7 +195,7 @@ TEST(ANTHROPOMETRICS, GUI)
       anthropometrics->debugToGUI(server, skel);
     }
 
-    if (step > 300)
+    if (step > 30)
     {
       step = 0;
       scales = originalGroupScales;
