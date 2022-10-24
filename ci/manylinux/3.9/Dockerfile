@@ -25,7 +25,7 @@ RUN git clone https://github.com/pybind/pybind11.git && \
     make install -j10
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
-RUN ${PYTHON} -m pip install auditwheel
+RUN ${PYTHON} -m pip install auditwheel==5.1.2
 RUN git clone https://github.com/keenon/nimblephysics.git
 RUN cd nimblephysics && \
     git checkout ${GIT_HASH} && \
