@@ -139,7 +139,7 @@ Eigen::Isometry3s ConstantCurveIncompressibleJoint::getRelativeTransformAt(
 
   s_t sinTheta
       = sqrt(linearAngle(0) * linearAngle(0) + linearAngle(2) * linearAngle(2));
-  if (sinTheta < 0.001)
+  if (sinTheta < 0.001 || sinTheta > 0.999)
   {
     // Near very vertical angles, don't worry about the bend, just approximate
     // with an euler joint
@@ -190,7 +190,7 @@ void ConstantCurveIncompressibleJoint::updateRelativeTransform() const
 
   s_t sinTheta
       = sqrt(linearAngle(0) * linearAngle(0) + linearAngle(2) * linearAngle(2));
-  if (sinTheta < 0.001)
+  if (sinTheta < 0.001 || sinTheta > 0.999)
   {
     // Near very vertical angles, don't worry about the bend, just approximate
     // with an euler joint
@@ -258,7 +258,7 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianStatic(
   s_t sinTheta
       = sqrt(linearAngle(0) * linearAngle(0) + linearAngle(2) * linearAngle(2));
 
-  if (sinTheta < 0.001)
+  if (sinTheta < 0.001 || sinTheta > 0.999)
   {
     // Near very vertical angles, don't worry about the bend, just approximate
     // with an euler joint
@@ -397,7 +397,7 @@ ConstantCurveIncompressibleJoint::getRelativeJacobianDerivWrtPositionStatic(
   const s_t sinTheta
       = sqrt(linearAngle(0) * linearAngle(0) + linearAngle(2) * linearAngle(2));
 
-  if (sinTheta < 0.001)
+  if (sinTheta < 0.001 || sinTheta > 0.999)
   {
     // Near very vertical angles, don't worry about the bend, just approximate
     // with an euler joint
@@ -726,7 +726,7 @@ Eigen::Matrix<s_t, 6, 3> ConstantCurveIncompressibleJoint::
   const s_t sinTheta
       = sqrt(linearAngle(0) * linearAngle(0) + linearAngle(2) * linearAngle(2));
 
-  if (sinTheta < 0.003)
+  if (sinTheta < 0.003 || sinTheta > 0.997)
   {
     // Near very vertical angles, don't worry about the bend, just approximate
     // with an euler joint

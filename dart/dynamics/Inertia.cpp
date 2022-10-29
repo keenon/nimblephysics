@@ -1140,11 +1140,11 @@ Eigen::Vector6s Inertia::computeDimsAndEuler(
   const s_t yy = principalInertia(1);
   const s_t zz = principalInertia(2);
   assert(mass != 0);
-  assert(6 * (xx + zz - yy) / mass > 0);
+  const s_t MAX_DIM = 0.1;
   Eigen::Vector3s dim = Eigen::Vector3s(
-      sqrt(6 * (yy + zz - xx) / mass),
-      sqrt(6 * (xx + zz - yy) / mass),
-      sqrt(6 * (xx + yy - zz) / mass));
+      (yy + zz - xx) > 0 ? sqrt(6 * (yy + zz - xx) / mass) : MAX_DIM,
+      (xx + zz - yy) > 0 ? sqrt(6 * (xx + zz - yy) / mass) : MAX_DIM,
+      (xx + yy - zz) > 0 ? sqrt(6 * (xx + yy - zz) / mass) : MAX_DIM);
   assert(!dim.hasNaN());
 
   Eigen::Vector6s result;
