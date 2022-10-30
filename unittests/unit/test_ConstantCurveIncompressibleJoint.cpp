@@ -312,7 +312,9 @@ TEST(ConstantCurveIncompressibleJoint, SAVE_SIM_TO_GUI)
   joint->setSpringStiffness(0, springStiffness);
   joint->setSpringStiffness(1, springStiffness);
   joint->setSpringStiffness(2, springStiffness);
+  joint->setNeutralPos(Eigen::Vector3s::Zero());
   joint->setPosition(0, 0.05);
+  joint->setPosition(1, 0.05);
   BodyNode* body = pair.second;
   std::shared_ptr<dynamics::BoxShape> boxShape
       = std::make_shared<dynamics::BoxShape>(
@@ -334,6 +336,7 @@ TEST(ConstantCurveIncompressibleJoint, SAVE_SIM_TO_GUI)
     joint->setSpringStiffness(0, springStiffness);
     joint->setSpringStiffness(1, springStiffness);
     joint->setSpringStiffness(2, springStiffness);
+    joint->setNeutralPos(Eigen::Vector3s::Zero());
     body = childPair.second;
     std::shared_ptr<dynamics::BoxShape> boxShape
         = std::make_shared<dynamics::BoxShape>(
@@ -344,6 +347,7 @@ TEST(ConstantCurveIncompressibleJoint, SAVE_SIM_TO_GUI)
   std::shared_ptr<simulation::World> world = simulation::World::create();
   world->addSkeleton(skel);
   world->setTimeStep(1.0 / 100);
+  world->setGravity(Eigen::Vector3s::UnitY() * -9.81);
 
   server::GUIRecording server;
   server.setFramesPerSecond(100);
@@ -361,6 +365,52 @@ TEST(ConstantCurveIncompressibleJoint, SAVE_SIM_TO_GUI)
   }
 
   server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+}
+#endif
+
+void printSimTKCode(std::string type, std::string name, Eigen::MatrixXs mat) {
+  std::cout << std::setprecision (10) << std::fixed;
+  std::cout << "// Jacobian: " << std::endl;
+  for (int i = 0; i < mat.rows(); i++) {
+    std::cout << "// ";
+    for (int j = 0; j < mat.cols(); j++) {
+      // Leave space for the negative sign, if we don't need one
+      if (mat(i,j) >= 0) {
+        std::cout << " ";
+      }
+      std::cout << mat(i,j) << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  std::cout << type << " " << name << ";" << std::endl;
+  std::cout << name << ".setToZero();" << std::endl;
+  for (int i = 0; i < mat.rows(); i++) {
+    for (int j = 0; j < mat.cols(); j++) {
+      std::cout << name << "(" << i << "," << j << ") = " << mat(i,j) << ";" << std::endl;
+    }
+  }
+}
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(ConstantCurveIncompressibleJoint, PRINT_TO_LOG)
+{
+  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
+
+  auto pair = skel->createJointAndBodyNodePair<
+      dynamics::ConstantCurveIncompressibleJoint>();
+  ConstantCurveIncompressibleJoint* joint = pair.first;
+  joint->setNeutralPos(Eigen::Vector3s::Zero());
+  // joint->setLength(0.2);
+  // joint->setPositions(Eigen::Vector3s(0.5, 0.5, 0.5));
+  // joint->setVelocities(Eigen::Vector3s(0.1, 0.2, 0.3));
+  joint->setLength(1.0);
+  joint->setPositions(Eigen::Vector3s(0.79846287622439227, 1.5707963210265892, -0.015968884371590844));
+  joint->setVelocities(Eigen::Vector3s(0.44693263, 0.76950436, 0.0065713527));
+
+  printSimTKCode("Mat63", "expectedJacobian", joint->getRelativeJacobian());
+  printSimTKCode("Mat63", "expectedJacobianTimeDeriv", joint->getRelativeJacobianTimeDeriv());
 }
 #endif
 

@@ -6047,7 +6047,7 @@ TEST(MarkerFitter, HIGH_BMI)
 #endif
 
 #ifdef ALL_TESTS
-TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_SPRINTING)
+TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_SPRINTER)
 {
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;

@@ -126,7 +126,6 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
   // TODO: Transfer markers to the thorax / scapula / lumbar / neck, instead of
   // the torso
 
-  /*
   for (int i = 0; i < osim.skeleton->getNumJoints(); i++)
   {
     auto* joint = osim.skeleton->getJoint(i);
@@ -162,7 +161,6 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
           math::matrixToEulerXYZ(worldT.linear()));
     }
   }
-  */
 
   server.saveFrame();
 
@@ -230,22 +228,22 @@ TEST(CompleteHumanModel, LOAD_SHOULDER_OPENSIM)
   */
 
   std::vector<std::string> names;
-  // names.push_back("scapula_abduction_r");
-  // names.push_back("scapula_elevation_r");
-  // names.push_back("scapula_upward_rot_r");
-  // names.push_back("scapula_abduction_l");
-  // names.push_back("scapula_elevation_l");
-  // names.push_back("scapula_upward_rot_l");
+  names.push_back("scapula_abduction_r");
+  names.push_back("scapula_elevation_r");
+  names.push_back("scapula_upward_rot_r");
+  names.push_back("scapula_abduction_l");
+  names.push_back("scapula_elevation_l");
+  names.push_back("scapula_upward_rot_l");
 
-  names.push_back("lumbar_bending");
-  names.push_back("lumbar_extension");
-  names.push_back("lumbar_twist");
-  names.push_back("thorax_bending");
-  names.push_back("thorax_extension");
-  names.push_back("thorax_twist");
-  names.push_back("head_bending");
-  names.push_back("head_extension");
-  names.push_back("head_twist");
+  // names.push_back("lumbar_bending");
+  // names.push_back("lumbar_extension");
+  // names.push_back("lumbar_twist");
+  // names.push_back("thorax_bending");
+  // names.push_back("thorax_extension");
+  // names.push_back("thorax_twist");
+  // names.push_back("head_bending");
+  // names.push_back("head_extension");
+  // names.push_back("head_twist");
 
   for (auto& name : names)
   {

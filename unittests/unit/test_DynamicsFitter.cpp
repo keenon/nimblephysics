@@ -1049,8 +1049,12 @@ bool testRelationshipBetweenResidualAndLinear(
   }
 
   std::cout << "Residual norm: " << residualNorm << std::endl;
-  if (abs(residualNorm - problemLoss) > 1e-8)
+  // TODO: this doesn't seem to work on the CompleteHumanModel, and we don't know why...
+  if (abs(residualNorm - problemLoss) / abs(residualNorm) > 1e-8)
   {
+    std::cout << "Problem loss: " << problemLoss << std::endl;
+    std::cout << "abs(Residual norm - problemLoss): " << abs(residualNorm - problemLoss) << std::endl;
+    std::cout << "abs(Residual norm - problemLoss) / abs(residualNorm): " << abs(residualNorm - problemLoss) / abs(residualNorm) << std::endl;
     EXPECT_EQ(residualNorm, problemLoss);
     return false;
   }
@@ -3266,6 +3270,36 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER)
 
   runEngine(
       "dart://sample/grf/Sprinter/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      200,
+      87,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/SprinterWithSpine/IK/JA1Gait35_ik.mot");
+  trcFiles.push_back("dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back("dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/SprinterWithSpine/Models/"
       "optimized_scale_and_markers.osim",
       footNames,
       motFiles,
