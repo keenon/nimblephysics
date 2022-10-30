@@ -19,6 +19,8 @@
 #include "dart/biomechanics/MarkerLabeller.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
 #include "dart/math/FiniteDifference.hpp"
@@ -4165,6 +4167,381 @@ void DynamicsFitter::smoothAccelerations(
 }
 
 //==============================================================================
+// 1. Adjust the total mass of the body, and change the initial positions and
+// velocities of the body to achieve a least-squares closest COM trajectory to
+// the current kinematic fit.
+void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  if (mSkeleton->getRootJoint()->getType()
+          != dynamics::EulerFreeJoint::getStaticType()
+      && mSkeleton->getRootJoint()->getType()
+             != dynamics::FreeJoint::getStaticType())
+  {
+    std::cout
+        << "ERROR: Cannot call zeroResidualsOnCOMTrajectory() on a skeleton "
+           "that does "
+           "not have a root joint that is either an EulerFreeJoint or "
+           "FreeJoint - instead got "
+        << mSkeleton->getRootJoint()->getType()
+        << ". Ignoring call, and leaving DynamicsInitialization unchanged."
+        << std::endl;
+    return;
+  }
+  Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
+  s_t regularizeUnobservedTimesteps = 1.0;
+
+  const s_t originalMass = mSkeleton->getMass();
+
+  std::vector<Eigen::MatrixXs> trialLinearMaps;
+  std::vector<Eigen::VectorXs> trialOriginalPositions;
+  std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
+  int totalTimesteps = 0;
+  int totalColsWithoutMass = 0;
+  int totalRows = 0;
+
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    int numMissingSteps = 0;
+    std::vector<bool> trialProbablyMissing;
+    std::vector<int> missingStepIndices;
+    if (init->probablyMissingGRF.size() > i)
+    {
+      trialProbablyMissing = init->probablyMissingGRF[i];
+      for (int t = 0; t < trialProbablyMissing.size(); t++)
+      {
+        if (trialProbablyMissing[t])
+        {
+          numMissingSteps++;
+          missingStepIndices.push_back(t);
+        }
+      }
+    }
+
+    std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, i);
+    std::vector<Eigen::Vector3s> originalCOMs = comPositions(init, i);
+    const s_t dt = init->trialTimesteps[i];
+    const int numTimesteps = originalCOMs.size();
+
+    totalTimesteps += numTimesteps;
+
+    // This has one col each for start COM positions, start COM velocities, and
+    // total mass. It outputs the physically consistent X, Y, Z coordinates of
+    // COM over time, given those inputs.
+    Eigen::MatrixXs trialLinearMapToPositions = Eigen::MatrixXs::Zero(
+        numTimesteps * 3 + (numMissingSteps * 3), 6 + numMissingSteps * 3 + 1);
+    totalColsWithoutMass += trialLinearMapToPositions.cols() - 1;
+    totalRows += trialLinearMapToPositions.rows();
+
+    // This is a vector with the original positions of our COM over time, which
+    // we will use to find good values for the position, velocity, and mass of
+    // our skeleton.
+    Eigen::VectorXs originalCOMPositions
+        = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+    Eigen::VectorXs comGravityOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+    const int startPosXCol = 0;
+    const int startPosYCol = 1;
+    const int startPosZCol = 2;
+    const int startVelXCol = 3;
+    const int startVelYCol = 4;
+    const int startVelZCol = 5;
+    const int massCol = 6 + numMissingSteps * 3;
+
+    Eigen::Vector3s forceVelocity = Eigen::Vector3s::Zero();
+    Eigen::Vector3s forceOffset = Eigen::Vector3s::Zero();
+    Eigen::Vector3s gravityVelocity = Eigen::Vector3s::Zero();
+    Eigen::Vector3s gravityOffset = Eigen::Vector3s::Zero();
+
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      const int xRow = (t * 3);
+      const int yRow = (t * 3) + 1;
+      const int zRow = (t * 3) + 2;
+
+      trialLinearMapToPositions(xRow, startPosXCol) = 1;
+      trialLinearMapToPositions(yRow, startPosYCol) = 1;
+      trialLinearMapToPositions(zRow, startPosZCol) = 1;
+
+      trialLinearMapToPositions(xRow, startVelXCol) = t * dt;
+      trialLinearMapToPositions(yRow, startVelYCol) = t * dt;
+      trialLinearMapToPositions(zRow, startVelZCol) = t * dt;
+
+      trialLinearMapToPositions(xRow, massCol) = forceOffset(0);
+      trialLinearMapToPositions(yRow, massCol) = forceOffset(1);
+      trialLinearMapToPositions(zRow, massCol) = forceOffset(2);
+
+      // Allow the missing steps to generate arbitrary delta V on each step
+      for (int j = 0; j < missingStepIndices.size(); j++)
+      {
+        int missingIndex = missingStepIndices[j];
+        if (missingIndex >= t)
+          break;
+        int timestepsSinceDv = t - missingIndex;
+
+        int missingXCol = 6 + j * 3;
+        int missingYCol = 6 + j * 3 + 1;
+        int missingZCol = 6 + j * 3 + 2;
+
+        trialLinearMapToPositions(xRow, missingXCol) = dt * timestepsSinceDv;
+        trialLinearMapToPositions(yRow, missingYCol) = dt * timestepsSinceDv;
+        trialLinearMapToPositions(zRow, missingZCol) = dt * timestepsSinceDv;
+      }
+
+      comGravityOffset(xRow) = gravityOffset(0);
+      comGravityOffset(yRow) = gravityOffset(1);
+      comGravityOffset(zRow) = gravityOffset(2);
+
+      forceVelocity += grfs[t] * dt;
+      forceOffset += forceVelocity * dt;
+
+      gravityVelocity += gravity * dt;
+      gravityOffset += gravityVelocity * dt;
+
+      originalCOMPositions(xRow) = originalCOMs[t](0);
+      originalCOMPositions(yRow) = originalCOMs[t](1);
+      originalCOMPositions(zRow) = originalCOMs[t](2);
+    }
+
+    // Output the delta V for missing steps to the output, so we can regularize
+    // it
+    for (int j = 0; j < missingStepIndices.size(); j++)
+    {
+      int missingXCol = 6 + j * 3;
+      int missingYCol = 6 + j * 3 + 1;
+      int missingZCol = 6 + j * 3 + 2;
+
+      int missingXRow = (numTimesteps * 3) + j * 3;
+      int missingYRow = (numTimesteps * 3) + j * 3 + 1;
+      int missingZRow = (numTimesteps * 3) + j * 3 + 2;
+
+      // Nothing else should've written to these rows at this point
+      if (!trialLinearMapToPositions.row(missingXRow).isZero())
+      {
+        std::cout << "missing X Row (" << missingXRow << ") for missing index "
+                  << j << " is not empty!" << std::endl
+                  << trialLinearMapToPositions.row(missingXRow).transpose()
+                  << std::endl;
+      }
+      assert(trialLinearMapToPositions.row(missingXRow).isZero());
+      assert(trialLinearMapToPositions.row(missingYRow).isZero());
+      assert(trialLinearMapToPositions.row(missingZRow).isZero());
+
+      trialLinearMapToPositions(missingXRow, missingXCol)
+          = regularizeUnobservedTimesteps;
+      trialLinearMapToPositions(missingYRow, missingYCol)
+          = regularizeUnobservedTimesteps;
+      trialLinearMapToPositions(missingZRow, missingZCol)
+          = regularizeUnobservedTimesteps;
+    }
+
+#ifndef NDEBUG
+    Eigen::VectorXs testConfig
+        = Eigen::VectorXs::Random(trialLinearMapToPositions.cols());
+    testConfig.head<3>() = originalCOMs[0];
+    testConfig.segment<3>(3) = (originalCOMs[1] - originalCOMs[0]);
+    testConfig(testConfig.size() - 1) = 1.0 / originalMass;
+
+    Eigen::VectorXs recoveredComPoses = trialLinearMapToPositions * testConfig;
+    recoveredComPoses.segment(0, comGravityOffset.size()) += comGravityOffset;
+
+    for (int j = 0; j < missingStepIndices.size(); j++)
+    {
+      int missingXCol = 6 + j * 3;
+      int missingYCol = 6 + j * 3 + 1;
+      int missingZCol = 6 + j * 3 + 2;
+
+      int missingXRow = (numTimesteps * 3) + j * 3;
+      int missingYRow = (numTimesteps * 3) + j * 3 + 1;
+      int missingZRow = (numTimesteps * 3) + j * 3 + 2;
+
+      if (recoveredComPoses.size() <= missingZRow)
+      {
+        std::cout << "Our recovered poses data doesn't seem long enough to "
+                     "contain missing step delta V ["
+                  << j << " / " << missingStepIndices.size() << "]. Needs "
+                  << missingZRow << ", but is only len "
+                  << recoveredComPoses.size() << std::endl;
+      }
+      assert(recoveredComPoses.size() > missingZRow);
+      if (testConfig.size() <= missingZCol)
+      {
+        std::cout << "Our test configuration doesn't seem long enough to "
+                     "contain missing step delta V ["
+                  << j << " / " << missingStepIndices.size() << "]. Needs "
+                  << missingZCol << ", but is only len " << testConfig.size()
+                  << std::endl;
+      }
+      assert(testConfig.size() > missingZCol);
+
+      if (abs(recoveredComPoses(missingXRow)
+              - testConfig(missingXCol) * regularizeUnobservedTimesteps)
+          > 1e-12)
+      {
+        std::cout << "Failed to recoverd deltaV X for missing timestep[" << j
+                  << "] = " << missingStepIndices[j] << ", expected "
+                  << testConfig(missingXCol) * regularizeUnobservedTimesteps
+                  << " but got " << recoveredComPoses(missingXRow) << std::endl;
+      }
+      if (abs(recoveredComPoses(missingYRow)
+              - testConfig(missingYCol) * regularizeUnobservedTimesteps)
+          > 1e-12)
+      {
+        std::cout << "Failed to recoverd deltaV Y for missing timestep[" << j
+                  << "] = " << missingStepIndices[j] << ", expected "
+                  << testConfig(missingYCol) * regularizeUnobservedTimesteps
+                  << " but got " << recoveredComPoses(missingYRow) << std::endl;
+      }
+      if (abs(recoveredComPoses(missingZRow)
+              - testConfig(missingZCol) * regularizeUnobservedTimesteps)
+          > 1e-12)
+      {
+        std::cout << "Failed to recoverd deltaV Z for missing timestep[" << j
+                  << "] = " << missingStepIndices[j] << ", expected "
+                  << testConfig(missingZCol) * regularizeUnobservedTimesteps
+                  << " but got " << recoveredComPoses(missingZRow) << std::endl;
+      }
+    }
+
+    for (int t = 1; t < numTimesteps - 1; t++)
+    {
+      if (init->probablyMissingGRF.size() > i && init->probablyMissingGRF[i][t])
+        continue;
+      Eigen::Vector3s acc = (recoveredComPoses.segment<3>((t + 1) * 3)
+                             - 2 * recoveredComPoses.segment<3>(t * 3)
+                             + recoveredComPoses.segment<3>((t - 1) * 3))
+                            / (dt * dt);
+      Eigen::Vector3s impliedForce = acc * originalMass;
+      Eigen::Vector3s expectedForce = (gravity * originalMass) + grfs[t];
+      Eigen::Vector3s diff = impliedForce - expectedForce;
+      if (diff.norm() > 1e-7)
+      {
+        std::cout << "Bug detected in zeroResidualsOnCOMTrajectory() linear "
+                     "formulation!"
+                  << std::endl;
+        Eigen::Matrix3s comp;
+        comp.col(0) = impliedForce;
+        comp.col(1) = expectedForce;
+        comp.col(2) = diff;
+        std::cout << "t=" << t << ": implied - expected - diff" << std::endl
+                  << comp << std::endl;
+      }
+    }
+#endif
+
+    trialLinearMaps.push_back(trialLinearMapToPositions);
+    trialOriginalPositions.push_back(originalCOMPositions);
+    trialOriginalGravityOffsets.push_back(comGravityOffset);
+    trialOriginalCOMs.push_back(originalCOMs);
+  }
+  int numTrials = trialLinearMaps.size();
+
+  // Build one big unified matrix, so we can hold mass fixed across all the
+  // trials. This keeps all the starting (position,velocity) pairs for each
+  // trial separate, but collapses each trial's mass quantity into a single
+  // column, so that we can solve them together for a single unified skeleton
+  // mass that is least-squares best across all the trials at once.
+
+  Eigen::MatrixXs unifiedLinearMap
+      = Eigen::MatrixXs::Zero(totalRows, totalColsWithoutMass + 1);
+  Eigen::VectorXs unifiedPositions = Eigen::VectorXs::Zero(totalRows);
+  Eigen::VectorXs unifiedGravityOffset = Eigen::VectorXs::Zero(totalRows);
+
+  int rowCursor = 0;
+  int colCursor = 0;
+  int massCol = unifiedLinearMap.cols() - 1;
+  for (int trial = 0; trial < numTrials; trial++)
+  {
+    int trialTimesteps = trialOriginalPositions[trial].size();
+    int trialRows = trialLinearMaps[trial].rows();
+    int trialCols = trialLinearMaps[trial].cols();
+    // (position,velocity) get their own unique block for each trial
+    unifiedLinearMap.block(rowCursor, colCursor, trialRows, trialCols - 1)
+        = trialLinearMaps[trial].block(0, 0, trialRows, trialCols - 1);
+    // mass all goes into the same column for every trial
+    unifiedLinearMap.block(rowCursor, massCol, trialRows, 1)
+        = trialLinearMaps[trial].block(0, trialCols - 1, trialRows, 1);
+    // original positions get concatenated together
+    unifiedPositions.segment(rowCursor, trialTimesteps)
+        = trialOriginalPositions[trial];
+    unifiedGravityOffset.segment(rowCursor, trialTimesteps)
+        = trialOriginalGravityOffsets[trial];
+    rowCursor += trialRows;
+    colCursor += trialCols;
+  }
+
+  // Now that we've formulated our problem, we can attempt to solve:
+  Eigen::VectorXs tentativeResult
+      = unifiedLinearMap.completeOrthogonalDecomposition().solve(
+          unifiedPositions - unifiedGravityOffset);
+  // The linear map is in terms of "inverse mass", so we need to invert to
+  // recover original mass.
+  s_t tentativeMass = 1.0 / tentativeResult(massCol);
+
+  Eigen::VectorXs adjustedComPositions;
+
+  // If our mass has dropped below an acceptable threshold in this solve, then
+  // we need to run again but hold mass fixed.
+  if (tentativeMass < 0.1 * originalMass && false)
+  {
+    Eigen::VectorXs massOffset
+        = unifiedLinearMap.col(massCol) * (1.0 / originalMass);
+
+    // Re-run the solve, while holding the mass fixed at `originalMass`
+    Eigen::VectorXs massFixedResult
+        = unifiedLinearMap
+              .block(0, 0, totalTimesteps, unifiedLinearMap.cols() - 1)
+              .completeOrthogonalDecomposition()
+              .solve(unifiedPositions - massOffset - unifiedGravityOffset);
+    tentativeResult.segment(0, massFixedResult.size()) = massFixedResult;
+
+    // Calculate the trajectory of our COM over time
+    adjustedComPositions
+        = unifiedLinearMap.block(
+              0, 0, totalTimesteps, unifiedLinearMap.cols() - 1)
+              * massFixedResult
+          + massOffset + unifiedGravityOffset;
+  }
+  else
+  {
+    // Now we want to scale every mass in the skeleton to get to `tentativeMass`
+    // total
+    s_t scalePercentage = tentativeMass / originalMass;
+    init->bodyMasses *= scalePercentage;
+
+    // Calculate the trajectory of our COM over time
+    adjustedComPositions
+        = unifiedLinearMap * tentativeResult + unifiedGravityOffset;
+  }
+
+  // Last, we need to decode the COM trajectory, and adjust our root
+  // translations to hit that trajectory
+  const int translationDofsStart
+      = mSkeleton->getRootJoint()->getDof(3)->getIndexInSkeleton();
+  int timeCursor = 0;
+  for (int trial = 0; trial < numTrials; trial++)
+  {
+    s_t totalChange = 0.0;
+    std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
+
+    for (int t = 0; t < originalCOMs.size(); t++)
+    {
+      Eigen::Vector3s change
+          = adjustedComPositions.segment<3>(timeCursor * 3) - originalCOMs[t];
+      timeCursor++;
+      init->poseTrials[trial].block<3, 1>(translationDofsStart, t) += change;
+      totalChange += change.norm();
+    }
+    std::cout << "Trial " << trial << " moved COM by an average of "
+              << (totalChange / originalCOMs.size())
+              << "m to achieve linear physical consistency." << std::endl;
+  }
+  assert(timeCursor == totalTimesteps);
+}
+
+//==============================================================================
 // 1. Scale the total mass of the body (keeping the ratios of body links
 // constant) to get it as close as possible to GRF gravity forces.
 void DynamicsFitter::scaleLinkMassesFromGravity(
@@ -5278,8 +5655,11 @@ void DynamicsFitter::saveDynamicsToGUI(
   server.createLayer(markersLayerName, markersLayerColor, false);
 
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trialIndex];
-  std::vector<ForcePlate> perfectForcePlates
-      = init->perfectForcePlateTrials[trialIndex];
+  std::vector<ForcePlate> perfectForcePlates;
+  if (init->perfectForcePlateTrials.size() > trialIndex)
+  {
+    perfectForcePlates = init->perfectForcePlateTrials[trialIndex];
+  }
   Eigen::MatrixXs poses = init->poseTrials[trialIndex];
 
   if (init->flatGround[trialIndex])
@@ -5494,14 +5874,17 @@ void DynamicsFitter::saveDynamicsToGUI(
 
     if (i % 1 == 0 && useForces[i])
     {
-      std::vector<Eigen::Vector3s> impliedVector;
-      impliedVector.push_back(coms[i]);
-      impliedVector.push_back(coms[i] + (impliedForces[i] * 0.001));
-      server.createLine(
-          "com_implied_" + std::to_string(i),
-          impliedVector,
-          impliedForcesLayerColor,
-          impliedForcesLayerName);
+      if (i > 0 && i - 1 < impliedForces.size())
+      {
+        std::vector<Eigen::Vector3s> impliedVector;
+        impliedVector.push_back(coms[i]);
+        impliedVector.push_back(coms[i] + (impliedForces[i - 1] * 0.001));
+        server.createLine(
+            "com_implied_" + std::to_string(i),
+            impliedVector,
+            impliedForcesLayerColor,
+            impliedForcesLayerName);
+      }
 
       if (measuredForces[i].norm() > 0)
       {
@@ -5514,13 +5897,14 @@ void DynamicsFitter::saveDynamicsToGUI(
             measuredForcesLayerColor,
             measuredForcesLayerName);
 
-        if (renderResidualForces)
+        if (renderResidualForces && i > 0 && i - 1 < residualForces.size()
+            && i - 1 < residualTorques.size())
         {
           std::vector<Eigen::Vector3s> residualForceVector;
           residualForceVector.push_back(coms[i] + (measuredForces[i] * 0.001));
           residualForceVector.push_back(
               coms[i] + (measuredForces[i] * 0.001)
-              + (residualForces[i] * 0.001));
+              + (residualForces[i - 1] * 0.001));
           server.createLine(
               "com_residual_force_" + std::to_string(i),
               residualForceVector,
@@ -5529,7 +5913,8 @@ void DynamicsFitter::saveDynamicsToGUI(
 
           std::vector<Eigen::Vector3s> residualTorqueVector;
           residualTorqueVector.push_back(coms[i]);
-          residualTorqueVector.push_back(coms[i] + (residualTorques[i] * 0.01));
+          residualTorqueVector.push_back(
+              coms[i] + (residualTorques[i - 1] * 0.01));
           server.createLine(
               "com_residual_torque_" + std::to_string(i),
               residualTorqueVector,

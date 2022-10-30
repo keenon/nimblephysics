@@ -1049,12 +1049,16 @@ bool testRelationshipBetweenResidualAndLinear(
   }
 
   std::cout << "Residual norm: " << residualNorm << std::endl;
-  // TODO: this doesn't seem to work on the CompleteHumanModel, and we don't know why...
+  // TODO: this doesn't seem to work on the CompleteHumanModel, and we don't
+  // know why...
   if (abs(residualNorm - problemLoss) / abs(residualNorm) > 1e-8)
   {
     std::cout << "Problem loss: " << problemLoss << std::endl;
-    std::cout << "abs(Residual norm - problemLoss): " << abs(residualNorm - problemLoss) << std::endl;
-    std::cout << "abs(Residual norm - problemLoss) / abs(residualNorm): " << abs(residualNorm - problemLoss) / abs(residualNorm) << std::endl;
+    std::cout << "abs(Residual norm - problemLoss): "
+              << abs(residualNorm - problemLoss) << std::endl;
+    std::cout << "abs(Residual norm - problemLoss) / abs(residualNorm): "
+              << abs(residualNorm - problemLoss) / abs(residualNorm)
+              << std::endl;
     EXPECT_EQ(residualNorm, problemLoss);
     return false;
   }
@@ -1070,7 +1074,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.smoothAccelerations(init);
-  fitter.scaleLinkMassesFromGravity(init);
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
   // fitter.estimateLinkMassesFromAcceleration(init, 100);
 
   std::cout << "Initial mass: " << skel->getMass() << " kg" << std::endl;
@@ -1199,6 +1203,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludeBodyScales(true)
           .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
 
   /*
   fitter.setIterationLimit(200);
@@ -2969,6 +2974,58 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
 }
 #endif
 
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, TEST_ZERO_RESIDUALS)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/SprinterWithSpine/IK/JA1Gait35_ik.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/SprinterWithSpine/Models/"
+      "optimized_scale_and_markers.osim");
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitter fitter(
+      standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
+
+  fitter.smoothAccelerations(init);
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
+  fitter.saveDynamicsToGUI(
+      "../../../javascript/src/data/movement2.bin",
+      init,
+      0,
+      (int)round(1.0 / init->trialTimesteps[0]));
+}
+#endif
+
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, WRENCH_ASSIGNMENT)
 {
@@ -3291,8 +3348,10 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
   std::vector<std::string> grfFiles;
 
   motFiles.push_back("dart://sample/grf/SprinterWithSpine/IK/JA1Gait35_ik.mot");
-  trcFiles.push_back("dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
-  grfFiles.push_back("dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
 
   std::vector<std::string> footNames;
   footNames.push_back("calcn_r");

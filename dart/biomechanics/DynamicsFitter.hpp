@@ -614,6 +614,12 @@ public:
   // 0. Smooth the accelerations.
   void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
 
+  // 1. Adjust the total mass of the body, and change the initial positions and
+  // velocities of the body to achieve a least-squares closest COM trajectory to
+  // the current kinematic fit.
+  void zeroLinearResidualsOnCOMTrajectory(
+      std::shared_ptr<DynamicsInitialization> init);
+
   // 1. Scale the total mass of the body (keeping the ratios of body links
   // constant) to get it as close as possible to GRF gravity forces.
   void scaleLinkMassesFromGravity(std::shared_ptr<DynamicsInitialization> init);
