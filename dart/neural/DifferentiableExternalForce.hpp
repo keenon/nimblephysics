@@ -37,7 +37,9 @@ public:
   /// This computes the Jacobian relating changes in `wrt` to changes in the
   /// output of `computeTau()`.
   Eigen::MatrixXs getJacobianOfTauWrt(
-      Eigen::Vector6s worldWrench, neural::WithRespectTo* wrt);
+      Eigen::Vector6s worldWrench,
+      neural::WithRespectTo* wrt,
+      int cutoffDim = -1);
 
   /// This computes the Jacobian relating changes in `wrt` to changes in the
   /// output of `computeTau()`.

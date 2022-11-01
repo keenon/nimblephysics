@@ -72,15 +72,19 @@ Eigen::VectorXs DifferentiableExternalForce::computeTau(
 /// This computes the Jacobian relating changes in `wrt` to changes in the
 /// output of `computeTau()`.
 Eigen::MatrixXs DifferentiableExternalForce::getJacobianOfTauWrt(
-    Eigen::Vector6s worldWrench, neural::WithRespectTo* wrt)
+    Eigen::Vector6s worldWrench, neural::WithRespectTo* wrt, int cutoffDim)
 {
   (void)worldWrench;
-  Eigen::MatrixXs result
-      = Eigen::MatrixXs::Zero(mSkel->getNumDofs(), wrt->dim(mSkel.get()));
+  int dim = wrt->dim(mSkel.get());
+  if (cutoffDim > 0 && dim > cutoffDim)
+  {
+    dim = cutoffDim;
+  }
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(mSkel->getNumDofs(), dim);
 
   if (wrt == WithRespectTo::POSITION)
   {
-    for (int col = 0; col < mSkel->getNumDofs(); col++)
+    for (int col = 0; col < result.cols(); col++)
     {
       for (int i : activeDofs)
       {
@@ -93,7 +97,7 @@ Eigen::MatrixXs DifferentiableExternalForce::getJacobianOfTauWrt(
   }
   else if (wrt == WithRespectTo::GROUP_SCALES)
   {
-    for (int col = 0; col < mSkel->getGroupScaleDim(); col++)
+    for (int col = 0; col < result.cols(); col++)
     {
       for (int i : activeDofs)
       {
@@ -121,7 +125,8 @@ Eigen::MatrixXs DifferentiableExternalForce::getJacobianOfTauWrt(
   else
   {
     // Fall back to finite differencing
-    return finiteDifferenceJacobianOfTauWrt(worldWrench, wrt);
+    return finiteDifferenceJacobianOfTauWrt(worldWrench, wrt)
+        .block(0, 0, mSkel->getNumDofs(), dim);
   }
 
   return result;

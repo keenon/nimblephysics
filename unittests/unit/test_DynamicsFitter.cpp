@@ -34,7 +34,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -812,6 +812,157 @@ bool testResidualGradWrt(
   return true;
 }
 
+bool testResidualAngularJacobians(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::map<int, Eigen::Vector6s> worldForces)
+{
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalTau = skel->getRandomPose();
+  Eigen::Vector6s originalResidual = originalTau.head<6>();
+  (void)originalResidual;
+  applyExternalForces(skel, worldForces);
+  skel->setControlForces(originalTau);
+  skel->computeForwardDynamics();
+  Eigen::VectorXs acc = skel->getAccelerations();
+  skel->integrateVelocities(skel->getTimeStep());
+  // Reset
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  applyExternalForces(skel, worldForces);
+  skel->clearExternalForces();
+  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+  std::vector<int> forceBodies;
+  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
+  for (auto& pair : worldForces)
+  {
+    concatForces.segment<6>(forceBodies.size() * 6) = pair.second;
+    forceBodies.push_back(pair.first);
+  }
+
+  ResidualForceHelper helper(skel, forceBodies);
+
+  Eigen::MatrixXs angularResidual
+      = helper.calculateRootAngularResidualJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+  Eigen::MatrixXs angularResidual_fd
+      = helper.finiteDifferenceRootAngularResidualJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+
+  if (!equals(angularResidual, angularResidual_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root angular residual wrt position not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << angularResidual << std::endl;
+    std::cout << "FD:" << std::endl << angularResidual_fd << std::endl;
+    std::cout << "Diff (" << (angularResidual_fd - angularResidual).minCoeff()
+              << " - " << (angularResidual_fd - angularResidual).maxCoeff()
+              << "):" << std::endl
+              << (angularResidual_fd - angularResidual) << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs fullResidual
+      = helper.calculateRootResidualJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+  Eigen::MatrixXs fullResidual_fd
+      = helper.finiteDifferenceRootResidualJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+
+  if (!equals(fullResidual, fullResidual_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root residual wrt position not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << fullResidual << std::endl;
+    std::cout << "FD:" << std::endl << fullResidual_fd << std::endl;
+    std::cout << "Diff (" << (fullResidual_fd - fullResidual).minCoeff()
+              << " - " << (fullResidual_fd - fullResidual).maxCoeff()
+              << "):" << std::endl
+              << (fullResidual_fd - fullResidual) << std::endl;
+    return false;
+  }
+
+  Eigen::Vector6s noResidualRoot = helper.calculateResidualFreeRootAcceleration(
+      originalPos, originalVel, acc, concatForces);
+  Eigen::VectorXs noResidualAcc = acc;
+  noResidualAcc.head<6>() = noResidualRoot;
+  Eigen::Vector6s residual = helper.calculateResidual(
+      originalPos, originalVel, noResidualAcc, concatForces);
+  Eigen::Vector6s zero6 = Eigen::Vector6s::Zero();
+  if (!equals(residual, zero6, 1e-8))
+  {
+    std::cout << "Residual free root acceleration did not remove residuals!"
+              << std::endl;
+    std::cout << "Remaining residuals: " << residual << std::endl;
+    return false;
+  }
+
+  Eigen::Vector3s noResidualAngular
+      = helper.calculateResidualFreeAngularAcceleration(
+          originalPos, originalVel, acc, concatForces);
+  noResidualAcc = acc;
+  noResidualAcc.head<3>() = noResidualAngular;
+  Eigen::Vector3s residualAng
+      = helper
+            .calculateResidual(
+                originalPos, originalVel, noResidualAcc, concatForces)
+            .head<3>();
+  Eigen::Vector3s zero3 = Eigen::Vector3s::Zero();
+  if (!equals(residualAng, zero3, 1e-8))
+  {
+    std::cout << "Residual free root acceleration did not remove residuals!"
+              << std::endl;
+    std::cout << "Remaining residuals: " << residualAng << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs angularAccResidual
+      = helper.calculateResidualFreeRootAngularAccelerationJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+  Eigen::MatrixXs angularAccResidual_fd
+      = helper
+            .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtPosition(
+                originalPos, originalVel, acc, concatForces);
+
+  if (!equals(angularAccResidual, angularAccResidual_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root angular residual wrt position not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << angularAccResidual << std::endl;
+    std::cout << "FD:" << std::endl << angularAccResidual_fd << std::endl;
+    std::cout << "Diff ("
+              << (angularAccResidual_fd - angularAccResidual).minCoeff()
+              << " - "
+              << (angularAccResidual_fd - angularAccResidual).maxCoeff()
+              << "):" << std::endl
+              << (angularAccResidual_fd - angularAccResidual) << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs rootAccResidual
+      = helper.calculateResidualFreeRootAccelerationJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+  Eigen::MatrixXs rootAccResidual_fd
+      = helper.finiteDifferenceResidualFreeRootAccelerationJacobianWrtPosition(
+          originalPos, originalVel, acc, concatForces);
+
+  if (!equals(rootAccResidual, rootAccResidual_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root acceleration wrt position not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << rootAccResidual << std::endl;
+    std::cout << "FD:" << std::endl << rootAccResidual_fd << std::endl;
+    std::cout << "Diff (" << (rootAccResidual_fd - rootAccResidual).minCoeff()
+              << " - " << (rootAccResidual_fd - rootAccResidual).maxCoeff()
+              << "):" << std::endl
+              << (rootAccResidual_fd - rootAccResidual) << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 bool testWorldWrenchAssignment(std::shared_ptr<DynamicsInitialization> init)
 {
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
@@ -1051,7 +1202,7 @@ bool testRelationshipBetweenResidualAndLinear(
   std::cout << "Residual norm: " << residualNorm << std::endl;
   // TODO: this doesn't seem to work on the CompleteHumanModel, and we don't
   // know why...
-  if (abs(residualNorm - problemLoss) / abs(residualNorm) > 1e-8)
+  if (abs(residualNorm - problemLoss) > 1e-10)
   {
     std::cout << "Problem loss: " << problemLoss << std::endl;
     std::cout << "abs(Residual norm - problemLoss): "
@@ -1075,6 +1226,25 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.smoothAccelerations(init);
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  // if (!fitter.verifyLinearForceConsistency(init))
+  // {
+  //   std::cout << "Failed linear consistency check! Exiting early." <<
+  //   std::endl; return init;
+  // }
+
+  fitter.zeroAngularResidualsOnCOMTrajectory(init);
+
+  // fitter.optimizeRootTrajectory(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setResidualWeight(1.0)
+  //         .setResidualTorqueMultiple(1.0)
+  //         .setMarkerWeight(1.0)
+  //         .setJointWeight(1.0));
+
+  // fitter.zeroSpatialResidualsUsingForwardSim(init);
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
   // fitter.estimateLinkMassesFromAcceleration(init, 100);
 
   std::cout << "Initial mass: " << skel->getMass() << " kg" << std::endl;
@@ -1163,27 +1333,36 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludePoses(true));
   */
 
+  // fitter.setIterationLimit(50);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel).setDefaults().setIncludePoses(true));
+  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
   // Run as L2
-  fitter.setIterationLimit(200);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults()
-          .setIncludeMasses(true)
-          .setIncludeInertias(true)
-          .setIncludePoses(true));
+  // fitter.setIterationLimit(200);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults()
+  //         .setIncludeMasses(true)
+  //         .setIncludeInertias(true)
+  //         .setIncludePoses(true));
+  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
 
   // Re-run as L1
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults(true)
-          .setIncludeMasses(true)
-          .setIncludeInertias(true)
-          .setIncludePoses(true));
+  // fitter.setIterationLimit(200);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setIncludeMasses(true)
+  //         .setIncludeInertias(true)
+  //         .setIncludePoses(true));
+  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
 
+  /*
   fitter.setIterationLimit(50);
-
   fitter.runSGDOptimization(
       init,
       DynamicsFitProblemConfig(skel)
@@ -1193,6 +1372,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludeInertias(true)
           .setIncludeBodyScales(true)
           .setIncludePoses(true));
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
   fitter.runSGDOptimization(
       init,
       DynamicsFitProblemConfig(skel)
@@ -1204,6 +1384,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  */
 
   /*
   fitter.setIterationLimit(200);
@@ -1214,8 +1395,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
   */
 
-  // TODO: re-enable
-  fitter.computePerfectGRFs(init);
+  // fitter.computePerfectGRFs(init);
+
   // bool consistent = fitter.checkPhysicalConsistency(init);
   // if (!consistent)
   // {
@@ -1282,9 +1463,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   }
 
   // Attempt writing out the data
-  fitter.writeCSVData("../../../data/grf/Subject4/motion.csv", init, 0);
-  MJCFExporter exporter;
-  exporter.writeSkeleton("../../../data/grf/Subject4/model.mjcf", skel);
+  // fitter.writeCSVData("../../../data/grf/Subject4/motion.csv", init, 0);
+  // MJCFExporter exporter;
+  // exporter.writeSkeleton("../../../data/grf/Subject4/model.mjcf", skel);
 
   return init;
 }
@@ -1587,6 +1768,36 @@ TEST(DynamicsFitter, ID_EQNS)
       file.skeleton, worldForces, WithRespectTo::GROUP_INERTIAS));
 }
 #endif
+
+// #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, ANGULAR_JACS)
+{
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+
+  for (int i = 0; i < 10; i++)
+  {
+    file.skeleton->setPositions(file.skeleton->getRandomPose());
+    file.skeleton->setVelocities(file.skeleton->getRandomVelocity());
+    std::map<int, Eigen::Vector6s> worldForces;
+    worldForces[file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton()]
+        = Eigen::Vector6s::Random() * 1000;
+    worldForces[file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton()]
+        = Eigen::Vector6s::Random() * 1000;
+    bool success = testResidualAngularJacobians(file.skeleton, worldForces);
+    if (!success)
+    {
+      EXPECT_TRUE(success);
+      return;
+    }
+  }
+}
+// #endif
 
 #ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, SPATIAL_NEWTON_GRAD)
