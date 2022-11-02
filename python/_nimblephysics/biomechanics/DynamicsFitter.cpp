@@ -451,6 +451,20 @@ protected:
           &dart::biomechanics::DynamicsFitter::estimateFootGroundContacts,
           ::py::arg("init"))
       .def(
+          "smoothAccelerations",
+          &dart::biomechanics::DynamicsFitter::smoothAccelerations,
+          ::py::arg("init"))
+      .def(
+          "zeroLinearResidualsOnCOMTrajectory",
+          &dart::biomechanics::DynamicsFitter::
+              zeroLinearResidualsOnCOMTrajectory,
+          ::py::arg("init"))
+      .def(
+          "optimizeSpatialResidualsOnCOMTrajectory",
+          &dart::biomechanics::DynamicsFitter::
+              optimizeSpatialResidualsOnCOMTrajectory,
+          ::py::arg("init"))
+      .def(
           "scaleLinkMassesFromGravity",
           &dart::biomechanics::DynamicsFitter::scaleLinkMassesFromGravity,
           ::py::arg("init"))

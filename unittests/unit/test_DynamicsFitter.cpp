@@ -34,7 +34,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -3694,7 +3694,7 @@ TEST(DynamicsFitter, END_TO_END_SUBJECT4)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, END_TO_END_SPRINTER)
 {
   std::vector<std::string> motFiles;
@@ -3722,7 +3722,7 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER)
       87,
       true);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
