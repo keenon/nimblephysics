@@ -463,7 +463,8 @@ protected:
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               optimizeSpatialResidualsOnCOMTrajectory,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("satisfactoryThreshold") = 1e-5)
       .def(
           "scaleLinkMassesFromGravity",
           &dart::biomechanics::DynamicsFitter::scaleLinkMassesFromGravity,

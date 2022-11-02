@@ -1180,7 +1180,8 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
-    Eigen::MatrixXs forces)
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
 {
   (void)qs;
   (void)dqs;
@@ -1197,7 +1198,8 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
       qs,
       dqs,
       ddqs,
-      forces);
+      forces,
+      probablyMissingGRF);
   Eigen::MatrixXs A = Eigen::MatrixXs::Zero(numTimesteps * 6, 13);
 
   A.block<6, 6>(0, 0) = Eigen::Matrix6s::Identity();
@@ -1217,6 +1219,11 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     A.block<6, 6>(t * 6, 6) += dOffsetPos_dInputVel;
 
     // GOHERE
+
+    if (probablyMissingGRF.size() > t && probablyMissingGRF[t])
+    {
+      continue;
+    }
 
     const Eigen::Matrix6s dAcc_dOffsetPos
         = calculateResidualFreeRootAccelerationJacobianWrtPosition(
@@ -1279,7 +1286,8 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
-    Eigen::MatrixXs forces)
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
 {
   (void)qs;
   (void)dqs;
@@ -1293,7 +1301,8 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
       qs,
       dqs,
       ddqs,
-      forces);
+      forces,
+      probablyMissingGRF);
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(zeroPoint.size(), 13);
 
   const bool useRidders = true;
@@ -1312,7 +1321,8 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
               qs,
               dqs,
               ddqs,
-              forces);
+              forces,
+              probablyMissingGRF);
         }
         else if (dof < 12)
         {
@@ -1323,7 +1333,8 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
               qs,
               dqs,
               ddqs,
-              forces);
+              forces,
+              probablyMissingGRF);
         }
         else
         {
@@ -1335,7 +1346,8 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
               qs,
               dqs,
               ddqs,
-              forces);
+              forces,
+              probablyMissingGRF);
         }
         return true;
       },
@@ -1365,7 +1377,8 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
-    Eigen::MatrixXs forces)
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
 {
   (void)initialPosOffset;
   (void)initialVelOffset;
@@ -1397,8 +1410,15 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
     Eigen::VectorXs offsetVel = dqs.col(i);
     offsetVel.head<6>() += initialVelOffset;
 
-    accelerations.push_back(calculateResidualFreeRootAcceleration(
-        offsetPos, offsetVel, ddqs.col(i), forces.col(i)));
+    if (probablyMissingGRF.size() > i && probablyMissingGRF[i])
+    {
+      accelerations.push_back(ddqs.col(i).head<6>());
+    }
+    else
+    {
+      accelerations.push_back(calculateResidualFreeRootAcceleration(
+          offsetPos, offsetVel, ddqs.col(i), forces.col(i)));
+    }
   }
 
   Eigen::VectorXs result = Eigen::VectorXs::Zero(numTimesteps * 6);
@@ -1439,7 +1459,8 @@ Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
-    Eigen::MatrixXs forces)
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
 {
   Eigen::VectorXs linearSystemRootStates
       = getRootTrajectoryLinearSystemTestOutput(
@@ -1449,7 +1470,8 @@ Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
           qs,
           dqs,
           ddqs,
-          forces);
+          forces,
+          probablyMissingGRF);
   Eigen::MatrixXs newQs = qs;
   for (int t = 0; t < newQs.cols(); t++)
   {
@@ -1463,7 +1485,8 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
     Eigen::Vector6s initialVelOffset,
     s_t inverseMassOffset,
     Eigen::MatrixXs qs,
-    Eigen::MatrixXs forces)
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
 {
   const int dimsToLetFree = 6;
   (void)inverseMassOffset;
@@ -1505,6 +1528,13 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
     qs.col(t).head<6>() += initialVelOffset * dt * t;
   }
 
+  Eigen::MatrixXs originalDdqs = Eigen::MatrixXs::Zero(qs.rows(), qs.cols());
+  for (int t = 1; t < qs.cols() - 1; t++)
+  {
+    originalDdqs.col(t)
+        = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
+  }
+
   // 2. For each timestep, go through and "re-simulate" the angular root.
   for (int t = 1; t < qs.cols() - 1; t++)
   {
@@ -1514,25 +1544,37 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
     Eigen::VectorXs ddq
         = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
 
-    // 2.2. Calculate inverse dynamics to get necessary torques
-    mSkel->setPositions(q);
-    mSkel->setVelocities(dq);
-    mSkel->setAccelerations(ddq);
-
 #ifndef NDEBUG
-    Eigen::VectorXs originalTau
-        = calculateInverseDynamics(q, dq, ddq, forces.col(t));
+    Eigen::VectorXs originalTau = Eigen::VectorXs::Zero(q.size());
+    Eigen::VectorXs originalDdq = Eigen::VectorXs::Zero(q.size());
 #endif
 
-    Eigen::Vector6s solve
-        = calculateResidualFreeRootAcceleration(q, dq, ddq, forces.col(t));
+    if (probablyMissingGRF.size() > t && probablyMissingGRF[t])
+    {
+      ddq.head(dimsToLetFree) = originalDdqs.col(t).head(dimsToLetFree);
+    }
+    else
+    {
+      // 2.2. Calculate inverse dynamics to get necessary torques
+      mSkel->setPositions(q);
+      mSkel->setVelocities(dq);
+      mSkel->setAccelerations(ddq);
 
 #ifndef NDEBUG
-    Eigen::VectorXs originalDdq = ddq;
+      originalTau = calculateInverseDynamics(q, dq, ddq, forces.col(t));
 #endif
-    // 2.5. We only want to change the acceleration at this timestep, so we
-    // overwrite the next timestep's position, and nothing else.
-    ddq.head(dimsToLetFree) = solve;
+
+      Eigen::Vector6s solve
+          = calculateResidualFreeRootAcceleration(q, dq, ddq, forces.col(t));
+
+#ifndef NDEBUG
+      originalDdq = ddq;
+#endif
+      // 2.5. We only want to change the acceleration at this timestep, so we
+      // overwrite the next timestep's position, and nothing else.
+      ddq.head(dimsToLetFree) = solve;
+    }
+
     Eigen::VectorXs nextDq = dq + dt * ddq;
     Eigen::VectorXs nextQ = q + dt * nextDq;
 
@@ -1544,45 +1586,49 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
     qs.col(t + 1).head(dimsToLetFree) = nextQ.head(dimsToLetFree);
 
 #ifndef NDEBUG
-    // 3. As an idiot check, and only in debug mode, we'll recompute inverse
-    // dynamics to check that the rotational residuals are in fact gone.
-    Eigen::VectorXs updatedDq = (qs.col(t) - qs.col(t - 1)) / dt;
-    assert(updatedDq == dq);
-    Eigen::VectorXs updatedDdq
-        = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
-    if ((updatedDdq - ddq).norm() > 1e-8)
+    if (probablyMissingGRF.size() <= t || !probablyMissingGRF[t])
     {
-      std::cout << "Did not get the acceleration we expected from our "
-                   "position change."
-                << std::endl;
-      Eigen::MatrixXs compare(ddq.size(), 4);
-      compare.col(0) = ddq;
-      compare.col(1) = updatedDdq;
-      compare.col(2) = ddq - updatedDdq;
-      compare.col(3) = originalDdq;
-      std::cout << "Desired - Achieved - Diff - Original" << std::endl
-                << compare << std::endl;
-      assert(false);
-    }
+      // 3. As an idiot check, and only in debug mode, we'll recompute inverse
+      // dynamics to check that the rotational residuals are in fact gone.
+      Eigen::VectorXs updatedDq = (qs.col(t) - qs.col(t - 1)) / dt;
+      assert(updatedDq == dq);
+      Eigen::VectorXs updatedDdq
+          = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
+      if ((updatedDdq - ddq).norm() > 1e-8)
+      {
+        std::cout << "Did not get the acceleration we expected from our "
+                     "position change."
+                  << std::endl;
+        Eigen::MatrixXs compare(ddq.size(), 4);
+        compare.col(0) = ddq;
+        compare.col(1) = updatedDdq;
+        compare.col(2) = ddq - updatedDdq;
+        compare.col(3) = originalDdq;
+        std::cout << "Desired - Achieved - Diff - Original" << std::endl
+                  << compare << std::endl;
+        assert(false);
+      }
 
-    Eigen::VectorXs newTau
-        = calculateInverseDynamics(q, updatedDq, updatedDdq, forces.col(t));
-    if (newTau.head(dimsToLetFree).norm() > 1e-8)
-    {
-      std::cout << "Timestep " << t
-                << " rotational procedure did not zero out rotational torques!"
-                << std::endl;
-      Eigen::MatrixXs compareAcc(dimsToLetFree, 2);
-      compareAcc.col(0) = originalDdq.head(dimsToLetFree);
-      compareAcc.col(1) = updatedDdq.head(dimsToLetFree);
-      std::cout << "Original acc - New acc:" << std::endl
-                << compareAcc << std::endl;
-      Eigen::MatrixXs compareTau(dimsToLetFree, 2);
-      compareTau.col(0) = originalTau.head(dimsToLetFree);
-      compareTau.col(1) = newTau.head(dimsToLetFree);
-      std::cout << "Original tau - New tau" << std::endl
-                << compareTau << std::endl;
-      assert(false);
+      Eigen::VectorXs newTau
+          = calculateInverseDynamics(q, updatedDq, updatedDdq, forces.col(t));
+      if (newTau.head(dimsToLetFree).norm() > 3e-8)
+      {
+        std::cout
+            << "Timestep " << t
+            << " rotational procedure did not zero out rotational torques!"
+            << std::endl;
+        Eigen::MatrixXs compareAcc(dimsToLetFree, 2);
+        compareAcc.col(0) = originalDdq.head(dimsToLetFree);
+        compareAcc.col(1) = updatedDdq.head(dimsToLetFree);
+        std::cout << "Original acc - New acc:" << std::endl
+                  << compareAcc << std::endl;
+        Eigen::MatrixXs compareTau(dimsToLetFree, 2);
+        compareTau.col(0) = originalTau.head(dimsToLetFree);
+        compareTau.col(1) = newTau.head(dimsToLetFree);
+        std::cout << "Original tau - New tau" << std::endl
+                  << compareTau << std::endl;
+        assert(false);
+      }
     }
 #endif
   }
@@ -5934,7 +5980,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 // 1.1. Shift the COM trajectory around to try to get the residual-free
 // rotation.
 void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init, s_t satisfactoryThreshold)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
   (void)helper;
@@ -6021,6 +6067,14 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     {
       for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
       {
+        // Don't count any timesteps without observations
+        if (init->probablyMissingGRF.size() > trial
+            && init->probablyMissingGRF[trial].size() > t
+            && init->probablyMissingGRF[trial][t])
+        {
+          continue;
+        }
+
         s_t thisTimestepCost = helper.calculateResidualNorm(
             qs[trial].col(t),
             dqs[trial].col(t),
@@ -6035,7 +6089,7 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     residualCost /= totalTimesteps;
     std::cout << "Spatial residual reduction iter " << iter << "/" << numIters
               << " - avg residual norm: " << residualCost << std::endl;
-    if (residualCost < 0.001)
+    if (residualCost < satisfactoryThreshold)
     {
       std::cout << "Reached satisfactory residuals. Exiting optimization early."
                 << std::endl;
@@ -6055,9 +6109,18 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       mSkeleton->setTimeStep(init->trialTimesteps[trial]);
       mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
+      std::vector<bool> probablyMissingGRF;
+      if (init->probablyMissingGRF.size() > trial)
+      {
+        probablyMissingGRF = init->probablyMissingGRF[trial];
+      }
       std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
           = helper.getRootTrajectoryLinearSystem(
-              qs[trial], dqs[trial], ddqs[trial], init->grfTrials[trial]);
+              qs[trial],
+              dqs[trial],
+              ddqs[trial],
+              init->grfTrials[trial],
+              probablyMissingGRF);
       Eigen::MatrixXs A = linearSystem.first;
       Eigen::VectorXs b = linearSystem.second;
 

@@ -1019,6 +1019,11 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
   Eigen::MatrixXs forces
       = 0.001
         * Eigen::MatrixXs::Random(collisionBodies.size() * 6, numTimesteps);
+  std::vector<bool> probablyMissingGRF;
+  for (int i = 0; i < numTimesteps; i++)
+  {
+    probablyMissingGRF.push_back(i % 4 == 0);
+  }
 
   // Generate q,dq from integrating the given accelerations
   qs.col(0) = skel->getRandomPose();
@@ -1052,9 +1057,16 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
   Eigen::Vector6s velOffset = Eigen::Vector6s::Zero();
   s_t invMassOffset = 0;
   Eigen::MatrixXs qsLin = helper.getRootTrajectoryLinearSystemPoses(
-      posOffset, velOffset, invMassOffset, qs, dqs, ddqs, forces);
+      posOffset,
+      velOffset,
+      invMassOffset,
+      qs,
+      dqs,
+      ddqs,
+      forces,
+      probablyMissingGRF);
   Eigen::MatrixXs qsFwd = helper.getResidualFreePoses(
-      posOffset, velOffset, invMassOffset, qs, forces);
+      posOffset, velOffset, invMassOffset, qs, forces, probablyMissingGRF);
   Eigen::MatrixXs diff = qsLin - qsFwd;
 
   // Note that the forward dynamics version only begins changing at the [2]
@@ -1064,10 +1076,11 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
             << diff.block(0, 0, 6, std::min((int)diff.cols(), 10)) << std::endl;
 
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor
-      = helper.getRootTrajectoryLinearSystem(qs, dqs, ddqs, forces);
+      = helper.getRootTrajectoryLinearSystem(
+          qs, dqs, ddqs, forces, probablyMissingGRF);
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor_fd
       = helper.finiteDifferenceRootTrajectoryLinearSystem(
-          qs, dqs, ddqs, forces);
+          qs, dqs, ddqs, forces, probablyMissingGRF);
 
   if (!equals(taylor.second, taylor_fd.second, 1e-8))
   {
@@ -1497,15 +1510,15 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludePoses(true));
   */
 
-  fitter.setIterationLimit(150);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults(true)
-          .setIncludePoses(true)
-          .setIncludeMasses(true)
-          .setIncludeBodyScales(true)
-          .setIncludeMarkerOffsets(true));
+  // fitter.setIterationLimit(150);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setIncludePoses(true)
+  //         .setIncludeMasses(true)
+  //         .setIncludeBodyScales(true)
+  //         .setIncludeMarkerOffsets(true));
 
   // // Run as L2 fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(

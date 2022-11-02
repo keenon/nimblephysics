@@ -272,7 +272,8 @@ public:
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
-      Eigen::MatrixXs forces);
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
 
   ////////////////////////////////////////////
   // This returns a matrix A and vector b, such that Ax+b gives you a legal root
@@ -283,7 +284,8 @@ public:
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
-      Eigen::MatrixXs forces);
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
 
   ////////////////////////////////////////////
   // This will go through and compute the "residual-free root acceleration" at
@@ -304,7 +306,8 @@ public:
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
-      Eigen::MatrixXs forces);
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
 
   Eigen::MatrixXs getRootTrajectoryLinearSystemPoses(
       Eigen::Vector6s initialPosOffset,
@@ -313,14 +316,16 @@ public:
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
-      Eigen::MatrixXs forces);
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
 
   Eigen::MatrixXs getResidualFreePoses(
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
       s_t inverseMassOffset,
       Eigen::MatrixXs qs,
-      Eigen::MatrixXs forces);
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
@@ -852,7 +857,8 @@ public:
   // 1.1. Shift the COM trajectory around to try to get the residual-free
   // rotation.
   void optimizeSpatialResidualsOnCOMTrajectory(
-      std::shared_ptr<DynamicsInitialization> init);
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t satisfactoryThreshold = 1e-5);
 
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
