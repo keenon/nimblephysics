@@ -4048,14 +4048,14 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
 DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
 {
   // mResidualWeight = 2e-2;
-  mResidualWeight = 1e-2;
   mMarkerWeight = 50;
-  mLinearNewtonWeight = 1e-2;
+  mResidualWeight = 0.1;
+  mLinearNewtonWeight = 0.1;
   mJointWeight = 1.0;
   mLinearNewtonUseL1 = true;
   mResidualUseL1 = true;
   mMarkerUseL1 = true;
-  mResidualTorqueMultiple = 3.0;
+  mResidualTorqueMultiple = 2.0;
   mRegularizeAcc = 0;
   mRegularizeAccUseL1 = false;
   mRegularizeMasses = 10.0;
@@ -4070,10 +4070,10 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
 
   if (!l1)
   {
-    // mMarkerWeight = 500;
-    mMarkerWeight = 2500;
-    mResidualWeight = 1e-5;
-    mLinearNewtonWeight = 5e-4;
+    // Square the weights
+    mMarkerWeight *= mMarkerWeight;
+    mResidualWeight *= mResidualWeight;
+    mLinearNewtonWeight *= mLinearNewtonWeight;
     mResidualUseL1 = false;
     mLinearNewtonUseL1 = false;
     mMarkerUseL1 = false;
@@ -5022,16 +5022,33 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
 std::vector<Eigen::Vector3s> DynamicsFitter::comAccelerations(
     std::shared_ptr<DynamicsInitialization> init, int trial)
 {
+  Eigen::VectorXs originalPos = mSkeleton->getPositions();
+  Eigen::VectorXs originalVel = mSkeleton->getVelocities();
+  Eigen::VectorXs originalAcc = mSkeleton->getAccelerations();
+
   s_t dt = init->trialTimesteps[trial];
+  Eigen::MatrixXs& inputPoses = init->poseTrials[trial];
   std::vector<Eigen::Vector3s> coms = comPositions(init, trial);
   std::vector<Eigen::Vector3s> accs;
   for (int i = 1; i < coms.size() - 1; i++)
   {
-    Eigen::Vector3s v1 = (coms[i] - coms[i - 1]) / dt;
-    Eigen::Vector3s v2 = (coms[i + 1] - coms[i]) / dt;
-    Eigen::Vector3s acc = (v2 - v1) / dt;
-    accs.push_back(acc);
+    Eigen::VectorXs pose = inputPoses.col(i);
+    Eigen::VectorXs vel = (inputPoses.col(i) - inputPoses.col(i - 1)) / dt;
+    Eigen::VectorXs acc = (inputPoses.col(i + 1) - 2 * inputPoses.col(i)
+                           + inputPoses.col(i - 1))
+                          / (dt * dt);
+
+    mSkeleton->setPositions(pose);
+    mSkeleton->setVelocities(vel);
+    mSkeleton->setAccelerations(acc);
+
+    accs.push_back(mSkeleton->getCOMLinearAcceleration());
   }
+
+  mSkeleton->setPositions(originalPos);
+  mSkeleton->setVelocities(originalVel);
+  mSkeleton->setAccelerations(originalAcc);
+
   return accs;
 }
 

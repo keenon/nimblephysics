@@ -1501,7 +1501,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
-          .setDefaults()
+          .setDefaults(true)
           .setIncludePoses(true)
           .setIncludeBodyScales(true)
           .setIncludeMarkerOffsets(true));
@@ -1590,6 +1590,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runOptimization(
       init, 2e-2, 100, false, false, false, true, true, true);
     */
+
+  // fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
 
   std::cout << "Post optimization mass: " << init->bodyMasses.sum() << " kg"
             << std::endl;

@@ -1,0 +1,469 @@
+<OpenSimDocument Version="40000">
+    <InverseKinematicsTool name="JA1Gait35">
+        <model_file>Models/optimized_scale_and_markers.osim</model_file>
+        <IKTaskSet name="IK_tasks">
+            <objects>
+                <IKMarkerTask name="BLFE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="BLHU">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="BLTI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="BRFE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="BRHU">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="BRTI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="C7">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="CHIN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="CLAV">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FBBT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FLFB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FLFE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FLHU">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FLTI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FRBT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FRFB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FRFE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FRHU">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="FRTI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LAKI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LANK">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LARM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LASI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LBHD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LBWT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LELB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LFHD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LFIN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LFOREARM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LFRM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LFWT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LHEE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LHEEL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LHPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LHTH">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LKNE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LKNI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LLEPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LLMAL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LMEPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LMFL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LMFS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LMMAL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LMT5">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LP1MT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LP5MT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LSH">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LSHN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LSHO">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTHAD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTHAP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTHI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTHLD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTHLP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTIAD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTIAP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTILAT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LTOE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LUPA">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LWR">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LWRA">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="LWRB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="MAN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="NOSE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RAKI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RANK">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RARM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RASI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RBAC">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RBHD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RBWT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RELB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RFHD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RFIN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RFOREARM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RFRM">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RFWT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RHEE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RHEEL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RHPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RHTH">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RKNE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RKNI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RLEPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RLMAL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RMEPI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RMFL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RMFS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RMMAL">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RMT5">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RP1MT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RP5MT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RSH">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RSHN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RSHO">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTHAD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTHAP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTHI">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTHLD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTHLP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTIAD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTIAP">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTILAT">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RTOE">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RUPA">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RWR">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RWRA">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="RWRB">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="SACR">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="STRN">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="T10">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="T7">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="T8">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="THD">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+            </objects>
+        </IKTaskSet>
+        <marker_file>../MarkerData/JA1Gait35.trc</marker_file>
+        <output_motion_file>JA1Gait35_ik_by_opensim.mot</output_motion_file>
+        <accuracy>1e-5</accuracy>
+        <report_errors>true</report_errors>
+    </InverseKinematicsTool>
+</OpenSimDocument>
