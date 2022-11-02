@@ -5949,12 +5949,16 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     rowCursor += originalTrajectory.size();
   }
 
+  std::vector<Eigen::Vector3s> trialShiftPos;
+  std::vector<Eigen::Vector3s> trialShiftVel;
+  std::vector<s_t> trialAvgMove;
+  std::vector<s_t> trialAvgRot;
+
   // Rule of thumb: this process solves one timestep at a time, approximately,
   // from left to right.
   const int numIters = totalTimesteps;
   for (int iter = 0; iter < numIters; iter++)
   {
-    std::cout << "Spatial COM iter: " << iter << "/" << numIters << std::endl;
     std::vector<Eigen::MatrixXs> qs;
     std::vector<Eigen::MatrixXs> dqs;
     std::vector<Eigen::MatrixXs> ddqs;
@@ -6008,10 +6012,16 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         // std::cout << t << ": " << thisTimestepCost << ", ";
         residualCost += thisTimestepCost;
       }
-      std::cout << std::endl;
     }
     residualCost /= totalTimesteps;
-    std::cout << "Average residuals: " << residualCost << std::endl;
+    std::cout << "Spatial residual reduction iter " << iter << "/" << numIters
+              << " - avg residual norm: " << residualCost << std::endl;
+    if (residualCost < 0.001)
+    {
+      std::cout << "Reached satisfactory residuals. Exiting optimization early."
+                << std::endl;
+      break;
+    }
 
     // [pos, vel] for each trial, plus one unified mass
     Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(
@@ -6071,6 +6081,12 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     }
 
     // Update trajectory
+
+    trialShiftPos.clear();
+    trialShiftVel.clear();
+    trialAvgMove.clear();
+    trialAvgRot.clear();
+
     Eigen::VectorXs newTrajectory = (fullA * solution) + fullB;
     rowCursor = 0;
     for (int trial = 0; trial < numTrials; trial++)
@@ -6078,11 +6094,8 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       Eigen::Vector3s deltaPos = solution.segment<3>(trial * 6);
       Eigen::Vector3s deltaVel = solution.segment<3>(trial * 6 + 3);
 
-      std::cout << "Trial " << trial << " moving starting pos by: " << std::endl
-                << deltaPos << std::endl;
-      std::cout << "Trial " << trial
-                << " changing starting vel by: " << std::endl
-                << deltaVel << std::endl;
+      trialShiftPos.push_back(deltaPos);
+      trialShiftVel.push_back(deltaVel);
 
       s_t movedPos = 0.0;
       s_t movedAngle = 0.0;
@@ -6102,10 +6115,9 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 
       movedPos /= init->poseTrials[trial].cols();
       movedAngle /= init->poseTrials[trial].cols();
-      std::cout << "Trial " << trial << " avg shift pos by: " << movedPos << "m"
-                << std::endl;
-      std::cout << "Trial " << trial << " avg shift angle by: " << movedAngle
-                << "r" << std::endl;
+
+      trialAvgMove.push_back(movedPos);
+      trialAvgRot.push_back(movedAngle);
 
       if (includeMass)
       {
@@ -6116,8 +6128,20 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     }
   }
 
-  // zeroSpatialResidualsUsingForwardSim(init, 0.07);
-  // zeroSpatialResidualsUsingForwardSim(init, 25);
+  // Print at the end
+  for (int trial = 0; trial < trialShiftPos.size(); trial++)
+  {
+    std::cout << "Trial " << trial << " moving starting pos by: " << std::endl
+              << trialShiftPos[trial] << std::endl;
+    std::cout << "Trial " << trial << " changing starting vel by: " << std::endl
+              << trialShiftVel[trial] << std::endl;
+    std::cout << "Trial " << trial
+              << " avg shift pos by: " << trialAvgMove[trial] << "m"
+              << std::endl;
+    std::cout << "Trial " << trial
+              << " avg shift angle by: " << trialAvgRot[trial] << "r"
+              << std::endl;
+  }
 }
 
 //==============================================================================

@@ -1411,28 +1411,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //   std::cout << "Failed linear consistency check! Exiting early." <<
   //   std::endl; return init;
   // }
-
   fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
 
-  // fitter.optimizeRootTrajectory(
-  //     init,
-  //     DynamicsFitProblemConfig(skel)
-  //         .setResidualWeight(1.0)
-  //         .setResidualTorqueMultiple(1.0)
-  //         .setMarkerWeight(1.0)
-  //         .setJointWeight(1.0));
-
-  // fitter.zeroSpatialResidualsUsingForwardSim(init);
-  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
-
-  // fitter.estimateLinkMassesFromAcceleration(init, 100);
-
-  std::cout << "Initial mass: " << skel->getMass() << " kg" << std::endl;
-  std::cout << "What we'd expect average ~GRF to be (Mass * 9.8): "
-            << skel->getMass() * 9.8 << " N" << std::endl;
   auto secondPair = fitter.computeAverageRealForce(init);
-  std::cout << "Avg Force: " << secondPair.first << " N" << std::endl;
-  std::cout << "Avg Torque: " << secondPair.second << " Nm" << std::endl;
+  std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
+  std::cout << "Avg GRF Torque: " << secondPair.second << " Nm" << std::endl;
 
   if (!testRelationshipBetweenResidualAndLinear(skel, init))
   {
@@ -1514,14 +1497,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludePoses(true));
   */
 
-  // fitter.setIterationLimit(50);
-  // fitter.runIPOPTOptimization(
-  //     init,
-  //     DynamicsFitProblemConfig(skel).setDefaults().setIncludePoses(true));
-  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  fitter.setIterationLimit(150);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          .setDefaults()
+          .setIncludePoses(true)
+          .setIncludeBodyScales(true)
+          .setIncludeMarkerOffsets(true));
 
-  // Run as L2
-  // fitter.setIterationLimit(200);
+  // // Run as L2 fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
@@ -1529,10 +1514,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeMasses(true)
   //         .setIncludeInertias(true)
   //         .setIncludePoses(true));
-  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
 
-  // Re-run as L1
-  // fitter.setIterationLimit(200);
+  // Re - run as L1 fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
@@ -1540,7 +1523,18 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeMasses(true)
   //         .setIncludeInertias(true)
   //         .setIncludePoses(true));
-  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
+  // fitter.setIterationLimit(50);
+  // fitter.runSGDOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setIncludeMasses(true)
+  //         .setIncludeCOMs(true)
+  //         .setIncludeInertias(true)
+  //         .setIncludeBodyScales(true)
+  //         .setIncludeMarkerOffsets(true)
+  //         .setIncludePoses(true));
 
   /*
   fitter.setIterationLimit(50);
