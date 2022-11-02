@@ -1503,6 +1503,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
           .setIncludePoses(true)
+          .setIncludeMasses(true)
           .setIncludeBodyScales(true)
           .setIncludeMarkerOffsets(true));
 
@@ -3752,8 +3753,8 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
       c3dFiles,
       trcFiles,
       grfFiles,
-      200,
-      87,
+      -1,
+      0,
       true);
 }
 #endif

@@ -5837,6 +5837,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     s_t scalePercentage = tentativeMass / originalMass;
     init->bodyMasses *= scalePercentage;
     mSkeleton->setLinkMasses(init->bodyMasses);
+    init->groupMasses = mSkeleton->getGroupMasses();
+    init->originalGroupMasses = mSkeleton->getGroupMasses();
 
     // Calculate the trajectory of our COM over time
     adjustedComPositions
