@@ -860,6 +860,13 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       s_t satisfactoryThreshold = 1e-5);
 
+  // 1.2. Now that we've got zero residuals, after calling
+  // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
+  // miscalibration on the force plates, if there's consistent error on the
+  // marker matches.
+  void recalibrateForcePlates(
+      std::shared_ptr<DynamicsInitialization> init, s_t maxMovement = 0.03);
+
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
   void centerAngularResiduals(std::shared_ptr<DynamicsInitialization> init);

@@ -4095,8 +4095,8 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
 {
   // mResidualWeight = 2e-2;
   mMarkerWeight = 50;
-  mResidualWeight = 0.1;
-  mLinearNewtonWeight = 0.1;
+  mResidualWeight = 0.01;
+  mLinearNewtonWeight = 0.01;
   mJointWeight = 1.0;
   mLinearNewtonUseL1 = true;
   mResidualUseL1 = true;
@@ -6223,6 +6223,93 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     std::cout << "Trial " << trial
               << " avg shift angle by: " << trialAvgRot[trial] << "r"
               << std::endl;
+  }
+}
+
+//==============================================================================
+// 1.2. Now that we've got zero residuals, after calling
+// optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
+// miscalibration on the force plates, if there's consistent error on the
+// marker matches.
+void DynamicsFitter::recalibrateForcePlates(
+    std::shared_ptr<DynamicsInitialization> init, s_t maxMovement)
+{
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::Vector3s avgMarkerOffset = Eigen::Vector3s::Zero();
+    int numSamples = 0;
+    Eigen::MatrixXs poses = init->poseTrials[trial];
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      mSkeleton->setPositions(poses.col(t));
+      auto markerMap
+          = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+      auto observedMap = init->markerObservationTrials[trial][t];
+      for (auto& pair : markerMap)
+      {
+        if (observedMap.count(pair.first))
+        {
+          Eigen::Vector3s offset = observedMap[pair.first] - pair.second;
+          // Exclude outliers, because they may be due to something else going
+          // wrong earlier in the pipeline.
+          if (offset.norm() < maxMovement * 1.5)
+          {
+            avgMarkerOffset += offset;
+            numSamples++;
+          }
+        }
+      }
+    }
+
+    if (numSamples == 0)
+      continue;
+    avgMarkerOffset /= numSamples;
+
+    // Create the X,Z shift (don't move anything up or down) to more closely
+    // calibrate the force plates.
+    Eigen::Vector3s shift = avgMarkerOffset;
+    shift(1) = 0.0;
+
+    // Trim the shift to at most `maxMovement`
+    if (shift.norm() > maxMovement)
+    {
+      shift = shift.normalized() * maxMovement;
+    }
+
+    // Now we have to go through and shift everything related to
+    // the forces over by "shift"
+    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+    {
+      ForcePlate& plate = init->forcePlateTrials[trial][i];
+      for (int j = 0; j < plate.corners.size(); j++)
+      {
+        plate.corners[j] += shift;
+      }
+      for (int t = 0; t < plate.centersOfPressure.size(); t++)
+      {
+        plate.centersOfPressure[t] += shift;
+      }
+      plate.worldOrigin += shift;
+    }
+
+    // We also want to shift the whole trajectory by the same amount, to
+    // maintain physical consistency
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      init->poseTrials[trial].col(t).segment<3>(3) += shift;
+    }
+    if (init->originalPoses.size() > trial)
+    {
+      for (int t = 0; t < init->originalPoses[trial].cols(); t++)
+      {
+        init->originalPoses[trial].col(t).segment<3>(3) += shift;
+      }
+    }
+
+    std::cout << "Trial " << trial
+              << " adjusted force plate location (correcting for calibration "
+                 "error) by "
+              << shift(0) << "m X, " << shift(2) << "m Z" << std::endl;
   }
 }
 

@@ -1425,6 +1425,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //   std::endl; return init;
   // }
   fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
+  fitter.recalibrateForcePlates(init);
 
   auto secondPair = fitter.computeAverageRealForce(init);
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
@@ -1510,15 +1511,10 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludePoses(true));
   */
 
-  // fitter.setIterationLimit(150);
-  // fitter.runIPOPTOptimization(
-  //     init,
-  //     DynamicsFitProblemConfig(skel)
-  //         .setDefaults(true)
-  //         .setIncludePoses(true)
-  //         .setIncludeMasses(true)
-  //         .setIncludeBodyScales(true)
-  //         .setIncludeMarkerOffsets(true));
+  fitter.setIterationLimit(150);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel).setDefaults(false).setIncludePoses(true));
 
   // // Run as L2 fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(

@@ -466,6 +466,11 @@ protected:
           ::py::arg("init"),
           ::py::arg("satisfactoryThreshold") = 1e-5)
       .def(
+          "recalibrateForcePlates",
+          &dart::biomechanics::DynamicsFitter::recalibrateForcePlates,
+          ::py::arg("init"),
+          ::py::arg("maxMovement") = 0.03)
+      .def(
           "scaleLinkMassesFromGravity",
           &dart::biomechanics::DynamicsFitter::scaleLinkMassesFromGravity,
           ::py::arg("init"))
