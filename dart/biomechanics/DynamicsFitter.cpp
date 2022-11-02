@@ -9,6 +9,7 @@
 #include <tuple>
 #include <utility>
 
+#include <asio/ip/udp.hpp>
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
@@ -494,8 +495,15 @@ Eigen::Matrix6s ResidualForceHelper::calculateRootResidualJacobianWrtPosition(
   (void)ddq;
   Eigen::VectorXs originalPos = mSkel->getPositions();
 
+  assert(false && "This method currently fails tests. Do not call it!");
+  std::cout << "called calculateRootResidualJacobianWrtPosition(), but it's "
+               "broken, so exit(1)!"
+            << std::endl;
+  exit(1);
+
   mSkel->setPositions(q);
 
+  // Eigen::VectorXs manualTau = M * ddq + C - Fs;
   Eigen::Matrix6s result = Eigen::Matrix6s::Zero();
   result += mSkel->getJacobianOfM(ddq, neural::WithRespectTo::POSITION)
                 .block<6, 6>(0, 0);
@@ -800,6 +808,591 @@ Eigen::Matrix6s ResidualForceHelper::
 
   Eigen::Matrix6s fixedSizeResult = result;
   return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::Matrix6s
+ResidualForceHelper::calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  (void)ddq;
+  (void)forcesConcat;
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+  Eigen::Matrix6s dC = mSkel->getJacobianOfC(neural::WithRespectTo::VELOCITY)
+                           .block<6, 6>(0, 0);
+
+  Eigen::MatrixXs M = mSkel->getMassMatrix();
+  Eigen::Matrix6s Msmall = M.block<6, 6>(0, 0);
+  auto Msmall_decom = Msmall.completeOrthogonalDecomposition();
+
+  // Original formula:
+  // Eigen::Vector6s solve
+  //     = -M.block<6, 6>(0, 0).completeOrthogonalDecomposition().solve(
+  //         rightHandSide);
+
+  Eigen::Matrix6s result;
+  for (int i = 0; i < 6; i++)
+  {
+    result.col(i) = -Msmall_decom.solve(dC.col(i));
+  }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  return result;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::Matrix6s ResidualForceHelper::
+    finiteDifferenceResidualFreeRootAccelerationJacobianWrtVelocity(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(6, 6);
+  Eigen::VectorXs original = q;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-2 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 6);
+        Eigen::VectorXs tweaked = dq;
+        tweaked(dof) += eps;
+        perturbed = calculateResidualFreeRootAcceleration(
+            q, tweaked, ddq, forcesConcat);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix6s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::VectorXs
+ResidualForceHelper::calculateResidualFreeRootAccelerationJacobianWrtInvMass(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+  Eigen::VectorXs originalMasses = mSkel->getLinkMasses();
+  const s_t totalMass = originalMasses.sum();
+  const s_t invMass = 1.0 / totalMass;
+  const s_t dInvMass = 1.0;
+  const s_t dNewMass = -dInvMass * (1.0 / (invMass * invMass));
+  const s_t dPercentage = dNewMass / totalMass;
+  Eigen::VectorXs dNewMasses = mSkel->getGroupMasses() * dPercentage;
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::MatrixXs M = mSkel->getMassMatrix();
+  Eigen::VectorXs tailDdq = ddq;
+  tailDdq.head<6>().setZero();
+  Eigen::VectorXs tailTauContribution = M * tailDdq;
+  Eigen::Vector6s dM_tailTau
+      = (mSkel->getJacobianOfM(tailDdq, neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+  Eigen::Vector6s dC
+      = (mSkel->getJacobianOfC(neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  Eigen::VectorXs Fs = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  for (int i = 0; i < mForces.size(); i++)
+  {
+    Eigen::VectorXs fTaus
+        = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+    Fs += fTaus;
+  }
+
+  Eigen::Vector6s rightHandSide
+      = tailTauContribution.head<6>() + C.head<6>() - Fs.head<6>();
+  Eigen::Vector6s dRightHandSide = dM_tailTau + dC;
+
+  Eigen::Matrix6s Msmall = M.block<6, 6>(0, 0);
+  auto Msmall_decom = Msmall.completeOrthogonalDecomposition();
+
+  // Original formula:
+  // Eigen::Vector6s solve
+  //     = -M.block<6, 6>(0, 0).completeOrthogonalDecomposition().solve(
+  //         rightHandSide);
+
+  Eigen::Vector6s result = -Msmall_decom.solve(dRightHandSide);
+  // We also have to account for changes to M here
+  Eigen::VectorXs paddedRHS = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  paddedRHS.head<6>() = Msmall_decom.solve(rightHandSide);
+  Eigen::Vector6s dM
+      = (mSkel->getJacobianOfM(paddedRHS, neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  result += Msmall_decom.solve(dM);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+
+  return result;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::VectorXs ResidualForceHelper::
+    finiteDifferenceResidualFreeRootAccelerationJacobianWrtInvMass(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+  Eigen::VectorXs originalMasses = mSkel->getLinkMasses();
+  Eigen::VectorXs originalGroupMasses = mSkel->getGroupMasses();
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  s_t totalMass = originalMasses.sum();
+  s_t invMass = 1.0 / totalMass;
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(6);
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-2 : 1e-6;
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t newInvMass = invMass + eps;
+        s_t newMass = 1.0 / newInvMass;
+        s_t percentage = newMass / totalMass;
+        Eigen::VectorXs newMasses = originalGroupMasses * percentage;
+        mSkel->setGroupMasses(newMasses);
+
+        perturbed
+            = calculateResidualFreeRootAcceleration(q, dq, ddq, forcesConcat);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setLinkMasses(originalMasses);
+  return result;
+
+  // Eigen::Vector6s fixedSizeResult = result;
+  // return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::VectorXs ResidualForceHelper::calculateScratchJacobianWrtInvMass(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  // return finiteDifferenceResidualFreeRootAccelerationJacobianWrtInvMass(
+  //     q, dq, ddq, forcesConcat);
+
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+  Eigen::VectorXs originalMasses = mSkel->getLinkMasses();
+  const s_t totalMass = originalMasses.sum();
+  const s_t invMass = 1.0 / totalMass;
+  const s_t dInvMass = 1.0;
+  const s_t dNewMass = -dInvMass * (1.0 / (invMass * invMass));
+  const s_t dPercentage = dNewMass / totalMass;
+  Eigen::VectorXs dNewMasses = mSkel->getGroupMasses() * dPercentage;
+
+  //////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::MatrixXs M = mSkel->getMassMatrix();
+  Eigen::VectorXs tailDdq = ddq;
+  tailDdq.head<6>().setZero();
+  Eigen::VectorXs tailTauContribution = M * tailDdq;
+  Eigen::Vector6s dM_tailTau
+      = (mSkel->getJacobianOfM(tailDdq, neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+  Eigen::Vector6s dC
+      = (mSkel->getJacobianOfC(neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  Eigen::VectorXs Fs = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  for (int i = 0; i < mForces.size(); i++)
+  {
+    Eigen::VectorXs fTaus
+        = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+    Fs += fTaus;
+  }
+
+  Eigen::Vector6s rightHandSide
+      = tailTauContribution.head<6>() + C.head<6>() - Fs.head<6>();
+  Eigen::Vector6s dRightHandSide = dM_tailTau + dC;
+
+  return dRightHandSide;
+  //////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+
+  Eigen::Matrix6s Msmall = M.block<6, 6>(0, 0);
+  auto Msmall_decom = Msmall.completeOrthogonalDecomposition();
+
+  // Original formula:
+  // Eigen::Vector6s solve
+  //     = -M.block<6, 6>(0, 0).completeOrthogonalDecomposition().solve(
+  //         rightHandSide);
+
+  Eigen::Vector6s result = -Msmall_decom.solve(dRightHandSide);
+  // We also have to account for changes to M here
+  Eigen::VectorXs paddedRHS = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  paddedRHS.head<6>() = Msmall_decom.solve(rightHandSide);
+  Eigen::Vector6s dM
+      = (mSkel->getJacobianOfM(paddedRHS, neural::WithRespectTo::GROUP_MASSES)
+         * dNewMasses)
+            .head<6>();
+  result += Msmall_decom.solve(dM);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+
+  return result;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::VectorXs ResidualForceHelper::finiteDifferenceScratchJacobianWrtInvMass(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+  Eigen::VectorXs originalMasses = mSkel->getLinkMasses();
+  Eigen::VectorXs originalGroupMasses = mSkel->getGroupMasses();
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  s_t totalMass = originalMasses.sum();
+  s_t invMass = 1.0 / totalMass;
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(6);
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-2 : 1e-6;
+  math::finiteDifference<Eigen::VectorXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t newInvMass = invMass + eps;
+        s_t newMass = 1.0 / newInvMass;
+        s_t percentage = newMass / totalMass;
+        Eigen::VectorXs newMasses = originalGroupMasses * percentage;
+        mSkel->setGroupMasses(newMasses);
+
+        // perturbed
+        //     = calculateResidualFreeRootAcceleration(q, dq, ddq,
+        //     forcesConcat);
+
+        //////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
+        Eigen::MatrixXs M = mSkel->getMassMatrix();
+        Eigen::VectorXs tailDdq = ddq;
+        tailDdq.head<6>().setZero();
+        Eigen::VectorXs tailTauContribution = M * tailDdq;
+        Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+        Eigen::VectorXs Fs = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+        for (int i = 0; i < mForces.size(); i++)
+        {
+          Eigen::VectorXs fTaus
+              = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+          Fs += fTaus;
+        }
+
+        Eigen::Vector6s rightHandSide
+            = tailTauContribution.head<6>() + C.head<6>() - Fs.head<6>();
+        perturbed = rightHandSide;
+        //////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setLinkMasses(originalMasses);
+  return result;
+
+  // Eigen::Vector6s fixedSizeResult = result;
+  // return fixedSizeResult;
+}
+
+//==============================================================================
+// This returns a matrix A and vector b, such that Ax+b gives you a legal root
+// trajectory. Here x is a 12 dimensional vector, composed of the
+// concatenation of the initial pos offset, and initial velocity offset.
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ResidualForceHelper::getRootTrajectoryLinearSystem(
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces)
+{
+  (void)qs;
+  (void)dqs;
+  (void)ddqs;
+  (void)forces;
+
+  const int numTimesteps = qs.cols();
+  const s_t dt = mSkel->getTimeStep();
+
+  Eigen::VectorXs b = getRootTrajectoryLinearSystemTestOutput(
+      Eigen::Vector6s::Zero(),
+      Eigen::Vector6s::Zero(),
+      0,
+      qs,
+      dqs,
+      ddqs,
+      forces);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(numTimesteps * 6, 13);
+
+  A.block<6, 6>(0, 0) = Eigen::Matrix6s::Identity();
+
+  for (int t = 1; t < numTimesteps; t++)
+  {
+    // Offset position linearly effects all output positions, and velocity does
+    // the same
+    const Eigen::Matrix6s dOffsetPos_dInputPos = Eigen::Matrix6s::Identity();
+    const Eigen::Matrix6s dOffsetVel_dInputVel = Eigen::Matrix6s::Identity();
+    (void)dOffsetVel_dInputVel;
+    // Offset velocity linearly effects output positions based on time taken
+    const Eigen::Matrix6s dOffsetPos_dInputVel
+        = dt * t * Eigen::Matrix6s::Identity();
+
+    A.block<6, 6>(t * 6, 0) += dOffsetPos_dInputPos;
+    A.block<6, 6>(t * 6, 6) += dOffsetPos_dInputVel;
+
+    const Eigen::Matrix6s dAcc_dOffsetPos
+        = calculateResidualFreeRootAccelerationJacobianWrtPosition(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix6s dAcc_dOffsetVel
+        = calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+
+    const Eigen::Matrix6s dAcc_dInputPos
+        = dAcc_dOffsetPos; // technically: dAcc_dOffsetPos *
+                           // dOffsetPos_dInputPos; but dOffsetPos_dInputPos =
+                           // Identity;
+    const Eigen::Matrix6s dAcc_dInputVel
+        = (dAcc_dOffsetPos * dOffsetPos_dInputVel)
+          + (dAcc_dOffsetVel); // technically: dAcc_dOffsetVel *
+                               // dOffsetVel_dInputVel
+    const Eigen::Vector6s dAcc_dOffsetInvMass
+        = calculateResidualFreeRootAccelerationJacobianWrtInvMass(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+
+    for (int downstream = 0; downstream < numTimesteps - t; downstream++)
+    {
+      int later = t + downstream;
+      int compoundingSteps = downstream + 1; // semi-implicit euler
+      A.block<6, 6>(later * 6, 0)
+          += compoundingSteps * dt * dt * dAcc_dInputPos;
+      A.block<6, 6>(later * 6, 6)
+          += compoundingSteps * dt * dt * dAcc_dInputVel;
+      A.block<6, 1>(later * 6, 12)
+          += compoundingSteps * dt * dt * dAcc_dOffsetInvMass;
+    }
+  }
+
+  return std::make_pair(A, b);
+}
+
+//==============================================================================
+// This returns a matrix A and vector b, such that Ax+b gives you a legal root
+// trajectory. Here x is a 12 dimensional vector, composed of the
+// concatenation of the initial pos offset, and initial velocity offset.
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces)
+{
+  (void)qs;
+  (void)dqs;
+  (void)ddqs;
+  (void)forces;
+
+  Eigen::VectorXs zeroPoint = getRootTrajectoryLinearSystemTestOutput(
+      Eigen::Vector6s::Zero(),
+      Eigen::Vector6s::Zero(),
+      0,
+      qs,
+      dqs,
+      ddqs,
+      forces);
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(zeroPoint.size(), 13);
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 0.05 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 13);
+        if (dof < 6)
+        {
+          perturbed = getRootTrajectoryLinearSystemTestOutput(
+              Eigen::Vector6s::Unit(dof) * eps,
+              Eigen::Vector6s::Zero(),
+              0,
+              qs,
+              dqs,
+              ddqs,
+              forces);
+        }
+        else if (dof < 12)
+        {
+          perturbed = getRootTrajectoryLinearSystemTestOutput(
+              Eigen::Vector6s::Zero(),
+              Eigen::Vector6s::Unit(dof - 6) * eps,
+              0,
+              qs,
+              dqs,
+              ddqs,
+              forces);
+        }
+        else
+        {
+          assert(dof == 12);
+          perturbed = getRootTrajectoryLinearSystemTestOutput(
+              Eigen::Vector6s::Zero(),
+              Eigen::Vector6s::Zero(),
+              eps,
+              qs,
+              dqs,
+              ddqs,
+              forces);
+        }
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return std::make_pair(result, zeroPoint);
+}
+
+//==============================================================================
+// This will go through and compute the "residual-free root acceleration" at
+// each timestep, in that timestep's INPUT CONFIGURATION, and then integrate
+// all those accelerations together to create a new trajeoctory.
+//
+// IMPORTANT: This does NOT allow intermediate "new accelerations" to affect
+// subsequent timestep computations. ALL the "new accelerations" are computed
+// FIRST, and ONLY AFTER EVERY ACCELERATION IS ALREADY COMPUTED are they all
+// integrated together to get a new trajectory.
+//
+// THIS DOES NOT GUARANTEE PHYSICAL CONSISTENCY!!! It is here to help test the
+// getRootTrajectoryLinearSystem() method, and that's pretty much it.
+Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
+    Eigen::Vector6s initialPosOffset,
+    Eigen::Vector6s initialVelOffset,
+    s_t inverseMassOffset,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces)
+{
+  (void)initialPosOffset;
+  (void)initialVelOffset;
+  (void)qs;
+  (void)dqs;
+  (void)ddqs;
+  (void)forces;
+
+  const int numTimesteps = qs.cols();
+
+  const s_t totalMass = mSkel->getMass();
+  const s_t invTotalMass = 1.0 / totalMass;
+  const s_t offsetInvTotalMass = invTotalMass + inverseMassOffset;
+  const s_t updatedMass = 1.0 / offsetInvTotalMass;
+  const s_t percentage = updatedMass / totalMass;
+  const Eigen::VectorXs originalLinkMasses = mSkel->getLinkMasses();
+  mSkel->setLinkMasses(originalLinkMasses * percentage);
+
+  const s_t dt = mSkel->getTimeStep();
+
+  std::vector<Eigen::Vector6s> accelerations;
+  for (int i = 0; i < numTimesteps; i++)
+  {
+    Eigen::VectorXs offsetPos = qs.col(i);
+    offsetPos.head<6>() += initialPosOffset + initialVelOffset * dt * i;
+    Eigen::VectorXs offsetVel = dqs.col(i);
+    offsetVel.head<6>() += initialVelOffset;
+
+    accelerations.push_back(calculateResidualFreeRootAcceleration(
+        offsetPos, offsetVel, ddqs.col(i), forces.col(i)));
+  }
+
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(numTimesteps * 6);
+
+  Eigen::Vector6s currentPos = qs.col(0).head<6>() + initialPosOffset;
+  Eigen::Vector6s currentVel = dqs.col(0).head<6>() + initialVelOffset;
+  result.head<6>() = currentPos;
+  for (int i = 1; i < numTimesteps; i++)
+  {
+    currentVel += dt * accelerations[i];
+    currentPos += dt * currentVel;
+    result.segment<6>(i * 6) = currentPos;
+  }
+
+  mSkel->setLinkMasses(originalLinkMasses);
+
+  return result;
 }
 
 //==============================================================================

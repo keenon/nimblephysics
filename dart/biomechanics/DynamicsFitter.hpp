@@ -208,6 +208,104 @@ public:
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat);
 
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::Matrix6s calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::Matrix6s
+  finiteDifferenceResidualFreeRootAccelerationJacobianWrtVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::VectorXs calculateResidualFreeRootAccelerationJacobianWrtInvMass(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::VectorXs
+  finiteDifferenceResidualFreeRootAccelerationJacobianWrtInvMass(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::VectorXs calculateScratchJacobianWrtInvMass(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::VectorXs finiteDifferenceScratchJacobianWrtInvMass(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This returns a matrix A and vector b, such that Ax+b gives you a legal root
+  // trajectory. Here x is a 12 dimensional vector, composed of the
+  // concatenation of the initial pos offset, and initial velocity offset.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> getRootTrajectoryLinearSystem(
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces);
+
+  ////////////////////////////////////////////
+  // This returns a matrix A and vector b, such that Ax+b gives you a legal root
+  // trajectory. Here x is a 12 dimensional vector, composed of the
+  // concatenation of the initial pos offset, and initial velocity offset.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  finiteDifferenceRootTrajectoryLinearSystem(
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces);
+
+  ////////////////////////////////////////////
+  // This will go through and compute the "residual-free root acceleration" at
+  // each timestep, in that timestep's INPUT CONFIGURATION, and then integrate
+  // all those accelerations together to create a new trajeoctory.
+  //
+  // IMPORTANT: This does NOT allow intermediate "new accelerations" to affect
+  // subsequent timestep computations. ALL the "new accelerations" are computed
+  // FIRST, and ONLY AFTER EVERY ACCELERATION IS ALREADY COMPUTED are they all
+  // integrated together to get a new trajectory.
+  //
+  // THIS DOES NOT GUARANTEE PHYSICAL CONSISTENCY!!! It is here to help test the
+  // getRootTrajectoryLinearSystem() method, and that's pretty much it.
+  Eigen::VectorXs getRootTrajectoryLinearSystemTestOutput(
+      Eigen::Vector6s initialPosOffset,
+      Eigen::Vector6s initialVelOffset,
+      s_t inverseMassOffset,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   std::vector<neural::DifferentiableExternalForce> mForces;

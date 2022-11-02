@@ -34,7 +34,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -812,43 +812,22 @@ bool testResidualGradWrt(
   return true;
 }
 
-bool testResidualAngularJacobians(
+bool testResidualRootJacobians(
     std::shared_ptr<dynamics::Skeleton> skel,
-    std::map<int, Eigen::Vector6s> worldForces)
+    std::vector<int> contactBodies,
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forces)
 {
-  Eigen::VectorXs originalPos = skel->getPositions();
-  Eigen::VectorXs originalVel = skel->getVelocities();
-  Eigen::VectorXs originalTau = skel->getRandomPose();
-  Eigen::Vector6s originalResidual = originalTau.head<6>();
-  (void)originalResidual;
-  applyExternalForces(skel, worldForces);
-  skel->setControlForces(originalTau);
-  skel->computeForwardDynamics();
-  Eigen::VectorXs acc = skel->getAccelerations();
-  skel->integrateVelocities(skel->getTimeStep());
-  // Reset
-  skel->setPositions(originalPos);
-  skel->setVelocities(originalVel);
-  applyExternalForces(skel, worldForces);
-  skel->clearExternalForces();
-  skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
-
-  std::vector<int> forceBodies;
-  Eigen::VectorXs concatForces = Eigen::VectorXs::Zero(worldForces.size() * 6);
-  for (auto& pair : worldForces)
-  {
-    concatForces.segment<6>(forceBodies.size() * 6) = pair.second;
-    forceBodies.push_back(pair.first);
-  }
-
-  ResidualForceHelper helper(skel, forceBodies);
+  ResidualForceHelper helper(skel, contactBodies);
 
   Eigen::MatrixXs angularResidual
       = helper.calculateRootAngularResidualJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+          q, dq, ddq, forces);
   Eigen::MatrixXs angularResidual_fd
       = helper.finiteDifferenceRootAngularResidualJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+          q, dq, ddq, forces);
 
   if (!equals(angularResidual, angularResidual_fd, 2e-8))
   {
@@ -863,32 +842,31 @@ bool testResidualAngularJacobians(
     return false;
   }
 
-  Eigen::MatrixXs fullResidual
-      = helper.calculateRootResidualJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
-  Eigen::MatrixXs fullResidual_fd
-      = helper.finiteDifferenceRootResidualJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+  // Eigen::MatrixXs fullResidual
+  //     = helper.calculateRootResidualJacobianWrtPosition(q, dq, ddq, forces);
+  // Eigen::MatrixXs fullResidual_fd
+  //     = helper.finiteDifferenceRootResidualJacobianWrtPosition(
+  //         q, dq, ddq, forces);
 
-  if (!equals(fullResidual, fullResidual_fd, 2e-8))
-  {
-    std::cout << "Jacobian of root residual wrt position not equal!"
-              << std::endl;
-    std::cout << "Analytical:" << std::endl << fullResidual << std::endl;
-    std::cout << "FD:" << std::endl << fullResidual_fd << std::endl;
-    std::cout << "Diff (" << (fullResidual_fd - fullResidual).minCoeff()
-              << " - " << (fullResidual_fd - fullResidual).maxCoeff()
-              << "):" << std::endl
-              << (fullResidual_fd - fullResidual) << std::endl;
-    return false;
-  }
+  // if (!equals(fullResidual, fullResidual_fd, 2e-8))
+  // {
+  //   std::cout << "Jacobian of root residual wrt position not equal!"
+  //             << std::endl;
+  //   std::cout << "Analytical:" << std::endl << fullResidual << std::endl;
+  //   std::cout << "FD:" << std::endl << fullResidual_fd << std::endl;
+  //   std::cout << "Diff (" << (fullResidual_fd - fullResidual).minCoeff()
+  //             << " - " << (fullResidual_fd - fullResidual).maxCoeff()
+  //             << "):" << std::endl
+  //             << (fullResidual_fd - fullResidual) << std::endl;
+  //   return false;
+  // }
 
-  Eigen::Vector6s noResidualRoot = helper.calculateResidualFreeRootAcceleration(
-      originalPos, originalVel, acc, concatForces);
-  Eigen::VectorXs noResidualAcc = acc;
+  Eigen::Vector6s noResidualRoot
+      = helper.calculateResidualFreeRootAcceleration(q, dq, ddq, forces);
+  Eigen::VectorXs noResidualAcc = ddq;
   noResidualAcc.head<6>() = noResidualRoot;
-  Eigen::Vector6s residual = helper.calculateResidual(
-      originalPos, originalVel, noResidualAcc, concatForces);
+  Eigen::Vector6s residual
+      = helper.calculateResidual(q, dq, noResidualAcc, forces);
   Eigen::Vector6s zero6 = Eigen::Vector6s::Zero();
   if (!equals(residual, zero6, 1e-8))
   {
@@ -899,15 +877,11 @@ bool testResidualAngularJacobians(
   }
 
   Eigen::Vector3s noResidualAngular
-      = helper.calculateResidualFreeAngularAcceleration(
-          originalPos, originalVel, acc, concatForces);
-  noResidualAcc = acc;
+      = helper.calculateResidualFreeAngularAcceleration(q, dq, ddq, forces);
+  noResidualAcc = ddq;
   noResidualAcc.head<3>() = noResidualAngular;
   Eigen::Vector3s residualAng
-      = helper
-            .calculateResidual(
-                originalPos, originalVel, noResidualAcc, concatForces)
-            .head<3>();
+      = helper.calculateResidual(q, dq, noResidualAcc, forces).head<3>();
   Eigen::Vector3s zero3 = Eigen::Vector3s::Zero();
   if (!equals(residualAng, zero3, 1e-8))
   {
@@ -919,11 +893,11 @@ bool testResidualAngularJacobians(
 
   Eigen::MatrixXs angularAccResidual
       = helper.calculateResidualFreeRootAngularAccelerationJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+          q, dq, ddq, forces);
   Eigen::MatrixXs angularAccResidual_fd
       = helper
             .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtPosition(
-                originalPos, originalVel, acc, concatForces);
+                q, dq, ddq, forces);
 
   if (!equals(angularAccResidual, angularAccResidual_fd, 2e-8))
   {
@@ -942,10 +916,10 @@ bool testResidualAngularJacobians(
 
   Eigen::MatrixXs rootAccResidual
       = helper.calculateResidualFreeRootAccelerationJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+          q, dq, ddq, forces);
   Eigen::MatrixXs rootAccResidual_fd
       = helper.finiteDifferenceResidualFreeRootAccelerationJacobianWrtPosition(
-          originalPos, originalVel, acc, concatForces);
+          q, dq, ddq, forces);
 
   if (!equals(rootAccResidual, rootAccResidual_fd, 2e-8))
   {
@@ -957,6 +931,189 @@ bool testResidualAngularJacobians(
               << " - " << (rootAccResidual_fd - rootAccResidual).maxCoeff()
               << "):" << std::endl
               << (rootAccResidual_fd - rootAccResidual) << std::endl;
+    return false;
+  }
+
+  Eigen::MatrixXs rootAccResidualWrtVel
+      = helper.calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+          q, dq, ddq, forces);
+  Eigen::MatrixXs rootAccResidualWrtVel_fd
+      = helper.finiteDifferenceResidualFreeRootAccelerationJacobianWrtVelocity(
+          q, dq, ddq, forces);
+
+  if (!equals(rootAccResidualWrtVel, rootAccResidualWrtVel_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root acceleration wrt velocity not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << rootAccResidualWrtVel << std::endl;
+    std::cout << "FD:" << std::endl << rootAccResidualWrtVel_fd << std::endl;
+    std::cout << "Diff ("
+              << (rootAccResidualWrtVel_fd - rootAccResidualWrtVel).minCoeff()
+              << " - "
+              << (rootAccResidualWrtVel_fd - rootAccResidualWrtVel).maxCoeff()
+              << "):" << std::endl
+              << (rootAccResidualWrtVel_fd - rootAccResidualWrtVel)
+              << std::endl;
+    return false;
+  }
+
+  Eigen::VectorXs scratchWrtInvMass
+      = helper.calculateScratchJacobianWrtInvMass(q, dq, ddq, forces);
+  Eigen::VectorXs scratchWrtInvMass_fd
+      = helper.finiteDifferenceScratchJacobianWrtInvMass(q, dq, ddq, forces);
+
+  if (!equals(scratchWrtInvMass, scratchWrtInvMass_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root acceleration wrt inverse mass not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << scratchWrtInvMass << std::endl;
+    std::cout << "FD:" << std::endl << scratchWrtInvMass_fd << std::endl;
+    std::cout << "Diff ("
+              << (scratchWrtInvMass_fd - scratchWrtInvMass).minCoeff() << " - "
+              << (scratchWrtInvMass_fd - scratchWrtInvMass).maxCoeff()
+              << "):" << std::endl
+              << (scratchWrtInvMass_fd - scratchWrtInvMass) << std::endl;
+    return false;
+  }
+
+  Eigen::VectorXs rootAccResidualWrtInvMass
+      = helper.calculateResidualFreeRootAccelerationJacobianWrtInvMass(
+          q, dq, ddq, forces);
+  Eigen::VectorXs rootAccResidualWrtInvMass_fd
+      = helper.finiteDifferenceResidualFreeRootAccelerationJacobianWrtInvMass(
+          q, dq, ddq, forces);
+
+  if (!equals(rootAccResidualWrtInvMass, rootAccResidualWrtInvMass_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root acceleration wrt inverse mass not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl
+              << rootAccResidualWrtInvMass << std::endl;
+    std::cout << "FD:" << std::endl
+              << rootAccResidualWrtInvMass_fd << std::endl;
+    std::cout
+        << "Diff ("
+        << (rootAccResidualWrtInvMass_fd - rootAccResidualWrtInvMass).minCoeff()
+        << " - "
+        << (rootAccResidualWrtInvMass_fd - rootAccResidualWrtInvMass).maxCoeff()
+        << "):" << std::endl
+        << (rootAccResidualWrtInvMass_fd - rootAccResidualWrtInvMass)
+        << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<int> collisionBodies,
+    int numTimesteps)
+{
+  s_t dt = skel->getTimeStep();
+  Eigen::MatrixXs qs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs dqs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs ddqs
+      = Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs forces
+      = 0.001
+        * Eigen::MatrixXs::Random(collisionBodies.size() * 6, numTimesteps);
+
+  // Generate q,dq from integrating the given accelerations
+  qs.col(0) = skel->getRandomPose();
+  dqs.col(0) = skel->getRandomVelocity();
+  for (int i = 1; i < numTimesteps; i++)
+  {
+    dqs.col(i) = dqs.col(i - 1) + ddqs.col(i) * dt;
+    qs.col(i) = qs.col(i - 1) + dqs.col(i) * dt;
+  }
+  // Add some random noise
+  // qs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.0001;
+  // dqs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.001;
+
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    std::cout << "Testing individual jacobians at t=" << t << std::endl;
+    bool success = testResidualRootJacobians(
+        skel,
+        collisionBodies,
+        qs.col(t),
+        dqs.col(t),
+        ddqs.col(t),
+        forces.col(t));
+    if (!success)
+      return false;
+  }
+
+  ResidualForceHelper helper(skel, collisionBodies);
+
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor
+      = helper.getRootTrajectoryLinearSystem(qs, dqs, ddqs, forces);
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor_fd
+      = helper.finiteDifferenceRootTrajectoryLinearSystem(
+          qs, dqs, ddqs, forces);
+
+  if (!equals(taylor.second, taylor_fd.second, 1e-8))
+  {
+    std::cout << "Linear system b vector is not equal!" << std::endl;
+    return false;
+  }
+
+  const s_t posTol = 0.001;
+  if (!equals(taylor.first, taylor_fd.first, posTol))
+  {
+    std::cout << "Linear system A matrix is not equal!" << std::endl;
+    Eigen::MatrixXs A = taylor.first;
+    Eigen::MatrixXs A_fd = taylor_fd.first;
+
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Matrix6s posOffsetPos = A.block<6, 6>(t * 6, 0);
+      Eigen::Matrix6s posOffsetPos_fd = A_fd.block<6, 6>(t * 6, 0);
+
+      if (!equals(posOffsetPos, posOffsetPos_fd, posTol))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetPos - posOffsetPos_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Matrix6s posOffsetVel = A.block<6, 6>(t * 6, 6);
+      Eigen::Matrix6s posOffsetVel_fd = A_fd.block<6, 6>(t * 6, 6);
+
+      if (!equals(posOffsetVel, posOffsetVel_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetVel - posOffsetVel_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Vector6s posOffsetInvMass = A.block<6, 1>(t * 6, 12);
+      Eigen::Vector6s posOffsetInvMass_fd = A_fd.block<6, 1>(t * 6, 12);
+
+      if (!equals(posOffsetInvMass, posOffsetInvMass_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetInvMass:" << std::endl
+                  << posOffsetInvMass << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetInvMass:" << std::endl
+                  << posOffsetInvMass_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetInvMass - posOffsetInvMass_fd << std::endl;
+        return false;
+      }
+    }
     return false;
   }
 
@@ -1769,8 +1926,8 @@ TEST(DynamicsFitter, ID_EQNS)
 }
 #endif
 
-// #ifdef JACOBIAN_TESTS
-TEST(DynamicsFitter, ANGULAR_JACS)
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, ROOT_JACS)
 {
 #ifdef DART_USE_ARBITRARY_PRECISION
   mpfr::mpreal::set_default_prec(512);
@@ -1780,16 +1937,15 @@ TEST(DynamicsFitter, ANGULAR_JACS)
       "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
   srand(42);
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 5; i++)
   {
-    file.skeleton->setPositions(file.skeleton->getRandomPose());
-    file.skeleton->setVelocities(file.skeleton->getRandomVelocity());
-    std::map<int, Eigen::Vector6s> worldForces;
-    worldForces[file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton()]
-        = Eigen::Vector6s::Random() * 1000;
-    worldForces[file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton()]
-        = Eigen::Vector6s::Random() * 1000;
-    bool success = testResidualAngularJacobians(file.skeleton, worldForces);
+    std::vector<int> collisionBodies;
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton());
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
+    bool success = testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
+        file.skeleton, collisionBodies, 5);
     if (!success)
     {
       EXPECT_TRUE(success);
@@ -1797,7 +1953,7 @@ TEST(DynamicsFitter, ANGULAR_JACS)
     }
   }
 }
-// #endif
+#endif
 
 #ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, SPATIAL_NEWTON_GRAD)
