@@ -4,6 +4,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <ostream>
 #include <queue>
 #include <string>
 #include <tuple>
@@ -1215,6 +1216,8 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     A.block<6, 6>(t * 6, 0) += dOffsetPos_dInputPos;
     A.block<6, 6>(t * 6, 6) += dOffsetPos_dInputVel;
 
+    // GOHERE
+
     const Eigen::Matrix6s dAcc_dOffsetPos
         = calculateResidualFreeRootAccelerationJacobianWrtPosition(
             qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
@@ -1234,10 +1237,27 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
         = calculateResidualFreeRootAccelerationJacobianWrtInvMass(
             qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
 
-    for (int downstream = 0; downstream < numTimesteps - t; downstream++)
+    // currentPos = qs.col(1).head<6>() + initialPosOffset + initialVelOffset *
+    // dt;
+    // currentVel = dqs.col(1).head<6>() + initialVelOffset; for (int i = 1;
+    // i < numTimesteps; i++)
+    // {
+    //   result.segment<6>(i * 6) = currentPos;
+
+    //   ///////////////////////////////////////////////////////////////////
+    //   // GOHERE: here is our integration
+    //   ///////////////////////////////////////////////////////////////////
+
+    //   Eigen::VectorXs nextVel = currentVel + dt * accelerations[i];
+    //   Eigen::VectorXs nextPos = currentPos + dt * nextVel;
+    //   // Prepare for the next iteration
+    //   currentPos = nextPos;
+    // }
+
+    for (int downstream = 1; downstream < numTimesteps - t; downstream++)
     {
       int later = t + downstream;
-      int compoundingSteps = downstream + 1; // semi-implicit euler
+      int compoundingSteps = downstream; // semi-implicit euler
       A.block<6, 6>(later * 6, 0)
           += compoundingSteps * dt * dt * dAcc_dInputPos;
       A.block<6, 6>(later * 6, 6)
@@ -1277,7 +1297,7 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(zeroPoint.size(), 13);
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 0.05 : 1e-6;
+  s_t eps = useRidders ? 0.01 : 1e-6;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -1356,13 +1376,16 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
 
   const int numTimesteps = qs.cols();
 
-  const s_t totalMass = mSkel->getMass();
-  const s_t invTotalMass = 1.0 / totalMass;
-  const s_t offsetInvTotalMass = invTotalMass + inverseMassOffset;
-  const s_t updatedMass = 1.0 / offsetInvTotalMass;
-  const s_t percentage = updatedMass / totalMass;
   const Eigen::VectorXs originalLinkMasses = mSkel->getLinkMasses();
-  mSkel->setLinkMasses(originalLinkMasses * percentage);
+  if (inverseMassOffset != 0)
+  {
+    const s_t totalMass = mSkel->getMass();
+    const s_t invTotalMass = 1.0 / totalMass;
+    const s_t offsetInvTotalMass = invTotalMass + inverseMassOffset;
+    const s_t updatedMass = 1.0 / offsetInvTotalMass;
+    const s_t percentage = updatedMass / totalMass;
+    mSkel->setLinkMasses(originalLinkMasses * percentage);
+  }
 
   const s_t dt = mSkel->getTimeStep();
 
@@ -1383,16 +1406,210 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
   Eigen::Vector6s currentPos = qs.col(0).head<6>() + initialPosOffset;
   Eigen::Vector6s currentVel = dqs.col(0).head<6>() + initialVelOffset;
   result.head<6>() = currentPos;
+
+  currentPos = qs.col(1).head<6>() + initialPosOffset + initialVelOffset * dt;
+  currentVel = dqs.col(1).head<6>() + initialVelOffset;
   for (int i = 1; i < numTimesteps; i++)
   {
-    currentVel += dt * accelerations[i];
-    currentPos += dt * currentVel;
     result.segment<6>(i * 6) = currentPos;
+
+    ///////////////////////////////////////////////////////////////////
+    // GOHERE: here is our integration
+    ///////////////////////////////////////////////////////////////////
+
+    Eigen::VectorXs nextVel = currentVel + dt * accelerations[i];
+    Eigen::VectorXs nextPos = currentPos + dt * nextVel;
+    // Prepare for the next iteration
+    currentPos = nextPos;
+    currentVel = nextVel;
   }
 
-  mSkel->setLinkMasses(originalLinkMasses);
+  if (inverseMassOffset != 0)
+  {
+    mSkel->setLinkMasses(originalLinkMasses);
+  }
 
   return result;
+}
+
+Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
+    Eigen::Vector6s initialPosOffset,
+    Eigen::Vector6s initialVelOffset,
+    s_t inverseMassOffset,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces)
+{
+  Eigen::VectorXs linearSystemRootStates
+      = getRootTrajectoryLinearSystemTestOutput(
+          initialPosOffset,
+          initialVelOffset,
+          inverseMassOffset,
+          qs,
+          dqs,
+          ddqs,
+          forces);
+  Eigen::MatrixXs newQs = qs;
+  for (int t = 0; t < newQs.cols(); t++)
+  {
+    newQs.col(t).head<6>() = linearSystemRootStates.segment<6>(t * 6);
+  }
+  return newQs;
+}
+
+Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
+    Eigen::Vector6s initialPosOffset,
+    Eigen::Vector6s initialVelOffset,
+    s_t inverseMassOffset,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs forces)
+{
+  const int dimsToLetFree = 6;
+  (void)inverseMassOffset;
+
+  s_t dt = mSkel->getTimeStep();
+  s_t totalChange = 0.0;
+  int numTimestepsChanged = 0;
+
+  /*
+#ifndef NDEBUG
+  // In debug mode, check that we produced a reduced net moment
+  std::vector<Eigen::Vector3s> newCOMs = comPositions(init, trial);
+  Eigen::Vector3s newSumForceCrossR = Eigen::Vector3s::Zero();
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    for (int t = 0; t < forcePlates[i].forces.size(); t++)
+    {
+      Eigen::Vector3s f = forcePlates[i].forces[t];
+      Eigen::Vector3s p = forcePlates[i].centersOfPressure[t];
+      Eigen::Vector3s m = forcePlates[i].moments[t];
+      Eigen::Vector3s r = newCOMs[t] - p;
+      newSumForceCrossR += f.cross(r) + m;
+    }
+  }
+
+  Eigen::MatrixXs compare(3, 2);
+  compare.col(0) = sumForceCrossR;
+  compare.col(1) = newSumForceCrossR;
+  std::cout << "Original f x r - Adjusted f x r" << std::endl
+            << compare << std::endl;
+  // We need to guarantee that it didn't get any worse
+  assert(newSumForceCrossR.norm() <= sumForceCrossR.norm());
+#endif
+  */
+
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    qs.col(t).head<6>() += initialPosOffset;
+    qs.col(t).head<6>() += initialVelOffset * dt * t;
+  }
+
+  // 2. For each timestep, go through and "re-simulate" the angular root.
+  for (int t = 1; t < qs.cols() - 1; t++)
+  {
+    // 2.1. First, finite difference out current q,dq,ddq:
+    Eigen::VectorXs q = qs.col(t);
+    Eigen::VectorXs dq = (qs.col(t) - qs.col(t - 1)) / dt;
+    Eigen::VectorXs ddq
+        = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
+
+    // 2.2. Calculate inverse dynamics to get necessary torques
+    mSkel->setPositions(q);
+    mSkel->setVelocities(dq);
+    mSkel->setAccelerations(ddq);
+
+#ifndef NDEBUG
+    Eigen::VectorXs originalTau
+        = calculateInverseDynamics(q, dq, ddq, forces.col(t));
+#endif
+
+    Eigen::Vector6s solve
+        = calculateResidualFreeRootAcceleration(q, dq, ddq, forces.col(t));
+
+#ifndef NDEBUG
+    Eigen::VectorXs originalDdq = ddq;
+#endif
+    // 2.5. We only want to change the acceleration at this timestep, so we
+    // overwrite the next timestep's position, and nothing else.
+    ddq.head(dimsToLetFree) = solve;
+    Eigen::VectorXs nextDq = dq + dt * ddq;
+    Eigen::VectorXs nextQ = q + dt * nextDq;
+
+    Eigen::VectorXs change
+        = (nextQ.head(dimsToLetFree) - qs.col(t + 1).head(dimsToLetFree));
+    totalChange += change.norm();
+    numTimestepsChanged++;
+
+    qs.col(t + 1).head(dimsToLetFree) = nextQ.head(dimsToLetFree);
+
+#ifndef NDEBUG
+    // 3. As an idiot check, and only in debug mode, we'll recompute inverse
+    // dynamics to check that the rotational residuals are in fact gone.
+    Eigen::VectorXs updatedDq = (qs.col(t) - qs.col(t - 1)) / dt;
+    assert(updatedDq == dq);
+    Eigen::VectorXs updatedDdq
+        = (qs.col(t + 1) - 2 * qs.col(t) + qs.col(t - 1)) / (dt * dt);
+    if ((updatedDdq - ddq).norm() > 1e-8)
+    {
+      std::cout << "Did not get the acceleration we expected from our "
+                   "position change."
+                << std::endl;
+      Eigen::MatrixXs compare(ddq.size(), 4);
+      compare.col(0) = ddq;
+      compare.col(1) = updatedDdq;
+      compare.col(2) = ddq - updatedDdq;
+      compare.col(3) = originalDdq;
+      std::cout << "Desired - Achieved - Diff - Original" << std::endl
+                << compare << std::endl;
+      assert(false);
+    }
+
+    Eigen::VectorXs newTau
+        = calculateInverseDynamics(q, updatedDq, updatedDdq, forces.col(t));
+    if (newTau.head(dimsToLetFree).norm() > 1e-8)
+    {
+      std::cout << "Timestep " << t
+                << " rotational procedure did not zero out rotational torques!"
+                << std::endl;
+      Eigen::MatrixXs compareAcc(dimsToLetFree, 2);
+      compareAcc.col(0) = originalDdq.head(dimsToLetFree);
+      compareAcc.col(1) = updatedDdq.head(dimsToLetFree);
+      std::cout << "Original acc - New acc:" << std::endl
+                << compareAcc << std::endl;
+      Eigen::MatrixXs compareTau(dimsToLetFree, 2);
+      compareTau.col(0) = originalTau.head(dimsToLetFree);
+      compareTau.col(1) = newTau.head(dimsToLetFree);
+      std::cout << "Original tau - New tau" << std::endl
+                << compareTau << std::endl;
+      assert(false);
+    }
+#endif
+  }
+
+  std::cout << "Had to rotate root by an average of "
+            << (totalChange / numTimestepsChanged)
+            << "radians to achieve rotational physical consistency."
+            << std::endl;
+
+  // s_t avgChange = totalChange / numTimestepsChanged;
+  // if (capChangeNorm > 0 && avgChange > capChangeNorm)
+  // {
+  //   s_t scaleChange = capChangeNorm / avgChange;
+  //   std::cout << "Scaling angular changes by " << scaleChange * 100
+  //             << "%, to keep average change within the cap of "
+  //             << capChangeNorm << "." << std::endl;
+  //   for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+  //   {
+  //     Eigen::VectorXs change
+  //         = init->poseTrials[trial].col(t).head(dimsToLetFree)
+  //           - originalPoses.col(t).head(dimsToLetFree);
+  //     init->poseTrials[trial].col(t).head(dimsToLetFree)
+  //         = originalPoses.col(t).head(dimsToLetFree) + change *
+  //         scaleChange;
+  //   }
+  // }
+  return qs;
 }
 
 //==============================================================================
@@ -5697,12 +5914,210 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 //==============================================================================
 // 1.1. Shift the COM trajectory around to try to get the residual-free
 // rotation.
-void DynamicsFitter::zeroAngularResidualsOnCOMTrajectory(
+void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
   (void)helper;
-  // TODO
+
+  int totalTimesteps = 0;
+  const int numTrials = init->poseTrials.size();
+  for (int trial = 0; trial < numTrials; trial++)
+  {
+    totalTimesteps += init->poseTrials[trial].cols();
+  }
+
+  const bool includeMass = false;
+  int numVariables = numTrials * 12;
+  if (includeMass)
+    numVariables++;
+
+  int rowCursor = 0;
+  Eigen::VectorXs fullOriginalTrajectory
+      = Eigen::VectorXs::Zero((totalTimesteps * 6) + numVariables);
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::VectorXs originalTrajectory
+        = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      originalTrajectory.segment<6>(t * 6)
+          = init->poseTrials[trial].col(t).head<6>();
+    }
+    fullOriginalTrajectory.segment(rowCursor, originalTrajectory.size())
+        = originalTrajectory;
+    rowCursor += originalTrajectory.size();
+  }
+
+  // Rule of thumb: this process solves one timestep at a time, approximately,
+  // from left to right.
+  const int numIters = totalTimesteps;
+  for (int iter = 0; iter < numIters; iter++)
+  {
+    std::cout << "Spatial COM iter: " << iter << "/" << numIters << std::endl;
+    std::vector<Eigen::MatrixXs> qs;
+    std::vector<Eigen::MatrixXs> dqs;
+    std::vector<Eigen::MatrixXs> ddqs;
+    for (int trial = 0; trial < numTrials; trial++)
+    {
+      s_t dt = init->trialTimesteps[trial];
+      Eigen::MatrixXs q = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        q.col(t) = init->poseTrials[trial].col(t);
+      }
+      for (int t = 1; t < init->poseTrials[trial].cols(); t++)
+      {
+        dq.col(t) = (init->poseTrials[trial].col(t)
+                     - init->poseTrials[trial].col(t - 1))
+                    / dt;
+      }
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        ddq.col(t) = (init->poseTrials[trial].col(t + 1)
+                      - 2 * init->poseTrials[trial].col(t)
+                      + init->poseTrials[trial].col(t - 1))
+                     / (dt * dt);
+      }
+
+      // We start with the same velocity as the 2nd timestep, and with 0
+      // acceleration. This is the best projection we can make given the data.
+      dq.col(0) = dq.col(1);
+      ddq.col(0).setZero();
+
+      qs.push_back(q);
+      dqs.push_back(dq);
+      ddqs.push_back(ddq);
+    }
+
+    s_t residualCost = 0.0;
+    for (int trial = 0; trial < numTrials; trial++)
+    {
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        s_t thisTimestepCost = helper.calculateResidualNorm(
+            qs[trial].col(t),
+            dqs[trial].col(t),
+            ddqs[trial].col(t),
+            init->grfTrials[trial].col(t),
+            0,
+            false);
+        // std::cout << t << ": " << thisTimestepCost << ", ";
+        residualCost += thisTimestepCost;
+      }
+      std::cout << std::endl;
+    }
+    residualCost /= totalTimesteps;
+    std::cout << "Average residuals: " << residualCost << std::endl;
+
+    // [pos, vel] for each trial, plus one unified mass
+    Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(
+        (totalTimesteps * 6) + numVariables, numVariables);
+    Eigen::VectorXs fullB
+        = Eigen::VectorXs::Zero((totalTimesteps * 6) + numVariables);
+
+    rowCursor = 0;
+    int colCursor = 0;
+    for (int trial = 0; trial < init->poseTrials.size(); trial++)
+    {
+      mSkeleton->setTimeStep(init->trialTimesteps[trial]);
+      mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+      std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
+          = helper.getRootTrajectoryLinearSystem(
+              qs[trial], dqs[trial], ddqs[trial], init->grfTrials[trial]);
+      Eigen::MatrixXs A = linearSystem.first;
+      Eigen::VectorXs b = linearSystem.second;
+
+      fullA.block(rowCursor, colCursor, A.rows(), 12)
+          = A.block(0, 0, A.rows(), 12);
+      if (includeMass)
+      {
+        // Copy inv-mass to a shared column across all the trials
+        fullA.block(rowCursor, fullA.cols() - 1, A.rows(), 1)
+            = A.block(0, A.cols() - 1, A.rows(), 1);
+      }
+      fullB.segment(rowCursor, b.size()) = b;
+      rowCursor += A.rows();
+      if (includeMass)
+      {
+        colCursor += A.cols() - 1;
+      }
+      else
+      {
+        colCursor += A.cols();
+      }
+    }
+
+    // Heavy regularize everything
+    s_t regularization = 0.5;
+    fullA.block(rowCursor, 0, fullA.cols(), fullA.cols())
+        = regularization
+          * Eigen::MatrixXs::Identity(fullA.cols(), fullA.cols());
+
+    Eigen::VectorXs solution = fullA.completeOrthogonalDecomposition().solve(
+        fullOriginalTrajectory - fullB);
+
+    // Scale masses
+    if (includeMass)
+    {
+      s_t invMass = solution(solution.size() - 1);
+      s_t newMass = 1.0 / invMass;
+      s_t percentage = newMass / mSkeleton->getMass();
+      mSkeleton->setLinkMasses(mSkeleton->getLinkMasses() * percentage);
+    }
+
+    // Update trajectory
+    Eigen::VectorXs newTrajectory = (fullA * solution) + fullB;
+    rowCursor = 0;
+    for (int trial = 0; trial < numTrials; trial++)
+    {
+      Eigen::Vector3s deltaPos = solution.segment<3>(trial * 6);
+      Eigen::Vector3s deltaVel = solution.segment<3>(trial * 6 + 3);
+
+      std::cout << "Trial " << trial << " moving starting pos by: " << std::endl
+                << deltaPos << std::endl;
+      std::cout << "Trial " << trial
+                << " changing starting vel by: " << std::endl
+                << deltaVel << std::endl;
+
+      s_t movedPos = 0.0;
+      s_t movedAngle = 0.0;
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        // newTrajectory
+        Eigen::Vector6s newRoot = newTrajectory.segment<6>(rowCursor);
+        Eigen::Vector6s diff
+            = newRoot - init->poseTrials[trial].col(t).head<6>();
+        init->poseTrials[trial].col(t).head<6>() = newRoot;
+
+        movedAngle += diff.head<3>().norm();
+        movedPos += diff.tail<3>().norm();
+
+        rowCursor += 6;
+      }
+
+      movedPos /= init->poseTrials[trial].cols();
+      movedAngle /= init->poseTrials[trial].cols();
+      std::cout << "Trial " << trial << " avg shift pos by: " << movedPos << "m"
+                << std::endl;
+      std::cout << "Trial " << trial << " avg shift angle by: " << movedAngle
+                << "r" << std::endl;
+
+      if (includeMass)
+      {
+        // Copy the trajectory back into the init
+        init->bodyMasses = mSkeleton->getLinkMasses();
+        init->groupMasses = mSkeleton->getGroupMasses();
+      }
+    }
+  }
+
+  // zeroSpatialResidualsUsingForwardSim(init, 0.07);
+  // zeroSpatialResidualsUsingForwardSim(init, 25);
 }
 
 //==============================================================================
@@ -5977,7 +6392,7 @@ void DynamicsFitter::optimizeRootTrajectory(
 //==============================================================================
 // 1. Just use forward dynamics to get zero residuals.
 void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
-    std::shared_ptr<DynamicsInitialization> init, s_t capChangeNorm)
+    std::shared_ptr<DynamicsInitialization> init, int resetEveryNSteps)
 {
   const int dimsToLetFree = 6;
 
@@ -6021,6 +6436,11 @@ void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
     // 2. For each timestep, go through and "re-simulate" the angular root.
     for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
     {
+      if (resetEveryNSteps > 0
+          && (t % resetEveryNSteps == 0 || (t - 1) % resetEveryNSteps == 0))
+      {
+        continue;
+      }
       // 2.1. First, finite difference out current q,dq,ddq:
       Eigen::VectorXs q = init->poseTrials[trial].col(t);
       Eigen::VectorXs dq = (init->poseTrials[trial].col(t)
@@ -6050,6 +6470,10 @@ void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
             q, dq, ddq, init->grfTrials[trial].col(t));
 #endif
 
+        Eigen::Vector6s solve = helper.calculateResidualFreeRootAcceleration(
+            q, dq, ddq, init->grfTrials[trial].col(t));
+
+#ifndef NDEBUG
         Eigen::MatrixXs M = mSkeleton->getMassMatrix();
         Eigen::VectorXs tailDdq = ddq;
         tailDdq.head(dimsToLetFree).setZero();
@@ -6057,13 +6481,19 @@ void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
         Eigen::VectorXs C = mSkeleton->getCoriolisAndGravityForces();
         Eigen::VectorXs Fs = helper.calculateContactForceTaus(
             q, init->grfTrials[trial].col(t));
-
-        Eigen::VectorXs solve
+        Eigen::VectorXs solve2
             = -M.block(0, 0, dimsToLetFree, dimsToLetFree)
                    .completeOrthogonalDecomposition()
                    .solve(
                        tailTauContribution.head(dimsToLetFree)
                        + C.head(dimsToLetFree) - Fs.head(dimsToLetFree));
+        Eigen::Vector6s diff = solve - solve2;
+        if (diff.norm() > 1e-12)
+        {
+          std::cout << "Diff: " << std::endl << diff << std::endl;
+          assert(diff.norm() < 1e-12);
+        }
+#endif
 
 #ifndef NDEBUG
         Eigen::VectorXs originalDdq = ddq;
@@ -6138,22 +6568,23 @@ void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
               << "radians to achieve rotational physical consistency."
               << std::endl;
 
-    s_t avgChange = totalChange / numTimestepsChanged;
-    if (capChangeNorm > 0 && avgChange > capChangeNorm)
-    {
-      s_t scaleChange = capChangeNorm / avgChange;
-      std::cout << "Scaling angular changes by " << scaleChange * 100
-                << "%, to keep average change within the cap of "
-                << capChangeNorm << "." << std::endl;
-      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
-      {
-        Eigen::VectorXs change
-            = init->poseTrials[trial].col(t).head(dimsToLetFree)
-              - originalPoses.col(t).head(dimsToLetFree);
-        init->poseTrials[trial].col(t).head(dimsToLetFree)
-            = originalPoses.col(t).head(dimsToLetFree) + change * scaleChange;
-      }
-    }
+    // s_t avgChange = totalChange / numTimestepsChanged;
+    // if (capChangeNorm > 0 && avgChange > capChangeNorm)
+    // {
+    //   s_t scaleChange = capChangeNorm / avgChange;
+    //   std::cout << "Scaling angular changes by " << scaleChange * 100
+    //             << "%, to keep average change within the cap of "
+    //             << capChangeNorm << "." << std::endl;
+    //   for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    //   {
+    //     Eigen::VectorXs change
+    //         = init->poseTrials[trial].col(t).head(dimsToLetFree)
+    //           - originalPoses.col(t).head(dimsToLetFree);
+    //     init->poseTrials[trial].col(t).head(dimsToLetFree)
+    //         = originalPoses.col(t).head(dimsToLetFree) + change *
+    //         scaleChange;
+    //   }
+    // }
   }
 }
 

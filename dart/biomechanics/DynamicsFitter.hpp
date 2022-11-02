@@ -306,6 +306,22 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces);
 
+  Eigen::MatrixXs getRootTrajectoryLinearSystemPoses(
+      Eigen::Vector6s initialPosOffset,
+      Eigen::Vector6s initialVelOffset,
+      s_t inverseMassOffset,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces);
+
+  Eigen::MatrixXs getResidualFreePoses(
+      Eigen::Vector6s initialPosOffset,
+      Eigen::Vector6s initialVelOffset,
+      s_t inverseMassOffset,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs forces);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   std::vector<neural::DifferentiableExternalForce> mForces;
@@ -835,7 +851,7 @@ public:
 
   // 1.1. Shift the COM trajectory around to try to get the residual-free
   // rotation.
-  void zeroAngularResidualsOnCOMTrajectory(
+  void optimizeSpatialResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init);
 
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
@@ -850,7 +866,7 @@ public:
 
   // 1. Just use forward dynamics to get zero residuals.
   void zeroSpatialResidualsUsingForwardSim(
-      std::shared_ptr<DynamicsInitialization> init, s_t capChangeNorm = -1);
+      std::shared_ptr<DynamicsInitialization> init, int resetEveryNSteps = -1);
 
   bool verifyLinearForceConsistency(
       std::shared_ptr<DynamicsInitialization> init);
