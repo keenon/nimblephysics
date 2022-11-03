@@ -1419,11 +1419,13 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.smoothAccelerations(init);
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
   // if (!fitter.verifyLinearForceConsistency(init))
   // {
   //   std::cout << "Failed linear consistency check! Exiting early." <<
   //   std::endl; return init;
   // }
+
   fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
   fitter.recalibrateForcePlates(init);
 
@@ -1511,10 +1513,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           .setIncludePoses(true));
   */
 
-  fitter.setIterationLimit(150);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel).setDefaults(false).setIncludePoses(true));
+  // fitter.setIterationLimit(150);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel).setDefaults(false).setIncludePoses(true));
+  // // Re-optimize when we finish
+  // fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
 
   // // Run as L2 fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(
@@ -1640,13 +1644,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   if (saveGUI)
   {
+    int trajectoryIndex = 0;
+
     std::cout << "Saving trajectory..." << std::endl;
-    std::cout << "FPS: " << 1.0 / init->trialTimesteps[0] << std::endl;
+    std::cout << "FPS: " << 1.0 / init->trialTimesteps[trajectoryIndex]
+              << std::endl;
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
         init,
-        0,
-        (int)round(1.0 / init->trialTimesteps[0]));
+        trajectoryIndex,
+        (int)round(1.0 / init->trialTimesteps[trajectoryIndex]));
   }
 
   // Attempt writing out the data
@@ -1783,12 +1790,16 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
       newClip.push_back(t == 0);
     }
 
+    // TODO: re-enable me
+
     // 2. Find the joint centers
-    fitter.findJointCenters(
-        fitterInit, newClip, markerObservationTrials[trial]);
-    fitter.findAllJointAxis(
-        fitterInit, newClip, markerObservationTrials[trial]);
-    fitter.computeJointConfidences(fitterInit, markerObservationTrials[trial]);
+    // fitter.findJointCenters(
+    //     fitterInit, newClip, markerObservationTrials[trial]);
+    // fitter.findAllJointAxis(
+    //     fitterInit, newClip, markerObservationTrials[trial]);
+    // fitter.computeJointConfidences(fitterInit,
+    // markerObservationTrials[trial]);
+
     kinematicInits.push_back(fitterInit);
   }
 
@@ -3756,6 +3767,105 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
 
   runEngine(
       "dart://sample/grf/SprinterWithSpine/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MICHAEL_TEST_SCALING)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("S02DN101");
+  // trialNames.push_back("S02DN102");
+  // trialNames.push_back("S02DN103");
+  // trialNames.push_back("S02DN104");
+  // trialNames.push_back("S02DN105");
+  // trialNames.push_back("S02DN106");
+  // trialNames.push_back("S02DN107");
+  // trialNames.push_back("S02DN108");
+  // trialNames.push_back("S02DN109");
+  // trialNames.push_back("S02DN110");
+  // trialNames.push_back("S02DN111");
+  // trialNames.push_back("S02DN112");
+  // trialNames.push_back("S02DN113");
+  // trialNames.push_back("S02DN114");
+  // trialNames.push_back("S02DN115");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    motFiles.push_back(
+        "dart://sample/osim/MichaelTest4/IK/" + name + "_ik.mot");
+    trcFiles.push_back(
+        "dart://sample/osim/MichaelTest4/MarkerData/" + name + ".trc");
+    grfFiles.push_back(
+        "dart://sample/osim/MichaelTest4/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/osim/MichaelTest4/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, OPENCAP_SCALING)
+{
+  std::string subjectName = "Subject4";
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DJ1");
+  // trialNames.push_back("walking1");
+  // trialNames.push_back("walking2");
+  // trialNames.push_back("walking4");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    motFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/IK/" + name
+        + "_ik.mot");
+    trcFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/MarkerData/" + name
+        + ".trc");
+    grfFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/ID/" + name
+        + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/osim/OpenCapTest/" + subjectName + "/Models/"
       "optimized_scale_and_markers.osim",
       footNames,
       motFiles,

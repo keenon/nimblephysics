@@ -745,6 +745,10 @@ public:
   /// Sets the maximum number of iterations for IPOPT
   void setIterationLimit(int limit);
 
+  /// Sets the number of SGD iterations to run when fitting joint center / axis
+  /// problems
+  void setJointFitSGDIterations(int iters);
+
   /// This sets an anthropometric prior which is used by the default loss. If
   /// you've called `setCustomLossAndGrad` then this has no effect.
   void setAnthropometricPrior(
@@ -979,6 +983,8 @@ protected:
   int mPrintFrequency;
   bool mSilenceOutput;
   bool mDisableLinesearch;
+
+  int mJointFitSGDIterations;
 };
 
 /*

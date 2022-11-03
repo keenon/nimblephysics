@@ -543,6 +543,7 @@ MarkerFitter::MarkerFitter(
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
+    mJointFitSGDIterations(500),
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
@@ -4847,7 +4848,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
 #endif
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 500; i++)
+  for (int i = 0; i < mJointFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     Eigen::VectorXs newAccum = accum + grad.cwiseProduct(grad);
@@ -4983,7 +4984,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
 
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < 500; i++)
+  for (int i = 0; i < mJointFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     accum += grad.cwiseProduct(grad);
@@ -5518,6 +5519,14 @@ void MarkerFitter::setMaxMarkerOffset(s_t offset)
 void MarkerFitter::setIterationLimit(int limit)
 {
   mIterationLimit = limit;
+}
+
+//==============================================================================
+/// Sets the number of SGD iterations to run when fitting joint center / axis
+/// problems
+void MarkerFitter::setJointFitSGDIterations(int iters)
+{
+  mJointFitSGDIterations = iters;
 }
 
 //==============================================================================

@@ -15,25 +15,60 @@ namespace utils {
  * corresponds to no smoothing.
  */
 AccelerationSmoother::AccelerationSmoother(
-    int timesteps, s_t smoothingWeight, s_t regularizationWeight)
+    int timesteps,
+    s_t smoothingWeight,
+    s_t regularizationWeight,
+    bool useSparse)
   : mTimesteps(timesteps),
     mSmoothingWeight(smoothingWeight),
-    mRegularizationWeight(regularizationWeight)
+    mRegularizationWeight(regularizationWeight),
+    mUseSparse(useSparse)
 {
   Eigen::Vector4s stamp;
   stamp << -1, 3, -3, 1;
   stamp *= mSmoothingWeight;
   mSmoothedTimesteps = max(0, mTimesteps - 3);
 
-  mB = Eigen::MatrixXs::Zero(mSmoothedTimesteps + mTimesteps, mTimesteps);
-  for (int i = 0; i < mSmoothedTimesteps; i++)
+  if (useSparse)
   {
-    mB.block<1, 4>(i, i) = stamp;
+    typedef Eigen::Triplet<s_t> T;
+    std::vector<T> tripletList;
+    for (int i = 0; i < mSmoothedTimesteps; i++)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        tripletList.push_back(T(i, i + j, stamp(j)));
+      }
+    }
+    for (int i = 0; i < mTimesteps; i++)
+    {
+      tripletList.push_back(T(mSmoothedTimesteps + i, i, 1));
+    }
+    mB_sparse
+        = Eigen::SparseMatrix<s_t>(mSmoothedTimesteps + mTimesteps, mTimesteps);
+    mB_sparse.setFromTriplets(tripletList.begin(), tripletList.end());
+    mB_sparse.makeCompressed();
+    mB_sparseSolver.analyzePattern(mB_sparse);
+    mB_sparseSolver.factorize(mB_sparse);
+    if (mB_sparseSolver.info() != Eigen::Success)
+    {
+      std::cout << "mB_sparseSolver.factorize(mB_sparse) error: "
+                << mB_sparseSolver.lastErrorMessage() << std::endl;
+    }
+    assert(mB_sparseSolver.info() == Eigen::Success);
   }
-  mB.block(mSmoothedTimesteps, 0, mTimesteps, mTimesteps)
-      = Eigen::MatrixXs::Identity(mTimesteps, mTimesteps);
+  else
+  {
+    mB = Eigen::MatrixXs::Zero(mSmoothedTimesteps + mTimesteps, mTimesteps);
+    for (int i = 0; i < mSmoothedTimesteps; i++)
+    {
+      mB.block<1, 4>(i, i) = stamp;
+    }
+    mB.block(mSmoothedTimesteps, 0, mTimesteps, mTimesteps)
+        = Eigen::MatrixXs::Identity(mTimesteps, mTimesteps);
 
-  mFactoredB = Eigen::HouseholderQR<Eigen::MatrixXs>(mB);
+    mFactoredB = Eigen::HouseholderQR<Eigen::MatrixXs>(mB);
+  }
 };
 
 /**
@@ -57,7 +92,16 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
     c.segment(mSmoothedTimesteps, mTimesteps)
         = mRegularizationWeight * series.row(row);
     // Eigen::VectorXs deltas = mB.completeOrthogonalDecomposition().solve(c);
-    smoothed.row(row) = mFactoredB.solve(c) * (1.0 / mRegularizationWeight);
+    if (mUseSparse)
+    {
+      smoothed.row(row)
+          = mB_sparseSolver.solve(c) * (1.0 / mRegularizationWeight);
+      assert(mB_sparseSolver.info() == Eigen::Success);
+    }
+    else
+    {
+      smoothed.row(row) = mFactoredB.solve(c) * (1.0 / mRegularizationWeight);
+    }
   }
 
   return smoothed;

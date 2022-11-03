@@ -1,6 +1,9 @@
 #ifndef UTILS_PATH_SMOOTHER
 #define UTILS_PATH_SMOOTHER
 
+#include <Eigen/Sparse>
+#include <Eigen/SparseQR>
+
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
@@ -14,7 +17,10 @@ public:
    * seriese of data.
    */
   AccelerationSmoother(
-      int timesteps, s_t smoothingWeight, s_t regularizationWeight);
+      int timesteps,
+      s_t smoothingWeight,
+      s_t regularizationWeight,
+      bool useSparse = true);
 
   /**
    * Adjust a time series of points to minimize the jerk (d/dt of acceleration)
@@ -48,8 +54,13 @@ private:
   int mSmoothedTimesteps;
   s_t mSmoothingWeight;
   s_t mRegularizationWeight;
+  bool mUseSparse;
   Eigen::MatrixXs mB;
   Eigen::HouseholderQR<Eigen::MatrixXs> mFactoredB;
+
+  Eigen::SparseMatrix<s_t> mB_sparse;
+  Eigen::SparseQR<Eigen::SparseMatrix<s_t>, Eigen::NaturalOrdering<int>>
+      mB_sparseSolver;
 };
 
 } // namespace utils

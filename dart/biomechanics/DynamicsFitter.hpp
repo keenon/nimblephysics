@@ -848,6 +848,12 @@ public:
   // 0. Smooth the accelerations.
   void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
 
+  // 0. Estimate which timesteps probably have unmeasured external forces
+  // present. By passing a number smaller than 1.0 to scaleThresholds, we can
+  // increase the rate at which we throw out potentially bad data.
+  void estimateUnmeasuredExternalForces(
+      std::shared_ptr<DynamicsInitialization> init, s_t scaleThresholds = 1.0);
+
   // 1. Adjust the total mass of the body, and change the initial positions and
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
