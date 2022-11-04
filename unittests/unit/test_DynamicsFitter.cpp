@@ -1055,18 +1055,10 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
 
   Eigen::Vector6s posOffset = Eigen::Vector6s::Zero();
   Eigen::Vector6s velOffset = Eigen::Vector6s::Zero();
-  s_t invMassOffset = 0;
   Eigen::MatrixXs qsLin = helper.getRootTrajectoryLinearSystemPoses(
-      posOffset,
-      velOffset,
-      invMassOffset,
-      qs,
-      dqs,
-      ddqs,
-      forces,
-      probablyMissingGRF);
+      posOffset, velOffset, qs, dqs, ddqs, forces, probablyMissingGRF);
   Eigen::MatrixXs qsFwd = helper.getResidualFreePoses(
-      posOffset, velOffset, invMassOffset, qs, forces, probablyMissingGRF);
+      posOffset, velOffset, qs, forces, probablyMissingGRF);
   Eigen::MatrixXs diff = qsLin - qsFwd;
 
   // Note that the forward dynamics version only begins changing at the [2]

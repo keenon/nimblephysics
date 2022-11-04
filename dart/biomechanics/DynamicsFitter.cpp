@@ -1194,13 +1194,12 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
   Eigen::VectorXs b = getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s::Zero(),
       Eigen::Vector6s::Zero(),
-      0,
       qs,
       dqs,
       ddqs,
       forces,
       probablyMissingGRF);
-  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(numTimesteps * 6, 13);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(numTimesteps * 6, 12);
 
   A.block<6, 6>(0, 0) = Eigen::Matrix6s::Identity();
 
@@ -1240,9 +1239,6 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
         = (dAcc_dOffsetPos * dOffsetPos_dInputVel)
           + (dAcc_dOffsetVel); // technically: dAcc_dOffsetVel *
                                // dOffsetVel_dInputVel
-    const Eigen::Vector6s dAcc_dOffsetInvMass
-        = calculateResidualFreeRootAccelerationJacobianWrtInvMass(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
 
     // currentPos = qs.col(1).head<6>() + initialPosOffset + initialVelOffset *
     // dt;
@@ -1269,8 +1265,6 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
           += compoundingSteps * dt * dt * dAcc_dInputPos;
       A.block<6, 6>(later * 6, 6)
           += compoundingSteps * dt * dt * dAcc_dInputVel;
-      A.block<6, 1>(later * 6, 12)
-          += compoundingSteps * dt * dt * dAcc_dOffsetInvMass;
     }
   }
 
@@ -1297,13 +1291,12 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
   Eigen::VectorXs zeroPoint = getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s::Zero(),
       Eigen::Vector6s::Zero(),
-      0,
       qs,
       dqs,
       ddqs,
       forces,
       probablyMissingGRF);
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(zeroPoint.size(), 13);
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(zeroPoint.size(), 12);
 
   const bool useRidders = true;
   s_t eps = useRidders ? 0.01 : 1e-6;
@@ -1311,13 +1304,12 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
           /*out*/ Eigen::VectorXs& perturbed) {
-        assert(dof >= 0 && dof < 13);
+        assert(dof >= 0 && dof < 12);
         if (dof < 6)
         {
           perturbed = getRootTrajectoryLinearSystemTestOutput(
               Eigen::Vector6s::Unit(dof) * eps,
               Eigen::Vector6s::Zero(),
-              0,
               qs,
               dqs,
               ddqs,
@@ -1329,20 +1321,6 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
           perturbed = getRootTrajectoryLinearSystemTestOutput(
               Eigen::Vector6s::Zero(),
               Eigen::Vector6s::Unit(dof - 6) * eps,
-              0,
-              qs,
-              dqs,
-              ddqs,
-              forces,
-              probablyMissingGRF);
-        }
-        else
-        {
-          assert(dof == 12);
-          perturbed = getRootTrajectoryLinearSystemTestOutput(
-              Eigen::Vector6s::Zero(),
-              Eigen::Vector6s::Zero(),
-              eps,
               qs,
               dqs,
               ddqs,
@@ -1373,7 +1351,6 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
 Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
     Eigen::Vector6s initialPosOffset,
     Eigen::Vector6s initialVelOffset,
-    s_t inverseMassOffset,
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
@@ -1388,17 +1365,6 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
   (void)forces;
 
   const int numTimesteps = qs.cols();
-
-  const Eigen::VectorXs originalLinkMasses = mSkel->getLinkMasses();
-  if (inverseMassOffset != 0)
-  {
-    const s_t totalMass = mSkel->getMass();
-    const s_t invTotalMass = 1.0 / totalMass;
-    const s_t offsetInvTotalMass = invTotalMass + inverseMassOffset;
-    const s_t updatedMass = 1.0 / offsetInvTotalMass;
-    const s_t percentage = updatedMass / totalMass;
-    mSkel->setLinkMasses(originalLinkMasses * percentage);
-  }
 
   const s_t dt = mSkel->getTimeStep();
 
@@ -1444,18 +1410,12 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
     currentVel = nextVel;
   }
 
-  if (inverseMassOffset != 0)
-  {
-    mSkel->setLinkMasses(originalLinkMasses);
-  }
-
   return result;
 }
 
 Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
     Eigen::Vector6s initialPosOffset,
     Eigen::Vector6s initialVelOffset,
-    s_t inverseMassOffset,
     Eigen::MatrixXs qs,
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
@@ -1466,7 +1426,6 @@ Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
       = getRootTrajectoryLinearSystemTestOutput(
           initialPosOffset,
           initialVelOffset,
-          inverseMassOffset,
           qs,
           dqs,
           ddqs,
@@ -1483,13 +1442,11 @@ Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
 Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
     Eigen::Vector6s initialPosOffset,
     Eigen::Vector6s initialVelOffset,
-    s_t inverseMassOffset,
     Eigen::MatrixXs qs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF)
 {
   const int dimsToLetFree = 6;
-  (void)inverseMassOffset;
 
   s_t dt = mSkel->getTimeStep();
   s_t totalChange = 0.0;
@@ -5666,11 +5623,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     return;
   }
 
-  for (s_t threshold = 1.0; threshold > 0.0001; threshold *= 0.5)
+  for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
   {
-    std::cout << "Detecting external forces, with thresholds at "
-              << (threshold * 100) << " percent of normal." << std::endl;
-    estimateUnmeasuredExternalForces(init, threshold);
     Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeUnobservedTimesteps = 1.0;
 
@@ -5685,10 +5639,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     int totalRows = 0;
 
     std::cout << "Zeroing linear residuals in the COM trajectory" << std::endl;
-    std::cout
-        << "Reducing the threshold for detecting external forces and trying "
-           "again, because we had at least one trial that changed too much."
-        << std::endl;
 
     std::vector<int> trialNumMissingSteps;
     for (int i = 0; i < init->poseTrials.size(); i++)
@@ -6106,6 +6056,11 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
           << "Reducing the threshold for detecting external forces and trying "
              "again, because we had at least one trial that changed too much."
           << std::endl;
+
+      std::cout << "Detecting external forces, with thresholds at "
+                << (threshold * 100) << " percent of normal." << std::endl;
+      estimateUnmeasuredExternalForces(init, threshold);
+
       continue;
     }
 
@@ -6188,6 +6143,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     */
 
     assert(timeCursor == totalTimesteps);
+    std::cout << "Finished zeroing linear residuals." << std::endl;
+    break;
   }
 }
 
@@ -6198,25 +6155,23 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init, s_t satisfactoryThreshold)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
-  (void)helper;
-
-  int totalTimesteps = 0;
   const int numTrials = init->poseTrials.size();
+
+  // We hold mass fixed, so it's possible to optimize each trial sequentially,
+  // saving us time on matrix factorazation.
   for (int trial = 0; trial < numTrials; trial++)
   {
-    totalTimesteps += init->poseTrials[trial].cols();
-  }
+    mSkeleton->setTimeStep(init->trialTimesteps[trial]);
+    mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
-  const bool includeMass = false;
-  int numVariables = numTrials * 12;
-  if (includeMass)
-    numVariables++;
+    // Get the original data about this trial
+    s_t dt = init->trialTimesteps[trial];
+    std::vector<bool> probablyMissingGRF;
+    if (init->probablyMissingGRF.size() > trial)
+    {
+      probablyMissingGRF = init->probablyMissingGRF[trial];
+    }
 
-  int rowCursor = 0;
-  Eigen::VectorXs fullOriginalTrajectory
-      = Eigen::VectorXs::Zero((totalTimesteps * 6) + numVariables);
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
-  {
     Eigen::VectorXs originalTrajectory
         = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
@@ -6224,220 +6179,164 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       originalTrajectory.segment<6>(t * 6)
           = init->poseTrials[trial].col(t).head<6>();
     }
-    fullOriginalTrajectory.segment(rowCursor, originalTrajectory.size())
-        = originalTrajectory;
-    rowCursor += originalTrajectory.size();
-  }
 
-  std::vector<Eigen::Vector3s> trialShiftPos;
-  std::vector<Eigen::Vector3s> trialShiftVel;
-  std::vector<s_t> trialAvgMove;
-  std::vector<s_t> trialAvgRot;
+    // auto dummyMatrices =
+    // optimizeSpatialResidualsOnCOMTrajectoryOldDummy(init);
 
-  // Rule of thumb: this process solves one timestep at a time, approximately,
-  // from left to right.
-  const int numIters = totalTimesteps;
-  for (int iter = 0; iter < numIters; iter++)
-  {
-    std::vector<Eigen::MatrixXs> qs;
-    std::vector<Eigen::MatrixXs> dqs;
-    std::vector<Eigen::MatrixXs> ddqs;
-    for (int trial = 0; trial < numTrials; trial++)
+    const int optimizationBlockSize = 200;
+
+    // We will progressively add more steps to the optimization, until we've
+    // solved the entire trajectory. We don't take the whole trajectory at once,
+    // because some trajectories are thousands of timesteps long and non-linear
+    // effects at the tail can prevent convergence.
+    int limitSteps = optimizationBlockSize;
+    while (true)
     {
-      s_t dt = init->trialTimesteps[trial];
-      Eigen::MatrixXs q = Eigen::MatrixXs::Zero(
-          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
-      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      int totalSteps = init->poseTrials[trial].cols();
+      if (totalSteps > limitSteps)
       {
-        q.col(t) = init->poseTrials[trial].col(t);
-      }
-      for (int t = 1; t < init->poseTrials[trial].cols(); t++)
-      {
-        dq.col(t) = (init->poseTrials[trial].col(t)
-                     - init->poseTrials[trial].col(t - 1))
-                    / dt;
-      }
-      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
-      {
-        ddq.col(t) = (init->poseTrials[trial].col(t + 1)
-                      - 2 * init->poseTrials[trial].col(t)
-                      + init->poseTrials[trial].col(t - 1))
-                     / (dt * dt);
-      }
-
-      // We start with the same velocity as the 2nd timestep, and with 0
-      // acceleration. This is the best projection we can make given the data.
-      dq.col(0) = dq.col(1);
-      ddq.col(0).setZero();
-
-      qs.push_back(q);
-      dqs.push_back(dq);
-      ddqs.push_back(ddq);
-    }
-
-    s_t residualCost = 0.0;
-    for (int trial = 0; trial < numTrials; trial++)
-    {
-      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
-      {
-        // Don't count any timesteps without observations
-        if (init->probablyMissingGRF.size() > trial
-            && init->probablyMissingGRF[trial].size() > t
-            && init->probablyMissingGRF[trial][t])
-        {
-          continue;
-        }
-
-        s_t thisTimestepCost = helper.calculateResidualNorm(
-            qs[trial].col(t),
-            dqs[trial].col(t),
-            ddqs[trial].col(t),
-            init->grfTrials[trial].col(t),
-            0,
-            false);
-        // std::cout << t << ": " << thisTimestepCost << ", ";
-        residualCost += thisTimestepCost;
-      }
-    }
-    residualCost /= totalTimesteps;
-    std::cout << "Spatial residual reduction iter " << iter << "/" << numIters
-              << " - avg residual norm: " << residualCost << std::endl;
-    if (residualCost < satisfactoryThreshold)
-    {
-      std::cout << "Reached satisfactory residuals. Exiting optimization early."
-                << std::endl;
-      break;
-    }
-
-    // [pos, vel] for each trial, plus one unified mass
-    Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(
-        (totalTimesteps * 6) + numVariables, numVariables);
-    Eigen::VectorXs fullB
-        = Eigen::VectorXs::Zero((totalTimesteps * 6) + numVariables);
-
-    rowCursor = 0;
-    int colCursor = 0;
-    for (int trial = 0; trial < init->poseTrials.size(); trial++)
-    {
-      mSkeleton->setTimeStep(init->trialTimesteps[trial]);
-      mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
-
-      std::vector<bool> probablyMissingGRF;
-      if (init->probablyMissingGRF.size() > trial)
-      {
-        probablyMissingGRF = init->probablyMissingGRF[trial];
-      }
-      std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
-          = helper.getRootTrajectoryLinearSystem(
-              qs[trial],
-              dqs[trial],
-              ddqs[trial],
-              init->grfTrials[trial],
-              probablyMissingGRF);
-      Eigen::MatrixXs A = linearSystem.first;
-      Eigen::VectorXs b = linearSystem.second;
-
-      fullA.block(rowCursor, colCursor, A.rows(), 12)
-          = A.block(0, 0, A.rows(), 12);
-      if (includeMass)
-      {
-        // Copy inv-mass to a shared column across all the trials
-        fullA.block(rowCursor, fullA.cols() - 1, A.rows(), 1)
-            = A.block(0, A.cols() - 1, A.rows(), 1);
-      }
-      fullB.segment(rowCursor, b.size()) = b;
-      rowCursor += A.rows();
-      if (includeMass)
-      {
-        colCursor += A.cols() - 1;
+        totalSteps = limitSteps;
+        std::cout << "Attempting to optimize residuals for the first "
+                  << totalSteps << "/" << init->poseTrials[trial].cols()
+                  << " timesteps for trial " << trial << std::endl;
       }
       else
       {
-        colCursor += A.cols();
+        std::cout << "Attempting to optimize residuals for all "
+                  << init->poseTrials[trial].cols() << " timesteps for trial "
+                  << trial << std::endl;
       }
-    }
 
-    // Heavy regularize everything
-    s_t regularization = 0.5;
-    fullA.block(rowCursor, 0, fullA.cols(), fullA.cols())
-        = regularization
-          * Eigen::MatrixXs::Identity(fullA.cols(), fullA.cols());
-
-    Eigen::VectorXs solution = fullA.completeOrthogonalDecomposition().solve(
-        fullOriginalTrajectory - fullB);
-
-    // Scale masses
-    if (includeMass)
-    {
-      s_t invMass = solution(solution.size() - 1);
-      s_t newMass = 1.0 / invMass;
-      s_t percentage = newMass / mSkeleton->getMass();
-      mSkeleton->setLinkMasses(mSkeleton->getLinkMasses() * percentage);
-    }
-
-    // Update trajectory
-
-    trialShiftPos.clear();
-    trialShiftVel.clear();
-    trialAvgMove.clear();
-    trialAvgRot.clear();
-
-    Eigen::VectorXs newTrajectory = (fullA * solution) + fullB;
-    rowCursor = 0;
-    for (int trial = 0; trial < numTrials; trial++)
-    {
-      Eigen::Vector3s deltaPos = solution.segment<3>(trial * 6);
-      Eigen::Vector3s deltaVel = solution.segment<3>(trial * 6 + 3);
-
-      trialShiftPos.push_back(deltaPos);
-      trialShiftVel.push_back(deltaVel);
-
-      s_t movedPos = 0.0;
-      s_t movedAngle = 0.0;
-      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      const int numIters = 5000;
+      for (int iter = 0; iter < numIters; iter++)
       {
-        // newTrajectory
-        Eigen::Vector6s newRoot = newTrajectory.segment<6>(rowCursor);
-        Eigen::Vector6s diff
-            = newRoot - init->poseTrials[trial].col(t).head<6>();
-        init->poseTrials[trial].col(t).head<6>() = newRoot;
+        ////////////////////////////////
+        // Finite difference out dq, ddq using latest values
+        ////////////////////////////////
 
-        movedAngle += diff.head<3>().norm();
-        movedPos += diff.tail<3>().norm();
+        Eigen::MatrixXs q
+            = Eigen::MatrixXs::Zero(init->poseTrials[trial].rows(), totalSteps);
+        Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+        Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+        for (int t = 0; t < totalSteps; t++)
+        {
+          q.col(t) = init->poseTrials[trial].col(t);
+        }
+        for (int t = 1; t < totalSteps; t++)
+        {
+          dq.col(t) = (init->poseTrials[trial].col(t)
+                       - init->poseTrials[trial].col(t - 1))
+                      / dt;
+        }
+        for (int t = 1; t < totalSteps - 1; t++)
+        {
+          ddq.col(t) = (init->poseTrials[trial].col(t + 1)
+                        - 2 * init->poseTrials[trial].col(t)
+                        + init->poseTrials[trial].col(t - 1))
+                       / (dt * dt);
+        }
 
-        rowCursor += 6;
+        // We start with the same velocity as the 2nd timestep, and with 0
+        // acceleration. This is the best projection we can make given the data.
+        dq.col(0) = dq.col(1);
+        ddq.col(0).setZero();
+
+        ////////////////////////////////
+        // Check residual cost
+        ////////////////////////////////
+
+        s_t residualCost = 0.0;
+        int totalCountedResiduals = 0;
+        for (int t = 1; t < totalSteps - 1; t++)
+        {
+          // Don't count any timesteps without observations
+          if (init->probablyMissingGRF.size() > trial
+              && init->probablyMissingGRF[trial].size() > t
+              && init->probablyMissingGRF[trial][t])
+          {
+            continue;
+          }
+
+          s_t thisTimestepCost = helper.calculateResidualNorm(
+              q.col(t),
+              dq.col(t),
+              ddq.col(t),
+              init->grfTrials[trial].col(t),
+              0,
+              false);
+          // std::cout << t << ": " << thisTimestepCost << ", ";
+          residualCost += thisTimestepCost;
+          totalCountedResiduals++;
+        }
+        residualCost /= totalCountedResiduals;
+        std::cout << "Spatial residual reduction iter " << iter << "/"
+                  << numIters << " - avg residual norm: " << residualCost
+                  << std::endl;
+        if (residualCost < satisfactoryThreshold)
+        {
+          std::cout
+              << "Reached satisfactory residuals. Exiting optimization early."
+              << std::endl;
+          break;
+        }
+
+        ////////////////////////////////
+        // Build linear system at current configuration
+        ////////////////////////////////
+
+        std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
+            = helper.getRootTrajectoryLinearSystem(
+                q.block(0, 0, q.rows(), totalSteps),
+                dq.block(0, 0, dq.rows(), totalSteps),
+                ddq.block(0, 0, ddq.rows(), totalSteps),
+                init->grfTrials[trial],
+                probablyMissingGRF);
+        Eigen::MatrixXs A = linearSystem.first;
+        Eigen::VectorXs b = linearSystem.second;
+
+        ////////////////////////////////
+        // Regularize and solve the linear system
+        ////////////////////////////////
+
+        s_t regularization = 0.5;
+        Eigen::MatrixXs fullA
+            = Eigen::MatrixXs::Zero(A.rows() + A.cols(), A.cols());
+        fullA.block(0, 0, A.rows(), A.cols()) = A;
+        fullA.block(A.rows(), 0, A.cols(), A.cols())
+            = regularization * Eigen::MatrixXs::Identity(A.cols(), A.cols());
+        Eigen::VectorXs fullB = Eigen::VectorXs::Zero(b.size() + A.cols());
+        fullB.segment(0, b.size()) = b;
+        Eigen::VectorXs fullOriginalTrajectory
+            = Eigen::VectorXs::Zero(fullB.size());
+        fullOriginalTrajectory.segment(0, totalSteps * 6)
+            = originalTrajectory.segment(0, totalSteps * 6);
+
+        Eigen::VectorXs solution
+            = fullA.completeOrthogonalDecomposition().solve(
+                fullOriginalTrajectory - fullB);
+
+        ////////////////////////////////
+        // Decode the linear system into our state
+        ////////////////////////////////
+
+        Eigen::VectorXs newTrajectory = (fullA * solution) + fullB;
+
+        for (int t = 0; t < totalSteps; t++)
+        {
+          init->poseTrials[trial].col(t).head<6>()
+              = newTrajectory.segment<6>(t * 6);
+        }
       }
 
-      movedPos /= init->poseTrials[trial].cols();
-      movedAngle /= init->poseTrials[trial].cols();
-
-      trialAvgMove.push_back(movedPos);
-      trialAvgRot.push_back(movedAngle);
-
-      if (includeMass)
+      // If we've just optimized over the whole trajectory at once, then we're
+      // done!
+      if (totalSteps == init->poseTrials[trial].cols())
       {
-        // Copy the trajectory back into the init
-        init->bodyMasses = mSkeleton->getLinkMasses();
-        init->groupMasses = mSkeleton->getGroupMasses();
+        break;
       }
-    }
-  }
 
-  // Print at the end
-  for (int trial = 0; trial < trialShiftPos.size(); trial++)
-  {
-    std::cout << "Trial " << trial << " moving starting pos by: " << std::endl
-              << trialShiftPos[trial] << std::endl;
-    std::cout << "Trial " << trial << " changing starting vel by: " << std::endl
-              << trialShiftVel[trial] << std::endl;
-    std::cout << "Trial " << trial
-              << " avg shift pos by: " << trialAvgMove[trial] << "m"
-              << std::endl;
-    std::cout << "Trial " << trial
-              << " avg shift angle by: " << trialAvgRot[trial] << "r"
-              << std::endl;
+      limitSteps += optimizationBlockSize;
+    }
   }
 }
 

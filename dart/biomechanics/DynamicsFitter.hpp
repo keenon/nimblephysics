@@ -302,7 +302,6 @@ public:
   Eigen::VectorXs getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
-      s_t inverseMassOffset,
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
@@ -312,7 +311,6 @@ public:
   Eigen::MatrixXs getRootTrajectoryLinearSystemPoses(
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
-      s_t inverseMassOffset,
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
@@ -322,7 +320,6 @@ public:
   Eigen::MatrixXs getResidualFreePoses(
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
-      s_t inverseMassOffset,
       Eigen::MatrixXs qs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF);
