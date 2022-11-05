@@ -1411,6 +1411,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.smoothAccelerations(init);
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  fitter.recalibrateForcePlates(init);
 
   // if (!fitter.verifyLinearForceConsistency(init))
   // {
@@ -1419,7 +1420,6 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // }
 
   fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
-  fitter.recalibrateForcePlates(init);
 
   auto secondPair = fitter.computeAverageRealForce(init);
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;

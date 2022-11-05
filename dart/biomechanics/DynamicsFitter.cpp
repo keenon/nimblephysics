@@ -6172,68 +6172,67 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       probablyMissingGRF = init->probablyMissingGRF[trial];
     }
 
-    Eigen::VectorXs originalTrajectory
-        = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
-    {
-      originalTrajectory.segment<6>(t * 6)
-          = init->poseTrials[trial].col(t).head<6>();
-    }
-
     // auto dummyMatrices =
     // optimizeSpatialResidualsOnCOMTrajectoryOldDummy(init);
 
-    const int optimizationBlockSize = 200;
+    const int optimizationBlockSize = 100;
+    const int shiftBy = 50;
 
     // We will progressively add more steps to the optimization, until we've
     // solved the entire trajectory. We don't take the whole trajectory at once,
     // because some trajectories are thousands of timesteps long and non-linear
     // effects at the tail can prevent convergence.
     int limitSteps = optimizationBlockSize;
-    while (true)
+
+    int cursor = 0;
+    while (cursor < init->poseTrials[trial].cols())
     {
-      int totalSteps = init->poseTrials[trial].cols();
+      Eigen::VectorXs targetTrajectory
+          = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        targetTrajectory.segment<6>(t * 6)
+            = init->poseTrials[trial].col(t).head<6>();
+      }
+
+      int totalSteps = init->poseTrials[trial].cols() - cursor;
       if (totalSteps > limitSteps)
       {
         totalSteps = limitSteps;
-        std::cout << "Attempting to optimize residuals for the first "
-                  << totalSteps << "/" << init->poseTrials[trial].cols()
-                  << " timesteps for trial " << trial << std::endl;
+        std::cout << "Attempting to optimize residuals for the " << cursor
+                  << "-" << (cursor + totalSteps) << " (total "
+                  << init->poseTrials[trial].cols() << ") timesteps for trial "
+                  << trial << std::endl;
       }
       else
       {
-        std::cout << "Attempting to optimize residuals for all "
-                  << init->poseTrials[trial].cols() << " timesteps for trial "
-                  << trial << std::endl;
+        std::cout << "Attempting to optimize residuals for last " << totalSteps
+                  << " timesteps for trial " << trial << std::endl;
       }
 
-      const int numIters = 5000;
+      Eigen::MatrixXs q
+          = Eigen::MatrixXs::Zero(init->poseTrials[trial].rows(), totalSteps);
+      for (int t = 0; t < totalSteps; t++)
+      {
+        q.col(t) = init->poseTrials[trial].col(t + cursor);
+      }
+
+      const int numIters = 500;
       for (int iter = 0; iter < numIters; iter++)
       {
         ////////////////////////////////
         // Finite difference out dq, ddq using latest values
         ////////////////////////////////
 
-        Eigen::MatrixXs q
-            = Eigen::MatrixXs::Zero(init->poseTrials[trial].rows(), totalSteps);
         Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
         Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-        for (int t = 0; t < totalSteps; t++)
-        {
-          q.col(t) = init->poseTrials[trial].col(t);
-        }
         for (int t = 1; t < totalSteps; t++)
         {
-          dq.col(t) = (init->poseTrials[trial].col(t)
-                       - init->poseTrials[trial].col(t - 1))
-                      / dt;
+          dq.col(t) = (q.col(t) - q.col(t - 1)) / dt;
         }
         for (int t = 1; t < totalSteps - 1; t++)
         {
-          ddq.col(t) = (init->poseTrials[trial].col(t + 1)
-                        - 2 * init->poseTrials[trial].col(t)
-                        + init->poseTrials[trial].col(t - 1))
-                       / (dt * dt);
+          ddq.col(t) = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
         }
 
         // We start with the same velocity as the 2nd timestep, and with 0
@@ -6261,7 +6260,7 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
               q.col(t),
               dq.col(t),
               ddq.col(t),
-              init->grfTrials[trial].col(t),
+              init->grfTrials[trial].col(t + cursor),
               0,
               false);
           // std::cout << t << ": " << thisTimestepCost << ", ";
@@ -6286,10 +6285,11 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 
         std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
             = helper.getRootTrajectoryLinearSystem(
-                q.block(0, 0, q.rows(), totalSteps),
-                dq.block(0, 0, dq.rows(), totalSteps),
-                ddq.block(0, 0, ddq.rows(), totalSteps),
-                init->grfTrials[trial],
+                q,
+                dq,
+                ddq,
+                init->grfTrials[trial].block(
+                    0, cursor, init->grfTrials[trial].rows(), totalSteps),
                 probablyMissingGRF);
         Eigen::MatrixXs A = linearSystem.first;
         Eigen::VectorXs b = linearSystem.second;
@@ -6309,24 +6309,116 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         Eigen::VectorXs fullOriginalTrajectory
             = Eigen::VectorXs::Zero(fullB.size());
         fullOriginalTrajectory.segment(0, totalSteps * 6)
-            = originalTrajectory.segment(0, totalSteps * 6);
+            = targetTrajectory.segment(cursor * 6, totalSteps * 6);
 
+        Eigen::VectorXs desired = fullOriginalTrajectory - fullB;
+
+        s_t weightFirstFewTimesteps = 1000 * totalSteps;
+        const int weightTimestepNum = 5;
+        if (cursor > 0)
+        {
+          desired.segment(0, weightTimestepNum * 6) *= weightFirstFewTimesteps;
+          fullA.block(0, 0, weightTimestepNum * 6, fullA.cols())
+              *= weightFirstFewTimesteps;
+        }
         Eigen::VectorXs solution
-            = fullA.completeOrthogonalDecomposition().solve(
-                fullOriginalTrajectory - fullB);
+            = fullA.completeOrthogonalDecomposition().solve(desired);
 
         ////////////////////////////////
         // Decode the linear system into our state
         ////////////////////////////////
 
-        Eigen::VectorXs newTrajectory = (fullA * solution) + fullB;
+        Eigen::VectorXs recovered = (fullA * solution);
+        if (cursor > 0)
+        {
+          recovered.segment(0, weightTimestepNum * 6)
+              /= weightFirstFewTimesteps;
+        }
+        Eigen::VectorXs newTrajectory = recovered + fullB;
 
         for (int t = 0; t < totalSteps; t++)
         {
-          init->poseTrials[trial].col(t).head<6>()
-              = newTrajectory.segment<6>(t * 6);
+          q.col(t).head<6>() = newTrajectory.segment<6>(t * 6);
         }
       }
+
+      ////////////////////////////////
+      // Projecting pos and vel differences from the original, if necessary
+      ////////////////////////////////
+
+      // Eigen::Vector6s oldPos
+      //     = init->poseTrials[trial].col(cursor + totalSteps - 1).head<6>();
+      // Eigen::Vector6s newPos = q.col(totalSteps - 1).head<6>();
+      // Eigen::Vector6s posDiff = newPos - oldPos;
+
+      // Eigen::Vector6s oldVel
+      //     = (init->poseTrials[trial].col(cursor + totalSteps - 1).head<6>()
+      //        - init->poseTrials[trial].col(cursor + totalSteps -
+      //        2).head<6>())
+      //       / dt;
+      // Eigen::Vector6s newVel
+      //     = (q.col(totalSteps - 1).head<6>() - q.col(totalSteps -
+      //     2).head<6>())
+      //       / dt;
+      // Eigen::Vector6s velDiff = newVel - oldVel;
+
+      Eigen::MatrixXs oldAccLinear = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        oldAccLinear.col(t)
+            = (init->poseTrials[trial].col(t + 1)
+               - 2 * init->poseTrials[trial].col(t)
+               + init->poseTrials[trial].col(t - 1));
+      }
+
+      ////////////////////////////////
+      // Update the poseTrials[trial] data
+      ////////////////////////////////
+
+      int cutoff = cursor + totalSteps;
+      for (int t = cursor; t < init->poseTrials[trial].cols(); t++)
+      {
+        if (t < cutoff)
+        {
+          Eigen::Vector6s diff
+              = (q.col(t - cursor).head<6>()
+                 - init->poseTrials[trial].col(t).head<6>());
+          std::cout << "T[" << t << "]=" << diff.norm() << std::endl;
+          init->poseTrials[trial].col(t).head<6>() += diff;
+        }
+        else
+        {
+          // Pick a position to preserve the old acceleration values
+          Eigen::VectorXs formula = oldAccLinear.col(t - 1)
+                                    + 2 * init->poseTrials[trial].col(t - 1)
+                                    - init->poseTrials[trial].col(t - 2);
+
+          Eigen::Vector6s diff
+              = (formula.head<6>() - init->poseTrials[trial].col(t).head<6>());
+          std::cout << "After T[" << t << "]=" << diff.norm() << std::endl;
+          init->poseTrials[trial].col(t).head<6>() += diff;
+        }
+      }
+
+      // #ifndef NDEBUG
+      Eigen::MatrixXs updatedAccLinear = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        updatedAccLinear.col(t)
+            = (init->poseTrials[trial].col(t + 1)
+               - 2 * init->poseTrials[trial].col(t)
+               + init->poseTrials[trial].col(t - 1));
+        if (t >= cursor + totalSteps - 1)
+        {
+          if ((updatedAccLinear.col(t) - oldAccLinear.col(t)).norm() > 1e-8)
+          {
+            std::cout << "Linear bad at time t=" << t << "!" << std::endl;
+          }
+        }
+      }
+      // #endif
 
       // If we've just optimized over the whole trajectory at once, then we're
       // done!
@@ -6335,7 +6427,7 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         break;
       }
 
-      limitSteps += optimizationBlockSize;
+      cursor += shiftBy;
     }
   }
 }
@@ -7847,9 +7939,12 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
                             / (dt * dt);
       Eigen::Vector6s residual
           = helper.calculateResidual(q, dq, ddq, init->grfTrials[trial].col(t));
-      torque += residual.head<3>().norm();
+      s_t frameTorque = residual.head<3>().norm();
+      torque += frameTorque;
       s_t frameForce = residual.tail<3>().norm();
       force += frameForce;
+      std::cout << t << ":" << frameForce << "N," << frameTorque << "Nm"
+                << std::endl;
       count++;
     }
   }

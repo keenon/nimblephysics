@@ -861,7 +861,7 @@ public:
   // rotation.
   void optimizeSpatialResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
-      s_t satisfactoryThreshold = 1e-5);
+      s_t satisfactoryThreshold = 1e-10);
 
   // 1.2. Now that we've got zero residuals, after calling
   // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
