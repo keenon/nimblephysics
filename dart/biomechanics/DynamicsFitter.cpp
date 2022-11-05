@@ -6081,7 +6081,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       // missing timesteps
       timeCursor += trialNumMissingSteps[trial];
     }
-    assert(timeCursor == totalTimesteps);
 
     /*
   #ifndef NDEBUG
@@ -6142,7 +6141,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
   #endif
     */
 
-    assert(timeCursor == totalTimesteps);
     std::cout << "Finished zeroing linear residuals." << std::endl;
     break;
   }
@@ -6171,9 +6169,15 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     {
       probablyMissingGRF = init->probablyMissingGRF[trial];
     }
-
-    // auto dummyMatrices =
-    // optimizeSpatialResidualsOnCOMTrajectoryOldDummy(init);
+    Eigen::MatrixXs originalDdqUnscaled = Eigen::MatrixXs::Zero(
+        init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+    {
+      originalDdqUnscaled.col(t)
+          = (init->poseTrials[trial].col(t + 1)
+             - 2 * init->poseTrials[trial].col(t)
+             + init->poseTrials[trial].col(t - 1));
+    }
 
     const int optimizationBlockSize = 100;
     const int shiftBy = 50;
@@ -6235,6 +6239,35 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
           ddq.col(t) = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
         }
 
+#ifndef NDEBUG
+        // In debug mode, check that accelerations are always preserved on
+        // frames that have unmeasured external forces
+        for (int t = 1; t < totalSteps - 1; t++)
+        {
+          if (probablyMissingGRF.size() > t + cursor
+              && probablyMissingGRF[t + cursor])
+          {
+            Eigen::Vector6s originalUnscaledDdq
+                = originalDdqUnscaled.col(t + cursor).head<6>();
+            Eigen::Vector6s unscaledDdq
+                = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
+            if ((unscaledDdq - originalUnscaledDdq).norm() > 1e-12)
+            {
+              std::cout << "Failed to preserve acceleration for missing GRF on "
+                           "timestep T="
+                        << (t + cursor) << std::endl;
+              Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+              compare.col(0) = originalUnscaledDdq;
+              compare.col(1) = unscaledDdq;
+              compare.col(2) = originalUnscaledDdq - unscaledDdq;
+              std::cout << "Original ddq - Present ddq - Diff" << std::endl
+                        << compare << std::endl;
+            }
+            assert((unscaledDdq - originalUnscaledDdq).norm() < 1e-12);
+          }
+        }
+#endif
+
         // We start with the same velocity as the 2nd timestep, and with 0
         // acceleration. This is the best projection we can make given the data.
         dq.col(0) = dq.col(1);
@@ -6250,8 +6283,8 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         {
           // Don't count any timesteps without observations
           if (init->probablyMissingGRF.size() > trial
-              && init->probablyMissingGRF[trial].size() > t
-              && init->probablyMissingGRF[trial][t])
+              && init->probablyMissingGRF[trial].size() > t + cursor
+              && init->probablyMissingGRF[trial][t + cursor])
           {
             continue;
           }
@@ -6283,6 +6316,11 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         // Build linear system at current configuration
         ////////////////////////////////
 
+        std::vector<bool> probablyMissingGRFWindow;
+        for (int t = 0; t < totalSteps; t++)
+        {
+          probablyMissingGRFWindow.push_back(probablyMissingGRF[t + cursor]);
+        }
         std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
             = helper.getRootTrajectoryLinearSystem(
                 q,
@@ -6290,7 +6328,7 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
                 ddq,
                 init->grfTrials[trial].block(
                     0, cursor, init->grfTrials[trial].rows(), totalSteps),
-                probablyMissingGRF);
+                probablyMissingGRFWindow);
         Eigen::MatrixXs A = linearSystem.first;
         Eigen::VectorXs b = linearSystem.second;
 
@@ -6324,6 +6362,25 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         Eigen::VectorXs solution
             = fullA.completeOrthogonalDecomposition().solve(desired);
 
+        // Keep solutions within reasonable bounds, never offset the trajectory
+        // too far
+        s_t maxPosOffsets = 0.1;
+        for (int i = 0; i < 6; i++)
+        {
+          if (solution(i) > maxPosOffsets)
+            solution(i) = maxPosOffsets;
+          if (solution(i) < -maxPosOffsets)
+            solution(i) = -maxPosOffsets;
+        }
+        s_t maxVelOffsets = 5.0;
+        for (int i = 6; i < 12; i++)
+        {
+          if (solution(i) > maxVelOffsets)
+            solution(i) = maxVelOffsets;
+          if (solution(i) < -maxVelOffsets)
+            solution(i) = -maxVelOffsets;
+        }
+
         ////////////////////////////////
         // Decode the linear system into our state
         ////////////////////////////////
@@ -6343,33 +6400,90 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       }
 
       ////////////////////////////////
-      // Projecting pos and vel differences from the original, if necessary
+      // Check for differences from the original trajectory. This is important
+      // for detecting unmeasured external forces acting on the body at certain
+      // frames, that might otherwise throw our solution off course.
       ////////////////////////////////
 
-      // Eigen::Vector6s oldPos
-      //     = init->poseTrials[trial].col(cursor + totalSteps - 1).head<6>();
-      // Eigen::Vector6s newPos = q.col(totalSteps - 1).head<6>();
-      // Eigen::Vector6s posDiff = newPos - oldPos;
-
-      // Eigen::Vector6s oldVel
-      //     = (init->poseTrials[trial].col(cursor + totalSteps - 1).head<6>()
-      //        - init->poseTrials[trial].col(cursor + totalSteps -
-      //        2).head<6>())
-      //       / dt;
-      // Eigen::Vector6s newVel
-      //     = (q.col(totalSteps - 1).head<6>() - q.col(totalSteps -
-      //     2).head<6>())
-      //       / dt;
-      // Eigen::Vector6s velDiff = newVel - oldVel;
-
-      Eigen::MatrixXs oldAccLinear = Eigen::MatrixXs::Zero(
-          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
-      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      Eigen::VectorXs posDiffs = Eigen::VectorXs::Zero(q.cols());
+      Eigen::VectorXs accDiffs = Eigen::VectorXs::Zero(q.cols());
+      for (int t = 1; t < q.cols() - 1; t++)
       {
-        oldAccLinear.col(t)
-            = (init->poseTrials[trial].col(t + 1)
-               - 2 * init->poseTrials[trial].col(t)
-               + init->poseTrials[trial].col(t - 1));
+        Eigen::Vector6s updatedAcc
+            = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
+        Eigen::Vector6s originalAcc
+            = originalDdqUnscaled.col(t + cursor).head<6>();
+
+        s_t diff = 1.0
+                   - (updatedAcc.dot(originalAcc)
+                      / (updatedAcc.norm() * originalAcc.norm()));
+        diff *= diff;
+        accDiffs(t) = diff;
+
+        Eigen::Vector6s posDiff
+            = (q.col(t).head<6>()
+               - init->poseTrials[trial].col(t + cursor).head<6>());
+        posDiffs(t) = posDiff.norm();
+      }
+      // TODO: use position difference information in a more robust algorithm to
+      // detect bad timesteps
+      (void)posDiffs;
+
+      const s_t accDiffFilterThreshold = 0.1;
+      const int accFilterExtendForFrames = 5;
+
+      bool anyFiltered = false;
+      for (int t = 1; t < accDiffs.size(); t++)
+      {
+        if (accDiffs(t) > accDiffFilterThreshold)
+        {
+          std::cout
+              << "Marking the next " << accFilterExtendForFrames
+              << " frames as probablying missing some measured external forces"
+              << std::endl;
+          // Mark the next few frames as missing their GRF data
+          for (int i = 0; i < 5; i++)
+          {
+            if (t + cursor + i < probablyMissingGRF.size())
+            {
+              probablyMissingGRF[t + cursor + i] = true;
+            }
+          }
+          // Re-jig the positions to reset acceleration on these and following
+          // timesteps to the original values in the initialization.
+          for (int i = cursor + t + 1; i < init->poseTrials[trial].cols(); i++)
+          {
+            Eigen::VectorXs positionToPreserveAcceleration
+                = originalDdqUnscaled.col(i - 1)
+                  + 2 * init->poseTrials[trial].col(i - 1)
+                  - init->poseTrials[trial].col(i - 2);
+
+            Eigen::Vector6s diff
+                = (positionToPreserveAcceleration.head<6>()
+                   - init->poseTrials[trial].col(i).head<6>());
+            // std::cout << "Adjusting For Acc T[" << i << "]=" << diff.norm()
+            //           << std::endl;
+            init->poseTrials[trial].col(i).head<6>() += diff;
+          }
+
+#ifndef NDEBUG
+          Eigen::Vector6s newAcc
+              = (init->poseTrials[trial].col(t + cursor + 1)
+                 - 2 * init->poseTrials[trial].col(t + cursor)
+                 + init->poseTrials[trial].col(t + cursor - 1))
+                    .head<6>();
+          assert((newAcc - originalAcc).norm() < 1e-12);
+#endif
+
+          init->probablyMissingGRF[trial] = probablyMissingGRF;
+          anyFiltered = true;
+          break;
+        }
+      }
+      if (anyFiltered)
+      {
+        std::cout << "Re-trying this optimization block" << std::endl;
+        continue;
       }
 
       ////////////////////////////////
@@ -6389,40 +6503,43 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         }
         else
         {
-          // Pick a position to preserve the old acceleration values
-          Eigen::VectorXs formula = oldAccLinear.col(t - 1)
-                                    + 2 * init->poseTrials[trial].col(t - 1)
-                                    - init->poseTrials[trial].col(t - 2);
+          Eigen::VectorXs positionToPreserveAcceleration
+              = originalDdqUnscaled.col(t - 1)
+                + 2 * init->poseTrials[trial].col(t - 1)
+                - init->poseTrials[trial].col(t - 2);
 
           Eigen::Vector6s diff
-              = (formula.head<6>() - init->poseTrials[trial].col(t).head<6>());
-          std::cout << "After T[" << t << "]=" << diff.norm() << std::endl;
+              = (positionToPreserveAcceleration.head<6>()
+                 - init->poseTrials[trial].col(t).head<6>());
+          // std::cout << "After T[" << t << "]=" << diff.norm() << std::endl;
           init->poseTrials[trial].col(t).head<6>() += diff;
         }
       }
 
-      // #ifndef NDEBUG
-      Eigen::MatrixXs updatedAccLinear = Eigen::MatrixXs::Zero(
+#ifndef NDEBUG
+      Eigen::MatrixXs updatedAccUnscaled = Eigen::MatrixXs::Zero(
           init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
       for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
       {
-        updatedAccLinear.col(t)
+        updatedAccUnscaled.col(t)
             = (init->poseTrials[trial].col(t + 1)
                - 2 * init->poseTrials[trial].col(t)
                + init->poseTrials[trial].col(t - 1));
-        if (t >= cursor + totalSteps - 1)
+        if (t >= cursor + totalSteps - 1
+            || (probablyMissingGRF.size() > t && probablyMissingGRF[t]))
         {
-          if ((updatedAccLinear.col(t) - oldAccLinear.col(t)).norm() > 1e-8)
+          if ((updatedAccUnscaled.col(t) - originalDdqUnscaled.col(t)).norm()
+              > 1e-12)
           {
-            std::cout << "Linear bad at time t=" << t << "!" << std::endl;
+            std::cout << "Unscaled acc bad at time t=" << t << "!" << std::endl;
           }
         }
       }
-      // #endif
+#endif
 
       // If we've just optimized over the whole trajectory at once, then we're
       // done!
-      if (totalSteps == init->poseTrials[trial].cols())
+      if (totalSteps + cursor == init->poseTrials[trial].cols())
       {
         break;
       }
