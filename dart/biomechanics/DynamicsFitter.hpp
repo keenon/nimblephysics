@@ -273,7 +273,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      bool includeResidualAccs);
 
   ////////////////////////////////////////////
   // This returns a matrix A and vector b, such that Ax+b gives you a legal root
@@ -285,7 +286,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      bool includeResidualAccs);
 
   ////////////////////////////////////////////
   // This will go through and compute the "residual-free root acceleration" at
@@ -302,6 +304,7 @@ public:
   Eigen::VectorXs getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
+      Eigen::VectorXs residualAccelerations,
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,

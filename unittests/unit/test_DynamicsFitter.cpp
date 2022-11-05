@@ -1069,10 +1069,10 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
 
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor
       = helper.getRootTrajectoryLinearSystem(
-          qs, dqs, ddqs, forces, probablyMissingGRF);
+          qs, dqs, ddqs, forces, probablyMissingGRF, true);
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor_fd
       = helper.finiteDifferenceRootTrajectoryLinearSystem(
-          qs, dqs, ddqs, forces, probablyMissingGRF);
+          qs, dqs, ddqs, forces, probablyMissingGRF, true);
 
   if (!equals(taylor.second, taylor_fd.second, 1e-8))
   {
