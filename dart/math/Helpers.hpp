@@ -384,6 +384,36 @@ constexpr double operator"" _deg(unsigned long long int angle)
 
 } // namespace suffixes
 
+inline std::vector<int> evenlySpacedTimesteps(int totalSteps, int maxSteps)
+{
+  std::vector<int> timesteps;
+  // 1. Select the random indices we'll be using for this problem
+  if (maxSteps >= totalSteps)
+  {
+    for (int i = 0; i < totalSteps; i++)
+    {
+      timesteps.push_back(i);
+    }
+  }
+  else
+  {
+    double stride = (double)totalSteps / maxSteps;
+
+    for (int i = 0; i < maxSteps; i++)
+    {
+      int index = (int)round(stride * ((double)i + 0.5));
+      if (index > totalSteps - 1)
+        index = totalSteps - 1;
+      if (index < 0)
+        index = 0;
+
+      timesteps.push_back(index);
+    }
+  }
+
+  return timesteps;
+}
+
 } // namespace math
 
 namespace Color {

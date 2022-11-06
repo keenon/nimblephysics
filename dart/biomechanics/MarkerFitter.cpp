@@ -20,6 +20,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
@@ -6982,29 +6983,32 @@ BilevelFitProblem::BilevelFitProblem(
     mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
 {
   // 1. Select the random indices we'll be using for this problem
-  if (numSamples >= markerObservations.size())
-  {
-    numSamples = markerObservations.size();
-    for (int i = 0; i < numSamples; i++)
-    {
-      mSampleIndices.push_back(i);
-    }
-  }
-  else
-  {
-    double stride = (double)markerObservations.size() / numSamples;
+  mSampleIndices
+      = math::evenlySpacedTimesteps(markerObservations.size(), numSamples);
 
-    for (int i = 0; i < numSamples; i++)
-    {
-      int index = (int)round(stride * ((double)i + 0.5));
-      if (index > markerObservations.size() - 1)
-        index = markerObservations.size() - 1;
-      if (index < 0)
-        index = 0;
+  // if (numSamples >= markerObservations.size())
+  // {
+  //   numSamples = markerObservations.size();
+  //   for (int i = 0; i < numSamples; i++)
+  //   {
+  //     mSampleIndices.push_back(i);
+  //   }
+  // }
+  // else
+  // {
+  //   double stride = (double)markerObservations.size() / numSamples;
 
-      mSampleIndices.push_back(index);
-    }
-  }
+  //   for (int i = 0; i < numSamples; i++)
+  //   {
+  //     int index = (int)round(stride * ((double)i + 0.5));
+  //     if (index > markerObservations.size() - 1)
+  //       index = markerObservations.size() - 1;
+  //     if (index < 0)
+  //       index = 0;
+
+  //     mSampleIndices.push_back(index);
+  //   }
+  // }
 
   // TODO: <remove>
   std::cout << "Picked " << numSamples << " evenly spaced in [0,"

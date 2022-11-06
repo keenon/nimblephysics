@@ -1227,6 +1227,10 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
       continue;
     }
 
+    // std::cout << "Computing linear system column: " << t << "/" <<
+    // numTimesteps
+    //           << std::endl;
+
     const Eigen::Matrix6s dAcc_dOffsetPos
         = calculateResidualFreeRootAccelerationJacobianWrtPosition(
             qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
@@ -5555,16 +5559,17 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       bool isEstimatedZero = estimatedForce.norm() < absZeroThreshold;
       bool isMeasuredZero = smoothedGrf.norm() < absZeroThreshold;
 
-#ifndef NDEBUG
-      Eigen::Matrix3s compare;
-      compare.col(0) = estimatedForce;
-      compare.col(1) = smoothedGrf;
-      compare.col(2) = estimatedForce - smoothedGrf;
-      std::cout << "t=" << t << ": estimate(isZero=" << isEstimatedZero
-                << ") - measured(isZero=" << isMeasuredZero << ") - diff"
-                << std::endl
-                << compare << std::endl;
-#endif
+      // #ifndef NDEBUG
+      //       Eigen::Matrix3s compare;
+      //       compare.col(0) = estimatedForce;
+      //       compare.col(1) = smoothedGrf;
+      //       compare.col(2) = estimatedForce - smoothedGrf;
+      //       std::cout << "t=" << t << ": estimate(isZero=" << isEstimatedZero
+      //                 << ") - measured(isZero=" << isMeasuredZero << ") -
+      //                 diff"
+      //                 << std::endl
+      //                 << compare << std::endl;
+      // #endif
 
       if (isEstimatedZero && !isMeasuredZero)
       {
@@ -5654,7 +5659,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     return;
   }
 
-  for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
+  for (s_t threshold = 0.01; threshold > 1e-6; threshold *= 0.5)
   {
     Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeUnobservedTimesteps = 1.0;
@@ -6210,16 +6215,17 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
              + init->poseTrials[trial].col(t - 1));
     }
 
-    int optimizationBlockSize = 250;
-    // If our trajectory is "very large" (some are thousands of timesteps long),
-    // then it's cheaper to do a number of "zipper" optimizations over time.
-    // However, these optimizations do sacrifice some quality of the results,
-    // because they're myopic.
+    int optimizationBlockSize = 600;
+    // If our trajectory is "very large" (some are tens of thousands of
+    // timesteps long), then it's cheaper to do a number of "zipper"
+    // optimizations over time. However, these optimizations do sacrifice some
+    // quality of the results, because they're myopic.
     if (init->poseTrials[trial].cols() > optimizationBlockSize)
     {
-      optimizationBlockSize = 100;
+      optimizationBlockSize = 400;
     }
-    const int shiftBy = 75;
+    const int subsampleMaxSize = 150;
+    const int shiftBy = optimizationBlockSize / 2;
 
     const bool filterSuspiciousTimesteps = false;
     const s_t accDiffFilterThreshold = 0.1;
@@ -6264,8 +6270,9 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         q.col(t) = init->poseTrials[trial].col(t + cursor);
       }
 
-      const int numIters = 75;
-      s_t residualAccRegularization = 1000.0;
+      const int numIters = 250;
+      // s_t residualAccRegularization = 1000.0;
+      s_t residualAccRegularization = dt * dt * 0.5;
       s_t lastResidualCount = std::numeric_limits<s_t>::infinity();
       s_t lastMaxDist = 0.0;
       for (int iter = 0; iter < numIters; iter++)
@@ -6433,36 +6440,90 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         Eigen::VectorXs b = linearSystem.second;
 
         ////////////////////////////////
-        // Regularize and solve the linear system
+        // Sub-sample, regularize and solve the linear system
         ////////////////////////////////
 
+        std::vector<int> outputTimesteps
+            = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
+        std::vector<int> residualAccTimesteps;
+        if (includeResidualAccs)
+        {
+          residualAccTimesteps
+              = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
+        }
+
+        const int numVariables = 2 + residualAccTimesteps.size();
+        const int inputSize = numVariables * 6;
+        const int outputSize = (outputTimesteps.size() + numVariables) * 6;
+
+        Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(outputSize, inputSize);
+        for (int row = 0; row < outputTimesteps.size(); row++)
+        {
+          for (int col = 0; col < numVariables; col++)
+          {
+            if (col < 2)
+            {
+              fullA.block<6, 6>(row * 6, col * 6)
+                  = A.block<6, 6>(outputTimesteps[row] * 6, col * 6);
+            }
+            else
+            {
+              fullA.block<6, 6>(row * 6, col * 6) = A.block<6, 6>(
+                  outputTimesteps[row] * 6,
+                  12 + (residualAccTimesteps[col - 2] * 6));
+            }
+          }
+        }
+#ifndef NDEBUG
+        if (totalSteps == outputTimesteps.size())
+        {
+          if (fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
+              != A.block(0, 0, outputTimesteps.size() * 6, numVariables))
+          {
+            Eigen::MatrixXs diff
+                = fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
+                  - A.block(0, 0, outputTimesteps.size() * 6, numVariables);
+            assert(false);
+          }
+        }
+#endif
+
         s_t offsetRegularization = 0.5;
-        Eigen::MatrixXs fullA
-            = Eigen::MatrixXs::Zero(A.rows() + A.cols(), A.cols());
-        fullA.block(0, 0, A.rows(), A.cols()) = A;
         Eigen::VectorXs regularizationDiagonal
-            = Eigen::VectorXs::Ones(A.cols());
+            = Eigen::VectorXs::Ones(inputSize);
         regularizationDiagonal.segment(0, 12) *= offsetRegularization;
         if (includeResidualAccs)
         {
           regularizationDiagonal.segment(12, regularizationDiagonal.size() - 12)
               *= residualAccRegularization;
         }
-        fullA.block(A.rows(), 0, A.cols(), A.cols())
+        fullA.block(outputTimesteps.size() * 6, 0, inputSize, inputSize)
             = regularizationDiagonal.asDiagonal();
-        Eigen::VectorXs fullB = Eigen::VectorXs::Zero(b.size() + A.cols());
-        fullB.segment(0, b.size()) = b;
+
+        Eigen::VectorXs fullB = Eigen::VectorXs::Zero(outputSize);
         Eigen::VectorXs fullOriginalTrajectory
             = Eigen::VectorXs::Zero(fullB.size());
-        fullOriginalTrajectory.segment(0, totalSteps * 6)
-            = targetTrajectory.segment(cursor * 6, totalSteps * 6);
+        for (int row = 0; row < outputTimesteps.size(); row++)
+        {
+          fullB.segment<6>(row * 6) = b.segment<6>(outputTimesteps[row] * 6);
+          fullOriginalTrajectory.segment<6>(row * 6)
+              = targetTrajectory.segment<6>(
+                  (outputTimesteps[row] + cursor) * 6);
+        }
 
         Eigen::VectorXs desired = fullOriginalTrajectory - fullB;
 
         s_t weightFirstFewTimesteps = 1000 * totalSteps;
-        s_t weightLastFewTimesteps = 100;
+        s_t weightLastFewTimesteps = 5;
+        // If we're in a zipper step, make sure to prioritize keeping the end of
+        // the zipper as clean as possible, to propagate as little error as we
+        // can
+        if (cursor + totalSteps < init->poseTrials[trial].cols())
+        {
+          weightLastFewTimesteps = 200;
+        }
 
-        const int weightTimestepNum = 5;
+        const int weightTimestepNum = 3;
         desired.segment(
             desired.size() - weightTimestepNum * 6, weightTimestepNum * 6)
             *= weightLastFewTimesteps;
@@ -6472,7 +6533,6 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
             weightTimestepNum * 6,
             fullA.cols())
             *= weightLastFewTimesteps;
-
         if (cursor > 0)
         {
           desired.segment(0, weightTimestepNum * 6) *= weightFirstFewTimesteps;
@@ -6502,20 +6562,29 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         }
 
         ////////////////////////////////
-        // Decode the linear system into our state
+        // Decompress and decode the linear system into our state
         ////////////////////////////////
 
-        Eigen::VectorXs recovered = (fullA * solution);
-        if (cursor > 0)
+        Eigen::VectorXs solutionDecompressed = Eigen::VectorXs::Zero(A.cols());
+        for (int col = 0; col < numVariables; col++)
         {
-          recovered.segment(0, weightTimestepNum * 6)
-              /= weightFirstFewTimesteps;
+          if (col < 2)
+          {
+            // Copy the root offsets
+            solutionDecompressed.segment<6>(col * 6)
+                = solution.segment<6>(col * 6);
+          }
+          else
+          {
+            // Spread out the residual acc's
+            solutionDecompressed.segment<6>(
+                12 + (residualAccTimesteps[col - 2] * 6))
+                = solution.segment<6>(col * 6);
+          }
         }
-        recovered.segment(
-            recovered.size() - weightTimestepNum * 6, weightTimestepNum * 6)
-            /= weightLastFewTimesteps;
-        Eigen::VectorXs newTrajectory = recovered + fullB;
 
+        Eigen::VectorXs recovered = (A * solutionDecompressed);
+        Eigen::VectorXs newTrajectory = recovered + b;
         for (int t = 0; t < totalSteps; t++)
         {
           q.col(t).head<6>() = newTrajectory.segment<6>(t * 6);
