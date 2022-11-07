@@ -6215,14 +6215,14 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
              + init->poseTrials[trial].col(t - 1));
     }
 
-    int optimizationBlockSize = 600;
+    int optimizationBlockSize = 3000;
     // If our trajectory is "very large" (some are tens of thousands of
     // timesteps long), then it's cheaper to do a number of "zipper"
     // optimizations over time. However, these optimizations do sacrifice some
     // quality of the results, because they're myopic.
     if (init->poseTrials[trial].cols() > optimizationBlockSize)
     {
-      optimizationBlockSize = 400;
+      optimizationBlockSize = 1000;
     }
     const int subsampleMaxSize = 150;
     const int shiftBy = optimizationBlockSize / 2;
@@ -6271,10 +6271,15 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       }
 
       const int numIters = 250;
-      // s_t residualAccRegularization = 1000.0;
-      s_t residualAccRegularization = dt * dt * 0.5;
-      s_t lastResidualCount = std::numeric_limits<s_t>::infinity();
+      s_t residualAccRegularization = 1000.0;
+      // s_t residualAccRegularization = dt * dt * 0.5;
+      s_t lastResidualCost = std::numeric_limits<s_t>::infinity();
       s_t lastMaxDist = 0.0;
+
+      int bestResidualTimestep = 0;
+      s_t bestResidualCost = std::numeric_limits<s_t>::infinity();
+      Eigen::VectorXs bestResidualQ = Eigen::VectorXs::Zero(q.cols() * 6);
+
       for (int iter = 0; iter < numIters; iter++)
       {
         ////////////////////////////////
@@ -6327,101 +6332,10 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         ddq.col(0).setZero();
 
         ////////////////////////////////
-        // Compute our average distance from the original trajectory
-        ////////////////////////////////
-
-        s_t maxDist = 0.0;
-        for (int t = 0; t < totalSteps; t++)
-        {
-          Eigen::Vector6s dist
-              = q.col(t).head<6>()
-                - init->poseTrials[trial].col(t + cursor).head<6>();
-          if (dist.norm() > maxDist)
-          {
-            maxDist = dist.norm();
-          }
-        }
-
-        ////////////////////////////////
-        // Check residual cost
-        ////////////////////////////////
-
-        s_t residualCost = 0.0;
-        int totalCountedResiduals = 0;
-        for (int t = 1; t < totalSteps - 1; t++)
-        {
-          // Don't count any timesteps without observations
-          if (init->probablyMissingGRF.size() > trial
-              && init->probablyMissingGRF[trial].size() > t + cursor
-              && init->probablyMissingGRF[trial][t + cursor])
-          {
-            continue;
-          }
-
-          s_t thisTimestepCost = helper.calculateResidualNorm(
-              q.col(t),
-              dq.col(t),
-              ddq.col(t),
-              init->grfTrials[trial].col(t + cursor),
-              0,
-              false);
-          // std::cout << t << ": " << thisTimestepCost << ", ";
-          residualCost += thisTimestepCost;
-          totalCountedResiduals++;
-        }
-        residualCost /= totalCountedResiduals;
-
-        ////////////////////////////////
-        // Adapt residual weighting, and print output
-        ////////////////////////////////
-
-        if (maxDist > 1.0)
-        {
-          // This is an emergency, immediately drop us to the lowest
-          // regularization setting to avoid causing an INF
-          residualAccRegularization = dt * dt * 0.5;
-        }
-        else if (maxDist < 0.2)
-        {
-          residualAccRegularization *= 2.0;
-          if (residualAccRegularization > 20000)
-          {
-            residualAccRegularization = 20000;
-          }
-        }
-        else
-        {
-          residualAccRegularization *= 0.5;
-          if (residualAccRegularization < dt * dt * 0.5)
-          {
-            residualAccRegularization = dt * dt * 0.5;
-          }
-        }
-        (void)lastResidualCount;
-        (void)lastMaxDist;
-        lastResidualCount = residualCost;
-        lastMaxDist = maxDist;
-        bool includeResidualAccs = residualAccRegularization <= 10000;
-        std::cout << "Spatial residual reduction iter " << iter << "/"
-                  << numIters << " - avg residual norm: " << residualCost
-                  << ", max dist any timestep changed: " << maxDist
-                  << " (current residual penalty="
-                  << (includeResidualAccs
-                          ? std::to_string(residualAccRegularization)
-                          : "inf")
-                  << ")" << std::endl;
-        if (residualCost < satisfactoryThreshold)
-        {
-          std::cout
-              << "Reached satisfactory residuals. Exiting optimization early."
-              << std::endl;
-          break;
-        }
-
-        ////////////////////////////////
         // Build linear system at current configuration
         ////////////////////////////////
 
+        bool includeResidualAccs = residualAccRegularization <= 10000;
         std::vector<bool> probablyMissingGRFWindow;
         for (int t = 0; t < totalSteps; t++)
         {
@@ -6449,7 +6363,7 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         if (includeResidualAccs)
         {
           residualAccTimesteps
-              = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
+              = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize * 3);
         }
 
         const int numVariables = 2 + residualAccTimesteps.size();
@@ -6585,10 +6499,165 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 
         Eigen::VectorXs recovered = (A * solutionDecompressed);
         Eigen::VectorXs newTrajectory = recovered + b;
+
+        Eigen::VectorXs originalQHead = Eigen::VectorXs::Zero(q.cols() * 6);
+        Eigen::VectorXs diff = Eigen::VectorXs::Zero(q.cols() * 6);
         for (int t = 0; t < totalSteps; t++)
         {
-          q.col(t).head<6>() = newTrajectory.segment<6>(t * 6);
+          originalQHead.segment<6>(t * 6) = q.col(t).head<6>();
+          diff.segment<6>(t * 6)
+              = (newTrajectory.segment<6>(t * 6) - q.col(t).head<6>());
         }
+
+        // line search
+        s_t lineSearchDist = 1.0;
+        while (true)
+        {
+          for (int t = 0; t < totalSteps; t++)
+          {
+            q.col(t).head<6>() = originalQHead.segment<6>(t * 6)
+                                 + (lineSearchDist * diff.segment<6>(t * 6));
+          }
+
+          // Compute new loss
+
+          for (int t = 1; t < totalSteps; t++)
+          {
+            dq.col(t) = (q.col(t) - q.col(t - 1)) / dt;
+          }
+          for (int t = 1; t < totalSteps - 1; t++)
+          {
+            ddq.col(t)
+                = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
+          }
+
+          ////////////////////////////////
+          // Compute our average distance from the original trajectory
+          ////////////////////////////////
+
+          s_t maxDist = 0.0;
+          for (int t = 0; t < totalSteps; t++)
+          {
+            Eigen::Vector6s dist
+                = q.col(t).head<6>()
+                  - init->poseTrials[trial].col(t + cursor).head<6>();
+            if (dist.norm() > maxDist)
+            {
+              maxDist = dist.norm();
+            }
+          }
+
+          ////////////////////////////////
+          // Check residual cost
+          ////////////////////////////////
+
+          s_t residualCost = 0.0;
+          int totalCountedResiduals = 0;
+          for (int t = 1; t < totalSteps - 1; t++)
+          {
+            // Don't count any timesteps without observations
+            if (init->probablyMissingGRF.size() > trial
+                && init->probablyMissingGRF[trial].size() > t + cursor
+                && init->probablyMissingGRF[trial][t + cursor])
+            {
+              continue;
+            }
+
+            s_t thisTimestepCost = helper.calculateResidualNorm(
+                q.col(t),
+                dq.col(t),
+                ddq.col(t),
+                init->grfTrials[trial].col(t + cursor),
+                0,
+                false);
+            // std::cout << t << ": " << thisTimestepCost << ", ";
+            residualCost += thisTimestepCost;
+            totalCountedResiduals++;
+          }
+          residualCost /= totalCountedResiduals;
+
+          ////////////////////////////////
+          // Adapt residual weighting, and print output
+          ////////////////////////////////
+
+          if (maxDist > 1.0)
+          {
+            // This is an emergency, immediately drop us to the lowest
+            // regularization setting to avoid causing an INF
+            residualAccRegularization = dt * dt * 0.5;
+          }
+          else if (maxDist < 0.2)
+          {
+            residualAccRegularization *= 2.0;
+            if (residualAccRegularization > 20000)
+            {
+              residualAccRegularization = 20000;
+            }
+          }
+          else
+          {
+            residualAccRegularization *= 0.5;
+            if (residualAccRegularization < dt * dt * 0.5)
+            {
+              residualAccRegularization = dt * dt * 0.5;
+            }
+          }
+
+          if (residualCost > lastResidualCost * 1.2)
+          {
+            lineSearchDist *= 0.5;
+            if (lineSearchDist < 1e-18)
+            {
+              std::cout << "Line search got too small, optimization stalled, "
+                           "accepting current point."
+                        << std::endl;
+              break;
+            }
+            std::cout << "Shortening line search to " << lineSearchDist
+                      << std::endl;
+            continue;
+          }
+
+          (void)lastResidualCost;
+          (void)lastMaxDist;
+          lastResidualCost = residualCost;
+          lastMaxDist = maxDist;
+          std::cout << "Spatial residual reduction iter " << iter << "/"
+                    << numIters << " - avg residual norm: " << residualCost
+                    << ", max dist any timestep changed: " << maxDist
+                    << " (current residual penalty="
+                    << (includeResidualAccs
+                            ? std::to_string(residualAccRegularization)
+                            : "inf")
+                    << ")" << std::endl;
+          break;
+        }
+        if (lastResidualCost < bestResidualCost)
+        {
+          for (int t = 0; t < totalSteps; t++)
+          {
+            bestResidualQ.segment<6>(t * 6) = q.col(t).head<6>();
+          }
+          bestResidualTimestep = iter;
+          bestResidualCost = lastResidualCost;
+        }
+        if (lastResidualCost < satisfactoryThreshold)
+        {
+          std::cout
+              << "Reached satisfactory residuals. Exiting optimization early."
+              << std::endl;
+          break;
+        }
+      }
+
+      ////////////////////////////////
+      // Revert to the best result
+      ////////////////////////////////
+      std::cout << "Recovering best result from step " << bestResidualTimestep
+                << " with value " << bestResidualCost << std::endl;
+      for (int t = 0; t < totalSteps; t++)
+      {
+        q.col(t).head<6>() = bestResidualQ.segment<6>(t * 6);
       }
 
       ////////////////////////////////
