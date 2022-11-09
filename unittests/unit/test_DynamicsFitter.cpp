@@ -12,6 +12,7 @@
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -1872,6 +1873,240 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   }
 }
 
+bool verifyResidualElimination(
+    std::string modelPath,
+    std::vector<std::string> footNames,
+    std::vector<std::string> motFiles,
+    std::vector<std::string> c3dFiles,
+    std::vector<std::string> trcFiles,
+    std::vector<std::string> grfFiles,
+    int limitTrialLength = -1,
+    int trialStartOffset = 0)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
+  standard.skeleton->zeroTranslationInCustomFunctions();
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autodetectScaleGroupAxisFlips(2);
+  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  {
+    standard.skeleton->setScaleGroupUniformScaling(
+        standard.skeleton->getBodyNode("hand_r"));
+  }
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
+  standard.skeleton->setPositionLowerLimit(0, -M_PI);
+  standard.skeleton->setPositionUpperLimit(0, M_PI);
+  standard.skeleton->setPositionLowerLimit(1, -M_PI);
+  standard.skeleton->setPositionUpperLimit(1, M_PI);
+  standard.skeleton->setPositionLowerLimit(2, -M_PI);
+  standard.skeleton->setPositionUpperLimit(2, M_PI);
+  // TODO: limit COM for the centerline bodies
+
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  std::shared_ptr<dynamics::Skeleton> skel = standard.skeleton;
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      limitTrialLength,
+      trialStartOffset);
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      init->poseTrials[trial].col(t)
+          = standard.skeleton->convertPositionsToBallSpace(
+              init->poseTrials[trial].col(t));
+    }
+  }
+
+  DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
+  fitter.smoothAccelerations(init);
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
+  ResidualForceHelper helper(skel, init->grfBodyIndices);
+
+  std::vector<std::vector<std::vector<Eigen::Vector6s>>>
+      originalTrialSpatialAccelerations;
+  std::vector<std::vector<std::vector<Eigen::Vector3s>>>
+      originalTrialWorldAccelerations;
+
+  // Check all the COM spatial residuals are zero
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    s_t dt = init->trialTimesteps[trial];
+
+    std::vector<std::vector<Eigen::Vector6s>> originalSpatialAccelerations;
+    std::vector<std::vector<Eigen::Vector3s>> originalWorldAccelerations;
+    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+    {
+      Eigen::VectorXs q = init->poseTrials[trial].col(t);
+      Eigen::VectorXs dq = skel->getPositionDifferences(
+                               init->poseTrials[trial].col(t),
+                               init->poseTrials[trial].col(t - 1))
+                           / dt;
+      Eigen::VectorXs ddq = (skel->getPositionDifferences(
+                                 init->poseTrials[trial].col(t + 1),
+                                 init->poseTrials[trial].col(t))
+                             - skel->getPositionDifferences(
+                                 init->poseTrials[trial].col(t),
+                                 init->poseTrials[trial].col(t - 1)))
+                            / (dt * dt);
+      skel->setPositions(q);
+      skel->setVelocities(dq);
+      skel->setAccelerations(ddq);
+
+      std::vector<Eigen::Vector6s> bodyAccelerations;
+      std::vector<Eigen::Vector3s> bodyWorldAccelerations;
+      for (int i = 0; i < skel->getNumBodyNodes(); i++)
+      {
+        bodyAccelerations.push_back(
+            skel->getBodyNode(i)->getCOMSpatialAcceleration());
+        bodyWorldAccelerations.push_back(
+            skel->getBodyNode(i)->getCOMLinearAcceleration());
+      }
+      originalSpatialAccelerations.push_back(bodyAccelerations);
+      originalWorldAccelerations.push_back(bodyWorldAccelerations);
+
+      Eigen::Vector6s spatialResidual = helper.calculateCOMSpatialResidual(
+          q, dq, ddq, init->grfTrials[trial].col(t));
+      if (spatialResidual.tail<3>().norm() > 1e-7)
+      {
+        std::cout << "Linear COM spatial residual non-zero at t=" << t << ":"
+                  << std::endl
+                  << spatialResidual << std::endl;
+        return false;
+      }
+    }
+    originalTrialSpatialAccelerations.push_back(originalSpatialAccelerations);
+    originalTrialWorldAccelerations.push_back(originalWorldAccelerations);
+  }
+
+  // ZYX = 0,
+  // XYZ = 1,
+  // ZXY = 2,
+  // XZY = 3,
+  std::cout << "Axis order: "
+            << (int)static_cast<dynamics::EulerFreeJoint*>(skel->getRootJoint())
+                   ->getAxisOrder()
+            << std::endl;
+
+  // Rotate all the positions, maintaining the COM locations
+  Eigen::Vector3s rotation = Eigen::Vector3s::Random() * 0.1;
+  Eigen::Matrix3s R = math::expMapRot(rotation);
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    std::vector<Eigen::Vector3s> originalCOMs
+        = fitter.comPositions(init, trial);
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      Eigen::VectorXs originalQ = init->poseTrials[trial].col(t);
+      Eigen::VectorXs q = originalQ;
+      // q.head<3>() += rotation;
+      q.head<3>() = math::matrixToEulerZXY(R * eulerZXYToMatrix(q.head<3>()));
+      skel->setPositions(q);
+      Eigen::Vector3s newCOM = skel->getCOM();
+      Eigen::Vector3s diff = newCOM - originalCOMs[t];
+      q.segment<3>(3) -= diff;
+      init->poseTrials[trial].col(t) = q;
+    }
+    std::vector<Eigen::Vector3s> newCOMs = fitter.comPositions(init, trial);
+    for (int t = 0; t < originalCOMs.size(); t++)
+    {
+      if ((originalCOMs[t] - newCOMs[t]).norm() > 1e-8)
+      {
+        std::cout << "COM position changed after rotation at t=" << t << ":"
+                  << std::endl;
+        std::cout << "Original:" << std::endl << originalCOMs[t] << std::endl;
+        std::cout << "New:" << std::endl << newCOMs[t] << std::endl;
+      }
+    }
+  }
+
+  // Check all the COM spatial residuals are still zero
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    s_t dt = init->trialTimesteps[trial];
+    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+    {
+      Eigen::VectorXs q = init->poseTrials[trial].col(t);
+      Eigen::VectorXs dq = skel->getPositionDifferences(
+                               init->poseTrials[trial].col(t),
+                               init->poseTrials[trial].col(t - 1))
+                           / dt;
+      Eigen::VectorXs ddq = (skel->getPositionDifferences(
+                                 init->poseTrials[trial].col(t + 1),
+                                 init->poseTrials[trial].col(t))
+                             - skel->getPositionDifferences(
+                                 init->poseTrials[trial].col(t),
+                                 init->poseTrials[trial].col(t - 1)))
+                            / (dt * dt);
+      skel->setPositions(q);
+      skel->setVelocities(dq);
+      skel->setAccelerations(ddq);
+
+      for (int i = 0; i < skel->getNumBodyNodes(); i++)
+      {
+        Eigen::Vector6s originalSpatial
+            = originalTrialSpatialAccelerations[trial][t - 1][i];
+        Eigen::Vector6s newSpatial
+            = skel->getBodyNode(i)->getCOMSpatialAcceleration();
+        newSpatial.tail<3>() = R.transpose() * newSpatial.tail<3>();
+        if (!equals(originalSpatial, newSpatial, 1e-8))
+        {
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+          compare.col(0) = originalSpatial;
+          compare.col(1) = newSpatial;
+          compare.col(2) = originalSpatial - newSpatial;
+          std::cout << "Body-local \"" << skel->getBodyNode(i)->getName()
+                    << "\" spatial acceleration on t=" << t
+                    << " doesn't match original after rotation!" << std::endl;
+          std::cout << "Original - Rotated - Diff" << std::endl
+                    << compare << std::endl;
+        }
+
+        Eigen::Vector3s originalWorld
+            = R * originalTrialWorldAccelerations[trial][t - 1][i];
+        Eigen::Vector3s newWorld
+            = skel->getBodyNode(i)->getCOMLinearAcceleration();
+        if (!equals(originalWorld, newWorld, 1e-8))
+        {
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(3, 3);
+          compare.col(0) = originalWorld;
+          compare.col(1) = newWorld;
+          compare.col(2) = originalWorld - newWorld;
+          std::cout << "Body-local \"" << skel->getBodyNode(i)->getName()
+                    << "\" linear acceleration on t=" << t
+                    << " doesn't match original after rotation!" << std::endl;
+          std::cout << "R * Original - New - Diff" << std::endl
+                    << compare << std::endl;
+          break;
+        }
+      }
+
+      Eigen::Vector6s spatialResidual = helper.calculateCOMSpatialResidual(
+          q, dq, ddq, init->grfTrials[trial].col(t));
+      if (spatialResidual.tail<3>().norm() > 1e-7)
+      {
+        std::cout
+            << "Linear COM spatial residual (after rotation) non-zero at t="
+            << t << ":" << std::endl
+            << spatialResidual << std::endl;
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 #ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, ID_EQNS)
 {
@@ -3708,6 +3943,108 @@ TEST(DynamicsFitter, END_TO_END_SUBJECT4)
       true);
 }
 #endif
+
+/*
+TEST(DynamicsFitter, DUMMY_1)
+{
+  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
+  auto pair = skel->createJointAndBodyNodePair<dynamics::EulerFreeJoint>();
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+  T.translation() = Eigen::Vector3s::UnitZ();
+  pair.first->setTransformFromChildBodyNode(T);
+  skel->setControlForce(0, 1.0);
+  s_t dt = 1e-6;
+  skel->setTimeStep(dt);
+  skel->setGravity(Eigen::Vector3s::Zero());
+  skel->computeForwardDynamics();
+  std::cout << "Accelerations: " << std::endl
+            << skel->getAccelerations() << std::endl;
+  std::cout << "Inv mass matrix (tau -> ddq): " << std::endl
+            << skel->getInvMassMatrix() << std::endl;
+  std::cout << "Mass matrix (ddq -> tau): " << std::endl
+            << skel->getMassMatrix() << std::endl;
+  std::cout << "COM pos: " << std::endl << skel->getCOM() << std::endl;
+  std::cout << "COM lin Acc: " << std::endl
+            << skel->getCOMLinearAcceleration() << std::endl;
+  std::cout << "COM spatial Acc: " << std::endl
+            << skel->getCOMSpatialAcceleration() << std::endl;
+  std::cout << "Integrating velocities" << std::endl;
+  skel->integrateVelocities(dt);
+  std::cout << "COM lin Acc: " << std::endl
+            << skel->getCOMLinearAcceleration() << std::endl;
+  std::cout << "COM spatial Acc: " << std::endl
+            << skel->getCOMSpatialAcceleration() << std::endl;
+  std::cout << "Integrating positions" << std::endl;
+  skel->integratePositions(dt);
+  std::cout << "COM pos: " << std::endl << skel->getCOM() << std::endl;
+}
+*/
+
+/*
+TEST(DynamicsFitter, DUMMY_2)
+{
+  std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
+  auto pair = skel->createJointAndBodyNodePair<dynamics::EulerFreeJoint>();
+  (void)pair;
+  Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+  T.translation() = Eigen::Vector3s::UnitZ();
+  pair.first->setTransformFromChildBodyNode(T);
+  // skel->setControlForce(0, 1.0);
+  s_t dt = 1e-6;
+  skel->setTimeStep(dt);
+  skel->setGravity(-9.81 * Eigen::Vector3s::UnitZ());
+  skel->computeForwardDynamics();
+  std::cout << "Accelerations with no vel: " << std::endl
+            << skel->getAccelerations() << std::endl;
+  std::cout << "COM spatial acc no vel: " << std::endl
+            << skel->getCOMSpatialAcceleration() << std::endl;
+  std::cout << "COM linear acc no vel: " << std::endl
+            << skel->getCOMLinearAcceleration() << std::endl;
+
+  skel->setVelocities(Eigen::Vector6s(0, 1, 0, 1, 0, 0));
+  skel->computeForwardDynamics();
+  std::cout << "Accelerations with vel: " << std::endl
+            << skel->getAccelerations() << std::endl;
+  std::cout << "COM spatial acc with vel: " << std::endl
+            << skel->getCOMSpatialAcceleration() << std::endl;
+  std::cout << "COM linear acc with vel: " << std::endl
+            << skel->getCOMLinearAcceleration() << std::endl;
+}
+*/
+
+// #ifdef JACOBIAN_TESTS
+// This test doesn't pass, because rotating about the COM while preserving the
+// COM trajectory doesn't actually work, due to differences between FD and
+// analytical accelerations.
+/*
+TEST(DynamicsFitter, RESIDUAL_UNDER_ROTATION_SPRINTERS)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Sprinter2/IK/JA1Gait35_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Sprinter2/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back("dart://sample/grf/Sprinter2/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  EXPECT_TRUE(verifyResidualElimination(
+      "dart://sample/grf/Sprinter/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      200,
+      87));
+}
+*/
+// #endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, END_TO_END_SPRINTER)

@@ -556,6 +556,27 @@ ResidualForceHelper::finiteDifferenceRootResidualJacobianWrtPosition(
 }
 
 //==============================================================================
+// This computes the residual at the root, then transforms that to the COM and
+// expresses the torque as a spatial vector (even if the root joint uses euler
+// coordinates for rotation).
+Eigen::Vector6s ResidualForceHelper::calculateCOMSpatialResidual(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::Matrix6s jac = mSkel->getCOMJacobian().block<6, 6>(0, 0);
+  Eigen::Vector6s rootResidual = calculateResidual(q, dq, ddq, forcesConcat);
+  Eigen::Vector6s comForce
+      = jac.transpose().completeOrthogonalDecomposition().solve(rootResidual);
+#ifndef NDEBUG
+  Eigen::Vector6s recoveredResidual = jac.transpose() * comForce;
+  assert((recoveredResidual - rootResidual).norm() < 1e-8);
+#endif
+  return comForce;
+}
+
+//==============================================================================
 // This computes the acceleration we would need at the root in order to keep
 // everything else the same, and end up with zero residuals at the root.
 Eigen::Vector6s ResidualForceHelper::calculateResidualFreeRootAcceleration(
@@ -5071,9 +5092,13 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comAccelerations(
   for (int i = 1; i < coms.size() - 1; i++)
   {
     Eigen::VectorXs pose = inputPoses.col(i);
-    Eigen::VectorXs vel = (inputPoses.col(i) - inputPoses.col(i - 1)) / dt;
-    Eigen::VectorXs acc = (inputPoses.col(i + 1) - 2 * inputPoses.col(i)
-                           + inputPoses.col(i - 1))
+    Eigen::VectorXs vel = mSkeleton->getPositionDifferences(
+                              inputPoses.col(i), inputPoses.col(i - 1))
+                          / dt;
+    Eigen::VectorXs acc = (mSkeleton->getPositionDifferences(
+                               inputPoses.col(i + 1), inputPoses.col(i))
+                           - mSkeleton->getPositionDifferences(
+                               inputPoses.col(i), inputPoses.col(i - 1)))
                           / (dt * dt);
 
     mSkeleton->setPositions(pose);
@@ -5670,6 +5695,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::vector<Eigen::VectorXs> trialOriginalPositions;
     std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
     std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
+    std::vector<std::vector<Eigen::Vector3s>> trialOriginalAccOffsets;
     int totalTimesteps = 0;
     int totalColsWithoutMass = 0;
     int totalRows = 0;
@@ -5736,10 +5762,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       Eigen::Vector3s forceOffset = Eigen::Vector3s::Zero();
       Eigen::Vector3s gravityVelocity = Eigen::Vector3s::Zero();
       Eigen::Vector3s gravityOffset = Eigen::Vector3s::Zero();
-
-#ifndef NDEBUG
       std::vector<Eigen::Vector3s> accOffset;
-#endif
 
       for (int t = 0; t < numTimesteps; t++)
       {
@@ -5791,11 +5814,15 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         {
           Eigen::VectorXs q = init->poseTrials[i].col(t);
           Eigen::VectorXs dq
-              = (init->poseTrials[i].col(t) - init->poseTrials[i].col(t - 1))
+              = mSkeleton->getPositionDifferences(
+                    init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
                 / dt;
           Eigen::VectorXs ddq
-              = (init->poseTrials[i].col(t + 1) - 2 * init->poseTrials[i].col(t)
-                 + init->poseTrials[i].col(t - 1))
+              = (mSkeleton->getPositionDifferences(
+                     init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
+                 - mSkeleton->getPositionDifferences(
+                     init->poseTrials[i].col(t),
+                     init->poseTrials[i].col(t - 1)))
                 / (dt * dt);
           mSkeleton->setPositions(q);
           mSkeleton->setVelocities(dq);
@@ -5806,9 +5833,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                                    + originalCOMs[t - 1])
                                   / (dt * dt);
           Eigen::Vector3s offset = analyticalAcc - fdAcc;
-#ifndef NDEBUG
           accOffset.push_back(offset);
-#endif
           gravityVelocity -= offset * dt;
         }
 
@@ -5956,6 +5981,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       trialOriginalPositions.push_back(originalCOMPositions);
       trialOriginalGravityOffsets.push_back(comGravityOffset);
       trialOriginalCOMs.push_back(originalCOMs);
+      trialOriginalAccOffsets.push_back(accOffset);
     }
     int numTrials = trialLinearMaps.size();
 
@@ -6105,6 +6131,31 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     {
       std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
 
+#ifndef NDEBUG
+      s_t dt = init->trialTimesteps[trial];
+      Eigen::MatrixXs q = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(
+          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        q.col(t) = init->poseTrials[trial].col(t);
+        dq.col(t) = mSkeleton->getPositionDifferences(
+                        init->poseTrials[trial].col(t),
+                        init->poseTrials[trial].col(t - 1))
+                    / dt;
+        ddq.col(t) = (mSkeleton->getPositionDifferences(
+                          init->poseTrials[trial].col(t + 1),
+                          init->poseTrials[trial].col(t))
+                      - mSkeleton->getPositionDifferences(
+                          init->poseTrials[trial].col(t),
+                          init->poseTrials[trial].col(t - 1)))
+                     / (dt * dt);
+      }
+#endif
+
       for (int t = 0; t < originalCOMs.size(); t++)
       {
         Eigen::Vector3s change
@@ -6113,31 +6164,133 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         init->poseTrials[trial].block<3, 1>(translationDofsStart, t) += change;
       }
 
+#ifndef NDEBUG
+      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      {
+        Eigen::VectorXs afterQ = init->poseTrials[trial].col(t);
+        Eigen::VectorXs afterDq = mSkeleton->getPositionDifferences(
+                                      init->poseTrials[trial].col(t),
+                                      init->poseTrials[trial].col(t - 1))
+                                  / dt;
+        Eigen::VectorXs afterDdq = (mSkeleton->getPositionDifferences(
+                                        init->poseTrials[trial].col(t + 1),
+                                        init->poseTrials[trial].col(t))
+                                    - mSkeleton->getPositionDifferences(
+                                        init->poseTrials[trial].col(t),
+                                        init->poseTrials[trial].col(t - 1)))
+                                   / (dt * dt);
+        if (afterDdq.head<3>() != ddq.col(t).head<3>())
+        {
+          std::cout << "Root angular acceleration changed at t=" << t << "!"
+                    << std::endl;
+          Eigen::Matrix3s compare;
+          compare.col(0) = afterDdq.head<3>();
+          compare.col(1) = ddq.col(t).head<3>();
+          compare.col(2) = afterDdq.head<3>() - ddq.col(t).head<3>();
+          std::cout << "New ddq - Original ddq - Diff" << std::endl
+                    << compare << std::endl;
+          assert(afterDdq.head<3>() == ddq.col(t).head<3>());
+        }
+        if (afterDdq.segment(6, afterDdq.size() - 6)
+            != ddq.col(t).segment(6, afterDdq.size() - 6))
+        {
+          std::cout << "Child joint acceleration changed at t=" << t << "!"
+                    << std::endl;
+          Eigen::MatrixXs compare
+              = Eigen::MatrixXs::Zero(afterDdq.size() - 6, 3);
+          compare.col(0) = afterDdq.segment(6, afterDdq.size() - 6);
+          compare.col(1) = ddq.col(t).segment(6, afterDdq.size() - 6);
+          compare.col(2) = afterDdq.segment(6, afterDdq.size() - 6)
+                           - ddq.col(t).segment(6, afterDdq.size() - 6);
+          std::cout << "New ddq - Original ddq - Diff" << std::endl
+                    << compare << std::endl;
+          assert(
+              afterDdq.segment(6, afterDdq.size() - 6)
+              == ddq.col(t).segment(6, afterDdq.size() - 6));
+        }
+      }
+#endif
+
       // Offset to skip over entries allocated for regularizing forces from
       // missing timesteps
       timeCursor += trialNumMissingSteps[trial];
     }
 
-    /*
-  #ifndef NDEBUG
+#ifndef NDEBUG
     ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
     for (int i = 0; i < numTrials; i++)
     {
       s_t dt = init->trialTimesteps[i];
       std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, i);
+      std::vector<Eigen::Vector3s> coms = comPositions(init, i);
       for (int t = 1; t < init->poseTrials[i].cols() - 1; t++)
       {
-        if (init->probablyMissingGRF.size() > i &&
-  init->probablyMissingGRF[i][t]) continue;
+        if (init->probablyMissingGRF.size() > i
+            && init->probablyMissingGRF[i][t])
+          continue;
 
         Eigen::VectorXs q = init->poseTrials[i].col(t);
         Eigen::VectorXs dq
-            = (init->poseTrials[i].col(t) - init->poseTrials[i].col(t - 1)) /
-  dt; Eigen::VectorXs ddq = (init->poseTrials[i].col(t + 1) - 2 *
-  init->poseTrials[i].col(t)
-               + init->poseTrials[i].col(t - 1))
+            = mSkeleton->getPositionDifferences(
+                  init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
+              / dt;
+        Eigen::VectorXs ddq
+            = (mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
+               - mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1)))
               / (dt * dt);
+        mSkeleton->setPositions(q);
+        mSkeleton->setVelocities(dq);
+        mSkeleton->setAccelerations(ddq);
+
+        Eigen::Vector3s comAcc_fd
+            = (coms[t + 1] - 2 * coms[t] + coms[t - 1]) / (dt * dt);
+        Eigen::Vector3s comAcc = mSkeleton->getCOMLinearAcceleration();
+        Eigen::Vector3s offset = comAcc - comAcc_fd;
+        Eigen::Vector3s originalOffset = trialOriginalAccOffsets[i][t - 1];
+        Eigen::Vector3s offsetDiff = offset - originalOffset;
+        if (offsetDiff.norm() > 1e-8)
+        {
+          std::cout << "ERROR: Time t=" << t
+                    << " did not preserve COM linear acc offset!" << std::endl;
+          Eigen::Matrix3s compare;
+          compare.col(0) = originalOffset;
+          compare.col(1) = offset;
+          compare.col(2) = originalOffset - offset;
+          std::cout << "Original offset - New offset - Diff" << std::endl
+                    << compare << std::endl;
+
+          Eigen::Vector3s randomOffset = Eigen::Vector3s::Random();
+          Eigen::VectorXs offsetDdq = ddq;
+          offsetDdq.segment<3>(3) += randomOffset;
+          mSkeleton->setAccelerations(offsetDdq);
+          Eigen::Vector3s offsetComAcc = mSkeleton->getCOMLinearAcceleration();
+          mSkeleton->setAccelerations(ddq);
+
+          Eigen::Vector3s offsetDiff = offsetComAcc - comAcc;
+          if (offsetDiff != randomOffset)
+          {
+            Eigen::Matrix3s compareDiff;
+            compareDiff.col(0) = randomOffset;
+            compareDiff.col(1) = offsetDiff;
+            compareDiff.col(2) = offsetDiff - randomOffset;
+            std::cout << "Random COM Acc offset not linear:" << std::endl;
+            std::cout << "Random offset - Recovered offset - Diff" << std::endl
+                      << compareDiff << std::endl;
+            assert(offsetDiff == randomOffset);
+          }
+
+          Eigen::Vector3s originalComAcc_fd
+              = (trialOriginalCOMs[i][t + 1] - 2 * trialOriginalCOMs[i][t]
+                 + trialOriginalCOMs[i][t - 1])
+                / (dt * dt);
+          (void)originalComAcc_fd;
+
+          assert(offsetDiff.norm() < 1e-8);
+        }
+
         Eigen::VectorXs forces = init->grfTrials[i].col(t);
 
         Eigen::Vector3s sumOfForces = Eigen::Vector3s::Zero();
@@ -6174,8 +6327,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         }
       }
     }
-  #endif
-    */
+#endif
 
     std::cout << "Finished zeroing linear residuals." << std::endl;
     break;
@@ -6290,11 +6442,12 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
         for (int t = 1; t < totalSteps; t++)
         {
-          dq.col(t) = (q.col(t) - q.col(t - 1)) / dt;
+          dq.col(t)
+              = mSkeleton->getPositionDifferences(q.col(t), q.col(t - 1)) / dt;
         }
         for (int t = 1; t < totalSteps - 1; t++)
         {
-          ddq.col(t) = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
+          ddq.col(t) = (dq.col(t + 1) - dq.col(t)) / (dt);
         }
 
 #ifndef NDEBUG
@@ -6928,12 +7081,16 @@ void DynamicsFitter::centerAngularResiduals(
       {
         // 2.1. First, finite difference out current q,dq,ddq:
         Eigen::VectorXs q = init->poseTrials[trial].col(t);
-        Eigen::VectorXs dq = (init->poseTrials[trial].col(t)
-                              - init->poseTrials[trial].col(t - 1))
+        Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                                 init->poseTrials[trial].col(t),
+                                 init->poseTrials[trial].col(t - 1))
                              / dt;
-        Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 1)
-                               - 2 * init->poseTrials[trial].col(t)
-                               + init->poseTrials[trial].col(t - 1))
+        Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                                   init->poseTrials[trial].col(t + 1),
+                                   init->poseTrials[trial].col(t))
+                               - mSkeleton->getPositionDifferences(
+                                   init->poseTrials[trial].col(t),
+                                   init->poseTrials[trial].col(t - 1)))
                               / (dt * dt);
         Eigen::VectorXs tau = helper.calculateInverseDynamics(
             q, dq, ddq, init->grfTrials[trial].col(t));

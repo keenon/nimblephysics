@@ -151,6 +151,16 @@ public:
       Eigen::VectorXs forcesConcat);
 
   ////////////////////////////////////////////
+  // This computes the residual at the root, then transforms that to the COM and
+  // expresses the torque as a spatial vector (even if the root joint uses euler
+  // coordinates for rotation). Linear force is left unchanged.
+  Eigen::Vector6s calculateCOMSpatialResidual(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
   // This computes the acceleration we would need at the root in order to keep
   // everything else the same, and end up with zero residuals at the root.
   Eigen::Vector6s calculateResidualFreeRootAcceleration(
@@ -858,6 +868,12 @@ public:
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // 1. Adjust the total mass of the body, and change the initial positions and
+  // velocities of the body to achieve a least-squares closest COM trajectory to
+  // the current kinematic fit.
+  void zeroLinearResidualsOnCOMTrajectoryMinimizeAngular(
       std::shared_ptr<DynamicsInitialization> init);
 
   // 1.1. Shift the COM trajectory around to try to get the residual-free
