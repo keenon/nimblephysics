@@ -823,24 +823,155 @@ bool testResidualRootJacobians(
 {
   ResidualForceHelper helper(skel, contactBodies);
 
-  Eigen::MatrixXs angularResidual
-      = helper.calculateRootAngularResidualJacobianWrtPosition(
+  Eigen::MatrixXs angWrtPos
+      = helper.calculateRootAngularResidualJacobianWrtLinearPosition(
           q, dq, ddq, forces);
-  Eigen::MatrixXs angularResidual_fd
-      = helper.finiteDifferenceRootAngularResidualJacobianWrtPosition(
+  Eigen::MatrixXs angWrtPos_fd
+      = helper.finiteDifferenceRootAngularResidualJacobianWrtLinearPosition(
           q, dq, ddq, forces);
 
-  if (!equals(angularResidual, angularResidual_fd, 2e-8))
+  if (!equals(angWrtPos, angWrtPos_fd, 2e-8))
   {
-    std::cout << "Jacobian of root angular residual wrt position not equal!"
-              << std::endl;
-    std::cout << "Analytical:" << std::endl << angularResidual << std::endl;
-    std::cout << "FD:" << std::endl << angularResidual_fd << std::endl;
-    std::cout << "Diff (" << (angularResidual_fd - angularResidual).minCoeff()
-              << " - " << (angularResidual_fd - angularResidual).maxCoeff()
-              << "):" << std::endl
-              << (angularResidual_fd - angularResidual) << std::endl;
+    std::cout
+        << "Jacobian of root angular residual wrt linear position not equal!"
+        << std::endl;
+    std::cout << "Analytical:" << std::endl << angWrtPos << std::endl;
+    std::cout << "FD:" << std::endl << angWrtPos_fd << std::endl;
+    std::cout << "Diff (" << (angWrtPos_fd - angWrtPos).minCoeff() << " - "
+              << (angWrtPos_fd - angWrtPos).maxCoeff() << "):" << std::endl
+              << (angWrtPos_fd - angWrtPos) << std::endl;
     return false;
+  }
+
+  // Check that the linear position offset has a linear effect on angular
+  // residual
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetQ = q;
+    offsetQ.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angWrtPos * offset;
+    Eigen::Vector3s actualChange
+        = helper.calculateResidual(offsetQ, dq, ddq, forces).head<3>()
+          - helper.calculateResidual(q, dq, ddq, forces).head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout << "Relationship between root position and angular residual is "
+                   "not linear! Change:"
+                << std::endl
+                << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
+  }
+
+  Eigen::MatrixXs angWrtVel
+      = helper.calculateRootAngularResidualJacobianWrtLinearVelocity(
+          q, dq, ddq, forces);
+  Eigen::MatrixXs angWrtVel_fd
+      = helper.finiteDifferenceRootAngularResidualJacobianWrtLinearVelocity(
+          q, dq, ddq, forces);
+
+  if (!equals(angWrtVel, angWrtVel_fd, 2e-8))
+  {
+    std::cout
+        << "Jacobian of root angular residual wrt linear velocity not equal!"
+        << std::endl;
+    std::cout << "Analytical:" << std::endl << angWrtVel << std::endl;
+    std::cout << "FD:" << std::endl << angWrtVel_fd << std::endl;
+    std::cout << "Diff (" << (angWrtVel_fd - angWrtVel).minCoeff() << " - "
+              << (angWrtVel_fd - angWrtVel).maxCoeff() << "):" << std::endl
+              << (angWrtVel_fd - angWrtVel) << std::endl;
+    return false;
+  }
+
+  // Check that the linear velocity offset has a linear effect on angular
+  // residual
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetDq = dq;
+    offsetDq.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angWrtVel * offset;
+    Eigen::Vector3s actualChange
+        = helper.calculateResidual(q, offsetDq, ddq, forces).head<3>()
+          - helper.calculateResidual(q, dq, ddq, forces).head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout << "Relationship between root velocity and angular residual is "
+                   "not linear! Change:"
+                << std::endl
+                << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
+  }
+
+  Eigen::MatrixXs angWrtAcc
+      = helper.calculateRootAngularResidualJacobianWrtLinearAcceleration(
+          q, dq, ddq, forces);
+  Eigen::MatrixXs angWrtAcc_fd
+      = helper.finiteDifferenceRootAngularResidualJacobianWrtLinearAcceleration(
+          q, dq, ddq, forces);
+
+  if (!equals(angWrtAcc, angWrtAcc_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root angular residual wrt linear acceleration "
+                 "not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << angWrtAcc << std::endl;
+    std::cout << "FD:" << std::endl << angWrtAcc_fd << std::endl;
+    std::cout << "Diff (" << (angWrtAcc_fd - angWrtAcc).minCoeff() << " - "
+              << (angWrtAcc_fd - angWrtAcc).maxCoeff() << "):" << std::endl
+              << (angWrtAcc_fd - angWrtAcc) << std::endl;
+    return false;
+  }
+
+  // Check that the linear acceleration offset has a linear effect on angular
+  // residual
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetDdq = ddq;
+    offsetDdq.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angWrtAcc * offset;
+    Eigen::Vector3s actualChange
+        = helper.calculateResidual(q, dq, offsetDdq, forces).head<3>()
+          - helper.calculateResidual(q, dq, ddq, forces).head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout
+          << "Relationship between root acceleration and angular residual is "
+             "not linear! Change:"
+          << std::endl
+          << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
   }
 
   // Eigen::MatrixXs fullResidual
@@ -892,27 +1023,173 @@ bool testResidualRootJacobians(
     return false;
   }
 
-  Eigen::MatrixXs angularAccResidual
-      = helper.calculateResidualFreeRootAngularAccelerationJacobianWrtPosition(
-          q, dq, ddq, forces);
-  Eigen::MatrixXs angularAccResidual_fd
+  Eigen::MatrixXs angAccWrtPos
       = helper
-            .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtPosition(
+            .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+                q, dq, ddq, forces);
+  Eigen::MatrixXs angAccWrtPos_fd
+      = helper
+            .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
                 q, dq, ddq, forces);
 
-  if (!equals(angularAccResidual, angularAccResidual_fd, 2e-8))
+  if (!equals(angAccWrtPos, angAccWrtPos_fd, 2e-8))
   {
     std::cout << "Jacobian of root angular residual wrt position not equal!"
               << std::endl;
-    std::cout << "Analytical:" << std::endl << angularAccResidual << std::endl;
-    std::cout << "FD:" << std::endl << angularAccResidual_fd << std::endl;
-    std::cout << "Diff ("
-              << (angularAccResidual_fd - angularAccResidual).minCoeff()
-              << " - "
-              << (angularAccResidual_fd - angularAccResidual).maxCoeff()
+    std::cout << "Analytical:" << std::endl << angAccWrtPos << std::endl;
+    std::cout << "FD:" << std::endl << angAccWrtPos_fd << std::endl;
+    std::cout << "Diff (" << (angAccWrtPos_fd - angAccWrtPos).minCoeff()
+              << " - " << (angAccWrtPos_fd - angAccWrtPos).maxCoeff()
               << "):" << std::endl
-              << (angularAccResidual_fd - angularAccResidual) << std::endl;
+              << (angAccWrtPos_fd - angAccWrtPos) << std::endl;
     return false;
+  }
+
+  // Check that the linear position offset has a linear effect on residual-free
+  // angular acc
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetQ = q;
+    offsetQ.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angAccWrtPos * offset;
+    Eigen::Vector3s actualChange
+        = helper
+              .calculateResidualFreeAngularAcceleration(
+                  offsetQ, dq, ddq, forces)
+              .head<3>()
+          - helper.calculateResidualFreeAngularAcceleration(q, dq, ddq, forces)
+                .head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout << "Relationship between root position and angular residual is "
+                   "not linear! Change:"
+                << std::endl
+                << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
+  }
+
+  Eigen::MatrixXs angAccWrtVel
+      = helper
+            .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+                q, dq, ddq, forces);
+  Eigen::MatrixXs angAccWrtVel_fd
+      = helper
+            .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+                q, dq, ddq, forces);
+
+  if (!equals(angAccWrtVel, angAccWrtVel_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root angular residual wrt velocity not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << angAccWrtVel << std::endl;
+    std::cout << "FD:" << std::endl << angAccWrtVel_fd << std::endl;
+    std::cout << "Diff (" << (angAccWrtVel_fd - angAccWrtVel).minCoeff()
+              << " - " << (angAccWrtVel_fd - angAccWrtVel).maxCoeff()
+              << "):" << std::endl
+              << (angAccWrtVel_fd - angAccWrtVel) << std::endl;
+    return false;
+  }
+
+  // Check that the linear velocity offset has a linear effect on residual-free
+  // angular acc
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetDq = dq;
+    offsetDq.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angAccWrtVel * offset;
+    Eigen::Vector3s actualChange
+        = helper
+              .calculateResidualFreeAngularAcceleration(
+                  q, offsetDq, ddq, forces)
+              .head<3>()
+          - helper.calculateResidualFreeAngularAcceleration(q, dq, ddq, forces)
+                .head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout << "Relationship between root velocity and angular residual is "
+                   "not linear! Change:"
+                << std::endl
+                << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
+  }
+
+  Eigen::MatrixXs angAccWrtAcc
+      = helper
+            .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
+                q, dq, ddq, forces);
+  Eigen::MatrixXs angAccWrtAcc_fd
+      = helper
+            .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
+                q, dq, ddq, forces);
+
+  if (!equals(angAccWrtAcc, angAccWrtAcc_fd, 2e-8))
+  {
+    std::cout << "Jacobian of root angular residual wrt acceleration not equal!"
+              << std::endl;
+    std::cout << "Analytical:" << std::endl << angAccWrtAcc << std::endl;
+    std::cout << "FD:" << std::endl << angAccWrtAcc_fd << std::endl;
+    std::cout << "Diff (" << (angAccWrtAcc_fd - angAccWrtAcc).minCoeff()
+              << " - " << (angAccWrtAcc_fd - angAccWrtAcc).maxCoeff()
+              << "):" << std::endl
+              << (angAccWrtAcc_fd - angAccWrtAcc) << std::endl;
+    return false;
+  }
+
+  // Check that the linear acceleration offset has a linear effect on
+  // residual-free angular acc
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s offset = Eigen::Vector3s::Random();
+
+    Eigen::VectorXs offsetDdq = ddq;
+    offsetDdq.segment<3>(3) += offset;
+
+    Eigen::Vector3s predictedChange = angAccWrtAcc * offset;
+    Eigen::Vector3s actualChange
+        = helper
+              .calculateResidualFreeAngularAcceleration(
+                  q, dq, offsetDdq, forces)
+              .head<3>()
+          - helper.calculateResidualFreeAngularAcceleration(q, dq, ddq, forces)
+                .head<3>();
+    if (!equals(predictedChange, actualChange, 1e-8))
+    {
+      std::cout
+          << "Relationship between root acceleration and angular residual is "
+             "not linear! Change:"
+          << std::endl
+          << offset << std::endl;
+      Eigen::Matrix3s compare;
+      compare.col(0) = predictedChange;
+      compare.col(1) = actualChange;
+      compare.col(2) = predictedChange - actualChange;
+      std::cout << "Predicted - Actual - Diff" << std::endl
+                << compare << std::endl;
+      return false;
+    }
   }
 
   Eigen::MatrixXs rootAccResidual
@@ -1141,6 +1418,233 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
         std::cout << "Diff:" << std::endl
                   << posOffsetInvMass - posOffsetInvMass_fd << std::endl;
         return false;
+      }
+    }
+    return false;
+  }
+
+  return true;
+}
+
+bool testLinearTrajectorLinearMapWithRandomTrajectory(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<int> collisionBodies,
+    int numTimesteps)
+{
+  s_t dt = skel->getTimeStep();
+  Eigen::MatrixXs qs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs dqs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs ddqs
+      = Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs forces
+      = 0.001
+        * Eigen::MatrixXs::Random(collisionBodies.size() * 6, numTimesteps);
+  std::vector<bool> probablyMissingGRF;
+  int numMissing = 0;
+  std::vector<int> missingIndices;
+  for (int i = 0; i < numTimesteps; i++)
+  {
+    bool missing = i % 4 == 0;
+    probablyMissingGRF.push_back(missing);
+    if (missing)
+    {
+      numMissing++;
+      missingIndices.push_back(i);
+    }
+  }
+
+  // Generate q,dq from integrating the given accelerations
+  qs.col(0) = skel->getRandomPose();
+  dqs.col(0) = skel->getRandomVelocity();
+  for (int i = 1; i < numTimesteps; i++)
+  {
+    dqs.col(i) = dqs.col(i - 1) + ddqs.col(i - 1) * dt;
+    qs.col(i) = qs.col(i - 1) + dqs.col(i) * dt;
+  }
+  // Add some random noise
+  qs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.0001;
+  dqs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.001;
+
+  // for (int t = 0; t < numTimesteps; t++)
+  // {
+  //   std::cout << "Testing individual jacobians at t=" << t << std::endl;
+  //   bool success = testResidualRootJacobians(
+  //       skel,
+  //       collisionBodies,
+  //       qs.col(t),
+  //       dqs.col(t),
+  //       ddqs.col(t),
+  //       forces.col(t));
+  //   if (!success)
+  //     return false;
+  // }
+
+  ResidualForceHelper helper(skel, collisionBodies);
+
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear
+      = helper.getLinearTrajectoryLinearSystem(
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF);
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear_fd
+      = helper.finiteDifferenceLinearTrajectoryLinearSystem(
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF);
+
+  if (!equals(linear.second, linear_fd.second, 1e-8))
+  {
+    std::cout << "Linear system b vector is not equal!" << std::endl;
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Vector3s pos = linear.second.segment<3>(t * 3);
+      Eigen::Vector3s pos_fd = linear_fd.second.segment<3>(t * 3);
+      if (!equals(pos, pos_fd, 1e-8))
+      {
+        std::cout << "Linear system b vector pos not equal at t=" << t
+                  << std::endl;
+        Eigen::Matrix3s compare;
+        compare.col(0) = pos;
+        compare.col(1) = pos_fd;
+        compare.col(2) = pos - pos_fd;
+        std::cout << "Analytical - FD - Diff" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Vector3s pos = linear.second.segment<3>((numTimesteps + t) * 3);
+      Eigen::Vector3s pos_fd
+          = linear_fd.second.segment<3>((numTimesteps + t) * 3);
+      if (!equals(pos, pos_fd, 1e-8))
+      {
+        std::cout << "Linear system b vector ang not equal at t=" << t
+                  << std::endl;
+        Eigen::Matrix3s compare;
+        compare.col(0) = pos;
+        compare.col(1) = pos_fd;
+        compare.col(2) = pos - pos_fd;
+        std::cout << "Analytical - FD - Diff" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  if (!equals(linear.first, linear_fd.first, 1e-8))
+  {
+    std::cout << "Linear system A matrix is not equal!" << std::endl;
+    Eigen::MatrixXs A = linear.first;
+    Eigen::MatrixXs A_fd = linear_fd.first;
+
+    /// Check the linear pose map
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Matrix3s posOffsetPos = A.block<3, 3>(t * 3, 0);
+      Eigen::Matrix3s posOffsetPos_fd = A_fd.block<3, 3>(t * 3, 0);
+
+      if (!equals(posOffsetPos, posOffsetPos_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos_fd << std::endl;
+        std::cout << "Extra (Analytical - FD):" << std::endl
+                  << posOffsetPos - posOffsetPos_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Matrix3s posOffsetVel = A.block<3, 3>(t * 3, 3);
+      Eigen::Matrix3s posOffsetVel_fd = A_fd.block<3, 3>(t * 3, 3);
+
+      if (!equals(posOffsetVel, posOffsetVel_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetVel - posOffsetVel_fd << std::endl;
+        return false;
+      }
+
+      for (int i = 0; i < numMissing; i++)
+      {
+        Eigen::Matrix3s posOffsetResidual = A.block<3, 3>(t * 3, 6 + i * 3);
+        Eigen::Matrix3s posOffsetResidual_fd
+            = A_fd.block<3, 3>(t * 3, 6 + i * 3);
+
+        if (!equals(posOffsetResidual, posOffsetResidual_fd, 1e-8))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dPos[" << t << "]/dLinResidual["
+                    << missingIndices[i] << "]:" << std::endl
+                    << posOffsetResidual << std::endl;
+          std::cout << "FD dPos[" << t << "]/dLinResidual[" << missingIndices[i]
+                    << "]:" << std::endl
+                    << posOffsetResidual_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetResidual - posOffsetResidual_fd << std::endl;
+          return false;
+        }
+      }
+    }
+    std::cout << "Linear pose map passes!" << std::endl;
+
+    int rowOffset = numTimesteps * 3;
+    /// Check the angular pose map
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Matrix3s posOffsetPos = A.block<3, 3>(rowOffset + t * 3, 0);
+      Eigen::Matrix3s posOffsetPos_fd = A_fd.block<3, 3>(rowOffset + t * 3, 0);
+
+      if (!equals(posOffsetPos, posOffsetPos_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dAng[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos << std::endl;
+        std::cout << "FD dAng[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos_fd << std::endl;
+        std::cout << "Extra (Analytical - FD):" << std::endl
+                  << posOffsetPos - posOffsetPos_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Matrix3s posOffsetVel = A.block<3, 3>(rowOffset + t * 3, 3);
+      Eigen::Matrix3s posOffsetVel_fd = A_fd.block<3, 3>(rowOffset + t * 3, 3);
+
+      if (!equals(posOffsetVel, posOffsetVel_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dAng[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel << std::endl;
+        std::cout << "FD dAng[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetVel - posOffsetVel_fd << std::endl;
+        return false;
+      }
+
+      for (int i = 0; i < numMissing; i++)
+      {
+        Eigen::Matrix3s posOffsetResidual
+            = A.block<3, 3>(rowOffset + t * 3, 6 + i * 3);
+        Eigen::Matrix3s posOffsetResidual_fd
+            = A_fd.block<3, 3>(rowOffset + t * 3, 6 + i * 3);
+
+        if (!equals(posOffsetResidual, posOffsetResidual_fd, 1e-8))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dAng[" << t << "]/dLinResidual["
+                    << missingIndices[i] << "]:" << std::endl
+                    << posOffsetResidual << std::endl;
+          std::cout << "FD dAng[" << t << "]/dLinResidual[" << missingIndices[i]
+                    << "]:" << std::endl
+                    << posOffsetResidual_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetResidual - posOffsetResidual_fd << std::endl;
+          return false;
+        }
       }
     }
     return false;
@@ -1420,7 +1924,20 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //   std::endl; return init;
   // }
 
-  fitter.optimizeSpatialResidualsOnCOMTrajectory(init);
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
+    for (int i = 0; i < 40; i++)
+    {
+      // this holds the mass constant, and re-jigs the trajectory to try to get
+      // the angular ACC's to match more closely what was actually observed
+      fitter.zeroLinearResidualsAndOptimizeAngular(
+          init, trial, originalTrajectory, 1.0, 5.0);
+      fitter.estimateUnmeasuredExternalTorques(init, trial);
+    }
+  }
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  fitter.recalibrateForcePlates(init);
 
   auto secondPair = fitter.computeAverageRealForce(init);
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
@@ -2213,6 +2730,35 @@ TEST(DynamicsFitter, ROOT_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
+        file.skeleton, collisionBodies, 5);
+    if (!success)
+    {
+      EXPECT_TRUE(success);
+      return;
+    }
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, LIN_JACS)
+{
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+
+  for (int i = 0; i < 5; i++)
+  {
+    std::vector<int> collisionBodies;
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton());
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
+    bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
         file.skeleton, collisionBodies, 5);
     if (!success)
     {
@@ -3651,7 +4197,23 @@ TEST(DynamicsFitter, TEST_ZERO_RESIDUALS)
       standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
 
   fitter.smoothAccelerations(init);
+  Eigen::MatrixXs originalTrajectory = init->poseTrials[0];
+  // this gets the mass of the skeleton
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  for (int i = 0; i < 20; i++)
+  {
+    // this holds the mass constant, and re-jigs the trajectory to try to get
+    // the angular ACC's to match more closely what was actually observed
+    fitter.zeroLinearResidualsAndOptimizeAngular(
+        init, 0, originalTrajectory, 1.0, 5.0);
+  }
+  // fitter.zeroLinearResidualsAndOptimizeAngular(
+  //     init, 0, originalTrajectory, 1.0, 0.0);
+
+  // Recompute the mass of the system
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+
+  // fitter.moveComsToMinimizeAngularResiduals(init);
 
   fitter.saveDynamicsToGUI(
       "../../../javascript/src/data/movement2.bin",

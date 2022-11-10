@@ -117,7 +117,7 @@ public:
   ////////////////////////////////////////////
   // Computes the Jacobian relating changes in the root position to changes in
   // the residual torque
-  Eigen::Matrix3s calculateRootAngularResidualJacobianWrtPosition(
+  Eigen::Matrix3s calculateRootAngularResidualJacobianWrtLinearPosition(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
@@ -126,7 +126,44 @@ public:
   ////////////////////////////////////////////
   // Computes the Jacobian relating changes in the root position to changes in
   // the residual torque
-  Eigen::Matrix3s finiteDifferenceRootAngularResidualJacobianWrtPosition(
+  Eigen::Matrix3s finiteDifferenceRootAngularResidualJacobianWrtLinearPosition(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix3s calculateRootAngularResidualJacobianWrtLinearVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix3s finiteDifferenceRootAngularResidualJacobianWrtLinearVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix3s calculateRootAngularResidualJacobianWrtLinearAcceleration(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix3s
+  finiteDifferenceRootAngularResidualJacobianWrtLinearAcceleration(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
@@ -161,6 +198,16 @@ public:
       Eigen::VectorXs forcesConcat);
 
   ////////////////////////////////////////////
+  // This computes the residual at the root, then transforms that to the COM and
+  // expresses the torque as a spatial vector (even if the root joint uses euler
+  // coordinates for rotation). Linear force is left unchanged.
+  Eigen::Vector3s calculateCOMAngularResidual(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
   // This computes the acceleration we would need at the root in order to keep
   // everything else the same, and end up with zero residuals at the root.
   Eigen::Vector6s calculateResidualFreeRootAcceleration(
@@ -180,10 +227,10 @@ public:
       Eigen::VectorXs forcesConcat);
 
   ////////////////////////////////////////////
-  // This computes the change in angular acceleration as we change the root
-  // position.
-  Eigen::Matrix3s
-  calculateResidualFreeRootAngularAccelerationJacobianWrtPosition(
+  // This computes the linear acceleration we would need at the root in order
+  // to keep everything else the same, and end up with zero residuals at the
+  // root.
+  Eigen::Vector3s calculateResidualFreeLinearAcceleration(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
@@ -193,7 +240,57 @@ public:
   // This computes the change in angular acceleration as we change the root
   // position.
   Eigen::Matrix3s
-  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtPosition(
+  calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // position.
+  Eigen::Matrix3s
+  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::Matrix3s
+  calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // velocity.
+  Eigen::Matrix3s
+  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // acceleration.
+  Eigen::Matrix3s
+  calculateResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change the root
+  // acceleration.
+  Eigen::Matrix3s
+  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
@@ -275,6 +372,17 @@ public:
       Eigen::VectorXs forcesConcat);
 
   ////////////////////////////////////////////
+  // This computes the location that we would need to move the COM to in order
+  // to center the angular residuals. Moving the COM to the computed location
+  // doesn't remove angular residuals, but ensures that any remaining residuals
+  // are parallel to the net external force on the body.
+  Eigen::Vector3s calculateComToCenterAngularResiduals(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
   // This returns a matrix A and vector b, such that Ax+b gives you a legal root
   // trajectory. Here x is a 12 dimensional vector, composed of the
   // concatenation of the initial pos offset, and initial velocity offset.
@@ -334,6 +442,53 @@ public:
       Eigen::Vector6s initialPosOffset,
       Eigen::Vector6s initialVelOffset,
       Eigen::MatrixXs qs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
+
+  ////////////////////////////////////////////
+  // This returns a matrix A and vector b, such that Ax+b gives you a trajectory
+  // with zero linear residuals, along with a "hypothetical" angular trajectory.
+  // The angular trajectory is "hypothetical" in that changing the angles of the
+  // root at any timestep will break the linear residuals, so this is just the
+  // integration of the "residual free angular acceleration" computed at each
+  // timestep. Happily, this hypothetical angular trajectory is linear in the
+  // initial conditions, so it's possible to solve this whole system in one
+  // shot. This won't produce something legal, but it well let you get your
+  // angular accelerations quite close to the desired trajectory.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> getLinearTrajectoryLinearSystem(
+      s_t dt,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
+
+  ////////////////////////////////////////////
+  // This returns the same thing as getLinearTrajectoryLinearSystem(), in
+  // theory.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  finiteDifferenceLinearTrajectoryLinearSystem(
+      s_t dt,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF);
+
+  ////////////////////////////////////////////
+  // This produces the same output as you would get from using A*x+b from
+  // getLinearTrajectoryLinearSystem().
+  Eigen::VectorXs getLinearTrajectoryLinearSystemTestOutput(
+      s_t dt,
+      Eigen::Vector3s linPosOffset,
+      Eigen::Vector3s linVelOffset,
+      Eigen::VectorXs linResiduals,
+      Eigen::Vector3s angPosOffset,
+      Eigen::Vector3s angVelOffset,
+      Eigen::VectorXs angResiduals,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF);
 
@@ -834,6 +989,11 @@ public:
   std::vector<Eigen::Vector3s> comPositions(
       std::shared_ptr<DynamicsInitialization> init, int trial);
 
+  // This computes and returns the positions of the center of mass at each
+  // frame that would center the remaining angular residuals
+  std::vector<Eigen::Vector3s> comPositionsToCenterResiduals(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
   // This computes and returns the acceleration of the center of mass at each
   // frame
   std::vector<Eigen::Vector3s> comAccelerations(
@@ -864,17 +1024,36 @@ public:
   void estimateUnmeasuredExternalForces(
       std::shared_ptr<DynamicsInitialization> init, s_t scaleThresholds = 1.0);
 
+  // 0. Estimate which timesteps probably have unmeasured external torques
+  // present. By passing a number smaller than 1.0 to scaleThresholds, we can
+  // increase the rate at which we throw out potentially bad data.
+  void estimateUnmeasuredExternalTorques(
+      std::shared_ptr<DynamicsInitialization> init,
+      int trial,
+      s_t scaleThresholds = 1.0);
+
+  // This is pretty much just here for testing. It goes through and moves the
+  // COM at every timestep to the spot it would need to be in order to minimize
+  // angular residuals.
+  void moveComsToMinimizeAngularResiduals(
+      std::shared_ptr<DynamicsInitialization> init);
+
   // 1. Adjust the total mass of the body, and change the initial positions and
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init);
 
-  // 1. Adjust the total mass of the body, and change the initial positions and
-  // velocities of the body to achieve a least-squares closest COM trajectory to
-  // the current kinematic fit.
-  void zeroLinearResidualsOnCOMTrajectoryMinimizeAngular(
-      std::shared_ptr<DynamicsInitialization> init);
+  // 1. Change the initial positions and velocities of the body to achieve a
+  // least-squares closest COM trajectory to the current kinematic fit, taking
+  // into account approximate angular positions.
+  void zeroLinearResidualsAndOptimizeAngular(
+      std::shared_ptr<DynamicsInitialization> init,
+      int trial,
+      Eigen::MatrixXs targetPoses,
+      s_t weightLinear = 1.0,
+      s_t weightAngular = 1.0,
+      s_t regularizeResiduals = 1.0);
 
   // 1.1. Shift the COM trajectory around to try to get the residual-free
   // rotation.

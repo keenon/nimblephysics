@@ -410,7 +410,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceResidualNormGradientWrt(
 // Computes the Jacobian relating changes in the root position to changes in
 // the residual torque
 Eigen::Matrix3s
-ResidualForceHelper::calculateRootAngularResidualJacobianWrtPosition(
+ResidualForceHelper::calculateRootAngularResidualJacobianWrtLinearPosition(
     Eigen::VectorXs q,
     Eigen::VectorXs dq,
     Eigen::VectorXs ddq,
@@ -453,12 +453,12 @@ ResidualForceHelper::calculateRootAngularResidualJacobianWrtPosition(
 //==============================================================================
 // Computes the Jacobian relating changes in the root position to changes in
 // the residual torque
-Eigen::Matrix3s
-ResidualForceHelper::finiteDifferenceRootAngularResidualJacobianWrtPosition(
-    Eigen::VectorXs q,
-    Eigen::VectorXs dq,
-    Eigen::VectorXs ddq,
-    Eigen::VectorXs forcesConcat)
+Eigen::Matrix3s ResidualForceHelper::
+    finiteDifferenceRootAngularResidualJacobianWrtLinearPosition(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
 {
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 3);
   Eigen::VectorXs original = q;
@@ -473,6 +473,129 @@ ResidualForceHelper::finiteDifferenceRootAngularResidualJacobianWrtPosition(
         Eigen::VectorXs tweaked = q;
         tweaked(dof + 3) += eps;
         perturbed = calculateResidual(tweaked, dq, ddq, forcesConcat).head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix3s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix3s
+ResidualForceHelper::calculateRootAngularResidualJacobianWrtLinearVelocity(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::Matrix3s result
+      = mSkel->getJacobianOfC(neural::WithRespectTo::VELOCITY)
+            .block<3, 3>(0, 3);
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+
+  return result;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix3s ResidualForceHelper::
+    finiteDifferenceRootAngularResidualJacobianWrtLinearVelocity(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 3);
+  Eigen::VectorXs original = q;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 3);
+        Eigen::VectorXs tweaked = dq;
+        tweaked(dof + 3) += eps;
+        perturbed = calculateResidual(q, tweaked, ddq, forcesConcat).head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix3s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix3s
+ResidualForceHelper::calculateRootAngularResidualJacobianWrtLinearAcceleration(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+
+  mSkel->setPositions(q);
+
+  Eigen::Matrix3s result = mSkel->getMassMatrix().block<3, 3>(0, 3);
+
+  mSkel->setPositions(originalPos);
+
+  return result;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix3s ResidualForceHelper::
+    finiteDifferenceRootAngularResidualJacobianWrtLinearAcceleration(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 3);
+  Eigen::VectorXs original = q;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 3);
+        Eigen::VectorXs tweaked = ddq;
+        tweaked(dof + 3) += eps;
+        perturbed = calculateResidual(q, dq, tweaked, forcesConcat).head<3>();
         return true;
       },
       result,
@@ -570,8 +693,36 @@ Eigen::Vector6s ResidualForceHelper::calculateCOMSpatialResidual(
   Eigen::Vector6s comForce
       = jac.transpose().completeOrthogonalDecomposition().solve(rootResidual);
 #ifndef NDEBUG
+  // Ensure Jacobian transpose inversion is full rank
   Eigen::Vector6s recoveredResidual = jac.transpose() * comForce;
   assert((recoveredResidual - rootResidual).norm() < 1e-8);
+#endif
+  return comForce;
+}
+
+//==============================================================================
+// This computes the residual at the root, then transforms that to the COM and
+// expresses the torque as a spatial vector (even if the root joint uses euler
+// coordinates for rotation).
+Eigen::Vector3s ResidualForceHelper::calculateCOMAngularResidual(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs oldPos = mSkel->getPositions();
+  mSkel->setPositions(q);
+  Eigen::Matrix3s jac = mSkel->getCOMJacobian().block<3, 3>(0, 0);
+  mSkel->setPositions(oldPos);
+
+  Eigen::Vector6s rootResidual = calculateResidual(q, dq, ddq, forcesConcat);
+  Eigen::Vector3s comForce
+      = jac.transpose().completeOrthogonalDecomposition().solve(
+          rootResidual.head<3>());
+#ifndef NDEBUG
+  // Ensure Jacobian transpose inversion is full rank
+  Eigen::Vector3s recoveredResidual = jac.transpose() * comForce;
+  assert((recoveredResidual - rootResidual.head<3>()).norm() < 1e-8);
 #endif
   return comForce;
 }
@@ -665,10 +816,53 @@ Eigen::Vector3s ResidualForceHelper::calculateResidualFreeAngularAcceleration(
 }
 
 //==============================================================================
+// This computes the linear acceleration we would need at the root in order
+// to keep everything else the same, and end up with zero residuals at the
+// root.
+Eigen::Vector3s ResidualForceHelper::calculateResidualFreeLinearAcceleration(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+  Eigen::VectorXs originalAcc = mSkel->getAccelerations();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+  mSkel->setAccelerations(ddq);
+
+  Eigen::MatrixXs M = mSkel->getMassMatrix();
+  Eigen::VectorXs tailDdq = ddq;
+  tailDdq.segment<3>(3).setZero();
+  Eigen::VectorXs tailTauContribution = M * tailDdq;
+  Eigen::VectorXs C = mSkel->getCoriolisAndGravityForces();
+  Eigen::VectorXs Fs = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  for (int i = 0; i < mForces.size(); i++)
+  {
+    Eigen::VectorXs fTaus
+        = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+    Fs += fTaus;
+  }
+
+  Eigen::Vector3s solve
+      = -M.block<3, 3>(3, 3).completeOrthogonalDecomposition().solve(
+          tailTauContribution.segment<3>(3) + C.segment<3>(3)
+          - Fs.segment<3>(3));
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  mSkel->setAccelerations(originalAcc);
+
+  return solve;
+}
+
+//==============================================================================
 // This computes the change in angular acceleration as we change the root
 // position.
 Eigen::Matrix3s ResidualForceHelper::
-    calculateResidualFreeRootAngularAccelerationJacobianWrtPosition(
+    calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
         Eigen::VectorXs q,
         Eigen::VectorXs dq,
         Eigen::VectorXs ddq,
@@ -678,7 +872,7 @@ Eigen::Matrix3s ResidualForceHelper::
   mSkel->setPositions(q);
 
   Eigen::Matrix3s angResidualWrtPos
-      = calculateRootAngularResidualJacobianWrtPosition(
+      = calculateRootAngularResidualJacobianWrtLinearPosition(
           q, dq, ddq, forcesConcat);
   Eigen::Matrix3s M = mSkel->getMassMatrix().block<3, 3>(0, 0);
   auto Mdecomp = M.completeOrthogonalDecomposition();
@@ -697,7 +891,7 @@ Eigen::Matrix3s ResidualForceHelper::
 // This computes the change in angular acceleration as we change the root
 // position.
 Eigen::Matrix3s ResidualForceHelper::
-    finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtPosition(
+    finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
         Eigen::VectorXs q,
         Eigen::VectorXs dq,
         Eigen::VectorXs ddq,
@@ -717,6 +911,133 @@ Eigen::Matrix3s ResidualForceHelper::
         tweaked(dof + 3) += eps;
         perturbed = calculateResidualFreeAngularAcceleration(
                         tweaked, dq, ddq, forcesConcat)
+                        .head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix3s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::Matrix3s ResidualForceHelper::
+    calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  mSkel->setPositions(q);
+
+  Eigen::Matrix3s angResidualWrtPos
+      = calculateRootAngularResidualJacobianWrtLinearVelocity(
+          q, dq, ddq, forcesConcat);
+  Eigen::Matrix3s M = mSkel->getMassMatrix().block<3, 3>(0, 0);
+  auto Mdecomp = M.completeOrthogonalDecomposition();
+
+  Eigen::Matrix3s result;
+  for (int i = 0; i < 3; i++)
+  {
+    result.col(i) = -Mdecomp.solve(angResidualWrtPos.col(i));
+  }
+
+  mSkel->setPositions(originalPos);
+  return result;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// velocity.
+Eigen::Matrix3s ResidualForceHelper::
+    finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 3);
+  Eigen::VectorXs original = dq;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 3);
+        Eigen::VectorXs tweaked = dq;
+        tweaked(dof + 3) += eps;
+        perturbed = calculateResidualFreeAngularAcceleration(
+                        q, tweaked, ddq, forcesConcat)
+                        .head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix3s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// acceleration.
+Eigen::Matrix3s ResidualForceHelper::
+    calculateResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  mSkel->setPositions(q);
+
+  Eigen::Matrix3s angResidualWrtPos
+      = calculateRootAngularResidualJacobianWrtLinearAcceleration(
+          q, dq, ddq, forcesConcat);
+  Eigen::Matrix3s M = mSkel->getMassMatrix().block<3, 3>(0, 0);
+  auto Mdecomp = M.completeOrthogonalDecomposition();
+
+  Eigen::Matrix3s result;
+  for (int i = 0; i < 3; i++)
+  {
+    result.col(i) = -Mdecomp.solve(angResidualWrtPos.col(i));
+  }
+
+  mSkel->setPositions(originalPos);
+  return result;
+}
+
+//==============================================================================
+// This computes the change in angular acceleration as we change the root
+// acceleration.
+Eigen::Matrix3s ResidualForceHelper::
+    finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtLinearAcceleration(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 3);
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof >= 0 && dof < 3);
+        Eigen::VectorXs tweaked = ddq;
+        tweaked(dof + 3) += eps;
+        perturbed = calculateResidualFreeAngularAcceleration(
+                        q, dq, tweaked, forcesConcat)
                         .head<3>();
         return true;
       },
@@ -1190,6 +1511,75 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceScratchJacobianWrtInvMass(
 
   // Eigen::Vector6s fixedSizeResult = result;
   // return fixedSizeResult;
+}
+
+//==============================================================================
+// This computes the location that we would need to move the COM to in order
+// to center the angular residuals. Moving the COM to the computed location
+// doesn't remove angular residuals, but ensures that any remaining residuals
+// are parallel to the net external force on the body.
+Eigen::Vector3s ResidualForceHelper::calculateComToCenterAngularResiduals(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat)
+{
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  mSkel->setPositions(q);
+  Eigen::Vector3s com = mSkel->getCOM();
+  mSkel->setPositions(originalPos);
+
+  Eigen::Vector3s f = Eigen::Vector3s::Zero();
+  for (int i = 0; i < forcesConcat.size() / 6; i++)
+  {
+    f += forcesConcat.segment<3>(i * 6 + 3);
+  }
+  if (f.norm() > 0)
+  {
+    Eigen::Vector3s spatialTorque
+        = calculateCOMAngularResidual(q, dq, ddq, forcesConcat);
+
+    Eigen::Matrix3s skewF = math::makeSkewSymmetric(f);
+    Eigen::Vector3s offset
+        = skewF.completeOrthogonalDecomposition().solve(spatialTorque);
+    // Subtract out any change in COM parallel to f
+    offset -= f.normalized() * offset.dot(f.normalized());
+
+#ifndef NDEBUG
+    // Verify that if we shift the COM by `offset`, the remaining
+    // residual on this frame is parallel to the offset with the force
+    // plate.
+    Eigen::VectorXs offsetQ = q;
+    offsetQ.segment<3>(3) += offset;
+    Eigen::Vector3s offsetSpatialTorque
+        = calculateCOMAngularResidual(offsetQ, dq, ddq, forcesConcat);
+    Eigen::Vector3s notParallel
+        = offsetSpatialTorque
+          - f.normalized().dot(offsetSpatialTorque) * f.normalized();
+    if (notParallel.norm() > 1e-8)
+    {
+      std::cout << "Linear offset did not leave remaining spatial torque "
+                   "parallel to ground force!"
+                << std::endl;
+      Eigen::MatrixXs compare(3, 5);
+      compare.col(0) = spatialTorque;
+      compare.col(1) = offsetSpatialTorque;
+      compare.col(2) = f;
+      compare.col(3) = offset;
+      compare.col(4) = notParallel;
+      std::cout << "Original spatial torque - Offset spatial torque - "
+                   "Force - Offset - Not Parallel F"
+                << std::endl
+                << compare << std::endl;
+      assert(notParallel.norm() < 1e-8);
+    }
+#endif
+    return com + offset;
+  }
+  else
+  {
+    return com;
+  }
 }
 
 //==============================================================================
@@ -1669,6 +2059,512 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
   //   }
   // }
   return qs;
+}
+
+//==============================================================================
+// This returns a matrix A and vector b, such that Ax+b gives you a trajectory
+// with zero linear residuals, along with a "hypothetical" angular trajectory.
+// The angular trajectory is "hypothetical" in that changing the angles of the
+// root at any timestep will break the linear residuals, so this is just the
+// integration of the "residual free angular acceleration" computed at each
+// timestep. Happily, this hypothetical angular trajectory is linear in the
+// initial conditions, so it's possible to solve this whole system in one
+// shot. This won't produce something legal, but it well let you get your
+// angular accelerations quite close to the desired trajectory.
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ResidualForceHelper::getLinearTrajectoryLinearSystem(
+    s_t dt,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
+{
+  int numTimesteps = qs.cols();
+
+  int numMissingSteps = 0;
+  std::vector<int> missingStepIndices;
+  for (int t = 0; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+    {
+      numMissingSteps++;
+      missingStepIndices.push_back(t);
+    }
+  }
+
+  std::vector<Eigen::Vector3s> grfs;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    Eigen::Vector3s f = Eigen::Vector3s::Zero();
+    for (int i = 0; i < forces.col(t).size() / 6; i++)
+    {
+      f += forces.col(t).segment<3>(i * 6 + 3);
+    }
+    grfs.push_back(f);
+  }
+
+  std::vector<Eigen::Vector3s> coms;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    mSkel->setPositions(qs.col(t));
+    coms.push_back(mSkel->getCOM());
+  }
+
+  std::vector<Eigen::Vector3s> accOffset;
+  for (int t = 1; t < qs.cols() - 1; t++)
+  {
+    // Compute the offset from the difference between a finite-difference's
+    // COM acceleration and an analytical one
+    mSkel->setPositions(qs.col(t));
+    mSkel->setVelocities(dqs.col(t));
+    mSkel->setAccelerations(ddqs.col(t));
+
+    Eigen::Vector3s analyticalAcc = mSkel->getCOMLinearAcceleration();
+    Eigen::Vector3s fdAcc
+        = (coms[t + 1] - 2 * coms[t] + coms[t - 1]) / (dt * dt);
+    Eigen::Vector3s offset = analyticalAcc - fdAcc;
+    accOffset.push_back(offset);
+  }
+
+  std::vector<Eigen::Vector3s> angAcc;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    angAcc.push_back(calculateResidualFreeAngularAcceleration(
+        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t)));
+  }
+
+  // This has one col each for start COM positions, start COM velocities,
+  // It outputs the change in physically consistent X, Y, Z coordinates of COM
+  // over time, given those initial offsets and residual velocities..
+  Eigen::MatrixXs trialLinearMapToPositions
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+  // This outputs the change in linear vels over time, given the initial
+  // offsets and residual velocities.
+  Eigen::MatrixXs trialLinearMapToVelocities
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+
+  // This is a vector with the original positions of our COM over time,
+  // which we will use to find good values for the position, velocity, and
+  // mass of our skeleton.
+  Eigen::VectorXs originalCOMPositions
+      = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+  const Eigen::Vector3s gravity = mSkel->getGravity();
+  const s_t mass = mSkel->getMass();
+
+  Eigen::VectorXs comOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+  Eigen::VectorXs comVelOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+  const int startPosXCol = 0;
+  const int startPosYCol = 1;
+  const int startPosZCol = 2;
+  const int startVelXCol = 3;
+  const int startVelYCol = 4;
+  const int startVelZCol = 5;
+
+  Eigen::Vector3s vel = Eigen::Vector3s::Zero();
+  Eigen::Vector3s offset = Eigen::Vector3s::Zero();
+
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    const int xRow = (t * 3);
+    const int yRow = (t * 3) + 1;
+    const int zRow = (t * 3) + 2;
+
+    trialLinearMapToPositions(xRow, startPosXCol) = 1;
+    trialLinearMapToPositions(yRow, startPosYCol) = 1;
+    trialLinearMapToPositions(zRow, startPosZCol) = 1;
+
+    trialLinearMapToPositions(xRow, startVelXCol) = t * dt;
+    trialLinearMapToPositions(yRow, startVelYCol) = t * dt;
+    trialLinearMapToPositions(zRow, startVelZCol) = t * dt;
+
+    trialLinearMapToVelocities(xRow, startVelXCol) = 1;
+    trialLinearMapToVelocities(yRow, startVelYCol) = 1;
+    trialLinearMapToVelocities(zRow, startVelZCol) = 1;
+
+    // Allow the missing steps to generate arbitrary delta V on each step
+    for (int j = 0; j < missingStepIndices.size(); j++)
+    {
+      int missingIndex = missingStepIndices[j];
+      if (missingIndex >= t)
+        break;
+      int timestepsSinceDv = t - missingIndex;
+
+      int missingXCol = 6 + j * 3;
+      int missingYCol = 6 + j * 3 + 1;
+      int missingZCol = 6 + j * 3 + 2;
+
+      trialLinearMapToPositions(xRow, missingXCol) = dt * timestepsSinceDv;
+      trialLinearMapToPositions(yRow, missingYCol) = dt * timestepsSinceDv;
+      trialLinearMapToPositions(zRow, missingZCol) = dt * timestepsSinceDv;
+
+      trialLinearMapToVelocities(xRow, missingXCol) = 1;
+      trialLinearMapToVelocities(yRow, missingYCol) = 1;
+      trialLinearMapToVelocities(zRow, missingZCol) = 1;
+    }
+
+    comOffset(xRow) = offset(0);
+    comOffset(yRow) = offset(1);
+    comOffset(zRow) = offset(2);
+
+    comVelOffset(xRow) = vel(0);
+    comVelOffset(yRow) = vel(1);
+    comVelOffset(zRow) = vel(2);
+
+    vel += grfs[t] * dt / mass;
+    vel += gravity * dt;
+
+    if (t > 0 && t < numTimesteps - 1)
+    {
+      vel -= accOffset[t - 1] * dt;
+    }
+    offset += vel * dt;
+
+    originalCOMPositions(xRow) = coms[t](0);
+    originalCOMPositions(yRow) = coms[t](1);
+    originalCOMPositions(zRow) = coms[t](2);
+  }
+
+  Eigen::Vector3s angularPos = Eigen::Vector3s::Zero();
+  Eigen::Vector3s angularVel = Eigen::Vector3s::Zero();
+  Eigen::VectorXs angularOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+  Eigen::MatrixXs linearMapToAngularOffset
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    angularOffset.segment<3>(t * 3) = angularPos;
+
+    Eigen::VectorXs q = qs.col(t);
+    Eigen::VectorXs dq = dqs.col(t);
+    q.segment<3>(3) = comOffset.segment<3>(t * 3);
+    dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+    Eigen::Vector3s angularAcc = calculateResidualFreeAngularAcceleration(
+        q, dq, ddqs.col(t), forces.col(t));
+    angularVel += angularAcc * dt;
+    angularPos += angularVel * dt;
+
+    Eigen::Matrix3s angAccWrtPos
+        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    Eigen::Matrix3s angAccWrtVel
+        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
+    {
+      Eigen::Matrix3s dAngAcc
+          = angAccWrtPos * trialLinearMapToPositions.block<3, 3>(t * 3, i * 3)
+            + angAccWrtVel
+                  * trialLinearMapToVelocities.block<3, 3>(t * 3, i * 3);
+      for (int offset = 1; offset < numTimesteps - t; offset++)
+      {
+        linearMapToAngularOffset.block<3, 3>((t + offset) * 3, i * 3)
+            += offset * dt * dt * dAngAcc;
+      }
+    }
+  }
+
+  // Construct a complete A,b system.
+  // For columns, we concatenate all the variables for the linear pos and linear
+  // residuals first, then all the variables for angular pos and angular
+  // residuals second. Likewise for rows, we concatenate all the linear output
+  // poses first, then all the angular output poses.
+
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(
+      trialLinearMapToPositions.rows() * 2,
+      trialLinearMapToPositions.cols() * 2);
+  Eigen::VectorXs b = Eigen::VectorXs(comOffset.size() * 2);
+  // Set up linear positions
+  A.block(
+      0, 0, trialLinearMapToPositions.rows(), trialLinearMapToPositions.cols())
+      = trialLinearMapToPositions;
+  b.segment(0, comOffset.size()) = comOffset;
+  // Set up angular positions
+  A.block(
+      trialLinearMapToPositions.rows(),
+      0,
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols())
+      = linearMapToAngularOffset;
+  A.block(
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols(),
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols())
+      = trialLinearMapToPositions;
+  b.segment(comOffset.size(), comOffset.size()) = angularOffset;
+
+  return std::make_pair(A, b);
+}
+
+//==============================================================================
+// This returns the same thing as getLinearTrajectoryLinearSystem(), in
+// theory.
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
+    s_t dt,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
+{
+  (void)qs;
+  (void)dqs;
+  (void)ddqs;
+  (void)forces;
+
+  int numMissingSteps = 0;
+  for (int t = 0; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+    {
+      numMissingSteps++;
+    }
+  }
+
+  Eigen::VectorXs zeroPoint = getLinearTrajectoryLinearSystemTestOutput(
+      dt,
+      Eigen::Vector3s::Zero(),
+      Eigen::Vector3s::Zero(),
+      Eigen::VectorXs::Zero(numMissingSteps * 3),
+      Eigen::Vector3s::Zero(),
+      Eigen::Vector3s::Zero(),
+      Eigen::VectorXs::Zero(numMissingSteps * 3),
+      qs,
+      dqs,
+      ddqs,
+      forces,
+      probablyMissingGRF);
+
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(zeroPoint.size(), (6 + numMissingSteps * 3) * 2);
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 0.01 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        if (dof < 3)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Unit(dof) * eps,
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        else if (dof < 6)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Unit(dof - 3) * eps,
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        else if (dof < 6 + numMissingSteps * 3)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Unit(numMissingSteps * 3, dof - 6) * eps,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        else if (dof < (6 + numMissingSteps * 3) + 3)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Unit(dof - (6 + numMissingSteps * 3)) * eps,
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        else if (dof < (6 + numMissingSteps * 3) + 6)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Unit(dof - (3 + (6 + numMissingSteps * 3)))
+                  * eps,
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        else if (dof < (6 + numMissingSteps * 3) + (6 + numMissingSteps * 3))
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Unit(
+                  numMissingSteps * 3, dof - (6 + (6 + numMissingSteps * 3)))
+                  * eps,
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF);
+        }
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return std::make_pair(result, zeroPoint);
+}
+
+//==============================================================================
+// This produces the same output as you would get from using A*x+b from
+// getLinearTrajectoryLinearSystem().
+Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
+    s_t dt,
+    Eigen::Vector3s linPosOffset,
+    Eigen::Vector3s linVelOffset,
+    Eigen::VectorXs linResiduals,
+    Eigen::Vector3s angPosOffset,
+    Eigen::Vector3s angVelOffset,
+    Eigen::VectorXs angResiduals,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF)
+{
+  const s_t mass = mSkel->getMass();
+  Eigen::Vector3s gravity = mSkel->getGravity();
+
+  std::vector<Eigen::Vector3s> grfs;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    Eigen::Vector3s f = Eigen::Vector3s::Zero();
+    for (int i = 0; i < forces.col(t).size() / 6; i++)
+    {
+      f += forces.col(t).segment<3>(i * 6 + 3);
+    }
+    grfs.push_back(f);
+  }
+
+  std::vector<Eigen::Vector3s> coms;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    mSkel->setPositions(qs.col(t));
+    coms.push_back(mSkel->getCOM());
+  }
+
+  std::vector<Eigen::Vector3s> accOffset;
+  for (int t = 1; t < qs.cols() - 1; t++)
+  {
+    // Compute the offset from the difference between a finite-difference's
+    // COM acceleration and an analytical one
+    mSkel->setPositions(qs.col(t));
+    mSkel->setVelocities(dqs.col(t));
+    mSkel->setAccelerations(ddqs.col(t));
+
+    Eigen::Vector3s analyticalAcc = mSkel->getCOMLinearAcceleration();
+    Eigen::Vector3s fdAcc
+        = (coms[t + 1] - 2 * coms[t] + coms[t - 1]) / (dt * dt);
+    Eigen::Vector3s offset = analyticalAcc - fdAcc;
+    accOffset.push_back(offset);
+  }
+
+  Eigen::Vector3s linPos = linPosOffset;
+  Eigen::Vector3s linVel = linVelOffset;
+  Eigen::VectorXs linPoses = Eigen::VectorXs::Zero(qs.cols() * 3);
+
+  Eigen::Vector3s angPos = angPosOffset;
+  Eigen::Vector3s angVel = angVelOffset;
+  Eigen::VectorXs angPoses = Eigen::VectorXs::Zero(qs.cols() * 3);
+
+  int residualCursor = 0;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    // Record current pos
+    linPoses.segment<3>(t * 3) = linPos;
+    angPoses.segment<3>(t * 3) = angPos;
+
+    Eigen::VectorXs q = qs.col(t);
+    q.segment<3>(3) = linPos;
+    Eigen::VectorXs dq = dqs.col(t);
+    dq.segment<3>(3) = linVel;
+
+    // Integrate pos
+
+    Eigen::Vector3s linAcc = gravity + grfs[t] / mass;
+    if (t > 0 && t < qs.cols() - 1)
+    {
+      linAcc -= accOffset[t - 1];
+    }
+    linVel += dt * linAcc;
+    if (probablyMissingGRF[t])
+    {
+      linVel += linResiduals.segment<3>(residualCursor * 3);
+    }
+    linPos += dt * linVel;
+
+    // Integrate acc
+
+    Eigen::Vector3s angAcc = calculateResidualFreeAngularAcceleration(
+        q, dq, ddqs.col(t), forces.col(t));
+    angVel += dt * angAcc;
+    if (probablyMissingGRF[t])
+    {
+      angVel += angResiduals.segment<3>(residualCursor * 3);
+    }
+    angPos += dt * angVel;
+
+    if (probablyMissingGRF[t])
+    {
+      residualCursor++;
+    }
+  }
+
+  Eigen::VectorXs result
+      = Eigen::VectorXs::Zero(linPoses.size() + angPoses.size());
+  result.segment(0, linPoses.size()) = linPoses;
+  result.segment(linPoses.size(), angPoses.size()) = angPoses;
+  return result;
 }
 
 //==============================================================================
@@ -5045,7 +5941,7 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
 
   if (trial >= init->poseTrials.size())
   {
-    std::cout << "Trying to get accelerations on an out-of-bounds trial: "
+    std::cout << "Trying to get com positions on an out-of-bounds trial: "
               << trial << " >= " << init->poseTrials.size() << std::endl;
     exit(1);
   }
@@ -5073,6 +5969,62 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
   mSkeleton->setPositions(originalPoses);
 
   return coms;
+}
+
+//==============================================================================
+// This computes and returns the positions of the center of mass at each
+// frame that would center the remaining angular residuals
+std::vector<Eigen::Vector3s> DynamicsFitter::comPositionsToCenterResiduals(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+
+  if (trial >= init->poseTrials.size())
+  {
+    std::cout << "Trying to get com positions to center residuals on an "
+                 "out-of-bounds trial: "
+              << trial << " >= " << init->poseTrials.size() << std::endl;
+    exit(1);
+  }
+  const Eigen::MatrixXs& poses = init->poseTrials[trial];
+  s_t dt = init->trialTimesteps[trial];
+
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
+  std::vector<Eigen::Vector3s> centeredComs;
+
+  mSkeleton->setLinkMasses(init->bodyMasses);
+
+  if (poses.cols() > 0)
+  {
+    mSkeleton->setPositions(poses.col(0));
+    centeredComs.push_back(mSkeleton->getCOM());
+  }
+  for (int timestep = 1; timestep < poses.cols() - 1; timestep++)
+  {
+    Eigen::VectorXs q = poses.col(timestep);
+    Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                             poses.col(timestep), poses.col(timestep - 1))
+                         / dt;
+    Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                               poses.col(timestep + 1), poses.col(timestep))
+                           - mSkeleton->getPositionDifferences(
+                               poses.col(timestep), poses.col(timestep - 1)))
+                          / (dt * dt);
+    centeredComs.push_back(helper.calculateComToCenterAngularResiduals(
+        q, dq, ddq, init->grfTrials[trial].col(timestep)));
+  }
+  if (poses.cols() > 1)
+  {
+    mSkeleton->setPositions(poses.col(poses.cols() - 1));
+    centeredComs.push_back(mSkeleton->getCOM());
+  }
+
+  mSkeleton->setLinkMasses(originalMasses);
+  mSkeleton->setPositions(originalPoses);
+
+  return centeredComs;
 }
 
 //==============================================================================
@@ -5539,7 +6491,7 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, trial);
-    // Note, this cuts of the first and last timestep of the trial
+    // Note, this cuts off the first and last timestep of the trial
     std::vector<Eigen::Vector3s> accs = comAccelerations(init, trial);
 
     Eigen::MatrixXs grfsAndAccs = Eigen::MatrixXs(6, accs.size());
@@ -5650,13 +6602,102 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
     }
     if (filteredTimesteps.size() > 0)
     {
-      std::cout << "Detected unmeasured force acting on subject in trial "
+      std::cout << "Heuristically detected unmeasured force acting on subject "
+                   "in trial "
                 << trial << " at times: ";
       for (int i : filteredTimesteps)
       {
         std::cout << i << ", ";
       }
       std::cout << std::endl;
+    }
+  }
+}
+
+//==============================================================================
+// 0. Estimate which timesteps probably have unmeasured external torques
+// present. By passing a number smaller than 1.0 to scaleThresholds, we can
+// increase the rate at which we throw out potentially bad data.
+void DynamicsFitter::estimateUnmeasuredExternalTorques(
+    std::shared_ptr<DynamicsInitialization> init,
+    int trial,
+    s_t scaleThresholds)
+{
+  std::vector<Eigen::Vector3s> coms = comPositions(init, trial);
+  std::vector<Eigen::Vector3s> comsCorrected
+      = comPositionsToCenterResiduals(init, trial);
+  std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, trial);
+
+  s_t zeroThreshold = 0.005; // anything <0.5% of max force
+                             // is interpreted as zero
+  s_t threshold = 0.2 * scaleThresholds;
+  (void)threshold;
+
+  s_t maxGRF = 0.0;
+  for (int t = 0; t < coms.size(); t++)
+  {
+    if (grfs[t].norm() > maxGRF)
+    {
+      maxGRF = grfs[t].norm();
+    }
+  }
+  std::vector<int> filteredTimesteps;
+  for (int t = 0; t < coms.size(); t++)
+  {
+    if (init->probablyMissingGRF.size() > trial
+        && init->probablyMissingGRF[trial][t])
+    {
+      continue;
+    }
+    if (grfs[t].norm() > zeroThreshold)
+    {
+      s_t grfPercentage = grfs[t].norm() / maxGRF;
+      s_t badness = (comsCorrected[t] - coms[t]).norm() * grfPercentage;
+      if (badness > threshold)
+      {
+        filteredTimesteps.push_back(t);
+        if (init->probablyMissingGRF.size() > trial)
+        {
+          init->probablyMissingGRF[trial][t] = true;
+        }
+      }
+      // std::cout << "Ang badness " << t << ": " << badness << std::endl;
+    }
+  }
+  if (filteredTimesteps.size() > 0)
+  {
+    std::cout << "Heuristically detected unmeasured torque acting on subject "
+                 "in trial "
+              << trial << " at times: ";
+    for (int i : filteredTimesteps)
+    {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
+  }
+  else
+  {
+    std::cout << "Heuristically detected no timesteps with unmeasured torque "
+                 "acting on the subject in trial "
+              << trial << std::endl;
+  }
+}
+
+//==============================================================================
+// This is pretty much just here for testing. It goes through and moves the
+// COM at every timestep to the spot it would need to be in order to minimize
+// angular residuals.
+void DynamicsFitter::moveComsToMinimizeAngularResiduals(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> coms = comPositions(init, i);
+    std::vector<Eigen::Vector3s> comsMoved
+        = comPositionsToCenterResiduals(init, i);
+    for (int t = 0; t < init->poseTrials[i].cols(); t++)
+    {
+      init->poseTrials[i].col(t).segment<3>(3) += comsMoved[t] - coms[t];
     }
   }
 }
@@ -5684,6 +6725,59 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     return;
   }
 
+#ifndef NDEBUG
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+#endif
+
+  std::vector<std::vector<Eigen::Vector3s>> trialGRFs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalCenteredCOMs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalAccOffsets;
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    trialGRFs.push_back(measuredGRFForces(init, i));
+    trialOriginalCOMs.push_back(comPositions(init, i));
+    trialOriginalCenteredCOMs.push_back(comPositionsToCenterResiduals(init, i));
+  }
+  (void)trialOriginalCenteredCOMs;
+
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> accOffset;
+    s_t dt = init->trialTimesteps[i];
+    for (int t = 0; t < init->poseTrials[i].cols(); t++)
+    {
+      // Compute the offset from the difference between a finite-difference's
+      // COM acceleration and an analytical one
+      if (t > 0 && t < init->poseTrials[i].cols() - 1)
+      {
+        Eigen::VectorXs q = init->poseTrials[i].col(t);
+        Eigen::VectorXs dq
+            = mSkeleton->getPositionDifferences(
+                  init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
+              / dt;
+        Eigen::VectorXs ddq
+            = (mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
+               - mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1)))
+              / (dt * dt);
+        mSkeleton->setPositions(q);
+        mSkeleton->setVelocities(dq);
+        mSkeleton->setAccelerations(ddq);
+
+        Eigen::Vector3s analyticalAcc = mSkeleton->getCOMLinearAcceleration();
+        Eigen::Vector3s fdAcc
+            = (trialOriginalCOMs[i][t + 1] - 2 * trialOriginalCOMs[i][t]
+               + trialOriginalCOMs[i][t - 1])
+              / (dt * dt);
+        Eigen::Vector3s offset = analyticalAcc - fdAcc;
+        accOffset.push_back(offset);
+      }
+    }
+    trialOriginalAccOffsets.push_back(accOffset);
+  }
+
   for (s_t threshold = 0.01; threshold > 1e-6; threshold *= 0.5)
   {
     Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
@@ -5694,8 +6788,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::vector<Eigen::MatrixXs> trialLinearMaps;
     std::vector<Eigen::VectorXs> trialOriginalPositions;
     std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
-    std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
-    std::vector<std::vector<Eigen::Vector3s>> trialOriginalAccOffsets;
     int totalTimesteps = 0;
     int totalColsWithoutMass = 0;
     int totalRows = 0;
@@ -5725,10 +6817,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       }
       trialNumMissingSteps.push_back(numMissingSteps);
 
-      std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, i);
-      std::vector<Eigen::Vector3s> originalCOMs = comPositions(init, i);
       const s_t dt = init->trialTimesteps[i];
-      const int numTimesteps = originalCOMs.size();
+      const int numTimesteps = init->poseTrials[i].cols();
 
       totalTimesteps += numTimesteps;
 
@@ -5762,7 +6852,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       Eigen::Vector3s forceOffset = Eigen::Vector3s::Zero();
       Eigen::Vector3s gravityVelocity = Eigen::Vector3s::Zero();
       Eigen::Vector3s gravityOffset = Eigen::Vector3s::Zero();
-      std::vector<Eigen::Vector3s> accOffset;
 
       for (int t = 0; t < numTimesteps; t++)
       {
@@ -5803,46 +6892,103 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         comGravityOffset(yRow) = gravityOffset(1);
         comGravityOffset(zRow) = gravityOffset(2);
 
-        forceVelocity += grfs[t] * dt;
+        forceVelocity += trialGRFs[i][t] * dt;
         forceOffset += forceVelocity * dt;
 
         gravityVelocity += gravity * dt;
 
+        if (t > 0 && t < numTimesteps - 1)
+        {
+          gravityVelocity -= trialOriginalAccOffsets[i][t - 1] * dt;
+        }
+        gravityOffset += gravityVelocity * dt;
+
+        originalCOMPositions(xRow) = trialOriginalCOMs[i][t](0);
+        originalCOMPositions(yRow) = trialOriginalCOMs[i][t](1);
+        originalCOMPositions(zRow) = trialOriginalCOMs[i][t](2);
+      }
+
+#ifndef NDEBUG
+      // Check that the ResidualHelper system gets the same matrix for the
+      // related section
+      Eigen::MatrixXs q = init->poseTrials[i];
+      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      for (int t = 0; t < init->poseTrials[i].cols(); t++)
+      {
         // Compute the offset from the difference between a finite-difference's
         // COM acceleration and an analytical one
         if (t > 0 && t < init->poseTrials[i].cols() - 1)
         {
-          Eigen::VectorXs q = init->poseTrials[i].col(t);
-          Eigen::VectorXs dq
+          dq.col(t)
               = mSkeleton->getPositionDifferences(
                     init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
                 / dt;
-          Eigen::VectorXs ddq
+          ddq.col(t)
               = (mSkeleton->getPositionDifferences(
                      init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
                  - mSkeleton->getPositionDifferences(
                      init->poseTrials[i].col(t),
                      init->poseTrials[i].col(t - 1)))
                 / (dt * dt);
-          mSkeleton->setPositions(q);
-          mSkeleton->setVelocities(dq);
-          mSkeleton->setAccelerations(ddq);
-
-          Eigen::Vector3s analyticalAcc = mSkeleton->getCOMLinearAcceleration();
-          Eigen::Vector3s fdAcc = (originalCOMs[t + 1] - 2 * originalCOMs[t]
-                                   + originalCOMs[t - 1])
-                                  / (dt * dt);
-          Eigen::Vector3s offset = analyticalAcc - fdAcc;
-          accOffset.push_back(offset);
-          gravityVelocity -= offset * dt;
+        }
+      }
+      Eigen::VectorXs thisOffset
+          = comGravityOffset
+            + (1.0 / mSkeleton->getMass())
+                  * trialLinearMapToPositions.col(massCol).segment(
+                      0, numTimesteps * 3);
+      auto pair = helper.getLinearTrajectoryLinearSystem(
+          dt, q, dq, ddq, init->grfTrials[i], init->probablyMissingGRF[i]);
+      Eigen::VectorXs compareOffset = pair.second.segment(0, thisOffset.size());
+      Eigen::VectorXs offsetDiff = compareOffset - thisOffset;
+      if (offsetDiff.cwiseAbs().maxCoeff() > 1e-8)
+      {
+        for (int t = 0; t < offsetDiff.size() / 3; t++)
+        {
+          if (offsetDiff.segment<3>(t * 3).norm() > 1e-8)
+          {
+            std::cout << "Disagreement on b at t=" << t << ":" << std::endl;
+            Eigen::Matrix3s compare;
+            compare.col(0) = thisOffset.segment<3>(t * 3);
+            compare.col(1) = compareOffset.segment<3>(t * 3);
+            compare.col(2) = offsetDiff.segment<3>(t * 3);
+            std::cout << "Original - ResidualHelper - Diff" << std::endl
+                      << compare << std::endl;
+          }
         }
 
-        gravityOffset += gravityVelocity * dt;
-
-        originalCOMPositions(xRow) = originalCOMs[t](0);
-        originalCOMPositions(yRow) = originalCOMs[t](1);
-        originalCOMPositions(zRow) = originalCOMs[t](2);
+        assert(offsetDiff.cwiseAbs().maxCoeff() < 1e-8);
       }
+
+      Eigen::MatrixXs compareLinearSystem = pair.first.block(
+          0, 0, numTimesteps * 3, trialLinearMapToPositions.cols() - 1);
+      Eigen::MatrixXs diff
+          = compareLinearSystem
+            - trialLinearMapToPositions.block(
+                0, 0, numTimesteps * 3, trialLinearMapToPositions.cols() - 1);
+      if (diff.cwiseAbs().maxCoeff() > 1e-8)
+      {
+        for (int t = 0; t < diff.rows() / 3; t++)
+        {
+          for (int col = 0; col < diff.cols() / 3; col++)
+          {
+            Eigen::Matrix3s original
+                = trialLinearMapToPositions.block<3, 3>(t * 3, col * 3);
+            Eigen::Matrix3s reconstructed
+                = compareLinearSystem.block<3, 3>(t * 3, col * 3);
+            std::cout << "Disagreement on A at t=" << t << ", var=" << col
+                      << ":" << std::endl;
+            std::cout << "Original:" << std::endl << original << std::endl;
+            std::cout << "Reconstructed:" << std::endl
+                      << reconstructed << std::endl;
+            std::cout << "Diff:" << std::endl
+                      << diff.block<3, 3>(t * 3, col * 3) << std::endl;
+          }
+        }
+        assert(diff.cwiseAbs().maxCoeff() < 1e-8);
+      }
+#endif
 
       // Output the delta V for missing steps to the output, so we can
       // regularize it
@@ -5880,8 +7026,9 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 #ifndef NDEBUG
       Eigen::VectorXs testConfig
           = Eigen::VectorXs::Random(trialLinearMapToPositions.cols());
-      testConfig.head<3>() = originalCOMs[0];
-      testConfig.segment<3>(3) = (originalCOMs[1] - originalCOMs[0]);
+      testConfig.head<3>() = trialOriginalCOMs[i][0];
+      testConfig.segment<3>(3)
+          = (trialOriginalCOMs[i][1] - trialOriginalCOMs[i][0]);
       testConfig(testConfig.size() - 1) = 1.0 / originalMass;
 
       Eigen::VectorXs recoveredComPoses
@@ -5958,9 +7105,10 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                                - 2 * recoveredComPoses.segment<3>(t * 3)
                                + recoveredComPoses.segment<3>((t - 1) * 3))
                               / (dt * dt);
-        acc += accOffset[t - 1];
+        acc += trialOriginalAccOffsets[i][t - 1];
         Eigen::Vector3s impliedForce = acc * originalMass;
-        Eigen::Vector3s expectedForce = (gravity * originalMass) + grfs[t];
+        Eigen::Vector3s expectedForce
+            = (gravity * originalMass) + trialGRFs[i][t];
         Eigen::Vector3s diff = impliedForce - expectedForce;
         if (diff.norm() > 1e-7)
         {
@@ -5980,8 +7128,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       trialLinearMaps.push_back(trialLinearMapToPositions);
       trialOriginalPositions.push_back(originalCOMPositions);
       trialOriginalGravityOffsets.push_back(comGravityOffset);
-      trialOriginalCOMs.push_back(originalCOMs);
-      trialOriginalAccOffsets.push_back(accOffset);
     }
     int numTrials = trialLinearMaps.size();
 
@@ -6027,9 +7173,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               << unifiedLinearMap.rows() << "x" << unifiedLinearMap.cols()
               << std::endl;
     // Now that we've formulated our problem, we can attempt to solve:
-    Eigen::VectorXs tentativeResult
-        = unifiedLinearMap.completeOrthogonalDecomposition().solve(
-            unifiedPositions - unifiedGravityOffset);
+    Eigen::VectorXs tentativeResult = unifiedLinearMap.householderQr().solve(
+        unifiedPositions - unifiedGravityOffset);
     std::cout << "Solved!" << std::endl;
 
     // The linear map is in terms of "inverse mass", so we need to invert to
@@ -6053,7 +7198,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       Eigen::VectorXs massFixedResult
           = unifiedLinearMap
                 .block(0, 0, totalTimesteps, unifiedLinearMap.cols() - 1)
-                .completeOrthogonalDecomposition()
+                .householderQr()
                 .solve(unifiedPositions - massOffset - unifiedGravityOffset);
       std::cout << "Solved!" << std::endl;
 
@@ -6217,7 +7362,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     }
 
 #ifndef NDEBUG
-    ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
     for (int i = 0; i < numTrials; i++)
     {
@@ -6330,6 +7474,225 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 #endif
 
     std::cout << "Finished zeroing linear residuals." << std::endl;
+    break;
+  }
+}
+
+//==============================================================================
+// 1. Change the initial positions and velocities of the body to achieve a
+// least-squares closest COM trajectory to the current kinematic fit, taking
+// into account approximate angular positions.
+void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
+    std::shared_ptr<DynamicsInitialization> init,
+    int trial,
+    Eigen::MatrixXs targetPoses,
+    s_t weightLinear,
+    s_t weightAngular,
+    s_t regularizeResiduals)
+{
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
+  s_t dt = init->trialTimesteps[trial];
+  mSkeleton->setTimeStep(dt);
+  std::vector<Eigen::Vector3s> originalCOMs = comPositions(init, trial);
+  Eigen::MatrixXs q = init->poseTrials[trial];
+  Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+  Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+  int countedSteps = 0;
+  s_t totalResidual = 0.0;
+  for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+  {
+    // Compute the offset from the difference between a finite-difference's
+    // COM acceleration and an analytical one
+    if (t > 0 && t < init->poseTrials[trial].cols() - 1)
+    {
+      dq.col(t) = mSkeleton->getPositionDifferences(
+                      init->poseTrials[trial].col(t),
+                      init->poseTrials[trial].col(t - 1))
+                  / dt;
+      ddq.col(t) = (mSkeleton->getPositionDifferences(
+                        init->poseTrials[trial].col(t + 1),
+                        init->poseTrials[trial].col(t))
+                    - mSkeleton->getPositionDifferences(
+                        init->poseTrials[trial].col(t),
+                        init->poseTrials[trial].col(t - 1)))
+                   / (dt * dt);
+      if (init->probablyMissingGRF.size() > trial
+          && init->probablyMissingGRF[trial][t])
+      {
+        // don't count residual
+      }
+      else
+      {
+        totalResidual = helper.calculateResidualNorm(
+            q.col(t),
+            dq.col(t),
+            ddq.col(t),
+            init->grfTrials[trial].col(t),
+            1.0,
+            true);
+        countedSteps++;
+      }
+    }
+  }
+  totalResidual /= countedSteps;
+  std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
+               "residuals: "
+            << totalResidual << std::endl;
+
+  for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
+  {
+    int numMissing = 0;
+    for (bool b : init->probablyMissingGRF[trial])
+    {
+      if (b)
+        numMissing++;
+    }
+    int numTimesteps = q.cols();
+
+    std::cout
+        << "Building linear system for optimizing linear + angular motion for "
+        << numTimesteps << " timesteps with " << numMissing
+        << " timesteps with unmeasured external force" << std::endl;
+    std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
+        = helper.getLinearTrajectoryLinearSystem(
+            dt,
+            q,
+            dq,
+            ddq,
+            init->grfTrials[trial],
+            init->probablyMissingGRF[trial]);
+
+    // We're going to sub-sample the rows of the linear system, and add outputs
+    // for the residuals, so we can regularize them.
+
+    const int grabLast = 10;
+    std::vector<int> indices
+        = math::evenlySpacedTimesteps(q.cols() - grabLast, 50);
+    for (int i = 1; i < grabLast; i++)
+    {
+      indices.push_back(q.cols() - grabLast + i);
+    }
+    int numRows = (indices.size() * 3) + (indices.size() * 3) + (numMissing * 3)
+                  + (numMissing * 3);
+
+    std::cout
+        << "Sub-sampling linear system for optimizing linear + angular motion"
+        << std::endl;
+    Eigen::MatrixXs sampledA
+        = Eigen::MatrixXs::Zero(numRows, linearSystem.first.cols());
+    Eigen::VectorXs sampledB = Eigen::VectorXs::Zero(numRows);
+    Eigen::VectorXs sampledTarget = Eigen::VectorXs::Zero(numRows);
+    // Grab the linear outputs
+    for (int i = 0; i < indices.size(); i++)
+    {
+      sampledA.block(i * 3, 0, 3, sampledA.cols())
+          = weightLinear
+            * linearSystem.first.block(
+                indices[i] * 3, 0, 3, linearSystem.first.cols());
+      sampledB.segment<3>(i * 3)
+          = weightLinear * linearSystem.second.segment<3>(indices[i] * 3);
+
+      mSkeleton->setPositions(targetPoses.col(indices[i]));
+      sampledTarget.segment<3>(i * 3) = weightLinear * mSkeleton->getCOM();
+    }
+    // Grab the angular outputs
+    for (int i = 0; i < indices.size(); i++)
+    {
+      sampledA.block((indices.size() + i) * 3, 0, 3, sampledA.cols())
+          = weightAngular
+            * linearSystem.first.block(
+                (numTimesteps + indices[i]) * 3,
+                0,
+                3,
+                linearSystem.first.cols());
+      sampledB.segment<3>((indices.size() + i) * 3)
+          = weightAngular
+            * linearSystem.second.segment<3>((numTimesteps + indices[i]) * 3);
+      sampledTarget.segment<3>((indices.size() + i) * 3)
+          = weightAngular * targetPoses.col(indices[i]).head<3>();
+    }
+    // Grab the linear residuals
+    int linearResidualsStartCol = 6;
+    int linearResidualsStartRow = indices.size() * 6;
+    int linearResidualsSize = numMissing * 3;
+    for (int i = 0; i < linearResidualsSize; i++)
+    {
+      sampledA(linearResidualsStartRow + i, linearResidualsStartCol + i)
+          = regularizeResiduals;
+    }
+    int angularResidualsStartCol = 6 + (numMissing * 3) + 6;
+    int angularResidualsStartRow = indices.size() * 6 + numMissing * 3;
+    int angularResidualsSize = numMissing * 3;
+    for (int i = 0; i < angularResidualsSize; i++)
+    {
+      sampledA(angularResidualsStartRow + i, angularResidualsStartCol + i)
+          = regularizeResiduals;
+    }
+
+    std::cout << "Solving linear system for optimizing linear + angular motion"
+              << std::endl;
+    // Solve the system
+    Eigen::VectorXs solution
+        = sampledA.householderQr().solve(sampledTarget - sampledB);
+    // Get the new (original size, not sampled down) trajectory
+    Eigen::VectorXs recovered
+        = (linearSystem.first * solution) + linearSystem.second;
+
+    std::cout << "Decoding optimized linear + angular motion" << std::endl;
+
+    // Measure the total change
+    s_t totalPosChange = 0.0;
+    s_t totalAngChange = 0.0;
+
+    // Write the trajectory out to the positions
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      if (weightAngular > 0)
+      {
+        Eigen::Vector3s angularPos
+            = recovered.segment<3>((numTimesteps + t) * 3);
+        Eigen::Vector3s angularChange
+            = init->poseTrials[trial].col(t).head<3>() - angularPos;
+        totalAngChange += angularChange.norm();
+      }
+      if (weightLinear > 0)
+      {
+        Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
+        Eigen::Vector3s change = comPos - originalCOMs[t];
+        totalPosChange += change.norm();
+      }
+    }
+    totalPosChange /= init->poseTrials[trial].cols();
+    totalAngChange /= init->poseTrials[trial].cols();
+
+    if (totalPosChange > 0.08 || totalAngChange > 0.15)
+    {
+      std::cout << "Trial pos/angle changed too much! (pos change="
+                << totalPosChange << ", angle change=" << totalAngChange << ")"
+                << std::endl;
+      std::cout << "Estimating unmeasured external torques with threshold at "
+                << (threshold * 100) << " percent of nominal" << std::endl;
+      estimateUnmeasuredExternalTorques(init, trial, threshold);
+      continue;
+    }
+
+    // Write the trajectory out to the positions
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      if (weightAngular > 0)
+      {
+        Eigen::Vector3s angularPos
+            = recovered.segment<3>((numTimesteps + t) * 3);
+        init->poseTrials[trial].col(t).head<3>() = angularPos;
+      }
+      if (weightLinear > 0)
+      {
+        Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
+        Eigen::Vector3s change = comPos - originalCOMs[t];
+        init->poseTrials[trial].col(t).segment<3>(3) += change;
+      }
+    }
     break;
   }
 }
@@ -7053,6 +8416,7 @@ void DynamicsFitter::centerAngularResiduals(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     s_t dt = init->trialTimesteps[trial];
+    mSkeleton->setTimeStep(dt);
 
     // 1. Shift the COM trajectory around linearly to get to a RMS minimal sum
     // of angular residual average from external forces. This should remove as
@@ -7101,6 +8465,19 @@ void DynamicsFitter::centerAngularResiduals(
                                             .eval()
                                             .completeOrthogonalDecomposition()
                                             .solve(tau.head<3>());
+#ifndef NDEBUG
+        Eigen::Vector3s helperSpatialTorque
+            = helper.calculateCOMAngularResidual(
+                q, dq, ddq, init->grfTrials[trial].col(t));
+        assert(spatialTorque == helperSpatialTorque);
+
+        Eigen::Vector3s recomputedF = Eigen::Vector3s::Zero();
+        for (int i = 0; i < init->grfTrials[trial].col(t).size() / 6; i++)
+        {
+          recomputedF += init->grfTrials[trial].col(t).segment<3>(i * 6 + 3);
+        }
+        assert(recomputedF == f);
+#endif
 
         residuals.segment<3>((t - 1) * 3) = spatialTorque;
         skewSymmetricForces.block<3, 3>((t - 1) * 3, 0)
@@ -7128,10 +8505,25 @@ void DynamicsFitter::centerAngularResiduals(
                   .eval()
                   .completeOrthogonalDecomposition()
                   .solve(offsetTau.head<3>());
+        Eigen::Vector3s offsetSpatialTorqueHelper
+            = helper.calculateCOMAngularResidual(
+                offsetQ, dq, ddq, init->grfTrials[trial].col(t));
+        if ((offsetSpatialTorqueHelper - offsetSpatialTorque).norm() > 1e-12)
+        {
+          Eigen::Matrix3s compare;
+          compare.col(0) = offsetSpatialTorqueHelper;
+          compare.col(1) = offsetSpatialTorque;
+          compare.col(2) = offsetSpatialTorqueHelper - offsetSpatialTorque;
+          std::cout << "Spatial torque formulas don't agree:" << std::endl;
+          std::cout << "helper - manual - diff" << std::endl
+                    << compare << std::endl;
+          assert(
+              (offsetSpatialTorqueHelper - offsetSpatialTorque).norm() < 1e-12);
+        }
         Eigen::Vector3s notParallel
             = offsetSpatialTorque
               - f.normalized().dot(offsetSpatialTorque) * f.normalized();
-        if (notParallel.norm() > 1e-8 || true)
+        if (notParallel.norm() > 1e-8)
         {
           std::cout << "Linear offset did not leave remaining spatial torque "
                        "parallel to ground force!"
@@ -7150,6 +8542,10 @@ void DynamicsFitter::centerAngularResiduals(
         }
         avgOffset += justThisOffset;
         numOffset++;
+
+        // Eigen::Vector3s residualVersion
+        //     = helper.calculateComToCenterAngularResiduals(
+        //         q, dq, ddq, init->grfTrials[trial].col(t));
 #endif
       }
     }
@@ -8818,9 +10214,13 @@ void DynamicsFitter::saveDynamicsToGUI(
   {
     s_t dt = init->trialTimesteps[trialIndex];
     Eigen::VectorXs q = poses.col(timestep);
-    Eigen::VectorXs dq = (poses.col(timestep) - poses.col(timestep - 1)) / dt;
-    Eigen::VectorXs ddq = (poses.col(timestep + 1) - 2 * poses.col(timestep)
-                           + poses.col(timestep - 1))
+    Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                             poses.col(timestep), poses.col(timestep - 1))
+                         / dt;
+    Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                               poses.col(timestep + 1), poses.col(timestep))
+                           - mSkeleton->getPositionDifferences(
+                               poses.col(timestep), poses.col(timestep - 1)))
                           / (dt * dt);
     mSkeleton->setTimeStep(dt);
     mSkeleton->setPositions(q);
