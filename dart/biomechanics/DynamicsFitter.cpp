@@ -7566,9 +7566,10 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // We're going to sub-sample the rows of the linear system, and add outputs
     // for the residuals, so we can regularize them.
 
+    const int maxIndices = 500;
     const int grabLast = 10;
     std::vector<int> indices
-        = math::evenlySpacedTimesteps(q.cols() - grabLast, 50);
+        = math::evenlySpacedTimesteps(q.cols() - grabLast, maxIndices);
     for (int i = 1; i < grabLast; i++)
     {
       indices.push_back(q.cols() - grabLast + i);
@@ -7700,622 +7701,570 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 //==============================================================================
 // 1.1. Shift the COM trajectory around to try to get the residual-free
 // rotation.
-void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
-    std::shared_ptr<DynamicsInitialization> init, s_t satisfactoryThreshold)
+bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
+    std::shared_ptr<DynamicsInitialization> init,
+    int trial,
+    s_t satisfactoryThreshold)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
-  const int numTrials = init->poseTrials.size();
 
-  // We hold mass fixed, so it's possible to optimize each trial sequentially,
-  // saving us time on matrix factorazation.
-  for (int trial = 0; trial < numTrials; trial++)
+  mSkeleton->setTimeStep(init->trialTimesteps[trial]);
+  mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  // Get the original data about this trial
+  s_t dt = init->trialTimesteps[trial];
+  std::vector<bool> probablyMissingGRF;
+  if (init->probablyMissingGRF.size() > trial)
   {
-    mSkeleton->setTimeStep(init->trialTimesteps[trial]);
-    mSkeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+    probablyMissingGRF = init->probablyMissingGRF[trial];
+  }
 
-    // Get the original data about this trial
-    s_t dt = init->trialTimesteps[trial];
-    std::vector<bool> probablyMissingGRF;
-    if (init->probablyMissingGRF.size() > trial)
+  // Save our original trajectory of poses, so we can reset if necessary
+  Eigen::MatrixXs originalPoses = init->poseTrials[trial];
+  (void)originalPoses;
+
+  Eigen::MatrixXs originalDdqUnscaled = Eigen::MatrixXs::Zero(
+      init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+  for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+  {
+    originalDdqUnscaled.col(t)
+        = (init->poseTrials[trial].col(t + 1)
+           - 2 * init->poseTrials[trial].col(t)
+           + init->poseTrials[trial].col(t - 1));
+  }
+
+  int optimizationBlockSize = 3000;
+  // If our trajectory is "very large" (some are tens of thousands of
+  // timesteps long), then it's cheaper to do a number of "zipper"
+  // optimizations over time. However, these optimizations do sacrifice some
+  // quality of the results, because they're myopic.
+  if (init->poseTrials[trial].cols() > optimizationBlockSize)
+  {
+    optimizationBlockSize = 1000;
+  }
+  const int subsampleMaxSize = 150;
+  const int shiftBy = optimizationBlockSize / 2;
+
+  // We will progressively add more steps to the optimization, until we've
+  // solved the entire trajectory. We don't take the whole trajectory at once,
+  // because some trajectories are thousands of timesteps long and non-linear
+  // effects at the tail can prevent convergence.
+  int limitSteps = optimizationBlockSize;
+
+  int cursor = 0;
+  while (cursor < init->poseTrials[trial].cols())
+  {
+    Eigen::VectorXs targetTrajectory
+        = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
     {
-      probablyMissingGRF = init->probablyMissingGRF[trial];
+      targetTrajectory.segment<6>(t * 6)
+          = init->poseTrials[trial].col(t).head<6>();
     }
-    Eigen::MatrixXs originalDdqUnscaled = Eigen::MatrixXs::Zero(
-        init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
-    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+
+    int totalSteps = init->poseTrials[trial].cols() - cursor;
+    if (totalSteps > limitSteps)
     {
-      originalDdqUnscaled.col(t)
-          = (init->poseTrials[trial].col(t + 1)
-             - 2 * init->poseTrials[trial].col(t)
-             + init->poseTrials[trial].col(t - 1));
+      totalSteps = limitSteps;
+      std::cout << "Attempting to optimize residuals for the " << cursor << "-"
+                << (cursor + totalSteps) << " (total "
+                << init->poseTrials[trial].cols() << ") timesteps for trial "
+                << trial << std::endl;
+    }
+    else
+    {
+      std::cout << "Attempting to optimize residuals for last " << totalSteps
+                << " timesteps for trial " << trial << std::endl;
     }
 
-    int optimizationBlockSize = 3000;
-    // If our trajectory is "very large" (some are tens of thousands of
-    // timesteps long), then it's cheaper to do a number of "zipper"
-    // optimizations over time. However, these optimizations do sacrifice some
-    // quality of the results, because they're myopic.
-    if (init->poseTrials[trial].cols() > optimizationBlockSize)
+    Eigen::MatrixXs q
+        = Eigen::MatrixXs::Zero(init->poseTrials[trial].rows(), totalSteps);
+    for (int t = 0; t < totalSteps; t++)
     {
-      optimizationBlockSize = 1000;
+      q.col(t) = init->poseTrials[trial].col(t + cursor);
     }
-    const int subsampleMaxSize = 150;
-    const int shiftBy = optimizationBlockSize / 2;
 
-    const bool filterSuspiciousTimesteps = false;
-    const s_t accDiffFilterThreshold = 0.1;
-    const int accFilterExtendForFrames = 5;
+    const int numIters = 250;
+    s_t residualAccRegularization = 1000.0;
+    // s_t residualAccRegularization = dt * dt * 0.5;
+    s_t lastResidualCost = std::numeric_limits<s_t>::infinity();
+    s_t lastMaxDist = 0.0;
 
-    // We will progressively add more steps to the optimization, until we've
-    // solved the entire trajectory. We don't take the whole trajectory at once,
-    // because some trajectories are thousands of timesteps long and non-linear
-    // effects at the tail can prevent convergence.
-    int limitSteps = optimizationBlockSize;
+    int bestResidualTimestep = 0;
+    s_t bestResidualCost = std::numeric_limits<s_t>::infinity();
+    int consecutiveTimestepsWithIncreasingCost = 0;
+    const int maxConsecutiveIncreasingCostBeforeQuit = 15;
+    Eigen::VectorXs bestResidualQ = Eigen::VectorXs::Zero(q.cols() * 6);
 
-    int cursor = 0;
-    while (cursor < init->poseTrials[trial].cols())
+    for (int iter = 0; iter < numIters; iter++)
     {
-      Eigen::VectorXs targetTrajectory
-          = Eigen::VectorXs::Zero(init->poseTrials[trial].cols() * 6);
-      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      ////////////////////////////////
+      // Finite difference out dq, ddq using latest values
+      ////////////////////////////////
+
+      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
+      for (int t = 1; t < totalSteps; t++)
       {
-        targetTrajectory.segment<6>(t * 6)
-            = init->poseTrials[trial].col(t).head<6>();
+        dq.col(t)
+            = mSkeleton->getPositionDifferences(q.col(t), q.col(t - 1)) / dt;
+      }
+      for (int t = 1; t < totalSteps - 1; t++)
+      {
+        ddq.col(t) = (dq.col(t + 1) - dq.col(t)) / (dt);
       }
 
-      int totalSteps = init->poseTrials[trial].cols() - cursor;
-      if (totalSteps > limitSteps)
+#ifndef NDEBUG
+      // In debug mode, check that accelerations are always preserved on
+      // frames that have unmeasured external forces
+      for (int t = 1; t < totalSteps - 1; t++)
       {
-        totalSteps = limitSteps;
-        std::cout << "Attempting to optimize residuals for the " << cursor
-                  << "-" << (cursor + totalSteps) << " (total "
-                  << init->poseTrials[trial].cols() << ") timesteps for trial "
-                  << trial << std::endl;
+        if (probablyMissingGRF.size() > t + cursor
+            && probablyMissingGRF[t + cursor])
+        {
+          Eigen::Vector6s originalUnscaledDdq
+              = originalDdqUnscaled.col(t + cursor).head<6>();
+          Eigen::Vector6s unscaledDdq
+              = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
+          if ((unscaledDdq - originalUnscaledDdq).norm() > 1e-12)
+          {
+            std::cout << "Failed to preserve acceleration for missing GRF on "
+                         "timestep T="
+                      << (t + cursor) << std::endl;
+            Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+            compare.col(0) = originalUnscaledDdq;
+            compare.col(1) = unscaledDdq;
+            compare.col(2) = originalUnscaledDdq - unscaledDdq;
+            std::cout << "Original ddq - Present ddq - Diff" << std::endl
+                      << compare << std::endl;
+          }
+          assert((unscaledDdq - originalUnscaledDdq).norm() < 1e-12);
+        }
       }
-      else
-      {
-        std::cout << "Attempting to optimize residuals for last " << totalSteps
-                  << " timesteps for trial " << trial << std::endl;
-      }
+#endif
 
-      Eigen::MatrixXs q
-          = Eigen::MatrixXs::Zero(init->poseTrials[trial].rows(), totalSteps);
+      // We start with the same velocity as the 2nd timestep, and with 0
+      // acceleration. This is the best projection we can make given the data.
+      dq.col(0) = dq.col(1);
+      ddq.col(0).setZero();
+
+      ////////////////////////////////
+      // Build linear system at current configuration
+      ////////////////////////////////
+
+      bool includeResidualAccs = residualAccRegularization <= 10000;
+      std::vector<bool> probablyMissingGRFWindow;
       for (int t = 0; t < totalSteps; t++)
       {
-        q.col(t) = init->poseTrials[trial].col(t + cursor);
+        probablyMissingGRFWindow.push_back(probablyMissingGRF[t + cursor]);
+      }
+      std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
+          = helper.getRootTrajectoryLinearSystem(
+              q,
+              dq,
+              ddq,
+              init->grfTrials[trial].block(
+                  0, cursor, init->grfTrials[trial].rows(), totalSteps),
+              probablyMissingGRFWindow,
+              includeResidualAccs);
+      Eigen::MatrixXs A = linearSystem.first;
+      Eigen::VectorXs b = linearSystem.second;
+
+      ////////////////////////////////
+      // Sub-sample, regularize and solve the linear system
+      ////////////////////////////////
+
+      std::vector<int> outputTimesteps
+          = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
+      std::vector<int> residualAccTimesteps;
+      if (includeResidualAccs)
+      {
+        residualAccTimesteps
+            = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize * 3);
       }
 
-      const int numIters = 250;
-      s_t residualAccRegularization = 1000.0;
-      // s_t residualAccRegularization = dt * dt * 0.5;
-      s_t lastResidualCost = std::numeric_limits<s_t>::infinity();
-      s_t lastMaxDist = 0.0;
+      const int numVariables = 2 + residualAccTimesteps.size();
+      const int inputSize = numVariables * 6;
+      const int outputSize = (outputTimesteps.size() + numVariables) * 6;
 
-      int bestResidualTimestep = 0;
-      s_t bestResidualCost = std::numeric_limits<s_t>::infinity();
-      Eigen::VectorXs bestResidualQ = Eigen::VectorXs::Zero(q.cols() * 6);
-
-      for (int iter = 0; iter < numIters; iter++)
+      Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(outputSize, inputSize);
+      for (int row = 0; row < outputTimesteps.size(); row++)
       {
-        ////////////////////////////////
-        // Finite difference out dq, ddq using latest values
-        ////////////////////////////////
-
-        Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-        Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-        for (int t = 1; t < totalSteps; t++)
-        {
-          dq.col(t)
-              = mSkeleton->getPositionDifferences(q.col(t), q.col(t - 1)) / dt;
-        }
-        for (int t = 1; t < totalSteps - 1; t++)
-        {
-          ddq.col(t) = (dq.col(t + 1) - dq.col(t)) / (dt);
-        }
-
-#ifndef NDEBUG
-        // In debug mode, check that accelerations are always preserved on
-        // frames that have unmeasured external forces
-        for (int t = 1; t < totalSteps - 1; t++)
-        {
-          if (probablyMissingGRF.size() > t + cursor
-              && probablyMissingGRF[t + cursor])
-          {
-            Eigen::Vector6s originalUnscaledDdq
-                = originalDdqUnscaled.col(t + cursor).head<6>();
-            Eigen::Vector6s unscaledDdq
-                = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
-            if ((unscaledDdq - originalUnscaledDdq).norm() > 1e-12)
-            {
-              std::cout << "Failed to preserve acceleration for missing GRF on "
-                           "timestep T="
-                        << (t + cursor) << std::endl;
-              Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
-              compare.col(0) = originalUnscaledDdq;
-              compare.col(1) = unscaledDdq;
-              compare.col(2) = originalUnscaledDdq - unscaledDdq;
-              std::cout << "Original ddq - Present ddq - Diff" << std::endl
-                        << compare << std::endl;
-            }
-            assert((unscaledDdq - originalUnscaledDdq).norm() < 1e-12);
-          }
-        }
-#endif
-
-        // We start with the same velocity as the 2nd timestep, and with 0
-        // acceleration. This is the best projection we can make given the data.
-        dq.col(0) = dq.col(1);
-        ddq.col(0).setZero();
-
-        ////////////////////////////////
-        // Build linear system at current configuration
-        ////////////////////////////////
-
-        bool includeResidualAccs = residualAccRegularization <= 10000;
-        std::vector<bool> probablyMissingGRFWindow;
-        for (int t = 0; t < totalSteps; t++)
-        {
-          probablyMissingGRFWindow.push_back(probablyMissingGRF[t + cursor]);
-        }
-        std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
-            = helper.getRootTrajectoryLinearSystem(
-                q,
-                dq,
-                ddq,
-                init->grfTrials[trial].block(
-                    0, cursor, init->grfTrials[trial].rows(), totalSteps),
-                probablyMissingGRFWindow,
-                includeResidualAccs);
-        Eigen::MatrixXs A = linearSystem.first;
-        Eigen::VectorXs b = linearSystem.second;
-
-        ////////////////////////////////
-        // Sub-sample, regularize and solve the linear system
-        ////////////////////////////////
-
-        std::vector<int> outputTimesteps
-            = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
-        std::vector<int> residualAccTimesteps;
-        if (includeResidualAccs)
-        {
-          residualAccTimesteps
-              = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize * 3);
-        }
-
-        const int numVariables = 2 + residualAccTimesteps.size();
-        const int inputSize = numVariables * 6;
-        const int outputSize = (outputTimesteps.size() + numVariables) * 6;
-
-        Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(outputSize, inputSize);
-        for (int row = 0; row < outputTimesteps.size(); row++)
-        {
-          for (int col = 0; col < numVariables; col++)
-          {
-            if (col < 2)
-            {
-              fullA.block<6, 6>(row * 6, col * 6)
-                  = A.block<6, 6>(outputTimesteps[row] * 6, col * 6);
-            }
-            else
-            {
-              fullA.block<6, 6>(row * 6, col * 6) = A.block<6, 6>(
-                  outputTimesteps[row] * 6,
-                  12 + (residualAccTimesteps[col - 2] * 6));
-            }
-          }
-        }
-#ifndef NDEBUG
-        if (totalSteps == outputTimesteps.size())
-        {
-          if (fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
-              != A.block(0, 0, outputTimesteps.size() * 6, numVariables))
-          {
-            Eigen::MatrixXs diff
-                = fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
-                  - A.block(0, 0, outputTimesteps.size() * 6, numVariables);
-            assert(false);
-          }
-        }
-#endif
-
-        s_t offsetRegularization = 0.5;
-        Eigen::VectorXs regularizationDiagonal
-            = Eigen::VectorXs::Ones(inputSize);
-        regularizationDiagonal.segment(0, 12) *= offsetRegularization;
-        if (includeResidualAccs)
-        {
-          regularizationDiagonal.segment(12, regularizationDiagonal.size() - 12)
-              *= residualAccRegularization;
-        }
-        fullA.block(outputTimesteps.size() * 6, 0, inputSize, inputSize)
-            = regularizationDiagonal.asDiagonal();
-
-        Eigen::VectorXs fullB = Eigen::VectorXs::Zero(outputSize);
-        Eigen::VectorXs fullOriginalTrajectory
-            = Eigen::VectorXs::Zero(fullB.size());
-        for (int row = 0; row < outputTimesteps.size(); row++)
-        {
-          fullB.segment<6>(row * 6) = b.segment<6>(outputTimesteps[row] * 6);
-          fullOriginalTrajectory.segment<6>(row * 6)
-              = targetTrajectory.segment<6>(
-                  (outputTimesteps[row] + cursor) * 6);
-        }
-
-        Eigen::VectorXs desired = fullOriginalTrajectory - fullB;
-
-        s_t weightFirstFewTimesteps = 1000 * totalSteps;
-        s_t weightLastFewTimesteps = 5;
-        // If we're in a zipper step, make sure to prioritize keeping the end of
-        // the zipper as clean as possible, to propagate as little error as we
-        // can
-        if (cursor + totalSteps < init->poseTrials[trial].cols())
-        {
-          weightLastFewTimesteps = 200;
-        }
-
-        const int weightTimestepNum = 3;
-        desired.segment(
-            desired.size() - weightTimestepNum * 6, weightTimestepNum * 6)
-            *= weightLastFewTimesteps;
-        fullA.block(
-            desired.size() - weightTimestepNum * 6,
-            0,
-            weightTimestepNum * 6,
-            fullA.cols())
-            *= weightLastFewTimesteps;
-        if (cursor > 0)
-        {
-          desired.segment(0, weightTimestepNum * 6) *= weightFirstFewTimesteps;
-          fullA.block(0, 0, weightTimestepNum * 6, fullA.cols())
-              *= weightFirstFewTimesteps;
-        }
-        Eigen::VectorXs solution
-            = fullA.completeOrthogonalDecomposition().solve(desired);
-
-        // Keep solutions within reasonable bounds, never offset the trajectory
-        // too far
-        s_t maxPosOffsets = 0.1;
-        for (int i = 0; i < 6; i++)
-        {
-          if (solution(i) > maxPosOffsets)
-            solution(i) = maxPosOffsets;
-          if (solution(i) < -maxPosOffsets)
-            solution(i) = -maxPosOffsets;
-        }
-        s_t maxVelOffsets = 5.0;
-        for (int i = 6; i < 12; i++)
-        {
-          if (solution(i) > maxVelOffsets)
-            solution(i) = maxVelOffsets;
-          if (solution(i) < -maxVelOffsets)
-            solution(i) = -maxVelOffsets;
-        }
-
-        ////////////////////////////////
-        // Decompress and decode the linear system into our state
-        ////////////////////////////////
-
-        Eigen::VectorXs solutionDecompressed = Eigen::VectorXs::Zero(A.cols());
         for (int col = 0; col < numVariables; col++)
         {
           if (col < 2)
           {
-            // Copy the root offsets
-            solutionDecompressed.segment<6>(col * 6)
-                = solution.segment<6>(col * 6);
+            fullA.block<6, 6>(row * 6, col * 6)
+                = A.block<6, 6>(outputTimesteps[row] * 6, col * 6);
           }
           else
           {
-            // Spread out the residual acc's
-            solutionDecompressed.segment<6>(
-                12 + (residualAccTimesteps[col - 2] * 6))
-                = solution.segment<6>(col * 6);
+            fullA.block<6, 6>(row * 6, col * 6) = A.block<6, 6>(
+                outputTimesteps[row] * 6,
+                12 + (residualAccTimesteps[col - 2] * 6));
           }
-        }
-
-        Eigen::VectorXs recovered = (A * solutionDecompressed);
-        Eigen::VectorXs newTrajectory = recovered + b;
-
-        Eigen::VectorXs originalQHead = Eigen::VectorXs::Zero(q.cols() * 6);
-        Eigen::VectorXs diff = Eigen::VectorXs::Zero(q.cols() * 6);
-        for (int t = 0; t < totalSteps; t++)
-        {
-          originalQHead.segment<6>(t * 6) = q.col(t).head<6>();
-          diff.segment<6>(t * 6)
-              = (newTrajectory.segment<6>(t * 6) - q.col(t).head<6>());
-        }
-
-        // line search
-        s_t lineSearchDist = 1.0;
-        while (true)
-        {
-          for (int t = 0; t < totalSteps; t++)
-          {
-            q.col(t).head<6>() = originalQHead.segment<6>(t * 6)
-                                 + (lineSearchDist * diff.segment<6>(t * 6));
-          }
-
-          // Compute new loss
-
-          for (int t = 1; t < totalSteps; t++)
-          {
-            dq.col(t) = (q.col(t) - q.col(t - 1)) / dt;
-          }
-          for (int t = 1; t < totalSteps - 1; t++)
-          {
-            ddq.col(t)
-                = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
-          }
-
-          ////////////////////////////////
-          // Compute our average distance from the original trajectory
-          ////////////////////////////////
-
-          s_t maxDist = 0.0;
-          for (int t = 0; t < totalSteps; t++)
-          {
-            Eigen::Vector6s dist
-                = q.col(t).head<6>()
-                  - init->poseTrials[trial].col(t + cursor).head<6>();
-            if (dist.norm() > maxDist)
-            {
-              maxDist = dist.norm();
-            }
-          }
-
-          ////////////////////////////////
-          // Check residual cost
-          ////////////////////////////////
-
-          s_t residualCost = 0.0;
-          int totalCountedResiduals = 0;
-          for (int t = 1; t < totalSteps - 1; t++)
-          {
-            // Don't count any timesteps without observations
-            if (init->probablyMissingGRF.size() > trial
-                && init->probablyMissingGRF[trial].size() > t + cursor
-                && init->probablyMissingGRF[trial][t + cursor])
-            {
-              continue;
-            }
-
-            s_t thisTimestepCost = helper.calculateResidualNorm(
-                q.col(t),
-                dq.col(t),
-                ddq.col(t),
-                init->grfTrials[trial].col(t + cursor),
-                0,
-                false);
-            // std::cout << t << ": " << thisTimestepCost << ", ";
-            residualCost += thisTimestepCost;
-            totalCountedResiduals++;
-          }
-          residualCost /= totalCountedResiduals;
-
-          ////////////////////////////////
-          // Adapt residual weighting, and print output
-          ////////////////////////////////
-
-          if (maxDist > 1.0)
-          {
-            // This is an emergency, immediately drop us to the lowest
-            // regularization setting to avoid causing an INF
-            residualAccRegularization = dt * dt * 0.5;
-          }
-          else if (maxDist < 0.2)
-          {
-            residualAccRegularization *= 2.0;
-            if (residualAccRegularization > 20000)
-            {
-              residualAccRegularization = 20000;
-            }
-          }
-          else
-          {
-            residualAccRegularization *= 0.5;
-            if (residualAccRegularization < dt * dt * 0.5)
-            {
-              residualAccRegularization = dt * dt * 0.5;
-            }
-          }
-
-          if (residualCost > lastResidualCost * 1.2)
-          {
-            lineSearchDist *= 0.5;
-            if (lineSearchDist < 1e-18)
-            {
-              std::cout << "Line search got too small, optimization stalled, "
-                           "accepting current point."
-                        << std::endl;
-              break;
-            }
-            std::cout << "Shortening line search to " << lineSearchDist
-                      << std::endl;
-            continue;
-          }
-
-          (void)lastResidualCost;
-          (void)lastMaxDist;
-          lastResidualCost = residualCost;
-          lastMaxDist = maxDist;
-          std::cout << "Spatial residual reduction iter " << iter << "/"
-                    << numIters << " - avg residual norm: " << residualCost
-                    << ", max dist any timestep changed: " << maxDist
-                    << " (current residual penalty="
-                    << (includeResidualAccs
-                            ? std::to_string(residualAccRegularization)
-                            : "inf")
-                    << ")" << std::endl;
-          break;
-        }
-        if (lastResidualCost < bestResidualCost)
-        {
-          for (int t = 0; t < totalSteps; t++)
-          {
-            bestResidualQ.segment<6>(t * 6) = q.col(t).head<6>();
-          }
-          bestResidualTimestep = iter;
-          bestResidualCost = lastResidualCost;
-        }
-        if (lastResidualCost < satisfactoryThreshold)
-        {
-          std::cout
-              << "Reached satisfactory residuals. Exiting optimization early."
-              << std::endl;
-          break;
         }
       }
-
-      ////////////////////////////////
-      // Revert to the best result
-      ////////////////////////////////
-      std::cout << "Recovering best result from step " << bestResidualTimestep
-                << " with value " << bestResidualCost << std::endl;
-      for (int t = 0; t < totalSteps; t++)
-      {
-        q.col(t).head<6>() = bestResidualQ.segment<6>(t * 6);
-      }
-
-      ////////////////////////////////
-      // Check for differences from the original trajectory. This is important
-      // for detecting unmeasured external forces acting on the body at certain
-      // frames, that might otherwise throw our solution off course.
-      ////////////////////////////////
-
-      if (filterSuspiciousTimesteps)
-      {
-        Eigen::VectorXs posDiffs = Eigen::VectorXs::Zero(q.cols());
-        Eigen::VectorXs accDiffs = Eigen::VectorXs::Zero(q.cols());
-        for (int t = 1; t < q.cols() - 1; t++)
-        {
-          Eigen::Vector6s updatedAcc
-              = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
-          Eigen::Vector6s originalAcc
-              = originalDdqUnscaled.col(t + cursor).head<6>();
-
-          s_t diff = 1.0
-                     - (updatedAcc.dot(originalAcc)
-                        / (updatedAcc.norm() * originalAcc.norm()));
-          diff *= diff;
-          accDiffs(t) = diff;
-
-          Eigen::Vector6s posDiff
-              = (q.col(t).head<6>()
-                 - init->poseTrials[trial].col(t + cursor).head<6>());
-          posDiffs(t) = posDiff.norm();
-        }
-        // TODO: use position difference information in a more robust algorithm
-        // to detect bad timesteps
-        (void)posDiffs;
-
-        bool anyFiltered = false;
-        for (int t = 1; t < accDiffs.size(); t++)
-        {
-          if (accDiffs(t) > accDiffFilterThreshold)
-          {
-            std::cout << "Marking the next " << accFilterExtendForFrames
-                      << " frames as probablying missing some measured "
-                         "external forces"
-                      << std::endl;
-            // Mark the next few frames as missing their GRF data
-            for (int i = 0; i < 5; i++)
-            {
-              if (t + cursor + i < probablyMissingGRF.size())
-              {
-                probablyMissingGRF[t + cursor + i] = true;
-              }
-            }
-            // Re-jig the positions to reset acceleration on these and following
-            // timesteps to the original values in the initialization.
-            for (int i = cursor + t + 1; i < init->poseTrials[trial].cols();
-                 i++)
-            {
-              Eigen::VectorXs positionToPreserveAcceleration
-                  = originalDdqUnscaled.col(i - 1)
-                    + 2 * init->poseTrials[trial].col(i - 1)
-                    - init->poseTrials[trial].col(i - 2);
-
-              Eigen::Vector6s diff
-                  = (positionToPreserveAcceleration.head<6>()
-                     - init->poseTrials[trial].col(i).head<6>());
-              // std::cout << "Adjusting For Acc T[" << i << "]=" << diff.norm()
-              //           << std::endl;
-              init->poseTrials[trial].col(i).head<6>() += diff;
-            }
-
-            init->probablyMissingGRF[trial] = probablyMissingGRF;
-            anyFiltered = true;
-            break;
-          }
-        }
-        if (anyFiltered)
-        {
-          std::cout << "Re-trying this optimization block" << std::endl;
-          continue;
-        }
-      }
-
-      ////////////////////////////////
-      // Update the poseTrials[trial] data
-      ////////////////////////////////
-
-      int cutoff = cursor + totalSteps;
-      for (int t = cursor; t < init->poseTrials[trial].cols(); t++)
-      {
-        if (t < cutoff)
-        {
-          Eigen::Vector6s diff
-              = (q.col(t - cursor).head<6>()
-                 - init->poseTrials[trial].col(t).head<6>());
-          std::cout << "T[" << t << "]=" << diff.norm() << std::endl;
-          init->poseTrials[trial].col(t).head<6>() += diff;
-        }
-        else
-        {
-          Eigen::VectorXs positionToPreserveAcceleration
-              = originalDdqUnscaled.col(t - 1)
-                + 2 * init->poseTrials[trial].col(t - 1)
-                - init->poseTrials[trial].col(t - 2);
-
-          Eigen::Vector6s diff
-              = (positionToPreserveAcceleration.head<6>()
-                 - init->poseTrials[trial].col(t).head<6>());
-          // std::cout << "After T[" << t << "]=" << diff.norm() << std::endl;
-          init->poseTrials[trial].col(t).head<6>() += diff;
-        }
-      }
-
 #ifndef NDEBUG
-      Eigen::MatrixXs updatedAccUnscaled = Eigen::MatrixXs::Zero(
-          init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
-      for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+      if (totalSteps == outputTimesteps.size())
       {
-        updatedAccUnscaled.col(t)
-            = (init->poseTrials[trial].col(t + 1)
-               - 2 * init->poseTrials[trial].col(t)
-               + init->poseTrials[trial].col(t - 1));
-        if (t >= cursor + totalSteps - 1
-            || (probablyMissingGRF.size() > t && probablyMissingGRF[t]))
+        if (fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
+            != A.block(0, 0, outputTimesteps.size() * 6, numVariables))
         {
-          if ((updatedAccUnscaled.col(t) - originalDdqUnscaled.col(t)).norm()
-              > 1e-12)
-          {
-            std::cout << "Unscaled acc bad at time t=" << t << "!" << std::endl;
-          }
+          Eigen::MatrixXs diff
+              = fullA.block(0, 0, outputTimesteps.size() * 6, numVariables)
+                - A.block(0, 0, outputTimesteps.size() * 6, numVariables);
+          assert(false);
         }
       }
 #endif
 
-      // If we've just optimized over the whole trajectory at once, then we're
-      // done!
-      if (totalSteps + cursor == init->poseTrials[trial].cols())
+      s_t offsetRegularization = 0.5;
+      Eigen::VectorXs regularizationDiagonal = Eigen::VectorXs::Ones(inputSize);
+      regularizationDiagonal.segment(0, 12) *= offsetRegularization;
+      if (includeResidualAccs)
       {
-        break;
+        regularizationDiagonal.segment(12, regularizationDiagonal.size() - 12)
+            *= residualAccRegularization;
+      }
+      fullA.block(outputTimesteps.size() * 6, 0, inputSize, inputSize)
+          = regularizationDiagonal.asDiagonal();
+
+      Eigen::VectorXs fullB = Eigen::VectorXs::Zero(outputSize);
+      Eigen::VectorXs fullOriginalTrajectory
+          = Eigen::VectorXs::Zero(fullB.size());
+      for (int row = 0; row < outputTimesteps.size(); row++)
+      {
+        fullB.segment<6>(row * 6) = b.segment<6>(outputTimesteps[row] * 6);
+        fullOriginalTrajectory.segment<6>(row * 6)
+            = targetTrajectory.segment<6>((outputTimesteps[row] + cursor) * 6);
       }
 
-      cursor += shiftBy;
+      Eigen::VectorXs desired = fullOriginalTrajectory - fullB;
+
+      s_t weightFirstFewTimesteps = 1000 * totalSteps;
+      s_t weightLastFewTimesteps = 5;
+      // If we're in a zipper step, make sure to prioritize keeping the end of
+      // the zipper as clean as possible, to propagate as little error as we
+      // can
+      if (cursor + totalSteps < init->poseTrials[trial].cols())
+      {
+        weightLastFewTimesteps = 200;
+      }
+
+      const int weightTimestepNum = 3;
+      desired.segment(
+          desired.size() - weightTimestepNum * 6, weightTimestepNum * 6)
+          *= weightLastFewTimesteps;
+      fullA.block(
+          desired.size() - weightTimestepNum * 6,
+          0,
+          weightTimestepNum * 6,
+          fullA.cols())
+          *= weightLastFewTimesteps;
+      if (cursor > 0)
+      {
+        desired.segment(0, weightTimestepNum * 6) *= weightFirstFewTimesteps;
+        fullA.block(0, 0, weightTimestepNum * 6, fullA.cols())
+            *= weightFirstFewTimesteps;
+      }
+      Eigen::VectorXs solution = fullA.householderQr().solve(desired);
+
+      // Keep solutions within reasonable bounds, never offset the trajectory
+      // too far
+      s_t maxPosOffsets = 0.1;
+      for (int i = 0; i < 6; i++)
+      {
+        if (solution(i) > maxPosOffsets)
+          solution(i) = maxPosOffsets;
+        if (solution(i) < -maxPosOffsets)
+          solution(i) = -maxPosOffsets;
+      }
+      s_t maxVelOffsets = 5.0;
+      for (int i = 6; i < 12; i++)
+      {
+        if (solution(i) > maxVelOffsets)
+          solution(i) = maxVelOffsets;
+        if (solution(i) < -maxVelOffsets)
+          solution(i) = -maxVelOffsets;
+      }
+
+      ////////////////////////////////
+      // Decompress and decode the linear system into our state
+      ////////////////////////////////
+
+      Eigen::VectorXs solutionDecompressed = Eigen::VectorXs::Zero(A.cols());
+      for (int col = 0; col < numVariables; col++)
+      {
+        if (col < 2)
+        {
+          // Copy the root offsets
+          solutionDecompressed.segment<6>(col * 6)
+              = solution.segment<6>(col * 6);
+        }
+        else
+        {
+          // Spread out the residual acc's
+          solutionDecompressed.segment<6>(
+              12 + (residualAccTimesteps[col - 2] * 6))
+              = solution.segment<6>(col * 6);
+        }
+      }
+
+      Eigen::VectorXs recovered = (A * solutionDecompressed);
+      Eigen::VectorXs newTrajectory = recovered + b;
+
+      Eigen::VectorXs originalQHead = Eigen::VectorXs::Zero(q.cols() * 6);
+      Eigen::VectorXs diff = Eigen::VectorXs::Zero(q.cols() * 6);
+      for (int t = 0; t < totalSteps; t++)
+      {
+        originalQHead.segment<6>(t * 6) = q.col(t).head<6>();
+        diff.segment<6>(t * 6)
+            = (newTrajectory.segment<6>(t * 6) - q.col(t).head<6>());
+      }
+
+      // line search
+      s_t lineSearchDist = 1.0;
+      while (true)
+      {
+        for (int t = 0; t < totalSteps; t++)
+        {
+          q.col(t).head<6>() = originalQHead.segment<6>(t * 6)
+                               + (lineSearchDist * diff.segment<6>(t * 6));
+        }
+
+        // Compute new loss
+
+        for (int t = 1; t < totalSteps; t++)
+        {
+          dq.col(t) = (q.col(t) - q.col(t - 1)) / dt;
+        }
+        for (int t = 1; t < totalSteps - 1; t++)
+        {
+          ddq.col(t) = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)) / (dt * dt);
+        }
+
+        ////////////////////////////////
+        // Compute our average distance from the original trajectory
+        ////////////////////////////////
+
+        s_t maxDist = 0.0;
+        for (int t = 0; t < totalSteps; t++)
+        {
+          Eigen::Vector6s dist
+              = q.col(t).head<6>()
+                - init->poseTrials[trial].col(t + cursor).head<6>();
+          if (dist.norm() > maxDist)
+          {
+            maxDist = dist.norm();
+          }
+        }
+
+        ////////////////////////////////
+        // Check residual cost
+        ////////////////////////////////
+
+        s_t residualCost = 0.0;
+        int totalCountedResiduals = 0;
+        for (int t = 1; t < totalSteps - 1; t++)
+        {
+          // Don't count any timesteps without observations
+          if (init->probablyMissingGRF.size() > trial
+              && init->probablyMissingGRF[trial].size() > t + cursor
+              && init->probablyMissingGRF[trial][t + cursor])
+          {
+            continue;
+          }
+
+          s_t thisTimestepCost = helper.calculateResidualNorm(
+              q.col(t),
+              dq.col(t),
+              ddq.col(t),
+              init->grfTrials[trial].col(t + cursor),
+              0,
+              false);
+          // std::cout << t << ": " << thisTimestepCost << ", ";
+          residualCost += thisTimestepCost;
+          totalCountedResiduals++;
+        }
+        residualCost /= totalCountedResiduals;
+
+        ////////////////////////////////
+        // Adapt residual weighting, and print output
+        ////////////////////////////////
+
+        if (maxDist > 1.0)
+        {
+          // This is an emergency, immediately drop us to the lowest
+          // regularization setting to avoid causing an INF
+          residualAccRegularization = dt * dt * 0.5;
+        }
+        else if (maxDist < 0.2)
+        {
+          residualAccRegularization *= 2.0;
+          if (residualAccRegularization > 20000)
+          {
+            residualAccRegularization = 20000;
+          }
+        }
+        else
+        {
+          residualAccRegularization *= 0.5;
+          if (residualAccRegularization < dt * dt * 0.5)
+          {
+            residualAccRegularization = dt * dt * 0.5;
+          }
+        }
+
+        if (residualCost > lastResidualCost * 1.2)
+        {
+          lineSearchDist *= 0.5;
+          if (lineSearchDist < 1e-18)
+          {
+            std::cout << "Line search got too small, optimization stalled, "
+                         "accepting current point."
+                      << std::endl;
+            break;
+          }
+          std::cout << "Shortening line search to " << lineSearchDist
+                    << std::endl;
+          continue;
+        }
+
+        if (isnan(residualCost) || residualCost > lastResidualCost)
+        {
+          consecutiveTimestepsWithIncreasingCost++;
+          if (consecutiveTimestepsWithIncreasingCost
+              > maxConsecutiveIncreasingCostBeforeQuit)
+          {
+            std::cout << "Had " << maxConsecutiveIncreasingCostBeforeQuit
+                      << " timesteps with increasing cost in a row. "
+                         "Considering this optimization to have failed. "
+                         "Resetting to original poses and returning."
+                      << std::endl;
+            init->poseTrials[trial] = originalPoses;
+            return false;
+          }
+          if (isnan(residualCost) || residualCost > 1e12)
+          {
+            std::cout << "Had residual cost " << residualCost
+                      << " > 1e12 (or NaN). "
+                         "Considering this optimization to have failed. "
+                         "Resetting to original poses and returning."
+                      << std::endl;
+            init->poseTrials[trial] = originalPoses;
+            return false;
+          }
+        }
+        else
+        {
+          consecutiveTimestepsWithIncreasingCost = 0;
+        }
+
+        (void)lastResidualCost;
+        (void)lastMaxDist;
+        lastResidualCost = residualCost;
+        lastMaxDist = maxDist;
+        std::cout << "Spatial residual reduction iter " << iter << "/"
+                  << numIters << " - avg residual norm: " << residualCost
+                  << ", max dist any timestep changed: " << maxDist
+                  << " (current residual penalty="
+                  << (includeResidualAccs
+                          ? std::to_string(residualAccRegularization)
+                          : "inf")
+                  << ")" << std::endl;
+        break;
+      }
+      if (lastResidualCost < bestResidualCost)
+      {
+        for (int t = 0; t < totalSteps; t++)
+        {
+          bestResidualQ.segment<6>(t * 6) = q.col(t).head<6>();
+        }
+        bestResidualTimestep = iter;
+        bestResidualCost = lastResidualCost;
+      }
+      if (lastResidualCost < satisfactoryThreshold)
+      {
+        std::cout
+            << "Reached satisfactory residuals. Exiting optimization early."
+            << std::endl;
+        break;
+      }
     }
+
+    ////////////////////////////////
+    // Revert to the best result
+    ////////////////////////////////
+    std::cout << "Recovering best result from step " << bestResidualTimestep
+              << " with value " << bestResidualCost << std::endl;
+    for (int t = 0; t < totalSteps; t++)
+    {
+      q.col(t).head<6>() = bestResidualQ.segment<6>(t * 6);
+    }
+
+    ////////////////////////////////
+    // Update the poseTrials[trial] data
+    ////////////////////////////////
+
+    int cutoff = cursor + totalSteps;
+    for (int t = cursor; t < init->poseTrials[trial].cols(); t++)
+    {
+      if (t < cutoff)
+      {
+        Eigen::Vector6s diff
+            = (q.col(t - cursor).head<6>()
+               - init->poseTrials[trial].col(t).head<6>());
+        std::cout << "T[" << t << "]=" << diff.norm() << std::endl;
+        init->poseTrials[trial].col(t).head<6>() += diff;
+      }
+      else
+      {
+        Eigen::VectorXs positionToPreserveAcceleration
+            = originalDdqUnscaled.col(t - 1)
+              + 2 * init->poseTrials[trial].col(t - 1)
+              - init->poseTrials[trial].col(t - 2);
+
+        Eigen::Vector6s diff
+            = (positionToPreserveAcceleration.head<6>()
+               - init->poseTrials[trial].col(t).head<6>());
+        // std::cout << "After T[" << t << "]=" << diff.norm() << std::endl;
+        init->poseTrials[trial].col(t).head<6>() += diff;
+      }
+    }
+
+#ifndef NDEBUG
+    Eigen::MatrixXs updatedAccUnscaled = Eigen::MatrixXs::Zero(
+        init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+    {
+      updatedAccUnscaled.col(t)
+          = (init->poseTrials[trial].col(t + 1)
+             - 2 * init->poseTrials[trial].col(t)
+             + init->poseTrials[trial].col(t - 1));
+      if (t >= cursor + totalSteps - 1
+          || (probablyMissingGRF.size() > t && probablyMissingGRF[t]))
+      {
+        if ((updatedAccUnscaled.col(t) - originalDdqUnscaled.col(t)).norm()
+            > 1e-12)
+        {
+          std::cout << "Unscaled acc bad at time t=" << t << "!" << std::endl;
+        }
+      }
+    }
+#endif
+
+    // If we've just optimized over the whole trajectory at once, then we're
+    // done!
+    if (totalSteps + cursor == init->poseTrials[trial].cols())
+    {
+      break;
+    }
+
+    cursor += shiftBy;
   }
+
+  return true;
 }
 
 //==============================================================================
@@ -8324,85 +8273,82 @@ void DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 // miscalibration on the force plates, if there's consistent error on the
 // marker matches.
 void DynamicsFitter::recalibrateForcePlates(
-    std::shared_ptr<DynamicsInitialization> init, s_t maxMovement)
+    std::shared_ptr<DynamicsInitialization> init, int trial, s_t maxMovement)
 {
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  Eigen::Vector3s avgMarkerOffset = Eigen::Vector3s::Zero();
+  int numSamples = 0;
+  Eigen::MatrixXs poses = init->poseTrials[trial];
+  for (int t = 0; t < poses.cols(); t++)
   {
-    Eigen::Vector3s avgMarkerOffset = Eigen::Vector3s::Zero();
-    int numSamples = 0;
-    Eigen::MatrixXs poses = init->poseTrials[trial];
-    for (int t = 0; t < poses.cols(); t++)
+    mSkeleton->setPositions(poses.col(t));
+    auto markerMap
+        = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+    auto observedMap = init->markerObservationTrials[trial][t];
+    for (auto& pair : markerMap)
     {
-      mSkeleton->setPositions(poses.col(t));
-      auto markerMap
-          = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
-      auto observedMap = init->markerObservationTrials[trial][t];
-      for (auto& pair : markerMap)
+      if (observedMap.count(pair.first))
       {
-        if (observedMap.count(pair.first))
+        Eigen::Vector3s offset = observedMap[pair.first] - pair.second;
+        // Exclude outliers, because they may be due to something else going
+        // wrong earlier in the pipeline.
+        if (offset.norm() < maxMovement * 1.5)
         {
-          Eigen::Vector3s offset = observedMap[pair.first] - pair.second;
-          // Exclude outliers, because they may be due to something else going
-          // wrong earlier in the pipeline.
-          if (offset.norm() < maxMovement * 1.5)
-          {
-            avgMarkerOffset += offset;
-            numSamples++;
-          }
+          avgMarkerOffset += offset;
+          numSamples++;
         }
       }
     }
-
-    if (numSamples == 0)
-      continue;
-    avgMarkerOffset /= numSamples;
-
-    // Create the X,Z shift (don't move anything up or down) to more closely
-    // calibrate the force plates.
-    Eigen::Vector3s shift = avgMarkerOffset;
-    shift(1) = 0.0;
-
-    // Trim the shift to at most `maxMovement`
-    if (shift.norm() > maxMovement)
-    {
-      shift = shift.normalized() * maxMovement;
-    }
-
-    // Now we have to go through and shift everything related to
-    // the forces over by "shift"
-    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
-    {
-      ForcePlate& plate = init->forcePlateTrials[trial][i];
-      for (int j = 0; j < plate.corners.size(); j++)
-      {
-        plate.corners[j] += shift;
-      }
-      for (int t = 0; t < plate.centersOfPressure.size(); t++)
-      {
-        plate.centersOfPressure[t] += shift;
-      }
-      plate.worldOrigin += shift;
-    }
-
-    // We also want to shift the whole trajectory by the same amount, to
-    // maintain physical consistency
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
-    {
-      init->poseTrials[trial].col(t).segment<3>(3) += shift;
-    }
-    if (init->originalPoses.size() > trial)
-    {
-      for (int t = 0; t < init->originalPoses[trial].cols(); t++)
-      {
-        init->originalPoses[trial].col(t).segment<3>(3) += shift;
-      }
-    }
-
-    std::cout << "Trial " << trial
-              << " adjusted force plate location (correcting for calibration "
-                 "error) by "
-              << shift(0) << "m X, " << shift(2) << "m Z" << std::endl;
   }
+
+  if (numSamples == 0)
+    return;
+  avgMarkerOffset /= numSamples;
+
+  // Create the X,Z shift (don't move anything up or down) to more closely
+  // calibrate the force plates.
+  Eigen::Vector3s shift = avgMarkerOffset;
+  shift(1) = 0.0;
+
+  // Trim the shift to at most `maxMovement`
+  if (shift.norm() > maxMovement)
+  {
+    shift = shift.normalized() * maxMovement;
+  }
+
+  // Now we have to go through and shift everything related to
+  // the forces over by "shift"
+  for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+  {
+    ForcePlate& plate = init->forcePlateTrials[trial][i];
+    for (int j = 0; j < plate.corners.size(); j++)
+    {
+      plate.corners[j] += shift;
+    }
+    for (int t = 0; t < plate.centersOfPressure.size(); t++)
+    {
+      plate.centersOfPressure[t] += shift;
+    }
+    plate.worldOrigin += shift;
+  }
+
+  // We also want to shift the whole trajectory by the same amount, to
+  // maintain physical consistency
+  for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+  {
+    init->poseTrials[trial].col(t).segment<3>(3) += shift;
+  }
+  if (init->originalPoses.size() > trial)
+  {
+    for (int t = 0; t < init->originalPoses[trial].cols(); t++)
+    {
+      init->originalPoses[trial].col(t).segment<3>(3) += shift;
+    }
+  }
+
+  std::cout << "Trial " << trial
+            << " adjusted force plate location (correcting for calibration "
+               "error) by "
+            << shift(0) << "m X, " << shift(2) << "m Z" << std::endl;
 }
 
 //==============================================================================

@@ -1053,12 +1053,16 @@ public:
       Eigen::MatrixXs targetPoses,
       s_t weightLinear = 1.0,
       s_t weightAngular = 1.0,
-      s_t regularizeResiduals = 1.0);
+      s_t regularizeResiduals = 0.5);
 
-  // 1.1. Shift the COM trajectory around to try to get the residual-free
-  // rotation.
-  void optimizeSpatialResidualsOnCOMTrajectory(
+  // 1.1. Attempt to shift the COM trajectory around to try to get the
+  // residual-free trajectory. This can fail, when we've got unmeasured external
+  // forces, too much smoothing on force plates, or severe model imperfections
+  // (basically, if you just can't fit the data), so it returns a boolean false
+  // on failure, and resets everything how it left it.
+  bool optimizeSpatialResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
+      int trial,
       s_t satisfactoryThreshold = 1e-10);
 
   // 1.2. Now that we've got zero residuals, after calling
@@ -1066,7 +1070,9 @@ public:
   // miscalibration on the force plates, if there's consistent error on the
   // marker matches.
   void recalibrateForcePlates(
-      std::shared_ptr<DynamicsInitialization> init, s_t maxMovement = 0.03);
+      std::shared_ptr<DynamicsInitialization> init,
+      int trial,
+      s_t maxMovement = 0.03);
 
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
