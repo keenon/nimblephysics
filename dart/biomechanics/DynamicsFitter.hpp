@@ -1074,6 +1074,9 @@ public:
       int trial,
       s_t maxMovement = 0.03);
 
+  // This utility recomputes the GRF world wrenches, in case we changed the data
+  void recomputeGRFs(std::shared_ptr<DynamicsInitialization> init, int trial);
+
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
   void centerAngularResiduals(std::shared_ptr<DynamicsInitialization> init);

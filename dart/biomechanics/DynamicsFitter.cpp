@@ -6788,8 +6788,11 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::vector<Eigen::MatrixXs> trialLinearMaps;
     std::vector<Eigen::VectorXs> trialOriginalPositions;
     std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
-    int totalTimesteps = 0;
-    int totalColsWithoutMass = 0;
+
+    const int maxTrajectoriesToSolveMassOver = 1;
+
+    int totalSampledColsWithoutMass = 0;
+    int totalSampledRows = 0;
     int totalRows = 0;
 
     std::cout << "Zeroing linear residuals in the COM trajectory" << std::endl;
@@ -6820,15 +6823,17 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       const s_t dt = init->trialTimesteps[i];
       const int numTimesteps = init->poseTrials[i].cols();
 
-      totalTimesteps += numTimesteps;
-
       // This has one col each for start COM positions, start COM velocities,
       // and total mass. It outputs the physically consistent X, Y, Z
       // coordinates of COM over time, given those inputs.
       Eigen::MatrixXs trialLinearMapToPositions = Eigen::MatrixXs::Zero(
           numTimesteps * 3 + (numMissingSteps * 3),
           6 + numMissingSteps * 3 + 1);
-      totalColsWithoutMass += trialLinearMapToPositions.cols() - 1;
+      if (i < maxTrajectoriesToSolveMassOver)
+      {
+        totalSampledColsWithoutMass += trialLinearMapToPositions.cols() - 1;
+        totalSampledRows += trialLinearMapToPositions.rows();
+      }
       totalRows += trialLinearMapToPositions.rows();
 
       // This is a vector with the original positions of our COM over time,
@@ -7140,15 +7145,18 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     // column, so that we can solve them together for a single unified skeleton
     // mass that is least-squares best across all the trials at once.
 
-    Eigen::MatrixXs unifiedLinearMap
-        = Eigen::MatrixXs::Zero(totalRows, totalColsWithoutMass + 1);
-    Eigen::VectorXs unifiedPositions = Eigen::VectorXs::Zero(totalRows);
-    Eigen::VectorXs unifiedGravityOffset = Eigen::VectorXs::Zero(totalRows);
+    Eigen::MatrixXs unifiedLinearMap = Eigen::MatrixXs::Zero(
+        totalSampledRows, totalSampledColsWithoutMass + 1);
+    Eigen::VectorXs unifiedPositions = Eigen::VectorXs::Zero(totalSampledRows);
+    Eigen::VectorXs unifiedGravityOffset
+        = Eigen::VectorXs::Zero(totalSampledRows);
 
     int rowCursor = 0;
     int colCursor = 0;
     int massCol = unifiedLinearMap.cols() - 1;
-    for (int trial = 0; trial < numTrials; trial++)
+    for (int trial = 0;
+         trial < numTrials && trial < maxTrajectoriesToSolveMassOver;
+         trial++)
     {
       int trialTimesteps = trialOriginalPositions[trial].size();
       int trialRows = trialLinearMaps[trial].rows();
@@ -7167,7 +7175,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       rowCursor += trialRows;
       colCursor += trialCols - 1;
     }
-    assert(colCursor == totalColsWithoutMass);
+    assert(colCursor == totalSampledColsWithoutMass);
 
     std::cout << "Solving linear COM trajectory map: size="
               << unifiedLinearMap.rows() << "x" << unifiedLinearMap.cols()
@@ -7181,35 +7189,13 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     // recover original mass.
     s_t tentativeMass = 1.0 / tentativeResult(massCol);
 
-    Eigen::VectorXs adjustedComPositions;
+    Eigen::VectorXs adjustedComPositions = Eigen::VectorXs::Zero(totalRows);
 
     // If our mass has dropped below an acceptable threshold in this solve, then
     // we need to run again but hold mass fixed.
-    if (tentativeMass < 0.1 * originalMass && false)
+    if (tentativeMass < 0.1 * originalMass)
     {
-      Eigen::VectorXs massOffset
-          = unifiedLinearMap.col(massCol) * (1.0 / originalMass);
-
-      std::cout
-          << "Re-solving linear COM trajectory map while excluding mass: size="
-          << unifiedLinearMap.rows() << "x" << unifiedLinearMap.cols()
-          << std::endl;
-      // Re-run the solve, while holding the mass fixed at `originalMass`
-      Eigen::VectorXs massFixedResult
-          = unifiedLinearMap
-                .block(0, 0, totalTimesteps, unifiedLinearMap.cols() - 1)
-                .householderQr()
-                .solve(unifiedPositions - massOffset - unifiedGravityOffset);
-      std::cout << "Solved!" << std::endl;
-
-      tentativeResult.segment(0, massFixedResult.size()) = massFixedResult;
-
-      // Calculate the trajectory of our COM over time
-      adjustedComPositions
-          = unifiedLinearMap.block(
-                0, 0, totalTimesteps, unifiedLinearMap.cols() - 1)
-                * massFixedResult
-            + massOffset + unifiedGravityOffset;
+      tentativeMass = originalMass;
     }
     else
     {
@@ -7222,7 +7208,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       init->originalGroupMasses = mSkeleton->getGroupMasses();
 
       // Calculate the trajectory of our COM over time
-      adjustedComPositions
+      adjustedComPositions.segment(0, totalSampledRows)
           = unifiedLinearMap * tentativeResult + unifiedGravityOffset;
     }
 
@@ -7237,12 +7223,47 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       s_t totalChange = 0.0;
       std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
 
-      for (int t = 0; t < originalCOMs.size(); t++)
+      if (trial < maxTrajectoriesToSolveMassOver)
       {
-        Eigen::Vector3s change
-            = adjustedComPositions.segment<3>(timeCursor * 3) - originalCOMs[t];
-        timeCursor++;
-        totalChange += change.norm();
+        // In this case, we can just read the answer right off the unified
+        // matrix
+        for (int t = 0; t < originalCOMs.size(); t++)
+        {
+          Eigen::Vector3s change
+              = adjustedComPositions.segment<3>(timeCursor * 3)
+                - originalCOMs[t];
+          timeCursor++;
+          totalChange += change.norm();
+        }
+      }
+      else
+      {
+        // Otherwise, we have to solve using our found mass
+        Eigen::MatrixXs A = trialLinearMaps[trial];
+        Eigen::VectorXs b = trialOriginalGravityOffsets[trial];
+
+        Eigen::MatrixXs AFixedMass = A.block(0, 0, A.rows(), A.cols() - 1);
+        Eigen::VectorXs bFixedMass
+            = A.col(A.cols() - 1) * (1.0 / tentativeMass);
+        bFixedMass.segment(0, b.size()) += b;
+
+        Eigen::VectorXs desired = Eigen::VectorXs::Zero(bFixedMass.size());
+        desired.segment(0, trialOriginalPositions[trial].size())
+            += trialOriginalPositions[trial];
+
+        Eigen::VectorXs localResult
+            = AFixedMass.householderQr().solve(desired - bFixedMass);
+        Eigen::VectorXs recoveredTrajectory
+            = AFixedMass * localResult + bFixedMass;
+        for (int t = 0; t < originalCOMs.size(); t++)
+        {
+          adjustedComPositions.segment<3>(timeCursor * 3)
+              = recoveredTrajectory.segment<3>(t * 3);
+          timeCursor++;
+          Eigen::Vector3s change
+              = recoveredTrajectory.segment<3>(t * 3) - originalCOMs[t];
+          totalChange += change.norm();
+        }
       }
       std::cout << "Trial " << trial << " moved COM by an average of "
                 << (totalChange / originalCOMs.size())
@@ -7793,7 +7814,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     int bestResidualTimestep = 0;
     s_t bestResidualCost = std::numeric_limits<s_t>::infinity();
     int consecutiveTimestepsWithIncreasingCost = 0;
-    const int maxConsecutiveIncreasingCostBeforeQuit = 15;
+    const int maxConsecutiveIncreasingCostBeforeQuit = 5;
     Eigen::VectorXs bestResidualQ = Eigen::VectorXs::Zero(q.cols() * 6);
 
     for (int iter = 0; iter < numIters; iter++)
@@ -8135,10 +8156,13 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         {
           consecutiveTimestepsWithIncreasingCost++;
           if (consecutiveTimestepsWithIncreasingCost
-              > maxConsecutiveIncreasingCostBeforeQuit)
+                  > maxConsecutiveIncreasingCostBeforeQuit
+              && (maxDist > 3.0 || residualCost > 5000))
           {
             std::cout << "Had " << maxConsecutiveIncreasingCostBeforeQuit
-                      << " timesteps with increasing cost in a row. "
+                      << " timesteps with increasing cost in a row, with "
+                         "change distances greater than 3.0 meters or residual "
+                         "cost greater than 5000. "
                          "Considering this optimization to have failed. "
                          "Resetting to original poses and returning."
                       << std::endl;
@@ -8349,6 +8373,65 @@ void DynamicsFitter::recalibrateForcePlates(
             << " adjusted force plate location (correcting for calibration "
                "error) by "
             << shift(0) << "m X, " << shift(2) << "m Z" << std::endl;
+
+  recomputeGRFs(init, trial);
+}
+
+//==============================================================================
+// This utility recomputes the GRF world wrenches, in case we changed the data
+void DynamicsFitter::recomputeGRFs(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
+
+  Eigen::MatrixXs& poses = init->poseTrials[trial];
+
+  init->grfTrials[trial].setZero();
+
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    mSkeleton->setPositions(poses.col(t));
+
+    for (int i = 0; i < forcePlates.size(); i++)
+    {
+      Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+      Eigen::Vector3s force = forcePlates[i].forces[t];
+      Eigen::Vector3s moments = forcePlates[i].moments[t];
+      // Ignore timesteps where the force plate has a 0 force, those don't
+      // need to be assigned to anything
+      if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
+          || moments.hasNaN())
+      {
+        continue;
+      }
+      Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
+      wrench.head<3>() = moments;
+      wrench.tail<3>() = force;
+      Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
+      wrenchT.translation() = cop;
+      Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
+
+      // Every force from force plates must be accounted for somewhere. Simply
+      // assign it to the nearest foot
+      int closestFoot = -1;
+      s_t minDist = (s_t)std::numeric_limits<double>::infinity();
+      for (int i = 0; i < init->grfBodyNodes.size(); i++)
+      {
+        Eigen::Vector3s footLoc
+            = init->grfBodyNodes[i]->getWorldTransform().translation();
+        s_t dist = (footLoc - cop).norm();
+        if (dist < minDist)
+        {
+          minDist = dist;
+          closestFoot = i;
+        }
+      }
+      assert(closestFoot != -1);
+
+      // If multiple force plates assign to the same foot, sum up the forces
+      init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
+    }
+  }
 }
 
 //==============================================================================
