@@ -2042,26 +2042,38 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeInertias(true)
   //         .setIncludePoses(true));
 
-  // Re - run as L1 fitter.setIterationLimit(200);
-  // fitter.runIPOPTOptimization(
-  //     init,
-  //     DynamicsFitProblemConfig(skel)
-  //         .setDefaults(true)
-  //         .setIncludeMasses(true)
-  //         .setIncludeInertias(true)
-  //         .setIncludePoses(true));
+  // Re - run as L1
+  fitter.setIterationLimit(200);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          .setDefaults(true)
+          .setIncludeMasses(true)
+          .setIncludeInertias(true)
+          .setIncludePoses(true));
 
-  // fitter.setIterationLimit(50);
-  // fitter.runSGDOptimization(
-  //     init,
-  //     DynamicsFitProblemConfig(skel)
-  //         .setDefaults(true)
-  //         .setIncludeMasses(true)
-  //         .setIncludeCOMs(true)
-  //         .setIncludeInertias(true)
-  //         .setIncludeBodyScales(true)
-  //         .setIncludeMarkerOffsets(true)
-  //         .setIncludePoses(true));
+  fitter.setIterationLimit(50);
+  fitter.runSGDOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          .setDefaults(true)
+          .setIncludeMasses(true)
+          .setIncludeCOMs(true)
+          .setIncludeInertias(true)
+          .setIncludeBodyScales(true)
+          .setIncludeMarkerOffsets(true)
+          .setIncludePoses(true));
+
+  // Reset force plates to 0-ish residuals
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    bool successOnResiduals
+        = fitter.optimizeSpatialResidualsOnCOMTrajectory(init, trial);
+    if (successOnResiduals)
+    {
+      fitter.recalibrateForcePlates(init, trial);
+    }
+  }
 
   /*
   fitter.setIterationLimit(50);
@@ -2097,7 +2109,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
   */
 
-  // fitter.computePerfectGRFs(init);
+  fitter.computePerfectGRFs(init);
 
   // bool consistent = fitter.checkPhysicalConsistency(init);
   // if (!consistent)
@@ -4123,19 +4135,92 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
       c3dFiles,
       trcFiles,
       grfFiles,
-      20);
+      6);
 
   std::vector<dynamics::BodyNode*> footNodes;
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
 
   DynamicsFitProblemConfig config(standard.skeleton);
+  config.setIncludeMasses(true);
+  config.setIncludeCOMs(true);
   config.setIncludeInertias(true);
+  config.setIncludeBodyScales(true);
   config.setIncludePoses(true);
+  config.setConstrainResidualsZero(true);
 
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, footNodes, config);
   std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+  std::cout << "Constraint dim: " << problem.getConstraintSize() << std::endl;
+
+  Eigen::MatrixXs analytical = problem.computeConstraintsJacobian();
+  Eigen::MatrixXs fd = problem.finiteDifferenceConstraintsJacobian();
+
+  if (!equals(analytical, fd, 1e-8))
+  {
+    std::cout << "Jacobian of constraints of DynamicsFitProblem not equal!"
+              << std::endl;
+    for (int i = 0; i < fd.rows(); i++)
+    {
+      problem.debugErrors(fd.row(i), analytical.row(i), 1e-8);
+    }
+    EXPECT_TRUE(equals(analytical, fd, 1e-8));
+
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_JAC_IMPLICIT_VEL)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      6);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setIncludeMasses(true);
+  config.setIncludeCOMs(true);
+  config.setIncludeInertias(true);
+  config.setIncludeBodyScales(true);
+  config.setIncludePoses(true);
+  config.setConstrainResidualsZero(true);
+
+  config.setVelAccImplicit(true);
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, footNodes, config);
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+  std::cout << "Constraint dim: " << problem.getConstraintSize() << std::endl;
 
   Eigen::MatrixXs analytical = problem.computeConstraintsJacobian();
   Eigen::MatrixXs fd = problem.finiteDifferenceConstraintsJacobian();

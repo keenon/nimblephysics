@@ -681,6 +681,7 @@ public:
   DynamicsFitProblemConfig& setMarkerWeight(s_t weight);
   DynamicsFitProblemConfig& setJointWeight(s_t weight);
 
+  DynamicsFitProblemConfig& setConstrainResidualsZero(bool constrain);
   DynamicsFitProblemConfig& setLinearNewtonUseL1(bool l1);
   DynamicsFitProblemConfig& setResidualUseL1(bool l1);
   DynamicsFitProblemConfig& setMarkerUseL1(bool l1);
@@ -709,6 +710,8 @@ public:
   s_t mResidualWeight;
   s_t mMarkerWeight;
   s_t mJointWeight;
+
+  bool mConstrainResidualsZero;
 
   bool mLinearNewtonUseL1;
   bool mResidualUseL1;
