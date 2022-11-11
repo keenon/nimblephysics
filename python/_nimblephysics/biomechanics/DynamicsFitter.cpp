@@ -460,15 +460,27 @@ protected:
               zeroLinearResidualsOnCOMTrajectory,
           ::py::arg("init"))
       .def(
+          "zeroLinearResidualsAndOptimizeAngular",
+          &dart::biomechanics::DynamicsFitter::
+              zeroLinearResidualsAndOptimizeAngular,
+          ::py::arg("init"),
+          ::py::arg("trial"),
+          ::py::arg("targetPoses"),
+          ::py::arg("weightLinear") = 1.0,
+          ::py::arg("weightAngular") = 1.0,
+          ::py::arg("regularizeResiduals") = 1.0)
+      .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               optimizeSpatialResidualsOnCOMTrajectory,
           ::py::arg("init"),
+          ::py::arg("trial"),
           ::py::arg("satisfactoryThreshold") = 1e-5)
       .def(
           "recalibrateForcePlates",
           &dart::biomechanics::DynamicsFitter::recalibrateForcePlates,
           ::py::arg("init"),
+          ::py::arg("trial"),
           ::py::arg("maxMovement") = 0.03)
       .def(
           "scaleLinkMassesFromGravity",

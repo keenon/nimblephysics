@@ -2238,6 +2238,58 @@ void OpenSimParser::saveMot(
 }
 
 //==============================================================================
+/// This saves the *.mot file from the inverse dynamics solved for the
+/// skeleton
+void OpenSimParser::saveIDMot(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const Eigen::MatrixXs& controlForces)
+{
+  std::ofstream motFile;
+  motFile.open(outputPath);
+  motFile << "Coordinates\n";
+  motFile << "version=1\n";
+  motFile << "nRows=" << timestamps.size() << "\n";
+  motFile << "nColumns=" << controlForces.rows() + 1 << "\n";
+  motFile << "inDegrees=no\n";
+  motFile << "\n";
+  motFile << "Units are S.I. units (second, meters, Newtons, ...)\n";
+  motFile
+      << "If the header above contains a line with 'inDegrees', this indicates "
+         "whether rotational values are in degrees (yes) or radians (no).\n";
+  motFile << "\n";
+  motFile << "endheader\n";
+
+  motFile << "time";
+  for (int i = 0; i < skel->getNumDofs(); i++)
+  {
+    motFile << "\t" << skel->getDof(i)->getName();
+    if (3 <= i && i < 6)
+    {
+      motFile << "_force";
+    }
+    else
+    {
+      motFile << "_moment";
+    }
+  }
+  motFile << "\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    motFile << timestamps[t];
+    for (int i = 0; i < skel->getNumDofs(); i++)
+    {
+      motFile << "\t" << controlForces(i, t);
+    }
+    motFile << "\n";
+  }
+
+  motFile.close();
+}
+
+//==============================================================================
 double zeroIfNan(double n)
 {
   if (isnan(n))
@@ -4253,6 +4305,7 @@ OpenSimFile OpenSimParser::readOsim40(
             = markerCursor->FirstChildElement("body")->GetText();
         bool fixed
             = markerCursor->FirstChildElement("fixed") == nullptr
+              || markerCursor->FirstChildElement("fixed")->GetText() == nullptr
               || trim(std::string(
                      markerCursor->FirstChildElement("fixed")->GetText()))
                      == "true";
@@ -4759,7 +4812,7 @@ OpenSimFile OpenSimParser::readOsim30(
 
         tinyxml2::XMLElement* fixedElem
             = markerCursor->FirstChildElement("fixed");
-        bool fixed = fixedElem == nullptr
+        bool fixed = fixedElem == nullptr || fixedElem->GetText() == nullptr
                      || trim(std::string(fixedElem->GetText())) == "true";
         dynamics::BodyNode* body = skel->getBodyNode(bodyName);
 

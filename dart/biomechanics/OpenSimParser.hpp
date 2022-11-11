@@ -208,6 +208,14 @@ public:
       const std::vector<double>& timestamps,
       const Eigen::MatrixXs& poses);
 
+  /// This saves the *.mot file from the inverse dynamics solved for the
+  /// skeleton
+  static void saveIDMot(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const Eigen::MatrixXs& controlForces);
+
   /// This saves the *.mot file for the ground reaction forces we've read from
   /// a C3D file
   static void saveGRFMot(

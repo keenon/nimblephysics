@@ -8239,7 +8239,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         Eigen::Vector6s diff
             = (q.col(t - cursor).head<6>()
                - init->poseTrials[trial].col(t).head<6>());
-        std::cout << "T[" << t << "]=" << diff.norm() << std::endl;
+        // std::cout << "T[" << t << "]=" << diff.norm() << std::endl;
         init->poseTrials[trial].col(t).head<6>() += diff;
       }
       else
@@ -9811,6 +9811,36 @@ void DynamicsFitter::writeCSVData(
 }
 
 //==============================================================================
+// This computes the inverse dynamics control forces for a trial, and returns
+// it.
+Eigen::MatrixXs DynamicsFitter::computeInverseDynamics(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t dt = init->trialTimesteps[trial];
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+  Eigen::MatrixXs tau = Eigen::MatrixXs::Zero(
+      init->poseTrials[trial].rows(), init->poseTrials[trial].cols());
+  for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+  {
+    Eigen::VectorXs q = init->poseTrials[trial].col(t);
+    Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                             init->poseTrials[trial].col(t),
+                             init->poseTrials[trial].col(t - 1))
+                         / dt;
+    Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                               init->poseTrials[trial].col(t + 1),
+                               init->poseTrials[trial].col(t))
+                           - mSkeleton->getPositionDifferences(
+                               init->poseTrials[trial].col(t),
+                               init->poseTrials[trial].col(t - 1)))
+                          / (dt * dt);
+    tau.col(t) = helper.calculateInverseDynamics(
+        q, dq, ddq, init->grfTrials[trial].col(t));
+  }
+  return tau;
+}
+
+//==============================================================================
 // Get the average RMSE, in meters, of the markers
 s_t DynamicsFitter::computeAverageMarkerRMSE(
     std::shared_ptr<DynamicsInitialization> init)
@@ -9882,12 +9912,16 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
         continue;
       }
       Eigen::VectorXs q = init->poseTrials[trial].col(t);
-      Eigen::VectorXs dq = (init->poseTrials[trial].col(t)
-                            - init->poseTrials[trial].col(t - 1))
+      Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                               init->poseTrials[trial].col(t),
+                               init->poseTrials[trial].col(t - 1))
                            / dt;
-      Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 1)
-                             - 2 * init->poseTrials[trial].col(t)
-                             + init->poseTrials[trial].col(t - 1))
+      Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                                 init->poseTrials[trial].col(t + 1),
+                                 init->poseTrials[trial].col(t))
+                             - mSkeleton->getPositionDifferences(
+                                 init->poseTrials[trial].col(t),
+                                 init->poseTrials[trial].col(t - 1)))
                             / (dt * dt);
       Eigen::Vector6s residual
           = helper.calculateResidual(q, dq, ddq, init->grfTrials[trial].col(t));
@@ -9895,8 +9929,8 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
       torque += frameTorque;
       s_t frameForce = residual.tail<3>().norm();
       force += frameForce;
-      std::cout << t << ":" << frameForce << "N," << frameTorque << "Nm"
-                << std::endl;
+      // std::cout << t << ":" << frameForce << "N," << frameTorque << "Nm"
+      //           << std::endl;
       count++;
     }
   }

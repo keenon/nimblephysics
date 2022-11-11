@@ -1143,6 +1143,11 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       int trial);
 
+  // This computes the inverse dynamics control forces for a trial, and returns
+  // it.
+  Eigen::MatrixXs computeInverseDynamics(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
   // Get the average RMSE, in meters, of the markers
   s_t computeAverageMarkerRMSE(std::shared_ptr<DynamicsInitialization> init);
 

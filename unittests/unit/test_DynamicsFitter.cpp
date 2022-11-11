@@ -2157,7 +2157,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   if (saveGUI)
   {
-    int trajectoryIndex = 1;
+    int trajectoryIndex = 0;
 
     std::cout << "Saving trajectory..." << std::endl;
     std::cout << "FPS: " << 1.0 / init->trialTimesteps[trajectoryIndex]
@@ -2303,15 +2303,12 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
       newClip.push_back(t == 0);
     }
 
-    // TODO: re-enable me
-
     // 2. Find the joint centers
-    // fitter.findJointCenters(
-    //     fitterInit, newClip, markerObservationTrials[trial]);
-    // fitter.findAllJointAxis(
-    //     fitterInit, newClip, markerObservationTrials[trial]);
-    // fitter.computeJointConfidences(fitterInit,
-    // markerObservationTrials[trial]);
+    fitter.findJointCenters(
+        fitterInit, newClip, markerObservationTrials[trial]);
+    fitter.findAllJointAxis(
+        fitterInit, newClip, markerObservationTrials[trial]);
+    fitter.computeJointConfidences(fitterInit, markerObservationTrials[trial]);
 
     kinematicInits.push_back(fitterInit);
   }
