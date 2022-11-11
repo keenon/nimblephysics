@@ -240,6 +240,10 @@ protected:
           ::py::init<std::shared_ptr<dynamics::Skeleton>>(),
           ::py::arg("skeleton"))
       .def(
+          "setDefaults",
+          &dart::biomechanics::DynamicsFitProblemConfig::setDefaults,
+          ::py::arg("useL1") = true)
+      .def(
           "setIncludeMasses",
           &dart::biomechanics::DynamicsFitProblemConfig::setIncludeMasses,
           ::py::arg("value"))
@@ -506,6 +510,11 @@ protected:
           "computePerfectGRFs",
           &dart::biomechanics::DynamicsFitter::computePerfectGRFs,
           ::py::arg("init"))
+      .def(
+          "computeInverseDynamics",
+          &dart::biomechanics::DynamicsFitter::computeInverseDynamics,
+          ::py::arg("init"),
+          ::py::arg("trial"))
       .def(
           "checkPhysicalConsistency",
           &dart::biomechanics::DynamicsFitter::checkPhysicalConsistency,
