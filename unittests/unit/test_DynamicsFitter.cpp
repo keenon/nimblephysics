@@ -35,7 +35,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -1709,15 +1709,18 @@ bool testRelationshipBetweenResidualAndLinear(
   SpatialNewtonHelper newtonHelper(skel);
 
   DynamicsFitProblemConfig config(skel);
+  config.setIncludePoses(true);
+  config.setIncludeMasses(true);
+  config.setIncludeCOMs(true);
+  config.setIncludeInertias(true);
+  config.setIncludeBodyScales(true);
+  // config.setIncludeMarkerOffsets(true);
   config.setResidualWeight(1.0);
   config.setResidualTorqueMultiple(1.0);
   config.setResidualUseL1(true);
 
   DynamicsFitProblem problem(
       init, skel, init->trackingMarkers, init->grfBodyNodes, config);
-
-  s_t problemLoss = problem.computeLoss(problem.flatten(), true);
-  std::cout << "Problem loss: " << problemLoss << std::endl;
 
   int totalAccTimesteps = 0;
   for (int trial = 0; trial < problem.mPoses.size(); trial++)
@@ -1890,6 +1893,71 @@ bool testRelationshipBetweenResidualAndLinear(
   }
 
   std::cout << "Residual norm: " << residualNorm << std::endl;
+
+  std::vector<Eigen::MatrixXs> originalPoses;
+  for (Eigen::MatrixXs mat : problem.mPoses)
+  {
+    originalPoses.push_back(Eigen::MatrixXs(mat));
+  }
+  std::vector<Eigen::MatrixXs> originalVels;
+  for (Eigen::MatrixXs mat : problem.mVels)
+  {
+    originalVels.push_back(Eigen::MatrixXs(mat));
+  }
+  std::vector<Eigen::MatrixXs> originalAccs;
+  for (Eigen::MatrixXs mat : problem.mAccs)
+  {
+    originalAccs.push_back(Eigen::MatrixXs(mat));
+  }
+  Eigen::VectorXs originalMasses = skel->getLinkMasses();
+  Eigen::VectorXs originalCOMs = skel->getGroupCOMs();
+  Eigen::VectorXs originalInertias = skel->getGroupInertias();
+  Eigen::VectorXs originalScales = skel->getBodyScales();
+
+  problem.unflatten(problem.flatten());
+  for (int i = 0; i < problem.mPoses.size(); i++)
+  {
+    if (!equals(originalPoses[i], problem.mPoses[i], 1e-16))
+    {
+      std::cout << "Poses not preserved across flatten/unflatten!" << std::endl;
+      return false;
+    }
+    if (!equals(originalVels[i], problem.mVels[i], 1e-16))
+    {
+      std::cout << "Vels not preserved across flatten/unflatten!" << std::endl;
+      return false;
+    }
+    if (!equals(originalAccs[i], problem.mAccs[i], 1e-16))
+    {
+      std::cout << "Accs not preserved across flatten/unflatten!" << std::endl;
+      return false;
+    }
+  }
+  if (!equals(originalMasses, skel->getLinkMasses(), 1e-16))
+  {
+    std::cout << "Masses not preserved across flatten/unflatten!" << std::endl;
+    return false;
+  }
+  if (!equals(originalCOMs, skel->getGroupCOMs(), 1e-16))
+  {
+    std::cout << "COMs not preserved across flatten/unflatten!" << std::endl;
+    return false;
+  }
+  if (!equals(originalInertias, skel->getGroupInertias(), 1e-16))
+  {
+    std::cout << "Inertias not preserved across flatten/unflatten!"
+              << std::endl;
+    return false;
+  }
+  if (!equals(originalScales, skel->getBodyScales(), 1e-16))
+  {
+    std::cout << "Scales not preserved across flatten/unflatten!" << std::endl;
+    return false;
+  }
+
+  s_t problemLoss = problem.computeLoss(problem.flatten(), true);
+  std::cout << "Problem loss: " << problemLoss << std::endl;
+
   // TODO: this doesn't seem to work on the CompleteHumanModel, and we don't
   // know why...
   if (abs(residualNorm - problemLoss) > 1e-10)
@@ -1923,6 +1991,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //   std::endl; return init;
   // }
 
+  bool successOnAllResiduals = true;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
@@ -1934,11 +2003,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           init, trial, originalTrajectory, 1.0, 5.0);
     }
 
-    bool successOnResiduals
-        = fitter.optimizeSpatialResidualsOnCOMTrajectory(init, trial);
+    bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
+        init, trial, 5e-7); // 5e-9 is the practical limit
     if (successOnResiduals)
     {
-      fitter.recalibrateForcePlates(init, trial);
+      // For now, do nothing
+      // fitter.recalibrateForcePlates(init, trial);
+    }
+    else
+    {
+      successOnAllResiduals = false;
     }
   }
 
@@ -1950,7 +2024,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   {
     std::cout << "The residual norm doesn't map!" << std::endl;
     // TODO: Re-enable me
-    // return init;
+    return init;
   }
 
   // skel->setGroupInertias(skel->getGroupInertias());
@@ -2043,37 +2117,57 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludePoses(true));
 
   // Re - run as L1
-  fitter.setIterationLimit(200);
-  fitter.runIPOPTOptimization(
+  (void)successOnAllResiduals;
+  fitter.setIterationLimit(350);
+  fitter.setLBFGSHistoryLength(18);
+  fitter.runNewtonsMethod(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
-          .setIncludeMasses(true)
-          .setIncludeInertias(true)
+          .setConstrainResidualsZero(successOnAllResiduals)
+          .setVelAccImplicit(true)
+          // .setIncludeMasses(true)
+          // .setIncludeCOMs(true)
+          // .setIncludeInertias(true)
+          // .setIncludeBodyScales(true)
+          // .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
 
-  fitter.setIterationLimit(50);
-  fitter.runSGDOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults(true)
-          .setIncludeMasses(true)
-          .setIncludeCOMs(true)
-          .setIncludeInertias(true)
-          .setIncludeBodyScales(true)
-          .setIncludeMarkerOffsets(true)
-          .setIncludePoses(true));
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setConstrainResidualsZero(successOnAllResiduals)
+  //         // .setVelAccImplicit(true)
+  //         // .setIncludeMasses(true)
+  //         // .setIncludeCOMs(true)
+  //         // .setIncludeInertias(true)
+  //         // .setIncludeBodyScales(true)
+  //         // .setIncludeMarkerOffsets(true)
+  //         .setIncludePoses(true));
 
-  // Reset force plates to 0-ish residuals
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
-  {
-    bool successOnResiduals
-        = fitter.optimizeSpatialResidualsOnCOMTrajectory(init, trial);
-    if (successOnResiduals)
-    {
-      fitter.recalibrateForcePlates(init, trial);
-    }
-  }
+  // fitter.setIterationLimit(50);
+  // fitter.runSGDOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setIncludeMasses(true)
+  //         .setIncludeCOMs(true)
+  //         .setIncludeInertias(true)
+  //         .setIncludeBodyScales(true)
+  //         .setIncludeMarkerOffsets(true)
+  //         .setIncludePoses(true));
+
+  // // Reset force plates to 0-ish residuals
+  // for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  // {
+  //   bool successOnResiduals
+  //       = fitter.optimizeSpatialResidualsOnCOMTrajectory(init, trial);
+  //   if (successOnResiduals)
+  //   {
+  //     fitter.recalibrateForcePlates(init, trial);
+  //   }
+  // }
 
   /*
   fitter.setIterationLimit(50);
@@ -4749,7 +4843,7 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
       c3dFiles,
       trcFiles,
       grfFiles,
-      -1,
+      4,
       0,
       true);
 }

@@ -805,6 +805,10 @@ public:
   // This gets the jacobian of the constraints vector with respect to x
   Eigen::MatrixXs finiteDifferenceConstraintsJacobian();
 
+  // This gets the hessian of the loss function
+  Eigen::MatrixXs finiteDifferenceHessian(
+      Eigen::VectorXs x, bool useRidders = true);
+
   // Print out the errors in a gradient vector in human readable form
   bool debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
 
@@ -945,6 +949,7 @@ public:
 
   int mBestObjectiveValueIteration;
   s_t mBestObjectiveValue;
+  Eigen::VectorXs mInitX;
   Eigen::VectorXs mLastX;
   Eigen::VectorXs mBestObjectiveValueState;
 };
@@ -1125,7 +1130,22 @@ public:
   // functions of the position values, and removes any constraints. That means
   // we can optimize this using simple gradient descent with line search, and
   // can warm start.
-  void runSGDOptimization(
+  void runUnconstrainedSGDOptimization(
+      std::shared_ptr<DynamicsInitialization> init,
+      DynamicsFitProblemConfig config);
+
+  // 4. This runs the same optimization problem as
+  // runExplicitVelAccOptimization(), but holds velocity and acc as implicit
+  // functions of the position values, and removes any constraints. That means
+  // we can optimize this using simple gradient descent with line search, and
+  // can warm start.
+  void runConstrainedSGDOptimization(
+      std::shared_ptr<DynamicsInitialization> init,
+      DynamicsFitProblemConfig config);
+
+  // 4. This runs an explicit Newton's method update, using finite differencing
+  // to get a Hessian
+  void runNewtonsMethod(
       std::shared_ptr<DynamicsInitialization> init,
       DynamicsFitProblemConfig config);
 

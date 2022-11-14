@@ -42,6 +42,7 @@
 #include <pybind11/stl.h>
 
 #include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace py = pybind11;
 
@@ -338,6 +339,20 @@ void OpenSimParser(py::module& m)
         return dart::biomechanics::OpenSimParser::saveGRFMot(
             outputPath, timestamps, forcePlates);
       },
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("forcePlates"));
+
+  sm.def(
+      "saveIDMot",
+      +[](std::shared_ptr<dynamics::Skeleton> skel,
+          const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const Eigen::MatrixXs torques) {
+        return dart::biomechanics::OpenSimParser::saveIDMot(
+            skel, outputPath, timestamps, torques);
+      },
+      ::py::arg("skel"),
       ::py::arg("outputPath"),
       ::py::arg("timestamps"),
       ::py::arg("forcePlates"));

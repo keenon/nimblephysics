@@ -2903,7 +2903,8 @@ DynamicsFitProblem::DynamicsFitProblem(
     mSkeleton(skeleton),
     mFootNodes(footNodes),
     mConfig(config),
-    mBestObjectiveValue(std::numeric_limits<s_t>::infinity())
+    mBestObjectiveValue(std::numeric_limits<s_t>::infinity()),
+    mLastX(Eigen::VectorXs::Zero(0))
 {
   // 1. Set up the markers
 
@@ -2925,26 +2926,30 @@ DynamicsFitProblem::DynamicsFitProblem(
   // 2. Set up the q, dq, ddq, and GRF
 
   int dofs = skeleton->getNumDofs();
-  for (int i = 0; i < init->poseTrials.size(); i++)
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    s_t dt = init->trialTimesteps[i];
-    Eigen::MatrixXs& inputPoses = init->poseTrials[i];
-    std::cout << "Trial " << i << ": " << inputPoses.cols() << std::endl;
+    s_t dt = init->trialTimesteps[trial];
+    Eigen::MatrixXs& inputPoses = init->poseTrials[trial];
+    std::cout << "Trial " << trial << ": " << inputPoses.cols() << std::endl;
     Eigen::MatrixXs poses = Eigen::MatrixXs::Zero(dofs, inputPoses.cols());
     Eigen::MatrixXs vels = Eigen::MatrixXs::Zero(dofs, inputPoses.cols());
     Eigen::MatrixXs accs = Eigen::MatrixXs::Zero(dofs, inputPoses.cols());
-    for (int j = 0; j < inputPoses.cols(); j++)
+    for (int t = 0; t < inputPoses.cols(); t++)
     {
-      poses.col(j) = inputPoses.col(j);
+      poses.col(t) = inputPoses.col(t);
     }
-    for (int j = 1; j < inputPoses.cols(); j++)
+    for (int t = 1; t < inputPoses.cols(); t++)
     {
-      vels.col(j) = (inputPoses.col(j) - inputPoses.col(j - 1)) / dt;
+      vels.col(t) = mSkeleton->getPositionDifferences(
+                        inputPoses.col(t), inputPoses.col(t - 1))
+                    / dt;
     }
-    for (int j = 1; j < inputPoses.cols() - 1; j++)
+    for (int t = 1; t < inputPoses.cols() - 1; t++)
     {
-      accs.col(j) = (inputPoses.col(j + 1) - 2 * inputPoses.col(j)
-                     + inputPoses.col(j - 1))
+      accs.col(t) = (mSkeleton->getPositionDifferences(
+                         inputPoses.col(t + 1), inputPoses.col(t))
+                     - mSkeleton->getPositionDifferences(
+                         inputPoses.col(t), inputPoses.col(t - 1)))
                     / (dt * dt);
     }
     mPoses.push_back(poses);
@@ -2960,6 +2965,8 @@ DynamicsFitProblem::DynamicsFitProblem(
   mResidualHelper
       = std::make_shared<ResidualForceHelper>(mSkeleton, mForceBodyIndices);
   mSpatialNewtonHelper = std::make_shared<SpatialNewtonHelper>(mSkeleton);
+
+  mInitX = flatten();
 }
 
 //==============================================================================
@@ -4405,12 +4412,19 @@ Eigen::VectorXs DynamicsFitProblem::computeConstraints(Eigen::VectorXs x)
       {
         for (int t = 1; t < mPoses[trial].cols() - 1; t++)
         {
-          Eigen::Vector6s residual = mResidualHelper->calculateResidual(
-              mPoses[trial].col(t),
-              mVels[trial].col(t),
-              mAccs[trial].col(t),
-              mInit->grfTrials[trial].col(t));
-          constraints.segment<6>(cursor) = residual;
+          if (mInit->probablyMissingGRF[trial][t])
+          {
+            constraints.segment<6>(cursor).setZero();
+          }
+          else
+          {
+            Eigen::Vector6s residual = mResidualHelper->calculateResidual(
+                mPoses[trial].col(t),
+                mVels[trial].col(t),
+                mAccs[trial].col(t),
+                mInit->grfTrials[trial].col(t));
+            constraints.segment<6>(cursor) = residual;
+          }
           cursor += 6;
         }
       }
@@ -4573,6 +4587,15 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
       posJacs.push_back(Eigen::MatrixXs::Zero(6, dofs));
       for (int t = 1; t < mPoses[trial].cols() - 1; t++)
       {
+        if (mInit->probablyMissingGRF[trial][t])
+        {
+          // Skip this timestep
+          timestepRows.push_back(rowCursor);
+          posJacs.push_back(Eigen::MatrixXs::Zero(6, dofs));
+          rowCursor += 6;
+          continue;
+        }
+
         if (mConfig.mIncludeMasses)
         {
           Eigen::MatrixXs J = mResidualHelper->calculateResidualJacobianWrt(
@@ -4661,6 +4684,11 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
         for (int t = 1; t < mPoses[trial].cols() - 1; t++)
         {
           int rowCursorReplay = timestepRows[t - 1];
+          if (mInit->probablyMissingGRF[trial][t])
+          {
+            colCursor += dofs;
+            continue;
+          }
 
           // // v = (t - t-1) / dt
           // // dv/dt = I / dt
@@ -4749,6 +4777,12 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 
         for (int t = 1; t < mPoses[trial].cols() - 1; t++)
         {
+          if (mInit->probablyMissingGRF[trial][t])
+          {
+            colCursor += dofs * 3;
+            continue;
+          }
+
           Eigen::MatrixXs J = posJacs[t];
           int rowCursorReplay = timestepRows[t - 1];
           for (int row = 0; row < J.rows(); row++)
@@ -4848,6 +4882,36 @@ Eigen::MatrixXs DynamicsFitProblem::finiteDifferenceConstraintsJacobian()
         Eigen::VectorXs tweaked = original;
         tweaked(dof) += eps;
         perturbed = computeConstraints(tweaked);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
+// This gets the hessian of the loss function
+Eigen::MatrixXs DynamicsFitProblem::finiteDifferenceHessian(
+    Eigen::VectorXs x, bool useRidders)
+{
+  int problemDim = getProblemSize();
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(problemDim, problemDim);
+  Eigen::VectorXs original = x;
+
+  std::cout << "Finite Differencing Hessian with DOFs=" << problemDim
+            << std::endl;
+
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        std::cout << "   " << dof << "/" << problemDim << std::endl;
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        perturbed = computeGradient(tweaked);
         return true;
       },
       result,
@@ -5331,8 +5395,8 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   mRegularizeAcc = 0;
   mRegularizeAccUseL1 = false;
   mRegularizeMasses = 10.0;
-  mRegularizeCOMs = 20.0;
-  mRegularizeInertias = 1.0;
+  mRegularizeCOMs = 40.0;
+  mRegularizeInertias = 20.0;
   mRegularizeTrackingMarkerOffsets = 0.05;
   mRegularizeAnatomicalMarkerOffsets = 10.0;
   mRegularizeImpliedDensity = 3e-8;
@@ -5637,9 +5701,7 @@ bool DynamicsFitProblem::get_starting_point(
   (void)init_x;
   assert(init_x == true);
   (void)init_z;
-  assert(init_z == false);
   (void)init_lambda;
-  assert(init_lambda == false);
   // We don't set the lagrange multipliers
   (void)z_L;
   (void)z_U;
@@ -5649,7 +5711,21 @@ bool DynamicsFitProblem::get_starting_point(
   if (init_x)
   {
     Eigen::Map<Eigen::VectorXd> x(_x, n);
-    x = flatten().cast<double>();
+    x = mInitX.cast<double>();
+  }
+  if (init_z)
+  {
+    Eigen::Map<Eigen::VectorXd> zLower(z_L, n);
+    zLower.setZero();
+    Eigen::Map<Eigen::VectorXd> zUpper(z_U, n);
+    zUpper.setZero();
+  }
+
+  if (init_lambda)
+  {
+    // TODO: work out feasible-start lambda values
+    assert(init_lambda == false);
+    // Gradient of the objective wrt to each constraint value
   }
 
   return true;
@@ -5920,9 +5996,13 @@ DynamicsFitter::DynamicsFitter(
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
-    mDisableLinesearch(false){
-
-    };
+    mDisableLinesearch(false)
+{
+  mSkeleton->setGroupMasses(mSkeleton->getGroupMasses());
+  mSkeleton->setGroupCOMs(mSkeleton->getGroupCOMs());
+  mSkeleton->setGroupInertias(mSkeleton->getGroupInertias());
+  mSkeleton->setGroupScales(mSkeleton->getGroupScales());
+};
 
 //==============================================================================
 // This bundles together the objects we need in order to track a dynamics
@@ -6274,7 +6354,7 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
 
   std::vector<Eigen::Vector3s> coms;
 
-  mSkeleton->setLinkMasses(init->bodyMasses);
+  // mSkeleton->setLinkMasses(init->bodyMasses);
   for (int timestep = 0; timestep < poses.cols(); timestep++)
   {
     mSkeleton->setPositions(poses.col(timestep));
@@ -6290,7 +6370,7 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
     coms.push_back(weightedCOM);
   }
 
-  mSkeleton->setLinkMasses(originalMasses);
+  // mSkeleton->setLinkMasses(originalMasses);
   mSkeleton->setPositions(originalPoses);
 
   return coms;
@@ -6319,7 +6399,7 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositionsToCenterResiduals(
 
   std::vector<Eigen::Vector3s> centeredComs;
 
-  mSkeleton->setLinkMasses(init->bodyMasses);
+  // mSkeleton->setLinkMasses(init->bodyMasses);
 
   if (poses.cols() > 0)
   {
@@ -6346,7 +6426,7 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositionsToCenterResiduals(
     centeredComs.push_back(mSkeleton->getCOM());
   }
 
-  mSkeleton->setLinkMasses(originalMasses);
+  // mSkeleton->setLinkMasses(originalMasses);
   mSkeleton->setPositions(originalPoses);
 
   return centeredComs;
@@ -7527,8 +7607,10 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       // Now we want to scale every mass in the skeleton to get to
       // `tentativeMass` total
       s_t scalePercentage = tentativeMass / originalMass;
-      init->bodyMasses *= scalePercentage;
-      mSkeleton->setLinkMasses(init->bodyMasses);
+      // init->bodyMasses *= scalePercentage;
+      // mSkeleton->setLinkMasses(init->bodyMasses);
+      mSkeleton->setLinkMasses(mSkeleton->getLinkMasses() * scalePercentage);
+      init->bodyMasses = mSkeleton->getLinkMasses();
       init->groupMasses = mSkeleton->getGroupMasses();
       init->originalGroupMasses = mSkeleton->getGroupMasses();
 
@@ -7913,7 +7995,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // for the residuals, so we can regularize them.
 
     const int maxIndices = 500;
-    const int grabLast = 10;
+    const int grabLast = q.cols() < 10 ? q.cols() : 10;
     std::vector<int> indices
         = math::evenlySpacedTimesteps(q.cols() - grabLast, maxIndices);
     for (int i = 1; i < grabLast; i++)
@@ -8130,7 +8212,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       q.col(t) = init->poseTrials[trial].col(t + cursor);
     }
 
-    const int numIters = 250;
+    const int numIters = 600;
     s_t residualAccRegularization = 1000.0;
     // s_t residualAccRegularization = dt * dt * 0.5;
     s_t lastResidualCost = std::numeric_limits<s_t>::infinity();
@@ -8427,8 +8509,8 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
               dq.col(t),
               ddq.col(t),
               init->grfTrials[trial].col(t + cursor),
-              0,
-              false);
+              1,
+              true);
           // std::cout << t << ": " << thisTimestepCost << ", ";
           residualCost += thisTimestepCost;
           totalCountedResiduals++;
@@ -8516,7 +8598,8 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         lastMaxDist = maxDist;
         std::cout << "Spatial residual reduction iter " << iter << "/"
                   << numIters << " - avg residual norm: " << residualCost
-                  << ", max dist any timestep changed: " << maxDist
+                  << " (on " << totalCountedResiduals
+                  << " steps), max dist any timestep changed: " << maxDist
                   << " (current residual penalty="
                   << (includeResidualAccs
                           ? std::to_string(residualAccRegularization)
@@ -9268,7 +9351,7 @@ void DynamicsFitter::zeroSpatialResidualsUsingForwardSim(
 bool DynamicsFitter::verifyLinearForceConsistency(
     std::shared_ptr<DynamicsInitialization> init)
 {
-  mSkeleton->setLinkMasses(init->bodyMasses);
+  // mSkeleton->setLinkMasses(init->bodyMasses);
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
@@ -9643,6 +9726,11 @@ void DynamicsFitter::runIPOPTOptimization(
 
   app->Options()->SetIntegerValue("max_iter", mIterationLimit);
 
+  // Warm start
+  // app->Options()->SetBoolValue("warm_start_init_point", true);
+  // app->Options()->SetNumericValue("warm_start_bound_push", 1e-6);
+  // app->Options()->SetNumericValue("warm_start_mult_bound_push", 1e-6);
+
   // Disable LBFGS history
   app->Options()->SetIntegerValue(
       "limited_memory_max_history", mLBFGSHistoryLength);
@@ -9694,7 +9782,7 @@ void DynamicsFitter::runIPOPTOptimization(
   // crash. If you try to leave `problem` on the stack, you'll get invalid
   // free exceptions when IPOpt attempts to free it.
   DynamicsFitProblem* problem = new DynamicsFitProblem(
-      init, mSkeleton, mTrackingMarkers, mFootNodes, config);
+      init, mSkeleton, mTrackingMarkers, init->grfBodyNodes, config);
   if (problem->getProblemSize() == 0)
   {
     delete problem;
@@ -9718,6 +9806,12 @@ void DynamicsFitter::runIPOPTOptimization(
   */
   std::cout << "BEGINNING OPTIMIZATION WITH LOSS: "
             << problem->computeLoss(problem->flatten()) << std::endl;
+  if (config.mConstrainResidualsZero)
+  {
+    std::cout << "BEGINNING OPTIMIZATION WITH CONSTRAINTS NORM="
+              << problem->computeConstraints(problem->flatten()).norm()
+              << std::endl;
+  }
 
   SmartPtr<DynamicsFitProblem> problemPtr(problem);
 
@@ -9747,7 +9841,7 @@ void DynamicsFitter::runIPOPTOptimization(
 // functions of the position values, and removes any constraints. That means
 // we can optimize this using simple gradient descent with line search, and
 // can warm start.
-void DynamicsFitter::runSGDOptimization(
+void DynamicsFitter::runUnconstrainedSGDOptimization(
     std::shared_ptr<DynamicsInitialization> init,
     DynamicsFitProblemConfig config)
 {
@@ -9847,6 +9941,327 @@ void DynamicsFitter::runSGDOptimization(
                   << " too large! Change in loss (" << testLoss << " - "
                   << lastLoss << ") = " << (testLoss - lastLoss) << " >= 0"
                   << std::endl;
+      }
+      firstTry = false;
+      stepSize *= 0.5;
+    } while (stepSize > 1e-12);
+  }
+
+  // Save the result back to the problem init
+  problem.finalize_solution(
+      Ipopt::SolverReturn::SUCCESS,
+      mIterationLimit,
+      nullptr,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr);
+}
+
+//==============================================================================
+// 5. This runs the same optimization problem as
+// runExplicitVelAccOptimization(), but holds velocity and acc as implicit
+// functions of the position values, and removes any constraints. That means
+// we can optimize this using simple gradient descent with line search, and
+// can warm start.
+void DynamicsFitter::runConstrainedSGDOptimization(
+    std::shared_ptr<DynamicsInitialization> init,
+    DynamicsFitProblemConfig config)
+{
+  config.setVelAccImplicit(true);
+
+  // Create a problem object on the stack
+  DynamicsFitProblem problem(
+      init, mSkeleton, mTrackingMarkers, mFootNodes, config);
+  if (problem.getProblemSize() == 0)
+  {
+    std::cout << "WARNING: Optimization problem had no decision variables! "
+                 "Please enable some variables, for example with "
+                 "config.setIncludePoses(true)"
+              << std::endl;
+    return;
+  }
+
+  Eigen::VectorXs x = problem.flatten();
+  s_t lastLoss = problem.computeLoss(x);
+  Eigen::VectorXs lastConstraint = problem.computeConstraints(x);
+
+  Eigen::VectorXs lowerBounds = problem.flattenLowerBound();
+  Eigen::VectorXs upperBounds = problem.flattenUpperBound();
+
+  s_t stepSize = 1e-7;
+  for (int i = 0; i < mIterationLimit; i++)
+  {
+    std::cout << "Step " << i << ": " << lastLoss << std::endl;
+    Eigen::VectorXs grad = problem.computeGradient(x);
+    Eigen::VectorXs constraint = problem.computeConstraints(x);
+    Eigen::MatrixXs J = problem.computeConstraintsJacobian();
+
+    Eigen::VectorXs constrainedGrad
+        = grad
+          - J.completeOrthogonalDecomposition().solve(J * grad + constraint);
+    std::cout << "Constrained grad: " << constrainedGrad.transpose()
+              << std::endl;
+
+    // #ifndef NDEBUG
+    //     Eigen::VectorXs originalConGrad = J * grad;
+    //     Eigen::VectorXs zeroConGrad = J * constrainedGrad;
+    //     s_t ratio = zeroConGrad.norm() / originalConGrad.norm();
+    //     assert(ratio < 1e-14);
+    // #endif
+
+    /*
+    if (i % 10 == 0)
+    {
+      std::cout << "Checking FD gradient." << std::endl;
+      Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+      std::cout << " > Analytical gradient norm = " << grad.norm() << std::endl;
+      std::cout << " > FD gradient norm = " << fd.norm() << std::endl;
+      Eigen::VectorXs diff = grad - fd;
+      if (diff.norm() > 1e-7)
+      {
+        std::cout << "Gradient diff by " << diff.norm() << "!" << std::endl;
+        exit(1);
+      }
+    }
+    */
+
+    bool firstTry = true;
+    do
+    {
+      Eigen::VectorXs testX = x - constrainedGrad * stepSize;
+      for (int i = 0; i < testX.size(); i++)
+      {
+        if (testX(i) > upperBounds(i))
+        {
+          testX(i) = upperBounds(i);
+        }
+        if (testX(i) < lowerBounds(i))
+        {
+          testX(i) = lowerBounds(i);
+        }
+      }
+      s_t testLoss = problem.computeLoss(testX, true);
+      Eigen::VectorXs testConstraint = problem.computeConstraints(testX);
+      if (testLoss < lastLoss && testConstraint.norm() < lastConstraint.norm())
+      {
+        x = testX;
+        lastLoss = testLoss;
+        lastConstraint = testConstraint;
+        problem.intermediate_callback(
+            Ipopt::AlgorithmMode::RegularMode,
+            i,
+            lastLoss,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            nullptr,
+            nullptr);
+        if (firstTry)
+        {
+          // If we hit a success on our first try, then grow the step size
+          stepSize *= 2;
+        }
+        break;
+      }
+      else
+      {
+        std::cout << "    Step size " << stepSize << " too large";
+        if (testLoss > lastLoss)
+        {
+          std::cout << ". Change in loss (" << testLoss << " - " << lastLoss
+                    << ") = " << (testLoss - lastLoss) << " >= 0";
+        }
+        if (testConstraint.norm() > lastConstraint.norm())
+        {
+          std::cout << ". Change in constraint (" << testConstraint.norm()
+                    << " - " << lastConstraint.norm()
+                    << ") = " << (testConstraint.norm() - lastConstraint.norm())
+                    << " >= 0";
+        }
+        std::cout << std::endl;
+      }
+      firstTry = false;
+      stepSize *= 0.5;
+    } while (stepSize > 1e-12);
+  }
+
+  // Save the result back to the problem init
+  problem.finalize_solution(
+      Ipopt::SolverReturn::SUCCESS,
+      mIterationLimit,
+      nullptr,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr);
+}
+
+//==============================================================================
+void DynamicsFitter::runNewtonsMethod(
+    std::shared_ptr<DynamicsInitialization> init,
+    DynamicsFitProblemConfig config)
+{
+  // Create a problem object on the stack
+  DynamicsFitProblem problem(
+      init, mSkeleton, mTrackingMarkers, mFootNodes, config);
+  if (problem.getProblemSize() == 0)
+  {
+    std::cout << "WARNING: Optimization problem had no decision variables! "
+                 "Please enable some variables, for example with "
+                 "config.setIncludePoses(true)"
+              << std::endl;
+    return;
+  }
+
+  Eigen::VectorXs x = problem.flatten();
+  s_t lastLoss = problem.computeLoss(x);
+  Eigen::VectorXs lastConstraint = problem.computeConstraints(x);
+
+  Eigen::VectorXs lowerBounds = problem.flattenLowerBound();
+  Eigen::VectorXs upperBounds = problem.flattenUpperBound();
+
+  s_t stepSize = 1e-7;
+  for (int i = 0; i < mIterationLimit; i++)
+  {
+    std::cout << "Step " << i << ": " << lastLoss << std::endl;
+    Eigen::VectorXs grad = problem.computeGradient(x);
+    Eigen::VectorXs constraint = problem.computeConstraints(x);
+    Eigen::MatrixXs J = problem.computeConstraintsJacobian();
+    Eigen::MatrixXs H = problem.finiteDifferenceHessian(x, false);
+
+    int newtonSystemSize = H.cols() + J.rows();
+    Eigen::MatrixXs newtonSystem
+        = Eigen::MatrixXs::Zero(newtonSystemSize, newtonSystemSize);
+    newtonSystem.block(0, 0, H.rows(), H.cols()) = H;
+    newtonSystem.block(0, H.cols(), J.cols(), J.rows()) = J.transpose();
+    newtonSystem.block(H.rows(), 0, J.rows(), J.cols()) = J;
+
+    Eigen::VectorXs newtonTarget = Eigen::VectorXs::Zero(newtonSystemSize);
+    newtonTarget.segment(0, grad.size()) = grad;
+    newtonTarget.segment(grad.size(), constraint.size())
+        .setZero(); //  = constraint;
+
+    auto newtonSystemFactored
+        = newtonSystem.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::VectorXs newtonAnswer = newtonSystemFactored.solve(-newtonTarget);
+    Eigen::VectorXs newtonStep = newtonAnswer.segment(0, grad.size());
+    std::cout << "Newton singular values: "
+              << newtonSystemFactored.singularValues().transpose() << std::endl;
+    std::cout << "Newton step: " << newtonStep.transpose() << std::endl;
+
+    auto HFactored = H.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
+    newtonStep = HFactored.solve(-grad);
+    std::cout << "H singular values: " << HFactored.singularValues().transpose()
+              << std::endl;
+    for (int i = 0; i < 20; i++)
+    {
+      s_t max = HFactored.matrixU().col(i).cwiseAbs().maxCoeff();
+      std::cout << "H singular value[" << i
+                << "]: " << HFactored.singularValues()(i) << std::endl;
+      problem.debugErrors(
+          Eigen::VectorXs::Zero(grad.size()),
+          HFactored.matrixU().col(i),
+          max / 2);
+    }
+    std::cout << "H step: " << newtonStep.transpose() << std::endl;
+
+    // #ifndef NDEBUG
+    //     Eigen::VectorXs originalConGrad = J * grad;
+    //     Eigen::VectorXs zeroConGrad = J * constrainedGrad;
+    //     s_t ratio = zeroConGrad.norm() / originalConGrad.norm();
+    //     assert(ratio < 1e-14);
+    // #endif
+
+    /*
+    if (i % 10 == 0)
+    {
+      std::cout << "Checking FD gradient." << std::endl;
+      Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+      std::cout << " > Analytical gradient norm = " << grad.norm() << std::endl;
+      std::cout << " > FD gradient norm = " << fd.norm() << std::endl;
+      Eigen::VectorXs diff = grad - fd;
+      if (diff.norm() > 1e-7)
+      {
+        std::cout << "Gradient diff by " << diff.norm() << "!" << std::endl;
+        exit(1);
+      }
+    }
+    */
+
+    bool firstTry = true;
+    do
+    {
+      Eigen::VectorXs testX = x + newtonStep * stepSize;
+      for (int i = 0; i < testX.size(); i++)
+      {
+        if (testX(i) > upperBounds(i))
+        {
+          testX(i) = upperBounds(i);
+        }
+        if (testX(i) < lowerBounds(i))
+        {
+          testX(i) = lowerBounds(i);
+        }
+      }
+      s_t testLoss = problem.computeLoss(testX, true);
+      Eigen::VectorXs testConstraint = problem.computeConstraints(testX);
+      if ((testLoss < lastLoss)
+          || (testConstraint.norm() < lastConstraint.norm()))
+      {
+        x = testX;
+        lastLoss = testLoss;
+        lastConstraint = testConstraint;
+        problem.intermediate_callback(
+            Ipopt::AlgorithmMode::RegularMode,
+            i,
+            lastLoss,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            nullptr,
+            nullptr);
+        if (firstTry)
+        {
+          // If we hit a success on our first try, then grow the step size
+          stepSize *= 2;
+        }
+        break;
+      }
+      else
+      {
+        std::cout << "    Step size " << stepSize << " too large";
+        if (testLoss > lastLoss)
+        {
+          std::cout << ". Change in loss (" << testLoss << " - " << lastLoss
+                    << ") = " << (testLoss - lastLoss) << " >= 0";
+        }
+        if (testConstraint.norm() > lastConstraint.norm())
+        {
+          std::cout << ". Change in constraint (" << testConstraint.norm()
+                    << " - " << lastConstraint.norm()
+                    << ") = " << (testConstraint.norm() - lastConstraint.norm())
+                    << " >= 0";
+        }
+        std::cout << std::endl;
       }
       firstTry = false;
       stepSize *= 0.5;
@@ -10462,7 +10877,7 @@ void DynamicsFitter::saveDynamicsToGUI(
   Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
 
-  mSkeleton->setLinkMasses(init->bodyMasses);
+  // mSkeleton->setLinkMasses(init->bodyMasses);
 
   ///////////////////////////////////////////////////
   // Start actually rendering out results
@@ -11116,7 +11531,7 @@ void DynamicsFitter::saveDynamicsToGUI(
   }
 
   mSkeleton->setPositions(originalPoses);
-  mSkeleton->setLinkMasses(originalMasses);
+  // mSkeleton->setLinkMasses(originalMasses);
 
   server.writeFramesJson(path);
 }
