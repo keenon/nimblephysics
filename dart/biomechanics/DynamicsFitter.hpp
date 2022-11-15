@@ -701,6 +701,8 @@ public:
   DynamicsFitProblemConfig& setRegularizeAnatomicalMarkerOffsets(s_t value);
   DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
 
+  DynamicsFitProblemConfig& setMaxBlockSize(int value);
+
 public:
   friend class DynamicsFitProblem;
   friend class DynamicsFitter;
@@ -735,6 +737,8 @@ public:
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
   s_t mRegularizeImpliedDensity;
+
+  int mMaxBlockSize;
 };
 
 /**

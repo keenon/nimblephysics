@@ -1871,6 +1871,86 @@ bool testRelationshipBetweenResidualAndLinear(
     }
   }
 
+  for (int blockIdx = 0; blockIdx < problem.mBlocks.size(); blockIdx++)
+  {
+    auto& block = problem.mBlocks[blockIdx];
+    for (int t = 0; t < block.len; t++)
+    {
+      int realT = block.start + t;
+      Eigen::VectorXs q = init->poseTrials[block.trial].col(realT);
+      Eigen::VectorXs grf = init->grfTrials[block.trial].col(realT);
+      if (!equals(q, Eigen::VectorXs(block.pos.col(t)), 1e-10))
+      {
+        std::cout
+            << "Before unflatten(flatten()): Block pos doesn't match at t="
+            << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+            << std::endl;
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+        compare.col(0) = q;
+        compare.col(1) = block.pos.col(t);
+        compare.col(2) = q - block.pos.col(t);
+        std::cout << "Init - Block - Diff" << std::endl << compare << std::endl;
+        return false;
+      }
+
+      if (!equals(grf, Eigen::VectorXs(block.grf.col(t)), 1e-10))
+      {
+        std::cout
+            << "Before unflatten(flatten()): Block grf doesn't match at t="
+            << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+            << std::endl;
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+        compare.col(0) = grf;
+        compare.col(1) = block.grf.col(t);
+        compare.col(2) = grf - block.grf.col(t);
+        std::cout << "Init - Block - Diff" << std::endl << compare << std::endl;
+        return false;
+      }
+
+      if (realT > 0 && realT < init->poseTrials[block.trial].cols() - 1)
+      {
+        s_t dt = init->trialTimesteps[block.trial];
+        Eigen::VectorXs dq = (init->poseTrials[block.trial].col(realT)
+                              - init->poseTrials[block.trial].col(realT - 1))
+                             / dt;
+        Eigen::VectorXs ddq = (init->poseTrials[block.trial].col(realT + 1)
+                               - 2 * init->poseTrials[block.trial].col(realT)
+                               + init->poseTrials[block.trial].col(realT - 1))
+                              / (dt * dt);
+
+        if (!equals(dq, Eigen::VectorXs(block.vel.col(t)), 1e-10))
+        {
+          std::cout
+              << "Before unflatten(flatten()): Block vel doesn't match at t="
+              << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+              << std::endl;
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+          compare.col(0) = dq;
+          compare.col(1) = block.vel.col(t);
+          compare.col(2) = dq - block.vel.col(t);
+          std::cout << "Init - Block - Diff" << std::endl
+                    << compare << std::endl;
+          return false;
+        }
+
+        if (!equals(ddq, Eigen::VectorXs(block.acc.col(t)), 1e-10))
+        {
+          std::cout
+              << "Before unflatten(flatten()): Block acc doesn't match at t="
+              << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+              << std::endl;
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+          compare.col(0) = ddq;
+          compare.col(1) = block.acc.col(t);
+          compare.col(2) = ddq - block.acc.col(t);
+          std::cout << "Init - Block - Diff" << std::endl
+                    << compare << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+
   std::cout << "Residual norm: " << residualNorm << std::endl;
 
   Eigen::VectorXs originalMasses = skel->getLinkMasses();
@@ -1899,6 +1979,83 @@ bool testRelationshipBetweenResidualAndLinear(
   {
     std::cout << "Scales not preserved across flatten/unflatten!" << std::endl;
     return false;
+  }
+  for (int blockIdx = 0; blockIdx < problem.mBlocks.size(); blockIdx++)
+  {
+    auto& block = problem.mBlocks[blockIdx];
+    for (int t = 0; t < block.len; t++)
+    {
+      int realT = block.start + t;
+      Eigen::VectorXs q = init->poseTrials[block.trial].col(realT);
+      Eigen::VectorXs grf = init->grfTrials[block.trial].col(realT);
+      if (!equals(q, Eigen::VectorXs(block.pos.col(t)), 1e-10))
+      {
+        std::cout << "After unflatten(flatten()): Block pos doesn't match at t="
+                  << realT << " (block=" << blockIdx << ", t_in_block=" << t
+                  << ")" << std::endl;
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+        compare.col(0) = q;
+        compare.col(1) = block.pos.col(t);
+        compare.col(2) = q - block.pos.col(t);
+        std::cout << "Init - Block - Diff" << std::endl << compare << std::endl;
+        return false;
+      }
+
+      if (!equals(grf, Eigen::VectorXs(block.grf.col(t)), 1e-10))
+      {
+        std::cout << "After unflatten(flatten()): Block grf doesn't match at t="
+                  << realT << " (block=" << blockIdx << ", t_in_block=" << t
+                  << ")" << std::endl;
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+        compare.col(0) = grf;
+        compare.col(1) = block.grf.col(t);
+        compare.col(2) = grf - block.grf.col(t);
+        std::cout << "Init - Block - Diff" << std::endl << compare << std::endl;
+        return false;
+      }
+
+      if (realT > 0 && realT < init->poseTrials[block.trial].cols() - 1)
+      {
+        s_t dt = init->trialTimesteps[block.trial];
+        Eigen::VectorXs dq = (init->poseTrials[block.trial].col(realT)
+                              - init->poseTrials[block.trial].col(realT - 1))
+                             / dt;
+        Eigen::VectorXs ddq = (init->poseTrials[block.trial].col(realT + 1)
+                               - 2 * init->poseTrials[block.trial].col(realT)
+                               + init->poseTrials[block.trial].col(realT - 1))
+                              / (dt * dt);
+
+        if (!equals(dq, Eigen::VectorXs(block.vel.col(t)), 1e-10))
+        {
+          std::cout
+              << "After unflatten(flatten()): Block vel doesn't match at t="
+              << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+              << std::endl;
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+          compare.col(0) = dq;
+          compare.col(1) = block.vel.col(t);
+          compare.col(2) = dq - block.vel.col(t);
+          std::cout << "Init - Block - Diff" << std::endl
+                    << compare << std::endl;
+          return false;
+        }
+
+        if (!equals(ddq, Eigen::VectorXs(block.acc.col(t)), 1e-10))
+        {
+          std::cout
+              << "After unflatten(flatten()): Block acc doesn't match at t="
+              << realT << " (block=" << blockIdx << ", t_in_block=" << t << ")"
+              << std::endl;
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(q.size(), 3);
+          compare.col(0) = ddq;
+          compare.col(1) = block.acc.col(t);
+          compare.col(2) = ddq - block.acc.col(t);
+          std::cout << "Init - Block - Diff" << std::endl
+                    << compare << std::endl;
+          return false;
+        }
+      }
+    }
   }
 
   s_t problemLoss = problem.computeLoss(problem.flatten(), true);
@@ -2066,16 +2223,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   (void)successOnAllResiduals;
   fitter.setIterationLimit(350);
   fitter.setLBFGSHistoryLength(18);
-  fitter.runNewtonsMethod(
+  fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
           .setConstrainResidualsZero(successOnAllResiduals)
-          // .setIncludeMasses(true)
-          // .setIncludeCOMs(true)
-          // .setIncludeInertias(true)
-          // .setIncludeBodyScales(true)
-          // .setIncludeMarkerOffsets(true)
+          .setIncludeMasses(true)
+          .setIncludeCOMs(true)
+          .setIncludeInertias(true)
+          .setIncludeBodyScales(true)
+          .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
 
   // fitter.runIPOPTOptimization(
@@ -3995,7 +4152,7 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
       c3dFiles,
       trcFiles,
       grfFiles,
-      20);
+      12);
 
   std::vector<dynamics::BodyNode*> footNodes;
   footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
@@ -4008,7 +4165,8 @@ TEST(DynamicsFitter, FIT_PROBLEM_JAC)
   config.setIncludeMarkerOffsets(true);
   config.setIncludeMasses(true);
   config.setIncludePoses(true);
-  // config.setConstrainResidualsZero(true);
+  config.setConstrainResidualsZero(true);
+  config.setMaxBlockSize(5);
 
   DynamicsFitProblem problem(
       init, standard.skeleton, standard.trackingMarkers, config);

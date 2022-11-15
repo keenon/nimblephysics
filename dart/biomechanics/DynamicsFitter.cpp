@@ -2958,6 +2958,16 @@ DynamicsFitProblem::DynamicsFitProblem(
                            / (block.dt * block.dt);
       }
     }
+
+    // If this block starts the trial, we need to initialize the first timestep
+    // so that time integration will work for positions and velocities
+    if (block.start == 0)
+    {
+      block.vel.col(0) = mSkeleton->getPositionDifferences(
+                             block.pos.col(1), block.pos.col(0))
+                         / block.dt;
+      block.acc.col(0).setZero();
+    }
   }
 
   mResidualHelper
@@ -2974,10 +2984,7 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
 {
   std::vector<struct DynamicsFitProblemBlock> blocks;
 
-  int blockSize = 20;
-  // TODO: make block size, and sub-sampling trials all configurable from the
-  // config block
-  (void)config;
+  int blockSize = config.mMaxBlockSize;
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
@@ -3041,7 +3048,7 @@ int DynamicsFitProblem::getProblemSize()
     for (auto& block : mBlocks)
     {
       // Each block stores initial q, dq, and then every timestep's ddq
-      size += (2 * dofs) + block.len * dofs;
+      size += (2 + block.len) * dofs;
     }
   }
   return size;
@@ -4404,6 +4411,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
 
 #ifndef NDEBUG
   int cols = getProblemSize();
+  int rows = getConstraintSize();
 #endif
 
   std::vector<std::tuple<int, int, s_t>> result;
@@ -4474,6 +4482,12 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
         assert(colCursor <= cols);
         rowCursor += dofs * 2;
       }
+      else
+      {
+        // Even for unconstrained blocks, we still need to move the column
+        // cursor to account for them.
+        colCursor += (2 + block.len) * dofs;
+      }
     }
   }
 
@@ -4528,6 +4542,17 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
       for (int t = 0; t < block.len; t++)
       {
         int realT = block.start + t;
+
+        if (realT == 0 || realT >= mInit->poseTrials[block.trial].cols() - 1)
+        {
+          // Skip these timesteps, since they can't be enforced
+          timestepRows.push_back(rowCursor);
+          posJacs.push_back(Eigen::MatrixXs::Zero(6, dofs));
+          velJacs.push_back(Eigen::MatrixXs::Zero(6, dofs));
+          accJacs.push_back(Eigen::MatrixXs::Zero(6, dofs));
+          // IMPORTANT: DO NOT INCREMENT THE ROW CURSOR!!
+          continue;
+        }
 
         if (mInit->probablyMissingGRF[block.trial][realT])
         {
@@ -4632,6 +4657,7 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
         }
 
         rowCursor += 6;
+        assert(rowCursor <= rows);
       }
 
       if (mConfig.mIncludePoses)
@@ -4644,7 +4670,15 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
         for (int constraintTimestep = 0; constraintTimestep < block.len;
              constraintTimestep++)
         {
+          int realT = block.start + constraintTimestep;
+          if (realT == 0 || realT >= mInit->poseTrials[block.trial].cols() - 1)
+          {
+            // Skip these timesteps, since they can't be enforced
+            continue;
+          }
+
           int rowCursor = timestepRows[constraintTimestep];
+          assert(rowCursor + 6 <= rows);
 
           Eigen::MatrixXs initialPosJ = Eigen::MatrixXs::Zero(6, dofs);
           // Changes: Initial position -> constraint position
@@ -4714,9 +4748,9 @@ DynamicsFitProblem::computeSparseConstraintsJacobian()
             }
           }
         }
+        colCursor += (2 + block.len) * dofs;
       }
-
-      colCursor += (2 * block.len) * dofs;
+      assert(colCursor <= cols);
     }
   }
 
@@ -4950,7 +4984,8 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mRegularizeAnatomicalMarkerOffsets(0.0),
     mRegularizeImpliedDensity(0),
     mRegularizeBodyScales(0.0),
-    mRegularizePoses(0.0)
+    mRegularizePoses(0.0),
+    mMaxBlockSize(20)
 // mResidualWeight(0.1),
 // mLinearNewtonWeight(0.1),
 // mMarkerWeight(1.0),
@@ -5211,6 +5246,13 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeImpliedDensity(
     s_t value)
 {
   mRegularizeImpliedDensity = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxBlockSize(int value)
+{
+  mMaxBlockSize = value;
   return *(this);
 }
 
