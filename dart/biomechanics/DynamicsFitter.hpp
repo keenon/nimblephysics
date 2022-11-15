@@ -701,8 +701,6 @@ public:
   DynamicsFitProblemConfig& setRegularizeAnatomicalMarkerOffsets(s_t value);
   DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
 
-  DynamicsFitProblemConfig& setVelAccImplicit(bool implicit);
-
 public:
   friend class DynamicsFitProblem;
   friend class DynamicsFitter;
@@ -737,8 +735,30 @@ public:
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
   s_t mRegularizeImpliedDensity;
+};
 
-  bool mVelAccImplicit;
+/**
+ * This keeps track of a single "shot" in the DynamicsFitProblem. Keeping things
+ * this granular means that we can very tightly customize how we sub-sample the
+ * problem, so it's worth the extra book-keeping headache.
+ */
+struct DynamicsFitProblemBlock
+{
+  // These are configuration parameters about how the block maps onto the
+  // original trial
+  int trial;
+  int start;
+  int len;
+  bool constrainToNextBlock;
+
+  // These are the state values that get re-inflated when we unflatten(). When
+  // initializing the problem, leave these blank.
+  s_t dt;
+  Eigen::MatrixXs pos;
+  Eigen::MatrixXs vel;
+  Eigen::MatrixXs acc;
+  Eigen::MatrixXs grf;
+  friend class DynamicsFitProblem;
 };
 
 /*
@@ -753,7 +773,10 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       std::shared_ptr<dynamics::Skeleton> skeleton,
       std::vector<std::string> trackingMarkers,
-      std::vector<dynamics::BodyNode*> footNodes,
+      DynamicsFitProblemConfig config);
+
+  static std::vector<struct DynamicsFitProblemBlock> createBlocks(
+      std::shared_ptr<DynamicsInitialization> init,
       DynamicsFitProblemConfig config);
 
   // This returns the dimension of the decision variables (the length of the
@@ -811,10 +834,6 @@ public:
 
   // Print out the errors in a gradient vector in human readable form
   bool debugErrors(Eigen::VectorXs fd, Eigen::VectorXs analytical, s_t tol);
-
-  // This attempts to perfect the physical consistency of the data, and writes
-  // them back to the problem
-  void computePerfectGRFs();
 
   //------------------------- Ipopt::TNLP --------------------------------------
   /// \brief Method to return some info about the nlp
@@ -934,16 +953,12 @@ public:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   DynamicsFitProblemConfig mConfig;
 
-  std::vector<Eigen::MatrixXs> mPoses;
-  std::vector<Eigen::MatrixXs> mVels;
-  std::vector<Eigen::MatrixXs> mAccs;
+  std::vector<struct DynamicsFitProblemBlock> mBlocks;
 
   std::vector<std::string> mMarkerNames;
   std::vector<bool> mMarkerIsTracking;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
 
-  std::vector<dynamics::BodyNode*> mFootNodes;
-  std::vector<int> mForceBodyIndices;
   std::shared_ptr<ResidualForceHelper> mResidualHelper;
   std::shared_ptr<SpatialNewtonHelper> mSpatialNewtonHelper;
 
