@@ -1065,6 +1065,7 @@ class DARTView {
       }
       const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
       const path = new THREE.Line(pathGeometry, pathMaterial);
+      path.frustumCulled = false;
 
       this.objects.set(key, path);
       this.disposeHandlers.set(key, () => {

@@ -2111,7 +2111,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     if (successOnResiduals)
     {
       // For now, do nothing
-      // fitter.recalibrateForcePlates(init, trial);
+      fitter.recalibrateForcePlates(init, trial);
     }
     else
     {
@@ -2222,12 +2222,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // Re - run as L1
   (void)successOnAllResiduals;
   fitter.setIterationLimit(350);
-  fitter.setLBFGSHistoryLength(18);
+  fitter.setLBFGSHistoryLength(30);
   fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
-          .setConstrainResidualsZero(successOnAllResiduals)
+          .setConstrainResidualsZero(false)
           .setIncludeMasses(true)
           .setIncludeCOMs(true)
           .setIncludeInertias(true)
@@ -4702,7 +4702,7 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
       c3dFiles,
       trcFiles,
       grfFiles,
-      4,
+      -1,
       0,
       true);
 }

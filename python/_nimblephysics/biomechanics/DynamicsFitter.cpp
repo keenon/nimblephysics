@@ -358,9 +358,17 @@ protected:
               setConstrainResidualsZero,
           ::py::arg("constrain"))
       .def(
-          "setVelAccImplicit",
-          &dart::biomechanics::DynamicsFitProblemConfig::setVelAccImplicit,
-          ::py::arg("implicit"));
+          "setMaxNumTrials",
+          &dart::biomechanics::DynamicsFitProblemConfig::setMaxNumTrials,
+          ::py::arg("value"))
+      .def(
+          "setMaxNumTrials",
+          &dart::biomechanics::DynamicsFitProblemConfig::setOnlyOneTrial,
+          ::py::arg("value"))
+      .def(
+          "setMaxBlockSize",
+          &dart::biomechanics::DynamicsFitProblemConfig::setMaxBlockSize,
+          ::py::arg("value"));
   ;
 
   ::py::class_<
@@ -507,8 +515,13 @@ protected:
           ::py::arg("init"),
           ::py::arg("config"))
       .def(
-          "runSGDOptimization",
-          &dart::biomechanics::DynamicsFitter::runSGDOptimization,
+          "runConstrainedSGDOptimization",
+          &dart::biomechanics::DynamicsFitter::runConstrainedSGDOptimization,
+          ::py::arg("init"),
+          ::py::arg("config"))
+      .def(
+          "runUnconstrainedSGDOptimization",
+          &dart::biomechanics::DynamicsFitter::runUnconstrainedSGDOptimization,
           ::py::arg("init"),
           ::py::arg("config"))
       .def(

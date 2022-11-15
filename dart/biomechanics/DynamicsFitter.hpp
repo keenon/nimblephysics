@@ -702,6 +702,8 @@ public:
   DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
 
   DynamicsFitProblemConfig& setMaxBlockSize(int value);
+  DynamicsFitProblemConfig& setMaxNumTrials(int value);
+  DynamicsFitProblemConfig& setOnlyOneTrial(int value);
 
 public:
   friend class DynamicsFitProblem;
@@ -739,6 +741,8 @@ public:
   s_t mRegularizeImpliedDensity;
 
   int mMaxBlockSize;
+  int mMaxNumTrials;
+  int mOnlyOneTrial;
 };
 
 /**

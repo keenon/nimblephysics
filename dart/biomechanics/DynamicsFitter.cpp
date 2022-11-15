@@ -2985,9 +2985,16 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
   std::vector<struct DynamicsFitProblemBlock> blocks;
 
   int blockSize = config.mMaxBlockSize;
+  int maxNumTrials = config.mMaxNumTrials;
+  int onlyOneTrial = config.mOnlyOneTrial;
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    if (maxNumTrials > -1 && trial >= maxNumTrials)
+      continue;
+    if (onlyOneTrial > -1 && trial != onlyOneTrial)
+      continue;
+
     int cursor = 0;
     while (cursor < init->poseTrials[trial].cols())
     {
@@ -4985,7 +4992,9 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mRegularizeImpliedDensity(0),
     mRegularizeBodyScales(0.0),
     mRegularizePoses(0.0),
-    mMaxBlockSize(20)
+    mMaxBlockSize(20),
+    mMaxNumTrials(-1),
+    mOnlyOneTrial(-1)
 // mResidualWeight(0.1),
 // mLinearNewtonWeight(0.1),
 // mMarkerWeight(1.0),
@@ -5017,7 +5026,7 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   mMarkerWeight = 50;
   mResidualWeight = 0.01;
   mLinearNewtonWeight = 0.01;
-  mJointWeight = 1.0;
+  mJointWeight = 2e-2;
   mConstrainResidualsZero = false;
   mLinearNewtonUseL1 = true;
   mResidualUseL1 = true;
@@ -5253,6 +5262,20 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeImpliedDensity(
 DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxBlockSize(int value)
 {
   mMaxBlockSize = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxNumTrials(int value)
+{
+  mMaxNumTrials = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setOnlyOneTrial(int value)
+{
+  mOnlyOneTrial = value;
   return *(this);
 }
 
@@ -8342,7 +8365,8 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 // 1.2. Now that we've got zero residuals, after calling
 // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
 // miscalibration on the force plates, if there's consistent error on the
-// marker matches.
+// marker matches. This method treats the marker data as ground truth, and moves
+// the force plate and force data to more closely match the marker data.
 void DynamicsFitter::recalibrateForcePlates(
     std::shared_ptr<DynamicsInitialization> init, int trial, s_t maxMovement)
 {
@@ -8408,13 +8432,9 @@ void DynamicsFitter::recalibrateForcePlates(
   {
     init->poseTrials[trial].col(t).segment<3>(3) += shift;
   }
-  if (init->originalPoses.size() > trial)
-  {
-    for (int t = 0; t < init->originalPoses[trial].cols(); t++)
-    {
-      init->originalPoses[trial].col(t).segment<3>(3) += shift;
-    }
-  }
+
+  // DO NOT SHIFT: original poses, joints, etc, because that's all related to
+  // the marker data, which we're not moving.
 
   std::cout << "Trial " << trial
             << " adjusted force plate location (correcting for calibration "
