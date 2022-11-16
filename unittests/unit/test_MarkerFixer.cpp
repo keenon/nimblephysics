@@ -40,7 +40,7 @@ using namespace biomechanics;
 
 // #define ALL_TESTS
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFixer, SPRINTER_ARM_RIPPLE)
 {
   // Get the raw marker trajectory data
@@ -50,5 +50,55 @@ TEST(MarkerFixer, SPRINTER_ARM_RIPPLE)
   RippleReductionProblem problem(markerTrajectories.markerTimesteps);
   problem.smooth();
   problem.saveToGUI("LARM", "../../../javascript/src/data/movement2.bin");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFixer, FIX_SPRINT_MARKERS)
+{
+  // Get the raw marker trajectory data
+  OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/grf/Sprinter/MarkerData/JA1Gait35.trc");
+
+  auto report = MarkerFixer::generateDataErrorsReport(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
+  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  {
+    for (auto pair : timestep)
+    {
+      bool hasNan = pair.second.hasNaN();
+      if (hasNan)
+      {
+        EXPECT_FALSE(pair.second.hasNaN());
+        return;
+      }
+    }
+  }
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(MarkerFixer, FIX_CMU_MARKERS)
+{
+  // Get the raw marker trajectory data
+  auto markerTrajectories
+      = C3DLoader::loadC3D("dart://sample/c3d/cmu_02_05.c3d");
+
+  auto report = MarkerFixer::generateDataErrorsReport(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
+  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  {
+    for (auto pair : timestep)
+    {
+      bool hasNan = pair.second.hasNaN();
+      if (hasNan)
+      {
+        EXPECT_FALSE(pair.second.hasNaN());
+        return;
+      }
+    }
+  }
 }
 // #endif

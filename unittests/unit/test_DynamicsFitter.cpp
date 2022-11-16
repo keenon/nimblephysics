@@ -2221,7 +2221,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   // Re - run as L1
   (void)successOnAllResiduals;
-  fitter.setIterationLimit(350);
+  fitter.setIterationLimit(50);
   fitter.setLBFGSHistoryLength(30);
   fitter.runIPOPTOptimization(
       init,
@@ -2581,6 +2581,447 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       grfFiles,
       limitTrialLength,
       trialStartOffset);
+
+  if (simplify)
+  {
+    std::map<std::string, std::string> mergeBodiesInto;
+    std::shared_ptr<dynamics::Skeleton> simplified
+        = standard.skeleton->simplifySkeleton("simplified", mergeBodiesInto);
+    std::shared_ptr<DynamicsInitialization> simplifiedInit
+        = DynamicsFitter::retargetInitialization(
+            standard.skeleton, simplified, init);
+    return runEngine(simplified, simplifiedInit, saveGUI);
+  }
+  else
+  {
+    return runEngine(standard.skeleton, init, saveGUI);
+  }
+}
+
+std::pair<std::vector<MarkerInitialization>, OpenSimFile> runMarkerFitter(
+    std::string modelPath,
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+        markerObservationTrials,
+    std::vector<int> framesPerSecond,
+    std::vector<std::vector<ForcePlate>> forcePlates,
+    s_t massKg,
+    s_t heightM,
+    std::string sex,
+    bool saveGUI = false,
+    bool runGUI = false)
+{
+  (void)forcePlates;
+  (void)saveGUI;
+  (void)runGUI;
+
+  OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
+  standard.skeleton->zeroTranslationInCustomFunctions();
+  standard.skeleton->autogroupSymmetricSuffixes();
+  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  {
+    standard.skeleton->setScaleGroupUniformScaling(
+        standard.skeleton->getBodyNode("hand_r"));
+  }
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
+  standard.skeleton->setPositionLowerLimit(0, -M_PI);
+  standard.skeleton->setPositionUpperLimit(0, M_PI);
+  standard.skeleton->setPositionLowerLimit(1, -M_PI);
+  standard.skeleton->setPositionUpperLimit(1, M_PI);
+  standard.skeleton->setPositionLowerLimit(2, -M_PI);
+  standard.skeleton->setPositionUpperLimit(2, M_PI);
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerList;
+  for (auto& pair : standard.markersMap)
+  {
+    markerList.push_back(pair.second);
+  }
+  // Do some sanity checks
+  if (!verifySkeletonMarkerJacobians(standard.skeleton, markerList))
+    return std::make_pair(std::vector<MarkerInitialization>(), standard);
+  std::shared_ptr<dynamics::Skeleton> skelBallJoints
+      = standard.skeleton->convertSkeletonToBallJoints();
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> ballMarkerList;
+  for (auto& pair : standard.markersMap)
+  {
+    markerList.push_back(std::make_pair(
+        skelBallJoints->getBodyNode(pair.second.first->getName()),
+        pair.second.second));
+  }
+  if (!verifySkeletonMarkerJacobians(skelBallJoints, ballMarkerList))
+    return std::make_pair(std::vector<MarkerInitialization>(), standard);
+
+  // Create MarkerFitter
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+  fitter.setInitialIKSatisfactoryLoss(0.005);
+  fitter.setInitialIKMaxRestarts(50);
+  fitter.setIterationLimit(40); // TODO: revert back to 400
+  if (standard.anatomicalMarkers.size() > 10)
+  {
+    // If there are at least 10 tracking markers
+    std::cout << "Setting tracking markers based on OSIM model." << std::endl;
+    fitter.setTrackingMarkers(standard.trackingMarkers);
+  }
+  else
+  {
+    // Set all the triads to be tracking markers, instead of anatomical
+    std::cout << "WARNING!! Guessing tracking markers." << std::endl;
+    fitter.setTriadsToTracking();
+  }
+  // This is 1.0x the values in the default code
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
+  // This is 1.0x the default value
+  fitter.setRegularizeTrackingMarkerOffsets(0.05);
+  // These are 2x the values in the default code
+  // fitter.setMinSphereFitScore(3e-5 * 2)
+  // fitter.setMinAxisFitScore(6e-5 * 2)
+  fitter.setMinSphereFitScore(0.01);
+  fitter.setMinAxisFitScore(0.001);
+  // Default max joint weight is 0.5, so this is 2x the default value
+  fitter.setMaxJointWeight(1.0);
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  cols.push_back("Weightlbs");
+  cols.push_back("Heightin");
+  std::shared_ptr<MultivariateGaussian> gauss;
+  if (sex == "male")
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  else if (sex == "female")
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_FEMALE_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  else
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_BOTH_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  std::map<std::string, s_t> observedValues;
+  observedValues["Weightlbs"] = massKg * 2.204 * 0.001;
+  observedValues["Heightin"] = heightM * 39.37 * 0.001;
+  gauss = gauss->condition(observedValues);
+  anthropometrics->setDistribution(gauss);
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  std::vector<MarkersErrorReport> reports;
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    MarkersErrorReport report = fitter.generateDataErrorsReport(
+        markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
+    for (std::string& warning : report.warnings)
+    {
+      std::cout << "DATA WARNING: " << warning << std::endl;
+    }
+    markerObservationTrials[i] = report.markerObservationsAttemptedFixed;
+    reports.push_back(report);
+  }
+
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    if (!fitter.checkForEnoughMarkers(markerObservationTrials[i]))
+    {
+      std::cout << "Input files don't have enough markers that match the "
+                   "OpenSim model! Aborting."
+                << std::endl;
+      return std::make_pair(std::vector<MarkerInitialization>(), standard);
+    }
+  }
+
+  std::vector<MarkerInitialization> results
+      = fitter.runMultiTrialKinematicsPipeline(
+          markerObservationTrials,
+          InitialMarkerFitParams()
+              .setMaxTrialsToUseForMultiTrialScaling(5)
+              .setMaxTimestepsToUseForMultiTrialScaling(4000),
+          150);
+
+  bool anySwapped = false;
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    if (fitter.checkForFlippedMarkers(
+            markerObservationTrials[i], results[i], reports[i]))
+    {
+      anySwapped = true;
+      markerObservationTrials[i] = reports[i].markerObservationsAttemptedFixed;
+    }
+  }
+  if (anySwapped)
+  {
+    std::cout
+        << "******** Unfortunately, it looks like some markers were swapped in "
+           "the uploaded data, so we have to run the whole pipeline "
+           "again with unswapped markers. ********"
+        << std::endl;
+
+    results = fitter.runMultiTrialKinematicsPipeline(
+        markerObservationTrials,
+        InitialMarkerFitParams()
+            .setMaxTrialsToUseForMultiTrialScaling(5)
+            .setMaxTimestepsToUseForMultiTrialScaling(4000),
+        150);
+  }
+
+  for (int i = 0; i < reports.size(); i++)
+  {
+    std::cout << "Trial " << std::to_string(i) << std::endl;
+    for (std::string& warning : reports[i].warnings)
+    {
+      std::cout << "Warning: " << warning << std::endl;
+    }
+    for (std::string& info : reports[i].info)
+    {
+      std::cout << "Info: " << info << std::endl;
+    }
+  }
+
+  IKErrorReport finalKinematicsReport(
+      standard.skeleton,
+      results[0].updatedMarkerMap,
+      results[0].poses,
+      markerObservationTrials[0],
+      anthropometrics);
+
+  std::cout << "Final kinematic fit report:" << std::endl;
+  finalKinematicsReport.printReport(5);
+
+  std::cout << "Final marker locations: " << std::endl;
+  for (auto& pair : results[0].updatedMarkerMap)
+  {
+    Eigen::Vector3s offset = pair.second.second;
+    std::cout << pair.first << ": " << pair.second.first->getName() << ", "
+              << offset(0) << " " << offset(1) << " " << offset(2) << std::endl;
+  }
+
+  /*
+  std::cout << "Saving marker error report" << std::endl;
+  finalKinematicsReport.saveCSVMarkerErrorReport(
+      "./_ik_per_marker_error_report.csv");
+  std::vector<std::vector<s_t>> timestamps;
+  for (int i = 0; i < results.size(); i++)
+  {
+    timestamps.emplace_back();
+    for (int t = 0; t < results[i].poses.cols(); t++)
+    {
+      timestamps[i].push_back((s_t)t * (1.0 / framesPerSecond[i]));
+    }
+  }
+  for (int i = 0; i < results.size(); i++)
+  {
+    std::cout << "Saving IK Mot " << i << std::endl;
+    OpenSimParser::saveMot(
+        standard.skeleton,
+        "./_ik" + std::to_string(i) + ".mot",
+        timestamps[i],
+        results[i].poses);
+    std::cout << "Saving GRF Mot " << i << std::endl;
+    OpenSimParser::saveGRFMot(
+        "./_grf" + std::to_string(i) + ".mot", timestamps[i], forcePlates[i]);
+    std::cout << "Saving TRC " << i << std::endl;
+    std::cout << "timestamps[i]: " << timestamps[i].size() << std::endl;
+    std::cout << "markerObservationTrials[i]: "
+              << markerObservationTrials[i].size() << std::endl;
+    OpenSimParser::saveTRC(
+        "./_markers" + std::to_string(i) + ".trc",
+        timestamps[i],
+        markerObservationTrials[i]);
+  }
+  std::vector<std::string> markerNames;
+  for (auto& pair : standard.markersMap)
+  {
+    markerNames.push_back(pair.first);
+  }
+  std::cout << "Saving OpenSim IK XML" << std::endl;
+  OpenSimParser::saveOsimInverseKinematicsXMLFile(
+      "trial",
+      markerNames,
+      "Models/optimized_scale_and_markers.osim",
+      "./test.trc",
+      "_ik_by_opensim.mot",
+      "./_ik_setup.xml");
+  // TODO: remove me
+  for (int i = 0; i < results.size(); i++)
+  {
+    std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
+    OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+        "test_name",
+        standard.skeleton,
+        results[i].poses,
+        forcePlates[i],
+        "name_grf.mot",
+        "./_external_forces.xml");
+  }
+  std::cout << "Saving OpenSim ID XML" << std::endl;
+  OpenSimParser::saveOsimInverseDynamicsXMLFile(
+      "trial",
+      "Models/optimized_scale_and_markers.osim",
+      "./_ik.mot",
+      "./_external_forces.xml",
+      "_id.sto",
+      "_id_body_forces.sto",
+      "./_id_setup.xml");
+
+  if (saveGUI)
+  {
+    std::cout << "Saving trajectory..." << std::endl;
+    std::cout << "FPS: " << framesPerSecond[0] << std::endl;
+    std::cout << "Force plates len: " << forcePlates.size() << std::endl;
+    fitter.saveTrajectoryAndMarkersToGUI(
+        "../../../javascript/src/data/movement2.bin",
+        results[0],
+        markerObservationTrials[0],
+        framesPerSecond[0],
+        forcePlates[0]);
+  }
+
+  if (runGUI)
+  {
+    // Target markers
+    std::shared_ptr<server::GUIWebsocketServer> server
+        = std::make_shared<server::GUIWebsocketServer>();
+    server->serve(8070);
+    // , &scaled, goldPoses
+    fitter.debugTrajectoryAndMarkersToGUI(
+        server, results[0], markerObservationTrials[0], forcePlates[0]);
+    server->blockWhileServing();
+  }
+  */
+
+  return std::make_pair(results, standard);
+}
+
+std::shared_ptr<DynamicsInitialization> runEndToEnd(
+    std::string modelPath,
+    std::vector<std::string> footNames,
+    std::vector<std::string> c3dFiles,
+    std::vector<std::string> trcFiles,
+    std::vector<std::string> grfFiles,
+    int limitTrialSizes = -1,
+    int trialStartOffset = 0,
+    bool saveGUI = false,
+    bool simplify = false)
+{
+  std::vector<C3D> c3ds;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      markerObservationTrials;
+  std::vector<int> framesPerSecond;
+  std::vector<std::vector<ForcePlate>> forcePlateTrials;
+
+  for (std::string& path : c3dFiles)
+  {
+    C3D c3d = C3DLoader::loadC3D(path);
+    c3ds.push_back(c3d);
+    markerObservationTrials.push_back(c3d.markerTimesteps);
+    forcePlateTrials.push_back(c3d.forcePlates);
+    framesPerSecond.push_back(c3d.framesPerSecond);
+  }
+
+  for (int i = 0; i < trcFiles.size(); i++)
+  {
+    OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[i]);
+    framesPerSecond.push_back(trc.framesPerSecond);
+    markerObservationTrials.push_back(trc.markerTimesteps);
+
+    if (i < grfFiles.size())
+    {
+      std::vector<ForcePlate> grf
+          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+      forcePlateTrials.push_back(grf);
+    }
+    else
+    {
+      forcePlateTrials.emplace_back();
+    }
+  }
+
+  // This code trims all the timesteps down, if we asked for that
+  if (limitTrialSizes > 0 || trialStartOffset > 0)
+  {
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+        trimmedMarkerObservationTrials;
+    std::vector<std::vector<ForcePlate>> trimmedForcePlateTrials;
+
+    for (int trial = 0; trial < markerObservationTrials.size(); trial++)
+    {
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerSubset;
+      for (int t = trialStartOffset; t < trialStartOffset + limitTrialSizes;
+           t++)
+      {
+        markerSubset.push_back(markerObservationTrials[trial][t]);
+      }
+      trimmedMarkerObservationTrials.push_back(markerSubset);
+
+      std::vector<ForcePlate> trimmedPlates;
+      for (int i = 0; i < forcePlateTrials[trial].size(); i++)
+      {
+        ForcePlate& toCopy = forcePlateTrials[trial][i];
+        ForcePlate trimmedPlate;
+
+        trimmedPlate.corners = toCopy.corners;
+        trimmedPlate.worldOrigin = toCopy.worldOrigin;
+
+        for (int t = trialStartOffset; t < trialStartOffset + limitTrialSizes;
+             t++)
+        {
+          trimmedPlate.centersOfPressure.push_back(toCopy.centersOfPressure[t]);
+          trimmedPlate.forces.push_back(toCopy.forces[t]);
+          trimmedPlate.moments.push_back(toCopy.moments[t]);
+        }
+
+        trimmedPlates.push_back(trimmedPlate);
+      }
+      trimmedForcePlateTrials.push_back(trimmedPlates);
+    }
+
+    markerObservationTrials = trimmedMarkerObservationTrials;
+    forcePlateTrials = trimmedForcePlateTrials;
+  }
+
+  auto kinematicResults = runMarkerFitter(
+      modelPath,
+      markerObservationTrials,
+      framesPerSecond,
+      forcePlateTrials,
+      68,
+      1.65,
+      "unknown");
+
+  OpenSimFile standard = kinematicResults.second;
+  standard.skeleton->setGroupScales(kinematicResults.first[0].groupScales);
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  for (std::string& name : footNames)
+  {
+    footNodes.push_back(standard.skeleton->getBodyNode(name));
+  }
+
+  std::vector<MarkerInitialization> kinematicInits = kinematicResults.first;
+
+  std::shared_ptr<DynamicsInitialization> init
+      = DynamicsFitter::createInitialization(
+          standard.skeleton,
+          kinematicInits,
+          standard.trackingMarkers,
+          footNodes,
+          forcePlateTrials,
+          framesPerSecond,
+          markerObservationTrials);
+
+  DynamicsFitter dynamicsFitter(
+      standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
+  dynamicsFitter.estimateFootGroundContacts(init);
 
   if (simplify)
   {
@@ -4704,6 +5145,36 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER_WITH_SPINE)
       grfFiles,
       -1,
       0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  trcFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/grf/SprinterWithSpine/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20,
+      87,
       true);
 }
 #endif

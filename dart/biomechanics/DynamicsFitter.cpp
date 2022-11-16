@@ -6844,9 +6844,9 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     trialOriginalAccOffsets.push_back(accOffset);
   }
 
-  for (s_t threshold = 0.01; threshold > 1e-6; threshold *= 0.5)
+  for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
   {
-    Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
+    const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeUnobservedTimesteps = 1.0;
 
     const s_t originalMass = mSkeleton->getMass();
@@ -7004,6 +7004,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                 / (dt * dt);
         }
       }
+      // TODO: these don't match up when we're creating a DynamicsInit from the
+      // result of a marker fitter pass. Why not I wonder?
       Eigen::VectorXs thisOffset
           = comGravityOffset
             + (1.0 / mSkeleton->getMass())
@@ -7624,6 +7626,16 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         countedSteps++;
       }
     }
+  }
+  if (countedSteps == 0)
+  {
+    std::cout
+        << "Attempting to zero linear and minimize angular residuals for trial "
+        << trial
+        << ", but we don't have any timesteps remaining with GRF data (that "
+           "haven't been filtered out by previous heuristics). Returning."
+        << std::endl;
+    return;
   }
   totalResidual /= countedSteps;
   std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
@@ -11306,7 +11318,6 @@ void DynamicsFitter::saveDynamicsToGUI(
 
     for (int i = 0; i < forcePlates.size(); i++)
     {
-      server.deleteObject("force_" + std::to_string(i));
       if (forcePlates[i].forces[timestep].squaredNorm() > 0)
       {
         std::vector<Eigen::Vector3s> forcePoints;
@@ -11320,11 +11331,14 @@ void DynamicsFitter::saveDynamicsToGUI(
             forcePlateLayerColor,
             forcePlateLayerName);
       }
+      else
+      {
+        server.deleteObject("force_" + std::to_string(i));
+      }
     }
 
     for (int i = 0; i < perfectForcePlates.size(); i++)
     {
-      server.deleteObject("perfect_force_" + std::to_string(i));
       if (perfectForcePlates[i].forces[timestep].squaredNorm() > 0)
       {
         std::vector<Eigen::Vector3s> forcePoints;
@@ -11338,6 +11352,10 @@ void DynamicsFitter::saveDynamicsToGUI(
             forcePoints,
             perfectForcePlateLayerColor,
             perfectForcePlateLayerName);
+      }
+      else
+      {
+        server.deleteObject("perfect_force_" + std::to_string(i));
       }
     }
 

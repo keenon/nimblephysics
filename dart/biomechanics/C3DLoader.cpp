@@ -81,11 +81,19 @@ s_t C3D::getWeightedDistFromCoPToNearestMarker()
       {
         s_t weight = plate.forces[i].norm();
 
+        assert(!isnan(minDist));
         dist += minDist * weight;
         totalWeight += weight;
       }
     }
   }
+
+  if (totalWeight == 0)
+    return 0.0;
+
+  assert(!isnan(dist));
+  assert(!isnan(totalWeight));
+  assert(totalWeight > 0);
 
   return dist / totalWeight;
 }
@@ -95,6 +103,13 @@ C3D C3DLoader::loadC3D(const std::string& uri)
 {
   C3D bestResult = loadC3DWithGRFConvention(uri, 0);
   s_t bestResultRMS = bestResult.getWeightedDistFromCoPToNearestMarker();
+
+  // If there are no GRF's, no need to try multiple conventions
+  if (bestResultRMS == 0)
+  {
+    return bestResult;
+  }
+
   for (int i = 1; i < biomechanics::FORCE_PLATFORM_NUM_CONVENTIONS; i++)
   {
     C3D competingConvention = loadC3DWithGRFConvention(uri, i);

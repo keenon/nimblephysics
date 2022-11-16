@@ -1278,11 +1278,12 @@ void GUIStateMachine::deleteObject(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  // This is a no-op if the object does not exist.
-  if (!hasObject(key))
-  {
-    return;
-  }
+  // We actually want to delete objects even if they don't currently exist,
+  // because people may skip frames in the visualizer and we want to properly
+  // clean up. if (!hasObject(key))
+  // {
+  //   return;
+  // }
 
   mBoxes.erase(key);
   mSpheres.erase(key);
