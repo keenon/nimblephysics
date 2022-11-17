@@ -3045,6 +3045,13 @@ DynamicsFitProblem::DynamicsFitProblem(
   mSpatialNewtonHelper = std::make_shared<SpatialNewtonHelper>(mSkeleton);
 
   mInitX = flatten();
+
+  mLastX = mInitX;
+  std::cout << "Getting initial loss:" << std::endl;
+  s_t initialLoss = computeLoss(mInitX, true);
+  std::cout << "Got initial loss:" << initialLoss << std::endl;
+  mBestObjectiveValue = initialLoss;
+  mBestObjectiveValueIteration = -1;
 }
 
 //==============================================================================
@@ -4455,6 +4462,56 @@ Eigen::VectorXs DynamicsFitProblem::computeConstraints(Eigen::VectorXs x)
   return Eigen::VectorXs::Zero(0);
 }
 
+// Gets a vector of upper bounds for the constraints. To have a constrant be
+// equal to 0, just set both upper and lower bounds to 0.
+Eigen::VectorXs DynamicsFitProblem::getConstraintUpperBounds()
+{
+  int dim = getConstraintSize();
+  Eigen::VectorXs bounds = Eigen::VectorXs::Zero(dim);
+
+  int dofs = mSkeleton->getNumDofs();
+  int cursor = 0;
+  if (mConfig.mIncludePoses)
+  {
+    for (int blockIdx = 0; blockIdx < mBlocks.size(); blockIdx++)
+    {
+      auto& block = mBlocks[blockIdx];
+      if (block.constrainToNextBlock)
+      {
+        // Compare to the next block
+        cursor += dofs;
+        cursor += dofs;
+      }
+    }
+  }
+  if (mConfig.mConstrainResidualsZero)
+  {
+    for (auto& block : mBlocks)
+    {
+      for (int t = 0; t < block.len; t++)
+      {
+        int realT = block.start + t;
+        if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1)
+        {
+          bounds.segment<3>(cursor).setConstant(
+              mConfig.mConstrainAngularResiduals);
+          bounds.segment<3>(cursor + 3)
+              .setConstant(mConfig.mConstrainLinearResiduals);
+          cursor += 6;
+        }
+      }
+    }
+  }
+  return bounds;
+}
+
+// Gets a vector of lower bounds for the constraints. To have a constrant be
+// equal to 0, just set both upper and lower bounds to 0.
+Eigen::VectorXs DynamicsFitProblem::getConstraintLowerBounds()
+{
+  return -1 * getConstraintUpperBounds();
+}
+
 // This gets the sparse version of the constraints jacobian, returning objects
 // with (row,col,value).
 std::vector<std::tuple<int, int, s_t>>
@@ -5329,6 +5386,22 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setRegularizeImpliedDensity(
 }
 
 //==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setConstrainLinearResiduals(
+    s_t value)
+{
+  mConstrainLinearResiduals = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setConstrainAngularResiduals(s_t value)
+{
+  mConstrainAngularResiduals = value;
+  return *(this);
+}
+
+//==============================================================================
 DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxBlockSize(int value)
 {
   mMaxBlockSize = value;
@@ -5399,9 +5472,9 @@ bool DynamicsFitProblem::get_bounds_info(
 
   // Our constraint function has to be 0
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
-  constraintUpperBounds.setZero();
+  constraintUpperBounds = getConstraintUpperBounds();
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
-  constraintLowerBounds.setZero();
+  constraintLowerBounds = getConstraintLowerBounds();
 
   return true;
 }

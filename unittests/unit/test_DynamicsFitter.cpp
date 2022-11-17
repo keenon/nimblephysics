@@ -2156,7 +2156,6 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   if (!testRelationshipBetweenResidualAndLinear(skel, init))
   {
     std::cout << "The residual norm doesn't map!" << std::endl;
-    // TODO: Re-enable me
     return init;
   }
 
@@ -2257,7 +2256,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
-          .setConstrainResidualsZero(false)
+          .setConstrainResidualsZero(successOnAllResiduals)
+          .setConstrainLinearResiduals(0.1)
+          .setConstrainAngularResiduals(1.0)
           .setIncludeMasses(true)
           .setIncludeCOMs(true)
           .setIncludeInertias(true)

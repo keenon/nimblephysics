@@ -353,6 +353,16 @@ protected:
               setRegularizeImpliedDensity,
           ::py::arg("value"))
       .def(
+          "setConstrainLinearResiduals",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setConstrainLinearResiduals,
+          ::py::arg("value"))
+      .def(
+          "setConstrainAngularResiduals",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setConstrainAngularResiduals,
+          ::py::arg("value"))
+      .def(
           "setConstrainResidualsZero",
           &dart::biomechanics::DynamicsFitProblemConfig::
               setConstrainResidualsZero,

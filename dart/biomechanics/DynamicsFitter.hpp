@@ -702,6 +702,9 @@ public:
   DynamicsFitProblemConfig& setRegularizeAnatomicalMarkerOffsets(s_t value);
   DynamicsFitProblemConfig& setRegularizeImpliedDensity(s_t value);
 
+  DynamicsFitProblemConfig& setConstrainLinearResiduals(s_t value);
+  DynamicsFitProblemConfig& setConstrainAngularResiduals(s_t value);
+
   DynamicsFitProblemConfig& setMaxBlockSize(int value);
   DynamicsFitProblemConfig& setMaxNumTrials(int value);
   DynamicsFitProblemConfig& setOnlyOneTrial(int value);
@@ -740,6 +743,9 @@ public:
   s_t mRegularizeTrackingMarkerOffsets;
   s_t mRegularizeAnatomicalMarkerOffsets;
   s_t mRegularizeImpliedDensity;
+
+  s_t mConstrainLinearResiduals;
+  s_t mConstrainAngularResiduals;
 
   int mMaxBlockSize;
   int mMaxNumTrials;
@@ -825,6 +831,14 @@ public:
   // just enforce that finite differencing is valid to relate velocity,
   // acceleration, and position.
   Eigen::VectorXs computeConstraints(Eigen::VectorXs x);
+
+  // Gets a vector of upper bounds for the constraints. To have a constrant be
+  // equal to 0, just set both upper and lower bounds to 0.
+  Eigen::VectorXs getConstraintUpperBounds();
+
+  // Gets a vector of lower bounds for the constraints. To have a constrant be
+  // equal to 0, just set both upper and lower bounds to 0.
+  Eigen::VectorXs getConstraintLowerBounds();
 
   // This gets the sparse version of the constraints jacobian, returning objects
   // with (row,col,value).
