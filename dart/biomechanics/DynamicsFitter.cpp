@@ -1593,7 +1593,7 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
-    bool includeResidualAccs)
+    bool includeAllResidualAccs)
 {
   (void)qs;
   (void)dqs;
@@ -1603,20 +1603,33 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
   const int numTimesteps = qs.cols();
   const s_t dt = mSkel->getTimeStep();
 
+  int numMissing = 0;
+  for (int t = 1; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+      numMissing++;
+  }
+
+  int residualSize = (includeAllResidualAccs ? qs.cols() : numMissing) * 6;
+  std::cout << "From linear system: Num missing GRF steps = " << numMissing
+            << std::endl;
+
   Eigen::VectorXs b = getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s::Zero(),
       Eigen::Vector6s::Zero(),
-      Eigen::VectorXs::Zero(qs.cols() * 6),
+      Eigen::VectorXs::Zero(residualSize),
       qs,
       dqs,
       ddqs,
       forces,
-      probablyMissingGRF);
-  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(
-      numTimesteps * 6, 12 + (includeResidualAccs ? (numTimesteps * 6) : 0));
+      probablyMissingGRF,
+      includeAllResidualAccs);
+  Eigen::MatrixXs A
+      = Eigen::MatrixXs::Zero(numTimesteps * 6, 12 + residualSize);
 
   A.block<6, 6>(0, 0) = Eigen::Matrix6s::Identity();
 
+  int missingCursor = 0;
   for (int t = 1; t < numTimesteps; t++)
   {
     // Offset position linearly effects all output positions, and velocity does
@@ -1631,10 +1644,27 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     A.block<6, 6>(t * 6, 0) += dOffsetPos_dInputPos;
     A.block<6, 6>(t * 6, 6) += dOffsetPos_dInputVel;
 
-    // GOHERE
+    const Eigen::Matrix6s dAcc_dResidualAcc = Eigen::Matrix6s::Identity();
 
     if (probablyMissingGRF.size() > t && probablyMissingGRF[t])
     {
+      // Always enable residuals on all missing GRF timesteps
+      for (int downstream = 1; downstream < numTimesteps - t; downstream++)
+      {
+        int later = t + downstream;
+        int compoundingSteps = downstream; // semi-implicit euler
+        if (includeAllResidualAccs)
+        {
+          A.block<6, 6>(later * 6, 12 + (t * 6))
+              += compoundingSteps * dt * dt * dAcc_dResidualAcc;
+        }
+        else if (probablyMissingGRF[t])
+        {
+          A.block<6, 6>(later * 6, 12 + (missingCursor * 6))
+              += compoundingSteps * dt * dt * dAcc_dResidualAcc;
+        }
+      }
+      missingCursor++;
       continue;
     }
 
@@ -1657,8 +1687,6 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
         = (dAcc_dOffsetPos * dOffsetPos_dInputVel)
           + (dAcc_dOffsetVel); // technically: dAcc_dOffsetVel *
                                // dOffsetVel_dInputVel
-
-    const Eigen::Matrix6s dAcc_dResidualAcc = Eigen::Matrix6s::Identity();
 
     // currentPos = qs.col(1).head<6>() + initialPosOffset + initialVelOffset *
     // dt;
@@ -1685,7 +1713,7 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
           += compoundingSteps * dt * dt * dAcc_dInputPos;
       A.block<6, 6>(later * 6, 6)
           += compoundingSteps * dt * dt * dAcc_dInputVel;
-      if (includeResidualAccs)
+      if (includeAllResidualAccs)
       {
         A.block<6, 6>(later * 6, 12 + (t * 6))
             += compoundingSteps * dt * dt * dAcc_dResidualAcc;
@@ -1707,24 +1735,34 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
-    bool includeResidualAccs)
+    bool includeAllResidualAccs)
 {
   (void)qs;
   (void)dqs;
   (void)ddqs;
   (void)forces;
 
+  int numMissing = 0;
+  for (int t = 1; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+      numMissing++;
+  }
+
+  int residualSize = (includeAllResidualAccs ? qs.cols() : numMissing) * 6;
+
   Eigen::VectorXs zeroPoint = getRootTrajectoryLinearSystemTestOutput(
       Eigen::Vector6s::Zero(),
       Eigen::Vector6s::Zero(),
-      Eigen::VectorXs::Zero(qs.cols() * 6),
+      Eigen::VectorXs::Zero(residualSize),
       qs,
       dqs,
       ddqs,
       forces,
-      probablyMissingGRF);
-  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(
-      zeroPoint.size(), 12 + (includeResidualAccs ? (dqs.cols() * 6) : 0));
+      probablyMissingGRF,
+      includeAllResidualAccs);
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(zeroPoint.size(), 12 + residualSize);
 
   const bool useRidders = true;
   s_t eps = useRidders ? 0.01 : 1e-6;
@@ -1737,36 +1775,39 @@ ResidualForceHelper::finiteDifferenceRootTrajectoryLinearSystem(
           perturbed = getRootTrajectoryLinearSystemTestOutput(
               Eigen::Vector6s::Unit(dof) * eps,
               Eigen::Vector6s::Zero(),
-              Eigen::VectorXs::Zero(qs.cols() * 6),
+              Eigen::VectorXs::Zero(residualSize),
               qs,
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              includeAllResidualAccs);
         }
         else if (dof < 12)
         {
           perturbed = getRootTrajectoryLinearSystemTestOutput(
               Eigen::Vector6s::Zero(),
               Eigen::Vector6s::Unit(dof - 6) * eps,
-              Eigen::VectorXs::Zero(qs.cols() * 6),
+              Eigen::VectorXs::Zero(residualSize),
               qs,
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              includeAllResidualAccs);
         }
         else
         {
           perturbed = getRootTrajectoryLinearSystemTestOutput(
               Eigen::Vector6s::Zero(),
               Eigen::Vector6s::Zero(),
-              Eigen::VectorXs::Unit(qs.cols() * 6, dof - 12) * eps,
+              Eigen::VectorXs::Unit(residualSize, dof - 12) * eps,
               qs,
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              includeAllResidualAccs);
         }
         return true;
       },
@@ -1797,7 +1838,8 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
-    std::vector<bool> probablyMissingGRF)
+    std::vector<bool> probablyMissingGRF,
+    bool includeAllResidualAccs)
 {
   (void)initialPosOffset;
   (void)initialVelOffset;
@@ -1811,6 +1853,7 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
   const s_t dt = mSkel->getTimeStep();
 
   std::vector<Eigen::Vector6s> accelerations;
+  int missingTimestepCursor = 0;
   for (int i = 0; i < numTimesteps; i++)
   {
     Eigen::VectorXs offsetPos = qs.col(i);
@@ -1820,15 +1863,41 @@ Eigen::VectorXs ResidualForceHelper::getRootTrajectoryLinearSystemTestOutput(
 
     if (probablyMissingGRF.size() > i && probablyMissingGRF[i])
     {
-      accelerations.push_back(
-          ddqs.col(i).head<6>() + residualAccelerations.segment<6>(i * 6));
+      if (includeAllResidualAccs)
+      {
+        accelerations.push_back(
+            ddqs.col(i).head<6>() + residualAccelerations.segment<6>(i * 6));
+      }
+      else
+      {
+        // We don't count residuals at the 0'th timestep
+        if (i > 0)
+        {
+          Eigen::Vector6s residualAcc
+              = residualAccelerations.segment<6>(missingTimestepCursor * 6);
+          accelerations.push_back(ddqs.col(i).head<6>() + residualAcc);
+          missingTimestepCursor++;
+        }
+        else
+        {
+          accelerations.push_back(ddqs.col(i).head<6>());
+        }
+      }
     }
     else
     {
-      accelerations.push_back(
-          calculateResidualFreeRootAcceleration(
-              offsetPos, offsetVel, ddqs.col(i), forces.col(i))
-          + residualAccelerations.segment<6>(i * 6));
+      if (includeAllResidualAccs)
+      {
+        accelerations.push_back(
+            calculateResidualFreeRootAcceleration(
+                offsetPos, offsetVel, ddqs.col(i), forces.col(i))
+            + residualAccelerations.segment<6>(i * 6));
+      }
+      else
+      {
+        accelerations.push_back(calculateResidualFreeRootAcceleration(
+            offsetPos, offsetVel, ddqs.col(i), forces.col(i)));
+      }
     }
   }
 
@@ -1876,7 +1945,8 @@ Eigen::MatrixXs ResidualForceHelper::getRootTrajectoryLinearSystemPoses(
           dqs,
           ddqs,
           forces,
-          probablyMissingGRF);
+          probablyMissingGRF,
+          true);
   Eigen::MatrixXs newQs = qs;
   for (int t = 0; t < newQs.cols(); t++)
   {
@@ -6519,6 +6589,39 @@ void DynamicsFitter::estimateFootGroundContacts(
       trialAnyOffForcePlate.push_back(anyContactIsSus);
     }
 
+    // Smooth out any GRF contact blips that are shorter than `blipFilterLen`
+    int blipFilterLen = 10;
+    for (int t = 1; t < trialAnyOffForcePlate.size(); t++)
+    {
+      if (trialAnyOffForcePlate[t - 1] && !trialAnyOffForcePlate[t])
+      {
+        bool isBlip = false;
+        for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
+        {
+          int scanT = t + scanForward;
+          if (scanT < trialAnyOffForcePlate.size())
+          {
+            if (trialAnyOffForcePlate[scanT])
+            {
+              isBlip = true;
+              break;
+            }
+          }
+        }
+        if (isBlip)
+        {
+          for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
+          {
+            int scanT = t + scanForward;
+            if (scanT < trialAnyOffForcePlate.size())
+            {
+              trialAnyOffForcePlate[scanT] = true;
+            }
+          }
+        }
+      }
+    }
+
     init->grfBodyForceActive.push_back(trialForceActive);
     init->grfBodySphereInContact.push_back(trialSphereInContact);
     init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
@@ -6538,6 +6641,10 @@ void DynamicsFitter::smoothAccelerations(
     // 0.05
     AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.05);
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
+
+    // Controversial: Smooth the original poses, too, so we're not regularizing
+    // our positions back to something jittery later
+    init->originalPoses[trial] = init->poseTrials[trial];
   }
   std::cout << "All jitter in joint accelerations smoothed!" << std::endl;
 }
@@ -6847,7 +6954,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
   for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
   {
     const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
-    s_t regularizeUnobservedTimesteps = 1.0;
+    // s_t regularizeUnobservedTimesteps = 1.0;
+    s_t regularizeUnobservedTimesteps = 0.1;
 
     const s_t originalMass = mSkeleton->getMass();
 
@@ -7616,7 +7724,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       }
       else
       {
-        totalResidual = helper.calculateResidualNorm(
+        totalResidual += helper.calculateResidualNorm(
             q.col(t),
             dq.col(t),
             ddq.col(t),
@@ -7627,6 +7735,10 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       }
     }
   }
+  // Extend to initial position and velocity
+  dq.col(0) = dq.col(1);
+  ddq.col(0).setZero();
+
   if (countedSteps == 0)
   {
     std::cout
@@ -7652,10 +7764,10 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     int numTimesteps = q.cols();
 
-    std::cout << "Building linear system for optimizing linear + angular "
-                 "motion for "
-              << numTimesteps << " timesteps with " << numMissing
-              << " timesteps with unmeasured external force" << std::endl;
+    // std::cout << "Building linear system for optimizing linear + angular "
+    //              "motion for "
+    //           << numTimesteps << " timesteps with " << numMissing
+    //           << " timesteps with unmeasured external force" << std::endl;
     std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
         = helper.getLinearTrajectoryLinearSystem(
             dt,
@@ -7679,9 +7791,10 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     int numRows = (indices.size() * 3) + (indices.size() * 3) + (numMissing * 3)
                   + (numMissing * 3);
 
-    std::cout
-        << "Sub-sampling linear system for optimizing linear + angular motion"
-        << std::endl;
+    // std::cout
+    //     << "Sub-sampling linear system for optimizing linear + angular
+    //     motion"
+    //     << std::endl;
     Eigen::MatrixXs sampledA
         = Eigen::MatrixXs::Zero(numRows, linearSystem.first.cols());
     Eigen::VectorXs sampledB = Eigen::VectorXs::Zero(numRows);
@@ -7733,8 +7846,9 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
           = regularizeResiduals;
     }
 
-    std::cout << "Solving linear system for optimizing linear + angular motion"
-              << std::endl;
+    // std::cout << "Solving linear system for optimizing linear + angular
+    // motion"
+    //           << std::endl;
     // Solve the system
     Eigen::VectorXs solution
         = sampledA.householderQr().solve(sampledTarget - sampledB);
@@ -7742,7 +7856,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     Eigen::VectorXs recovered
         = (linearSystem.first * solution) + linearSystem.second;
 
-    std::cout << "Decoding optimized linear + angular motion" << std::endl;
+    // std::cout << "Decoding optimized linear + angular motion" << std::endl;
 
     // Measure the total change
     s_t totalPosChange = 0.0;
@@ -7806,8 +7920,15 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
-    s_t satisfactoryThreshold)
+    s_t satisfactoryThreshold,
+    int numIters,
+    s_t missingResidualRegularization,
+    s_t weightAngular,
+    s_t weightLastFewTimesteps,
+    s_t offsetRegularization,
+    bool regularizeResiduals)
 {
+
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
   mSkeleton->setTimeStep(init->trialTimesteps[trial]);
@@ -7886,7 +8007,6 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       q.col(t) = init->poseTrials[trial].col(t + cursor);
     }
 
-    const int numIters = 600;
     s_t residualAccRegularization = 1000.0;
     // s_t residualAccRegularization = dt * dt * 0.5;
     s_t lastResidualCost = std::numeric_limits<s_t>::infinity();
@@ -7916,35 +8036,6 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         ddq.col(t) = (dq.col(t + 1) - dq.col(t)) / (dt);
       }
 
-#ifndef NDEBUG
-      // In debug mode, check that accelerations are always preserved on
-      // frames that have unmeasured external forces
-      for (int t = 1; t < totalSteps - 1; t++)
-      {
-        if (probablyMissingGRF.size() > t + cursor
-            && probablyMissingGRF[t + cursor])
-        {
-          Eigen::Vector6s originalUnscaledDdq
-              = originalDdqUnscaled.col(t + cursor).head<6>();
-          Eigen::Vector6s unscaledDdq
-              = (q.col(t + 1) - 2 * q.col(t) + q.col(t - 1)).head<6>();
-          if ((unscaledDdq - originalUnscaledDdq).norm() > 1e-12)
-          {
-            std::cout << "Failed to preserve acceleration for missing GRF on "
-                         "timestep T="
-                      << (t + cursor) << std::endl;
-            Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
-            compare.col(0) = originalUnscaledDdq;
-            compare.col(1) = unscaledDdq;
-            compare.col(2) = originalUnscaledDdq - unscaledDdq;
-            std::cout << "Original ddq - Present ddq - Diff" << std::endl
-                      << compare << std::endl;
-          }
-          assert((unscaledDdq - originalUnscaledDdq).norm() < 1e-12);
-        }
-      }
-#endif
-
       // We start with the same velocity as the 2nd timestep, and with 0
       // acceleration. This is the best projection we can make given the data.
       dq.col(0) = dq.col(1);
@@ -7954,7 +8045,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       // Build linear system at current configuration
       ////////////////////////////////
 
-      bool includeResidualAccs = residualAccRegularization <= 10000;
+      bool includeAllResidualAccs = residualAccRegularization <= 10000;
       std::vector<bool> probablyMissingGRFWindow;
       for (int t = 0; t < totalSteps; t++)
       {
@@ -7968,7 +8059,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
               init->grfTrials[trial].block(
                   0, cursor, init->grfTrials[trial].rows(), totalSteps),
               probablyMissingGRFWindow,
-              includeResidualAccs);
+              includeAllResidualAccs);
       Eigen::MatrixXs A = linearSystem.first;
       Eigen::VectorXs b = linearSystem.second;
 
@@ -7979,32 +8070,47 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       std::vector<int> outputTimesteps
           = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize);
       std::vector<int> residualAccTimesteps;
-      if (includeResidualAccs)
+      if (includeAllResidualAccs)
       {
         residualAccTimesteps
             = math::evenlySpacedTimesteps(totalSteps, subsampleMaxSize * 3);
       }
 
-      const int numVariables = 2 + residualAccTimesteps.size();
+      const int numVariables = includeAllResidualAccs
+                                   ? (2 + residualAccTimesteps.size())
+                                   : (A.cols() / 6);
       const int inputSize = numVariables * 6;
-      const int outputSize = (outputTimesteps.size() + numVariables) * 6;
+      const int outputSize
+          = (outputTimesteps.size() + (regularizeResiduals ? numVariables : 0))
+            * 6;
 
       Eigen::MatrixXs fullA = Eigen::MatrixXs::Zero(outputSize, inputSize);
       for (int row = 0; row < outputTimesteps.size(); row++)
       {
-        for (int col = 0; col < numVariables; col++)
+        if (includeAllResidualAccs)
         {
-          if (col < 2)
+          for (int col = 0; col < numVariables; col++)
           {
-            fullA.block<6, 6>(row * 6, col * 6)
-                = A.block<6, 6>(outputTimesteps[row] * 6, col * 6);
+            if (col < 2)
+            {
+              fullA.block<6, 6>(row * 6, col * 6)
+                  = A.block<6, 6>(outputTimesteps[row] * 6, col * 6);
+            }
+            else
+            {
+              fullA.block<6, 6>(row * 6, col * 6) = A.block<6, 6>(
+                  outputTimesteps[row] * 6,
+                  12 + (residualAccTimesteps[col - 2] * 6));
+            }
           }
-          else
-          {
-            fullA.block<6, 6>(row * 6, col * 6) = A.block<6, 6>(
-                outputTimesteps[row] * 6,
-                12 + (residualAccTimesteps[col - 2] * 6));
-          }
+        }
+        else
+        {
+          assert(fullA.cols() == A.cols());
+          // If we're not including all residuals, keep all the columns and
+          // just sub-sample rows
+          fullA.block(row * 6, 0, 6, fullA.cols())
+              = A.block(outputTimesteps[row] * 6, 0, 6, A.cols());
         }
       }
 #ifndef NDEBUG
@@ -8021,16 +8127,35 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       }
 #endif
 
-      s_t offsetRegularization = 0.5;
-      Eigen::VectorXs regularizationDiagonal = Eigen::VectorXs::Ones(inputSize);
-      regularizationDiagonal.segment(0, 12) *= offsetRegularization;
-      if (includeResidualAccs)
+      if (regularizeResiduals)
       {
-        regularizationDiagonal.segment(12, regularizationDiagonal.size() - 12)
-            *= residualAccRegularization;
+        Eigen::VectorXs regularizationDiagonal
+            = Eigen::VectorXs::Ones(inputSize);
+        regularizationDiagonal.segment(0, 12) *= offsetRegularization;
+        if (includeAllResidualAccs)
+        {
+          for (int s = 0; s < residualAccTimesteps.size(); s++)
+          {
+            if (probablyMissingGRFWindow[residualAccTimesteps[s]])
+            {
+              regularizationDiagonal.segment<6>(12 + s * 6)
+                  *= missingResidualRegularization;
+            }
+            else
+            {
+              regularizationDiagonal.segment<6>(12 + s * 6)
+                  *= residualAccRegularization;
+            }
+          }
+        }
+        else
+        {
+          regularizationDiagonal.segment(12, regularizationDiagonal.size() - 12)
+              *= missingResidualRegularization;
+        }
+        fullA.block(outputTimesteps.size() * 6, 0, inputSize, inputSize)
+            = regularizationDiagonal.asDiagonal();
       }
-      fullA.block(outputTimesteps.size() * 6, 0, inputSize, inputSize)
-          = regularizationDiagonal.asDiagonal();
 
       Eigen::VectorXs fullB = Eigen::VectorXs::Zero(outputSize);
       Eigen::VectorXs fullOriginalTrajectory
@@ -8044,14 +8169,19 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 
       Eigen::VectorXs desired = fullOriginalTrajectory - fullB;
 
-      s_t weightFirstFewTimesteps = 1000 * totalSteps;
-      s_t weightLastFewTimesteps = 5;
       // If we're in a zipper step, make sure to prioritize keeping the end of
       // the zipper as clean as possible, to propagate as little error as we
       // can
       if (cursor + totalSteps < init->poseTrials[trial].cols())
       {
         weightLastFewTimesteps = 200;
+      }
+
+      // Up-weight angular residuals
+      for (int i = 0; i < outputTimesteps.size(); i++)
+      {
+        desired.segment<3>(i * 6) *= weightAngular;
+        fullA.block(i * 6, 0, 3, fullA.cols()) *= weightAngular;
       }
 
       const int weightTimestepNum = 3;
@@ -8066,9 +8196,12 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
           *= weightLastFewTimesteps;
       if (cursor > 0)
       {
-        desired.segment(0, weightTimestepNum * 6) *= weightFirstFewTimesteps;
+        s_t zipperWeightFirstFewTimesteps = 1000 * totalSteps;
+
+        desired.segment(0, weightTimestepNum * 6)
+            *= zipperWeightFirstFewTimesteps;
         fullA.block(0, 0, weightTimestepNum * 6, fullA.cols())
-            *= weightFirstFewTimesteps;
+            *= zipperWeightFirstFewTimesteps;
       }
       Eigen::VectorXs solution = fullA.householderQr().solve(desired);
 
@@ -8096,21 +8229,28 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
       ////////////////////////////////
 
       Eigen::VectorXs solutionDecompressed = Eigen::VectorXs::Zero(A.cols());
-      for (int col = 0; col < numVariables; col++)
+      if (includeAllResidualAccs)
       {
-        if (col < 2)
+        for (int col = 0; col < numVariables; col++)
         {
-          // Copy the root offsets
-          solutionDecompressed.segment<6>(col * 6)
-              = solution.segment<6>(col * 6);
+          if (col < 2)
+          {
+            // Copy the root offsets
+            solutionDecompressed.segment<6>(col * 6)
+                = solution.segment<6>(col * 6);
+          }
+          else
+          {
+            // Spread out the residual acc's
+            solutionDecompressed.segment<6>(
+                12 + (residualAccTimesteps[col - 2] * 6))
+                = solution.segment<6>(col * 6);
+          }
         }
-        else
-        {
-          // Spread out the residual acc's
-          solutionDecompressed.segment<6>(
-              12 + (residualAccTimesteps[col - 2] * 6))
-              = solution.segment<6>(col * 6);
-        }
+      }
+      else
+      {
+        solutionDecompressed = solution;
       }
 
       Eigen::VectorXs recovered = (A * solutionDecompressed);
@@ -8171,13 +8311,10 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         for (int t = 1; t < totalSteps - 1; t++)
         {
           // Don't count any timesteps without observations
-          if (init->probablyMissingGRF.size() > trial
-              && init->probablyMissingGRF[trial].size() > t + cursor
-              && init->probablyMissingGRF[trial][t + cursor])
+          if (probablyMissingGRFWindow[t])
           {
             continue;
           }
-
           s_t thisTimestepCost = helper.calculateResidualNorm(
               q.col(t),
               dq.col(t),
@@ -8185,7 +8322,6 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
               init->grfTrials[trial].col(t + cursor),
               1,
               true);
-          // std::cout << t << ": " << thisTimestepCost << ", ";
           residualCost += thisTimestepCost;
           totalCountedResiduals++;
         }
@@ -8218,9 +8354,9 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
           }
         }
 
-        if (residualCost > lastResidualCost * 1.2)
+        if (residualCost > lastResidualCost * 1.5)
         {
-          lineSearchDist *= 0.5;
+          lineSearchDist *= 0.25;
           if (lineSearchDist < 1e-18)
           {
             std::cout << "Line search got too small, optimization stalled, "
@@ -8275,7 +8411,7 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
                   << " (on " << totalCountedResiduals
                   << " steps), max dist any timestep changed: " << maxDist
                   << " (current residual penalty="
-                  << (includeResidualAccs
+                  << (includeAllResidualAccs
                           ? std::to_string(residualAccRegularization)
                           : "inf")
                   << ")" << std::endl;
@@ -9974,6 +10110,11 @@ void DynamicsFitter::computePerfectGRFs(
       ForcePlate& perfectPlate
           = perfectForcePlates[perfectForcePlates.size() - 1];
 
+      perfectForcePlates[i].centersOfPressure.push_back(
+          originalPlate.centersOfPressure[0]);
+      perfectForcePlates[i].moments.push_back(originalPlate.moments[0]);
+      perfectForcePlates[i].forces.push_back(originalPlate.forces[0]);
+
       perfectPlate.worldOrigin = originalPlate.worldOrigin;
       perfectPlate.corners = originalPlate.corners;
     }
@@ -10516,8 +10657,126 @@ s_t DynamicsFitter::computeAverageMarkerRMSE(
       }
     }
   }
-  std::cout << "Marker raw RMS: " << result << std::endl;
-  std::cout << "Count: " << count << std::endl;
+
+  result /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return result;
+}
+
+//==============================================================================
+// Get the average RMSE, in meters, of the markers
+s_t DynamicsFitter::computeAverageTrialMarkerRMSE(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+  mSkeleton->setGroupScales(init->groupScales);
+
+  s_t result = 0;
+  int count = 0;
+  for (int i = 0; i < init->poseTrials[trial].cols(); i++)
+  {
+    mSkeleton->setPositions(init->poseTrials[trial].col(i));
+    auto simulatedMarkers
+        = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+    auto markers = init->markerObservationTrials[trial][i];
+    for (auto pair : simulatedMarkers)
+    {
+      if (markers.count(pair.first))
+      {
+        result += (markers.at(pair.first) - pair.second).norm();
+        count++;
+      }
+    }
+  }
+
+  result /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return result;
+}
+
+//==============================================================================
+// Get the average max marker error on each frame, in meters, of the markers
+s_t DynamicsFitter::computeAverageMarkerMaxError(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+  mSkeleton->setGroupScales(init->groupScales);
+
+  s_t result = 0;
+  int count = 0;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int i = 0; i < init->poseTrials[trial].cols(); i++)
+    {
+      mSkeleton->setPositions(init->poseTrials[trial].col(i));
+      auto simulatedMarkers
+          = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+      auto markers = init->markerObservationTrials[trial][i];
+      s_t max = 0.0;
+      for (auto pair : simulatedMarkers)
+      {
+        if (markers.count(pair.first))
+        {
+          s_t dist = (markers.at(pair.first) - pair.second).norm();
+          if (dist > max)
+          {
+            max = dist;
+          }
+        }
+      }
+      result += max;
+      count++;
+    }
+  }
+
+  result /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return result;
+}
+
+//==============================================================================
+// Get the average max marker error on each frame, in meters, of the markers
+s_t DynamicsFitter::computeAverageTrialMarkerMaxError(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+  mSkeleton->setGroupScales(init->groupScales);
+
+  s_t result = 0;
+  int count = 0;
+  for (int i = 0; i < init->poseTrials[trial].cols(); i++)
+  {
+    mSkeleton->setPositions(init->poseTrials[trial].col(i));
+    auto simulatedMarkers
+        = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+    auto markers = init->markerObservationTrials[trial][i];
+    s_t max = 0.0;
+    for (auto pair : simulatedMarkers)
+    {
+      if (markers.count(pair.first))
+      {
+        s_t dist = (markers.at(pair.first) - pair.second).norm();
+        if (dist > max)
+        {
+          max = dist;
+        }
+      }
+    }
+    result += max;
+    count++;
+  }
 
   result /= count;
 
@@ -10581,7 +10840,65 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
       count++;
     }
   }
-  std::cout << "count: " << count << std::endl;
+  force /= count;
+  torque /= count;
+
+  mSkeleton->setPositions(originalPoses);
+  mSkeleton->setGroupScales(originalScales);
+
+  return std::make_pair(force, torque);
+}
+
+//==============================================================================
+// Get the average residual force (in newtons) and torque (in newton-meters)
+std::pair<s_t, s_t> DynamicsFitter::computeAverageTrialResidualForce(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  Eigen::VectorXs originalPoses = mSkeleton->getPositions();
+  Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
+
+  mSkeleton->setGroupScales(init->groupScales);
+
+  std::vector<int> footIndices;
+  for (auto foot : mFootNodes)
+  {
+    footIndices.push_back(foot->getIndexInSkeleton());
+  }
+  ResidualForceHelper helper(mSkeleton, footIndices);
+
+  s_t force = 0;
+  s_t torque = 0;
+  int count = 0;
+
+  s_t dt = init->trialTimesteps[trial];
+  for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+  {
+    if (init->probablyMissingGRF[trial][t])
+    {
+      continue;
+    }
+    Eigen::VectorXs q = init->poseTrials[trial].col(t);
+    Eigen::VectorXs dq = mSkeleton->getPositionDifferences(
+                             init->poseTrials[trial].col(t),
+                             init->poseTrials[trial].col(t - 1))
+                         / dt;
+    Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
+                               init->poseTrials[trial].col(t + 1),
+                               init->poseTrials[trial].col(t))
+                           - mSkeleton->getPositionDifferences(
+                               init->poseTrials[trial].col(t),
+                               init->poseTrials[trial].col(t - 1)))
+                          / (dt * dt);
+    Eigen::Vector6s residual
+        = helper.calculateResidual(q, dq, ddq, init->grfTrials[trial].col(t));
+    s_t frameTorque = residual.head<3>().norm();
+    torque += frameTorque;
+    s_t frameForce = residual.tail<3>().norm();
+    force += frameForce;
+    // std::cout << t << ":" << frameForce << "N," << frameTorque << "Nm"
+    //           << std::endl;
+    count++;
+  }
   force /= count;
   torque /= count;
 
@@ -10620,6 +10937,39 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageRealForce(
       }
       count++;
     }
+  }
+  force /= count;
+  torque /= count;
+
+  return std::make_pair(force, torque);
+}
+
+//==============================================================================
+// Get the average real measured force (in newtons) and torque (in
+// newton-meters)
+std::pair<s_t, s_t> DynamicsFitter::computeAverageTrialRealForce(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t force = 0;
+  s_t torque = 0;
+  int count = 0;
+
+  for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+  {
+    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+    {
+      if (!init->forcePlateTrials[trial][i].forces[t].hasNaN()
+          && !init->forcePlateTrials[trial][i].moments[t].hasNaN())
+      {
+        s_t forceNorm = init->forcePlateTrials[trial][i].forces[t].norm();
+        if (forceNorm > 0)
+        {
+          force += forceNorm;
+          torque += init->forcePlateTrials[trial][i].moments[t].norm();
+        }
+      }
+    }
+    count++;
   }
   force /= count;
   torque /= count;
@@ -10684,9 +11034,141 @@ s_t DynamicsFitter::computeAverageCOPChange(
 }
 
 //==============================================================================
+// Get the average change in the center of pressure point (in meters) after
+// "perfecting" the GRF data
+s_t DynamicsFitter::computeAverageTrialCOPChange(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  if (init->perfectForcePlateTrials.size() > trial
+      && init->forcePlateTrials[trial].size()
+             == init->perfectForcePlateTrials[trial].size())
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        continue;
+      }
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+        {
+          s_t distNow
+              = (init->forcePlateTrials[trial][i].centersOfPressure[t]
+                 - init->perfectForcePlateTrials[trial][i].centersOfPressure[t])
+                    .norm();
+          // std::cout << "CoP moved " << distNow << " at time " << t
+          //           << std::endl;
+          // if (distNow > 0.1)
+          // {
+          //   std::cout << "'Perfect' CoP [" << i << "]:" << std::endl
+          //             << init->perfectForcePlateTrials[trial][i]
+          //                    .centersOfPressure[t]
+          //             << std::endl;
+          //   std::cout << "Measured CoP [" << i << "]:" << std::endl
+          //             <<
+          //             init->forcePlateTrials[trial][i].centersOfPressure[t]
+          //             << std::endl;
+          // }
+          if (distNow < 0.5)
+          {
+            dist += distNow;
+            count++;
+          }
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
 // Get the average change in the force vector (in Newtons) after "perfecting"
 // the GRF data
 s_t DynamicsFitter::computeAverageForceMagnitudeChange(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        continue;
+      }
+      if (init->perfectForcePlateTrials.size() > trial
+          && init->forcePlateTrials[trial].size()
+                 == init->perfectForcePlateTrials[trial].size())
+      {
+        for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+        {
+          if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+          {
+            s_t thisDist = abs(
+                init->forcePlateTrials[trial][i].forces[t].norm()
+                - init->perfectForcePlateTrials[trial][i].forces[t].norm());
+            // std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
+            //           << "N diff" << std::endl;
+            dist += thisDist;
+            count++;
+          }
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
+// Get the average change in the force vector (in Newtons) after "perfecting"
+// the GRF data
+s_t DynamicsFitter::computeAverageTrialForceMagnitudeChange(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+  {
+    if (init->probablyMissingGRF[trial][t])
+    {
+      continue;
+    }
+    if (init->perfectForcePlateTrials.size() > trial
+        && init->forcePlateTrials[trial].size()
+               == init->perfectForcePlateTrials[trial].size())
+    {
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+        {
+          s_t thisDist = abs(
+              init->forcePlateTrials[trial][i].forces[t].norm()
+              - init->perfectForcePlateTrials[trial][i].forces[t].norm());
+          // std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
+          //           << "N diff" << std::endl;
+          dist += thisDist;
+          count++;
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
+// Get the average change in the force vector (in Newtons) after "perfecting"
+// the GRF data
+s_t DynamicsFitter::computeAverageForceVectorChange(
     std::shared_ptr<DynamicsInitialization> init)
 {
   s_t dist = 0;
@@ -10725,6 +11207,44 @@ s_t DynamicsFitter::computeAverageForceMagnitudeChange(
 }
 
 //==============================================================================
+// Get the average change in the force vector (in Newtons) after "perfecting"
+// the GRF data
+s_t DynamicsFitter::computeAverageTrialForceVectorChange(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t dist = 0;
+  int count = 0;
+
+  for (int t = 0; t < init->poseTrials[trial].cols() - 2; t++)
+  {
+    if (init->probablyMissingGRF[trial][t])
+    {
+      continue;
+    }
+    if (init->perfectForcePlateTrials.size() > trial
+        && init->forcePlateTrials[trial].size()
+               == init->perfectForcePlateTrials[trial].size())
+    {
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-8)
+        {
+          s_t thisDist = (init->forcePlateTrials[trial][i].forces[t]
+                          - init->perfectForcePlateTrials[trial][i].forces[t])
+                             .norm();
+          // std::cout << "t=" << t << ", plate=" << i << ": " << thisDist
+          //           << "N diff" << std::endl;
+          dist += thisDist;
+          count++;
+        }
+      }
+    }
+  }
+  dist /= count;
+  return dist;
+}
+
+//==============================================================================
 // This debugs the current state, along with visualizations of errors
 // where the dynamics do not match the force plate data
 void DynamicsFitter::saveDynamicsToGUI(
@@ -10733,14 +11253,14 @@ void DynamicsFitter::saveDynamicsToGUI(
     int trialIndex,
     int framesPerSecond)
 {
-  bool renderResidualForces = true;
+  bool renderResidualForces = false;
 
   std::string skeletonLayerName = "Skeleton";
   Eigen::Vector4s skeletonLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
   std::string skeletonInertiaLayerName = "Skeleton Inertia";
   Eigen::Vector4s skeletonInertiaLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 0.5);
-  std::string originalSkeletonLayerName = "Original Skeleton";
+  std::string originalSkeletonLayerName = "Purely Kinematic Skeleton";
   Eigen::Vector4s originalSkeletonLayerColor
       = Eigen::Vector4s(1.0, 0.3, 0.3, 0.3);
   std::string originalSkeletonInertiaLayerName = "Original Skeleton Inertia";

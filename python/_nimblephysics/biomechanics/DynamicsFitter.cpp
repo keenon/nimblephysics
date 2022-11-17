@@ -485,14 +485,20 @@ protected:
           ::py::arg("targetPoses"),
           ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 1.0,
-          ::py::arg("regularizeResiduals") = 1.0)
+          ::py::arg("regularizeResiduals") = 0.5)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               optimizeSpatialResidualsOnCOMTrajectory,
           ::py::arg("init"),
           ::py::arg("trial"),
-          ::py::arg("satisfactoryThreshold") = 1e-5)
+          ::py::arg("satisfactoryThreshold") = 1e-5,
+          ::py::arg("numIters") = 600,
+          ::py::arg("missingResidualRegularization") = 1000,
+          ::py::arg("weightAngular") = 2.0,
+          ::py::arg("weightLastFewTimesteps") = 5.0,
+          ::py::arg("offsetRegularization") = 0.001,
+          ::py::arg("regularizeResiduals") = true)
       .def(
           "recalibrateForcePlates",
           &dart::biomechanics::DynamicsFitter::recalibrateForcePlates,
@@ -544,22 +550,68 @@ protected:
           &dart::biomechanics::DynamicsFitter::computeAverageMarkerRMSE,
           ::py::arg("init"))
       .def(
+          "computeAverageTrialMarkerRMSE",
+          &dart::biomechanics::DynamicsFitter::computeAverageTrialMarkerRMSE,
+          ::py::arg("init"),
+          ::py::arg("trial"))
+      .def(
+          "computeAverageMarkerMaxError",
+          &dart::biomechanics::DynamicsFitter::computeAverageMarkerMaxError,
+          ::py::arg("init"))
+      .def(
+          "computeAverageTrialMarkerMaxError",
+          &dart::biomechanics::DynamicsFitter::
+              computeAverageTrialMarkerMaxError,
+          ::py::arg("init"),
+          ::py::arg("trial"))
+      .def(
           "computeAverageResidualForce",
           &dart::biomechanics::DynamicsFitter::computeAverageResidualForce,
           ::py::arg("init"))
+      .def(
+          "computeAverageTrialResidualForce",
+          &dart::biomechanics::DynamicsFitter::computeAverageTrialResidualForce,
+          ::py::arg("init"),
+          ::py::arg("trial"))
       .def(
           "computeAverageRealForce",
           &dart::biomechanics::DynamicsFitter::computeAverageRealForce,
           ::py::arg("init"))
       .def(
+          "computeAverageTrialRealForce",
+          &dart::biomechanics::DynamicsFitter::computeAverageTrialRealForce,
+          ::py::arg("init"),
+          ::py::arg("trial"))
+      .def(
           "computeAverageCOPChange",
           &dart::biomechanics::DynamicsFitter::computeAverageCOPChange,
           ::py::arg("init"))
+      .def(
+          "computeAverageTrialCOPChange",
+          &dart::biomechanics::DynamicsFitter::computeAverageTrialCOPChange,
+          ::py::arg("init"),
+          ::py::arg("trial"))
       .def(
           "computeAverageForceMagnitudeChange",
           &dart::biomechanics::DynamicsFitter::
               computeAverageForceMagnitudeChange,
           ::py::arg("init"))
+      .def(
+          "computeAverageTrialForceMagnitudeChange",
+          &dart::biomechanics::DynamicsFitter::
+              computeAverageTrialForceMagnitudeChange,
+          ::py::arg("init"),
+          ::py::arg("trial"))
+      .def(
+          "computeAverageForceVectorChange",
+          &dart::biomechanics::DynamicsFitter::computeAverageForceVectorChange,
+          ::py::arg("init"))
+      .def(
+          "computeAverageTrialForceVectorChange",
+          &dart::biomechanics::DynamicsFitter::
+              computeAverageTrialForceVectorChange,
+          ::py::arg("init"),
+          ::py::arg("trial"))
       .def(
           "saveDynamicsToGUI",
           &dart::biomechanics::DynamicsFitter::saveDynamicsToGUI,

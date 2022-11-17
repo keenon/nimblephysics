@@ -392,7 +392,7 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
-      bool includeResidualAccs);
+      bool includeAllResidualAccs);
 
   ////////////////////////////////////////////
   // This returns a matrix A and vector b, such that Ax+b gives you a legal root
@@ -405,7 +405,7 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
-      bool includeResidualAccs);
+      bool includeAllResidualAccs);
 
   ////////////////////////////////////////////
   // This will go through and compute the "residual-free root acceleration" at
@@ -427,7 +427,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      bool includeAllResidualAccs);
 
   Eigen::MatrixXs getRootTrajectoryLinearSystemPoses(
       Eigen::Vector6s initialPosOffset,
@@ -1094,7 +1095,13 @@ public:
   bool optimizeSpatialResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
-      s_t satisfactoryThreshold = 1e-10);
+      s_t satisfactoryThreshold = 1e-10,
+      int numIters = 600,
+      s_t missingResidualRegularization = 1000,
+      s_t weightAngular = 2.0,
+      s_t weightLastFewTimesteps = 5.0,
+      s_t offsetRegularization = 0.001,
+      bool regularizeResiduals = true);
 
   // 1.2. Now that we've got zero residuals, after calling
   // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
@@ -1197,23 +1204,64 @@ public:
   // Get the average RMSE, in meters, of the markers
   s_t computeAverageMarkerRMSE(std::shared_ptr<DynamicsInitialization> init);
 
+  // Get the average RMSE, in meters, of the markers
+  s_t computeAverageTrialMarkerRMSE(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
+  // Get the average max marker error on each frame, in meters, of the markers
+  s_t computeAverageMarkerMaxError(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average max marker error on each frame, in meters, of the markers
+  s_t computeAverageTrialMarkerMaxError(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
   // Get the average residual force (in newtons) and torque (in newton-meters)
   std::pair<s_t, s_t> computeAverageResidualForce(
       std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average residual force (in newtons) and torque (in newton-meters)
+  std::pair<s_t, s_t> computeAverageTrialResidualForce(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
 
   // Get the average real measured force (in newtons) and torque (in
   // newton-meters)
   std::pair<s_t, s_t> computeAverageRealForce(
       std::shared_ptr<DynamicsInitialization> init);
 
+  // Get the average real measured force (in newtons) and torque (in
+  // newton-meters)
+  std::pair<s_t, s_t> computeAverageTrialRealForce(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
   // Get the average change in the center of pressure point (in meters) after
   // "perfecting" the GRF data
   s_t computeAverageCOPChange(std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average change in the center of pressure point (in meters) after
+  // "perfecting" the GRF data
+  s_t computeAverageTrialCOPChange(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
 
   // Get the average change in the force vector (in Newtons) after "perfecting"
   // the GRF data
   s_t computeAverageForceMagnitudeChange(
       std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average change in the force vector (in Newtons) after "perfecting"
+  // the GRF data
+  s_t computeAverageTrialForceMagnitudeChange(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
+  // Get the average change in the force vector (in Newtons) after "perfecting"
+  // the GRF data
+  s_t computeAverageForceVectorChange(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // Get the average change in the force vector (in Newtons) after "perfecting"
+  // the GRF data
+  s_t computeAverageTrialForceVectorChange(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
 
   // This debugs the current state, along with visualizations of errors where
   // the dynamics do not match the force plate data

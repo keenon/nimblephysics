@@ -1345,82 +1345,111 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
             << std::endl
             << diff.block(0, 0, 6, std::min((int)diff.cols(), 10)) << std::endl;
 
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor
-      = helper.getRootTrajectoryLinearSystem(
-          qs, dqs, ddqs, forces, probablyMissingGRF, true);
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor_fd
-      = helper.finiteDifferenceRootTrajectoryLinearSystem(
-          qs, dqs, ddqs, forces, probablyMissingGRF, true);
-
-  if (!equals(taylor.second, taylor_fd.second, 1e-8))
+  std::vector<bool> includeAllResidualsList;
+  includeAllResidualsList.push_back(true);
+  includeAllResidualsList.push_back(false);
+  for (bool includeAllResiduals : includeAllResidualsList)
   {
-    std::cout << "Linear system b vector is not equal!" << std::endl;
-    return false;
-  }
+    std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor
+        = helper.getRootTrajectoryLinearSystem(
+            qs, dqs, ddqs, forces, probablyMissingGRF, includeAllResiduals);
+    std::pair<Eigen::MatrixXs, Eigen::VectorXs> taylor_fd
+        = helper.finiteDifferenceRootTrajectoryLinearSystem(
+            qs, dqs, ddqs, forces, probablyMissingGRF, includeAllResiduals);
 
-  const s_t massTol = 1e-7;
-  if (!equals(taylor.first, taylor_fd.first, massTol))
-  {
-    std::cout << "Linear system A matrix is not equal!" << std::endl;
-    Eigen::MatrixXs A = taylor.first;
-    Eigen::MatrixXs A_fd = taylor_fd.first;
-
-    for (int t = 0; t < numTimesteps; t++)
+    if (!equals(taylor.second, taylor_fd.second, 1e-8))
     {
-      Eigen::Matrix6s posOffsetPos = A.block<6, 6>(t * 6, 0);
-      Eigen::Matrix6s posOffsetPos_fd = A_fd.block<6, 6>(t * 6, 0);
-
-      if (!equals(posOffsetPos, posOffsetPos_fd, 1e-8))
-      {
-        std::cout << "Linear system error at t=" << t << std::endl;
-        std::cout << "Analytical dPos[" << t << "]/dOffsetPos:" << std::endl
-                  << posOffsetPos << std::endl;
-        std::cout << "FD dPos[" << t << "]/dOffsetPos:" << std::endl
-                  << posOffsetPos_fd << std::endl;
-        std::cout << "Extra (Analytical - FD):" << std::endl
-                  << posOffsetPos - posOffsetPos_fd << std::endl;
-        for (int i = 0; i <= t; i++)
-        {
-          const Eigen::Matrix6s dAcc_dOffsetPos
-              = helper.calculateResidualFreeRootAccelerationJacobianWrtPosition(
-                  qs.col(i), dqs.col(i), ddqs.col(i), forces.col(i));
-          std::cout << "dt * dt * dAcc[" << i << "]/dOffsetPos:" << std::endl
-                    << dt * dt * dAcc_dOffsetPos << std::endl;
-        }
-        return false;
-      }
-
-      Eigen::Matrix6s posOffsetVel = A.block<6, 6>(t * 6, 6);
-      Eigen::Matrix6s posOffsetVel_fd = A_fd.block<6, 6>(t * 6, 6);
-
-      if (!equals(posOffsetVel, posOffsetVel_fd, 1e-8))
-      {
-        std::cout << "Linear system error at t=" << t << std::endl;
-        std::cout << "Analytical dPos[" << t << "]/dOffsetVel:" << std::endl
-                  << posOffsetVel << std::endl;
-        std::cout << "FD dPos[" << t << "]/dOffsetVel:" << std::endl
-                  << posOffsetVel_fd << std::endl;
-        std::cout << "Diff:" << std::endl
-                  << posOffsetVel - posOffsetVel_fd << std::endl;
-        return false;
-      }
-
-      Eigen::Vector6s posOffsetInvMass = A.block<6, 1>(t * 6, 12);
-      Eigen::Vector6s posOffsetInvMass_fd = A_fd.block<6, 1>(t * 6, 12);
-
-      if (!equals(posOffsetInvMass, posOffsetInvMass_fd, massTol))
-      {
-        std::cout << "Linear system error at t=" << t << std::endl;
-        std::cout << "Analytical dPos[" << t << "]/dOffsetInvMass:" << std::endl
-                  << posOffsetInvMass << std::endl;
-        std::cout << "FD dPos[" << t << "]/dOffsetInvMass:" << std::endl
-                  << posOffsetInvMass_fd << std::endl;
-        std::cout << "Diff:" << std::endl
-                  << posOffsetInvMass - posOffsetInvMass_fd << std::endl;
-        return false;
-      }
+      std::cout << "Linear system b vector is not equal (includeAllResiduals="
+                << includeAllResiduals << ")!" << std::endl;
+      return false;
     }
-    return false;
+
+    if (!equals(taylor.first, taylor_fd.first, 1e-8))
+    {
+      std::cout << "Linear system A matrix is not equal (includeAllResiduals="
+                << includeAllResiduals << ")!" << std::endl;
+      Eigen::MatrixXs A = taylor.first;
+      Eigen::MatrixXs A_fd = taylor_fd.first;
+
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        Eigen::Matrix6s posOffsetPos = A.block<6, 6>(t * 6, 0);
+        Eigen::Matrix6s posOffsetPos_fd = A_fd.block<6, 6>(t * 6, 0);
+
+        if (!equals(posOffsetPos, posOffsetPos_fd, 1e-8))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dPos[" << t << "]/dOffsetPos:" << std::endl
+                    << posOffsetPos << std::endl;
+          std::cout << "FD dPos[" << t << "]/dOffsetPos:" << std::endl
+                    << posOffsetPos_fd << std::endl;
+          std::cout << "Extra (Analytical - FD):" << std::endl
+                    << posOffsetPos - posOffsetPos_fd << std::endl;
+          for (int i = 0; i <= t; i++)
+          {
+            const Eigen::Matrix6s dAcc_dOffsetPos
+                = helper
+                      .calculateResidualFreeRootAccelerationJacobianWrtPosition(
+                          qs.col(i), dqs.col(i), ddqs.col(i), forces.col(i));
+            std::cout << "dt * dt * dAcc[" << i << "]/dOffsetPos:" << std::endl
+                      << dt * dt * dAcc_dOffsetPos << std::endl;
+          }
+          return false;
+        }
+
+        Eigen::Matrix6s posOffsetVel = A.block<6, 6>(t * 6, 6);
+        Eigen::Matrix6s posOffsetVel_fd = A_fd.block<6, 6>(t * 6, 6);
+
+        if (!equals(posOffsetVel, posOffsetVel_fd, 1e-8))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dPos[" << t << "]/dOffsetVel:" << std::endl
+                    << posOffsetVel << std::endl;
+          std::cout << "FD dPos[" << t << "]/dOffsetVel:" << std::endl
+                    << posOffsetVel_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetVel - posOffsetVel_fd << std::endl;
+          return false;
+        }
+
+        int numMissing = 0;
+        for (bool m : probablyMissingGRF)
+          if (m)
+            numMissing++;
+
+        int numResiduals = includeAllResiduals ? numTimesteps : numMissing;
+        assert(A.cols() == 12 + (numResiduals * 6));
+        assert(A_fd.cols() == 12 + (numResiduals * 6));
+        for (int r = 0; r < numResiduals; r++)
+        {
+          Eigen::Matrix6s posOffsetResidual
+              = A.block<6, 6>(t * 6, 12 + (r * 6));
+          Eigen::Matrix6s posOffsetResidual_fd
+              = A_fd.block<6, 6>(t * 6, 12 + (r * 6));
+
+          if (!equals(posOffsetResidual, posOffsetResidual_fd, 1e-8))
+          {
+            std::cout << "Linear system error at t=" << t << std::endl;
+            std::cout << "Analytical dPos[" << t << "]/dResidual[" << r
+                      << "]:" << std::endl
+                      << posOffsetResidual << std::endl;
+            std::cout << "FD dPos[" << t << "]/dResidual[" << r
+                      << "]:" << std::endl
+                      << posOffsetResidual_fd << std::endl;
+            std::cout << "Diff:" << std::endl
+                      << posOffsetResidual - posOffsetResidual_fd << std::endl;
+            std::cout << "Analytical allTimesteps/dResidual[" << r
+                      << "]:" << std::endl
+                      << A.block(0, 12 + (r * 6), A.rows(), 6) << std::endl;
+            std::cout << "FD allTimesteps/dResidual[" << r << "]:" << std::endl
+                      << A_fd.block(0, 12 + (r * 6), A_fd.rows(), 6)
+                      << std::endl;
+            return false;
+          }
+        }
+      }
+      return false;
+    }
   }
 
   return true;
@@ -2095,15 +2124,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // }
 
   bool successOnAllResiduals = true;
+  (void)successOnAllResiduals;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 20; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to get
       // the angular ACC's to match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 5.0);
+          init, trial, originalTrajectory, 1.0, 5.0, 0.1);
     }
 
     bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
@@ -2304,6 +2334,21 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.setIterationLimit(50);
   fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
   */
+
+  for (int trial = 0; trial < init->originalPoses.size(); trial++)
+  {
+    bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
+        init, trial, 5e-7); // 5e-9 is the practical limit
+    if (successOnResiduals)
+    {
+      // For now, do nothing
+      fitter.recalibrateForcePlates(init, trial);
+    }
+    else
+    {
+      successOnAllResiduals = false;
+    }
+  }
 
   fitter.computePerfectGRFs(init);
 
@@ -3379,7 +3424,7 @@ TEST(DynamicsFitter, ROOT_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
-        file.skeleton, collisionBodies, 5);
+        file.skeleton, collisionBodies, 10);
     if (!success)
     {
       EXPECT_TRUE(success);
