@@ -2128,7 +2128,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 30; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to get
       // the angular ACC's to match more closely what was actually observed
@@ -2137,7 +2137,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     }
 
     bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
-        init, trial, 5e-7); // 5e-9 is the practical limit
+        init, trial, 5e-7, 600, 5000); // 5e-9 is the practical limit
     if (successOnResiduals)
     {
       // For now, do nothing
@@ -2250,15 +2250,11 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   // Re - run as L1
   (void)successOnAllResiduals;
-  fitter.setIterationLimit(50);
-  fitter.setLBFGSHistoryLength(30);
+  fitter.setIterationLimit(200);
   fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
-          .setConstrainResidualsZero(successOnAllResiduals)
-          .setConstrainLinearResiduals(0.1)
-          .setConstrainAngularResiduals(1.0)
           .setIncludeMasses(true)
           .setIncludeCOMs(true)
           .setIncludeInertias(true)
@@ -2336,20 +2332,21 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.runSGDOptimization(init, 2e-2, 50, true, true, true, true, true, true);
   */
 
-  for (int trial = 0; trial < init->originalPoses.size(); trial++)
-  {
-    bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
-        init, trial, 5e-7); // 5e-9 is the practical limit
-    if (successOnResiduals)
-    {
-      // For now, do nothing
-      fitter.recalibrateForcePlates(init, trial);
-    }
-    else
-    {
-      successOnAllResiduals = false;
-    }
-  }
+  // RESTORE
+  // for (int trial = 0; trial < init->originalPoses.size(); trial++)
+  // {
+  //   bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
+  //       init, trial, 5e-7); // 5e-9 is the practical limit
+  //   if (successOnResiduals)
+  //   {
+  //     // For now, do nothing
+  //     fitter.recalibrateForcePlates(init, trial);
+  //   }
+  //   else
+  //   {
+  //     successOnAllResiduals = false;
+  //   }
+  // }
 
   fitter.computePerfectGRFs(init);
 

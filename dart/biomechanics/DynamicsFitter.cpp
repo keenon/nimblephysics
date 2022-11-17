@@ -3050,6 +3050,7 @@ DynamicsFitProblem::DynamicsFitProblem(
   std::cout << "Getting initial loss:" << std::endl;
   s_t initialLoss = computeLoss(mInitX, true);
   std::cout << "Got initial loss:" << initialLoss << std::endl;
+  mBestObjectiveValueState = mInitX;
   mBestObjectiveValue = initialLoss;
   mBestObjectiveValueIteration = -1;
 }
@@ -5472,9 +5473,27 @@ bool DynamicsFitProblem::get_bounds_info(
 
   // Our constraint function has to be 0
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
-  constraintUpperBounds = getConstraintUpperBounds();
+  Eigen::VectorXs constraintUpperBoundsValue = getConstraintUpperBounds();
+  if (constraintUpperBoundsValue.size() != m)
+  {
+    std::cout << "Got a constraint upper bounds vector that was the wrong "
+                 "size! Expected "
+              << m << " but got " << constraintUpperBoundsValue.size()
+              << std::endl;
+    exit(1);
+  }
+  constraintUpperBounds = constraintUpperBoundsValue.cast<double>();
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
-  constraintLowerBounds = getConstraintLowerBounds();
+  Eigen::VectorXs constraintLowerBoundsValue = getConstraintLowerBounds();
+  if (constraintLowerBoundsValue.size() != m)
+  {
+    std::cout << "Got a constraint lower bounds vector that was the wrong "
+                 "size! Expected "
+              << m << " but got " << constraintLowerBoundsValue.size()
+              << std::endl;
+    exit(1);
+  }
+  constraintLowerBounds = constraintLowerBoundsValue.cast<double>();
 
   return true;
 }
@@ -8380,6 +8399,8 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         ////////////////////////////////
 
         s_t residualCost = 0.0;
+        s_t maxResidualCost = 0.0;
+        int maxResidualCostTimestep = 0;
         int totalCountedResiduals = 0;
         for (int t = 1; t < totalSteps - 1; t++)
         {
@@ -8395,6 +8416,11 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
               init->grfTrials[trial].col(t + cursor),
               1,
               true);
+          if (thisTimestepCost > maxResidualCost)
+          {
+            maxResidualCost = thisTimestepCost;
+            maxResidualCostTimestep = t;
+          }
           residualCost += thisTimestepCost;
           totalCountedResiduals++;
         }
@@ -8482,7 +8508,9 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
         std::cout << "Spatial residual reduction iter " << iter << "/"
                   << numIters << " - avg residual norm: " << residualCost
                   << " (on " << totalCountedResiduals
-                  << " steps), max dist any timestep changed: " << maxDist
+                  << " steps), max residual norm: " << maxResidualCost
+                  << " on t=" << maxResidualCostTimestep << "/" << totalSteps
+                  << ", max dist any timestep changed: " << maxDist
                   << " (current residual penalty="
                   << (includeAllResidualAccs
                           ? std::to_string(residualAccRegularization)
