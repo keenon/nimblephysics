@@ -3842,7 +3842,7 @@ void BodyNode::computeJacobianOfCBackward(
       // Derivative of gravity force
       mCg_g_p.col(i).tail<3>().noalias()
           = -1 * math::makeSkewSymmetric(H.col(dofIndexInSkeleton).head<3>())
-            * Tworld.rotation().transpose() * gravity;
+            * Tworld.linear().transpose() * gravity;
       mCg_g_p.col(i) = G * mCg_g_p.col(i);
       mCg_V_ad_IV_p.col(i)
           = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
@@ -3991,7 +3991,7 @@ void BodyNode::computeJacobianOfCBackward(
       // Derivative of gravity force
       mCg_g_p.col(i).tail<3>().noalias()
           = -1 * math::makeSkewSymmetric(Hcol.head<3>())
-            * Tworld.rotation().transpose() * gravity;
+            * Tworld.linear().transpose() * gravity;
       mCg_g_p.col(i) = G * mCg_g_p.col(i);
       mCg_V_ad_IV_p.col(i)
           = dad(mCg_V_p.col(i), G * V) + dad(V, G * mCg_V_p.col(i));
@@ -4120,7 +4120,7 @@ void BodyNode::computeJacobianOfCBackward(
       // mCg_F -= mFgravity;
       // mCg_F -= math::dad(V, mI * V);
       mCg_g_p.col(i).tail<3>().noalias()
-          = Tworld.rotation().transpose() * gravity;
+          = Tworld.linear().transpose() * gravity;
       mCg_g_p.col(i) = dG * mCg_g_p.col(i);
       mCg_F_p.col(i) = dG * mCg_dV - mCg_g_p.col(i) - dad(V, dG * V);
 

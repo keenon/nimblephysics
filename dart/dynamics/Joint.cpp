@@ -1522,6 +1522,7 @@ void Joint::copyTransformsFrom(const dynamics::Joint* other)
 /// Set the scale of the child body
 void Joint::setChildScale(Eigen::Vector3s scale)
 {
+  if (mAspectProperties.mChildScale == scale) return;
   mAspectProperties.mChildScale = scale;
   mAspectProperties.mT_ChildBodyToJoint.translation()
       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
@@ -1534,6 +1535,7 @@ void Joint::setChildScale(Eigen::Vector3s scale)
 /// Set the scale of the parent body
 void Joint::setParentScale(Eigen::Vector3s scale)
 {
+  if (mAspectProperties.mParentScale == scale) return;
   mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);

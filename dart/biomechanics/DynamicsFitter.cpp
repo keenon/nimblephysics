@@ -1602,6 +1602,8 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
 
   const int numTimesteps = qs.cols();
   const s_t dt = mSkel->getTimeStep();
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
 
   int numMissing = 0;
   for (int t = 1; t < probablyMissingGRF.size(); t++)
@@ -1672,6 +1674,10 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     // numTimesteps
     //           << std::endl;
 
+    // Set these values to allow cacheing the mass matrix between the two jacobian computations below
+    mSkel->setPositions(qs.col(t));
+    mSkel->setVelocities(dqs.col(t));
+
     const Eigen::Matrix6s dAcc_dOffsetPos
         = calculateResidualFreeRootAccelerationJacobianWrtPosition(
             qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
@@ -1720,6 +1726,9 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
       }
     }
   }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
 
   return std::make_pair(A, b);
 }
