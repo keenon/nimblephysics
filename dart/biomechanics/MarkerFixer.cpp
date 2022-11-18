@@ -435,8 +435,9 @@ RippleReductionProblem::RippleReductionProblem(
 }
 
 //==============================================================================
-void RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
+int RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
 {
+  int dropped = 0;
   for (std::string markerName : mMarkerNames)
   {
     std::vector<int> observedTimesteps;
@@ -447,30 +448,41 @@ void RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
         observedTimesteps.push_back(t);
       }
     }
-    for (int i = 0; i < observedTimesteps.size(); i++)
+    // Keep the first two points no matter what
+    int lastObserved = 1;
+    Eigen::Vector3s vLast = (mMarkers[markerName].col(observedTimesteps[1])
+                             - mMarkers[markerName].col(observedTimesteps[0]))
+                            / (observedTimesteps[1] - observedTimesteps[0]);
+    // Go through and only accept points that still "fit" the existing
+    // trajectory, starting from the first two observed points
+    for (int i = 2; i < observedTimesteps.size(); i++)
     {
-      // Drop looking backwards
-      if (i > 1)
+      // Compute the velocity from the last observed to the current point
+      Eigen::Vector3s vNow
+          = (mMarkers[markerName].col(observedTimesteps[i])
+             - mMarkers[markerName].col(observedTimesteps[lastObserved]))
+            / (observedTimesteps[i] - observedTimesteps[lastObserved]);
+
+      Eigen::Vector3s acc
+          = (vNow - vLast)
+            / (observedTimesteps[i] - observedTimesteps[lastObserved]);
+      if (acc.norm() > 0.01)
       {
-        Eigen::Vector3s vLast
-            = (mMarkers[markerName].col(observedTimesteps[i - 1])
-               - mMarkers[markerName].col(observedTimesteps[i - 2]))
-              / (observedTimesteps[i - 1] - observedTimesteps[i - 2]);
-        Eigen::Vector3s vNow
-            = (mMarkers[markerName].col(observedTimesteps[i])
-               - mMarkers[markerName].col(observedTimesteps[i - 1]))
-              / (observedTimesteps[i] - observedTimesteps[i - 1]);
-        if ((vNow - vLast).norm() > vNow.norm())
+        // Drop this frame
+        mObserved[markerName](observedTimesteps[i]) = 0;
+        if (report != nullptr)
         {
-          // Drop this frame
-          mObserved[markerName](observedTimesteps[i]) = 0;
-          if (report != nullptr)
-          {
-            report->warnings.push_back(
-                "Dropping marker " + markerName
-                + " for suspicious acceleration on frame " + std::to_string(i));
-          }
+          report->warnings.push_back(
+              "Dropping marker " + markerName
+              + " for suspicious acceleration on frame "
+              + std::to_string(observedTimesteps[i]));
         }
+        dropped++;
+      }
+      else
+      {
+        lastObserved = i;
+        vLast = vNow;
       }
     }
 
@@ -504,6 +516,7 @@ void RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
     }
     */
   }
+  return dropped;
 }
 
 //==============================================================================
@@ -549,8 +562,32 @@ RippleReductionProblem::smooth(MarkersErrorReport* report)
   interpolateMissingPoints();
   for (std::string markerName : mMarkerNames)
   {
-    AccelerationSmoother smoother(mMarkers[markerName].cols(), 0.3, 1.0);
-    mMarkers[markerName] = smoother.smooth(mMarkers[markerName]);
+    // Figure out where the marker observations begin and end
+    int firstObserved = -1;
+    int lastObserved = 0;
+    for (int t = 0; t < mMarkers[markerName].cols(); t++)
+    {
+      if (mObserved[markerName](t) == 1)
+      {
+        if (firstObserved == -1)
+        {
+          firstObserved = t;
+        }
+        if (t > lastObserved)
+        {
+          lastObserved = t;
+        }
+      }
+    }
+    if (firstObserved == -1)
+      firstObserved = 0;
+    int duration = (lastObserved - firstObserved) + 1;
+
+    // Smooth only the window during which we observed the marker (don't smooth
+    // to the 0's on frames where we weren't observing the marker)
+    AccelerationSmoother smoother(duration, 0.3, 1.0);
+    mMarkers[markerName] = smoother.smooth(
+        mMarkers[markerName].block(0, firstObserved, 3, duration));
   }
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markers;
@@ -720,7 +757,6 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
       int index = traces[j].getIndexForTimestep(t);
       if (index != -1)
       {
-        /*
         // Ignore points that we specifically asked to drop
         if (index < traces[j].mDropPoint.size() && traces[j].mDropPoint[index])
         {
@@ -735,12 +771,47 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
           Eigen::Vector3s point = traces[j].mPoints[index];
           frame[traceLabels[j]] = point;
         }
-        */
+
         Eigen::Vector3s point = traces[j].mPoints[index];
         frame[traceLabels[j]] = point;
       }
     }
     correctedObservations.push_back(frame);
+  }
+
+  // 2.1. Count the number of observations of each marker name
+  std::map<std::string, int> observationCount;
+  for (auto& obs : correctedObservations)
+  {
+    for (auto& pair : obs)
+    {
+      if (observationCount.count(pair.first) == 0)
+      {
+        observationCount[pair.first] = 0;
+      }
+      observationCount[pair.first]++;
+    }
+  }
+
+  // 2.2. Drop any marker observations that occur too infrequently.
+  std::vector<std::string> markersToDrop;
+  for (auto& pair : observationCount)
+  {
+    s_t percentage = (s_t)pair.second / (s_t)immutableMarkerObservations.size();
+    if (percentage < 0.1)
+    {
+      report.warnings.push_back(
+          "Dropping marker \"" + pair.first + "\", only on "
+          + std::to_string(percentage * 100) + " percent of frames");
+      markersToDrop.push_back(pair.first);
+    }
+  }
+  for (auto& obs : correctedObservations)
+  {
+    for (std::string drop : markersToDrop)
+    {
+      obs.erase(drop);
+    }
   }
 
   RippleReductionProblem rippleReduction(correctedObservations);

@@ -114,7 +114,7 @@ public:
   RippleReductionProblem(
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
 
-  void dropSuspiciousPoints(MarkersErrorReport* report = nullptr);
+  int dropSuspiciousPoints(MarkersErrorReport* report = nullptr);
 
   void interpolateMissingPoints();
 

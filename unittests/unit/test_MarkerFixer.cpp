@@ -45,11 +45,18 @@ TEST(MarkerFixer, SPRINTER_ARM_RIPPLE)
 {
   // Get the raw marker trajectory data
   OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
-      "dart://sample/grf/Sprinter/MarkerData/JA1Gait35.trc");
+      "dart://sample/grf/Sprinter2/MarkerData/JA1Gait35.trc");
 
   RippleReductionProblem problem(markerTrajectories.markerTimesteps);
-  problem.smooth();
-  problem.saveToGUI("LARM", "../../../javascript/src/data/movement2.bin");
+  MarkersErrorReport report;
+  problem.smooth(&report);
+  for (std::string warning : report.warnings)
+  {
+    std::cout << "WARN: " << warning << std::endl;
+  }
+  // LARM
+  // RP5MT
+  problem.saveToGUI("RTOE", "../../../javascript/src/data/movement2.bin");
 }
 #endif
 

@@ -9,6 +9,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
+#include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -2518,6 +2519,13 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     poseTrials = trimmedPoseTrials;
     markerObservationTrials = trimmedMarkerObservationTrials;
     forcePlateTrials = trimmedForcePlateTrials;
+  }
+
+  for (int i = 0; i < markerObservationTrials.size(); i++)
+  {
+    auto report = MarkerFixer::generateDataErrorsReport(
+        markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
+    markerObservationTrials[i] = report.markerObservationsAttemptedFixed;
   }
 
   std::vector<dynamics::BodyNode*> footNodes;
@@ -5144,8 +5152,8 @@ TEST(DynamicsFitter, END_TO_END_SPRINTER)
       c3dFiles,
       trcFiles,
       grfFiles,
-      200,
-      87,
+      -1,
+      0,
       true);
 }
 #endif

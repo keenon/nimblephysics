@@ -6838,7 +6838,7 @@ bool DynamicsFitProblem::eval_f(
   (void)_new_x;
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
 
-  _obj_value = (double)computeLossParallel(x.cast<s_t>(), true);
+  _obj_value = (double)computeLossParallel(x.cast<s_t>(), false);
 
   return true;
 }
@@ -8013,7 +8013,8 @@ void DynamicsFitter::smoothAccelerations(
     std::cout << "Smoothing jitter in joint accelerations for trial " << trial
               << "/" << init->poseTrials.size() << std::endl;
     // 0.05
-    AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.05);
+    AccelerationSmoother smoother(
+        init->poseTrials[trial].cols(), 1, 0.05, false);
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
     // Controversial: Smooth the original poses, too, so we're not regularizing
@@ -13278,6 +13279,10 @@ void DynamicsFitter::saveDynamicsToGUI(
             points,
             markerErrorLayerColor,
             markerErrorLayerName);
+      }
+      else
+      {
+        server.deleteObject("error_" + pair.first);
       }
     }
 
