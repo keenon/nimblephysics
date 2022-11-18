@@ -1,6 +1,7 @@
 #include "dart/biomechanics/DynamicsFitter.hpp"
 
 #include <algorithm>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -23,6 +24,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/AssignmentMatcher.hpp"
 #include "dart/math/FiniteDifference.hpp"
@@ -42,7 +44,7 @@ using namespace Ipopt;
 //==============================================================================
 ResidualForceHelper::ResidualForceHelper(
     std::shared_ptr<dynamics::Skeleton> skeleton, std::vector<int> forceBodies)
-  : mSkel(skeleton)
+  : mSkel(skeleton), mForceBodies(forceBodies)
 {
   for (int i : forceBodies)
   {
@@ -1631,6 +1633,53 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
 
   A.block<6, 6>(0, 0) = Eigen::Matrix6s::Identity();
 
+  std::vector<Eigen::Matrix6s> dAcc_dOffsetPoses;
+  dAcc_dOffsetPoses.resize(numTimesteps, Eigen::Matrix6s::Zero());
+  std::vector<Eigen::Matrix6s> dAcc_dOffsetVels;
+  dAcc_dOffsetVels.resize(numTimesteps, Eigen::Matrix6s::Zero());
+
+  int numThreads = 16;
+  std::vector<std::future<void>> futures;
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = mSkel->cloneSkeleton();
+    futures.push_back(std::async([skel,
+                                  threadIdx,
+                                  numTimesteps,
+                                  numThreads,
+                                  &qs,
+                                  &dqs,
+                                  &ddqs,
+                                  &forces,
+                                  &dAcc_dOffsetPoses,
+                                  &dAcc_dOffsetVels,
+                                  this] {
+      ResidualForceHelper threadHelper(skel, mForceBodies);
+      for (int t = 1; t < numTimesteps; t++)
+      {
+        if ((t - threadIdx) % numThreads == 0)
+        {
+          skel->setPositions(qs.col(t));
+          skel->setVelocities(dqs.col(t));
+
+          dAcc_dOffsetPoses[t]
+              = threadHelper
+                    .calculateResidualFreeRootAccelerationJacobianWrtPosition(
+                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+          dAcc_dOffsetVels[t]
+              = threadHelper
+                    .calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+        }
+      }
+    }));
+  }
+
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    (void)futures[threadIdx].get();
+  }
+
   int missingCursor = 0;
   for (int t = 1; t < numTimesteps; t++)
   {
@@ -1674,16 +1723,17 @@ ResidualForceHelper::getRootTrajectoryLinearSystem(
     // numTimesteps
     //           << std::endl;
 
-    // Set these values to allow cacheing the mass matrix between the two jacobian computations below
+    // Set these values to allow cacheing the mass matrix between the two
+    // jacobian computations below
     mSkel->setPositions(qs.col(t));
     mSkel->setVelocities(dqs.col(t));
 
-    const Eigen::Matrix6s dAcc_dOffsetPos
-        = calculateResidualFreeRootAccelerationJacobianWrtPosition(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-    const Eigen::Matrix6s dAcc_dOffsetVel
-        = calculateResidualFreeRootAccelerationJacobianWrtVelocity(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix6s dAcc_dOffsetPos = dAcc_dOffsetPoses[t];
+    // = calculateResidualFreeRootAccelerationJacobianWrtPosition(
+    //     qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix6s dAcc_dOffsetVel = dAcc_dOffsetVels[t];
+    // = calculateResidualFreeRootAccelerationJacobianWrtVelocity(
+    //     qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
 
     const Eigen::Matrix6s dAcc_dInputPos
         = dAcc_dOffsetPos; // technically: dAcc_dOffsetPos *
@@ -2206,11 +2256,40 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     accOffset.push_back(offset);
   }
 
+  int numThreads = 16;
+
   std::vector<Eigen::Vector3s> angAcc;
-  for (int t = 0; t < qs.cols(); t++)
+  angAcc.resize(numTimesteps, Eigen::Vector3s::Zero());
+
+  std::vector<std::future<void>> angFutures;
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    angAcc.push_back(calculateResidualFreeAngularAcceleration(
-        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t)));
+    std::shared_ptr<dynamics::Skeleton> skel = mSkel->cloneSkeleton();
+    angFutures.push_back(std::async([skel,
+                                     threadIdx,
+                                     numTimesteps,
+                                     numThreads,
+                                     &qs,
+                                     &dqs,
+                                     &ddqs,
+                                     &forces,
+                                     &angAcc,
+                                     this] {
+      ResidualForceHelper threadHelper(skel, mForceBodies);
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        if ((t + threadIdx) % numThreads == 0)
+        {
+          angAcc[t] = threadHelper.calculateResidualFreeAngularAcceleration(
+              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+        }
+      }
+    }));
+  }
+
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    (void)angFutures[threadIdx].get();
   }
 
   // This has one col each for start COM positions, start COM velocities,
@@ -2306,6 +2385,64 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     originalCOMPositions(zRow) = coms[t](2);
   }
 
+  std::vector<Eigen::Vector3s> residualFreeAngularAccs;
+  residualFreeAngularAccs.resize(numTimesteps, Eigen::Vector3s::Zero());
+  std::vector<Eigen::Matrix3s> angAccWrtPoses;
+  angAccWrtPoses.resize(numTimesteps, Eigen::Matrix3s::Zero());
+  std::vector<Eigen::Matrix3s> angAccWrtVels;
+  angAccWrtVels.resize(numTimesteps, Eigen::Matrix3s::Zero());
+
+  std::vector<std::future<void>> futures;
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skel = mSkel->cloneSkeleton();
+    futures.push_back(std::async([skel,
+                                  threadIdx,
+                                  numTimesteps,
+                                  numThreads,
+                                  &comOffset,
+                                  &comVelOffset,
+                                  &qs,
+                                  &dqs,
+                                  &ddqs,
+                                  &forces,
+                                  &residualFreeAngularAccs,
+                                  &angAccWrtPoses,
+                                  &angAccWrtVels,
+                                  this] {
+      ResidualForceHelper threadHelper(skel, mForceBodies);
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        if ((t + threadIdx) % numThreads == 0)
+        {
+          Eigen::VectorXs q = qs.col(t);
+          Eigen::VectorXs dq = dqs.col(t);
+          q.segment<3>(3) = comOffset.segment<3>(t * 3);
+          dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+          residualFreeAngularAccs[t]
+              = threadHelper.calculateResidualFreeAngularAcceleration(
+                  q, dq, ddqs.col(t), forces.col(t));
+
+          skel->setPositions(qs.col(t));
+          skel->setVelocities(dqs.col(t));
+          angAccWrtPoses[t]
+              = threadHelper
+                    .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+          angAccWrtVels[t]
+              = threadHelper
+                    .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+        }
+      }
+    }));
+  }
+
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    (void)futures[threadIdx].get();
+  }
+
   Eigen::Vector3s angularPos = Eigen::Vector3s::Zero();
   Eigen::Vector3s angularVel = Eigen::Vector3s::Zero();
   Eigen::VectorXs angularOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
@@ -2315,21 +2452,16 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
   {
     angularOffset.segment<3>(t * 3) = angularPos;
 
-    Eigen::VectorXs q = qs.col(t);
-    Eigen::VectorXs dq = dqs.col(t);
-    q.segment<3>(3) = comOffset.segment<3>(t * 3);
-    dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
-    Eigen::Vector3s angularAcc = calculateResidualFreeAngularAcceleration(
-        q, dq, ddqs.col(t), forces.col(t));
+    const Eigen::Vector3s& angularAcc = residualFreeAngularAccs[t];
     angularVel += angularAcc * dt;
     angularPos += angularVel * dt;
 
-    Eigen::Matrix3s angAccWrtPos
-        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-    Eigen::Matrix3s angAccWrtVel
-        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix3s& angAccWrtPos = angAccWrtPoses[t];
+    // = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+    //     qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix3s& angAccWrtVel = angAccWrtVels[t];
+    // = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+    //     qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
     for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
     {
       Eigen::Matrix3s dAngAcc
@@ -3053,11 +3185,41 @@ DynamicsFitProblem::DynamicsFitProblem(
       = std::make_shared<ResidualForceHelper>(mSkeleton, mInit->grfBodyIndices);
   mSpatialNewtonHelper = std::make_shared<SpatialNewtonHelper>(mSkeleton);
 
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    std::shared_ptr<dynamics::Skeleton> skelClone = mSkeleton->cloneSkeleton();
+    skelClone->setGravity(mSkeleton->getGravity());
+    skelClone->setTimeStep(mSkeleton->getTimeStep());
+    mThreadSkeletons.push_back(skelClone);
+
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> threadMarkers;
+    for (auto& pair : mMarkers)
+    {
+      threadMarkers.emplace_back(
+          skelClone->getBodyNode(pair.first->getName()), pair.second);
+    }
+    mThreadMarkers.push_back(threadMarkers);
+
+    std::vector<dynamics::Joint*> threadJoints;
+    for (dynamics::Joint* j : mInit->joints)
+    {
+      threadJoints.push_back(skelClone->getJoint(j->getName()));
+    }
+    mThreadJoints.push_back(threadJoints);
+
+    mThreadResidualHelpers.push_back(std::make_shared<ResidualForceHelper>(
+        skelClone, mInit->grfBodyIndices));
+    mThreadSpatialNewtonHelpers.push_back(
+        std::make_shared<SpatialNewtonHelper>(skelClone));
+  }
+
   mInitX = flatten();
+  // Set all the thread copies to the same values
+  unflatten(mInitX);
 
   mLastX = mInitX;
   std::cout << "Getting initial loss:" << std::endl;
-  s_t initialLoss = computeLoss(mInitX, true);
+  s_t initialLoss = computeLossParallel(mInitX, true);
   std::cout << "Got initial loss:" << initialLoss << std::endl;
   mBestObjectiveValueState = mInitX;
   mBestObjectiveValue = initialLoss;
@@ -3347,24 +3509,40 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
   {
     int dim = mSkeleton->getNumScaleGroups();
     mSkeleton->setGroupMasses(x.segment(cursor, dim));
+    for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+    {
+      mThreadSkeletons[threadIdx]->setGroupMasses(x.segment(cursor, dim));
+    }
     cursor += dim;
   }
   if (mConfig.mIncludeCOMs)
   {
     int dim = mSkeleton->getNumScaleGroups() * 3;
     mSkeleton->setGroupCOMs(x.segment(cursor, dim));
+    for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+    {
+      mThreadSkeletons[threadIdx]->setGroupCOMs(x.segment(cursor, dim));
+    }
     cursor += dim;
   }
   if (mConfig.mIncludeInertias)
   {
     int dim = mSkeleton->getNumScaleGroups() * 6;
     mSkeleton->setGroupInertias(x.segment(cursor, dim));
+    for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+    {
+      mThreadSkeletons[threadIdx]->setGroupInertias(x.segment(cursor, dim));
+    }
     cursor += dim;
   }
   if (mConfig.mIncludeBodyScales)
   {
     int dim = mSkeleton->getGroupScaleDim();
     mSkeleton->setGroupScales(x.segment(cursor, dim));
+    for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+    {
+      mThreadSkeletons[threadIdx]->setGroupScales(x.segment(cursor, dim));
+    }
     cursor += dim;
   }
   if (mConfig.mIncludeMarkerOffsets)
@@ -3372,6 +3550,10 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
     for (int i = 0; i < mMarkers.size(); i++)
     {
       mMarkers[i].second = x.segment(cursor, 3);
+      for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+      {
+        mThreadMarkers[threadIdx][i].second = x.segment(cursor, 3);
+      }
       cursor += 3;
     }
   }
@@ -3532,6 +3714,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
 
   for (auto& block : mBlocks)
   {
+    mSkeleton->setTimeStep(mInit->trialTimesteps[block.trial]);
     for (int t = 0; t < block.len; t++)
     {
       int realT = block.start + t;
@@ -3673,6 +3856,354 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   return sum;
 }
 
+struct LossExplanation
+{
+  s_t linearNewtonError;
+  s_t residualRMS;
+  s_t markerRMS;
+  s_t poseRegularization;
+  s_t accRegularization;
+  s_t jointRMS;
+  s_t axisRMS;
+  int markerCount;
+};
+
+//==============================================================================
+// This gets the value of the loss function, as a weighted sum of the
+// discrepancy between measured and expected GRF data and other regularization
+// terms.
+s_t DynamicsFitProblem::computeLossParallel(
+    Eigen::VectorXs x, bool logExplanation)
+{
+  unflatten(x);
+
+  s_t sum = 0.0;
+
+  /*
+  if (logExplanation)
+  {
+    Eigen::MatrixXs compare
+        = Eigen::MatrixXs::Zero(mSkeleton->getNumScaleGroups(), 5);
+    compare.col(0) = mSkeleton->getGroupMasses();
+    compare.col(1) = mInit->originalGroupMasses;
+    compare.col(2) = mSkeleton->getGroupMassesUpperBound();
+    compare.col(3) = mSkeleton->getGroupMassesLowerBound();
+    compare.col(4) = (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
+    std::cout << "masses - orig - upper - lower - diff" << std::endl
+              << compare << std::endl;
+  }
+  */
+
+  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
+  {
+    std::cout << "Don't ask for loss before you've called "
+                 "DynamicsFitter::estimateFootGroundContacts() with this init "
+                 "object! Killing the process with exit 1."
+              << std::endl;
+    exit(1);
+  }
+
+  s_t massRegularization
+      = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses)
+              .squaredNorm();
+  sum += massRegularization;
+  assert(!isnan(sum));
+  s_t comRegularization
+      = mConfig.mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs).squaredNorm();
+  sum += comRegularization;
+  assert(!isnan(sum));
+  s_t inertiaRegularization
+      = mConfig.mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias)
+              .squaredNorm();
+  sum += inertiaRegularization;
+  assert(!isnan(sum));
+  s_t scaleRegularization
+      = mConfig.mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
+        * (mSkeleton->getGroupScales() - mInit->originalGroupScales)
+              .squaredNorm();
+  sum += scaleRegularization;
+  assert(!isnan(sum));
+  s_t markerRegularization = 0.0;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (mInit->originalMarkerOffsets.count(mMarkerNames.at(i)))
+    {
+      markerRegularization
+          += (mMarkerIsTracking[i] ? mConfig.mRegularizeTrackingMarkerOffsets
+                                   : mConfig.mRegularizeAnatomicalMarkerOffsets)
+             * (1.0 / mMarkerNames.size())
+             * (mMarkers[i].second
+                - mInit->originalMarkerOffsets.at(mMarkerNames.at(i)))
+                   .squaredNorm();
+    }
+    assert(!isnan(markerRegularization));
+  }
+  sum += markerRegularization;
+
+  s_t densityRegularization = 0.0;
+  Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+  Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+  for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+  {
+    s_t mass = masses(i);
+    Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+    s_t volume = dims(0) * dims(1) * dims(2);
+    s_t density = mass / volume;
+    s_t error = HUMAN_DENSITY_KG_M3 - density;
+    densityRegularization += mConfig.mRegularizeImpliedDensity * error * error;
+  }
+  sum += densityRegularization;
+
+  Eigen::VectorXs originalPos = mSkeleton->getPositions();
+  mSkeleton->clearExternalForces();
+
+  int totalTimesteps = 0;
+  int totalAccTimesteps = 0;
+  for (auto& block : mBlocks)
+  {
+    totalTimesteps += block.len;
+    for (int t = 0; t < block.len; t++)
+    {
+      int realT = block.start + t;
+      if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1)
+      {
+        // Add force residual RMS errors to all the middle timesteps
+        if (!mInit->probablyMissingGRF[block.trial][realT])
+        {
+          totalAccTimesteps++;
+        }
+      }
+    }
+  }
+
+  std::vector<struct LossExplanation> threadLossExplanations;
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    threadLossExplanations.emplace_back();
+    struct LossExplanation& threadLoss = threadLossExplanations[threadIdx];
+    threadLoss.linearNewtonError = 0.0;
+    threadLoss.residualRMS = 0.0;
+    threadLoss.markerRMS = 0.0;
+    threadLoss.poseRegularization = 0.0;
+    threadLoss.accRegularization = 0.0;
+    threadLoss.jointRMS = 0.0;
+    threadLoss.axisRMS = 0.0;
+    threadLoss.markerCount = 0;
+  }
+
+  std::vector<std::future<void>> futures;
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    futures.push_back(std::async([&threadLossExplanations,
+                                  this,
+                                  threadIdx,
+                                  totalAccTimesteps,
+                                  totalTimesteps] {
+      struct LossExplanation& threadLoss = threadLossExplanations[threadIdx];
+      mThreadSkeletons[threadIdx]->clearExternalForces();
+
+      for (int blockIdx = 0; blockIdx < mBlocks.size(); blockIdx++)
+      {
+        if ((blockIdx + threadIdx) % mConfig.mNumThreads != 0)
+        {
+          continue;
+        }
+
+        auto& block = mBlocks[blockIdx];
+
+        mThreadSkeletons[threadIdx]->setTimeStep(
+            mInit->trialTimesteps[block.trial]);
+
+        for (int t = 0; t < block.len; t++)
+        {
+          int realT = block.start + t;
+
+          mSkeleton->setPositions(block.pos.col(t));
+          mThreadSkeletons[threadIdx]->setPositions(block.pos.col(t));
+
+          // Add force residual RMS errors to all the middle timesteps
+          if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1
+              && !mInit->probablyMissingGRF[block.trial][realT])
+          {
+            if (mConfig.mLinearNewtonWeight > 0)
+            {
+              s_t cost = mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateLinearForceGapNorm(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   mConfig.mLinearNewtonUseL1);
+              threadLoss.linearNewtonError += cost;
+              assert(!isnan(threadLoss.linearNewtonError));
+            }
+            if (mConfig.mResidualWeight > 0)
+            {
+              s_t cost
+                  = mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                    * mThreadResidualHelpers[threadIdx]->calculateResidualNorm(
+                        block.pos.col(t),
+                        block.vel.col(t),
+                        block.acc.col(t),
+                        block.grf.col(t),
+                        mConfig.mResidualTorqueMultiple,
+                        mConfig.mResidualUseL1);
+              threadLoss.residualRMS += cost;
+              assert(!isnan(threadLoss.residualRMS));
+            }
+            if (mConfig.mRegularizeAcc > 0)
+            {
+              s_t cost = mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateAccelerationNorm(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   mConfig.mRegularizeAccBodyWeights,
+                                   mConfig.mRegularizeAccUseL1);
+              threadLoss.accRegularization += cost;
+              assert(!isnan(threadLoss.accRegularization));
+            }
+          }
+
+          // Add marker RMS errors to every timestep
+          auto markerPoses
+              = mThreadSkeletons[threadIdx]->getMarkerWorldPositions(
+                  mThreadMarkers[threadIdx]);
+          auto observedMarkerPoses
+              = mInit->markerObservationTrials[block.trial][realT];
+          for (int i = 0; i < mMarkerNames.size(); i++)
+          {
+            Eigen::Vector3s marker = markerPoses.segment<3>(i * 3);
+            if (observedMarkerPoses.count(mMarkerNames[i]))
+            {
+              Eigen::Vector3s diff
+                  = observedMarkerPoses.at(mMarkerNames[i]) - marker;
+              s_t thisMarkerCost;
+              if (mConfig.mMarkerUseL1)
+              {
+                thisMarkerCost = diff.norm();
+              }
+              else
+              {
+                thisMarkerCost = diff.squaredNorm();
+              }
+              threadLoss.markerRMS += thisMarkerCost;
+              threadLoss.markerCount++;
+              assert(!isnan(threadLoss.markerRMS));
+            }
+          }
+
+          // Add joints
+          Eigen::VectorXs jointPoses
+              = mThreadSkeletons[threadIdx]->getJointWorldPositions(
+                  mThreadJoints[threadIdx]);
+          Eigen::VectorXs jointCenters
+              = mInit->jointCenters[block.trial].col(realT);
+          Eigen::VectorXs jointAxis = mInit->jointAxis[block.trial].col(realT);
+          Eigen::VectorXs jointDiff = jointPoses - jointCenters;
+          for (int i = 0; i < mInit->jointWeights.size(); i++)
+          {
+            threadLoss.jointRMS += (jointPoses.segment<3>(i * 3)
+                                    - jointCenters.segment<3>(i * 3))
+                                       .squaredNorm()
+                                   * mInit->jointWeights(i);
+          }
+          for (int i = 0; i < mInit->axisWeights.size(); i++)
+          {
+            Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
+            Eigen::Vector3s axisDir
+                = jointAxis.segment<3>(i * 6 + 3).normalized();
+            Eigen::Vector3s actualJointPos = jointPoses.segment<3>(i * 3);
+            // Subtract out any component parallel to the axis
+            Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
+            jointDiff -= jointDiff.dot(axisDir) * axisDir;
+            threadLoss.axisRMS
+                += jointDiff.squaredNorm() * mInit->axisWeights(i);
+          }
+
+          // Add regularization
+          threadLoss.poseRegularization
+              += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
+                 * (block.pos.col(t)
+                    - mInit->originalPoses[block.trial].col(realT))
+                       .squaredNorm();
+          assert(!isnan(threadLoss.poseRegularization));
+        }
+      }
+    }));
+  }
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    (void)futures[threadIdx].get();
+  }
+
+  s_t linearNewtonError = 0.0;
+  s_t residualRMS = 0.0;
+  s_t markerRMS = 0.0;
+  s_t poseRegularization = 0.0;
+  s_t accRegularization = 0.0;
+  s_t jointRMS = 0.0;
+  s_t axisRMS = 0.0;
+  int markerCount = 0;
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    linearNewtonError += threadLossExplanations[threadIdx].linearNewtonError;
+    residualRMS += threadLossExplanations[threadIdx].residualRMS;
+    markerRMS += threadLossExplanations[threadIdx].markerRMS;
+    poseRegularization += threadLossExplanations[threadIdx].poseRegularization;
+    accRegularization += threadLossExplanations[threadIdx].accRegularization;
+    jointRMS += threadLossExplanations[threadIdx].jointRMS;
+    axisRMS += threadLossExplanations[threadIdx].axisRMS;
+    markerCount += threadLossExplanations[threadIdx].markerCount;
+  }
+
+  sum += linearNewtonError;
+  sum += residualRMS;
+  sum += accRegularization;
+  markerRMS *= mConfig.mMarkerWeight;
+  if (markerCount > 0)
+  {
+    markerRMS /= markerCount;
+  }
+  sum += markerRMS;
+  jointRMS *= mConfig.mJointWeight;
+  sum += jointRMS;
+  axisRMS *= mConfig.mJointWeight;
+  sum += axisRMS;
+  sum += poseRegularization;
+  assert(!isnan(sum));
+
+  if (logExplanation)
+  {
+    std::cout << "["
+              << "massR=" << massRegularization << ",comR=" << comRegularization
+              << ",inR=" << inertiaRegularization
+              << ",dnsR=" << densityRegularization
+              << ",scR=" << scaleRegularization
+              << ",mkrR=" << markerRegularization
+              << ",accR=" << accRegularization << ",jntRMS=" << jointRMS
+              << ",axisRMS=" << axisRMS << ",qR=" << poseRegularization
+              << ",fRMS=" << residualRMS << ",linF=" << linearNewtonError
+              << ",mkRMS=" << markerRMS << "]" << std::endl;
+  }
+
+  // // Check against linear:
+  // s_t linearSum = computeLoss(x, logExplanation);
+  // if (abs(linearSum - sum) > 1e-10)
+  // {
+  //   std::cout << "Parallel doesn't equal linear loss! Diff="
+  //             << abs(linearSum - sum) << std::endl;
+  //   exit(1);
+  // }
+
+  return sum;
+}
+
 //==============================================================================
 // This gets the gradient of the loss function
 Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
@@ -3721,7 +4252,6 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
     }
   }
   if (mIncludePoses)
-  {
   */
   if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
   {
@@ -4337,6 +4867,741 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   }
 
   assert(posesCursor == grad.size());
+
+  return grad;
+}
+
+//==============================================================================
+// This gets the gradient of the loss function
+Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
+{
+  unflatten(x);
+
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(getProblemSize());
+  const int dofs = mSkeleton->getNumDofs();
+
+  /*
+  //////////////////////
+  // From flatten():
+  //////////////////////
+
+  int cursor = 0;
+  if (mIncludeMasses)
+  {
+    int dim = mSkeleton->getNumScaleGroups();
+    mSkeleton->setGroupMasses(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeCOMs)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 3;
+    mSkeleton->setGroupCOMs(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeInertias)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 6;
+    mSkeleton->setGroupInertias(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeBodyScales)
+  {
+    int dim = mSkeleton->getGroupScaleDim();
+    mSkeleton->setGroupScales(x.segment(cursor, dim));
+    cursor += dim;
+  }
+  if (mIncludeMarkerOffsets)
+  {
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      mMarkers[i].second = x.segment(cursor, 3);
+      cursor += 3;
+    }
+  }
+  if (mIncludePoses)
+  */
+  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
+  {
+    std::cout << "Don't ask for gradients before you've called "
+                 "DynamicsFitter::estimateFootGroundContacts() with this init "
+                 "object! Killing the process with exit 1."
+              << std::endl;
+    exit(1);
+  }
+
+  int posesCursor = 0;
+  if (mConfig.mIncludeMasses)
+  {
+    int dim = mSkeleton->getNumScaleGroups();
+    grad.segment(posesCursor, dim)
+        += mConfig.mRegularizeMasses * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
+           * (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
+
+    Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+    Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+    for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+    {
+      s_t mass = masses(i);
+      Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+      s_t volume = dims(0) * dims(1) * dims(2);
+      grad(posesCursor + i) += mConfig.mRegularizeImpliedDensity
+                               * (2 * mass - 2 * volume * HUMAN_DENSITY_KG_M3)
+                               / (volume * volume);
+    }
+
+    posesCursor += dim;
+  }
+  if (mConfig.mIncludeCOMs)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 3;
+    grad.segment(posesCursor, dim)
+        += mConfig.mRegularizeCOMs * 2 * (1.0 / mSkeleton->getNumScaleGroups())
+           * (mSkeleton->getGroupCOMs() - mInit->originalGroupCOMs);
+    posesCursor += dim;
+  }
+  if (mConfig.mIncludeInertias)
+  {
+    int dim = mSkeleton->getNumScaleGroups() * 6;
+    grad.segment(posesCursor, dim)
+        += mConfig.mRegularizeInertias * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
+           * (mSkeleton->getGroupInertias() - mInit->originalGroupInertias);
+
+    Eigen::VectorXs masses = mSkeleton->getGroupMasses();
+    Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
+    for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+    {
+      s_t mass = masses(i);
+      Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+      s_t volume = dims(0) * dims(1) * dims(2);
+      s_t constant
+          = mConfig.mRegularizeImpliedDensity
+            * (2 * mass * HUMAN_DENSITY_KG_M3 * volume - 2 * mass * mass)
+            / (volume * volume);
+      grad(posesCursor + i * 6 + 0) += constant / dims(0);
+      grad(posesCursor + i * 6 + 1) += constant / dims(1);
+      grad(posesCursor + i * 6 + 2) += constant / dims(2);
+    }
+
+    posesCursor += dim;
+  }
+  if (mConfig.mIncludeBodyScales)
+  {
+    int dim = mSkeleton->getGroupScaleDim();
+    grad.segment(posesCursor, dim)
+        += mConfig.mRegularizeBodyScales * 2
+           * (1.0 / mSkeleton->getNumScaleGroups())
+           * (mSkeleton->getGroupScales() - mInit->originalGroupScales);
+    posesCursor += dim;
+  }
+  if (mConfig.mIncludeMarkerOffsets)
+  {
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      grad.segment<3>(posesCursor)
+          += 2
+             * (mMarkerIsTracking[i]
+                    ? mConfig.mRegularizeTrackingMarkerOffsets
+                    : mConfig.mRegularizeAnatomicalMarkerOffsets)
+             * (1.0 / mMarkerNames.size())
+             * (mMarkers[i].second
+                - mInit->originalMarkerOffsets[mMarkerNames[i]]);
+      posesCursor += 3;
+    }
+  }
+
+  int totalTimesteps = 0;
+  int totalAccTimesteps = 0;
+  for (auto& block : mBlocks)
+  {
+    totalTimesteps += block.len;
+    for (int t = 0; t < block.len; t++)
+    {
+      int realT = block.start + t;
+      if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1)
+      {
+        // Add force residual RMS errors to all the middle timesteps
+        if (!mInit->probablyMissingGRF[block.trial][realT])
+        {
+          totalAccTimesteps++;
+        }
+      }
+    }
+  }
+  int markerCount = 0;
+  for (auto& block : mBlocks)
+  {
+    for (int t = 0; t < block.len; t++)
+    {
+      int realT = block.start + t;
+
+      auto& markerObservations
+          = mInit->markerObservationTrials[block.trial][realT];
+      for (int i = 0; i < mMarkers.size(); i++)
+      {
+        if (markerObservations.count(mMarkerNames[i]))
+        {
+          markerCount++;
+        }
+      }
+    }
+  }
+
+  int initialPosesCursor = posesCursor;
+  std::vector<std::future<Eigen::VectorXs>> futures;
+  int gradSize = grad.size();
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    futures.push_back(std::async([initialPosesCursor,
+                                  this,
+                                  threadIdx,
+                                  dofs,
+                                  gradSize,
+                                  markerCount,
+                                  totalAccTimesteps,
+                                  totalTimesteps] {
+      int posesCursor = initialPosesCursor;
+      Eigen::VectorXs threadGrad = Eigen::VectorXs::Zero(gradSize);
+      for (int blockIdx = 0; blockIdx < mBlocks.size(); blockIdx++)
+      {
+        auto& block = mBlocks[blockIdx];
+        s_t dt = block.dt;
+        int blockStart = posesCursor;
+
+        if ((blockIdx + threadIdx) % mConfig.mNumThreads != 0)
+        {
+          posesCursor += (2 + block.len) * dofs;
+          continue;
+        }
+
+        for (int t = 0; t < block.len; t++)
+        {
+          int realT = block.start + t;
+
+          mThreadSkeletons[threadIdx]->setPositions(block.pos.col(t));
+          Eigen::VectorXs lossGradWrtMarkerError
+              = Eigen::VectorXs::Zero(mThreadMarkers[threadIdx].size() * 3);
+          auto& markerObservations
+              = mInit->markerObservationTrials[block.trial][realT];
+          auto markerPoses
+              = mThreadSkeletons[threadIdx]->getMarkerWorldPositions(
+                  mThreadMarkers[threadIdx]);
+          for (int i = 0; i < mThreadMarkers[threadIdx].size(); i++)
+          {
+            if (markerObservations.count(mMarkerNames[i]))
+            {
+              Eigen::Vector3s markerOffset
+                  = markerPoses.segment<3>(i * 3)
+                    - markerObservations.at(mMarkerNames[i]);
+              if (mConfig.mMarkerUseL1)
+              {
+                markerOffset.normalize();
+              }
+              else
+              {
+                markerOffset *= 2;
+              }
+              lossGradWrtMarkerError.segment<3>(i * 3)
+                  = (mConfig.mMarkerWeight / markerCount) * markerOffset;
+            }
+          }
+
+          Eigen::VectorXs jointGrad
+              = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
+          Eigen::VectorXs worldJoints
+              = mThreadSkeletons[threadIdx]->getJointWorldPositions(
+                  mThreadJoints[threadIdx]);
+          Eigen::VectorXs targetJoints
+              = mInit->jointCenters[block.trial].col(realT);
+          Eigen::VectorXs targetAxis = mInit->jointAxis[block.trial].col(realT);
+          for (int i = 0; i < mInit->joints.size(); i++)
+          {
+            Eigen::Vector3s worldDiff = worldJoints.segment<3>(i * 3)
+                                        - targetJoints.segment<3>(i * 3);
+            jointGrad.segment<3>(i * 3)
+                += 2 * worldDiff * mInit->jointWeights(i);
+
+            Eigen::Vector3s axisDiff
+                = worldJoints.segment<3>(i * 3) - targetAxis.segment<3>(i * 6);
+            Eigen::Vector3s axis
+                = targetAxis.segment<3>(i * 6 + 3).normalized();
+            axisDiff -= axisDiff.dot(axis) * axis;
+            jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights(i);
+          }
+          jointGrad *= mConfig.mJointWeight;
+
+          // We only compute the residual on middle t's, since we can't finite
+          // difference acceleration at the edges of the clip
+          if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1)
+          {
+            int cursor = 0;
+            if (mConfig.mIncludeMasses)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups();
+              if (!mInit->probablyMissingGRF[block.trial][realT])
+              {
+                if (mConfig.mResidualWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mThreadResidualHelpers[threadIdx]
+                               ->calculateResidualNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_MASSES,
+                                   mConfig.mResidualTorqueMultiple,
+                                   mConfig.mResidualUseL1);
+                }
+                if (mConfig.mLinearNewtonWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_MASSES,
+                                   mConfig.mLinearNewtonUseL1);
+                }
+                /*
+                // This should always be 0, and therefore not necessary
+                if (mRegularizeAcc > 0)
+                {
+                  grad.segment(cursor, dim)
+                      += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                             mPoses[trial].col(t),
+                             mVels[trial].col(t),
+                             mAccs[trial].col(t),
+                             mRegularizeAccBodyWeights,
+                             neural::WithRespectTo::GROUP_MASSES,
+                             mRegularizeAccUseL1);
+                }
+                */
+              }
+              cursor += dim;
+            }
+            if (mConfig.mIncludeCOMs)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups() * 3;
+              if (!mInit->probablyMissingGRF[block.trial][realT])
+              {
+                if (mConfig.mResidualWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mThreadResidualHelpers[threadIdx]
+                               ->calculateResidualNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_COMS,
+                                   mConfig.mResidualTorqueMultiple,
+                                   mConfig.mResidualUseL1);
+                }
+                if (mConfig.mLinearNewtonWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_COMS,
+                                   mConfig.mLinearNewtonUseL1);
+                }
+                if (mConfig.mRegularizeAcc > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateAccelerationNormGradient(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   mConfig.mRegularizeAccBodyWeights,
+                                   neural::WithRespectTo::GROUP_COMS,
+                                   mConfig.mRegularizeAccUseL1);
+                }
+              }
+              cursor += dim;
+            }
+            if (mConfig.mIncludeInertias)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups() * 6;
+              if (!mInit->probablyMissingGRF[block.trial][realT])
+              {
+                if (mConfig.mResidualWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mThreadResidualHelpers[threadIdx]
+                               ->calculateResidualNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_INERTIAS,
+                                   mConfig.mResidualTorqueMultiple,
+                                   mConfig.mResidualUseL1);
+                }
+                /*
+                // This should always be 0, and therefore not necessary
+
+                if (mLinearNewtonWeight > 0)
+                {
+                  grad.segment(cursor, dim)
+                      += mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   mPoses[trial].col(t),
+                                   mVels[trial].col(t),
+                                   mAccs[trial].col(t),
+                                   mInit->grfTrials[trial].col(t),
+                                   neural::WithRespectTo::GROUP_INERTIAS,
+                                   mLinearNewtonUseL1);
+                }
+                if (mRegularizeAcc > 0)
+                {
+                  grad.segment(cursor, dim)
+                      += mRegularizeAcc * (1.0 / totalAccTimesteps)
+                         * mSpatialNewtonHelper->calculateAccelerationNormGradient(
+                             mPoses[trial].col(t),
+                             mVels[trial].col(t),
+                             mAccs[trial].col(t),
+                             mRegularizeAccBodyWeights,
+                             neural::WithRespectTo::GROUP_INERTIAS,
+                             mRegularizeAccUseL1);
+                }
+                */
+              }
+              cursor += dim;
+            }
+            if (mConfig.mIncludeBodyScales)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getGroupScaleDim();
+              if (!mInit->probablyMissingGRF[block.trial][realT])
+              {
+                if (mConfig.mResidualWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                         * mThreadResidualHelpers[threadIdx]
+                               ->calculateResidualNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_SCALES,
+                                   mConfig.mResidualTorqueMultiple,
+                                   mConfig.mResidualUseL1);
+                }
+                if (mConfig.mLinearNewtonWeight > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateLinearForceGapNormGradientWrt(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   block.grf.col(t),
+                                   neural::WithRespectTo::GROUP_SCALES,
+                                   mConfig.mLinearNewtonUseL1);
+                }
+                if (mConfig.mRegularizeAcc > 0)
+                {
+                  threadGrad.segment(cursor, dim)
+                      += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                         * mThreadSpatialNewtonHelpers[threadIdx]
+                               ->calculateAccelerationNormGradient(
+                                   block.pos.col(t),
+                                   block.vel.col(t),
+                                   block.acc.col(t),
+                                   mConfig.mRegularizeAccBodyWeights,
+                                   neural::WithRespectTo::GROUP_SCALES,
+                                   mConfig.mRegularizeAccUseL1);
+                }
+              }
+
+              // Record marker gradients
+              threadGrad.segment(cursor, dim)
+                  += MarkerFitter::getMarkerLossGradientWrtGroupScales(
+                      mThreadSkeletons[threadIdx],
+                      mThreadMarkers[threadIdx],
+                      lossGradWrtMarkerError);
+
+              // Record joint gradients
+              threadGrad.segment(cursor, dim)
+                  += mThreadSkeletons[threadIdx]
+                         ->getJointWorldPositionsJacobianWrtGroupScales(
+                             mThreadJoints[threadIdx])
+                         .transpose()
+                     * jointGrad;
+
+              cursor += dim;
+            }
+            if (mConfig.mIncludeMarkerOffsets)
+            {
+              int dim = mThreadMarkers[threadIdx].size() * 3;
+              threadGrad.segment(cursor, dim)
+                  += MarkerFitter::getMarkerLossGradientWrtMarkerOffsets(
+                      mThreadSkeletons[threadIdx],
+                      mThreadMarkers[threadIdx],
+                      lossGradWrtMarkerError);
+              cursor += dim;
+            }
+
+            if (mConfig.mIncludePoses)
+            {
+              Eigen::VectorXs posGrad = Eigen::VectorXs::Zero(dofs);
+              Eigen::VectorXs velGrad = Eigen::VectorXs::Zero(dofs);
+              Eigen::VectorXs accGrad = Eigen::VectorXs::Zero(dofs);
+              if (!mInit->probablyMissingGRF[block.trial][realT])
+              {
+                if (mConfig.mResidualWeight > 0)
+                {
+                  posGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                             * mThreadResidualHelpers[threadIdx]
+                                   ->calculateResidualNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::POSITION,
+                                       mConfig.mResidualTorqueMultiple,
+                                       mConfig.mResidualUseL1);
+                  velGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                             * mThreadResidualHelpers[threadIdx]
+                                   ->calculateResidualNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::VELOCITY,
+                                       mConfig.mResidualTorqueMultiple,
+                                       mConfig.mResidualUseL1);
+                  accGrad += mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                             * mThreadResidualHelpers[threadIdx]
+                                   ->calculateResidualNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::ACCELERATION,
+                                       mConfig.mResidualTorqueMultiple,
+                                       mConfig.mResidualUseL1);
+                }
+                if (mConfig.mLinearNewtonWeight > 0)
+                {
+                  posGrad += mConfig.mLinearNewtonWeight
+                             * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateLinearForceGapNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::POSITION,
+                                       mConfig.mLinearNewtonUseL1);
+                  velGrad += mConfig.mLinearNewtonWeight
+                             * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateLinearForceGapNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::VELOCITY,
+                                       mConfig.mLinearNewtonUseL1);
+                  accGrad += mConfig.mLinearNewtonWeight
+                             * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateLinearForceGapNormGradientWrt(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       block.grf.col(t),
+                                       neural::WithRespectTo::ACCELERATION,
+                                       mConfig.mLinearNewtonUseL1);
+                }
+                if (mConfig.mRegularizeAcc > 0)
+                {
+                  posGrad += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateAccelerationNormGradient(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       mConfig.mRegularizeAccBodyWeights,
+                                       neural::WithRespectTo::POSITION,
+                                       mConfig.mRegularizeAccUseL1);
+                  velGrad += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateAccelerationNormGradient(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       mConfig.mRegularizeAccBodyWeights,
+                                       neural::WithRespectTo::VELOCITY,
+                                       mConfig.mRegularizeAccUseL1);
+                  accGrad += mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                             * mThreadSpatialNewtonHelpers[threadIdx]
+                                   ->calculateAccelerationNormGradient(
+                                       block.pos.col(t),
+                                       block.vel.col(t),
+                                       block.acc.col(t),
+                                       mConfig.mRegularizeAccBodyWeights,
+                                       neural::WithRespectTo::ACCELERATION,
+                                       mConfig.mRegularizeAccUseL1);
+                }
+              }
+
+              // Record marker gradients
+              posGrad += MarkerFitter::getMarkerLossGradientWrtJoints(
+                  mThreadSkeletons[threadIdx],
+                  mThreadMarkers[threadIdx],
+                  lossGradWrtMarkerError);
+
+              // Record regularization
+              posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
+                         * (block.pos.col(t)
+                            - mInit->originalPoses[block.trial].col(realT));
+
+              // Record joint gradients
+              posGrad += mThreadSkeletons[threadIdx]
+                             ->getJointWorldPositionsJacobianWrtJointPositions(
+                                 mThreadJoints[threadIdx])
+                             .transpose()
+                         * jointGrad;
+
+              threadGrad.segment(blockStart, dofs) += posGrad;
+              threadGrad.segment(blockStart + dofs, dofs) += velGrad;
+              // Initial velocity also has a linear effect on position, so
+              // reflect that in the gradients
+              threadGrad.segment(blockStart + dofs, dofs) += posGrad * dt * t;
+
+              threadGrad.segment(blockStart + (dofs * (2 + t)), dofs)
+                  += accGrad;
+
+              for (int pastAccStep = 0; pastAccStep < t; pastAccStep++)
+              {
+                threadGrad.segment(
+                    blockStart + (dofs * (2 + pastAccStep)), dofs)
+                    += dt * velGrad;
+                int stepsSinceAcc = t - pastAccStep;
+                threadGrad.segment(
+                    blockStart + (dofs * (2 + pastAccStep)), dofs)
+                    += dt * dt * stepsSinceAcc * posGrad;
+              }
+            }
+          }
+          else
+          {
+            int cursor = 0;
+            if (mConfig.mIncludeMasses)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups();
+              cursor += dim;
+            }
+            if (mConfig.mIncludeCOMs)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups() * 3;
+              cursor += dim;
+            }
+            if (mConfig.mIncludeInertias)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getNumScaleGroups() * 6;
+              cursor += dim;
+            }
+            if (mConfig.mIncludeBodyScales)
+            {
+              int dim = mThreadSkeletons[threadIdx]->getGroupScaleDim();
+              // Record marker gradients
+              threadGrad.segment(cursor, dim)
+                  += MarkerFitter::getMarkerLossGradientWrtGroupScales(
+                      mThreadSkeletons[threadIdx],
+                      mThreadMarkers[threadIdx],
+                      lossGradWrtMarkerError);
+              // Record joint gradients
+              threadGrad.segment(cursor, dim)
+                  += mThreadSkeletons[threadIdx]
+                         ->getJointWorldPositionsJacobianWrtGroupScales(
+                             mThreadJoints[threadIdx])
+                         .transpose()
+                     * jointGrad;
+
+              cursor += dim;
+            }
+            if (mConfig.mIncludeMarkerOffsets)
+            {
+              int dim = mThreadMarkers[threadIdx].size() * 3;
+              threadGrad.segment(cursor, dim)
+                  += MarkerFitter::getMarkerLossGradientWrtMarkerOffsets(
+                      mThreadSkeletons[threadIdx],
+                      mThreadMarkers[threadIdx],
+                      lossGradWrtMarkerError);
+              cursor += dim;
+            }
+            if (mConfig.mIncludePoses)
+            {
+              Eigen::VectorXs posGrad = Eigen::VectorXs::Zero(dofs);
+              // Record marker gradients
+              posGrad += MarkerFitter::getMarkerLossGradientWrtJoints(
+                  mThreadSkeletons[threadIdx],
+                  mThreadMarkers[threadIdx],
+                  lossGradWrtMarkerError);
+              // Record regularization
+              posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
+                         * (block.pos.col(t)
+                            - mInit->originalPoses[block.trial].col(realT));
+              // Record joint gradients
+              posGrad += mThreadSkeletons[threadIdx]
+                             ->getJointWorldPositionsJacobianWrtJointPositions(
+                                 mThreadJoints[threadIdx])
+                             .transpose()
+                         * jointGrad;
+
+              threadGrad.segment(blockStart, dofs) += posGrad;
+              threadGrad.segment(blockStart + dofs, dofs) += posGrad * dt * t;
+
+              for (int pastAccStep = 0; pastAccStep < t; pastAccStep++)
+              {
+                int stepsSinceAcc = t - pastAccStep;
+                threadGrad.segment(
+                    blockStart + (dofs * (2 + pastAccStep)), dofs)
+                    += dt * dt * stepsSinceAcc * posGrad;
+              }
+            }
+          }
+        }
+
+        posesCursor += (2 + block.len) * dofs;
+      }
+      assert(posesCursor == gradSize);
+      return threadGrad;
+    }));
+  }
+  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  {
+    grad += futures[threadIdx].get();
+  }
+
+  // // Check against single-threaded
+  // Eigen::VectorXs gradSingleThreaded = computeGradient(x);
+  // if ((gradSingleThreaded - grad).norm() > 1e-8)
+  // {
+  //   std::cout << "Grad difference: " << (gradSingleThreaded - grad).norm()
+  //             << std::endl;
+  // }
 
   return grad;
 }
@@ -5131,7 +6396,8 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mRegularizePoses(0.0),
     mMaxBlockSize(20),
     mMaxNumTrials(-1),
-    mOnlyOneTrial(-1)
+    mOnlyOneTrial(-1),
+    mNumThreads(16)
 // mResidualWeight(0.1),
 // mLinearNewtonWeight(0.1),
 // mMarkerWeight(1.0),
@@ -5432,6 +6698,13 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setOnlyOneTrial(int value)
   return *(this);
 }
 
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setNumThreads(int value)
+{
+  mNumThreads = value;
+  return *(this);
+}
+
 //------------------------- Ipopt::TNLP --------------------------------------
 
 //==============================================================================
@@ -5565,7 +6838,7 @@ bool DynamicsFitProblem::eval_f(
   (void)_new_x;
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
 
-  _obj_value = (double)computeLoss(x.cast<s_t>(), true);
+  _obj_value = (double)computeLossParallel(x.cast<s_t>(), true);
 
   return true;
 }
@@ -5582,7 +6855,7 @@ bool DynamicsFitProblem::eval_grad_f(
   Eigen::Map<const Eigen::VectorXd> x(_x, _n);
   Eigen::Map<Eigen::VectorXd> grad(_grad_f, _n);
 
-  grad = computeGradient(x.cast<s_t>()).cast<double>();
+  grad = computeGradientParallel(x.cast<s_t>()).cast<double>();
 
   return true;
 }
@@ -9780,7 +11053,7 @@ void DynamicsFitter::runUnconstrainedSGDOptimization(
   problem.mConfig.setIncludePoses(config.mIncludePoses);
 
   Eigen::VectorXs x = problem.flatten();
-  s_t lastLoss = problem.computeLoss(x);
+  s_t lastLoss = problem.computeLossParallel(x);
 
   Eigen::VectorXs lowerBounds = problem.flattenLowerBound();
   Eigen::VectorXs upperBounds = problem.flattenUpperBound();
@@ -9789,7 +11062,7 @@ void DynamicsFitter::runUnconstrainedSGDOptimization(
   for (int i = 0; i < mIterationLimit; i++)
   {
     std::cout << "Step " << i << ": " << lastLoss << std::endl;
-    Eigen::VectorXs grad = problem.computeGradient(x);
+    Eigen::VectorXs grad = problem.computeGradientParallel(x);
 
     /*
     if (i % 10 == 0)
@@ -9821,7 +11094,7 @@ void DynamicsFitter::runUnconstrainedSGDOptimization(
           testX(i) = lowerBounds(i);
         }
       }
-      s_t testLoss = problem.computeLoss(testX, true);
+      s_t testLoss = problem.computeLossParallel(testX, true);
       if (testLoss < lastLoss)
       {
         x = testX;
@@ -10035,7 +11308,7 @@ void DynamicsFitter::runNewtonsMethod(
   }
 
   Eigen::VectorXs x = problem.flatten();
-  s_t lastLoss = problem.computeLoss(x);
+  s_t lastLoss = problem.computeLossParallel(x);
   Eigen::VectorXs lastConstraint = problem.computeConstraints(x);
 
   Eigen::VectorXs lowerBounds = problem.flattenLowerBound();
@@ -10045,7 +11318,7 @@ void DynamicsFitter::runNewtonsMethod(
   for (int i = 0; i < mIterationLimit; i++)
   {
     std::cout << "Step " << i << ": " << lastLoss << std::endl;
-    Eigen::VectorXs grad = problem.computeGradient(x);
+    Eigen::VectorXs grad = problem.computeGradientParallel(x);
     Eigen::VectorXs constraint = problem.computeConstraints(x);
     Eigen::MatrixXs J = problem.computeConstraintsJacobian();
     Eigen::MatrixXs H = problem.finiteDifferenceHessian(x, false);

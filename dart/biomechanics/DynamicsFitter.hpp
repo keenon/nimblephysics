@@ -11,6 +11,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SmartPointer.hpp"
 #include "dart/math/Geometry.hpp"
@@ -495,6 +496,7 @@ public:
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
+  std::vector<int> mForceBodies;
   std::vector<neural::DifferentiableExternalForce> mForces;
 };
 
@@ -709,6 +711,8 @@ public:
   DynamicsFitProblemConfig& setMaxNumTrials(int value);
   DynamicsFitProblemConfig& setOnlyOneTrial(int value);
 
+  DynamicsFitProblemConfig& setNumThreads(int value);
+
 public:
   friend class DynamicsFitProblem;
   friend class DynamicsFitter;
@@ -750,6 +754,8 @@ public:
   int mMaxBlockSize;
   int mMaxNumTrials;
   int mOnlyOneTrial;
+
+  int mNumThreads;
 };
 
 /**
@@ -816,8 +822,16 @@ public:
   // terms.
   s_t computeLoss(Eigen::VectorXs x, bool logExplanation = false);
 
+  // This gets the value of the loss function, as a weighted sum of the
+  // discrepancy between measured and expected GRF data and other regularization
+  // terms.
+  s_t computeLossParallel(Eigen::VectorXs x, bool logExplanation = false);
+
   // This gets the gradient of the loss function
   Eigen::VectorXs computeGradient(Eigen::VectorXs x);
+
+  // This gets the gradient of the loss function
+  Eigen::VectorXs computeGradientParallel(Eigen::VectorXs x);
 
   // This gets the gradient of the loss function
   Eigen::VectorXs finiteDifferenceGradient(
@@ -984,6 +998,13 @@ public:
 
   std::shared_ptr<ResidualForceHelper> mResidualHelper;
   std::shared_ptr<SpatialNewtonHelper> mSpatialNewtonHelper;
+
+  std::vector<std::shared_ptr<dynamics::Skeleton>> mThreadSkeletons;
+  std::vector<std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>
+      mThreadMarkers;
+  std::vector<std::vector<dynamics::Joint*>> mThreadJoints;
+  std::vector<std::shared_ptr<ResidualForceHelper>> mThreadResidualHelpers;
+  std::vector<std::shared_ptr<SpatialNewtonHelper>> mThreadSpatialNewtonHelpers;
 
   int mBestObjectiveValueIteration;
   s_t mBestObjectiveValue;

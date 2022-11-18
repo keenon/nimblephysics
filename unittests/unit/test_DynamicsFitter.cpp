@@ -2128,25 +2128,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
-    for (int i = 0; i < 30; i++)
+    for (int i = 0; i < 15; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to get
       // the angular ACC's to match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
           init, trial, originalTrajectory, 1.0, 5.0, 0.1);
     }
-
-    bool successOnResiduals = fitter.optimizeSpatialResidualsOnCOMTrajectory(
-        init, trial, 5e-7, 600, 5000); // 5e-9 is the practical limit
-    if (successOnResiduals)
-    {
-      // For now, do nothing
-      fitter.recalibrateForcePlates(init, trial);
-    }
-    else
-    {
-      successOnAllResiduals = false;
-    }
+    fitter.recalibrateForcePlates(init, trial);
   }
 
   auto secondPair = fitter.computeAverageRealForce(init);
@@ -2255,6 +2244,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
+          .setMaxBlockSize(10)
           .setIncludeMasses(true)
           .setIncludeCOMs(true)
           .setIncludeInertias(true)
@@ -3451,7 +3441,7 @@ TEST(DynamicsFitter, LIN_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
-        file.skeleton, collisionBodies, 5);
+        file.skeleton, collisionBodies, 25);
     if (!success)
     {
       EXPECT_TRUE(success);
@@ -5227,20 +5217,20 @@ TEST(DynamicsFitter, MICHAEL_TEST_SCALING)
 {
   std::vector<std::string> trialNames;
   trialNames.push_back("S02DN101");
-  trialNames.push_back("S02DN102");
-  trialNames.push_back("S02DN103");
-  trialNames.push_back("S02DN104");
-  trialNames.push_back("S02DN105");
-  trialNames.push_back("S02DN106");
-  trialNames.push_back("S02DN107");
-  trialNames.push_back("S02DN108");
-  trialNames.push_back("S02DN109");
-  trialNames.push_back("S02DN110");
-  trialNames.push_back("S02DN111");
-  trialNames.push_back("S02DN112");
-  trialNames.push_back("S02DN113");
-  trialNames.push_back("S02DN114");
-  trialNames.push_back("S02DN115");
+  // trialNames.push_back("S02DN102");
+  // trialNames.push_back("S02DN103");
+  // trialNames.push_back("S02DN104");
+  // trialNames.push_back("S02DN105");
+  // trialNames.push_back("S02DN106");
+  // trialNames.push_back("S02DN107");
+  // trialNames.push_back("S02DN108");
+  // trialNames.push_back("S02DN109");
+  // trialNames.push_back("S02DN110");
+  // trialNames.push_back("S02DN111");
+  // trialNames.push_back("S02DN112");
+  // trialNames.push_back("S02DN113");
+  // trialNames.push_back("S02DN114");
+  // trialNames.push_back("S02DN115");
 
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;

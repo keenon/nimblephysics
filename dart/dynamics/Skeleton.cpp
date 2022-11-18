@@ -542,22 +542,22 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
     }
   }
 
-  // Fix the scale groups
-  for (auto group : mBodyScaleGroups)
+  // Copy the scale groups
+  skelClone->mBodyScaleGroups.clear();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
   {
-    if (group.nodes.size() > 0)
+    skelClone->mBodyScaleGroups.emplace_back();
+    auto& thisGroup = mBodyScaleGroups[i];
+    auto& cloneGroup = skelClone->mBodyScaleGroups[i];
+
+    cloneGroup.flipAxis = thisGroup.flipAxis;
+    cloneGroup.uniformScaling = thisGroup.uniformScaling;
+    for (auto& node : thisGroup.nodes)
     {
-      for (int i = 1; i < group.nodes.size(); i++)
-      {
-        skelClone->mergeScaleGroups(
-            skelClone->getBodyNode(group.nodes[0]->getName()),
-            skelClone->getBodyNode(group.nodes[i]->getName()));
-      }
-      skelClone->setScaleGroupUniformScaling(
-          skelClone->getBodyNode(group.nodes[0]->getName()),
-          group.uniformScaling);
+      cloneGroup.nodes.push_back(skelClone->getBodyNode(node->getName()));
     }
   }
+  skelClone->updateGroupScaleIndices();
 
   return skelClone;
 }
