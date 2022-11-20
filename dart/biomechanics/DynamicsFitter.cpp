@@ -11026,6 +11026,12 @@ void DynamicsFitter::runIPOPTOptimization(
   }
   app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
 
+  if (!config.mConstrainResidualsZero)
+  {
+    app->Options()->SetStringValue("jac_c_constant", "yes");
+    app->Options()->SetStringValue("jac_d_constant", "yes");
+  }
+
   std::shared_ptr<BilevelFitResult> result
       = std::make_shared<BilevelFitResult>();
 

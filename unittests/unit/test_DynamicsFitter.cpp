@@ -5277,7 +5277,7 @@ TEST(DynamicsFitter, MICHAEL_TEST_SCALING)
 {
   std::vector<std::string> trialNames;
   trialNames.push_back("S02DN101");
-  // trialNames.push_back("S02DN102");
+  trialNames.push_back("S02DN102");
   // trialNames.push_back("S02DN103");
   // trialNames.push_back("S02DN104");
   // trialNames.push_back("S02DN105");
