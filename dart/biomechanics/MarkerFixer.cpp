@@ -586,7 +586,7 @@ RippleReductionProblem::smooth(MarkersErrorReport* report)
     // Smooth only the window during which we observed the marker (don't smooth
     // to the 0's on frames where we weren't observing the marker)
     AccelerationSmoother smoother(duration, 0.3, 1.0);
-    mMarkers[markerName] = smoother.smooth(
+    mMarkers[markerName].block(0, firstObserved, 3, duration) = smoother.smooth(
         mMarkers[markerName].block(0, firstObserved, 3, duration));
   }
 

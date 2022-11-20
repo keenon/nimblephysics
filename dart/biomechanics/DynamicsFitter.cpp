@@ -2207,20 +2207,32 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
-    std::vector<bool> probablyMissingGRF)
+    std::vector<bool> probablyMissingGRF,
+    int maxBuckets)
 {
   int numTimesteps = qs.cols();
 
-  int numMissingSteps = 0;
   std::vector<int> missingStepIndices;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
-      numMissingSteps++;
       missingStepIndices.push_back(t);
     }
   }
+
+  std::vector<int> missingStepMappings
+      = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
+  int numMissingSteps = 0;
+  for (int m : missingStepMappings)
+  {
+    if (m > numMissingSteps)
+    {
+      numMissingSteps = m;
+    }
+  }
+  numMissingSteps += 1;
+  assert(numMissingSteps <= maxBuckets);
 
   std::vector<Eigen::Vector3s> grfs;
   for (int t = 0; t < qs.cols(); t++)
@@ -2343,24 +2355,28 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     trialLinearMapToVelocities(zRow, startVelZCol) = 1;
 
     // Allow the missing steps to generate arbitrary delta V on each step
-    for (int j = 0; j < missingStepIndices.size(); j++)
+    for (int j = 0; j < missingStepMappings.size(); j++)
     {
       int missingIndex = missingStepIndices[j];
       if (missingIndex >= t)
         break;
       int timestepsSinceDv = t - missingIndex;
 
-      int missingXCol = 6 + j * 3;
-      int missingYCol = 6 + j * 3 + 1;
-      int missingZCol = 6 + j * 3 + 2;
+      int mappedIndex = missingStepMappings[j];
 
-      trialLinearMapToPositions(xRow, missingXCol) = dt * timestepsSinceDv;
-      trialLinearMapToPositions(yRow, missingYCol) = dt * timestepsSinceDv;
-      trialLinearMapToPositions(zRow, missingZCol) = dt * timestepsSinceDv;
+      int missingXCol = 6 + mappedIndex * 3;
+      int missingYCol = 6 + mappedIndex * 3 + 1;
+      int missingZCol = 6 + mappedIndex * 3 + 2;
 
-      trialLinearMapToVelocities(xRow, missingXCol) = 1;
-      trialLinearMapToVelocities(yRow, missingYCol) = 1;
-      trialLinearMapToVelocities(zRow, missingZCol) = 1;
+      // We make sure to add, rather than overwrite here, because multiple
+      // missing timesteps can share the same column mapping
+      trialLinearMapToPositions(xRow, missingXCol) += dt * timestepsSinceDv;
+      trialLinearMapToPositions(yRow, missingYCol) += dt * timestepsSinceDv;
+      trialLinearMapToPositions(zRow, missingZCol) += dt * timestepsSinceDv;
+
+      trialLinearMapToVelocities(xRow, missingXCol) += 1;
+      trialLinearMapToVelocities(yRow, missingYCol) += 1;
+      trialLinearMapToVelocities(zRow, missingZCol) += 1;
     }
 
     comOffset(xRow) = offset(0);
@@ -2519,21 +2535,35 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
-    std::vector<bool> probablyMissingGRF)
+    std::vector<bool> probablyMissingGRF,
+    int maxBuckets)
 {
   (void)qs;
   (void)dqs;
   (void)ddqs;
   (void)forces;
 
-  int numMissingSteps = 0;
+  std::vector<int> missingStepIndices;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
-      numMissingSteps++;
+      missingStepIndices.push_back(t);
     }
   }
+
+  std::vector<int> missingStepMappings
+      = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
+  int numMissingSteps = 0;
+  for (int m : missingStepMappings)
+  {
+    if (m > numMissingSteps)
+    {
+      numMissingSteps = m;
+    }
+  }
+  numMissingSteps += 1;
+  assert(numMissingSteps <= maxBuckets);
 
   Eigen::VectorXs zeroPoint = getLinearTrajectoryLinearSystemTestOutput(
       dt,
@@ -2681,8 +2711,31 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     Eigen::MatrixXs dqs,
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
-    std::vector<bool> probablyMissingGRF)
+    std::vector<bool> probablyMissingGRF,
+    int maxBuckets)
 {
+  std::vector<int> missingStepIndices;
+  for (int t = 0; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+    {
+      missingStepIndices.push_back(t);
+    }
+  }
+
+  std::vector<int> missingStepMappings
+      = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
+  int numMissingSteps = 0;
+  for (int m : missingStepMappings)
+  {
+    if (m > numMissingSteps)
+    {
+      numMissingSteps = m;
+    }
+  }
+  numMissingSteps += 1;
+  assert(numMissingSteps <= maxBuckets);
+
   const s_t mass = mSkel->getMass();
   Eigen::Vector3s gravity = mSkel->getGravity();
 
@@ -2750,7 +2803,8 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     linVel += dt * linAcc;
     if (probablyMissingGRF[t])
     {
-      linVel += linResiduals.segment<3>(residualCursor * 3);
+      linVel
+          += linResiduals.segment<3>(missingStepMappings[residualCursor] * 3);
     }
     linPos += dt * linVel;
 
@@ -2761,7 +2815,8 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     angVel += dt * angAcc;
     if (probablyMissingGRF[t])
     {
-      angVel += angResiduals.segment<3>(residualCursor * 3);
+      angVel
+          += angResiduals.segment<3>(missingStepMappings[residualCursor] * 3);
     }
     angPos += dt * angVel;
 
@@ -8166,7 +8221,7 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
 // 0. Estimate which timesteps probably have unmeasured external torques
 // present. By passing a number smaller than 1.0 to scaleThresholds, we can
 // increase the rate at which we throw out potentially bad data.
-void DynamicsFitter::estimateUnmeasuredExternalTorques(
+int DynamicsFitter::estimateUnmeasuredExternalTorques(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     s_t scaleThresholds)
@@ -8229,6 +8284,7 @@ void DynamicsFitter::estimateUnmeasuredExternalTorques(
                  "acting on the subject in trial "
               << trial << std::endl;
   }
+  return filteredTimesteps.size();
 }
 
 //==============================================================================
@@ -8517,12 +8573,11 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         assert(offsetDiff.cwiseAbs().maxCoeff() < 1e-8);
       }
 
-      Eigen::MatrixXs compareLinearSystem = pair.first.block(
-          0, 0, numTimesteps * 3, trialLinearMapToPositions.cols() - 1);
+      Eigen::MatrixXs compareLinearSystem
+          = pair.first.block(0, 0, numTimesteps * 3, 6);
       Eigen::MatrixXs diff
           = compareLinearSystem
-            - trialLinearMapToPositions.block(
-                0, 0, numTimesteps * 3, trialLinearMapToPositions.cols() - 1);
+            - trialLinearMapToPositions.block(0, 0, numTimesteps * 3, 6);
       if (diff.cwiseAbs().maxCoeff() > 1e-8)
       {
         for (int t = 0; t < diff.rows() / 3; t++)
@@ -9063,7 +9118,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     Eigen::MatrixXs targetPoses,
     s_t weightLinear,
     s_t weightAngular,
-    s_t regularizeResiduals)
+    s_t regularizeResiduals,
+    int maxBuckets)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -9137,6 +9193,11 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       if (b)
         numMissing++;
     }
+    if (numMissing > maxBuckets)
+    {
+      numMissing = maxBuckets;
+    }
+
     int numTimesteps = q.cols();
 
     // std::cout << "Building linear system for optimizing linear + angular "
@@ -9150,7 +9211,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
             dq,
             ddq,
             init->grfTrials[trial],
-            init->probablyMissingGRF[trial]);
+            init->probablyMissingGRF[trial],
+            maxBuckets);
 
     // We're going to sub-sample the rows of the linear system, and add
     // outputs for the residuals, so we can regularize them.
@@ -9265,8 +9327,19 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                 << std::endl;
       std::cout << "Estimating unmeasured external torques with threshold at "
                 << (threshold * 100) << " percent of nominal" << std::endl;
-      estimateUnmeasuredExternalTorques(init, trial, threshold);
-      continue;
+      if (estimateUnmeasuredExternalTorques(init, trial, threshold) > 0
+          || threshold > 0.0005)
+      {
+        continue;
+      }
+      else
+      {
+        std::cout
+            << "Found no additional frames with suspicious torques even after "
+               "reducing the threshold, exiting the optimization early"
+            << std::endl;
+        return;
+      }
     }
 
     // Write the trajectory out to the positions

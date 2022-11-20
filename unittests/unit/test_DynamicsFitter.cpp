@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include <IpAlgTypes.hpp>
 #include <gtest/gtest.h>
@@ -19,6 +20,7 @@
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
 #include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
@@ -1513,10 +1515,10 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
 
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear
       = helper.getLinearTrajectoryLinearSystem(
-          dt, qs, dqs, ddqs, forces, probablyMissingGRF);
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear_fd
       = helper.finiteDifferenceLinearTrajectoryLinearSystem(
-          dt, qs, dqs, ddqs, forces, probablyMissingGRF);
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
 
   if (!equals(linear.second, linear_fd.second, 1e-8))
   {
@@ -2134,7 +2136,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       // this holds the mass constant, and re-jigs the trajectory to try to get
       // the angular ACC's to match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 5.0, 0.1);
+          init, trial, originalTrajectory, 1.0, 5.0, 0.1, 40);
     }
     fitter.recalibrateForcePlates(init, trial);
   }
@@ -2238,6 +2240,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeInertias(true)
   //         .setIncludePoses(true));
 
+  int maxNumTrials = 3;
+
   // Re - run as L1
   (void)successOnAllResiduals;
   fitter.setIterationLimit(200);
@@ -2245,13 +2249,23 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
-          .setMaxBlockSize(10)
+          .setMaxNumTrials(maxNumTrials)
           .setIncludeMasses(true)
           .setIncludeCOMs(true)
           .setIncludeInertias(true)
           .setIncludeBodyScales(true)
           .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
+
+  for (int i = maxNumTrials; i < init->poseTrials.size(); i++)
+  {
+    fitter.runIPOPTOptimization(
+        init,
+        DynamicsFitProblemConfig(skel)
+            .setDefaults(true)
+            .setOnlyOneTrial(i)
+            .setIncludePoses(true));
+  }
 
   // fitter.runIPOPTOptimization(
   //     init,
@@ -2553,6 +2567,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     }
 
     // 2. Find the joint centers
+
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
@@ -3431,6 +3446,43 @@ TEST(DynamicsFitter, ROOT_JACS)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, GROUP_INDICES)
+{
+  std::vector<int> indices;
+  indices.push_back(10);
+  indices.push_back(1001);
+  indices.push_back(1002);
+  indices.push_back(1003);
+  indices.push_back(1004);
+  indices.push_back(1005);
+  indices.push_back(1006);
+  indices.push_back(1007);
+  indices.push_back(1008);
+
+  std::vector<int> mapping = math::getConsolidatedMapping(indices, 2);
+
+  EXPECT_EQ(mapping.size(), indices.size());
+
+  int max = 0;
+  for (int m : mapping)
+  {
+    if (m > max)
+    {
+      max = m;
+    }
+  }
+  EXPECT_EQ(max, 1);
+
+  EXPECT_NE(mapping[0], mapping[1]);
+  EXPECT_EQ(mapping[1], mapping[2]);
+  EXPECT_EQ(mapping[2], mapping[3]);
+  EXPECT_EQ(mapping[3], mapping[4]);
+  EXPECT_EQ(mapping[4], mapping[5]);
+  EXPECT_EQ(mapping[5], mapping[6]);
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, LIN_JACS)
 {
 #ifdef DART_USE_ARBITRARY_PRECISION
@@ -3449,7 +3501,7 @@ TEST(DynamicsFitter, LIN_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
-        file.skeleton, collisionBodies, 25);
+        file.skeleton, collisionBodies, 8);
     if (!success)
     {
       EXPECT_TRUE(success);

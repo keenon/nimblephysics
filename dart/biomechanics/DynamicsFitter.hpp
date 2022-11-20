@@ -463,7 +463,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
 
   ////////////////////////////////////////////
   // This returns the same thing as getLinearTrajectoryLinearSystem(), in
@@ -475,7 +476,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
 
   ////////////////////////////////////////////
   // This produces the same output as you would get from using A*x+b from
@@ -492,7 +494,8 @@ public:
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
-      std::vector<bool> probablyMissingGRF);
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
@@ -1094,7 +1097,7 @@ public:
   // 0. Estimate which timesteps probably have unmeasured external torques
   // present. By passing a number smaller than 1.0 to scaleThresholds, we can
   // increase the rate at which we throw out potentially bad data.
-  void estimateUnmeasuredExternalTorques(
+  int estimateUnmeasuredExternalTorques(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       s_t scaleThresholds = 1.0);
@@ -1120,7 +1123,8 @@ public:
       Eigen::MatrixXs targetPoses,
       s_t weightLinear = 1.0,
       s_t weightAngular = 1.0,
-      s_t regularizeResiduals = 0.5);
+      s_t regularizeResiduals = 0.5,
+      int maxBuckets = 16);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external
