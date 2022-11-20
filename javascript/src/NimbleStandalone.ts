@@ -400,7 +400,6 @@ class NimbleStandalone {
     // Avoid race conditions if we were stopped, then this frame fired later
     if (!this.playing) return;
 
-    const elapsed: number = new Date().getTime() - this.startedPlaying;
     let frameNumber = this.getCurrentFrame();
     if (frameNumber != this.lastFrame) {
       if (frameNumber < this.lastFrame) {
