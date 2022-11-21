@@ -518,15 +518,15 @@ TEST(REALTIME, CARTPOLE_MPC_MASS)
     // recordObs(now, &ssid, realtimeUnderlyingWorld);
     if(renderIsReady)
     {
-      if((realtimeUnderlyingWorld->getState()-goal).norm()<0.2)
-      {
-        std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
-        std::cout << "Target Reached in: " << cnt << " Steps" << std::endl;
-        std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
-        //ssid.stop();
-        //mpcLocal.stop();
-        //exit(1);
-      }
+      // if((realtimeUnderlyingWorld->getState()-goal).norm()<0.2)
+      // {
+      //   std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
+      //   std::cout << "Target Reached in: " << cnt << " Steps" << std::endl;
+      //   std::cout << "+++++++++++++++++++++++++++++++" << std::endl;
+      //   //ssid.stop();
+      //   //mpcLocal.stop();
+      //   //exit(1);
+      // }
       recordObsWithNoise(now, &ssid, realtimeUnderlyingWorld, noise_scale, rand_gen);
       realtimeUnderlyingWorld->step();
       cnt++;

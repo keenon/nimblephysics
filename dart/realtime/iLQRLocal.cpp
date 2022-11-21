@@ -651,6 +651,7 @@ void iLQRLocal::optimizePlan(long startTime)
 void iLQRLocal::adjustPerformance(long lastOptimizeTimeMillis)
 {
   mMillisInAdvanceToPlan = 1.2 * lastOptimizeTimeMillis;
+  std::cout << "Estimated Planning time: " << mMillisInAdvanceToPlan << "From: " << lastOptimizeTimeMillis << std::endl;
   if (mMillisInAdvanceToPlan > 200)
     mMillisInAdvanceToPlan = 200;
   if(!mAdaptiveTime)
