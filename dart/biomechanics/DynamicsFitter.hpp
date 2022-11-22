@@ -501,6 +501,9 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   std::vector<int> mForceBodies;
   std::vector<neural::DifferentiableExternalForce> mForces;
+
+  std::vector<std::shared_ptr<dynamics::Skeleton>> mThreadSkels;
+  std::vector<ResidualForceHelper> mThreadHelpers;
 };
 
 /**
@@ -1092,7 +1095,9 @@ public:
   // present. By passing a number smaller than 1.0 to scaleThresholds, we can
   // increase the rate at which we throw out potentially bad data.
   void estimateUnmeasuredExternalForces(
-      std::shared_ptr<DynamicsInitialization> init, s_t scaleThresholds = 1.0);
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t scaleThresholds = 1.0,
+      std::vector<int> onlyConsiderTrials = std::vector<int>());
 
   // 0. Estimate which timesteps probably have unmeasured external torques
   // present. By passing a number smaller than 1.0 to scaleThresholds, we can

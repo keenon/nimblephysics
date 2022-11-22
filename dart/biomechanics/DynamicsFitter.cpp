@@ -2270,40 +2270,6 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
 
   int numThreads = 16;
 
-  std::vector<Eigen::Vector3s> angAcc;
-  angAcc.resize(numTimesteps, Eigen::Vector3s::Zero());
-
-  std::vector<std::future<void>> angFutures;
-  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
-  {
-    std::shared_ptr<dynamics::Skeleton> skel = mSkel->cloneSkeleton();
-    angFutures.push_back(std::async([skel,
-                                     threadIdx,
-                                     numTimesteps,
-                                     numThreads,
-                                     &qs,
-                                     &dqs,
-                                     &ddqs,
-                                     &forces,
-                                     &angAcc,
-                                     this] {
-      ResidualForceHelper threadHelper(skel, mForceBodies);
-      for (int t = 0; t < numTimesteps; t++)
-      {
-        if ((t + threadIdx) % numThreads == 0)
-        {
-          angAcc[t] = threadHelper.calculateResidualFreeAngularAcceleration(
-              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-        }
-      }
-    }));
-  }
-
-  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
-  {
-    (void)angFutures[threadIdx].get();
-  }
-
   // This has one col each for start COM positions, start COM velocities,
   // It outputs the change in physically consistent X, Y, Z coordinates of COM
   // over time, given those initial offsets and residual velocities..
@@ -2408,15 +2374,26 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
   std::vector<Eigen::Matrix3s> angAccWrtVels;
   angAccWrtVels.resize(numTimesteps, Eigen::Matrix3s::Zero());
 
+  // Make sure there are enough copies of skeletons, and residuals helpers, to
+  // fill out all the parallel threads we need.
+  for (int threadIdx = mThreadSkels.size(); threadIdx < numThreads; threadIdx++)
+  {
+    mThreadSkels.push_back(mSkel->cloneSkeleton());
+  }
+  for (int threadIdx = mThreadHelpers.size(); threadIdx < numThreads;
+       threadIdx++)
+  {
+    mThreadHelpers.emplace_back(mThreadSkels[threadIdx], mForceBodies);
+  }
+
   std::vector<std::future<void>> futures;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    std::shared_ptr<dynamics::Skeleton> skel = mSkel->cloneSkeleton();
-    futures.push_back(std::async([skel,
-                                  threadIdx,
+    futures.push_back(std::async([threadIdx,
                                   numTimesteps,
                                   numThreads,
                                   &comOffset,
+                                  &coms,
                                   &comVelOffset,
                                   &qs,
                                   &dqs,
@@ -2426,14 +2403,17 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
                                   &angAccWrtPoses,
                                   &angAccWrtVels,
                                   this] {
-      ResidualForceHelper threadHelper(skel, mForceBodies);
+      std::shared_ptr<dynamics::Skeleton> skel = mThreadSkels[threadIdx];
+      ResidualForceHelper& threadHelper = mThreadHelpers[threadIdx];
       for (int t = 0; t < numTimesteps; t++)
       {
         if ((t + threadIdx) % numThreads == 0)
         {
           Eigen::VectorXs q = qs.col(t);
+          Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+          q.segment<3>(3) += comMoves;
+
           Eigen::VectorXs dq = dqs.col(t);
-          q.segment<3>(3) = comOffset.segment<3>(t * 3);
           dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
           residualFreeAngularAccs[t]
               = threadHelper.calculateResidualFreeAngularAcceleration(
@@ -6481,9 +6461,16 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
 DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
 {
   // mResidualWeight = 2e-2;
+  // mMarkerWeight = 50;
+  // mResidualWeight = 0.01;
+  // mLinearNewtonWeight = 0.01;
+  // mRegularizePoses = 0.0;
+
   mMarkerWeight = 50;
-  mResidualWeight = 0.01;
-  mLinearNewtonWeight = 0.01;
+  mResidualWeight = 2e-2;
+  mLinearNewtonWeight = 2e-2;
+  mRegularizePoses = 1.0;
+
   mJointWeight = 2e-2;
   mConstrainResidualsZero = false;
   mLinearNewtonUseL1 = true;
@@ -6499,7 +6486,6 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   mRegularizeAnatomicalMarkerOffsets = 10.0;
   mRegularizeImpliedDensity = 3e-8;
   mRegularizeBodyScales = 1.0;
-  mRegularizePoses = 0.0;
 
   if (!l1)
   {
@@ -8083,14 +8069,23 @@ void DynamicsFitter::smoothAccelerations(
 // 0. Estimate which timesteps probably have unmeasured external forces
 // present.
 void DynamicsFitter::estimateUnmeasuredExternalForces(
-    std::shared_ptr<DynamicsInitialization> init, s_t scaleThresholds)
+    std::shared_ptr<DynamicsInitialization> init,
+    s_t scaleThresholds,
+    std::vector<int> onlyConsiderTrials)
 {
   std::cout << "Heuristically detecting unmeasured external forces"
             << std::endl;
 
   Eigen::Vector3s gravity = mSkeleton->getGravity();
+  if (onlyConsiderTrials.size() == 0)
+  {
+    for (int trial = 0; trial < init->poseTrials.size(); trial++)
+    {
+      onlyConsiderTrials.push_back(trial);
+    }
+  }
 
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  for (int trial : onlyConsiderTrials)
   {
     std::vector<Eigen::Vector3s> grfs = measuredGRFForces(init, trial);
     // Note, this cuts off the first and last timestep of the trial
@@ -8153,8 +8148,9 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
 
       if (isEstimatedZero && !isMeasuredZero)
       {
-        std::cout << "Detected unmeasured force acting on the subject in trial "
-                  << trial << " at time " << t << std::endl;
+        // std::cout << "Detected unmeasured force acting on the subject in
+        // trial "
+        //           << trial << " at time " << t << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
         continue;
@@ -8163,8 +8159,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       {
         if (estimatedForce.norm() > maxGRF * 0.2)
         {
-          std::cout << "Missing GRF on trial " << trial << " at time " << t
-                    << std::endl;
+          // std::cout << "Missing GRF on trial " << trial << " at time " << t
+          //           << std::endl;
           filteredTimesteps.push_back(t + 1);
           init->probablyMissingGRF[trial][t + 1] = true;
         }
@@ -8826,6 +8822,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         = mSkeleton->getRootJoint()->getDof(3)->getIndexInSkeleton();
     int timeCursor = 0;
     bool anyTrialChangedTooMuch = false;
+    std::vector<int> trialsChangedTooMuch;
     for (int trial = 0; trial < numTrials; trial++)
     {
       s_t totalChange = 0.0;
@@ -8880,6 +8877,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       {
         std::cout << "Trial " << trial << " changed too much!" << std::endl;
         anyTrialChangedTooMuch = true;
+        trialsChangedTooMuch.push_back(trial);
       }
 
       // Offset to skip over entries allocated for regularizing forces from
@@ -12716,7 +12714,7 @@ void DynamicsFitter::saveDynamicsToGUI(
     int trialIndex,
     int framesPerSecond)
 {
-  bool renderResidualForces = false;
+  bool renderResidualForces = true;
 
   std::string skeletonLayerName = "Skeleton";
   Eigen::Vector4s skeletonLayerColor = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);

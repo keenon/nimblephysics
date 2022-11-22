@@ -2131,12 +2131,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
-    for (int i = 0; i < 15; i++)
+    for (int i = 0; i < 100; i++)
     {
-      // this holds the mass constant, and re-jigs the trajectory to try to get
-      // the angular ACC's to match more closely what was actually observed
+      // this holds the mass constant, and re-jigs the trajectory to try to
+      // make angular ACC's match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 5.0, 0.1, 40);
+          init, trial, originalTrajectory, 1.0, 0.1, 0.1, 40);
     }
     fitter.recalibrateForcePlates(init, trial);
   }
@@ -5278,7 +5278,7 @@ TEST(DynamicsFitter, MICHAEL_TEST_SCALING)
   std::vector<std::string> trialNames;
   trialNames.push_back("S02DN101");
   trialNames.push_back("S02DN102");
-  // trialNames.push_back("S02DN103");
+  trialNames.push_back("S02DN103");
   // trialNames.push_back("S02DN104");
   // trialNames.push_back("S02DN105");
   // trialNames.push_back("S02DN106");
@@ -5331,9 +5331,11 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
   std::string subjectName = "Subject4";
   std::vector<std::string> trialNames;
   trialNames.push_back("DJ1");
-  trialNames.push_back("walking1");
-  trialNames.push_back("walking2");
   trialNames.push_back("walking4");
+  trialNames.push_back("walking1");
+  // trialNames.push_back("DJ2");
+  // trialNames.push_back("walking2");
+  // trialNames.push_back("DJ3");
 
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
