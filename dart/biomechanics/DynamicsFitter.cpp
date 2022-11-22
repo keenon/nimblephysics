@@ -2268,6 +2268,251 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     accOffset.push_back(offset);
   }
 
+  // This has one col each for start COM positions, start COM velocities,
+  // It outputs the change in physically consistent X, Y, Z coordinates of COM
+  // over time, given those initial offsets and residual velocities..
+  Eigen::MatrixXs trialLinearMapToPositions
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+  // This outputs the change in linear vels over time, given the initial
+  // offsets and residual velocities.
+  Eigen::MatrixXs trialLinearMapToVelocities
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+
+  // This is a vector with the original positions of our COM over time,
+  // which we will use to find good values for the position, velocity, and
+  // mass of our skeleton.
+  Eigen::VectorXs originalCOMPositions
+      = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+  const Eigen::Vector3s gravity = mSkel->getGravity();
+  const s_t mass = mSkel->getMass();
+
+  Eigen::VectorXs comOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+  Eigen::VectorXs comVelOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+  const int startPosXCol = 0;
+  const int startPosYCol = 1;
+  const int startPosZCol = 2;
+  const int startVelXCol = 3;
+  const int startVelYCol = 4;
+  const int startVelZCol = 5;
+
+  Eigen::Vector3s vel = Eigen::Vector3s::Zero();
+  Eigen::Vector3s offset = Eigen::Vector3s::Zero();
+
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    const int xRow = (t * 3);
+    const int yRow = (t * 3) + 1;
+    const int zRow = (t * 3) + 2;
+
+    trialLinearMapToPositions(xRow, startPosXCol) = 1;
+    trialLinearMapToPositions(yRow, startPosYCol) = 1;
+    trialLinearMapToPositions(zRow, startPosZCol) = 1;
+
+    trialLinearMapToPositions(xRow, startVelXCol) = t * dt;
+    trialLinearMapToPositions(yRow, startVelYCol) = t * dt;
+    trialLinearMapToPositions(zRow, startVelZCol) = t * dt;
+
+    trialLinearMapToVelocities(xRow, startVelXCol) = 1;
+    trialLinearMapToVelocities(yRow, startVelYCol) = 1;
+    trialLinearMapToVelocities(zRow, startVelZCol) = 1;
+
+    // Allow the missing steps to generate arbitrary delta V on each step
+    for (int j = 0; j < missingStepMappings.size(); j++)
+    {
+      int missingIndex = missingStepIndices[j];
+      if (missingIndex >= t)
+        break;
+      int timestepsSinceDv = t - missingIndex;
+
+      int mappedIndex = missingStepMappings[j];
+
+      int missingXCol = 6 + mappedIndex * 3;
+      int missingYCol = 6 + mappedIndex * 3 + 1;
+      int missingZCol = 6 + mappedIndex * 3 + 2;
+
+      // We make sure to add, rather than overwrite here, because multiple
+      // missing timesteps can share the same column mapping
+      trialLinearMapToPositions(xRow, missingXCol) += dt * timestepsSinceDv;
+      trialLinearMapToPositions(yRow, missingYCol) += dt * timestepsSinceDv;
+      trialLinearMapToPositions(zRow, missingZCol) += dt * timestepsSinceDv;
+
+      trialLinearMapToVelocities(xRow, missingXCol) += 1;
+      trialLinearMapToVelocities(yRow, missingYCol) += 1;
+      trialLinearMapToVelocities(zRow, missingZCol) += 1;
+    }
+
+    comOffset(xRow) = offset(0);
+    comOffset(yRow) = offset(1);
+    comOffset(zRow) = offset(2);
+
+    comVelOffset(xRow) = vel(0);
+    comVelOffset(yRow) = vel(1);
+    comVelOffset(zRow) = vel(2);
+
+    vel += grfs[t] * dt / mass;
+    vel += gravity * dt;
+
+    if (t > 0 && t < numTimesteps - 1)
+    {
+      vel -= accOffset[t - 1] * dt;
+    }
+    offset += vel * dt;
+
+    originalCOMPositions(xRow) = coms[t](0);
+    originalCOMPositions(yRow) = coms[t](1);
+    originalCOMPositions(zRow) = coms[t](2);
+  }
+
+  Eigen::Vector3s angularPos = Eigen::Vector3s::Zero();
+  Eigen::Vector3s angularVel = Eigen::Vector3s::Zero();
+  Eigen::VectorXs angularOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
+  Eigen::MatrixXs linearMapToAngularOffset
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    // Compute the residual values, on the main thread
+    Eigen::VectorXs q = qs.col(t);
+    Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+    q.segment<3>(3) += comMoves;
+
+    Eigen::VectorXs dq = dqs.col(t);
+    dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+    const Eigen::Vector3s angularAcc = calculateResidualFreeAngularAcceleration(
+        q, dq, ddqs.col(t), forces.col(t));
+
+    mSkel->setPositions(qs.col(t));
+    mSkel->setVelocities(dqs.col(t));
+    const Eigen::Matrix3s angAccWrtPos
+        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+    const Eigen::Matrix3s angAccWrtVel
+        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+
+    angularOffset.segment<3>(t * 3) = angularPos;
+
+    angularVel += angularAcc * dt;
+    angularPos += angularVel * dt;
+
+    for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
+    {
+      Eigen::Matrix3s dAngAcc
+          = angAccWrtPos * trialLinearMapToPositions.block<3, 3>(t * 3, i * 3)
+            + angAccWrtVel
+                  * trialLinearMapToVelocities.block<3, 3>(t * 3, i * 3);
+      for (int offset = 1; offset < numTimesteps - t; offset++)
+      {
+        linearMapToAngularOffset.block<3, 3>((t + offset) * 3, i * 3)
+            += offset * dt * dt * dAngAcc;
+      }
+    }
+  }
+
+  // Construct a complete A,b system.
+  // For columns, we concatenate all the variables for the linear pos and linear
+  // residuals first, then all the variables for angular pos and angular
+  // residuals second. Likewise for rows, we concatenate all the linear output
+  // poses first, then all the angular output poses.
+
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(
+      trialLinearMapToPositions.rows() * 2,
+      trialLinearMapToPositions.cols() * 2);
+  Eigen::VectorXs b = Eigen::VectorXs(comOffset.size() * 2);
+  // Set up linear positions
+  A.block(
+      0, 0, trialLinearMapToPositions.rows(), trialLinearMapToPositions.cols())
+      = trialLinearMapToPositions;
+  b.segment(0, comOffset.size()) = comOffset;
+  // Set up angular positions
+  A.block(
+      trialLinearMapToPositions.rows(),
+      0,
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols())
+      = linearMapToAngularOffset;
+  A.block(
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols(),
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols())
+      = trialLinearMapToPositions;
+  b.segment(comOffset.size(), comOffset.size()) = angularOffset;
+
+  return std::make_pair(A, b);
+}
+
+//==============================================================================
+// The parallel version of getLinearTrajectoryLinearSystem()
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
+    s_t dt,
+    Eigen::MatrixXs qs,
+    Eigen::MatrixXs dqs,
+    Eigen::MatrixXs ddqs,
+    Eigen::MatrixXs forces,
+    std::vector<bool> probablyMissingGRF,
+    int maxBuckets)
+{
+  int numTimesteps = qs.cols();
+
+  std::vector<int> missingStepIndices;
+  for (int t = 0; t < probablyMissingGRF.size(); t++)
+  {
+    if (probablyMissingGRF[t])
+    {
+      missingStepIndices.push_back(t);
+    }
+  }
+
+  std::vector<int> missingStepMappings
+      = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
+  int numMissingSteps = 0;
+  for (int m : missingStepMappings)
+  {
+    if (m > numMissingSteps)
+    {
+      numMissingSteps = m;
+    }
+  }
+  numMissingSteps += 1;
+  assert(numMissingSteps <= maxBuckets);
+
+  std::vector<Eigen::Vector3s> grfs;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    Eigen::Vector3s f = Eigen::Vector3s::Zero();
+    for (int i = 0; i < forces.col(t).size() / 6; i++)
+    {
+      f += forces.col(t).segment<3>(i * 6 + 3);
+    }
+    grfs.push_back(f);
+  }
+
+  std::vector<Eigen::Vector3s> coms;
+  for (int t = 0; t < qs.cols(); t++)
+  {
+    mSkel->setPositions(qs.col(t));
+    coms.push_back(mSkel->getCOM());
+  }
+
+  std::vector<Eigen::Vector3s> accOffset;
+  for (int t = 1; t < qs.cols() - 1; t++)
+  {
+    // Compute the offset from the difference between a finite-difference's
+    // COM acceleration and an analytical one
+    mSkel->setPositions(qs.col(t));
+    mSkel->setVelocities(dqs.col(t));
+    mSkel->setAccelerations(ddqs.col(t));
+
+    Eigen::Vector3s analyticalAcc = mSkel->getCOMLinearAcceleration();
+    Eigen::Vector3s fdAcc
+        = (coms[t + 1] - 2 * coms[t] + coms[t - 1]) / (dt * dt);
+    Eigen::Vector3s offset = analyticalAcc - fdAcc;
+    accOffset.push_back(offset);
+  }
+
   int numThreads = 16;
 
   // This has one col each for start COM positions, start COM velocities,

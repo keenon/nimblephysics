@@ -467,6 +467,18 @@ public:
       int maxBuckets = 16);
 
   ////////////////////////////////////////////
+  // The parallel version of getLinearTrajectoryLinearSystem()
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  getLinearTrajectoryLinearSystemParallel(
+      s_t dt,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
+
+  ////////////////////////////////////////////
   // This returns the same thing as getLinearTrajectoryLinearSystem(), in
   // theory.
   std::pair<Eigen::MatrixXs, Eigen::VectorXs>
