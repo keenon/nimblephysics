@@ -2710,7 +2710,7 @@ std::pair<std::vector<MarkerInitialization>, OpenSimFile> runMarkerFitter(
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
-  fitter.setIterationLimit(40); // TODO: revert back to 400
+  fitter.setIterationLimit(500);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
@@ -3049,8 +3049,8 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
       markerObservationTrials,
       framesPerSecond,
       forcePlateTrials,
-      68,
-      1.65,
+      62.6,
+      1.68,
       "unknown");
 
   OpenSimFile standard = kinematicResults.second;
@@ -5278,7 +5278,7 @@ TEST(DynamicsFitter, MICHAEL_TEST_SCALING)
   std::vector<std::string> trialNames;
   trialNames.push_back("S02DN101");
   trialNames.push_back("S02DN102");
-  trialNames.push_back("S02DN103");
+  // trialNames.push_back("S02DN103");
   // trialNames.push_back("S02DN104");
   // trialNames.push_back("S02DN105");
   // trialNames.push_back("S02DN106");
@@ -5331,10 +5331,10 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
   std::string subjectName = "Subject4";
   std::vector<std::string> trialNames;
   trialNames.push_back("DJ1");
-  trialNames.push_back("walking4");
   trialNames.push_back("walking1");
-  // trialNames.push_back("DJ2");
-  // trialNames.push_back("walking2");
+  trialNames.push_back("DJ2");
+  trialNames.push_back("walking2");
+  // trialNames.push_back("walking4");
   // trialNames.push_back("DJ3");
 
   std::vector<std::string> motFiles;
@@ -5364,6 +5364,53 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
       "optimized_scale_and_markers.osim",
       footNames,
       motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
+{
+  std::string subjectName = "Subject4";
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DJ1");
+  trialNames.push_back("walking1");
+  trialNames.push_back("DJ2");
+  trialNames.push_back("walking2");
+  // trialNames.push_back("walking4");
+  // trialNames.push_back("DJ3");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    motFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/IK/" + name
+        + "_ik.mot");
+    trcFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/MarkerData/" + name
+        + ".trc");
+    grfFiles.push_back(
+        "dart://sample/osim/OpenCapTest/" + subjectName + "/ID/" + name
+        + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/osim/OpenCapTest/" + subjectName + "/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
       c3dFiles,
       trcFiles,
       grfFiles,

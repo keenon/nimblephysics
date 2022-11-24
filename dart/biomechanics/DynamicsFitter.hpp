@@ -1100,6 +1100,11 @@ public:
   // it mess with our optimization.
   void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
 
+  // 0. This detects and fills in "blips", which are short segments of observed
+  // GRF data in the midst of longer windows of missing data.
+  void fillInMissingGRFBlips(
+      std::shared_ptr<DynamicsInitialization> init, int blipFilterLen = 20);
+
   // 0. Smooth the accelerations.
   void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
 

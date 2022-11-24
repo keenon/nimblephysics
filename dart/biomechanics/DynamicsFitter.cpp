@@ -35,6 +35,7 @@
 #include "dart/server/GUIRecording.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/AccelerationSmoother.hpp"
+#include "dart/utils/VelocityMinimizingSmoother.hpp"
 
 namespace dart {
 namespace biomechanics {
@@ -2629,6 +2630,13 @@ ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
        threadIdx++)
   {
     mThreadHelpers.emplace_back(mThreadSkels[threadIdx], mForceBodies);
+  }
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
+  {
+    mThreadSkels[threadIdx]->setGroupScales(mSkel->getGroupScales());
+    mThreadSkels[threadIdx]->setGroupCOMs(mSkel->getGroupCOMs());
+    mThreadSkels[threadIdx]->setGroupMasses(mSkel->getGroupMasses());
+    mThreadSkels[threadIdx]->setGroupInertias(mSkel->getGroupInertias());
   }
 
   std::vector<std::future<void>> futures;
@@ -8000,6 +8008,8 @@ void DynamicsFitter::estimateFootGroundContacts(
       }
     }
 
+    std::cout << "Detected ground height: " << groundHeight << std::endl;
+
     assert(!isnan(groundHeight));
 
     // 2.0. Check for the size of the contact spheres to check for contact
@@ -8056,6 +8066,16 @@ void DynamicsFitter::estimateFootGroundContacts(
           }
         }
       }
+    }
+
+    for (int b = 0; b < init->contactBodies.size(); b++)
+    {
+      std::cout << "Contact body " << b << " radii: [";
+      for (s_t r : grfContactSphereSizes[b])
+      {
+        std::cout << r << ",";
+      }
+      std::cout << std::endl;
     }
 
     init->grfBodyContactSphereRadius.push_back(grfContactSphereSizes);
@@ -8170,11 +8190,57 @@ void DynamicsFitter::estimateFootGroundContacts(
         // 4.2. Check all the contact bodies assigned to this GRF node to
         // guess if we think we might be in contact here
         bool inContact = false;
+        bool anyInPlate = false;
         for (int c = 0; c < init->contactBodies[b].size(); c++)
         {
           auto* body = init->contactBodies[b][c];
           Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+
+          // Check if this body is over a force plate
+          bool overPlate = false;
+          for (ForcePlate& plate : init->forcePlateTrials[trial])
+          {
+            if (plate.corners.size() > 0)
+            {
+              if (math::convex2DShapeContains(
+                      worldPos,
+                      plate.corners,
+                      plate.worldOrigin,
+                      Eigen::Vector3s::UnitX(),
+                      Eigen::Vector3s::UnitZ()))
+              {
+                overPlate = true;
+                break;
+              }
+            }
+          }
+          if (init->defaultForcePlateCorners[trial].size() > 0)
+          {
+            if (math::convex2DShapeContains(
+                    worldPos,
+                    init->defaultForcePlateCorners[trial],
+                    init->defaultForcePlateCorners[trial][0],
+                    Eigen::Vector3s::UnitX(),
+                    Eigen::Vector3s::UnitZ()))
+            {
+              overPlate = true;
+            }
+          }
+
+          if (overPlate)
+          {
+            anyInPlate = true;
+          }
+
           s_t dist = worldPos(1) - groundHeight;
+          if (!overPlate)
+          {
+            // If we're not over a force plate, use a more generous margin to
+            // detect foot-ground contact, since we almost certainly are missing
+            // data here, and we want to prioritize recall on those timesteps.
+            dist -= 0.015;
+          }
+
           if (dist < grfContactSphereSizes[b][c])
           {
             inContact = true;
@@ -8190,47 +8256,6 @@ void DynamicsFitter::estimateFootGroundContacts(
         bool contactIsSus = false;
         if (inContact && !footActive)
         {
-          // 4.3.1. Iterate over each contact body, and check if its inside
-          // any of the force plates.
-          bool anyInPlate = false;
-          for (int c = 0; c < init->contactBodies[b].size(); c++)
-          {
-            auto* body = init->contactBodies[b][c];
-            Eigen::Vector3s worldPos = body->getWorldTransform().translation();
-            for (ForcePlate& plate : init->forcePlateTrials[trial])
-            {
-              if (plate.corners.size() > 0)
-              {
-                if (math::convex2DShapeContains(
-                        worldPos,
-                        plate.corners,
-                        plate.worldOrigin,
-                        Eigen::Vector3s::UnitX(),
-                        Eigen::Vector3s::UnitZ()))
-                {
-                  anyInPlate = true;
-                  break;
-                }
-              }
-            }
-            if (init->defaultForcePlateCorners[trial].size() > 0)
-            {
-              if (math::convex2DShapeContains(
-                      worldPos,
-                      init->defaultForcePlateCorners[trial],
-                      init->defaultForcePlateCorners[trial][0],
-                      Eigen::Vector3s::UnitX(),
-                      Eigen::Vector3s::UnitZ()))
-              {
-                anyInPlate = true;
-              }
-            }
-            if (anyInPlate)
-            {
-              break;
-            }
-          }
-
           // 4.3.2. If we're NOT over a plate, then register this frame as
           // suspicious
           if (!anyInPlate)
@@ -8249,19 +8274,39 @@ void DynamicsFitter::estimateFootGroundContacts(
       trialAnyOffForcePlate.push_back(anyContactIsSus);
     }
 
+    init->grfBodyForceActive.push_back(trialForceActive);
+    init->grfBodySphereInContact.push_back(trialSphereInContact);
+    init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
+    init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
+  }
+
+  fillInMissingGRFBlips(init);
+}
+
+//==============================================================================
+// 0. This detects and fills in "blips", which are short segments of observed
+// GRF data in the midst of longer windows of missing data.
+void DynamicsFitter::fillInMissingGRFBlips(
+    std::shared_ptr<DynamicsInitialization> init, int blipFilterLen)
+{
+  for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
+  {
     // Smooth out any GRF contact blips that are shorter than `blipFilterLen`
-    int blipFilterLen = 10;
-    for (int t = 1; t < trialAnyOffForcePlate.size(); t++)
+    for (int t = 1; t < init->probablyMissingGRF[trial].size(); t++)
     {
-      if (trialAnyOffForcePlate[t - 1] && !trialAnyOffForcePlate[t])
+      // If we're missing data on last frame, but not on this frame, we should
+      // check if this is a brief "blip" of contact followed by more missing
+      // data.
+      if (init->probablyMissingGRF[trial][t - 1]
+          && !init->probablyMissingGRF[trial][t])
       {
         bool isBlip = false;
         for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
         {
           int scanT = t + scanForward;
-          if (scanT < trialAnyOffForcePlate.size())
+          if (scanT < init->probablyMissingGRF[trial].size())
           {
-            if (trialAnyOffForcePlate[scanT])
+            if (init->probablyMissingGRF[trial][scanT])
             {
               isBlip = true;
               break;
@@ -8273,19 +8318,14 @@ void DynamicsFitter::estimateFootGroundContacts(
           for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
           {
             int scanT = t + scanForward;
-            if (scanT < trialAnyOffForcePlate.size())
+            if (scanT < init->probablyMissingGRF[trial].size())
             {
-              trialAnyOffForcePlate[scanT] = true;
+              init->probablyMissingGRF[trial][scanT] = true;
             }
           }
         }
       }
     }
-
-    init->grfBodyForceActive.push_back(trialForceActive);
-    init->grfBodySphereInContact.push_back(trialSphereInContact);
-    init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
-    init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
   }
 }
 
@@ -8343,13 +8383,14 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       grfsAndAccs.col(t).tail<3>() = accs[t];
     }
 
-    AccelerationSmoother smoother(accs.size(), 1, 0.001);
+    // VelocityMinimizingSmoother smoother(accs.size(), 1, 0.001);
+    VelocityMinimizingSmoother smoother(accs.size(), 1, 0.01);
 
     s_t zeroThreshold = 0.005; // anything <0.5% of max force
                                // is interpreted as zero
     s_t threshold = 0.2 * scaleThresholds;
-    s_t massScaleUpperLimit = 1.5;
-    s_t massScaleLowerLimit = 0.5;
+    s_t massScaleUpperLimit = 1.2;
+    s_t massScaleLowerLimit = 0.8;
     s_t originalMass = init->bodyMasses.sum();
 
     Eigen::MatrixXs smoothedGrfsAndAccs = smoother.smooth(grfsAndAccs);
@@ -8456,6 +8497,7 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       std::cout << std::endl;
     }
   }
+  fillInMissingGRFBlips(init);
 }
 
 //==============================================================================
@@ -8525,6 +8567,7 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
                  "acting on the subject in trial "
               << trial << std::endl;
   }
+  fillInMissingGRFBlips(init);
   return filteredTimesteps.size();
 }
 
@@ -9448,7 +9491,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     //           << numTimesteps << " timesteps with " << numMissing
     //           << " timesteps with unmeasured external force" << std::endl;
     std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
-        = helper.getLinearTrajectoryLinearSystem(
+        = helper.getLinearTrajectoryLinearSystemParallel(
             dt,
             q,
             dq,
