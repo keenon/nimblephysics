@@ -1204,6 +1204,17 @@ public:
   // it mess with our optimization.
   void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
 
+  // 0. This goes through and marks any "impact" GRF timesteps (defined as
+  // `windowLen` steps after the first non-zero step after a flight phase with
+  // zero GRF) as missing GRF data. This allows the system to fill in the
+  // missing impacts with best guesses. This is useful if the GRF data was
+  // filtered, and the original data is no longer accessible (for example, if
+  // working with a published dataset where only filtered GRF is available).
+  void markMissingImpacts(
+      std::shared_ptr<DynamicsInitialization> init,
+      int windowLen = 3,
+      bool alsoMarkLiftoff = false);
+
   // 0. This detects and fills in "blips", which are short segments of observed
   // GRF data in the midst of longer windows of missing data.
   void fillInMissingGRFBlips(
@@ -1265,7 +1276,8 @@ public:
       Eigen::MatrixXs targetPoses,
       s_t weightLinear = 1.0,
       s_t weightAngular = 1.0,
-      s_t regularizeResiduals = 0.5,
+      s_t regularizeLinearResiduals = 0.5,
+      s_t regularizeAngularResiduals = 0.5,
       int maxBuckets = 16);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the

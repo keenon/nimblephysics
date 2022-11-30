@@ -2469,6 +2469,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.addJointBoundSlack(skel, 0.1);
   fitter.boundPush(init);
   fitter.smoothAccelerations(init);
+  fitter.markMissingImpacts(init);
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
   fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
 
@@ -2519,7 +2520,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 0.5, 0.1, 150);
+          init, trial, originalTrajectory, 1.0, 0.5, 0.1, 0.1, 150);
     }
     fitter.recalibrateForcePlates(init, trial);
   }
@@ -2627,9 +2628,10 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludePoses(true));
 
   int maxNumTrials = 3;
+  (void)maxNumTrials;
 
   // Re - run as L1
-  fitter.setIterationLimit(1000);
+  fitter.setIterationLimit(200);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
@@ -2638,34 +2640,34 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeMarkerOffsets(true)
   //         .setIncludePoses(true));
 
-  fitter.setLBFGSHistoryLength(250);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults(true)
-          // Add extra slack to all the bounds
-          .setMaxNumTrials(maxNumTrials)
-          .setIncludeMasses(true)
-          // .setIncludeCOMs(true)
-          // .setIncludeInertias(true)
-          // .setPoseSubsetLen(6)
-          // .setPoseSubsetStartIndex(0)
-          // .setIncludeBodyScales(true)
-          .setIncludeMarkerOffsets(true)
-          .setIncludePoses(true));
+  // fitter.setLBFGSHistoryLength(250);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         // Add extra slack to all the bounds
+  //         .setMaxNumTrials(maxNumTrials)
+  //         .setIncludeMasses(true)
+  //         // .setIncludeCOMs(true)
+  //         // .setIncludeInertias(true)
+  //         // .setPoseSubsetLen(6)
+  //         // .setPoseSubsetStartIndex(0)
+  //         // .setIncludeBodyScales(true)
+  //         .setIncludeMarkerOffsets(true)
+  //         .setIncludePoses(true));
 
-  for (int i = maxNumTrials; i < init->poseTrials.size(); i++)
-  {
-    fitter.runIPOPTOptimization(
-        init,
-        DynamicsFitProblemConfig(skel)
-            .setDefaults(true)
-            .setOnlyOneTrial(i)
-            .setIncludePoses(true));
-  }
+  // for (int i = maxNumTrials; i < init->poseTrials.size(); i++)
+  // {
+  //   fitter.runIPOPTOptimization(
+  //       init,
+  //       DynamicsFitProblemConfig(skel)
+  //           .setDefaults(true)
+  //           .setOnlyOneTrial(i)
+  //           .setIncludePoses(true));
+  // }
 
-  // Do a final polishing pass on the marker offsets
-  fitter.optimizeMarkerOffsets(init);
+  // // Do a final polishing pass on the marker offsets
+  // fitter.optimizeMarkerOffsets(init);
 
   // fitter.runIPOPTOptimization(
   //     init,

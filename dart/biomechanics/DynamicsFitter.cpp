@@ -9054,6 +9054,53 @@ void DynamicsFitter::estimateFootGroundContacts(
 }
 
 //==============================================================================
+// 0. This goes through and marks any "impact" GRF timesteps (defined as
+// `windowLen` steps after the first non-zero step after a flight phase with
+// zero GRF) as missing GRF data. This allows the system to fill in the
+// missing impacts with best guesses. This is useful if the GRF data was
+// filtered, and the original data is no longer accessible (for example, if
+// working with a published dataset where only filtered GRF is available).
+void DynamicsFitter::markMissingImpacts(
+    std::shared_ptr<DynamicsInitialization> init,
+    int windowLen,
+    bool alsoMarkLiftoff)
+{
+  s_t eps = 1e-4;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    bool lastInContact = true;
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      const s_t grfNorm = init->grfTrials[trial].col(t).norm();
+      const bool inContact = grfNorm > eps;
+      bool markWindow = false;
+      if (t > 0 && inContact && !lastInContact)
+      {
+        // Impact detected!
+        markWindow = true;
+      }
+      if (t > 0 && !inContact && lastInContact && alsoMarkLiftoff)
+      {
+        // Liftoff detected!
+        markWindow = true;
+      }
+      if (markWindow)
+      {
+        for (int i = 0; i < windowLen; i++)
+        {
+          int offsetT = t + i;
+          if (offsetT < init->probablyMissingGRF[trial].size())
+          {
+            init->probablyMissingGRF[trial][offsetT] = true;
+          }
+        }
+      }
+      lastInContact = inContact;
+    }
+  }
+}
+
+//==============================================================================
 // 0. This detects and fills in "blips", which are short segments of observed
 // GRF data in the midst of longer windows of missing data.
 void DynamicsFitter::fillInMissingGRFBlips(
@@ -10609,7 +10656,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     Eigen::MatrixXs targetPoses,
     s_t weightLinear,
     s_t weightAngular,
-    s_t regularizeResiduals,
+    s_t regularizeLinearResiduals,
+    s_t regularizeAngularResiduals,
     int maxBuckets)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
@@ -10763,7 +10811,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     for (int i = 0; i < linearResidualsSize; i++)
     {
       sampledA(linearResidualsStartRow + i, linearResidualsStartCol + i)
-          = regularizeResiduals;
+          = regularizeLinearResiduals;
     }
     int angularResidualsStartCol = 6 + (numMissing * 3) + 6;
     int angularResidualsStartRow = indices.size() * 6 + numMissing * 3;
@@ -10771,7 +10819,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     for (int i = 0; i < angularResidualsSize; i++)
     {
       sampledA(angularResidualsStartRow + i, angularResidualsStartCol + i)
-          = regularizeResiduals;
+          = regularizeAngularResiduals;
     }
 
     // std::cout << "Solving linear system for optimizing linear + angular

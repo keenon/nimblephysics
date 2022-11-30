@@ -556,7 +556,8 @@ protected:
           ::py::arg("targetPoses"),
           ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 1.0,
-          ::py::arg("regularizeResiduals") = 0.5,
+          ::py::arg("regularizeLinearResiduals") = 0.5,
+          ::py::arg("regularizeAngularResiduals") = 50.0,
           ::py::arg("maxBuckets") = 40)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
