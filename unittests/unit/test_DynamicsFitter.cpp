@@ -816,6 +816,137 @@ bool testResidualGradWrt(
   return true;
 }
 
+bool testResidualRootJacobianWrt(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<int> contactBodies,
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forces)
+{
+  ResidualForceHelper helper(skel, contactBodies);
+
+  Eigen::VectorXs originalPos = skel->getPositions();
+  Eigen::VectorXs originalVel = skel->getVelocities();
+  Eigen::VectorXs originalAcc = skel->getAccelerations();
+  skel->setPositions(q);
+  skel->setVelocities(dq);
+  skel->setAccelerations(ddq);
+
+  std::vector<neural::WithRespectTo*> wrts;
+  wrts.push_back(neural::WithRespectTo::LINEARIZED_MASSES);
+
+  for (neural::WithRespectTo* wrt : wrts)
+  {
+    Eigen::MatrixXs angWrt = helper.calculateRootAngularResidualJacobianWrt(
+        q, dq, ddq, forces, wrt);
+    Eigen::MatrixXs angWrt_fd
+        = helper.finiteDifferenceRootAngularResidualJacobianWrt(
+            q, dq, ddq, forces, wrt);
+
+    if (!equals(angWrt, angWrt_fd, 2e-8))
+    {
+      std::cout << "Jacobian of root angular residual wrt " << wrt->name()
+                << " not equal!" << std::endl;
+      std::cout << "Analytical:" << std::endl << angWrt << std::endl;
+      std::cout << "FD:" << std::endl << angWrt_fd << std::endl;
+      std::cout << "Diff (" << (angWrt_fd - angWrt).minCoeff() << " - "
+                << (angWrt_fd - angWrt).maxCoeff() << "):" << std::endl
+                << (angWrt_fd - angWrt) << std::endl;
+      return false;
+    }
+
+    Eigen::MatrixXs angAccWrt
+        = helper.calculateResidualFreeRootAngularAccelerationJacobianWrt(
+            q, dq, ddq, forces, wrt);
+    Eigen::MatrixXs angAccWrt_fd
+        = helper.finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrt(
+            q, dq, ddq, forces, wrt);
+
+    if (!equals(angAccWrt, angAccWrt_fd, 2e-8))
+    {
+      std::cout << "Jacobian of residual free angular acceleration wrt "
+                << wrt->name() << " not equal!" << std::endl;
+      std::cout << "Analytical:" << std::endl << angAccWrt << std::endl;
+      std::cout << "FD:" << std::endl << angAccWrt_fd << std::endl;
+      std::cout << "Diff (" << (angAccWrt_fd - angAccWrt).minCoeff() << " - "
+                << (angAccWrt_fd - angAccWrt).maxCoeff() << "):" << std::endl
+                << (angAccWrt_fd - angAccWrt) << std::endl;
+      return false;
+    }
+
+    // Check that the linear position offset has a linear effect on angular
+    // residual
+
+    Eigen::VectorXs originalWrt = wrt->get(skel.get());
+
+    Eigen::Vector3s originalAngAcc
+        = helper.calculateResidualFreeAngularAcceleration(
+            skel->getPositions(),
+            skel->getVelocities(),
+            skel->getAccelerations(),
+            forces);
+
+    for (int i = 0; i < 10; i++)
+    {
+      Eigen::VectorXs offset = Eigen::VectorXs::Random(originalWrt.size());
+
+      // Need to do special work to keep this in bounds
+      if (wrt == neural::WithRespectTo::LINEARIZED_MASSES)
+      {
+        offset(0) = abs(offset(0)) * 0.001;
+        offset.segment(1, offset.size() - 1).setZero();
+
+        // offset(0) = 0.0;
+        // // Make changes small
+        // offset.segment(1, offset.size() - 1) *= 0.001;
+        // // Make sure changes sum to 0
+        // offset.segment(1, offset.size() - 1)
+        //     -= Eigen::VectorXs::Ones(offset.size() - 1)
+        //        * (offset.segment(1, offset.size() - 1).sum()
+        //           / (offset.size() - 1));
+      }
+
+      Eigen::VectorXs offsetWrt = originalWrt;
+      offsetWrt += offset;
+      wrt->set(skel.get(), offsetWrt);
+
+      Eigen::Vector3s predictedChange = angWrt * offset;
+      Eigen::Vector3s actualChange
+          = helper.calculateResidualFreeAngularAcceleration(
+                skel->getPositions(),
+                skel->getVelocities(),
+                skel->getAccelerations(),
+                forces)
+            - originalAngAcc;
+
+      if (!equals(predictedChange, actualChange, 1e-8))
+      {
+        std::cout << "Relationship between " << wrt->name()
+                  << " and residual free angular acc is "
+                     "not linear! Change:"
+                  << std::endl
+                  << offset << std::endl;
+        Eigen::Matrix3s compare;
+        compare.col(0) = predictedChange;
+        compare.col(1) = actualChange;
+        compare.col(2) = predictedChange - actualChange;
+        std::cout << "Predicted - Actual - Diff" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+
+    wrt->set(skel.get(), originalWrt);
+  }
+
+  skel->setPositions(originalPos);
+  skel->setVelocities(originalVel);
+  skel->setAccelerations(originalAcc);
+
+  return true;
+}
+
 bool testResidualRootJacobians(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::vector<int> contactBodies,
@@ -1497,19 +1628,19 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
   qs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.0001;
   dqs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.001;
 
-  // for (int t = 0; t < numTimesteps; t++)
-  // {
-  //   std::cout << "Testing individual jacobians at t=" << t << std::endl;
-  //   bool success = testResidualRootJacobians(
-  //       skel,
-  //       collisionBodies,
-  //       qs.col(t),
-  //       dqs.col(t),
-  //       ddqs.col(t),
-  //       forces.col(t));
-  //   if (!success)
-  //     return false;
-  // }
+  for (int t = 0; t < numTimesteps; t++)
+  {
+    std::cout << "Testing individual jacobians at t=" << t << std::endl;
+    bool success = testResidualRootJacobians(
+        skel,
+        collisionBodies,
+        qs.col(t),
+        dqs.col(t),
+        ddqs.col(t),
+        forces.col(t));
+    if (!success)
+      return false;
+  }
 
   ResidualForceHelper helper(skel, collisionBodies);
 
@@ -1680,6 +1811,212 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
       }
     }
     return false;
+  }
+
+  return true;
+}
+
+bool testMultiMassLinearMapWithRandomTrajectory(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::vector<int> collisionBodies,
+    int numTimesteps)
+{
+  s_t dt = skel->getTimeStep();
+  Eigen::MatrixXs qs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs dqs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs ddqs
+      = Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps);
+  Eigen::MatrixXs forces
+      = 0.001
+        * Eigen::MatrixXs::Random(collisionBodies.size() * 6, numTimesteps);
+  std::vector<bool> probablyMissingGRF;
+  int numMissing = 0;
+  std::vector<int> missingIndices;
+  for (int i = 0; i < numTimesteps; i++)
+  {
+    bool missing = i % 4 == 0;
+    probablyMissingGRF.push_back(missing);
+    if (missing)
+    {
+      numMissing++;
+      missingIndices.push_back(i);
+    }
+  }
+
+  // Generate q,dq from integrating the given accelerations
+  qs.col(0) = skel->getRandomPose();
+  dqs.col(0) = skel->getRandomVelocity();
+  for (int i = 1; i < numTimesteps; i++)
+  {
+    dqs.col(i) = dqs.col(i - 1) + ddqs.col(i - 1) * dt;
+    qs.col(i) = qs.col(i - 1) + dqs.col(i) * dt;
+  }
+  // Add some random noise
+  qs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.0001;
+  dqs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.001;
+
+  skel->setLinearizedMasses(skel->getLinearizedMasses());
+  skel->setGravity(Eigen::Vector3s(0, 0, -9.81));
+  ResidualForceHelper helper(skel, collisionBodies);
+
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear
+      = helper.getMultiMassLinearSystem(
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear_fd
+      = helper.finiteDifferenceMultiMassLinearSystem(
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
+
+  if (!equals(linear.second, linear_fd.second, 1e-8))
+  {
+    std::cout << "Multi-mass system b vector is not equal!" << std::endl;
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Vector3s pos = linear.second.segment<3>(t * 3);
+      Eigen::Vector3s pos_fd = linear_fd.second.segment<3>(t * 3);
+      if (!equals(pos, pos_fd, 1e-8))
+      {
+        std::cout << "Multi-mass system b vector pos not equal at t=" << t
+                  << std::endl;
+        Eigen::Matrix3s compare;
+        compare.col(0) = pos;
+        compare.col(1) = pos_fd;
+        compare.col(2) = pos - pos_fd;
+        std::cout << "Analytical - FD - Diff" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  const s_t tol = 1e-8;
+  if (!equals(linear.first, linear_fd.first, tol))
+  {
+    std::cout << "Linear system A matrix is not equal!" << std::endl;
+    Eigen::MatrixXs A = linear.first;
+    Eigen::MatrixXs A_fd = linear_fd.first;
+
+    /// Check the linear pose map
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      Eigen::Matrix3s posOffsetPos = A.block<3, 3>(t * 3, 0);
+      Eigen::Matrix3s posOffsetPos_fd = A_fd.block<3, 3>(t * 3, 0);
+
+      if (!equals(posOffsetPos, posOffsetPos_fd, tol))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetPos:" << std::endl
+                  << posOffsetPos_fd << std::endl;
+        std::cout << "Extra (Analytical - FD):" << std::endl
+                  << posOffsetPos - posOffsetPos_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Matrix3s posOffsetVel = A.block<3, 3>(t * 3, 3);
+      Eigen::Matrix3s posOffsetVel_fd = A_fd.block<3, 3>(t * 3, 3);
+
+      if (!equals(posOffsetVel, posOffsetVel_fd, tol))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel << std::endl;
+        std::cout << "FD dPos[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetVel_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetVel - posOffsetVel_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Vector3s posOffsetInvMass = A.block<3, 1>(t * 3, 6);
+      Eigen::Vector3s posOffsetInvMass_fd = A_fd.block<3, 1>(t * 3, 6);
+      if (!equals(posOffsetInvMass, posOffsetInvMass_fd, tol))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dPos[" << t << "]/dInvMass:" << std::endl
+                  << posOffsetInvMass << std::endl;
+        std::cout << "FD dPos[" << t << "]/dInvMass:" << std::endl
+                  << posOffsetInvMass_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetInvMass - posOffsetInvMass_fd << std::endl;
+        return false;
+      }
+
+      for (int i = 0; i < skel->getNumScaleGroups(); i++)
+      {
+        Eigen::Vector3s posOffsetMassPerc = A.block<3, 1>(t * 3, 6 + i);
+        Eigen::Vector3s posOffsetMassPerc_fd = A_fd.block<3, 1>(t * 3, 6 + i);
+        if (!equals(posOffsetMassPerc, posOffsetMassPerc_fd, tol))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dPos[" << t << "]/dMassPerc[" << i
+                    << "]:" << std::endl
+                    << posOffsetMassPerc << std::endl;
+          std::cout << "FD dPos[" << t << "]/dMassPerc[" << i
+                    << "]:" << std::endl
+                    << posOffsetMassPerc_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetMassPerc - posOffsetMassPerc_fd << std::endl;
+          return false;
+        }
+      }
+
+      int numVariables = 7 + skel->getNumScaleGroups();
+
+      for (int i = 0; i < numMissing; i++)
+      {
+        Eigen::Matrix3s posOffsetResidual
+            = A.block<3, 3>(t * 3, numVariables + i * 3);
+        Eigen::Matrix3s posOffsetResidual_fd
+            = A_fd.block<3, 3>(t * 3, numVariables + i * 3);
+
+        if (!equals(posOffsetResidual, posOffsetResidual_fd, tol))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dPos[" << t << "]/dLinResidual["
+                    << missingIndices[i] << "]:" << std::endl
+                    << posOffsetResidual << std::endl;
+          std::cout << "FD dPos[" << t << "]/dLinResidual[" << missingIndices[i]
+                    << "]:" << std::endl
+                    << posOffsetResidual_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetResidual - posOffsetResidual_fd << std::endl;
+          return false;
+        }
+      }
+    }
+    std::cout << "Linear pose map passes!" << std::endl;
+
+    return false;
+  }
+
+  // Test some random points to ensure that the linear map is in fact linear
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::VectorXs random = Eigen::VectorXs::Random(linear.first.cols());
+
+    // These should give the same result
+    Eigen::VectorXs randomLinearOutput = linear.first * random + linear.second;
+    Eigen::VectorXs randomTestOutput
+        = helper.getMultiMassLinearSystemTestOutput(
+            dt,
+            random.segment<3>(0),
+            random.segment<3>(3),
+            random.segment(6 + numMissing * 3, 1 + skel->getNumScaleGroups()),
+            random.segment(6, numMissing * 3),
+            qs,
+            dqs,
+            ddqs,
+            forces,
+            probablyMissingGRF);
+    if (!equals(randomLinearOutput, randomTestOutput, 1e-8))
+    {
+      std::cout << "Not linear! Diff norm: "
+                << (randomLinearOutput - randomTestOutput).norm() << std::endl;
+      return false;
+    }
   }
 
   return true;
@@ -2115,10 +2452,57 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<DynamicsInitialization> init,
     bool saveGUI = false)
 {
+  // Have very loose bounds for scaling
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    skel->getBodyNode(i)->setScaleLowerBound(Eigen::Vector3s::Ones() * 0.3);
+    skel->getBodyNode(i)->setScaleUpperBound(Eigen::Vector3s::Ones() * 3.0);
+  }
+
+  std::vector<Eigen::MatrixXs> originalTrajectories;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    originalTrajectories.push_back(init->poseTrials[trial]);
+  }
 
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
+  fitter.addJointBoundSlack(skel, 0.1);
+  fitter.boundPush(init);
   fitter.smoothAccelerations(init);
-  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  // fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
+
+  // Regularize masses around the original values
+  init->regularizeGroupMassesTo = skel->getGroupMasses();
+
+  /*
+  // Run a few iterations to optimize angular first
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs originalTrajectory = originalTrajectories[trial];
+    for (int i = 0; i < 0; i++)
+    {
+      // this holds the mass constant, and re-jigs the trajectory to try to
+      // make angular ACC's match more closely what was actually observed
+      fitter.zeroLinearResidualsAndOptimizeAngular(
+          init, trial, originalTrajectory, 1.0, 0.5, 0.1, 150);
+    }
+  }
+
+  // Minimize residuals while holding positions fixed
+  fitter.setLBFGSHistoryLength(150);
+  fitter.setIterationLimit(500);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          .setLogLossDetails(true)
+          .setResidualUseL1(false)
+          .setResidualWeight(1e-3)
+          .setRegularizeCOMs(5.0)
+          .setRegularizeMasses(1.0)
+          .setIncludeMasses(true)
+          .setIncludeCOMs(true));
+  */
 
   // if (!fitter.verifyLinearForceConsistency(init))
   // {
@@ -2126,20 +2510,22 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //   std::endl; return init;
   // }
 
-  bool successOnAllResiduals = true;
-  (void)successOnAllResiduals;
+  // Get rid of the rest of the angular residuals
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    Eigen::MatrixXs originalTrajectory = init->poseTrials[trial];
+    Eigen::MatrixXs originalTrajectory = originalTrajectories[trial];
     for (int i = 0; i < 100; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 0.1, 0.1, 40);
+          init, trial, originalTrajectory, 1.0, 0.5, 0.1, 150);
     }
     fitter.recalibrateForcePlates(init, trial);
   }
+
+  // Recompute the marker offsets to minimize error
+  fitter.optimizeMarkerOffsets(init);
 
   auto secondPair = fitter.computeAverageRealForce(init);
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
@@ -2243,17 +2629,28 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   int maxNumTrials = 3;
 
   // Re - run as L1
-  (void)successOnAllResiduals;
-  fitter.setIterationLimit(200);
+  fitter.setIterationLimit(1000);
+  // fitter.runIPOPTOptimization(
+  //     init,
+  //     DynamicsFitProblemConfig(skel)
+  //         .setDefaults(true)
+  //         .setMaxNumTrials(maxNumTrials)
+  //         .setIncludeMarkerOffsets(true)
+  //         .setIncludePoses(true));
+
+  fitter.setLBFGSHistoryLength(250);
   fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
           .setDefaults(true)
+          // Add extra slack to all the bounds
           .setMaxNumTrials(maxNumTrials)
           .setIncludeMasses(true)
-          .setIncludeCOMs(true)
-          .setIncludeInertias(true)
-          .setIncludeBodyScales(true)
+          // .setIncludeCOMs(true)
+          // .setIncludeInertias(true)
+          // .setPoseSubsetLen(6)
+          // .setPoseSubsetStartIndex(0)
+          // .setIncludeBodyScales(true)
           .setIncludeMarkerOffsets(true)
           .setIncludePoses(true));
 
@@ -2266,6 +2663,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
             .setOnlyOneTrial(i)
             .setIncludePoses(true));
   }
+
+  // Do a final polishing pass on the marker offsets
+  fitter.optimizeMarkerOffsets(init);
 
   // fitter.runIPOPTOptimization(
   //     init,
@@ -2381,7 +2781,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   std::cout << "Post optimization average ~GRF (Mass * 9.8): "
             << init->bodyMasses.sum() * 9.8 << " N" << std::endl;
 
-  skel->setGroupMasses(init->originalGroupMasses);
+  skel->setGroupMasses(init->initialGroupMasses);
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
     auto* bodyNode = skel->getBodyNode(i);
@@ -3501,6 +3901,35 @@ TEST(DynamicsFitter, LIN_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
+        file.skeleton, collisionBodies, 8);
+    if (!success)
+    {
+      EXPECT_TRUE(success);
+      return;
+    }
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, MULTIMASS_JACS)
+{
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+
+  for (int i = 0; i < 5; i++)
+  {
+    std::vector<int> collisionBodies;
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton());
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
+    bool success = testMultiMassLinearMapWithRandomTrajectory(
         file.skeleton, collisionBodies, 8);
     if (!success)
     {
@@ -4786,6 +5215,63 @@ TEST(DynamicsFitter, TEST_ZERO_RESIDUALS)
   fitter.zeroLinearResidualsOnCOMTrajectory(init);
 
   // fitter.moveComsToMinimizeAngularResiduals(init);
+
+  fitter.saveDynamicsToGUI(
+      "../../../javascript/src/data/movement2.bin",
+      init,
+      0,
+      (int)round(1.0 / init->trialTimesteps[0]));
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, TEST_MULTIMASS_ZERO_RESIDUALS)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/SprinterWithSpine/IK/JA1Gait35_ik.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/SprinterWithSpine/Models/"
+      "optimized_scale_and_markers.osim");
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitter fitter(
+      standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
+
+  fitter.smoothAccelerations(init);
+  // Eigen::MatrixXs originalTrajectory = init->poseTrials[0];
+  fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
+
+  std::cout << "Linear residual: "
+            << fitter.computeAverageTrialResidualForce(init, 0).first
+            << std::endl;
 
   fitter.saveDynamicsToGUI(
       "../../../javascript/src/data/movement2.bin",

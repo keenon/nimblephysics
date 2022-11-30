@@ -1059,6 +1059,96 @@ public:
   /// This gets the lower bound for each group's mass, concatenated
   Eigen::VectorXs getGroupMassesLowerBound();
 
+  /// This gets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+  /// inverse of the total mass of the skeleton, and all subsequent entries are
+  /// the percentages of the total for each link mass.
+  Eigen::VectorXs getLinearizedMasses();
+
+  /// This sets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+  /// inverse of the total mass of the skeleton, and all subsequent entries are
+  /// the percentages of the total for each link mass, and maps back into the
+  /// mass list.
+  void setLinearizedMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for the linearized mass, concatenated
+  Eigen::VectorXs getLinearizedMassesUpperBound();
+
+  /// This gets the lower bound for the linearized mass, concatenated
+  Eigen::VectorXs getLinearizedMassesLowerBound();
+
+  /// This maps a linearized masses vector to an "unnormalized COM." This means
+  /// that the percentages in the linearized mass vector need not add to 1.
+  /// Relaxing this constraint, and then applying it later in the optimizer, can
+  /// make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOM(Eigen::VectorXs linearizedMasses);
+
+  /// This maps a linearized masses vector to an "unnormalized COM
+  /// acceleration." This means that the percentages in the linearized mass
+  /// vector need not add to 1. Relaxing this constraint, and then applying it
+  /// later in the optimizer, can make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOMAcceleration(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This maps a linearized masses vector to an "unnormalized COM
+  /// acceleration." This means that the percentages in the linearized mass
+  /// vector need not add to 1. Relaxing this constraint, and then applying it
+  /// later in the optimizer, can make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOMFDAcceleration(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This maps to the difference for unnormalized (analytical COM acc - fd COM
+  /// acc)
+  Eigen::Vector3s getUnnormalizedCOMAccelerationOffset(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This gets the analytical jacobian relating the linearized masses to link
+  /// masses
+  Eigen::MatrixXs getGroupMassesJacobianWrtLinearizedMasses();
+
+  /// This gets the finite difference'd jacobian relating the linearized masses
+  /// to link masses
+  Eigen::MatrixXs finiteDifferenceGroupMassesJacobianWrtLinearizedMasses();
+
+  /// This gets the analytical jacobian relating changes in the linearized
+  /// masses to changes in the COM position, neglecting normalization to
+  /// guarantee that total percentages sum to 1.0
+  Eigen::MatrixXs getUnnormalizedCOMJacobianWrtLinearizedMasses();
+
+  /// This gets the analytical jacobian relating changes in the linearized
+  /// masses to changes in the COM position, neglecting normalization to
+  /// guarantee that total percentages sum to 1.0
+  Eigen::MatrixXs finiteDifferenceUnnormalizedCOMJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the finite
+  /// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+  /// c[t+1])/(dt*dt)
+  Eigen::MatrixXs getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the finite
+  /// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+  /// c[t+1])/(dt*dt)
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the analytical
+  /// formula for COM acceleration
+  Eigen::MatrixXs getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the analytical
+  /// formula for COM acceleration
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes in the
+  /// unnormalized (analytical COM acc - fd COM acc) quantity.
+  Eigen::MatrixXs
+  getUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes in the
+  /// unnormalized (analytical COM acc - fd COM acc) quantity.
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses();
+
   /// This gets the COMs of each scale group, concatenated
   Eigen::VectorXs getGroupCOMs();
 

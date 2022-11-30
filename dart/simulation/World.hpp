@@ -268,6 +268,18 @@ public:
   /// This gets the lower bound for each group's mass, concatenated
   Eigen::VectorXs getGroupMassesLowerBound();
 
+  /// This gets the masses of each scale group, concatenated
+  Eigen::VectorXs getLinearizedMasses();
+
+  /// This sets the masses of each scale group, concatenated
+  void setLinearizedMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for each group's mass, concatenated
+  Eigen::VectorXs getLinearizedMassesUpperBound();
+
+  /// This gets the lower bound for each group's mass, concatenated
+  Eigen::VectorXs getLinearizedMassesLowerBound();
+
   /// This gets the COMs of each scale group, concatenated
   Eigen::VectorXs getGroupCOMs();
 

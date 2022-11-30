@@ -116,6 +116,26 @@ public:
       bool useL1);
 
   ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in wrt to changes in
+  // the residual torque
+  Eigen::MatrixXs calculateRootAngularResidualJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in wrt to changes in
+  // the residual torque
+  Eigen::MatrixXs finiteDifferenceRootAngularResidualJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ////////////////////////////////////////////
   // Computes the Jacobian relating changes in the root position to changes in
   // the residual torque
   Eigen::Matrix3s calculateRootAngularResidualJacobianWrtLinearPosition(
@@ -236,6 +256,25 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change wrt
+  Eigen::MatrixXs calculateResidualFreeRootAngularAccelerationJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
+
+  ////////////////////////////////////////////
+  // This computes the change in angular acceleration as we change wrt
+  Eigen::MatrixXs
+  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrt(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      neural::WithRespectTo* wrt);
 
   ////////////////////////////////////////////
   // This computes the change in angular acceleration as we change the root
@@ -509,6 +548,50 @@ public:
       std::vector<bool> probablyMissingGRF,
       int maxBuckets = 16);
 
+  ////////////////////////////////////////////
+  // This returns a matrix A and vector b, such that Ax+b gives you a trajectory
+  // with zero linear residuals. This linear system maps initial COM position,
+  // initial COM velocity, inverse mass, and total mass percentages for each
+  // body into a residual free linear root trajectory. Note, input is the COM,
+  // but output is the root position.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> getMultiMassLinearSystem(
+      s_t dt,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
+
+  ////////////////////////////////////////////
+  // This returns the same thing as getMultiMassLinearSystem(), in
+  // theory.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  finiteDifferenceMultiMassLinearSystem(
+      s_t dt,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
+
+  ////////////////////////////////////////////
+  // This produces the same output as you would get from using A*x+b from
+  // getMultiMassLinearSystem().
+  Eigen::VectorXs getMultiMassLinearSystemTestOutput(
+      s_t dt,
+      Eigen::Vector3s linPosOffset,
+      Eigen::Vector3s linVelOffset,
+      Eigen::VectorXs linearizedMasses,
+      Eigen::VectorXs linResiduals,
+      Eigen::MatrixXs qs,
+      Eigen::MatrixXs dqs,
+      Eigen::MatrixXs ddqs,
+      Eigen::MatrixXs forces,
+      std::vector<bool> probablyMissingGRF,
+      int maxBuckets = 16);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   std::vector<int> mForceBodies;
@@ -676,12 +759,20 @@ struct DynamicsInitialization
       updatedMarkerMap;
 
   ///////////////////////////////////////////
+  // To allow us to report how things changed since initialization
+  Eigen::VectorXs initialGroupMasses;
+  Eigen::VectorXs initialGroupCOMs;
+  Eigen::VectorXs initialGroupInertias;
+  Eigen::VectorXs initialGroupScales;
+  std::map<std::string, Eigen::Vector3s> initialMarkerOffsets;
+
+  ///////////////////////////////////////////
   // To support regularization
-  Eigen::VectorXs originalGroupMasses;
-  Eigen::VectorXs originalGroupCOMs;
-  Eigen::VectorXs originalGroupInertias;
-  Eigen::VectorXs originalGroupScales;
-  std::map<std::string, Eigen::Vector3s> originalMarkerOffsets;
+  Eigen::VectorXs regularizeGroupMassesTo;
+  Eigen::VectorXs regularizeGroupCOMsTo;
+  Eigen::VectorXs regularizeGroupInertiasTo;
+  Eigen::VectorXs regularizeGroupScalesTo;
+  std::map<std::string, Eigen::Vector3s> regularizeMarkerOffsetsTo;
 };
 
 class DynamicsFitProblemConfig
@@ -689,6 +780,7 @@ class DynamicsFitProblemConfig
 public:
   DynamicsFitProblemConfig(std::shared_ptr<dynamics::Skeleton> skeleton);
   DynamicsFitProblemConfig& setDefaults(bool l1 = false);
+  DynamicsFitProblemConfig& setLogLossDetails(bool value);
 
   DynamicsFitProblemConfig& setIncludeMasses(bool value);
   DynamicsFitProblemConfig& setIncludeCOMs(bool value);
@@ -697,12 +789,17 @@ public:
   DynamicsFitProblemConfig& setIncludeMarkerOffsets(bool value);
   DynamicsFitProblemConfig& setIncludeBodyScales(bool value);
 
+  DynamicsFitProblemConfig& setPoseSubsetStartIndex(int index);
+  DynamicsFitProblemConfig& setPoseSubsetLen(int len);
+
   DynamicsFitProblemConfig& setLinearNewtonWeight(s_t weight);
   DynamicsFitProblemConfig& setResidualWeight(s_t weight);
   DynamicsFitProblemConfig& setMarkerWeight(s_t weight);
   DynamicsFitProblemConfig& setJointWeight(s_t weight);
 
   DynamicsFitProblemConfig& setConstrainResidualsZero(bool constrain);
+  DynamicsFitProblemConfig& setDisableBounds(bool disable);
+  DynamicsFitProblemConfig& setBoundMoveDistance(s_t distance);
   DynamicsFitProblemConfig& setLinearNewtonUseL1(bool l1);
   DynamicsFitProblemConfig& setResidualUseL1(bool l1);
   DynamicsFitProblemConfig& setMarkerUseL1(bool l1);
@@ -739,7 +836,11 @@ public:
   s_t mMarkerWeight;
   s_t mJointWeight;
 
+  bool mLogLossDetails;
+
   bool mConstrainResidualsZero;
+  bool mDisableBounds;
+  s_t mBoundMoveDistance;
 
   bool mLinearNewtonUseL1;
   bool mResidualUseL1;
@@ -751,6 +852,9 @@ public:
   bool mIncludeBodyScales;
   bool mIncludePoses;
   bool mIncludeMarkerOffsets;
+
+  int mPoseSubsetStartIndex;
+  int mPoseSubsetLen;
 
   s_t mRegularizeAcc;
   Eigen::VectorXs mRegularizeAccBodyWeights;
@@ -1105,6 +1209,15 @@ public:
   void fillInMissingGRFBlips(
       std::shared_ptr<DynamicsInitialization> init, int blipFilterLen = 20);
 
+  // 0. Push the initialization away from hard bounds
+  void boundPush(
+      std::shared_ptr<DynamicsInitialization> init, s_t boundPush = 0.02);
+
+  // 0. Adjust the skeleton's joint bounds to increase the range of motion
+  // during fitting
+  void addJointBoundSlack(
+      std::shared_ptr<dynamics::Skeleton> skel, s_t slack = 0.1);
+
   // 0. Smooth the accelerations.
   void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
 
@@ -1134,6 +1247,13 @@ public:
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // 1. Adjust the total mass of the body and the individual link masses for
+  // each body, and change the initial positions and velocities of the body to
+  // achieve a least-squares closest COM trajectory to the current kinematic
+  // fit.
+  void multimassZeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init);
 
   // 1. Change the initial positions and velocities of the body to achieve a
@@ -1172,6 +1292,9 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       s_t maxMovement = 0.03);
+
+  // This analytically re-centers each marker to minimize marker errors.
+  void optimizeMarkerOffsets(std::shared_ptr<DynamicsInitialization> init);
 
   // This utility recomputes the GRF world wrenches, in case we changed the data
   void recomputeGRFs(std::shared_ptr<DynamicsInitialization> init, int trial);
@@ -1237,6 +1360,12 @@ public:
   // 4. This runs an explicit Newton's method update, using finite differencing
   // to get a Hessian
   void runNewtonsMethod(
+      std::shared_ptr<DynamicsInitialization> init,
+      DynamicsFitProblemConfig config);
+
+  // 4. This runs an explicit Newton's method update, using a constant Jacobian
+  // and constant (vore approximate) "Hessian"
+  void runConstantNewtonsMethod(
       std::shared_ptr<DynamicsInitialization> init,
       DynamicsFitProblemConfig config);
 

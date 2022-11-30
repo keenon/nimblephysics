@@ -1336,6 +1336,69 @@ Eigen::VectorXs World::getGroupMassesLowerBound()
 }
 
 //==============================================================================
+/// This gets the masses of each scale group, concatenated
+Eigen::VectorXs World::getLinearizedMasses()
+{
+  Eigen::VectorXs scales
+      = Eigen::VectorXs(getNumScaleGroups() + getNumSkeletons());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() + 1;
+    scales.segment(cursor, dofs) = mSkeletons[i]->getLinearizedMasses();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This sets the masses of each scale group, concatenated
+void World::setLinearizedMasses(Eigen::VectorXs masses)
+{
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() + 1;
+    mSkeletons[i]->setLinearizedMasses(masses.segment(cursor, dofs));
+    cursor += dofs;
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each group's mass, concatenated
+Eigen::VectorXs World::getLinearizedMassesUpperBound()
+{
+  Eigen::VectorXs scales
+      = Eigen::VectorXs(getNumScaleGroups() + getNumSkeletons());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() + 1;
+    scales.segment(cursor, dofs)
+        = mSkeletons[i]->getLinearizedMassesUpperBound();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
+/// This gets the lower bound for each group's mass, concatenated
+Eigen::VectorXs World::getLinearizedMassesLowerBound()
+{
+  Eigen::VectorXs scales
+      = Eigen::VectorXs(getNumScaleGroups() + getNumSkeletons());
+  std::size_t cursor = 0;
+  for (std::size_t i = 0; i < mSkeletons.size(); i++)
+  {
+    std::size_t dofs = mSkeletons[i]->getNumScaleGroups() + 1;
+    scales.segment(cursor, dofs)
+        = mSkeletons[i]->getLinearizedMassesLowerBound();
+    cursor += dofs;
+  }
+  return scales;
+}
+
+//==============================================================================
 /// This gets the COMs of each scale group, concatenated
 Eigen::VectorXs World::getGroupCOMs()
 {

@@ -1784,6 +1784,11 @@ Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
   {
     return DCg_Dp;
   }
+  else if (wrt == neural::WithRespectTo::LINEARIZED_MASSES)
+  {
+    Eigen::MatrixXs groupFromLin = getGroupMassesJacobianWrtLinearizedMasses();
+    return getJacobianOfC(neural::WithRespectTo::GROUP_MASSES) * groupFromLin;
+  }
   else if (
       wrt == neural::WithRespectTo::POSITION
       || wrt == neural::WithRespectTo::VELOCITY
@@ -1833,6 +1838,12 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
       || wrt == neural::WithRespectTo::FORCE)
   {
     return DM_Dp;
+  }
+  else if (wrt == neural::WithRespectTo::LINEARIZED_MASSES)
+  {
+    Eigen::MatrixXs groupFromLin = getGroupMassesJacobianWrtLinearizedMasses();
+    return getJacobianOfM(x, neural::WithRespectTo::GROUP_MASSES)
+           * groupFromLin;
   }
   else if (
       wrt == neural::WithRespectTo::POSITION
@@ -4562,6 +4573,413 @@ Eigen::VectorXs Skeleton::getGroupMassesLowerBound()
     groups(i) = mBodyScaleGroups[i].nodes[0]->getInertia().getMassLowerBound();
   }
   return groups;
+}
+
+//==============================================================================
+/// This gets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+/// inverse of the total mass of the skeleton, and all subsequent entries are
+/// the percentages of the total for each link mass.
+Eigen::VectorXs Skeleton::getLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  s_t totalMass = getMass();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Zero(mBodyScaleGroups.size() + 1);
+  linearized(0) = 1.0 / totalMass;
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t totalGroupMass = mBodyScaleGroups[i].nodes[0]->getMass()
+                         * mBodyScaleGroups[i].nodes.size();
+    linearized(i + 1) = totalGroupMass / totalMass;
+  }
+  return linearized;
+}
+
+//==============================================================================
+/// This sets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+/// inverse of the total mass of the skeleton, and all subsequent entries are
+/// the percentages of the total for each link mass, and maps back into the
+/// mass list.
+void Skeleton::setLinearizedMasses(Eigen::VectorXs masses)
+{
+  ensureBodyScaleGroups();
+  s_t totalMass = 1.0 / masses(0);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t totalGroupMass = masses(i + 1) * totalMass;
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      body->setMass(totalGroupMass / mBodyScaleGroups[i].nodes.size());
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for the linearized mass, concatenated
+Eigen::VectorXs Skeleton::getLinearizedMassesUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Ones(mBodyScaleGroups.size() + 1);
+  s_t minimumMass = 0.0;
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    minimumMass += getBodyNode(i)->getInertia().getMassLowerBound();
+  }
+  linearized(0) = 1.0 / minimumMass;
+  return linearized;
+}
+
+//==============================================================================
+/// This gets the lower bound for the linearized mass, concatenated
+Eigen::VectorXs Skeleton::getLinearizedMassesLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Zero(mBodyScaleGroups.size() + 1);
+  s_t maxMass = 0.0;
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    maxMass += getBodyNode(i)->getInertia().getMassUpperBound();
+  }
+  linearized(0) = 1.0 / maxMass;
+  return linearized;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM." This means
+/// that the percentages in the linearized mass vector need not add to 1.
+/// Relaxing this constraint, and then applying it later in the optimizer, can
+/// make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOM(Eigen::VectorXs linearizedMasses)
+{
+  Eigen::Vector3s unnormalizedCOM = Eigen::Vector3s::Zero();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t percentage = linearizedMasses(i + 1);
+    s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      unnormalizedCOM += bodyPercentage * body->getCOM();
+    }
+  }
+  return unnormalizedCOM;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM
+/// acceleration." This means that the percentages in the linearized mass
+/// vector need not add to 1. Relaxing this constraint, and then applying it
+/// later in the optimizer, can make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOMAcceleration(
+    Eigen::VectorXs linearizedMasses)
+{
+  Eigen::Vector3s unnormalizedCOMAcc = Eigen::Vector3s::Zero();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t percentage = linearizedMasses(i + 1);
+    s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      unnormalizedCOMAcc += bodyPercentage * body->getCOMLinearAcceleration();
+    }
+  }
+  return unnormalizedCOMAcc;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM
+/// acceleration." This means that the percentages in the linearized mass
+/// vector need not add to 1. Relaxing this constraint, and then applying it
+/// later in the optimizer, can make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOMFDAcceleration(
+    Eigen::VectorXs linearizedMasses)
+{
+  Eigen::VectorXs p = getPositions();
+  Eigen::VectorXs v = getVelocities();
+  Eigen::VectorXs a = getAccelerations();
+  s_t dt = getTimeStep();
+  Eigen::VectorXs p_last = p - (dt * v);
+  Eigen::VectorXs p_next = (dt * dt * a) - p_last + (2 * p);
+
+  setPositions(p);
+  Eigen::Vector3s com = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p_next);
+  Eigen::Vector3s com_next = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p_last);
+  Eigen::Vector3s com_last = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p);
+
+  return (com_last - 2 * com + com_next) / (dt * dt);
+}
+
+//==============================================================================
+/// This maps to the difference for unnormalized (analytical COM acc - fd COM
+/// acc)
+Eigen::Vector3s Skeleton::getUnnormalizedCOMAccelerationOffset(
+    Eigen::VectorXs linearizedMasses)
+{
+  return getUnnormalizedCOMAcceleration(linearizedMasses)
+         - getUnnormalizedCOMFDAcceleration(linearizedMasses);
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating the linearized masses to link
+/// masses
+Eigen::MatrixXs Skeleton::getGroupMassesJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  s_t totalMass = getMass();
+  s_t inverseMass = 1.0 / totalMass;
+  (void)inverseMass;
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(numGroups, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    result(i, 0) = -(linearized(i + 1) / mBodyScaleGroups[i].nodes.size())
+                   / (inverseMass * inverseMass);
+    result(i, i + 1) = totalMass / mBodyScaleGroups[i].nodes.size();
+  }
+  return result;
+}
+
+//==============================================================================
+/// This gets the finite difference'd jacobian relating the linearized masses
+/// to link masses
+Eigen::MatrixXs
+Skeleton::finiteDifferenceGroupMassesJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(numGroups, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        setLinearizedMasses(tweaked);
+        perturbed = getGroupMasses();
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating changes in the linearized
+/// masses to changes in the COM position
+Eigen::MatrixXs Skeleton::getUnnormalizedCOMJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    // s_t percentage = linearized(i + 1);
+    // s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      result.col(i + 1) += body->getCOM() / mBodyScaleGroups[i].nodes.size();
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating changes in the linearized
+/// masses to changes in the COM position
+Eigen::MatrixXs
+Skeleton::finiteDifferenceUnnormalizedCOMJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        perturbed = getUnnormalizedCOM(tweaked);
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the finite
+/// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+/// c[t+1])/(dt*dt)
+Eigen::MatrixXs Skeleton::getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses()
+{
+  Eigen::VectorXs p = getPositions();
+  Eigen::VectorXs v = getVelocities();
+  Eigen::VectorXs a = getAccelerations();
+  s_t dt = getTimeStep();
+  // v[t] = (p[t] - p[t-1])/dt
+  // p[t-1] = p[t] - dt*v[t]
+  // a[t] = (p[t-1] - 2*p[t] + p[t+1])/(dt*dt)
+  // dt*dt*a[t] = (p[t-1] - 2*p[t] + p[t+1])
+  // dt*dt*a[t] - p[t-1] + 2*p[t] = p[t+1]
+  Eigen::VectorXs p_last = p - (dt * v);
+  Eigen::VectorXs p_next = (dt * dt * a) - p_last + (2 * p);
+
+  Eigen::MatrixXs comJ = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p_last);
+  Eigen::MatrixXs comJ_last = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p_next);
+  Eigen::MatrixXs comJ_next = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p);
+
+  return (comJ_last - 2 * comJ + comJ_next) / (dt * dt);
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the finite
+/// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+/// c[t+1])/(dt*dt)
+Eigen::MatrixXs
+Skeleton::finiteDifferenceUnnormalizedCOMFDAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMFDAcceleration(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the analytical
+/// formula for COM acceleration
+Eigen::MatrixXs
+Skeleton::getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    // s_t percentage = linearized(i + 1);
+    // s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      result.col(i + 1) += body->getCOMLinearAcceleration()
+                           / mBodyScaleGroups[i].nodes.size();
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the analytical
+/// formula for COM acceleration
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMAcceleration(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes in the
+/// unnormalized (analytical COM acc - fd COM acc) quantity.
+Eigen::MatrixXs
+Skeleton::getUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses()
+{
+  return getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+         - getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes in the
+/// unnormalized (analytical COM acc - fd COM acc) quantity.
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMAccelerationOffset(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  return result;
 }
 
 //==============================================================================

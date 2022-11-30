@@ -149,20 +149,37 @@ void DynamicsFitter(py::module& m)
           "originalPoses",
           &dart::biomechanics::DynamicsInitialization::originalPoses)
       .def_readwrite(
-          "originalGroupMasses",
-          &dart::biomechanics::DynamicsInitialization::originalGroupMasses)
+          "initialGroupMasses",
+          &dart::biomechanics::DynamicsInitialization::initialGroupMasses)
       .def_readwrite(
-          "originalGroupCOMs",
-          &dart::biomechanics::DynamicsInitialization::originalGroupCOMs)
+          "initialGroupCOMs",
+          &dart::biomechanics::DynamicsInitialization::initialGroupCOMs)
       .def_readwrite(
-          "originalGroupInertias",
-          &dart::biomechanics::DynamicsInitialization::originalGroupInertias)
+          "initialGroupInertias",
+          &dart::biomechanics::DynamicsInitialization::initialGroupInertias)
       .def_readwrite(
-          "originalGroupScales",
-          &dart::biomechanics::DynamicsInitialization::originalGroupScales)
+          "initialGroupScales",
+          &dart::biomechanics::DynamicsInitialization::initialGroupScales)
       .def_readwrite(
-          "originalMarkerOffsets",
-          &dart::biomechanics::DynamicsInitialization::originalMarkerOffsets);
+          "initialMarkerOffsets",
+          &dart::biomechanics::DynamicsInitialization::initialMarkerOffsets)
+      .def_readwrite(
+          "regularizeGroupMassesTo",
+          &dart::biomechanics::DynamicsInitialization::regularizeGroupMassesTo)
+      .def_readwrite(
+          "regularizeGroupCOMsTo",
+          &dart::biomechanics::DynamicsInitialization::regularizeGroupCOMsTo)
+      .def_readwrite(
+          "regularizeGroupInertiasTo",
+          &dart::biomechanics::DynamicsInitialization::
+              regularizeGroupInertiasTo)
+      .def_readwrite(
+          "regularizeGroupScalesTo",
+          &dart::biomechanics::DynamicsInitialization::regularizeGroupScalesTo)
+      .def_readwrite(
+          "regularizeMarkerOffsetsTo",
+          &dart::biomechanics::DynamicsInitialization::
+              regularizeMarkerOffsetsTo);
 
   /*
 class DynamicsFitter
@@ -243,6 +260,10 @@ protected:
           "setDefaults",
           &dart::biomechanics::DynamicsFitProblemConfig::setDefaults,
           ::py::arg("useL1") = true)
+      .def(
+          "setLogLossDetails",
+          &dart::biomechanics::DynamicsFitProblemConfig::setLogLossDetails,
+          ::py::arg("value"))
       .def(
           "setIncludeMasses",
           &dart::biomechanics::DynamicsFitProblemConfig::setIncludeMasses,
@@ -368,6 +389,23 @@ protected:
               setConstrainResidualsZero,
           ::py::arg("constrain"))
       .def(
+          "setDisableBounds",
+          &dart::biomechanics::DynamicsFitProblemConfig::setDisableBounds,
+          ::py::arg("disable"))
+      .def(
+          "setBoundMoveDistance",
+          &dart::biomechanics::DynamicsFitProblemConfig::setBoundMoveDistance,
+          ::py::arg("distance"))
+      .def(
+          "setPoseSubsetLen",
+          &dart::biomechanics::DynamicsFitProblemConfig::setPoseSubsetLen,
+          ::py::arg("value"))
+      .def(
+          "setPoseSubsetStartIndex",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setPoseSubsetStartIndex,
+          ::py::arg("value"))
+      .def(
           "setMaxNumTrials",
           &dart::biomechanics::DynamicsFitProblemConfig::setMaxNumTrials,
           ::py::arg("value"))
@@ -486,9 +524,28 @@ protected:
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,
           ::py::arg("init"))
       .def(
+          "optimizeMarkerOffsets",
+          &dart::biomechanics::DynamicsFitter::optimizeMarkerOffsets,
+          ::py::arg("init"))
+      .def(
+          "boundPush",
+          &dart::biomechanics::DynamicsFitter::boundPush,
+          ::py::arg("init"),
+          ::py::arg("boundPush") = 0.02)
+      .def(
+          "addJointBoundSlack",
+          &dart::biomechanics::DynamicsFitter::addJointBoundSlack,
+          ::py::arg("init"),
+          ::py::arg("slack"))
+      .def(
           "zeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               zeroLinearResidualsOnCOMTrajectory,
+          ::py::arg("init"))
+      .def(
+          "multimassZeroLinearResidualsOnCOMTrajectory",
+          &dart::biomechanics::DynamicsFitter::
+              multimassZeroLinearResidualsOnCOMTrajectory,
           ::py::arg("init"))
       .def(
           "zeroLinearResidualsAndOptimizeAngular",

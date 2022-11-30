@@ -155,6 +155,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_DynamicsFitter dart-utils)
   target_link_libraries(test_DynamicsFitter dart-utils-urdf)
 
+  dart_add_test("unit" test_LinearizedMassMapping)
+  target_link_libraries(test_LinearizedMassMapping dart-utils)
+  target_link_libraries(test_LinearizedMassMapping dart-utils-urdf)
+
   dart_add_test("unit" test_ScapulathoracicJoint)
   target_link_libraries(test_ScapulathoracicJoint dart-utils)
   target_link_libraries(test_ScapulathoracicJoint dart-utils-urdf)
