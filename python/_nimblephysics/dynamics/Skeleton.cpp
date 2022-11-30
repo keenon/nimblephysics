@@ -49,6 +49,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "dart/math/MathTypes.hpp"
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -861,6 +863,45 @@ void Skeleton(py::module& m)
           ::py::arg("scales"),
           ::py::arg("silentlyClamp") = false)
       .def("getGroupScales", &dart::dynamics::Skeleton::getGroupScales)
+      .def(
+          "setGroupMasses",
+          &dart::dynamics::Skeleton::setGroupMasses,
+          ::py::arg("masses"))
+      .def("getGroupMasses", &dart::dynamics::Skeleton::getGroupMasses)
+      .def(
+          "getGroupMassesUpperBound",
+          &dart::dynamics::Skeleton::getGroupMassesUpperBound)
+      .def(
+          "getGroupMassesLowerBound",
+          &dart::dynamics::Skeleton::getGroupMassesLowerBound)
+      .def(
+          "setGroupInertias",
+          &dart::dynamics::Skeleton::setGroupInertias,
+          ::py::arg("inertias"))
+      .def("getGroupInertias", &dart::dynamics::Skeleton::getGroupInertias)
+      .def(
+          "getGroupInertiasUpperBound",
+          &dart::dynamics::Skeleton::getGroupInertiasUpperBound)
+      .def(
+          "getGroupInertiasLowerBound",
+          &dart::dynamics::Skeleton::getGroupInertiasLowerBound)
+      .def(
+          "setGroupCOMs",
+          &dart::dynamics::Skeleton::setGroupCOMs,
+          ::py::arg("coms"))
+      .def("getGroupCOMs", &dart::dynamics::Skeleton::getGroupCOMs)
+      .def(
+          "getGroupCOMUpperBound",
+          &dart::dynamics::Skeleton::getGroupCOMUpperBound)
+      .def(
+          "getGroupCOMLowerBound",
+          &dart::dynamics::Skeleton::getGroupCOMLowerBound)
+      .def(
+          "setLinearizedMasses",
+          &dart::dynamics::Skeleton::setLinearizedMasses,
+          ::py::arg("masses"))
+      .def(
+          "getLinearizedMasses", &dart::dynamics::Skeleton::getLinearizedMasses)
       .def(
           "getJointWorldPositionsJacobianWrtGroupScales",
           &dart::dynamics::Skeleton::

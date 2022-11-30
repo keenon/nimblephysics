@@ -15,6 +15,8 @@ WithRespectToGroupScales* WithRespectTo::GROUP_SCALES
     = new WithRespectToGroupScales();
 WithRespectToGroupMasses* WithRespectTo::GROUP_MASSES
     = new WithRespectToGroupMasses();
+WithRespectToLinearizedMasses* WithRespectTo::LINEARIZED_MASSES
+    = new WithRespectToLinearizedMasses();
 WithRespectToGroupCOMs* WithRespectTo::GROUP_COMS
     = new WithRespectToGroupCOMs();
 WithRespectToGroupInertias* WithRespectTo::GROUP_INERTIAS
@@ -334,6 +336,71 @@ Eigen::VectorXs WithRespectToGroupMasses::upperBound(simulation::World* world)
 Eigen::VectorXs WithRespectToGroupMasses::lowerBound(simulation::World* world)
 {
   return world->getGroupMassesLowerBound();
+}
+
+/// Basic constructor
+WithRespectToLinearizedMasses::WithRespectToLinearizedMasses()
+{
+}
+
+/// A printable name for this WRT object
+std::string WithRespectToLinearizedMasses::name()
+{
+  return "LINEARIZED_MASSES";
+}
+
+/// This returns this WRT from the world as a vector
+Eigen::VectorXs WithRespectToLinearizedMasses::get(simulation::World* world)
+{
+  return world->getLinearizedMasses();
+}
+
+/// This returns this WRT from the world as a vector
+Eigen::VectorXs WithRespectToLinearizedMasses::get(dynamics::Skeleton* skel)
+{
+  return skel->getLinearizedMasses();
+}
+
+/// This sets the world's state based on our WRT
+void WithRespectToLinearizedMasses::set(
+    simulation::World* world, Eigen::VectorXs value)
+{
+  world->setLinearizedMasses(value);
+}
+
+/// This sets the world's state based on our WRT
+void WithRespectToLinearizedMasses::set(
+    dynamics::Skeleton* skel, Eigen::VectorXs value)
+{
+  skel->setLinearizedMasses(value);
+}
+
+/// This gives the dimensions of the WRT
+int WithRespectToLinearizedMasses::dim(simulation::World* world)
+{
+  return world->getNumScaleGroups() + world->getNumSkeletons();
+}
+
+/// This sets the world's state based on our WRT
+int WithRespectToLinearizedMasses::dim(dynamics::Skeleton* skel)
+{
+  return skel->getNumScaleGroups() + 1;
+}
+
+/// This gives a vector of upper bound values for this WRT, given state in the
+/// world
+Eigen::VectorXs WithRespectToLinearizedMasses::upperBound(
+    simulation::World* world)
+{
+  return world->getLinearizedMassesUpperBound();
+}
+
+/// This gives a vector of lower bound values for this WRT, given state in the
+/// world
+Eigen::VectorXs WithRespectToLinearizedMasses::lowerBound(
+    simulation::World* world)
+{
+  return world->getLinearizedMassesLowerBound();
 }
 
 /// Basic constructor
