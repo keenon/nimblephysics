@@ -9385,9 +9385,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
 
       if (isEstimatedZero && !isMeasuredZero)
       {
-        // std::cout << "Detected unmeasured force acting on the subject in
-        // trial "
-        //           << trial << " at time " << t << std::endl;
+        std::cout << "Detected unmeasured force acting on the subject in trial "
+                  << trial << " at time " << t << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
         continue;
@@ -9396,8 +9395,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       {
         if (estimatedForce.norm() > maxGRF * 0.2)
         {
-          // std::cout << "Missing GRF on trial " << trial << " at time " << t
-          //           << std::endl;
+          std::cout << "Missing GRF on trial " << trial << " at time " << t
+                    << std::endl;
           filteredTimesteps.push_back(t + 1);
           init->probablyMissingGRF[trial][t + 1] = true;
         }
@@ -9432,6 +9431,10 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                    / (optimisticForce.norm() * smoothedGrf.norm()));
       if (diff * diff > threshold)
       {
+        std::cout
+            << "Detected a large force discrepancy on the subject in trial "
+            << trial << " at time " << t << " (" << diff * diff << " > "
+            << threshold << ")" << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
       }
