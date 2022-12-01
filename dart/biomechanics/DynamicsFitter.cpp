@@ -2376,25 +2376,22 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
   int numTimesteps = qs.cols();
 
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   std::vector<Eigen::Vector3s> grfs;
@@ -2621,25 +2618,22 @@ ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
   int numTimesteps = qs.cols();
 
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   std::vector<Eigen::Vector3s> grfs;
@@ -2939,25 +2933,22 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
   (void)forces;
 
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   Eigen::VectorXs zeroPoint = getLinearTrajectoryLinearSystemTestOutput(
@@ -3110,25 +3101,22 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     int maxBuckets)
 {
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   const s_t mass = mSkel->getMass();
@@ -3247,25 +3235,22 @@ ResidualForceHelper::getMultiMassLinearSystem(
   int numTimesteps = qs.cols();
 
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   std::vector<Eigen::Vector3s> grfs;
@@ -3443,25 +3428,22 @@ ResidualForceHelper::finiteDifferenceMultiMassLinearSystem(
   (void)forces;
 
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   Eigen::VectorXs originalLinearizedMasses = mSkel->getLinearizedMasses();
@@ -3580,25 +3562,22 @@ Eigen::VectorXs ResidualForceHelper::getMultiMassLinearSystemTestOutput(
     int maxBuckets)
 {
   std::vector<int> missingStepIndices;
+  int numMissingSteps = 0;
   for (int t = 0; t < probablyMissingGRF.size(); t++)
   {
     if (probablyMissingGRF[t])
     {
       missingStepIndices.push_back(t);
+      numMissingSteps++;
     }
+  }
+  if (numMissingSteps > maxBuckets)
+  {
+    numMissingSteps = maxBuckets;
   }
 
   std::vector<int> missingStepMappings
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
-  int numMissingSteps = 0;
-  for (int m : missingStepMappings)
-  {
-    if (m > numMissingSteps)
-    {
-      numMissingSteps = m;
-    }
-  }
-  numMissingSteps += 1;
   assert(numMissingSteps <= maxBuckets);
 
   const s_t inverseMass = linearizedMasses(0);
@@ -10372,6 +10351,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
   const int maxBucketSize = 150;
   int totalMissingSteps = 0;
   int totalTimesteps = 0;
+  std::vector<int> trialMissingTimesteps;
   for (int trial = 0; trial < numTrials; trial++)
   {
     totalTimesteps += init->poseTrials[trial].cols();
@@ -10387,8 +10367,10 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     {
       trialNumMissing = maxBucketSize;
     }
+    trialMissingTimesteps.push_back(trialNumMissing);
     totalMissingSteps += trialNumMissing;
   }
+  (void)trialMissingTimesteps;
 
   ////////////////////////////////////////////////////////////////////////////
   // Create the consolidated multi-trial linear system
@@ -10468,6 +10450,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     }
     // Add regularization for the residuals
     int trialResidualDims = trialInputDimsWithoutMass - 6;
+    assert(trialMissingTimesteps[trial] * 3 == trialResidualDims);
     A.block(
         regularizationCursor,
         colCursor + 6,
@@ -10490,6 +10473,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 #endif
   }
   assert(rowCursor == totalTimesteps * 3);
+  assert(regularizationCursor == (totalTimesteps * 3) + (totalMissingSteps * 3));
 
   ////////////////////////////////////////////////////////////////////////////
   // Center, regularize, and solve the linear system
@@ -10515,6 +10499,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
         = regularizeIndividualMassPercentages.asDiagonal()
           * regularizeMassPercentages;
     regularizationCursor += massPercentageCols;
+    assert(regularizationCursor == A.rows());
 
     // Now offset the system to center mass variables at 0
     Eigen::VectorXs centering = Eigen::VectorXs::Zero(inputDims);
