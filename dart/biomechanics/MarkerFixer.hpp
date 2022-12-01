@@ -112,7 +112,8 @@ class RippleReductionProblem
 {
 public:
   RippleReductionProblem(
-      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      s_t dt);
 
   int dropSuspiciousPoints(MarkersErrorReport* report = nullptr);
 
@@ -124,6 +125,7 @@ public:
   void saveToGUI(std::string markerName, std::string path);
 
 public:
+  s_t mDt;
   std::vector<std::string> mMarkerNames;
   std::map<std::string, Eigen::VectorXs> mObserved;
   std::map<std::string, Eigen::Matrix<s_t, 3, Eigen::Dynamic>> mOriginalMarkers;

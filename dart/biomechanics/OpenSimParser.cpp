@@ -3972,6 +3972,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
             = readVec2(coordinateCursor->FirstChildElement("range"));
         dof->setPositionLowerLimit(range(0));
         dof->setPositionUpperLimit(range(1));
+
+        // This prevents warnings when copying the skeleton about out-of-bounds
+        // rest positions
+        dof->setRestPosition((range(0) + range(1)) / 2.0);
       }
     }
     if (locked)
@@ -3981,12 +3985,16 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       dof->setVelocityUpperLimit(0);
       dof->setVelocityLowerLimit(0);
       */
+      std::cout << "Locking dof " << dof << std::endl;
       if (coordinateCursor->FirstChildElement("default_value"))
       {
         double defaultValue = atof(
             coordinateCursor->FirstChildElement("default_value")->GetText());
         dof->setPositionLowerLimit(defaultValue);
         dof->setPositionUpperLimit(defaultValue);
+        // This prevents warnings when copying the skeleton about out-of-bounds
+        // rest positions
+        dof->setRestPosition(defaultValue);
       }
     }
 

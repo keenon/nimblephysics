@@ -768,6 +768,7 @@ struct DynamicsInitialization
 
   ///////////////////////////////////////////
   // To support regularization
+  std::vector<Eigen::MatrixXs> regularizePosesTo;
   Eigen::VectorXs regularizeGroupMassesTo;
   Eigen::VectorXs regularizeGroupCOMsTo;
   Eigen::VectorXs regularizeGroupInertiasTo;
@@ -1264,8 +1265,11 @@ public:
   // each body, and change the initial positions and velocities of the body to
   // achieve a least-squares closest COM trajectory to the current kinematic
   // fit.
+  // The `boundPush` variable makes the optimizer try to keep link masses at
+  // least `boundPush` distance away from their bounds. This makes subsequent
+  // interior-point optimizations converge more quickly.
   void multimassZeroLinearResidualsOnCOMTrajectory(
-      std::shared_ptr<DynamicsInitialization> init);
+      std::shared_ptr<DynamicsInitialization> init, s_t boundPush = 0.01);
 
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
@@ -1275,10 +1279,36 @@ public:
       int trial,
       Eigen::MatrixXs targetPoses,
       s_t weightLinear = 1.0,
+      s_t weightAngular = 0.5,
+      s_t regularizeLinearResiduals = 0.1,
+      s_t regularizeAngularResiduals = 0.1,
+      int maxBuckets = 100,
+      bool detectUnmeasuredTorque = true);
+
+  // 1. This runs a number of zeroLinearResidualsAndOptimizeAngular() pipelines,
+  // each with different number of timesteps offset between the force plates and
+  // the marker data, and returns the best match (minimum marker error at 0
+  // residuals).
+  void timeSyncTrialGRF(
+      std::shared_ptr<DynamicsInitialization> init,
+      int trial,
+      int maxShiftGRFEarlier = -4,
+      int maxShiftGRFLater = 4,
+      int iterationsPerShift = 20,
+      s_t weightLinear = 1.0,
       s_t weightAngular = 1.0,
       s_t regularizeLinearResiduals = 0.5,
       s_t regularizeAngularResiduals = 0.5,
       int maxBuckets = 16);
+
+  // This runs the initial pipeline, which does an approximate mass optimization
+  // and time syncs the GRF data, then re-optimizes the mass and trajectory on
+  // the time sync'd data, using some sensible values.
+  void timeSyncAndInitializePipeline(
+      std::shared_ptr<DynamicsInitialization> init,
+      int maxShiftGRFEarlier = -4,
+      int maxShiftGRFLater = 4,
+      int iterationsPerShift = 20);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external

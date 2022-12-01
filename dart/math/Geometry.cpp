@@ -1682,6 +1682,53 @@ Eigen::Vector3s attemptToClampEulerAnglesToBounds(
   return angle;
 }
 
+/// This will find an equivalent set of euler angles that is closest in joint
+/// space to `previousAngle`
+Eigen::Vector3s roundEulerAnglesToNearest(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& previousAngle,
+    dynamics::detail::AxisOrder axisOrder)
+{
+  (void)axisOrder;
+
+  Eigen::Vector3s closestAngle = angle;
+
+  // Check if we can add/subtract 2PI from any combination of angles to get a
+  // closer value
+  Eigen::Vector3s roundedAngle = angle;
+  for (int i = 0; i < 3; i++)
+  {
+    s_t diff = angle(i) - previousAngle(i);
+    s_t diffMultipleOf2Pi = round(diff / (2 * M_PI)) * 2 * M_PI;
+    s_t smallestDiff = diff - diffMultipleOf2Pi;
+    roundedAngle(i) = previousAngle(i) + smallestDiff;
+  }
+  if ((roundedAngle - previousAngle).norm()
+      < (closestAngle - previousAngle).norm())
+  {
+    closestAngle = roundedAngle;
+  }
+
+  // Try the equivalent strategy, where we flip the first axis, then recover
+  // with 2nd and 3nd rotations
+  roundedAngle
+      = Eigen::Vector3s(M_PI + angle(0), M_PI - angle(1), M_PI + angle(2));
+  for (int i = 0; i < 3; i++)
+  {
+    s_t diff = angle(i) - previousAngle(i);
+    s_t diffMultipleOf2Pi = round(diff / (2 * M_PI)) * 2 * M_PI;
+    s_t smallestDiff = diff - diffMultipleOf2Pi;
+    roundedAngle(i) = previousAngle(i) + smallestDiff;
+  }
+  if ((roundedAngle - previousAngle).norm()
+      < (closestAngle - previousAngle).norm())
+  {
+    closestAngle = roundedAngle;
+  }
+
+  return closestAngle;
+}
+
 // Reference:
 // http://www.geometrictools.com/LibMathematics/Algebra/Wm5Matrix3.inl
 Eigen::Matrix3s eulerXYXToMatrix(const Eigen::Vector3s& _angle)

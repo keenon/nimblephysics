@@ -109,3 +109,36 @@ TEST(MarkerFixer, FIX_CMU_MARKERS)
   }
 }
 // #endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFixer, COMPARISON_TEST)
+{
+  // Get the raw marker trajectory data
+  auto markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/11_01_Marilyn_Bug/prod/MarkerData/markers_smpl.trc");
+
+  auto report = MarkerFixer::generateDataErrorsReport(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
+  for (auto& msg : report.info)
+  {
+    std::cout << "INFO: " << msg << std::endl;
+  }
+  for (auto& msg : report.warnings)
+  {
+    std::cout << "WARNING: " << msg << std::endl;
+  }
+  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  {
+    for (auto pair : timestep)
+    {
+      bool hasNan = pair.second.hasNaN();
+      if (hasNan)
+      {
+        EXPECT_FALSE(pair.second.hasNaN());
+        return;
+      }
+    }
+  }
+}
+#endif

@@ -147,7 +147,7 @@ void DynamicsFitter(py::module& m)
           &dart::biomechanics::DynamicsInitialization::updatedMarkerMap)
       .def_readwrite(
           "originalPoses",
-          &dart::biomechanics::DynamicsInitialization::originalPoses)
+          &dart::biomechanics::DynamicsInitialization::regularizePosesTo)
       .def_readwrite(
           "initialGroupMasses",
           &dart::biomechanics::DynamicsInitialization::initialGroupMasses)
@@ -546,7 +546,8 @@ protected:
           "multimassZeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               multimassZeroLinearResidualsOnCOMTrajectory,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("boundPush") = 0.01)
       .def(
           "zeroLinearResidualsAndOptimizeAngular",
           &dart::biomechanics::DynamicsFitter::
@@ -555,10 +556,31 @@ protected:
           ::py::arg("trial"),
           ::py::arg("targetPoses"),
           ::py::arg("weightLinear") = 1.0,
+          ::py::arg("weightAngular") = 0.5,
+          ::py::arg("regularizeLinearResiduals") = 0.1,
+          ::py::arg("regularizeAngularResiduals") = 0.1,
+          ::py::arg("maxBuckets") = 40,
+          ::py::arg("detectUnmeasuredTorque") = true)
+      .def(
+          "timeSyncTrialGRF",
+          &dart::biomechanics::DynamicsFitter::timeSyncTrialGRF,
+          ::py::arg("init"),
+          ::py::arg("trial"),
+          ::py::arg("maxShiftGRFEarlier") = -4,
+          ::py::arg("maxShiftGRFLater") = 4,
+          ::py::arg("iterationsPerShift") = 20,
+          ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 1.0,
           ::py::arg("regularizeLinearResiduals") = 0.5,
-          ::py::arg("regularizeAngularResiduals") = 50.0,
-          ::py::arg("maxBuckets") = 40)
+          ::py::arg("regularizeAngularResiduals") = 0.5,
+          ::py::arg("maxBuckets") = 20)
+      .def(
+          "timeSyncAndInitializePipeline",
+          &dart::biomechanics::DynamicsFitter::timeSyncAndInitializePipeline,
+          ::py::arg("init"),
+          ::py::arg("maxShiftGRFEarlier") = -4,
+          ::py::arg("maxShiftGRFLater") = 4,
+          ::py::arg("iterationsPerShift") = 20)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::

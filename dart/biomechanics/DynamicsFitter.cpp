@@ -10,6 +10,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <Eigen/Sparse>
 #include <Eigen/SparseQR>
@@ -4764,7 +4765,8 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
       // Add regularization
       poseRegularization
           += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
-             * (block.pos.col(t) - mInit->originalPoses[block.trial].col(realT))
+             * (block.pos.col(t)
+                - mInit->regularizePosesTo[block.trial].col(realT))
                    .squaredNorm();
       assert(!isnan(poseRegularization));
     }
@@ -5077,7 +5079,7 @@ s_t DynamicsFitProblem::computeLossParallel(
           threadLoss.poseRegularization
               += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
                  * (block.pos.col(t)
-                    - mInit->originalPoses[block.trial].col(realT))
+                    - mInit->regularizePosesTo[block.trial].col(realT))
                        .squaredNorm();
           assert(!isnan(threadLoss.poseRegularization));
         }
@@ -5714,7 +5716,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record regularization
           posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                      * (block.pos.col(t)
-                        - mInit->originalPoses[block.trial].col(realT));
+                        - mInit->regularizePosesTo[block.trial].col(realT));
 
           // Record joint gradients
           posGrad += mSkeleton
@@ -5795,7 +5797,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record regularization
           posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                      * (block.pos.col(t)
-                        - mInit->originalPoses[block.trial].col(realT));
+                        - mInit->regularizePosesTo[block.trial].col(realT));
           // Record joint gradients
           posGrad += mSkeleton
                          ->getJointWorldPositionsJacobianWrtJointPositions(
@@ -6434,7 +6436,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               // Record regularization
               posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                          * (block.pos.col(t)
-                            - mInit->originalPoses[block.trial].col(realT));
+                            - mInit->regularizePosesTo[block.trial].col(realT));
 
               // Record joint gradients
               posGrad += mThreadSkeletons[threadIdx]
@@ -6525,7 +6527,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               // Record regularization
               posGrad += mConfig.mRegularizePoses * 2 * (1.0 / totalTimesteps)
                          * (block.pos.col(t)
-                            - mInit->originalPoses[block.trial].col(realT));
+                            - mInit->regularizePosesTo[block.trial].col(realT));
               // Record joint gradients
               posGrad += mThreadSkeletons[threadIdx]
                              ->getJointWorldPositionsJacobianWrtJointPositions(
@@ -7356,6 +7358,7 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mIncludeBodyScales(false),
     mIncludePoses(false),
     mIncludeMarkerOffsets(false),
+    mLogLossDetails(false),
     mPoseSubsetStartIndex(0),
     mPoseSubsetLen(-1),
     mResidualWeight(0),
@@ -7419,9 +7422,11 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   // mRegularizePoses = 0.0;
 
   mMarkerWeight = 50;
-  mResidualWeight = 2e-2;
-  mLinearNewtonWeight = 2e-2;
-  // mRegularizePoses = 1.0;
+  // mResidualWeight = 2e-2;
+  // mLinearNewtonWeight = 2e-2;
+  mResidualWeight = 4e-2;
+  mLinearNewtonWeight = 0;
+  mRegularizePoses = 0.01;
 
   mJointWeight = 2e-2;
   mConstrainResidualsZero = false;
@@ -8171,6 +8176,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       = std::make_shared<DynamicsInitialization>();
   init->forcePlateTrials = forcePlateTrials;
   init->originalPoses = poseTrials;
+  init->regularizePosesTo = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
   init->trackingMarkers = trackingMarkers;
   init->updatedMarkerMap = markerMap;
@@ -8204,9 +8210,9 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   // Initially smooth the accelerations just a little bit
 
-  for (int i = 0; i < init->originalPoses.size(); i++)
+  for (int i = 0; i < init->regularizePosesTo.size(); i++)
   {
-    init->poseTrials.push_back(init->originalPoses[i]);
+    init->poseTrials.push_back(init->regularizePosesTo[i]);
     init->trialTimesteps.push_back(1.0 / framesPerSecond[i]);
   }
 
@@ -8482,10 +8488,12 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::retargetInitialization(
     }
   }
   converter.createVirtualMarkers();
-  for (int trial = 0; trial < init->originalPoses.size(); trial++)
+  for (int trial = 0; trial < init->regularizePosesTo.size(); trial++)
   {
     retargeted->originalPoses.push_back(
         converter.convertMotion(init->originalPoses[trial]));
+    retargeted->regularizePosesTo.push_back(
+        converter.convertMotion(init->regularizePosesTo[trial]));
     retargeted->poseTrials.push_back(
         converter.convertMotion(init->poseTrials[trial]));
   }
@@ -9234,6 +9242,26 @@ void DynamicsFitter::smoothAccelerations(
   {
     std::cout << "Smoothing jitter in joint accelerations for trial " << trial
               << "/" << init->poseTrials.size() << std::endl;
+
+    // Round all the Euler joints to their nearest previous value, to avoid
+    // jumping around on wrapping.
+    for (int t = 1; t < init->poseTrials[trial].cols(); t++)
+    {
+      Eigen::VectorXs pos = init->poseTrials[trial].col(t);
+      for (int j = 0; j < mSkeleton->getNumJoints(); j++)
+      {
+        auto* joint = mSkeleton->getJoint(j);
+        if (joint->getType() == dynamics::EulerJoint::getStaticType())
+        {
+          int start = joint->getDof(0)->getIndexInSkeleton();
+          init->poseTrials[trial].col(t).segment<3>(start)
+              = math::roundEulerAnglesToNearest(
+                  init->poseTrials[trial].col(t).segment<3>(start),
+                  init->poseTrials[trial].col(t - 1).segment<3>(start));
+        }
+      }
+    }
+
     // 0.05
     AccelerationSmoother smoother(
         init->poseTrials[trial].cols(), 1, 0.05, false);
@@ -9266,9 +9294,9 @@ void DynamicsFitter::smoothAccelerations(
     }
     // #endif
 
-    // Controversial: Smooth the original poses, too, so we're not regularizing
+    // Smooth the regularization target, too, so we're not regularizing
     // our positions back to something jittery later
-    init->originalPoses[trial] = init->poseTrials[trial];
+    init->regularizePosesTo[trial] = init->poseTrials[trial];
   }
   std::cout << "All jitter in joint accelerations smoothed!" << std::endl;
 }
@@ -10322,8 +10350,11 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 // each body, and change the initial positions and velocities of the body to
 // achieve a least-squares closest COM trajectory to the current kinematic
 // fit.
+// The `boundPush` variable makes the optimizer try to keep link masses at
+// least `boundPush` distance away from their bounds. This makes subsequent
+// interior-point optimizations converge more quickly.
 void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init, s_t boundPush)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -10568,21 +10599,50 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     Eigen::VectorXs solvedLinearizedMasses
         = solution.segment(inputDims - massCols, massCols);
 
-    // Don't allow masses to go zero or negative
-    bool anyMassesNegative = false;
+    // Don't allow masses to go out of bounds
+    bool anyMassesOutOfBounds = false;
+    s_t mass = 1.0 / solvedLinearizedMasses(0);
+    Eigen::VectorXs groupMassesUpperBounds
+        = mSkeleton->getGroupMassesUpperBound();
+    Eigen::VectorXs groupMassesLowerBounds
+        = mSkeleton->getGroupMassesLowerBound();
     for (int i = 1; i < solvedLinearizedMasses.size(); i++)
     {
-      if (solvedLinearizedMasses(i) < 1e-8)
+      s_t totalGroupMass = mass * solvedLinearizedMasses(i);
+      s_t groupMemberMass
+          = totalGroupMass / mSkeleton->getBodyScaleGroup(i - 1).nodes.size();
+      if (groupMemberMass < groupMassesLowerBounds(i - 1) + boundPush
+          || groupMemberMass > groupMassesUpperBounds(i - 1) - boundPush)
       {
+        std::cout << "Links [";
+        for (auto* body : mSkeleton->getBodyScaleGroup(i - 1).nodes)
+        {
+          std::cout << " " << body->getName();
+        }
+        std::cout << " ] out of bounds. Got " << groupMemberMass
+                  << ", which is within boundPush=" << boundPush << " of ["
+                  << groupMassesLowerBounds(i - 1) << ", "
+                  << groupMassesUpperBounds(i - 1) << "]" << std::endl;
+
         regularizeIndividualMassPercentages(i - 1) *= 10;
-        anyMassesNegative = true;
+        anyMassesOutOfBounds = true;
       }
     }
-    if (anyMassesNegative)
+    s_t maxCoeff = regularizeIndividualMassPercentages.maxCoeff();
+    if (anyMassesOutOfBounds)
     {
-      std::cout << "Got some negative link masses after solve. Increasing "
-                   "regularization and solving again."
-                << std::endl;
+      std::cout
+          << "Got some out-of-bounds link masses after solve. Increasing "
+             "regularization for those links and solving again. Max coeff = "
+          << maxCoeff << std::endl;
+      if (maxCoeff > 1e+9)
+      {
+        std::cout << "Above regularization boundary. Falling back to a "
+                     "linear solve (holding link masses constant)."
+                  << std::endl;
+        zeroLinearResidualsOnCOMTrajectory(init);
+        return;
+      }
       continue;
     }
 
@@ -10658,7 +10718,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     s_t weightAngular,
     s_t regularizeLinearResiduals,
     s_t regularizeAngularResiduals,
-    int maxBuckets)
+    int maxBuckets,
+    bool detectUnmeasuredTorque)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -10859,7 +10920,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     totalPosChange /= init->poseTrials[trial].cols();
     totalAngChange /= init->poseTrials[trial].cols();
 
-    if (totalPosChange > 0.08 || totalAngChange > 0.15)
+    if ((totalPosChange > 0.08 || totalAngChange > 0.15)
+        && detectUnmeasuredTorque)
     {
       std::cout << "Trial pos/angle changed too much! (pos change="
                 << totalPosChange << ", angle change=" << totalAngChange << ")"
@@ -10899,6 +10961,170 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     break;
   }
+}
+
+//==============================================================================
+// 1. This runs a number of zeroLinearResidualsAndOptimizeAngular() pipelines,
+// each with different number of timesteps offset between the force plates and
+// the marker data, and returns the best match (minimum marker error at 0
+// residuals).
+void DynamicsFitter::timeSyncTrialGRF(
+    std::shared_ptr<DynamicsInitialization> init,
+    int trial,
+    int maxShiftGRFEarlier,
+    int maxShiftGRFLater,
+    int iterationsPerShift,
+    s_t weightLinear,
+    s_t weightAngular,
+    s_t regularizeLinearResiduals,
+    s_t regularizeAngularResiduals,
+    int maxBuckets)
+{
+  Eigen::MatrixXs originalGRFTrial = init->grfTrials[trial];
+  Eigen::MatrixXs originalPoseTrial = init->poseTrials[trial];
+
+  int bestShiftGRF = 0;
+  s_t bestShiftGRFScore = std::numeric_limits<s_t>::infinity();
+  Eigen::MatrixXs bestShiftGRFTrial = originalGRFTrial;
+  Eigen::MatrixXs bestShiftPoseTrial = originalPoseTrial;
+  for (int shiftGRF = maxShiftGRFEarlier; shiftGRF <= maxShiftGRFLater;
+       shiftGRF++)
+  {
+    Eigen::MatrixXs shiftedGRFTrial = originalGRFTrial;
+    for (int t = 0; t < shiftedGRFTrial.cols(); t++)
+    {
+      // We want a shift of "-2" to result in the shiftedGRFTrial having its
+      // entries shifted to the left by 2, so that means grabbing "+2" columns
+      // from the original relative to itself.
+      int originalT = t - shiftGRF;
+      if (originalT < 0 || originalT >= originalGRFTrial.cols())
+      {
+        shiftedGRFTrial.col(t).setZero();
+      }
+      else
+      {
+        shiftedGRFTrial.col(t) = originalGRFTrial.col(originalT);
+      }
+    }
+
+    init->poseTrials[trial] = originalPoseTrial;
+    init->grfTrials[trial] = shiftedGRFTrial;
+
+    for (int i = 0; i < iterationsPerShift; i++)
+    {
+      zeroLinearResidualsAndOptimizeAngular(
+          init,
+          trial,
+          originalPoseTrial,
+          weightLinear,
+          weightAngular,
+          regularizeLinearResiduals,
+          regularizeAngularResiduals,
+          maxBuckets,
+          false);
+    }
+
+    // Now score the trial
+    s_t score = computeAverageTrialMarkerRMSE(init, trial);
+    std::cout << "Shift " << shiftGRF << " got " << score << "m RMSE"
+              << std::endl;
+    if (score < bestShiftGRFScore)
+    {
+      bestShiftGRFScore = score;
+      bestShiftGRF = shiftGRF;
+      bestShiftGRFTrial = init->grfTrials[trial];
+      bestShiftPoseTrial = init->poseTrials[trial];
+    }
+  }
+
+  std::cout << "Best shift was: " << bestShiftGRF << " timesteps, with "
+            << bestShiftGRFScore << "m RMSE" << std::endl;
+  init->grfTrials[trial] = bestShiftGRFTrial;
+  init->poseTrials[trial] = bestShiftPoseTrial;
+
+  // update force plates to reflect shift
+  if (bestShiftGRF != 0)
+  {
+    for (auto& plate : init->forcePlateTrials[trial])
+    {
+      std::vector<Eigen::Vector3s> shiftedCOPs;
+      std::vector<Eigen::Vector3s> shiftedForces;
+      std::vector<Eigen::Vector3s> shiftedMoments;
+      for (int t = 0; t < bestShiftGRFTrial.cols(); t++)
+      {
+        // We want a shift of "-2" to result in the shiftedGRFTrial having its
+        // entries shifted to the left by 2, so that means grabbing "+2" columns
+        // from the original relative to itself.
+        int originalT = t - bestShiftGRF;
+        if (originalT < 0 || originalT >= originalGRFTrial.cols())
+        {
+          shiftedCOPs.push_back(Eigen::Vector3s::Zero());
+          shiftedForces.push_back(Eigen::Vector3s::Zero());
+          shiftedMoments.push_back(Eigen::Vector3s::Zero());
+        }
+        else
+        {
+          shiftedCOPs.push_back(plate.centersOfPressure[originalT]);
+          shiftedForces.push_back(plate.forces[originalT]);
+          shiftedMoments.push_back(plate.moments[originalT]);
+        }
+      }
+      plate.centersOfPressure = shiftedCOPs;
+      plate.forces = shiftedForces;
+      plate.moments = shiftedMoments;
+    }
+  }
+}
+
+//==============================================================================
+// This runs the initial pipeline, which does an approximate mass optimization
+// and time syncs the GRF data, then re-optimizes the mass and trajectory on
+// the time sync'd data, using some sensible values.
+void DynamicsFitter::timeSyncAndInitializePipeline(
+    std::shared_ptr<DynamicsInitialization> init,
+    int maxShiftGRFEarlier,
+    int maxShiftGRFLater,
+    int iterationsPerShift)
+{
+  std::vector<Eigen::MatrixXs> originalPoseTrials;
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    originalPoseTrials.push_back(init->poseTrials[i]);
+  }
+  multimassZeroLinearResidualsOnCOMTrajectory(init);
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    timeSyncTrialGRF(
+        init, trial, maxShiftGRFEarlier, maxShiftGRFLater, iterationsPerShift);
+  }
+  // Reset the pose trials now that we've found the GRF data, and start again
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    init->poseTrials[trial] = originalPoseTrials[trial];
+  }
+  // Re-find the link masses, with updated GRF offsets
+  multimassZeroLinearResidualsOnCOMTrajectory(init);
+  init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
+
+  // Get rid of the rest of the angular residuals
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    for (int i = 0; i < 100; i++)
+    {
+      // this holds the mass constant, and re-jigs the trajectory to try to
+      // make angular ACC's match more closely what was actually observed
+      zeroLinearResidualsAndOptimizeAngular(
+          init, trial, originalPoseTrials[trial], 1.0, 0.5, 0.1, 0.1, 150);
+    }
+    // Adjust the regularization target to match our newly solved trajectory, so
+    // we're not trying to pull the root away from the solved trajectory
+    init->regularizePosesTo[trial] = init->poseTrials[trial];
+
+    recalibrateForcePlates(init, trial);
+  }
+
+  // Recompute the marker offsets to minimize error
+  optimizeMarkerOffsets(init);
 }
 
 //==============================================================================
@@ -11509,8 +11735,8 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 // 1.2. Now that we've got zero residuals, after calling
 // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
 // miscalibration on the force plates, if there's consistent error on the
-// marker matches. This method treats the marker data as ground truth, and moves
-// the force plate and force data to more closely match the marker data.
+// marker matches. This method treats the marker data as ground truth, and
+// moves the force plate and force data to more closely match the marker data.
 void DynamicsFitter::recalibrateForcePlates(
     std::shared_ptr<DynamicsInitialization> init, int trial, s_t maxMovement)
 {
@@ -13009,7 +13235,8 @@ void DynamicsFitter::runNewtonsMethod(
     Eigen::VectorXs constraint = problem.computeConstraints(x);
     Eigen::MatrixXs J = problem.computeConstraintsJacobian();
     Eigen::MatrixXs H = Eigen::MatrixXs::Identity(
-        grad.size(), grad.size()); // problem.finiteDifferenceHessian(x, false);
+        grad.size(),
+        grad.size()); // problem.finiteDifferenceHessian(x, false);
 
     int newtonSystemSize = H.cols() + J.rows();
     Eigen::MatrixXs newtonSystem

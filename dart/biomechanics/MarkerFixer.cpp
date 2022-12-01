@@ -394,7 +394,9 @@ std::vector<LabeledMarkerTrace> LabeledMarkerTrace::createRawTraces(
 
 //==============================================================================
 RippleReductionProblem::RippleReductionProblem(
-    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations)
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+    s_t dt)
+  : mDt(dt)
 {
   for (int t = 0; t < markerObservations.size(); t++)
   {
@@ -450,9 +452,10 @@ int RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
     }
     // Keep the first two points no matter what
     int lastObserved = 1;
-    Eigen::Vector3s vLast = (mMarkers[markerName].col(observedTimesteps[1])
-                             - mMarkers[markerName].col(observedTimesteps[0]))
-                            / (observedTimesteps[1] - observedTimesteps[0]);
+    Eigen::Vector3s vLast
+        = (mMarkers[markerName].col(observedTimesteps[1])
+           - mMarkers[markerName].col(observedTimesteps[0]))
+          / (mDt * (observedTimesteps[1] - observedTimesteps[0]));
     // Go through and only accept points that still "fit" the existing
     // trajectory, starting from the first two observed points
     for (int i = 2; i < observedTimesteps.size(); i++)
@@ -461,12 +464,12 @@ int RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
       Eigen::Vector3s vNow
           = (mMarkers[markerName].col(observedTimesteps[i])
              - mMarkers[markerName].col(observedTimesteps[lastObserved]))
-            / (observedTimesteps[i] - observedTimesteps[lastObserved]);
+            / (mDt * (observedTimesteps[i] - observedTimesteps[lastObserved]));
 
       Eigen::Vector3s acc
           = (vNow - vLast)
-            / (observedTimesteps[i] - observedTimesteps[lastObserved]);
-      if (acc.norm() > 0.01)
+            / (mDt * (observedTimesteps[i] - observedTimesteps[lastObserved]));
+      if (acc.norm() > 1000.0)
       {
         // Drop this frame
         mObserved[markerName](observedTimesteps[i]) = 0;
@@ -814,7 +817,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
     }
   }
 
-  RippleReductionProblem rippleReduction(correctedObservations);
+  RippleReductionProblem rippleReduction(correctedObservations, dt);
   correctedObservations = rippleReduction.smooth(&report);
 
   // 3. Emit warnings based on any traces that include markers that are not

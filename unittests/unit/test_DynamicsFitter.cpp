@@ -2469,47 +2469,25 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.addJointBoundSlack(skel, 0.1);
   fitter.boundPush(init);
   fitter.smoothAccelerations(init);
-  fitter.markMissingImpacts(init);
+  // fitter.markMissingImpacts(init);
+
+  fitter.timeSyncAndInitializePipeline(init);
+  /*
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
   fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
 
   // Regularize masses around the original values
   init->regularizeGroupMassesTo = skel->getGroupMasses();
 
-  /*
-  // Run a few iterations to optimize angular first
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
-  {
-    Eigen::MatrixXs originalTrajectory = originalTrajectories[trial];
-    for (int i = 0; i < 0; i++)
-    {
-      // this holds the mass constant, and re-jigs the trajectory to try to
-      // make angular ACC's match more closely what was actually observed
-      fitter.zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalTrajectory, 1.0, 0.5, 0.1, 150);
-    }
-  }
-
-  // Minimize residuals while holding positions fixed
-  fitter.setLBFGSHistoryLength(150);
-  fitter.setIterationLimit(500);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setLogLossDetails(true)
-          .setResidualUseL1(false)
-          .setResidualWeight(1e-3)
-          .setRegularizeCOMs(5.0)
-          .setRegularizeMasses(1.0)
-          .setIncludeMasses(true)
-          .setIncludeCOMs(true));
-  */
-
   // if (!fitter.verifyLinearForceConsistency(init))
   // {
   //   std::cout << "Failed linear consistency check! Exiting early." <<
   //   std::endl; return init;
   // }
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    fitter.timeSyncTrialGRF(init, trial);
+  }
 
   // Get rid of the rest of the angular residuals
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
@@ -2527,6 +2505,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   // Recompute the marker offsets to minimize error
   fitter.optimizeMarkerOffsets(init);
+  */
 
   auto secondPair = fitter.computeAverageRealForce(init);
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
@@ -2631,7 +2610,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   (void)maxNumTrials;
 
   // Re - run as L1
-  fitter.setIterationLimit(200);
+  fitter.setIterationLimit(400);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
@@ -5898,6 +5877,49 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
   runEndToEnd(
       "dart://sample/osim/OpenCapTest/" + subjectName + "/Models/"
       "optimized_scale_and_markers.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP_UNFILTERED)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DJ5");
+  // trialNames.push_back("walking1");
+  // trialNames.push_back("DJ2");
+  // trialNames.push_back("walking2");
+  // trialNames.push_back("walking4");
+  // trialNames.push_back("DJ3");
+
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/UnfiliteredOpencap/Marker/" + name + ".trc");
+    grfFiles.push_back(
+        "dart://sample/grf/UnfiliteredOpencap/Force/" + name
+        + "_forces_filt999Hz.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/osim/OpenCapTest/Subject4/Models/"
+      "unscaled_generic.osim",
+      // "dart://sample/grf/SprinterWithSpine/Models/"
+      // "unscaled_generic.osim",
       footNames,
       c3dFiles,
       trcFiles,

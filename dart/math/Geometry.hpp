@@ -111,6 +111,13 @@ Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     const Eigen::Vector3s& lowerBounds,
     dynamics::detail::AxisOrder axisOrder = dynamics::detail::AxisOrder::XYZ);
 
+/// This will find an equivalent set of euler angles that is closest in joint
+/// space to `previousAngle`
+Eigen::Vector3s roundEulerAnglesToNearest(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& previousAngle,
+    dynamics::detail::AxisOrder axisOrder = dynamics::detail::AxisOrder::XYZ);
+
 //------------------------------------------------------------------------------
 /// \brief Given Euler XYX angles, return a 3x3 rotation matrix, which is
 /// equivalent to RotX(angle(0)) * RotY(angle(1)) * RotX(angle(2)).
