@@ -95,7 +95,7 @@ TEST(MarkerFixer, FIX_CMU_MARKERS)
   auto report = MarkerFixer::generateDataErrorsReport(
       markerTrajectories.markerTimesteps,
       (1.0 / (s_t)markerTrajectories.framesPerSecond));
-  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  for (auto& timestep : report->markerObservationsAttemptedFixed)
   {
     for (auto pair : timestep)
     {

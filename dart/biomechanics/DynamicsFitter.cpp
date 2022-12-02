@@ -539,7 +539,7 @@ Eigen::Matrix3s ResidualForceHelper::
   Eigen::VectorXs original = q;
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 1e-3 : 1e-6;
+  s_t eps = useRidders ? 8e-3 : 1e-6;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -1066,7 +1066,7 @@ Eigen::Matrix3s ResidualForceHelper::
   Eigen::VectorXs original = q;
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 1e-3 : 1e-6;
+  s_t eps = useRidders ? 7e-3 : 1e-6;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -1298,7 +1298,7 @@ Eigen::Matrix6s ResidualForceHelper::
   Eigen::VectorXs original = q;
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 1e-3 : 1e-6;
+  s_t eps = useRidders ? 7e-3 : 1e-6;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -1493,7 +1493,7 @@ Eigen::VectorXs ResidualForceHelper::
   Eigen::VectorXs result = Eigen::VectorXs::Zero(6);
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 1e-2 : 1e-6;
+  s_t eps = useRidders ? 5e-3 : 1e-6;
   math::finiteDifference<Eigen::VectorXs>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::VectorXs& perturbed) {
@@ -1628,7 +1628,7 @@ Eigen::VectorXs ResidualForceHelper::finiteDifferenceScratchJacobianWrtInvMass(
   Eigen::VectorXs result = Eigen::VectorXs::Zero(6);
 
   const bool useRidders = true;
-  s_t eps = useRidders ? 1e-2 : 1e-6;
+  s_t eps = useRidders ? 5e-3 : 1e-6;
   math::finiteDifference<Eigen::VectorXs>(
       [&](/* in*/ s_t eps,
           /*out*/ Eigen::VectorXs& perturbed) {
@@ -10473,7 +10473,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 #endif
   }
   assert(rowCursor == totalTimesteps * 3);
-  assert(regularizationCursor == (totalTimesteps * 3) + (totalMissingSteps * 3));
+  assert(
+      regularizationCursor == (totalTimesteps * 3) + (totalMissingSteps * 3));
 
   ////////////////////////////////////////////////////////////////////////////
   // Center, regularize, and solve the linear system

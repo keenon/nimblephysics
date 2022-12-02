@@ -611,10 +611,13 @@ MarkerFitter::MarkerFitter(
   // Default to a least-squares loss over just the marker errors
   mLossAndGrad = [this](MarkerFitterState* state) {
     int numTimesteps = state->posesAtTimesteps.cols();
+
+    const s_t markerErrors = state->markerErrorsAtTimesteps.squaredNorm();
+    const s_t jointErrors = state->jointErrorsAtTimesteps.squaredNorm();
+    const s_t axisErrors = state->axisErrorsAtTimesteps.squaredNorm();
+
     // 1. Compute loss as a simple squared norm of marker and joint errors
-    s_t loss = state->markerErrorsAtTimesteps.squaredNorm()
-               + state->jointErrorsAtTimesteps.squaredNorm()
-               + state->axisErrorsAtTimesteps.squaredNorm();
+    s_t loss = markerErrors + jointErrors + axisErrors;
     // 2. Compute the gradient of squared norm
     state->markerErrorsAtTimestepsGrad = 2 * state->markerErrorsAtTimesteps;
     state->jointErrorsAtTimestepsGrad = 2 * state->jointErrorsAtTimesteps;
@@ -622,18 +625,22 @@ MarkerFitter::MarkerFitter(
 
     // Regularize tracking vs anatomical differently
     state->markerOffsetsGrad = 2 * numTimesteps * state->markerOffsets;
+    s_t markerRegularization = 0.0;
     for (int i = 0; i < this->mMarkerIsTracking.size(); i++)
     {
       s_t multiple
           = (this->mMarkerIsTracking[i]
                  ? this->mRegularizeTrackingMarkerOffsets
                  : this->mRegularizeAnatomicalMarkerOffsets);
-      loss += numTimesteps * state->markerOffsets.col(i).squaredNorm()
-              * multiple;
+      markerRegularization += numTimesteps
+                              * state->markerOffsets.col(i).squaredNorm()
+                              * multiple;
       state->markerOffsetsGrad.col(i) *= multiple;
     }
+    loss += markerRegularization;
 
     // 3. If we've got an anthropometrics prior, use it
+    s_t anthroRegularization = 0.0;
     if (this->mAnthropometrics)
     {
       Eigen::VectorXs oldBodyScales = this->mSkeleton->getBodyScales();
@@ -644,8 +651,8 @@ MarkerFitter::MarkerFitter(
         this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
       }
       // 3.2. Actually compute the loss
-      loss -= this->mAnthropometrics->getLogPDF(this->mSkeleton)
-              * this->mAnthropometricWeight;
+      anthroRegularization -= this->mAnthropometrics->getLogPDF(this->mSkeleton)
+                              * this->mAnthropometricWeight;
       // 3.3. Translate gradients from vector back to matrix form for the state
       // object
       Eigen::VectorXs bodyScalesGradVector
@@ -663,14 +670,17 @@ MarkerFitter::MarkerFitter(
     {
       state->bodyScalesGrad.setZero();
     }
+    loss += anthroRegularization;
 
     // 4. Regularize the body sizes to try to be even in every direction
+    s_t bodyEvenRegularization = 0.0;
     for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
     {
       Eigen::Vector3s scales = state->bodyScales.col(i);
       s_t avgScale = (scales(0) + scales(1) + scales(2)) / 3;
       Eigen::Vector3s diffVec = scales - (Eigen::Vector3s::Ones() * avgScale);
-      loss += diffVec.squaredNorm() * mRegularizeIndividualBodyScales;
+      bodyEvenRegularization
+          += diffVec.squaredNorm() * mRegularizeIndividualBodyScales;
 
       s_t gradScale = (2.0 / 3) * mRegularizeIndividualBodyScales;
       state->bodyScalesGrad(0, i)
@@ -680,6 +690,7 @@ MarkerFitter::MarkerFitter(
       state->bodyScalesGrad(2, i)
           += gradScale * (2 * scales(2) - scales(0) - scales(1));
     }
+    loss += bodyEvenRegularization;
 
     // 5. Regularize all the body scales, to try to make them all match the
     // average
@@ -708,10 +719,11 @@ MarkerFitter::MarkerFitter(
     */
 
     // s_t gradScale = (k - 1.0) * 2.0 / k;
+    s_t bodyScaleReg = 0.0;
     for (int i = 0; i < state->bodyScales.cols(); i++)
     {
       Eigen::Vector3s diff = state->bodyScales.col(i) - avgScale;
-      loss += mRegularizeAllBodyScales * diff.squaredNorm();
+      bodyScaleReg += mRegularizeAllBodyScales * diff.squaredNorm();
 
       // state->bodyScalesGrad.col(i) += 2.0 * ((k - 1) / k) * diff;
       // state->bodyScalesGrad.col(i) += 2.0 * diff;
@@ -721,6 +733,13 @@ MarkerFitter::MarkerFitter(
           += gradScale * (state->bodyScales.col(i) - avgScale);
       */
     }
+    loss += bodyScaleReg;
+
+    // std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
+    //           << ",axs=" << axisErrors << ",mkrR=" << markerRegularization
+    //           << ",anthR=" << anthroRegularization
+    //           << ",bodyEvenR=" << bodyEvenRegularization
+    //           << ",bodyR=" << bodyScaleReg << "]" << std::endl;
 
     return loss;
   };
@@ -764,12 +783,12 @@ bool MarkerFitter::checkForEnoughMarkers(
 /// This will go through original marker data and attempt to detect common
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
-MarkersErrorReport MarkerFitter::generateDataErrorsReport(
+std::shared_ptr<MarkersErrorReport> MarkerFitter::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         immutableMarkerObservations,
     s_t dt)
 {
-  MarkersErrorReport report
+  std::shared_ptr<MarkersErrorReport> report
       = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations, dt);
 
   // 1. Generate a list of the markers we observe in this clip
@@ -816,7 +835,7 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     }
     if (numFixedOnPelvis < 3)
     {
-      report.warnings.push_back(
+      report->warnings.push_back(
           "Need more fixed markers on the pelvis! This trial only has "
           + std::to_string(numFixedOnPelvis)
           + ". We recommend 3 (or more) for good results.");
@@ -842,7 +861,7 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     else
     {
       markersInJustMocap.push_back(marker);
-      report.info.push_back(
+      report->info.push_back(
           "The marker \"" + marker
           + "\" appears in the mocap data, but not on the model");
     }
@@ -852,13 +871,13 @@ MarkersErrorReport MarkerFitter::generateDataErrorsReport(
     if (observedMarkersMap.count(marker) == 0)
     {
       markersInJustModel.push_back(marker);
-      report.info.push_back("The marker \""+marker+"\" appears in the model, but not in the mocap data. This generally happens because the marker is a virtual marker. We ignore virtual markers, so this is not a problem, just a heads up.");
+      report->info.push_back("The marker \""+marker+"\" appears in the model, but not in the mocap data. This generally happens because the marker is a virtual marker. We ignore virtual markers, so this is not a problem, just a heads up.");
     }
   }
 
   if (markersInBoth.size() < 8)
   {
-    report.warnings.push_back("We only found " + std::to_string(markersInBoth.size()) + " model markers that also appear in the motion capture! This will probably lead to suboptimal results, and likely means this file doesn't match the model you uploaded!");
+    report->warnings.push_back("We only found " + std::to_string(markersInBoth.size()) + " model markers that also appear in the motion capture! This will probably lead to suboptimal results, and likely means this file doesn't match the model you uploaded!");
   }
 
   return report;
@@ -874,7 +893,7 @@ bool MarkerFitter::checkForFlippedMarkers(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         immutableMarkerObservations,
     MarkerInitialization& init,
-    MarkersErrorReport& report)
+    std::shared_ptr<MarkersErrorReport> report)
 {
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
       = immutableMarkerObservations;
@@ -973,7 +992,7 @@ bool MarkerFitter::checkForFlippedMarkers(
         && closestMarkers[closestMarkers[marker]] == marker
         && swapped.count(closestMarkers[marker]) == 0)
     {
-      report.warnings.push_back(
+      report->warnings.push_back(
           "Marker \"" + marker + "\" seems it was swapped with \""
           + closestMarkers[marker] + "\" for the whole clip.");
       swapped[marker] = closestMarkers[marker];
@@ -1008,7 +1027,7 @@ bool MarkerFitter::checkForFlippedMarkers(
   }
   if (anySwapped)
   {
-    report.markerObservationsAttemptedFixed = markerObservations;
+    report->markerObservationsAttemptedFixed = markerObservations;
   }
 
   return anySwapped;
@@ -7157,6 +7176,14 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
         = mInitialization.poses.col(mSampleIndices[i]);
   }
 
+  // std::cout << "Init group scales: " << std::endl
+  //           << init.segment(0, groupScaleDim) << std::endl;
+  // std::cout << "Init marker offsets: " << std::endl
+  //           << init.segment(groupScaleDim, markerOffsetDim) << std::endl;
+  // std::cout << "Init first pose: " << std::endl
+  //           << init.segment(groupScaleDim + markerOffsetDim, dofs) <<
+  //           std::endl;
+
   return init;
 }
 
@@ -7166,6 +7193,17 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
 s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
 {
   mLastX = x;
+
+  // int groupScaleDim = mFitter->mSkeleton->getGroupScaleDim();
+  // int markerOffsetDim = mFitter->mMarkers.size() * 3;
+  // int dofs = mFitter->mSkeleton->getNumDofs();
+  // std::cout << "Getting loss at group scales: " << std::endl
+  //           << x.segment(0, groupScaleDim) << std::endl;
+  // std::cout << "Getting loss at marker offsets: " << std::endl
+  //           << x.segment(groupScaleDim, markerOffsetDim) << std::endl;
+  // std::cout << "Getting loss at first pose: " << std::endl
+  //           << x.segment(groupScaleDim + markerOffsetDim, dofs) << std::endl;
+
   MarkerFitterState state(
       x,
       mMarkerMapObservations,
@@ -7643,6 +7681,24 @@ bool BilevelFitProblem::get_bounds_info(
     lowerBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
         = mFitter->mSkeleton->getPositionLowerLimits().cast<double>();
   }
+
+  // std::cout << "Group scales upper bound: " << std::endl
+  //           << upperBounds.segment(0, scaleGroupDim) << std::endl;
+  // std::cout << "Marker offset upper bound: " << std::endl
+  //           << upperBounds.segment(scaleGroupDim, markerOffsetDim) <<
+  //           std::endl;
+  // std::cout << "Positions upper bound: " << std::endl
+  //           << upperBounds.segment(scaleGroupDim + markerOffsetDim, dofs)
+  //           << std::endl;
+
+  // std::cout << "Group scales lower bound: " << std::endl
+  //           << lowerBounds.segment(0, scaleGroupDim) << std::endl;
+  // std::cout << "Marker offset lower bound: " << std::endl
+  //           << lowerBounds.segment(scaleGroupDim, markerOffsetDim) <<
+  //           std::endl;
+  // std::cout << "Positions lower bound: " << std::endl
+  //           << lowerBounds.segment(scaleGroupDim + markerOffsetDim, dofs)
+  //           << std::endl;
 
   // Our constraint function has to be 0
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);

@@ -346,7 +346,7 @@ public:
   /// This will go through original marker data and attempt to detect common
   /// anomalies, generate warnings to help the user fix their own issues, and
   /// produce fixes where possible.
-  MarkersErrorReport generateDataErrorsReport(
+  std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
       s_t dt);
@@ -360,7 +360,7 @@ public:
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
       MarkerInitialization& initialization,
-      MarkersErrorReport& report);
+      std::shared_ptr<MarkersErrorReport> report);
 
   /// Run the whole pipeline of optimization problems to fit the data as closely
   /// as we can, working on multiple trials at once

@@ -1,6 +1,7 @@
 #include "dart/biomechanics/MarkerFixer.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -717,12 +718,13 @@ void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
 /// This will go through original marker data and attempt to detect common
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
-MarkersErrorReport MarkerFixer::generateDataErrorsReport(
+std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         immutableMarkerObservations,
     s_t dt)
 {
-  MarkersErrorReport report;
+  std::shared_ptr<MarkersErrorReport> report
+      = std::make_shared<MarkersErrorReport>();
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
       = immutableMarkerObservations;
 
@@ -763,7 +765,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
         // Ignore points that we specifically asked to drop
         if (index < traces[j].mDropPoint.size() && traces[j].mDropPoint[index])
         {
-          report.warnings.push_back(
+          report->warnings.push_back(
               "Marker " + traceLabels[j]
               + " dropped for accelerating too fast ("
               + std::to_string((double)traces[j].mAccNorm[index])
@@ -803,7 +805,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
     s_t percentage = (s_t)pair.second / (s_t)immutableMarkerObservations.size();
     if (percentage < 0.1)
     {
-      report.warnings.push_back(
+      report->warnings.push_back(
           "Dropping marker \"" + pair.first + "\", only on "
           + std::to_string(percentage * 100) + " percent of frames");
       markersToDrop.push_back(pair.first);
@@ -818,7 +820,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
   }
 
   RippleReductionProblem rippleReduction(correctedObservations, dt);
-  correctedObservations = rippleReduction.smooth(&report);
+  correctedObservations = rippleReduction.smooth(report.get());
 
   // 3. Emit warnings based on any traces that include markers that are not
   // labelled correctly during part of the trace
@@ -860,7 +862,7 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
           s_t dist = trace.pointToAppendDistance(i, point, true);
           if (dist > 0.2)
           {
-            report.warnings.push_back(
+            report->warnings.push_back(
                 "Marker " + marker + " jumps a suspiciously large "
                 + std::to_string((double)dist) + "m on frame "
                 + std::to_string(i));
@@ -918,11 +920,11 @@ MarkersErrorReport MarkerFixer::generateDataErrorsReport(
         = merged.emitWarningsAboutLabelChange(pair.first);
     for (int j = 0; j < warnings.size(); j++)
     {
-      report.warnings.push_back(warnings[j]);
+      report->warnings.push_back(warnings[j]);
     }
   }
 
-  report.markerObservationsAttemptedFixed = correctedObservations;
+  report->markerObservationsAttemptedFixed = correctedObservations;
   return report;
 }
 

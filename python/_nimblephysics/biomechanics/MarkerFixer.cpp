@@ -46,7 +46,10 @@ namespace python {
 
 void MarkerFixer(py::module& m)
 {
-  ::py::class_<dart::biomechanics::MarkersErrorReport>(m, "MarkersErrorReport")
+  ::py::class_<
+      dart::biomechanics::MarkersErrorReport,
+      std::shared_ptr<dart::biomechanics::MarkersErrorReport>>(
+      m, "MarkersErrorReport")
       .def_readwrite(
           "warnings", &dart::biomechanics::MarkersErrorReport::warnings)
       .def_readwrite("info", &dart::biomechanics::MarkersErrorReport::info)

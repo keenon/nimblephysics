@@ -2,7 +2,10 @@
 
 #include <algorithm>
 
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/XmlHelpers.hpp"
@@ -15,16 +18,16 @@ namespace biomechanics {
 AnthroMetric::AnthroMetric(
     std::string name,
     Eigen::VectorXs bodyPose,
-    std::string bodyA,
+    std::string meshA,
     Eigen::Vector3s offsetA,
-    std::string bodyB,
+    std::string meshB,
     Eigen::Vector3s offsetB,
     Eigen::Vector3s axis)
   : name(name),
     bodyPose(bodyPose),
-    bodyA(bodyA),
+    meshA(meshA),
     offsetA(offsetA),
-    bodyB(bodyB),
+    meshB(meshB),
     offsetB(offsetB),
     axis(axis)
 {
@@ -95,12 +98,12 @@ std::shared_ptr<Anthropometrics> Anthropometrics::loadFromFile(
 
     tinyxml2::XMLElement* markerAElement
         = metricElement->FirstChildElement("MarkerA");
-    std::string bodyA = utils::getValueString(markerAElement, "BodyNode");
+    std::string meshA = utils::getValueString(markerAElement, "MeshNode");
     Eigen::Vector3s offsetA = utils::getValueVector3s(markerAElement, "Offset");
 
     tinyxml2::XMLElement* markerBElement
         = metricElement->FirstChildElement("MarkerB");
-    std::string bodyB = utils::getValueString(markerBElement, "BodyNode");
+    std::string meshB = utils::getValueString(markerBElement, "MeshNode");
     Eigen::Vector3s offsetB = utils::getValueVector3s(markerBElement, "Offset");
 
     Eigen::Vector3s axis
@@ -112,7 +115,7 @@ std::shared_ptr<Anthropometrics> Anthropometrics::loadFromFile(
       bodyPose = utils::getValueVectorXs(metricElement, "BodyPose");
     }
 
-    result->addMetric(name, bodyPose, bodyA, offsetA, bodyB, offsetB, axis);
+    result->addMetric(name, bodyPose, meshA, offsetA, meshB, offsetB, axis);
 
     metricElement = metricElement->NextSiblingElement("Metric");
   }
@@ -184,18 +187,30 @@ void Anthropometrics::debugToGUI(
     Eigen::Vector4s colorTransparent = Eigen::Vector4s(
         colors[i](0) / 255.0, colors[i](1) / 255.0, colors[i](2) / 255.0, 0.4);
 
-    if (skel->getBodyNode(metric.bodyA) == nullptr
-        || skel->getBodyNode(metric.bodyB) == nullptr)
+    auto pair = getMarkers(skel, metric);
+
+    if (pair.first.first == nullptr || pair.second.first == nullptr)
       continue;
 
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
-    markers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-        skel->getBodyNode(metric.bodyA), metric.offsetA));
-    markers.push_back(std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-        skel->getBodyNode(metric.bodyB), metric.offsetB));
+    markers.push_back(pair.first);
+    markers.push_back(pair.second);
     Eigen::VectorXs worldSpace = skel->getMarkerWorldPositions(markers);
     Eigen::Vector3s markerA = worldSpace.head<3>();
     Eigen::Vector3s markerB = worldSpace.tail<3>();
+
+    server->createBox(
+        "anthro_body_a_" + metric.name,
+        Eigen::Vector3s::Ones() * 0.007,
+        pair.first.first->getWorldTransform().translation(),
+        math::matrixToEulerXYZ(pair.first.first->getWorldTransform().linear()),
+        colorTransparent);
+    server->createBox(
+        "anthro_body_b_" + metric.name,
+        Eigen::Vector3s::Ones() * 0.007,
+        pair.second.first->getWorldTransform().translation(),
+        math::matrixToEulerXYZ(pair.second.first->getWorldTransform().linear()),
+        colorTransparent);
 
     // Create spheres at the endpoints
     server->createSphere(
@@ -312,9 +327,9 @@ std::shared_ptr<Anthropometrics> Anthropometrics::condition(
       conditioned->addMetric(
           metric.name,
           metric.bodyPose,
-          metric.bodyA,
+          metric.meshA,
           metric.offsetA,
-          metric.bodyB,
+          metric.meshB,
           metric.offsetB,
           metric.axis);
     }
@@ -366,6 +381,68 @@ void Anthropometrics::setSkelToMetricPose(
 }
 
 //==============================================================================
+std::pair<
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s>,
+    std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+Anthropometrics::getMarkers(
+    std::shared_ptr<dynamics::Skeleton> skel, AnthroMetric& metric)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
+      = std::make_pair(nullptr, Eigen::Vector3s::Zero());
+  std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
+      = std::make_pair(nullptr, Eigen::Vector3s::Zero());
+
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = skel->getBodyNode(i);
+    for (int j = 0; j < body->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapeNode* shapeNode = body->getShapeNode(j);
+      std::shared_ptr<dynamics::Shape> shape = shapeNode->getShape();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* mesh
+            = static_cast<dynamics::MeshShape*>(shape.get());
+        std::string path = mesh->getMeshPath();
+        int index = path.find_last_of("/");
+        if (index != std::string::npos)
+        {
+          path = path.substr(index + 1);
+        }
+        int dotIndex = path.find_first_of(".");
+        if (dotIndex != std::string::npos)
+        {
+          path = path.substr(0, dotIndex);
+        }
+
+        Eigen::Vector3s bodyScale = body->getScale();
+        Eigen::Vector3s unscaledOffset
+            = shapeNode->getOffset().cwiseQuotient(bodyScale);
+        Eigen::Isometry3s relativeT = Eigen::Isometry3s::Identity();
+        relativeT.linear() = shapeNode->getRelativeRotation();
+        relativeT.translation() = unscaledOffset;
+
+        // If "meshA" is a substring of this mesh name
+        if (path.find(metric.meshA) != std::string::npos)
+        {
+          markerA = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              body, relativeT * metric.offsetA);
+        }
+
+        // If "meshB" is a substring of this mesh name
+        if (path.find(metric.meshB) != std::string::npos)
+        {
+          markerB = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+              body, relativeT * metric.offsetB);
+        }
+      }
+    }
+  }
+
+  return std::make_pair(markerA, markerB);
+}
+
+//==============================================================================
 std::map<std::string, s_t> Anthropometrics::measure(
     std::shared_ptr<dynamics::Skeleton> skel)
 {
@@ -374,8 +451,10 @@ std::map<std::string, s_t> Anthropometrics::measure(
   for (AnthroMetric& metric : mMetrics)
   {
     setSkelToMetricPose(skel, metric);
-    if (skel->getBodyNode(metric.bodyA) == nullptr
-        || skel->getBodyNode(metric.bodyB) == nullptr)
+    auto markersPair = getMarkers(skel, metric);
+
+    if (markersPair.first.first == nullptr
+        || markersPair.second.first == nullptr)
     {
       if (result.count(metric.name) == 0)
       {
@@ -384,21 +463,15 @@ std::map<std::string, s_t> Anthropometrics::measure(
     }
     else
     {
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyA), metric.offsetA);
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyB), metric.offsetB);
-
       if (metric.axis == Eigen::Vector3s::Zero())
       {
-        result[metric.name] = skel->getDistanceInWorldSpace(markerA, markerB);
+        result[metric.name] = skel->getDistanceInWorldSpace(
+            markersPair.first, markersPair.second);
       }
       else
       {
-        result[metric.name]
-            = skel->getDistanceAlongAxis(markerA, markerB, metric.axis);
+        result[metric.name] = skel->getDistanceAlongAxis(
+            markersPair.first, markersPair.second, metric.axis);
       }
     }
   }
@@ -438,26 +511,22 @@ Eigen::VectorXs Anthropometrics::getGradientOfLogPDFWrtBodyScales(
   for (AnthroMetric& metric : mMetrics)
   {
     setSkelToMetricPose(skel, metric);
+    auto markersPair = getMarkers(skel, metric);
 
-    if (skel->getBodyNode(metric.bodyA) != nullptr
-        && skel->getBodyNode(metric.bodyB) != nullptr)
+    if (markersPair.first.first != nullptr
+        && markersPair.second.first != nullptr)
     {
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyA), metric.offsetA);
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyB), metric.offsetB);
       if (metric.axis == Eigen::Vector3s::Zero())
       {
         grad += gradMap[metric.name]
-                * skel->getGradientOfDistanceWrtBodyScales(markerA, markerB);
+                * skel->getGradientOfDistanceWrtBodyScales(
+                    markersPair.first, markersPair.second);
       }
       else
       {
         grad += gradMap[metric.name]
                 * skel->getGradientOfDistanceAlongAxisWrtBodyScales(
-                    markerA, markerB, metric.axis);
+                    markersPair.first, markersPair.second, metric.axis);
       }
     }
   }
@@ -511,25 +580,21 @@ Eigen::VectorXs Anthropometrics::getGradientOfLogPDFWrtGroupScales(
   {
     setSkelToMetricPose(skel, metric);
 
-    if (skel->getBodyNode(metric.bodyA) != nullptr
-        && skel->getBodyNode(metric.bodyB) != nullptr)
+    auto markersPair = getMarkers(skel, metric);
+    if (markersPair.first.first != nullptr
+        && markersPair.second.first != nullptr)
     {
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerA
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyA), metric.offsetA);
-      std::pair<dynamics::BodyNode*, Eigen::Vector3s> markerB
-          = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-              skel->getBodyNode(metric.bodyB), metric.offsetB);
       if (metric.axis == Eigen::Vector3s::Zero())
       {
         grad += gradMap[metric.name]
-                * skel->getGradientOfDistanceWrtGroupScales(markerA, markerB);
+                * skel->getGradientOfDistanceWrtGroupScales(
+                    markersPair.first, markersPair.second);
       }
       else
       {
         grad += gradMap[metric.name]
                 * skel->getGradientOfDistanceAlongAxisWrtGroupScales(
-                    markerA, markerB, metric.axis);
+                    markersPair.first, markersPair.second, metric.axis);
       }
     }
   }

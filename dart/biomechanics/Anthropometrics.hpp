@@ -26,18 +26,18 @@ struct AnthroMetric
 {
   std::string name;
   Eigen::VectorXs bodyPose;
-  std::string bodyA;
+  std::string meshA;
   Eigen::Vector3s offsetA;
-  std::string bodyB;
+  std::string meshB;
   Eigen::Vector3s offsetB;
   Eigen::Vector3s axis;
 
   AnthroMetric(
       std::string name,
       Eigen::VectorXs bodyPose,
-      std::string bodyA,
+      std::string meshA,
       Eigen::Vector3s offsetA,
-      std::string bodyB,
+      std::string meshB,
       Eigen::Vector3s offsetB,
       Eigen::Vector3s axis = Eigen::Vector3s::Zero());
 };
@@ -58,9 +58,9 @@ public:
   void addMetric(
       std::string name,
       Eigen::VectorXs bodyPose,
-      std::string bodyA,
+      std::string meshA,
       Eigen::Vector3s offsetA,
-      std::string bodyB,
+      std::string meshB,
       Eigen::Vector3s offsetB,
       Eigen::Vector3s axis = Eigen::Vector3s::Zero());
 
@@ -72,6 +72,11 @@ public:
 
   std::shared_ptr<Anthropometrics> condition(
       const std::map<std::string, s_t>& observedValues);
+
+  std::pair<
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s>,
+      std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+  getMarkers(std::shared_ptr<dynamics::Skeleton> skel, AnthroMetric& metric);
 
   std::map<std::string, s_t> measure(std::shared_ptr<dynamics::Skeleton> skel);
 

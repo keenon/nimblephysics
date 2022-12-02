@@ -30,7 +30,7 @@ using namespace biomechanics;
 TEST(ANTHROPOMETRICS, LOAD)
 {
   std::shared_ptr<Anthropometrics> result = Anthropometrics::loadFromFile(
-      "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+      "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
   std::vector<std::string> cols = result->getMetricNames();
   cols.push_back("Age");
   cols.push_back("Weightlbs");
@@ -135,7 +135,9 @@ TEST(ANTHROPOMETRICS, GUI)
   anthropometrics->setDistribution(gauss);
 
   OpenSimFile file = OpenSimParser::parseOsim(
-      "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim");
+      "dart://sample/osim/11_01_Marilyn_Bug/prod/Models/"
+      "unscaled_generic.osim");
+  // "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim");
   // OpenSimFile file = OpenSimParser::parseOsim(
   //     "dart://sample/osim/LaiArnoldSubject5/"
   //     "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim");

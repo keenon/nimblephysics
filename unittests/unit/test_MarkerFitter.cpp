@@ -1416,7 +1416,7 @@ std::vector<MarkerInitialization> runEngine(
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
   cols.push_back("Heightin");
@@ -1449,16 +1449,17 @@ std::vector<MarkerInitialization> runEngine(
   anthropometrics->setDistribution(gauss);
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
-  std::vector<MarkersErrorReport> reports;
+  std::vector<std::shared_ptr<MarkersErrorReport>> reports;
   for (int i = 0; i < markerObservationTrials.size(); i++)
   {
-    MarkersErrorReport report = fitter.generateDataErrorsReport(
-        markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
-    for (std::string& warning : report.warnings)
+    std::shared_ptr<MarkersErrorReport> report
+        = fitter.generateDataErrorsReport(
+            markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
+    for (std::string& warning : report->warnings)
     {
       std::cout << "DATA WARNING: " << warning << std::endl;
     }
-    markerObservationTrials[i] = report.markerObservationsAttemptedFixed;
+    markerObservationTrials[i] = report->markerObservationsAttemptedFixed;
     reports.push_back(report);
   }
 
@@ -1488,7 +1489,7 @@ std::vector<MarkerInitialization> runEngine(
             markerObservationTrials[i], results[i], reports[i]))
     {
       anySwapped = true;
-      markerObservationTrials[i] = reports[i].markerObservationsAttemptedFixed;
+      markerObservationTrials[i] = reports[i]->markerObservationsAttemptedFixed;
     }
   }
   if (anySwapped)
@@ -1510,11 +1511,11 @@ std::vector<MarkerInitialization> runEngine(
   for (int i = 0; i < reports.size(); i++)
   {
     std::cout << "Trial " << std::to_string(i) << std::endl;
-    for (std::string& warning : reports[i].warnings)
+    for (std::string& warning : reports[i]->warnings)
     {
       std::cout << "Warning: " << warning << std::endl;
     }
-    for (std::string& info : reports[i].info)
+    for (std::string& info : reports[i]->info)
     {
       std::cout << "Info: " << info << std::endl;
     }
@@ -2733,7 +2734,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -2926,7 +2927,7 @@ TEST(MarkerFitter, DERIVATIVES_COMPLEX_KNEE_BALL_JOINTS)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -3448,7 +3449,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_LAI_ARNOLD_2)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -3733,7 +3734,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -3909,7 +3910,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER_2)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -4073,7 +4074,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_SPRINTER_C3D)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -4468,7 +4469,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_COMPLEX_KNEE_C3D)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -4706,7 +4707,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_APRIL4_C3D)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -4890,7 +4891,7 @@ TEST(MarkerFitter, NAN_C3D_PROBLEMS)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -5019,7 +5020,7 @@ TEST(MarkerFitter, MULTI_TRIAL_WELK)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -5196,7 +5197,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_STACK_WELK)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -5389,7 +5390,7 @@ TEST(MarkerFitter, MULTI_TRIAL_SPRINTER)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -6078,7 +6079,7 @@ TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_Rajagopal_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -6354,7 +6355,7 @@ TEST(MarkerFitter, MONOLEVEL_VS_BILEVEL)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -6710,7 +6711,7 @@ TEST(MarkerFitter, OPENSIM_COMPAT_TEST_1)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
@@ -7003,7 +7004,7 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
       = Anthropometrics::loadFromFile(
-          "dart://sample/osim/ANSUR/ANSUR_LaiArnold_metrics.xml");
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("Weightlbs");
