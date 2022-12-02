@@ -1228,6 +1228,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       separateInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
 
       separateInits[i].joints = overallInit.joints;
+      separateInits[i].observedJoints = overallInit.observedJoints;
+      separateInits[i].unobservedJoints = overallInit.unobservedJoints;
       separateInits[i].jointMarkerVariability
           = overallInit.jointMarkerVariability;
       separateInits[i].jointsAdjacentMarkers
@@ -1303,6 +1305,7 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
         markerObservations,
         newClip,
         bilevelFit,
+        init.observedJoints,
         InitialMarkerFitParams(params)
             .setJointCentersAndWeights(
                 init.joints,
@@ -2492,8 +2495,10 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
         markerObservations,
     const std::vector<bool>& newClip,
     std::shared_ptr<BilevelFitResult> solution,
+    std::vector<dynamics::Joint*> initObservedJoints,
     InitialMarkerFitParams params)
 {
+  assert(initObservedJoints.size() > 0);
   // Before using Eigen in a multi-threaded environment, we need to explicitly
   // call this (at least prior to Eigen 3.3)
   Eigen::initParallel();
@@ -2593,7 +2598,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
         params.jointWeights,
         jointAxisArr,
         params.axisWeights,
-        result.observedJoints,
+        initObservedJoints,
         forwardPoses.block(
             0, thisIndex, mSkeleton->getNumDofs(), segmentLength),
         forwardScores.segment(thisIndex, segmentLength),
@@ -2678,7 +2683,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
         params.jointWeights,
         jointAxisArr,
         params.axisWeights,
-        result.observedJoints,
+        initObservedJoints,
         backwardPoses.block(
             0, prevIndexExclusive + 1, mSkeleton->getNumDofs(), segmentLength),
         backwardScores.segment(prevIndexExclusive + 1, segmentLength),
@@ -2817,6 +2822,8 @@ MarkerInitialization MarkerFitter::fineTuneIK(
     MarkerInitialization& initialization)
 {
   MarkerInitialization result(initialization);
+  result.observedJoints = initialization.observedJoints;
+  result.unobservedJoints = initialization.unobservedJoints;
 
   assert(
       initialization.jointCenters.cols() == 0
@@ -2974,6 +2981,8 @@ MarkerInitialization MarkerFitter::smoothOutIK(
     MarkerInitialization& initialization)
 {
   MarkerInitialization smoothed(initialization);
+  smoothed.observedJoints = initialization.observedJoints;
+  smoothed.unobservedJoints = initialization.unobservedJoints;
 
   std::vector<std::future<void>> ikFutures;
 
@@ -3193,6 +3202,8 @@ MarkerInitialization MarkerFitter::getInitialization(
                 << std::endl;
     }
   }
+  std::cout << "Size of observed joints: " << result.observedJoints.size()
+            << std::endl;
   std::cout << "Size of unobserved joints: " << result.unobservedJoints.size()
             << std::endl;
   assert(
@@ -3709,6 +3720,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     bool debug,
     bool saveToGUI)
 {
+  assert(initObservedJoints.size() > 0);
+
   // 0. To make this thread safe, we're going to clone the fitter skeleton
   std::shared_ptr<dynamics::Skeleton> skeleton;
   {
@@ -4340,6 +4353,8 @@ void MarkerFitter::fitTrajectory(
     Eigen::Ref<Eigen::VectorXs> resultScores,
     bool backwards)
 {
+  assert(initObservedJoints.size() > 0);
+
   // 0. To make this thread safe, we're going to clone the fitter skeleton
   std::shared_ptr<dynamics::Skeleton> skeleton;
   {

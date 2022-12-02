@@ -633,6 +633,7 @@ public:
           markerObservations,
       const std::vector<bool>& newClip,
       std::shared_ptr<BilevelFitResult> result,
+      std::vector<dynamics::Joint*> initObservedJoints,
       InitialMarkerFitParams params);
 
   /// For the multi-trial pipeline, this takes our finished body scales and

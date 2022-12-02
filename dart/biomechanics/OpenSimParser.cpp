@@ -3985,7 +3985,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       dof->setVelocityUpperLimit(0);
       dof->setVelocityLowerLimit(0);
       */
-      std::cout << "Locking dof " << dof << std::endl;
+      std::cout << "Locking dof " << dof->getName() << std::endl;
       if (coordinateCursor->FirstChildElement("default_value"))
       {
         double defaultValue = atof(
