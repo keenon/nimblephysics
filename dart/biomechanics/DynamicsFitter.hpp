@@ -1274,7 +1274,7 @@ public:
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
   // into account approximate angular positions.
-  void zeroLinearResidualsAndOptimizeAngular(
+  bool zeroLinearResidualsAndOptimizeAngular(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       Eigen::MatrixXs targetPoses,
@@ -1283,7 +1283,9 @@ public:
       s_t regularizeLinearResiduals = 0.1,
       s_t regularizeAngularResiduals = 0.1,
       int maxBuckets = 100,
-      bool detectUnmeasuredTorque = true);
+      bool detectUnmeasuredTorque = true,
+      s_t avgPositionChangeThreshold = 0.08,
+      s_t avgAngularChangeThreshold = 0.15);
 
   // 1. This runs a number of zeroLinearResidualsAndOptimizeAngular() pipelines,
   // each with different number of timesteps offset between the force plates and
@@ -1308,7 +1310,15 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       int maxShiftGRFEarlier = -4,
       int maxShiftGRFLater = 4,
-      int iterationsPerShift = 20);
+      int iterationsPerShift = 20,
+      s_t weightLinear = 1.0,
+      s_t weightAngular = 0.5,
+      s_t regularizeLinearResiduals = 0.1,
+      s_t regularizeAngularResiduals = 0.1,
+      int maxBuckets = 100,
+      bool detectUnmeasuredTorque = true,
+      s_t avgPositionChangeThreshold = 0.08,
+      s_t avgAngularChangeThreshold = 0.15);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external

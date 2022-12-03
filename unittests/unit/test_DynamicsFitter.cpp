@@ -2476,7 +2476,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.addJointBoundSlack(skel, 0.1);
   fitter.boundPush(init);
   fitter.smoothAccelerations(init);
-  // fitter.markMissingImpacts(init);
+  // fitter.markMissingImpacts(init, 3, true);
 
   fitter.timeSyncAndInitializePipeline(init);
   /*

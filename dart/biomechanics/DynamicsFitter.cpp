@@ -10699,7 +10699,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 // 1. Change the initial positions and velocities of the body to achieve a
 // least-squares closest COM trajectory to the current kinematic fit, taking
 // into account approximate angular positions.
-void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
+bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     Eigen::MatrixXs targetPoses,
@@ -10708,7 +10708,9 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     s_t regularizeLinearResiduals,
     s_t regularizeAngularResiduals,
     int maxBuckets,
-    bool detectUnmeasuredTorque)
+    bool detectUnmeasuredTorque,
+    s_t avgPositionChangeThreshold,
+    s_t avgAngularChangeThreshold)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -10767,7 +10769,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         << ", but we don't have any timesteps remaining with GRF data (that "
            "haven't been filtered out by previous heuristics). Returning."
         << std::endl;
-    return;
+    return false;
   }
   totalResidual /= countedSteps;
   std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
@@ -10909,7 +10911,8 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     totalPosChange /= init->poseTrials[trial].cols();
     totalAngChange /= init->poseTrials[trial].cols();
 
-    if ((totalPosChange > 0.08 || totalAngChange > 0.15)
+    if ((totalPosChange > avgPositionChangeThreshold
+         || totalAngChange > avgAngularChangeThreshold)
         && detectUnmeasuredTorque)
     {
       std::cout << "Trial pos/angle changed too much! (pos change="
@@ -10926,9 +10929,11 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       {
         std::cout
             << "Found no additional frames with suspicious torques even after "
-               "reducing the threshold, exiting the optimization early"
+               "reducing the threshold to "
+            << (threshold * 100)
+            << " percent of nominal, exiting the optimization early "
             << std::endl;
-        return;
+        return false;
       }
     }
 
@@ -10950,6 +10955,7 @@ void DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     break;
   }
+  return true;
 }
 
 //==============================================================================
@@ -11001,7 +11007,7 @@ void DynamicsFitter::timeSyncTrialGRF(
 
     for (int i = 0; i < iterationsPerShift; i++)
     {
-      zeroLinearResidualsAndOptimizeAngular(
+      bool success = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
           originalPoseTrial,
@@ -11011,6 +11017,8 @@ void DynamicsFitter::timeSyncTrialGRF(
           regularizeAngularResiduals,
           maxBuckets,
           false);
+      if (!success)
+        break;
     }
 
     // Now score the trial
@@ -11073,12 +11081,28 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
     std::shared_ptr<DynamicsInitialization> init,
     int maxShiftGRFEarlier,
     int maxShiftGRFLater,
-    int iterationsPerShift)
+    int iterationsPerShift,
+    s_t weightLinear,
+    s_t weightAngular,
+    s_t regularizeLinearResiduals,
+    s_t regularizeAngularResiduals,
+    int maxBuckets,
+    bool detectUnmeasuredTorque,
+    s_t avgPositionChangeThreshold,
+    s_t avgAngularChangeThreshold)
 {
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   for (int i = 0; i < init->poseTrials.size(); i++)
   {
     originalPoseTrials.push_back(init->poseTrials[i]);
+  }
+  // First detect external force
+  zeroLinearResidualsOnCOMTrajectory(init);
+
+  // Now reset positions and re-run with multi-mass
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    init->poseTrials[i] = originalPoseTrials[i];
   }
   multimassZeroLinearResidualsOnCOMTrajectory(init);
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
@@ -11102,8 +11126,20 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
     {
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
-      zeroLinearResidualsAndOptimizeAngular(
-          init, trial, originalPoseTrials[trial], 1.0, 0.5, 0.1, 0.1, 150);
+      bool success = zeroLinearResidualsAndOptimizeAngular(
+          init,
+          trial,
+          originalPoseTrials[trial],
+          weightLinear,
+          weightAngular,
+          regularizeLinearResiduals,
+          regularizeAngularResiduals,
+          maxBuckets,
+          detectUnmeasuredTorque,
+          avgPositionChangeThreshold,
+          avgAngularChangeThreshold);
+      if (!success)
+        break;
     }
     // Adjust the regularization target to match our newly solved trajectory, so
     // we're not trying to pull the root away from the solved trajectory

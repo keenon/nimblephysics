@@ -560,7 +560,9 @@ protected:
           ::py::arg("regularizeLinearResiduals") = 0.1,
           ::py::arg("regularizeAngularResiduals") = 0.1,
           ::py::arg("maxBuckets") = 40,
-          ::py::arg("detectUnmeasuredTorque") = true)
+          ::py::arg("detectUnmeasuredTorque") = true,
+          ::py::arg("avgPositionChangeThreshold") = 0.08,
+          ::py::arg("avgAngularChangeThreshold") = 0.15)
       .def(
           "timeSyncTrialGRF",
           &dart::biomechanics::DynamicsFitter::timeSyncTrialGRF,
@@ -580,7 +582,15 @@ protected:
           ::py::arg("init"),
           ::py::arg("maxShiftGRFEarlier") = -4,
           ::py::arg("maxShiftGRFLater") = 4,
-          ::py::arg("iterationsPerShift") = 20)
+          ::py::arg("iterationsPerShift") = 20,
+          ::py::arg("weightLinear") = 1.0,
+          ::py::arg("weightAngular") = 0.5,
+          ::py::arg("regularizeLinearResiduals") = 0.1,
+          ::py::arg("regularizeAngularResiduals") = 0.1,
+          ::py::arg("maxBuckets") = 100,
+          ::py::arg("detectUnmeasuredTorque") = true,
+          ::py::arg("avgPositionChangeThreshold") = 0.08,
+          ::py::arg("avgAngularChangeThreshold") = 0.15)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
