@@ -318,7 +318,9 @@ $triangle-size: 5px;
     overflow: hidden;
   }
 
-  .GUI_layers {
+  .GUI_layers_container {
+    max-height: 104px;
+    overflow-y: auto;
     position: absolute;
     pointer-events: all;
     cursor: pointer;
@@ -328,6 +330,12 @@ $triangle-size: 5px;
     color: #848484;
     /* font-weight: bold; */
     font-size: 13px;
+    border: 1px solid #848484;
+    border-radius: 5px;
+    padding: 5px;
+  }
+
+  .GUI_layers {
     border-collapse: collapse;
   }
 

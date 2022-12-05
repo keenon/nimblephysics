@@ -302,7 +302,11 @@ class DARTView {
     this.layersTable = document.createElement("table");
     this.layersTable.className = "GUI_layers";
 
-    this.uiContainer.appendChild(this.layersTable);
+    const layersTableHolder = document.createElement("div");
+    layersTableHolder.className = "GUI_layers_container";
+    layersTableHolder.appendChild(this.layersTable);
+
+    this.uiContainer.appendChild(layersTableHolder);
 
     // Set up the reusable sphere geometry
 
