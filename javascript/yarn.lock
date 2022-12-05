@@ -1400,11 +1400,6 @@
   "resolved" "https://registry.npmjs.org/binary-extensions/-/binary-extensions-2.2.0.tgz"
   "version" "2.2.0"
 
-"binary-loader@^0.0.1":
-  "integrity" "sha512-LujAJL3IhYn4zVWZWAct9B6G5hdonNle+fWsG/u9QyY1OhOVp00jFgygUVr9SrBVw8doddyx9A/VS1/T9co4Dg=="
-  "resolved" "https://registry.npmjs.org/binary-loader/-/binary-loader-0.0.1.tgz"
-  "version" "0.0.1"
-
 "bindings@^1.5.0":
   "integrity" "sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ=="
   "resolved" "https://registry.npmjs.org/bindings/-/bindings-1.5.0.tgz"
@@ -1711,11 +1706,6 @@
     "escape-string-regexp" "^1.0.5"
     "supports-color" "^5.3.0"
 
-"charenc@0.0.2":
-  "integrity" "sha512-yrLQ/yVUFXkzg7EDQsPieE/53+0RlaWTs+wBrvW36cyilJ2SaDWfl4Yj7MtLTXleV9uEKefbAGUPv2/iWSooRA=="
-  "resolved" "https://registry.npmjs.org/charenc/-/charenc-0.0.2.tgz"
-  "version" "0.0.2"
-
 "chokidar@^2.1.8":
   "integrity" "sha512-ZmZUazfOzf0Nve7duiCKD23PFSCs4JPoYyccjUFF3aQkQadqBhfzhjkwBH2mNOG9cTBwhamM37EIsIkZw3nRgg=="
   "resolved" "https://registry.npmjs.org/chokidar/-/chokidar-2.1.8.tgz"
@@ -1984,11 +1974,6 @@
     "semver" "^5.5.0"
     "shebang-command" "^1.2.0"
     "which" "^1.2.9"
-
-"crypt@0.0.2":
-  "integrity" "sha1-iNf/fsDfuG9xPch7u0LQRNPmxBs="
-  "resolved" "https://registry.npmjs.org/crypt/-/crypt-0.0.2.tgz"
-  "version" "0.0.2"
 
 "crypto-browserify@^3.11.0":
   "integrity" "sha512-fz4spIh+znjO2VjL+IdhEpRJ3YN6sMzITSBijk6FK2UvTqruSQW+/cCZTSNsMiZNvUeq0CqurF+dAbyiGOY6Wg=="
@@ -3260,7 +3245,7 @@
     "call-bind" "^1.0.2"
     "has-tostringtag" "^1.0.0"
 
-"is-buffer@^1.1.5", "is-buffer@~1.1.6":
+"is-buffer@^1.1.5":
   "integrity" "sha512-NcdALwpXkTm5Zvvbk7owOUSvVvBKDgKP5/ewfXEznmQFfs4ZRmanOeKBTjRVjka3QFoN6XJ+9F3USqfHqTaU5w=="
   "resolved" "https://registry.npmjs.org/is-buffer/-/is-buffer-1.1.6.tgz"
   "version" "1.1.6"
@@ -3674,15 +3659,6 @@
     "hash-base" "^3.0.0"
     "inherits" "^2.0.1"
     "safe-buffer" "^5.1.2"
-
-"md5@^2.3.0":
-  "integrity" "sha512-T1GITYmFaKuO91vxyoQMFETst+O71VUPEU3ze5GNzDm0OWdP8v1ziTaAEPUr/3kLsY3Sftgz242A1SetQiDL7g=="
-  "resolved" "https://registry.npmjs.org/md5/-/md5-2.3.0.tgz"
-  "version" "2.3.0"
-  dependencies:
-    "charenc" "0.0.2"
-    "crypt" "0.0.2"
-    "is-buffer" "~1.1.6"
 
 "media-typer@0.3.0":
   "integrity" "sha1-hxDXrwqmJvj/+hzgAWhUUmMlV0g="

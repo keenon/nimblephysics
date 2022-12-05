@@ -10,13 +10,18 @@ class NimbleStandalone {
   lastRecordingHash: string;
   rawBytes: Uint8Array;
   framePointers: number[];
+  frameSizes: number[];
   playing: boolean;
+  scrubbing: boolean;
   startedPlaying: number;
   originalMsPerFrame: number;
   playbackMultiple: number;
   msPerFrame: number;
   startFrame: number;
   lastFrame: number;
+  scrubFrame: number;
+
+  animationKey: number;
 
   viewContainer: HTMLDivElement;
   progressBarContainer: HTMLDivElement;
@@ -33,7 +38,13 @@ class NimbleStandalone {
   playbackSpeed: HTMLInputElement;
   playbackSpeedDisplay: HTMLDivElement;
 
+  frameChangedListener: ((frame: number) => void) | null;
+  playPausedListener: ((playing: boolean) => void) | null;
+
   constructor(container: HTMLElement) {
+    this.frameChangedListener = null;
+    this.playPausedListener = null;
+
     this.viewContainer = document.createElement("div");
     this.viewContainer.className = "NimbleStandalone-container";
     container.appendChild(this.viewContainer);
@@ -82,27 +93,29 @@ class NimbleStandalone {
     this.progressBarContainer.appendChild(this.progressScrub);
 
     const processMouseEvent = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       const rect = this.progressBarContainer.getBoundingClientRect();
       const x = e.clientX - rect.left;
       let percentage = x / rect.width;
       if (percentage < 0) percentage = 0;
       if (percentage > 1) percentage = 1;
       if (this.playing) this.togglePlay();
-      this.lastFrame = Math.round(this.framePointers.length * percentage);
-      if (this.view != null) {
-        this.getRecordingFrame(this.lastFrame).command.forEach(this.view.handleCommand);
-        this.view.render();
-      }
+      this.scrubFrame = Math.round(this.framePointers.length * percentage); 
       this.setProgress(percentage);
     };
 
     this.progressBarContainer.addEventListener("mousedown", (e: MouseEvent) => {
       processMouseEvent(e);
 
+      this.scrubbing = true;
+      this.startAnimation();
+
       window.addEventListener("mousemove", processMouseEvent);
       const mouseUp = () => {
         window.removeEventListener("mousemove", processMouseEvent);
         window.removeEventListener("mousup", mouseUp);
+        this.scrubbing = false;
       };
       window.addEventListener("mouseup", mouseUp);
     });
@@ -117,9 +130,13 @@ class NimbleStandalone {
 
     this.lastRecordingHash = "";
     this.framePointers = [];
+    this.frameSizes = [];
+    this.animationKey = 0;
     this.playing = false;
+    this.scrubbing = false;
     this.startedPlaying = new Date().getTime();
     this.lastFrame = -1;
+    this.scrubFrame = 0;
     this.originalMsPerFrame = 20.0;
     this.playbackMultiple = 1.0;
     this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
@@ -289,10 +306,11 @@ class NimbleStandalone {
 
   getRecordingFrame: (number) => dart.proto.CommandList = (index: number) => {
     let cursor: number = this.framePointers[index];
-    const u32bytes = this.rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
-    const size = new Uint32Array(u32bytes)[0];
+    // const u32bytes = this.rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
+    // const size = new Uint32Array(u32bytes)[0];
+    const size = this.frameSizes[index];
     cursor += 4;
-    let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(this.rawBytes.buffer.slice(cursor, cursor + size));
+    let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(this.rawBytes.subarray(cursor, cursor + size));
     return command;
   };
 
@@ -308,6 +326,7 @@ class NimbleStandalone {
       this.lastRecordingHash = hash;
       this.rawBytes = rawBytes;
       this.framePointers = [];
+      this.frameSizes = [];
 
       let cursor = [0];
 
@@ -322,6 +341,7 @@ class NimbleStandalone {
             this.framePointers.push(cursor[0]);
             const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
             const size = new Uint32Array(u32bytes)[0];
+            this.frameSizes.push(size);
             cursor[0] += 4;
             cursor[0] += size;
 
@@ -352,17 +372,42 @@ class NimbleStandalone {
     }
   };
 
+  registerPlayPauseListener = (playPausedListener: ((playing: boolean) => void) | null) => {
+    this.playPausedListener = playPausedListener;
+  };
+
   /**
    * This turns playback on or off.
    */
   togglePlay = () => {
     this.playing = !this.playing;
+    if (this.playPausedListener != null) {
+      this.playPausedListener(this.playing);
+    }
     if (this.playing) {
       this.startFrame = this.lastFrame;
       this.startedPlaying = new Date().getTime();
-      this.animationFrame();
+      this.startAnimation();
     }
   };
+
+  /**
+   * Sets whether or not we're currently playing.
+   */
+  setPlaying = (playing: boolean) => {
+    if (this.rawBytes != null && playing != this.playing) {
+      this.playing = playing;
+      if (this.playing) {
+        this.startFrame = this.lastFrame;
+        this.startedPlaying = new Date().getTime();
+        this.startAnimation();
+      }
+    }
+  }
+
+  getPlaying = () => {
+    return this.playing;
+  }
 
   /**
    * This sets our playback speed to a multiple of the fundamental number for this data.
@@ -377,41 +422,27 @@ class NimbleStandalone {
 
   getCurrentFrame = () => {
     const elapsed: number = new Date().getTime() - this.startedPlaying;
-    return (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
+    const currentFrame = (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
       this.framePointers.length;
+    return currentFrame;
   };
 
-
-  handleCommand = (command: dart.proto.Command) => {
-    if (command.set_frames_per_second) {
-      console.log("Frames per second: " + command.set_frames_per_second);
-      this.originalMsPerFrame = 1000.0 / command.set_frames_per_second.framesPerSecond;
-      this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
-    }
-    else {
-      this.view.handleCommand(command);
-    }
+  registerFrameChangeListener = (frameChange: ((frame: number) => void) | null) => {
+    this.frameChangedListener = frameChange;
   };
 
-  /**
-   * This gets called within requestAnimationFrame(...), and handles replaying any commands necessary to jump to the appropriate time in the animation.
-   */
-  animationFrame = () => {
-    // Avoid race conditions if we were stopped, then this frame fired later
-    if (!this.playing) return;
-
-    let frameNumber = this.getCurrentFrame();
-    if (frameNumber != this.lastFrame) {
+  setFrame = (frameNumber: number) => {
+    if (this.rawBytes != null && frameNumber != this.lastFrame) {
       if (frameNumber < this.lastFrame) {
         // Reset at the beginning
         this.lastFrame = -1;
+        // Deliberately skip the first frame when looping back, for efficiency. The first frame usually has a bunch of creation of meshes and stuff, which is expensive to decode and hangs the browser.
+        if (frameNumber == 0) {
+          frameNumber = 1;
+        }
       }
       this.setProgress(frameNumber / this.framePointers.length);
       if (this.view != null) {
-        // This is much more efficient. It's not perfect, because sometimes frames will be dropped that did important things, but if the general convention is followed that everything is initialized on the first frame, this works.
-        if (this.lastFrame == -1 && frameNumber != 0) {
-          this.getRecordingFrame(0).command.forEach(this.handleCommand);
-        }
         this.getRecordingFrame(frameNumber).command.forEach(this.handleCommand);
 
         // This is the slower but more correct method.
@@ -424,11 +455,62 @@ class NimbleStandalone {
       }
       this.lastFrame = frameNumber;
     }
+  };
+
+  getFrame = () => {
+    return this.lastFrame;
+  };
+
+  handleCommand = (command: dart.proto.Command) => {
+    if (command.set_frames_per_second) {
+      console.log("Frames per second: " + command.set_frames_per_second);
+      this.originalMsPerFrame = 1000.0 / command.set_frames_per_second.framesPerSecond;
+      this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
+    }
+    else {
+      this.view.handleCommand(command);
+    }
+  };
+
+  startAnimation = () => {
+    const key = Math.floor(Math.random() * 10000000);
+    this.animationKey = key;
+    this.animationFrame(key);
+  }
+
+  /**
+   * This gets called within requestAnimationFrame(...), and handles replaying any commands necessary to jump to the appropriate time in the animation.
+   */
+  animationFrame = (deduplicationKey: number) => {
+    // Only allow a single thread of animationFrame() calls to run at a time
+    if (deduplicationKey !== this.animationKey) {
+      return;
+    }
+    // Avoid race conditions if we were stopped, then this frame fired later
+    if (!this.playing && !this.scrubbing) return;
 
     if (this.playing) {
-      // Don't use requestAnimationFrame(), because that causes contention with the mouse interaction, which makes the whole UI feel sluggish
-      setTimeout(this.animationFrame, this.msPerFrame);
+      let frameNumber = this.getCurrentFrame();
+      if (frameNumber != this.lastFrame) {
+        this.setFrame(frameNumber);
+        // Always call this _after_ updating this.lastFrame, to avoid loops
+        if (this.frameChangedListener != null) {
+          this.frameChangedListener(frameNumber);
+        }
+      }
     }
+    if (this.scrubbing) {
+      if (this.scrubFrame !== this.lastFrame) {
+        this.setFrame(this.scrubFrame);
+        // Always call this _after_ updating this.lastFrame, to avoid loops
+        if (this.frameChangedListener != null) {
+          this.frameChangedListener(this.scrubFrame);
+        }
+      }
+    }
+
+    // Don't use requestAnimationFrame(), because that causes contention with the mouse interaction, which makes the whole UI feel sluggish
+    setTimeout(() => this.animationFrame(deduplicationKey), this.msPerFrame);
   };
 }
 

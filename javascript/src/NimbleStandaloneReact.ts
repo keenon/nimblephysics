@@ -7,11 +7,16 @@ type NimbleStandaloneReactProps = {
   recording: any;
   style?: any;
   className?: any;
+  // Making the controls accessible from the mounted component
+  playing?: boolean;
+  onPlayPause?: (playing: boolean) => void;
+  frame?: number;
+  onFrameChange?: (frame: number) => void;
 }
 
 const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.ReactElement) = (props: NimbleStandaloneReactProps) => {
   // This is responsible for calling the imperitive methods on the GUI to reflect what's currently going on in the props.
-  const setPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
+  const setLoadingPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
     if (gui != null) {
       if (pr.loading) {
         gui.setLoadingProgress(pr.loadingProgress);
@@ -45,7 +50,7 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
       // Create the standalone GUI
       if (node != null) {
         let newStandalone = new NimbleStandalone(node);
-        setPropsOnStandalone(newStandalone, props);
+        setLoadingPropsOnStandalone(newStandalone, props);
         // This doesn't cause a re-render
         standalone.current = newStandalone;
       }
@@ -64,8 +69,30 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
 
   // Handle the props changes
   useEffect(() => {
-    setPropsOnStandalone(standalone.current, props);
+    setLoadingPropsOnStandalone(standalone.current, props);
   }, [props.loading, props.loadingProgress, props.recording]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.playing != null && pr.playing != gui.getPlaying()) {
+        gui.setPlaying(pr.playing);
+      }
+      gui.registerPlayPauseListener(pr.onPlayPause);
+      gui.registerFrameChangeListener(pr.onFrameChange);
+    }
+  }, [props.playing, props.onPlayPause, props.onFrameChange]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.frame != null && pr.frame != gui.getFrame()) {
+        gui.setFrame(pr.frame);
+      }
+    }
+  }, [props.frame]);
 
   return React.createElement(
     "div",
