@@ -53,14 +53,16 @@ void SubjectOnDisk(py::module& m)
           ::py::arg("trialTaus"),
           // These are generalized 6-dof wrenches applied to arbitrary bodies
           // (generally by foot-ground contact, though other things too)
-          ::py::arg("externalForceBodies"),
-          ::py::arg("trialExternalBodyWrenches"),
+          ::py::arg("groundForceBodies"),
+          ::py::arg("trialGroundBodyWrenches"),
+          ::py::arg("trialGroundBodyCopTorqueForce"),
           // We include this to allow the binary format to store/load a bunch of
           // new types of values while remaining backwards compatible.
           ::py::arg("customValueNames"),
           ::py::arg("customValues"),
           // The provenance info, optional, for investigating where training
           // data came from after its been aggregated
+          ::py::arg("trialNames") = std::vector<std::string>(),
           ::py::arg("sourceHref") = "",
           ::py::arg("notes") = "")
       .def("getNumDofs", &dart::biomechanics::SubjectOnDisk::getNumDofs)
@@ -73,11 +75,15 @@ void SubjectOnDisk(py::module& m)
           "getProbablyMissingGRF",
           &dart::biomechanics::SubjectOnDisk::getProbablyMissingGRF,
           ::py::arg("trial"))
+      .def(
+          "getTrialName",
+          &dart::biomechanics::SubjectOnDisk::getTrialName,
+          ::py::arg("trial"))
       .def("getHref", &dart::biomechanics::SubjectOnDisk::getHref)
       .def("getNotes", &dart::biomechanics::SubjectOnDisk::getNotes)
       .def(
           "getContactBodies",
-          &dart::biomechanics::SubjectOnDisk::getContactBodies)
+          &dart::biomechanics::SubjectOnDisk::getGroundContactBodies)
       .def(
           "getCustomValues",
           &dart::biomechanics::SubjectOnDisk::getCustomValues)
@@ -98,7 +104,16 @@ void SubjectOnDisk(py::module& m)
       .def_readwrite("acc", &dart::biomechanics::Frame::acc)
       .def_readwrite("tau", &dart::biomechanics::Frame::tau)
       .def_readwrite(
-          "externalWrenches", &dart::biomechanics::Frame::externalWrenches)
+          "groundContactWrenches",
+          &dart::biomechanics::Frame::groundContactWrenches)
+      .def_readwrite(
+          "groundContactCenterOfPressure",
+          &dart::biomechanics::Frame::groundContactCenterOfPressure)
+      .def_readwrite(
+          "groundContactTorque",
+          &dart::biomechanics::Frame::groundContactTorque)
+      .def_readwrite(
+          "groundContactForce", &dart::biomechanics::Frame::groundContactForce)
       .def_readwrite("dt", &dart::biomechanics::Frame::dt)
       .def_readwrite("customValues", &dart::biomechanics::Frame::customValues);
 }

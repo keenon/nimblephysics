@@ -1439,6 +1439,16 @@ public:
       int trial,
       bool useAdjustedGRFs = false);
 
+  // This writes a random-seekable binary format to disk
+  void writeSubjectOnDisk(
+      std::string path,
+      std::string openSimFilePath,
+      std::shared_ptr<DynamicsInitialization> init,
+      bool useAdjustedGRFs = false,
+      std::vector<std::string> trialNames = std::vector<std::string>(),
+      std::string href = "",
+      std::string notes = "");
+
   // This computes the inverse dynamics control forces for a trial, and returns
   // it.
   Eigen::MatrixXs computeInverseDynamics(

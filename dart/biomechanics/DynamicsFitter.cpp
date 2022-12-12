@@ -24,6 +24,7 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/MarkerLabeller.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
+#include "dart/biomechanics/SubjectOnDisk.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
@@ -14136,6 +14137,150 @@ void DynamicsFitter::writeCSVData(
   }
 
   csvFile.close();
+}
+
+//==============================================================================
+// This writes a random-seekable binary format to disk
+void DynamicsFitter::writeSubjectOnDisk(
+    std::string outputPath,
+    std::string openSimFilePath,
+    std::shared_ptr<DynamicsInitialization> init,
+    bool useAdjustedGRFs,
+    std::vector<std::string> trialNames,
+    std::string href,
+    std::string notes)
+{
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
+  std::vector<Eigen::MatrixXs> trialPoses;
+  std::vector<Eigen::MatrixXs> trialVels;
+  std::vector<Eigen::MatrixXs> trialAccs;
+  std::vector<Eigen::MatrixXs> trialTaus;
+  std::vector<Eigen::MatrixXs> trialGroundBodyWrenches;
+  std::vector<Eigen::MatrixXs> trialGroundBodyCopTorqueForce;
+  std::vector<std::vector<bool>> trialProbablyMissingGRF;
+  std::vector<std::string> customValueNames;
+  std::vector<std::vector<Eigen::MatrixXs>> customValues;
+
+  std::vector<std::string> groundContactBodyNames;
+  for (auto* node : init->grfBodyNodes)
+  {
+    groundContactBodyNames.push_back(node->getName());
+  }
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    s_t dt = init->trialTimesteps[trial];
+
+    int dofs = init->poseTrials[trial].rows();
+    int timesteps = init->poseTrials[trial].cols() - 2;
+
+    Eigen::MatrixXs poses = Eigen::MatrixXs::Zero(dofs, timesteps);
+    Eigen::MatrixXs vels = Eigen::MatrixXs::Zero(dofs, timesteps);
+    Eigen::MatrixXs accs = Eigen::MatrixXs::Zero(dofs, timesteps);
+    Eigen::MatrixXs taus = Eigen::MatrixXs::Zero(dofs, timesteps);
+    Eigen::MatrixXs bodyWrenches
+        = Eigen::MatrixXs::Zero(groundContactBodyNames.size() * 6, timesteps);
+    Eigen::MatrixXs bodyCopTorqueForce
+        = Eigen::MatrixXs::Zero(groundContactBodyNames.size() * 9, timesteps);
+    std::vector<bool> probablyMissingGRF;
+
+    for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+    {
+      Eigen::VectorXs q = init->poseTrials[trial].col(t);
+      poses.col(t - 1) = q;
+      Eigen::VectorXs dq = (init->poseTrials[trial].col(t)
+                            - init->poseTrials[trial].col(t - 1))
+                           / dt;
+      vels.col(t - 1) = dq;
+      Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 1)
+                             - 2 * init->poseTrials[trial].col(t)
+                             + init->poseTrials[trial].col(t - 1))
+                            / (dt * dt);
+      accs.col(t - 1) = ddq;
+      Eigen::VectorXs tau = useAdjustedGRFs
+                                ? init->perfectTorques[trial].col(t)
+                                : helper.calculateInverseDynamics(
+                                    q, dq, ddq, init->grfTrials[trial].col(t));
+      taus.col(t - 1) = tau;
+
+      bodyWrenches.col(t - 1) = init->grfTrials[trial].col(t);
+      Eigen::VectorXs footContactData
+          = Eigen::VectorXs::Zero(9 * init->grfBodyIndices.size());
+      if (useAdjustedGRFs)
+      {
+        footContactData = init->perfectGrfAsCopTorqueForces[trial].col(t);
+      }
+      else
+      {
+        // Compute the CoP/Torque/Force combo for the "un-perfected" data.
+
+        for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+        {
+          Eigen::Vector3s cop
+              = init->forcePlateTrials[trial][i].centersOfPressure[t];
+          Eigen::Vector3s force = init->forcePlateTrials[trial][i].forces[t];
+          Eigen::Vector3s moments = init->forcePlateTrials[trial][i].moments[t];
+          // Ignore timesteps where the force plate has a 0 force, those don't
+          // need to be assigned to anything
+          if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
+              || moments.hasNaN())
+          {
+            continue;
+          }
+          // Every force from force plates must be accounted for somewhere.
+          // Simply assign it to the nearest foot
+          int closestFoot = -1;
+          s_t minDist = (s_t)std::numeric_limits<double>::infinity();
+          for (int i = 0; i < init->grfBodyNodes.size(); i++)
+          {
+            Eigen::Vector3s footLoc
+                = init->grfBodyNodes[i]->getWorldTransform().translation();
+            s_t dist = (footLoc - cop).norm();
+            if (dist < minDist)
+            {
+              minDist = dist;
+              closestFoot = i;
+            }
+          }
+          assert(closestFoot != -1);
+
+          footContactData.segment<3>(closestFoot * 9) = cop;
+          footContactData.segment<3>(closestFoot * 9 + 3) = moments;
+          footContactData.segment<3>(closestFoot * 9 + 6) = force;
+        }
+      }
+      bodyCopTorqueForce.col(t - 1) = footContactData;
+
+      probablyMissingGRF.push_back(init->probablyMissingGRF[trial][t]);
+    }
+
+    trialPoses.push_back(poses);
+    trialVels.push_back(vels);
+    trialAccs.push_back(accs);
+    trialTaus.push_back(taus);
+    trialGroundBodyWrenches.push_back(bodyWrenches);
+    trialGroundBodyCopTorqueForce.push_back(bodyCopTorqueForce);
+    trialProbablyMissingGRF.push_back(probablyMissingGRF);
+  }
+
+  SubjectOnDisk::writeSubject(
+      outputPath,
+      openSimFilePath,
+      init->trialTimesteps,
+      trialPoses,
+      trialVels,
+      trialAccs,
+      trialProbablyMissingGRF,
+      trialTaus,
+      groundContactBodyNames,
+      trialGroundBodyWrenches,
+      trialGroundBodyCopTorqueForce,
+      customValueNames,
+      customValues,
+      trialNames,
+      href,
+      notes);
 }
 
 //==============================================================================

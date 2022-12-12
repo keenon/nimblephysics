@@ -1,4 +1,6 @@
 #include <memory>
+#include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -59,7 +61,8 @@ bool testWriteSubjectToDisk(
   std::vector<Eigen::MatrixXs> velTrials;
   std::vector<Eigen::MatrixXs> accTrials;
   std::vector<Eigen::MatrixXs> tauTrials;
-  std::vector<Eigen::MatrixXs> externalBodyWrenchTrials;
+  std::vector<Eigen::MatrixXs> groundBodyWrenchTrials;
+  std::vector<Eigen::MatrixXs> groundBodyCopTorqueForceTrials;
   std::vector<std::vector<bool>> probablyMissingGRFData;
   std::vector<std::string> customValueNames;
   std::vector<std::vector<Eigen::MatrixXs>> customValueTrials;
@@ -124,9 +127,9 @@ bool testWriteSubjectToDisk(
     forcePlateTrials = trimmedForcePlateTrials;
   }
 
-  std::vector<std::string> externalForceBodies;
-  externalForceBodies.push_back("calcn_r");
-  externalForceBodies.push_back("calcn_l");
+  std::vector<std::string> groundForceBodies;
+  groundForceBodies.push_back("calcn_r");
+  groundForceBodies.push_back("calcn_l");
 
   for (int trial = 0; trial < poseTrials.size(); trial++)
   {
@@ -136,8 +139,10 @@ bool testWriteSubjectToDisk(
         poseTrials[trial].rows(), poseTrials[trial].cols()));
     tauTrials.push_back(Eigen::MatrixXs::Random(
         poseTrials[trial].rows(), poseTrials[trial].cols()));
-    externalBodyWrenchTrials.push_back(Eigen::MatrixXs::Random(
-        6 * externalForceBodies.size(), poseTrials[trial].cols()));
+    groundBodyWrenchTrials.push_back(Eigen::MatrixXs::Random(
+        6 * groundForceBodies.size(), poseTrials[trial].cols()));
+    groundBodyCopTorqueForceTrials.push_back(Eigen::MatrixXs::Random(
+        9 * groundForceBodies.size(), poseTrials[trial].cols()));
     std::vector<Eigen::MatrixXs> trialCustomValues;
     trialCustomValues.push_back(Eigen::MatrixXs::Random(
         poseTrials[trial].rows(), poseTrials[trial].cols()));
@@ -151,6 +156,11 @@ bool testWriteSubjectToDisk(
     probablyMissingGRFData.push_back(missingGRF);
   }
 
+  std::vector<std::string> trialNames;
+  for (int i = 0; i < poseTrials.size(); i++)
+  {
+    trialNames.push_back("trial_" + std::to_string(i));
+  }
   std::string originalHref
       = "https://dev.addbiomechanics.org/data/"
         "35e1c7ca-cc58-457e-bfc5-f6161cc7278b/SprinterTest";
@@ -167,10 +177,12 @@ bool testWriteSubjectToDisk(
       accTrials,
       probablyMissingGRFData,
       tauTrials,
-      externalForceBodies,
-      externalBodyWrenchTrials,
+      groundForceBodies,
+      groundBodyWrenchTrials,
+      groundBodyCopTorqueForceTrials,
       customValueNames,
       customValueTrials,
+      trialNames,
       originalHref,
       originalNotes);
 
@@ -186,6 +198,15 @@ bool testWriteSubjectToDisk(
   {
     std::cout << "Failed to read skeleton back in!" << std::endl;
     return false;
+  }
+
+  for (int i = 0; i < trialNames.size(); i++)
+  {
+    if (subject.getTrialName(i) != trialNames[i])
+    {
+      std::cout << "Failed to recover trial name!" << std::endl;
+      return false;
+    }
   }
 
   if (subject.getHref() != originalHref)
@@ -248,14 +269,44 @@ bool testWriteSubjectToDisk(
         std::cout << "Tau not recovered" << std::endl;
         return false;
       }
-      for (int b = 0; b < frame->externalWrenches.size(); b++)
+      for (int b = 0; b < frame->groundContactWrenches.size(); b++)
       {
         Eigen::Vector6s originalWrench
-            = externalBodyWrenchTrials[frame->trial].col(frame->t).segment<6>(
+            = groundBodyWrenchTrials[frame->trial].col(frame->t).segment<6>(
                 b * 6);
-        if (!equals(originalWrench, frame->externalWrenches[b].second, 1e-8))
+        if (!equals(
+                originalWrench, frame->groundContactWrenches[b].second, 1e-8))
         {
           std::cout << "Body wrench not recovered" << std::endl;
+          return false;
+        }
+        Eigen::Vector3s originalCoP
+            = groundBodyCopTorqueForceTrials[frame->trial]
+                  .col(frame->t)
+                  .segment<3>(b * 9);
+        if (!equals(
+                originalCoP,
+                frame->groundContactCenterOfPressure[b].second,
+                1e-8))
+        {
+          std::cout << "GRF CoP not recovered" << std::endl;
+          return false;
+        }
+        Eigen::Vector3s originalTau
+            = groundBodyCopTorqueForceTrials[frame->trial]
+                  .col(frame->t)
+                  .segment<3>((b * 9) + 3);
+        if (!equals(originalTau, frame->groundContactTorque[b].second, 1e-8))
+        {
+          std::cout << "GRF Tau not recovered" << std::endl;
+          return false;
+        }
+        Eigen::Vector3s originalF = groundBodyCopTorqueForceTrials[frame->trial]
+                                        .col(frame->t)
+                                        .segment<3>((b * 9) + 6);
+        if (!equals(originalF, frame->groundContactForce[b].second, 1e-8))
+        {
+          std::cout << "GRF Force not recovered" << std::endl;
           return false;
         }
       }

@@ -2457,6 +2457,8 @@ bool testRelationshipBetweenResidualAndLinear(
 std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::shared_ptr<DynamicsInitialization> init,
+    std::string modelPath,
+    std::vector<std::string> trialNames,
     bool saveGUI = false)
 {
   // Have very loose bounds for scaling
@@ -2806,6 +2808,15 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::cout << "Saving trajectory..." << std::endl;
     std::cout << "FPS: " << 1.0 / init->trialTimesteps[trajectoryIndex]
               << std::endl;
+    fitter.writeSubjectOnDisk(
+        "../../../testBinary.bin",
+        modelPath,
+        init,
+        false,
+        trialNames,
+        "http://test.demo",
+        "Generated in test_DynamicsFitter");
+
     fitter.writeCSVData(
         "../../../javascript/src/data/movement2.csv", init, trajectoryIndex);
     fitter.saveDynamicsToGUI(
@@ -3028,6 +3039,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
       limitTrialLength,
       trialStartOffset);
 
+  std::vector<std::string> trialNames;
+  for (std::string& mot : motFiles)
+  {
+    trialNames.push_back(mot);
+  }
+  for (std::string& c3d : c3dFiles)
+  {
+    trialNames.push_back(c3d);
+  }
+
   if (simplify)
   {
     std::map<std::string, std::string> mergeBodiesInto;
@@ -3036,11 +3057,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<DynamicsInitialization> simplifiedInit
         = DynamicsFitter::retargetInitialization(
             standard.skeleton, simplified, init);
-    return runEngine(simplified, simplifiedInit, saveGUI);
+    return runEngine(
+        simplified, simplifiedInit, modelPath, trialNames, saveGUI);
   }
   else
   {
-    return runEngine(standard.skeleton, init, saveGUI);
+    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI);
   }
 }
 
@@ -3474,6 +3496,16 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
       standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
   dynamicsFitter.estimateFootGroundContacts(init);
 
+  std::vector<std::string> trialNames;
+  for (std::string& trc : trcFiles)
+  {
+    trialNames.push_back(trc);
+  }
+  for (std::string& c3d : c3dFiles)
+  {
+    trialNames.push_back(c3d);
+  }
+
   if (simplify)
   {
     std::map<std::string, std::string> mergeBodiesInto;
@@ -3482,11 +3514,12 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
     std::shared_ptr<DynamicsInitialization> simplifiedInit
         = DynamicsFitter::retargetInitialization(
             standard.skeleton, simplified, init);
-    return runEngine(simplified, simplifiedInit, saveGUI);
+    return runEngine(
+        simplified, simplifiedInit, modelPath, trialNames, saveGUI);
   }
   else
   {
-    return runEngine(standard.skeleton, init, saveGUI);
+    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI);
   }
 }
 
@@ -5905,12 +5938,12 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
 TEST(DynamicsFitter, OPENCAP_SCALING)
 {
   std::vector<std::string> trialNames;
-  // trialNames.push_back("DJ1");
-  // trialNames.push_back("DJ4");
-  // trialNames.push_back("DJ5");
-  // trialNames.push_back("walking2");
+  trialNames.push_back("DJ1");
+  trialNames.push_back("DJ4");
+  trialNames.push_back("DJ5");
+  trialNames.push_back("walking2");
   trialNames.push_back("walking3");
-  // trialNames.push_back("walking4");
+  trialNames.push_back("walking4");
 
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;

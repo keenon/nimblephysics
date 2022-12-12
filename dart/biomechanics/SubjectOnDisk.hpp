@@ -25,7 +25,12 @@ struct Frame
   Eigen::VectorXd tau;
   // We don't use `std::map` here because somehow the Pybind wrapper for it is
   // excruciatingly slow
-  std::vector<std::pair<std::string, Eigen::Vector6d>> externalWrenches;
+  std::vector<std::pair<std::string, Eigen::Vector6d>> groundContactWrenches;
+  // These are the original force-plate data in world space
+  std::vector<std::pair<std::string, Eigen::Vector3d>>
+      groundContactCenterOfPressure;
+  std::vector<std::pair<std::string, Eigen::Vector3d>> groundContactTorque;
+  std::vector<std::pair<std::string, Eigen::Vector3d>> groundContactForce;
   // The timestep we used during this trial
   s_t dt;
   // We include this to allow the binary format to store/load a bunch of new
@@ -72,14 +77,16 @@ public:
       std::vector<Eigen::MatrixXs>& trialTaus,
       // These are generalized 6-dof wrenches applied to arbitrary bodies
       // (generally by foot-ground contact, though other things too)
-      std::vector<std::string>& externalForceBodies,
-      std::vector<Eigen::MatrixXs>& trialExternalBodyWrenches,
+      std::vector<std::string>& groundForceBodies,
+      std::vector<Eigen::MatrixXs>& trialGroundBodyWrenches,
+      std::vector<Eigen::MatrixXs>& trialGroundBodyCopTorqueForce,
       // We include this to allow the binary format to store/load a bunch of new
       // types of values while remaining backwards compatible.
       std::vector<std::string>& customValueNames,
       std::vector<std::vector<Eigen::MatrixXs>> customValues,
       // The provenance info, optional, for investigating where training data
       // came from after its been aggregated
+      std::vector<std::string> trialNames,
       const std::string& sourceHref = "",
       const std::string& notes = "");
 
@@ -98,13 +105,16 @@ public:
   std::vector<bool> getProbablyMissingGRF(int trial);
 
   /// This returns the list of contact body names for this Subject
-  std::vector<std::string> getContactBodies();
+  std::vector<std::string> getGroundContactBodies();
 
   /// This returns the list of custom value names stored in this subject
   std::vector<std::string> getCustomValues();
 
   /// This returns the dimension of the custom value specified by `valueName`
   int getCustomValueDim(std::string valueName);
+
+  /// The name of the trial, if provided, or else an empty string
+  std::string getTrialName(int trial);
 
   /// This gets the href link associated with the subject, if there is one.
   std::string getHref();
@@ -118,7 +128,7 @@ protected:
   // so we don't have to look that up every time.
   int mNumDofs;
   int mNumTrials;
-  std::vector<std::string> mContactBodies;
+  std::vector<std::string> mGroundContactBodies;
   std::vector<int> mTrialLength;
   std::vector<s_t> mTrialTimesteps;
   std::vector<std::string> mCustomValues;
@@ -131,6 +141,8 @@ protected:
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.
   std::vector<std::vector<bool>> mProbablyMissingGRF;
+  // The trial names, if provided, or empty strings
+  std::vector<std::string> mTrialNames;
   // An optional link to the web where this subject came from
   std::string mHref;
   // Any text-based notes on the subject data, like citations etc

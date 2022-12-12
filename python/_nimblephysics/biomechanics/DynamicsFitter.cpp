@@ -732,6 +732,16 @@ protected:
           ::py::arg("trialIndex"),
           ::py::arg("useAdjustedGRFs") = false)
       .def(
+          "writeSubjectOnDisk",
+          &dart::biomechanics::DynamicsFitter::writeSubjectOnDisk,
+          ::py::arg("outputPath"),
+          ::py::arg("openSimFilePath"),
+          ::py::arg("init"),
+          ::py::arg("useAdjustedGRFs") = false,
+          ::py::arg("trialNames") = std::vector<std::string>(),
+          ::py::arg("href") = "",
+          ::py::arg("notes") = "")
+      .def(
           "setTolerance",
           &dart::biomechanics::DynamicsFitter::setTolerance,
           ::py::arg("value"))

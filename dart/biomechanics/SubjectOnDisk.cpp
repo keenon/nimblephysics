@@ -30,7 +30,7 @@ struct FileHeader
   int32_t version;
   int32_t numDofs;
   int32_t numTrials;
-  int32_t numContactBodies;
+  int32_t numGroundContactBodies;
   int32_t numCustomValues;
 };
 }
@@ -40,6 +40,12 @@ SubjectOnDisk::SubjectOnDisk(
   : mPath(path)
 {
   FILE* file = fopen(path.c_str(), "r");
+  if (file == nullptr)
+  {
+    std::cout << "SubjectOnDisk attempting to open file that deos not exist: "
+              << path << std::endl;
+    throw new std::exception();
+  }
 
   struct FileHeader header;
   fread(&header, sizeof(struct FileHeader), 1, file);
@@ -92,8 +98,33 @@ SubjectOnDisk::SubjectOnDisk(
   mNotes = std::string(notesRaw);
   free(notesRaw);
 
+  // Read trial names
+  for (int i = 0; i < mNumTrials; i++)
+  {
+    int32_t len;
+    fread(&len, sizeof(int32_t), 1, file);
+    if (len < 0 || len > 255)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << path << ": bad string len for trial [" << i << "] name = " << len
+          << std::endl;
+      throw new std::exception();
+    }
+    char* rawTrialName = (char*)malloc(sizeof(char) * (len + 1));
+    fread(rawTrialName, sizeof(char), len, file);
+    rawTrialName[len] = 0;
+    std::string trialName(rawTrialName);
+    mTrialNames.push_back(trialName);
+    if (printDebuggingDetails)
+    {
+      std::cout << "Read trial name: " << trialName << std::endl;
+    }
+    free(rawTrialName);
+  }
+
   // Read contact body names
-  int32_t numContactBodies = header.numContactBodies;
+  int32_t numContactBodies = header.numGroundContactBodies;
   for (int i = 0; i < numContactBodies; i++)
   {
     int32_t len;
@@ -110,7 +141,7 @@ SubjectOnDisk::SubjectOnDisk(
     fread(body, sizeof(char), len, file);
     body[len] = 0;
     std::string bodyName(body);
-    mContactBodies.push_back(bodyName);
+    mGroundContactBodies.push_back(bodyName);
     if (printDebuggingDetails)
     {
       std::cout << "Read contact body name: " << bodyName << std::endl;
@@ -223,10 +254,10 @@ SubjectOnDisk::SubjectOnDisk(
   mDataSectionStart = mModelSectionStart + modelLen;
 
   // Magic number, pos, vel, acc, tau, contact wrenches, and custom values
-  mFrameSize
-      = sizeof(int32_t)
-        + (((mNumDofs * 4) + (mContactBodies.size() * 6) + customValuesTotalDim)
-           * sizeof(float64_t));
+  mFrameSize = sizeof(int32_t)
+               + (((mNumDofs * 4) + (mGroundContactBodies.size() * 6)
+                   + (mGroundContactBodies.size() * 9) + customValuesTotalDim)
+                  * sizeof(float64_t));
 
   fclose(file);
 }
@@ -331,12 +362,39 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     fread(frame->acc.data(), sizeof(float64_t), mNumDofs, file);
     fread(frame->tau.data(), sizeof(float64_t), mNumDofs, file);
 
-    for (int b = 0; b < mContactBodies.size(); b++)
+    for (int b = 0; b < mGroundContactBodies.size(); b++)
     {
-      frame->externalWrenches.emplace_back(
-          mContactBodies[b], Eigen::Vector6d());
+      frame->groundContactWrenches.emplace_back(
+          mGroundContactBodies[b], Eigen::Vector6d());
       fread(
-          frame->externalWrenches[b].second.data(), sizeof(float64_t), 6, file);
+          frame->groundContactWrenches[b].second.data(),
+          sizeof(float64_t),
+          6,
+          file);
+    }
+    for (int b = 0; b < mGroundContactBodies.size(); b++)
+    {
+      frame->groundContactCenterOfPressure.emplace_back(
+          mGroundContactBodies[b], Eigen::Vector3d());
+      fread(
+          frame->groundContactCenterOfPressure[b].second.data(),
+          sizeof(float64_t),
+          3,
+          file);
+      frame->groundContactTorque.emplace_back(
+          mGroundContactBodies[b], Eigen::Vector3d());
+      fread(
+          frame->groundContactTorque[b].second.data(),
+          sizeof(float64_t),
+          3,
+          file);
+      frame->groundContactForce.emplace_back(
+          mGroundContactBodies[b], Eigen::Vector3d());
+      fread(
+          frame->groundContactForce[b].second.data(),
+          sizeof(float64_t),
+          3,
+          file);
     }
     for (int b = 0; b < mCustomValues.size(); b++)
     {
@@ -367,14 +425,16 @@ void SubjectOnDisk::writeSubject(
     std::vector<Eigen::MatrixXs>& trialTaus,
     // These are generalized 6-dof wrenches applied to arbitrary bodies
     // (generally by foot-ground contact, though other things too)
-    std::vector<std::string>& externalForceBodies,
-    std::vector<Eigen::MatrixXs>& trialExternalBodyWrenches,
+    std::vector<std::string>& groundForceBodies,
+    std::vector<Eigen::MatrixXs>& trialGroundBodyWrenches,
+    std::vector<Eigen::MatrixXs>& trialGroundBodyCopTorqueForce,
     // We include this to allow the binary format to store/load a bunch of new
     // types of values while remaining backwards compatible.
     std::vector<std::string>& customValueNames,
     std::vector<std::vector<Eigen::MatrixXs>> customValues,
     // The provenance info, optional, for investigating where training data
     // came from after its been aggregated
+    std::vector<std::string> trialNames,
     const std::string& sourceHref,
     const std::string& notes)
 {
@@ -384,8 +444,9 @@ void SubjectOnDisk::writeSubject(
   (void)trialVels;
   (void)trialAccs;
   (void)trialTaus;
-  (void)externalForceBodies;
-  (void)trialExternalBodyWrenches;
+  (void)groundForceBodies;
+  (void)trialGroundBodyWrenches;
+  (void)trialGroundBodyCopTorqueForce;
   (void)trialTimesteps;
   (void)probablyMissingGRF;
   (void)customValueNames;
@@ -412,7 +473,7 @@ void SubjectOnDisk::writeSubject(
   header.version = 1;
   header.numDofs = trialPoses[0].rows();
   header.numTrials = trialPoses.size();
-  header.numContactBodies = externalForceBodies.size();
+  header.numGroundContactBodies = groundForceBodies.size();
   header.numCustomValues = customValueNames.size();
   fwrite(&header, sizeof(struct FileHeader), 1, file);
 
@@ -426,12 +487,25 @@ void SubjectOnDisk::writeSubject(
   fwrite(&notesLen, sizeof(int32_t), 1, file);
   fwrite(notes.c_str(), sizeof(char), notesLen, file);
 
-  // Write contact body names
-  for (int i = 0; i < externalForceBodies.size(); i++)
+  // Write trial names
+  for (int i = 0; i < header.numTrials; i++)
   {
-    int32_t len = externalForceBodies[i].length();
+    std::string trialName = "";
+    if (trialNames.size() > i)
+    {
+      trialName = trialNames[i];
+    }
+    int32_t len = trialName.length();
     fwrite(&len, sizeof(int32_t), 1, file);
-    fwrite(externalForceBodies[i].c_str(), sizeof(char), len, file);
+    fwrite(trialName.c_str(), sizeof(char), len, file);
+  }
+
+  // Write contact body names
+  for (int i = 0; i < groundForceBodies.size(); i++)
+  {
+    int32_t len = groundForceBodies[i].length();
+    fwrite(&len, sizeof(int32_t), 1, file);
+    fwrite(groundForceBodies[i].c_str(), sizeof(char), len, file);
   }
 
   // Write custom value names and lengths
@@ -517,10 +591,22 @@ void SubjectOnDisk::writeSubject(
           dofs,
           file);
       // external wrenches
+      assert(
+          trialGroundBodyWrenches[trial].rows()
+          == groundForceBodies.size() * 6);
       fwrite(
-          trialExternalBodyWrenches[trial].col(t).cast<float64_t>().data(),
+          trialGroundBodyWrenches[trial].col(t).cast<float64_t>().data(),
           sizeof(float64_t),
-          externalForceBodies.size() * 6,
+          trialGroundBodyWrenches[trial].rows(),
+          file);
+      // GRF data is COP-Torque-Force
+      assert(
+          trialGroundBodyCopTorqueForce[trial].rows()
+          == groundForceBodies.size() * 9);
+      fwrite(
+          trialGroundBodyCopTorqueForce[trial].col(t).cast<float64_t>().data(),
+          sizeof(float64_t),
+          trialGroundBodyCopTorqueForce[trial].rows(),
           file);
       // custom values
       for (int i = 0; i < customValueNames.size(); i++)
@@ -575,9 +661,9 @@ std::vector<bool> SubjectOnDisk::getProbablyMissingGRF(int trial)
 }
 
 /// This returns the list of contact body names for this Subject
-std::vector<std::string> SubjectOnDisk::getContactBodies()
+std::vector<std::string> SubjectOnDisk::getGroundContactBodies()
 {
-  return mContactBodies;
+  return mGroundContactBodies;
 }
 
 /// This returns the list of custom value names stored in this subject
@@ -605,6 +691,16 @@ int SubjectOnDisk::getCustomValueDim(std::string valueName)
   }
   std::cout << "]. Returning 0." << std::endl;
   return 0;
+}
+
+/// The name of the trial, if provided, or else an empty string
+std::string SubjectOnDisk::getTrialName(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return "";
+  }
+  return mTrialNames[trial];
 }
 
 /// This gets the href link associated with the subject, if there is one.
