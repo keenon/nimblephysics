@@ -500,30 +500,30 @@ TEST(OpenSimParser, RAJAGOPAL_GET_CONFIGURATION)
     }
   }
 
-  /*
   // Uncomment this for local testing
-  GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderSkeleton(skel);
+  // GUIWebsocketServer server;
+  // server.serve(8070);
+  // server.renderSkeleton(skel);
 
-  Ticker ticker = Ticker(0.01);
-  ticker.registerTickListener([&](long now) {
-    double progress = (now % 2000) / 2000.0;
-    skel->getDof("knee_angle_r")
-        ->setPosition(
-            progress * skel->getDof("knee_angle_r")->getPositionUpperLimit());
-    skel->getDof("knee_angle_l")
-        ->setPosition(
-            progress * skel->getDof("knee_angle_l")->getPositionUpperLimit());
-    // skel->getDof("knee_angle_r_beta")->setPosition(progress);
-    // skel->getDof("knee_angle_l_beta")->setPosition(progress);
-    server.renderSkeleton(skel);
-  });
+  // Ticker ticker = Ticker(0.01);
+  // ticker.registerTickListener([&](long now) {
+  //   double progress = (now % 2000) / 2000.0;
+  //   skel->getDof("knee_angle_r")
+  //       ->setPosition(
+  //           progress *
+  //           skel->getDof("knee_angle_r")->getPositionUpperLimit());
+  //   skel->getDof("knee_angle_l")
+  //       ->setPosition(
+  //           progress *
+  //           skel->getDof("knee_angle_l")->getPositionUpperLimit());
+  //   // skel->getDof("knee_angle_r_beta")->setPosition(progress);
+  //   // skel->getDof("knee_angle_l_beta")->setPosition(progress);
+  //   server.renderSkeleton(skel);
+  // });
 
-  server.registerConnectionListener([&]() { ticker.start(); });
+  // server.registerConnectionListener([&]() { ticker.start(); });
 
-  server.blockWhileServing();
-  */
+  // server.blockWhileServing();
 }
 #endif
 

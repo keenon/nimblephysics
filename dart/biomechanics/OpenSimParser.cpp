@@ -276,10 +276,9 @@ OpenSimFile OpenSimParser::parseOsim(
     return null_file;
   }
 
-  common::Uri geometryURI = common::Uri::createFromRelativeUri(
-      uri.getFilesystemPath(), "./Geometry/");
-  return parseOsim(
-      osimFile, uri.toString(), geometryURI.getFilesystemPath(), retriever);
+  common::Uri geometryURI
+      = common::Uri::createFromRelativeUri(uri.toString(), "./Geometry/");
+  return parseOsim(osimFile, uri.toString(), geometryURI.toString(), retriever);
 }
 
 //==============================================================================
