@@ -729,7 +729,8 @@ protected:
           &dart::biomechanics::DynamicsFitter::writeCSVData,
           ::py::arg("path"),
           ::py::arg("init"),
-          ::py::arg("trialIndex"))
+          ::py::arg("trialIndex"),
+          ::py::arg("useAdjustedGRFs") = false)
       .def(
           "setTolerance",
           &dart::biomechanics::DynamicsFitter::setTolerance,

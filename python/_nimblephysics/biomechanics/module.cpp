@@ -52,6 +52,7 @@ void MarkerLabeller(py::module& sm);
 void IKErrorReport(py::module& sm);
 void Anthropometrics(py::module& sm);
 void C3DLoader(py::module& sm);
+void SubjectOnDisk(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -73,6 +74,7 @@ void dart_biomechanics(py::module& m)
   IKErrorReport(sm);
   Anthropometrics(sm);
   C3DLoader(sm);
+  SubjectOnDisk(sm);
 }
 
 } // namespace python

@@ -2806,6 +2806,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::cout << "Saving trajectory..." << std::endl;
     std::cout << "FPS: " << 1.0 / init->trialTimesteps[trajectoryIndex]
               << std::endl;
+    fitter.writeCSVData(
+        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex);
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
         init,
@@ -5905,9 +5907,9 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
   std::vector<std::string> trialNames;
   // trialNames.push_back("DJ1");
   // trialNames.push_back("DJ4");
-  trialNames.push_back("DJ5");
+  // trialNames.push_back("DJ5");
   // trialNames.push_back("walking2");
-  // trialNames.push_back("walking3");
+  trialNames.push_back("walking3");
   // trialNames.push_back("walking4");
 
   std::vector<std::string> motFiles;

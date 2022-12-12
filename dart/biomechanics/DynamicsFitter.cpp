@@ -13997,7 +13997,10 @@ void writeVectorToCSV(std::ofstream& csvFile, Eigen::VectorXs& vec)
 // This writes a unified CSV with a ton of different columns in it, describing
 // the selected trial
 void DynamicsFitter::writeCSVData(
-    std::string path, std::shared_ptr<DynamicsInitialization> init, int trial)
+    std::string path,
+    std::shared_ptr<DynamicsInitialization> init,
+    int trial,
+    bool useAdjustedGRFs)
 {
   // time, pos, vel, acc, [contact] * feet, [cop, wrench] * feet
   std::ofstream csvFile;
@@ -14051,6 +14054,8 @@ void DynamicsFitter::writeCSVData(
   s_t time = 0.0;
   s_t dt = init->trialTimesteps[trial];
 
+  ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
   for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
   {
     csvFile << std::endl;
@@ -14065,9 +14070,55 @@ void DynamicsFitter::writeCSVData(
                            - 2 * init->poseTrials[trial].col(t)
                            + init->poseTrials[trial].col(t - 1))
                           / (dt * dt);
-    Eigen::VectorXs tau = init->perfectTorques[trial].col(t);
+    Eigen::VectorXs tau = useAdjustedGRFs
+                              ? init->perfectTorques[trial].col(t)
+                              : helper.calculateInverseDynamics(
+                                  q, dq, ddq, init->grfTrials[trial].col(t));
     Eigen::VectorXs footContactData
-        = init->perfectGrfAsCopTorqueForces[trial].col(t);
+        = Eigen::VectorXs::Zero(9 * init->grfBodyIndices.size());
+    if (useAdjustedGRFs)
+    {
+      footContactData = init->perfectGrfAsCopTorqueForces[trial].col(t);
+    }
+    else
+    {
+      // Compute the CoP/Torque/Force combo for the "un-perfected" data.
+
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        Eigen::Vector3s cop
+            = init->forcePlateTrials[trial][i].centersOfPressure[t];
+        Eigen::Vector3s force = init->forcePlateTrials[trial][i].forces[t];
+        Eigen::Vector3s moments = init->forcePlateTrials[trial][i].moments[t];
+        // Ignore timesteps where the force plate has a 0 force, those don't
+        // need to be assigned to anything
+        if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
+            || moments.hasNaN())
+        {
+          continue;
+        }
+        // Every force from force plates must be accounted for somewhere. Simply
+        // assign it to the nearest foot
+        int closestFoot = -1;
+        s_t minDist = (s_t)std::numeric_limits<double>::infinity();
+        for (int i = 0; i < init->grfBodyNodes.size(); i++)
+        {
+          Eigen::Vector3s footLoc
+              = init->grfBodyNodes[i]->getWorldTransform().translation();
+          s_t dist = (footLoc - cop).norm();
+          if (dist < minDist)
+          {
+            minDist = dist;
+            closestFoot = i;
+          }
+        }
+        assert(closestFoot != -1);
+
+        footContactData.segment<3>(closestFoot * 9) = cop;
+        footContactData.segment<3>(closestFoot * 9 + 3) = moments;
+        footContactData.segment<3>(closestFoot * 9 + 6) = force;
+      }
+    }
 
     writeVectorToCSV(csvFile, q);
     writeVectorToCSV(csvFile, dq);

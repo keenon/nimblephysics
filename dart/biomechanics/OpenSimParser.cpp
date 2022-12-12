@@ -276,19 +276,38 @@ OpenSimFile OpenSimParser::parseOsim(
     return null_file;
   }
 
+  common::Uri geometryURI = common::Uri::createFromRelativeUri(
+      uri.getFilesystemPath(), "./Geometry/");
+  return parseOsim(
+      osimFile, uri.toString(), geometryURI.getFilesystemPath(), retriever);
+}
+
+//==============================================================================
+OpenSimFile OpenSimParser::parseOsim(
+    tinyxml2::XMLDocument& osimFile,
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& nullOrGeometryRetriever)
+{
+  const common::ResourceRetrieverPtr geometryRetriever
+      = ensureRetriever(nullOrGeometryRetriever);
+
+  OpenSimFile null_file;
+  null_file.skeleton = nullptr;
+
   //--------------------------------------------------------------------------
   tinyxml2::XMLElement* docElement
       = osimFile.FirstChildElement("OpenSimDocument");
   if (docElement == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] does not contain <OpenSimDocument> as the root element.\n";
     return null_file;
   }
   tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
   if (modelElement == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
     return null_file;
@@ -299,12 +318,14 @@ OpenSimFile OpenSimParser::parseOsim(
   {
     // This is the older format, where JointSet specifies the joints separately
     // from the body hierarchy
-    return readOsim30(uri, docElement, retriever);
+    return readOsim30(
+        docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
   else
   {
     // This is the newer format, where Joints are specified as childen of Bodies
-    return readOsim40(uri, docElement, retriever);
+    return readOsim40(
+        docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
 }
 
@@ -3020,9 +3041,12 @@ void readAttachedGeometry(
     tinyxml2::XMLElement* attachedGeometry,
     dynamics::BodyNode* childBody,
     Eigen::Isometry3s relativeT,
-    const common::Uri& uri,
-    const common::ResourceRetrieverPtr& retriever)
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& geometryRetriever)
 {
+  (void)fileNameForErrorDisplay;
+
   tinyxml2::XMLElement* meshCursor
       = attachedGeometry->FirstChildElement("Mesh");
   while (meshCursor)
@@ -3043,15 +3067,15 @@ void readAttachedGeometry(
         = readVec3(meshCursor->FirstChildElement("scale_factors"));
 
     common::Uri meshUri = common::Uri::createFromRelativeUri(
-        uri, "./Geometry/" + mesh_file + ".ply");
+        geometryFolder, "./" + mesh_file + ".ply");
     std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
-        = dynamics::MeshShape::loadMesh(meshUri, retriever);
+        = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
 
     if (meshPtr)
     {
       std::shared_ptr<dynamics::MeshShape> meshShape
           = std::make_shared<dynamics::MeshShape>(
-              scale, meshPtr, meshUri, retriever);
+              scale, meshPtr, meshUri, geometryRetriever);
 
       dynamics::ShapeNode* meshShapeNode
           = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
@@ -3096,8 +3120,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     tinyxml2::XMLElement* jointDetail,
     Eigen::Isometry3s transformFromParent,
     Eigen::Isometry3s transformFromChild,
-    const common::Uri& uri,
-    const common::ResourceRetrieverPtr& retriever)
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& geometryRetriever)
 {
   std::string bodyName(bodyCursor->Attribute("name"));
   dynamics::BodyNode::Properties bodyProps;
@@ -4035,15 +4060,15 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
               displayGeometryCursor->FirstChildElement("opacity")->GetText());
 
           common::Uri meshUri = common::Uri::createFromRelativeUri(
-              uri, "./Geometry/" + mesh_file + ".ply");
+              geometryFolder, "./" + mesh_file + ".ply");
           std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
-              = dynamics::MeshShape::loadMesh(meshUri, retriever);
+              = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
 
           if (meshPtr)
           {
             std::shared_ptr<dynamics::MeshShape> meshShape
                 = std::make_shared<dynamics::MeshShape>(
-                    scale, meshPtr, meshUri, retriever);
+                    scale, meshPtr, meshUri, geometryRetriever);
 
             dynamics::ShapeNode* meshShapeNode
                 = childBody->createShapeNodeWith<dynamics::VisualAspect>(
@@ -4092,7 +4117,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       if (frameAttachedGeometry && childBody != nullptr)
       {
         readAttachedGeometry(
-            frameAttachedGeometry, childBody, relativeT, uri, retriever);
+            frameAttachedGeometry,
+            childBody,
+            relativeT,
+            fileNameForErrorDisplay,
+            geometryFolder,
+            geometryRetriever);
       }
 
       frameCursor = frameCursor->NextSiblingElement("PhysicalOffsetFrame");
@@ -4107,8 +4137,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         attachedGeometry,
         childBody,
         Eigen::Isometry3s::Identity(),
-        uri,
-        retriever);
+        fileNameForErrorDisplay,
+        geometryFolder,
+        geometryRetriever);
   }
 
   assert(childBody != nullptr);
@@ -4118,14 +4149,15 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 
 //==============================================================================
 OpenSimFile OpenSimParser::readOsim40(
-    const common::Uri& uri,
     tinyxml2::XMLElement* docElement,
-    const common::ResourceRetrieverPtr& retriever)
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& geometryRetriever)
 {
   tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
   if (modelElement == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
     OpenSimFile file;
@@ -4137,7 +4169,7 @@ OpenSimFile OpenSimParser::readOsim40(
 
   if (bodySet == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] missing <BodySet> group.\n";
     OpenSimFile file;
     file.skeleton = nullptr;
@@ -4246,8 +4278,9 @@ OpenSimFile OpenSimParser::readOsim40(
             jointDetail,
             transformFromParent,
             transformFromChild,
-            uri,
-            retriever);
+            fileNameForErrorDisplay,
+            geometryFolder,
+            geometryRetriever);
         childBody = pair.second;
       }
     }
@@ -4388,8 +4421,9 @@ void recursiveCreateJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,
     OpenSimJointXML* joint,
-    const common::Uri& uri,
-    const common::ResourceRetrieverPtr& retriever)
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& geometryRetriever)
 {
   (void)skel;
   (void)parentBody;
@@ -4407,8 +4441,9 @@ void recursiveCreateJoint(
       jointNode,
       joint->fromParent,
       joint->fromChild,
-      uri,
-      retriever);
+      fileNameForErrorDisplay,
+      geometryFolder,
+      geometryRetriever);
 
   dynamics::BodyNode* childBody = pair.second;
 
@@ -4446,24 +4481,30 @@ void recursiveCreateJoint(
   // Recurse to the next layer
   for (OpenSimJointXML* grandChildJoint : joint->child->children)
   {
-    recursiveCreateJoint(skel, childBody, grandChildJoint, uri, retriever);
+    recursiveCreateJoint(
+        skel,
+        childBody,
+        grandChildJoint,
+        fileNameForErrorDisplay,
+        geometryFolder,
+        geometryRetriever);
   }
 }
 
 //==============================================================================
 OpenSimFile OpenSimParser::readOsim30(
-    const common::Uri& uri,
     tinyxml2::XMLElement* docElement,
-    const common::ResourceRetrieverPtr& retriever)
+    const std::string fileNameForErrorDisplay,
+    const std::string geometryFolder,
+    const common::ResourceRetrieverPtr& geometryRetriever)
 {
   OpenSimFile null_file;
   null_file.skeleton = nullptr;
 
-  (void)retriever;
   tinyxml2::XMLElement* modelElement = docElement->FirstChildElement("Model");
   if (modelElement == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] does not contain <Model> as the child of the root "
              "<OpenSimDocument> element.\n";
     return null_file;
@@ -4474,7 +4515,7 @@ OpenSimFile OpenSimParser::readOsim30(
 
   if (bodySet == nullptr || jointSet == nullptr)
   {
-    dterr << "OpenSim file[" << uri.toString()
+    dterr << "OpenSim file[" << fileNameForErrorDisplay
           << "] missing <BodySet> or <JointSet> groups.\n";
     return null_file;
   }
@@ -4741,7 +4782,13 @@ OpenSimFile OpenSimParser::readOsim30(
 
   dynamics::SkeletonPtr skel = dynamics::Skeleton::create();
   root->parentBody = nullptr;
-  recursiveCreateJoint(skel, nullptr, root, uri, retriever);
+  recursiveCreateJoint(
+      skel,
+      nullptr,
+      root,
+      fileNameForErrorDisplay,
+      geometryFolder,
+      geometryRetriever);
 
   /*
   std::cout << "Num dofs: " << skel->getNumDofs() << std::endl;

@@ -74,6 +74,7 @@ namespace Eigen {
 using Vector9s = Matrix<s_t, 9, 1>;
 using Vector6s = Matrix<s_t, 6, 1>;
 using Matrix6s = Matrix<s_t, 6, 6>;
+using Vector6d = Matrix<double, 6, 1>;
 
 typedef Matrix<s_t, Dynamic, Dynamic> MatrixXs;
 typedef Matrix<s_t, Dynamic, 1> VectorXs;

@@ -76,6 +76,13 @@ public:
       const common::Uri& uri,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// Read Skeleton from *.osim file
+  static OpenSimFile parseOsim(
+      tinyxml2::XMLDocument& osimFile,
+      const std::string fileNameForErrorDisplay = "",
+      const std::string geometryFolder = "",
+      const common::ResourceRetrieverPtr& geometryRetriever = nullptr);
+
   /// This creates an XML configuration file, which you can pass to the OpenSim
   /// scaling tool to rescale a skeleton
   static void saveOsimScalingXMLFile(
@@ -272,13 +279,15 @@ public:
 
 protected:
   static OpenSimFile readOsim30(
-      const common::Uri& uri,
       tinyxml2::XMLElement* docElement,
-      const common::ResourceRetrieverPtr& retriever);
+      const std::string fileNameForErrorDisplay,
+      const std::string geometryFolder,
+      const common::ResourceRetrieverPtr& geometryRetriever);
   static OpenSimFile readOsim40(
-      const common::Uri& uri,
       tinyxml2::XMLElement* docElement,
-      const common::ResourceRetrieverPtr& retriever);
+      const std::string fileNameForErrorDisplay,
+      const std::string geometryFolder,
+      const common::ResourceRetrieverPtr& geometryRetriever);
 }; // namespace OpenSimParser
 
 } // namespace biomechanics

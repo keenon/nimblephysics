@@ -1436,7 +1436,8 @@ public:
   void writeCSVData(
       std::string path,
       std::shared_ptr<DynamicsInitialization> init,
-      int trial);
+      int trial,
+      bool useAdjustedGRFs = false);
 
   // This computes the inverse dynamics control forces for a trial, and returns
   // it.
