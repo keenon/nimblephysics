@@ -10,7 +10,7 @@ from .mapping import map_to_pos, map_to_vel
 from .loader import loadWorld, absPath
 from .models import *
 from .marker_mocap import *
-from .motion_dynamics_dataset import *
+from .motion_dynamics_dataset import MotionDynamicsDataset
 
 # This requires additional dependencies on `imageio` and `pybullet`, and
 # can be imported separately as `from nimblephysics.bullet_rendered import BulletRenderer`
