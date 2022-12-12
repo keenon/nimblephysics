@@ -7,11 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include <_stdio.h>
-#include <arm_neon.h>
 #include <stdio.h>
-#include <sys/_types/_int32_t.h>
-#include <sys/_types/_int8_t.h>
 #include <tinyxml2.h>
 
 #include "dart/biomechanics/OpenSimParser.hpp"
@@ -21,6 +17,8 @@
 #include "dart/utils/DartResourceRetriever.hpp"
 
 using namespace std;
+
+#define float64_t double
 
 namespace dart {
 namespace biomechanics {
