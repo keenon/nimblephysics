@@ -401,6 +401,9 @@ void OpenSimParser::saveOsimScalingXMLFile(
         <!--Name of file to write containing the scale factors that were applied to the unscaled model (optional).-->
         <output_scale_file>Unassigned</output_scale_file>
       </ModelScaler>
+      <MarkerPlacer>
+        <apply>false</apply>
+      </MarkerPlacer>
       </ScaleTool>
   </OpenSimDocument>
 
