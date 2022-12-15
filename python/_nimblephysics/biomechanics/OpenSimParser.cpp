@@ -158,7 +158,7 @@ void OpenSimParser(py::module& m)
       ::py::arg("ikInstructionsOutputPath"));
 
   sm.def(
-      "saveOsimInverseDynamicsForcesXMLFile",
+      "saveOsimInverseDynamicsRawForcesXMLFile",
       +[](const std::string& subjectName,
           std::shared_ptr<dynamics::Skeleton> skel,
           const Eigen::MatrixXs& poses,
@@ -166,7 +166,7 @@ void OpenSimParser(py::module& m)
           const std::string& grfForcesPath,
           const std::string& forcesOutputPath) {
         return dart::biomechanics::OpenSimParser::
-            saveOsimInverseDynamicsForcesXMLFile(
+            saveOsimInverseDynamicsRawForcesXMLFile(
                 subjectName,
                 skel,
                 poses,
@@ -178,6 +178,21 @@ void OpenSimParser(py::module& m)
       ::py::arg("skel"),
       ::py::arg("poses"),
       ::py::arg("forcePlates"),
+      ::py::arg("grfForcePath"),
+      ::py::arg("forcesOutputPath"));
+
+  sm.def(
+      "saveOsimInverseDynamicsProcessedForcesXMLFile",
+      +[](const std::string& subjectName,
+          const std::vector<dynamics::BodyNode*> contactBodies,
+          const std::string& grfForcesPath,
+          const std::string& forcesOutputPath) {
+        return dart::biomechanics::OpenSimParser::
+            saveOsimInverseDynamicsProcessedForcesXMLFile(
+                subjectName, contactBodies, grfForcesPath, forcesOutputPath);
+      },
+      ::py::arg("subjectName"),
+      ::py::arg("contactBodies"),
       ::py::arg("grfForcePath"),
       ::py::arg("forcesOutputPath"));
 
@@ -332,16 +347,31 @@ void OpenSimParser(py::module& m)
       ::py::arg("poses"));
 
   sm.def(
-      "saveGRFMot",
+      "saveRawGRFMot",
       +[](const std::string& outputPath,
           const std::vector<double>& timestamps,
           const std::vector<biomechanics::ForcePlate> forcePlates) {
-        return dart::biomechanics::OpenSimParser::saveGRFMot(
+        return dart::biomechanics::OpenSimParser::saveRawGRFMot(
             outputPath, timestamps, forcePlates);
       },
       ::py::arg("outputPath"),
       ::py::arg("timestamps"),
       ::py::arg("forcePlates"));
+  sm.def(
+      "saveProcessedGRFMot",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<dynamics::BodyNode*> bodyNodes,
+          s_t groundLevel,
+          const Eigen::MatrixXs wrenches) {
+        return dart::biomechanics::OpenSimParser::saveProcessedGRFMot(
+            outputPath, timestamps, bodyNodes, groundLevel, wrenches);
+      },
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("bodyNodes"),
+      ::py::arg("groundLevel"),
+      ::py::arg("wrenches"));
 
   sm.def(
       "saveIDMot",

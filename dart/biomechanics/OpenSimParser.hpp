@@ -16,6 +16,7 @@
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/simulation/World.hpp"
 #include "dart/utils/XmlHelpers.hpp"
 
@@ -107,11 +108,19 @@ public:
 
   /// This creates an XML configuration file, which you can pass to the OpenSim
   /// ID tool to recreate / validate the results of ID created from this tool
-  static void saveOsimInverseDynamicsForcesXMLFile(
+  static void saveOsimInverseDynamicsRawForcesXMLFile(
       const std::string& subjectName,
       std::shared_ptr<dynamics::Skeleton> skel,
       const Eigen::MatrixXs& poses,
       const std::vector<biomechanics::ForcePlate> forcePlates,
+      const std::string& grfForcesPath,
+      const std::string& forcesOutputPath);
+
+  /// This creates an XML configuration file, which you can pass to the OpenSim
+  /// ID tool to recreate / validate the results of ID created from this tool
+  static void saveOsimInverseDynamicsProcessedForcesXMLFile(
+      const std::string& subjectName,
+      const std::vector<dynamics::BodyNode*> contactBodies,
       const std::string& grfForcesPath,
       const std::string& forcesOutputPath);
 
@@ -225,10 +234,18 @@ public:
 
   /// This saves the *.mot file for the ground reaction forces we've read from
   /// a C3D file
-  static void saveGRFMot(
+  static void saveRawGRFMot(
       const std::string& outputPath,
       const std::vector<double>& timestamps,
       const std::vector<biomechanics::ForcePlate> forcePlates);
+
+  /// This saves the *.mot file for the ground reaction forces we've processed through our dynamics fitter.
+  static void saveProcessedGRFMot(
+      const std::string& outputPath,
+      const std::vector<double>& timestamps,
+      const std::vector<dynamics::BodyNode*> contactBodies,
+      s_t groundLevel,
+      const Eigen::MatrixXs wrenches);
 
   /// This saves the *.mot file with 3 columns for each body. This is
   /// basically only used for verifying consistency between Nimble and OpenSim.

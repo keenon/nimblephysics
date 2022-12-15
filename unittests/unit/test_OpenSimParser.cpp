@@ -598,7 +598,7 @@ TEST(OpenSimParser, SAVE_TRC)
 TEST(OpenSimParser, SAVE_GRF)
 {
   auto c3d = C3DLoader::loadC3D("dart://sample/osim/Test_Output/JA1Gait35.c3d");
-  OpenSimParser::saveGRFMot(
+  OpenSimParser::saveRawGRFMot(
       "/Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/"
       "Test_Output/JA1Gait35_grf.mot",
       c3d.timestamps,
@@ -819,7 +819,7 @@ TEST(OpenSimParser, SAVE_ID_FILE)
   auto mot = OpenSimParser::loadMot(
       standard.skeleton, "dart://sample/osim/JA1GaitResults/JA1Gait35_ik.mot");
 
-  OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+  OpenSimParser::saveOsimInverseDynamicsRawForcesXMLFile(
       "JA1Gait35",
       standard.skeleton,
       mot.poses,

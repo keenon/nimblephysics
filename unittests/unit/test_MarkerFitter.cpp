@@ -1560,7 +1560,7 @@ std::vector<MarkerInitialization> runEngine(
         timestamps[i],
         results[i].poses);
     std::cout << "Saving GRF Mot " << i << std::endl;
-    OpenSimParser::saveGRFMot(
+    OpenSimParser::saveRawGRFMot(
         "./_grf" + std::to_string(i) + ".mot", timestamps[i], forcePlates[i]);
     std::cout << "Saving TRC " << i << std::endl;
     std::cout << "timestamps[i]: " << timestamps[i].size() << std::endl;
@@ -1588,7 +1588,7 @@ std::vector<MarkerInitialization> runEngine(
   for (int i = 0; i < results.size(); i++)
   {
     std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
-    OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+    OpenSimParser::saveOsimInverseDynamicsRawForcesXMLFile(
         "test_name",
         standard.skeleton,
         results[i].poses,

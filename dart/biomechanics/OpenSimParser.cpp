@@ -637,7 +637,7 @@ void OpenSimParser::saveOsimInverseKinematicsXMLFile(
 //==============================================================================
 /// This creates an XML configuration file, which you can pass to the OpenSim
 /// ID tool to recreate / validate the results of ID created from this tool
-void OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
+void OpenSimParser::saveOsimInverseDynamicsRawForcesXMLFile(
     const std::string& subjectName,
     std::shared_ptr<dynamics::Skeleton> skel,
     const Eigen::MatrixXs& poses,
@@ -808,6 +808,118 @@ void OpenSimParser::saveOsimInverseDynamicsForcesXMLFile(
 //==============================================================================
 /// This creates an XML configuration file, which you can pass to the OpenSim
 /// ID tool to recreate / validate the results of ID created from this tool
+void OpenSimParser::saveOsimInverseDynamicsProcessedForcesXMLFile(
+    const std::string& subjectName,
+    const std::vector<dynamics::BodyNode*> contactBodies,
+    const std::string& grfForcesPath,
+    const std::string& forcesOutputPath)
+{
+  using namespace tinyxml2;
+
+  // We can write out the XML file
+
+  // clang-format off
+  /**
+
+  Here's an example file:
+
+  <OpenSimDocument Version="40000">
+    <ExternalLoads name="DJ1">
+      <objects>
+        <ExternalForce name="RightGRF">
+          <!--Name of the body the force is applied to.-->
+          <applied_to_body>calcn_r</applied_to_body>
+          <!--Name of the body the force is expressed in (default is ground).-->
+          <force_expressed_in_body>ground</force_expressed_in_body>
+          <!--Name of the body the point is expressed in (default is ground).-->
+          <point_expressed_in_body>ground</point_expressed_in_body>
+          <!--Identifier (string) to locate the force to be applied in the data source.-->
+          <force_identifier>R_ground_force_v</force_identifier>
+          <!--Identifier (string) to locate the point to be applied in the data source.-->
+          <point_identifier>R_ground_force_p</point_identifier>
+          <!--Identifier (string) to locate the torque to be applied in the data source.-->
+          <torque_identifier>R_ground_torque_</torque_identifier>
+        </ExternalForce>
+        <ExternalForce name="LeftGRF">
+          <!--Name of the body the force is applied to.-->
+          <applied_to_body>calcn_l</applied_to_body>
+          <!--Name of the body the force is expressed in (default is ground).-->
+          <force_expressed_in_body>ground</force_expressed_in_body>
+          <!--Name of the body the point is expressed in (default is ground).-->
+          <point_expressed_in_body>ground</point_expressed_in_body>
+          <!--Identifier (string) to locate the force to be applied in the data source.-->
+          <force_identifier>L_ground_force_v</force_identifier>
+          <!--Identifier (string) to locate the point to be applied in the data source.-->
+          <point_identifier>L_ground_force_p</point_identifier>
+          <!--Identifier (string) to locate the torque to be applied in the data source.-->
+          <torque_identifier>L_ground_torque_</torque_identifier>
+        </ExternalForce>
+      </objects>
+      <groups />
+      <!--Storage file (.sto) containing (3) components of force and/or torque and point of application.Note: this file overrides the data source specified by the individual external forces if specified.-->
+      <datafile>DJ1_forces.mot</datafile>
+    </ExternalLoads>
+  </OpenSimDocument>
+
+  */
+  // clang-format on
+
+  XMLDocument xmlDoc;
+  XMLElement* openSimRoot = xmlDoc.NewElement("OpenSimDocument");
+  openSimRoot->SetAttribute("Version", "40000");
+  xmlDoc.InsertFirstChild(openSimRoot);
+
+  XMLElement* toolRoot = xmlDoc.NewElement("ExternalLoads");
+  toolRoot->SetAttribute("name", subjectName.c_str());
+  openSimRoot->InsertEndChild(toolRoot);
+
+  XMLElement* loadsList = xmlDoc.NewElement("objects");
+  toolRoot->InsertEndChild(loadsList);
+
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    XMLElement* forceNode = xmlDoc.NewElement("ExternalForce");
+    std::string plateNumber = contactBodies[i]->getName();
+    forceNode->SetAttribute("name", ("ForcePlate_" + plateNumber).c_str());
+    loadsList->InsertEndChild(forceNode);
+
+    XMLElement* appliedToBody = xmlDoc.NewElement("applied_to_body");
+    appliedToBody->SetText(contactBodies[i]->getName().c_str());
+    forceNode->InsertEndChild(appliedToBody);
+
+    XMLElement* forceExpressedInBody
+        = xmlDoc.NewElement("force_expressed_in_body");
+    forceExpressedInBody->SetText("ground");
+    forceNode->InsertEndChild(forceExpressedInBody);
+
+    XMLElement* pointExpressedInBody
+        = xmlDoc.NewElement("point_expressed_in_body");
+    pointExpressedInBody->SetText("ground");
+    forceNode->InsertEndChild(pointExpressedInBody);
+
+    XMLElement* forceIdentifier = xmlDoc.NewElement("force_identifier");
+    forceIdentifier->SetText(("ground_force_" + plateNumber + "_v").c_str());
+    forceNode->InsertEndChild(forceIdentifier);
+
+    XMLElement* pointIdentifier = xmlDoc.NewElement("point_identifier");
+    pointIdentifier->SetText(("ground_force_" + plateNumber + "_p").c_str());
+    forceNode->InsertEndChild(pointIdentifier);
+
+    XMLElement* torqueIdentifier = xmlDoc.NewElement("torque_identifier");
+    torqueIdentifier->SetText(("ground_force_" + plateNumber + "_m").c_str());
+    forceNode->InsertEndChild(torqueIdentifier);
+  }
+
+  XMLElement* grfFile = xmlDoc.NewElement("datafile");
+  grfFile->SetText(grfForcesPath.c_str());
+  toolRoot->InsertEndChild(grfFile);
+
+  xmlDoc.SaveFile(forcesOutputPath.c_str());
+}
+
+//==============================================================================
+/// This creates an XML configuration file, which you can pass to the OpenSim
+/// ID tool to recreate / validate the results of ID created from this tool
 void OpenSimParser::saveOsimInverseDynamicsXMLFile(
     const std::string& subjectName,
     const std::string& osimInputModelPath,
@@ -864,6 +976,10 @@ void OpenSimParser::saveOsimInverseDynamicsXMLFile(
   XMLElement* forcesToExclude = xmlDoc.NewElement("forces_to_exclude");
   forcesToExclude->SetText("Muscles");
   toolRoot->InsertEndChild(forcesToExclude);
+
+  XMLElement* lowPassFilterFreq = xmlDoc.NewElement("lowpass_cutoff_frequency_for_coordinates");
+  lowPassFilterFreq->SetText("1000");
+  toolRoot->InsertEndChild(lowPassFilterFreq);
 
   XMLElement* externalLoadsFile = xmlDoc.NewElement("external_loads_file");
   externalLoadsFile->SetText(osimForcesXmlPath.c_str());
@@ -2322,7 +2438,7 @@ double zeroIfNan(double n)
 //==============================================================================
 /// This saves the *.mot file for the ground reaction forces we've read from
 /// a C3D file
-void OpenSimParser::saveGRFMot(
+void OpenSimParser::saveRawGRFMot(
     const std::string& outputPath,
     const std::vector<double>& timestamps,
     const std::vector<biomechanics::ForcePlate> forcePlates)
@@ -2378,6 +2494,88 @@ void OpenSimParser::saveGRFMot(
       motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](0));
       motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](1));
       motFile << "\t" << zeroIfNan((double)forcePlates[i].moments[t](2));
+    }
+    motFile << "\n";
+  }
+
+  motFile.close();
+}
+
+//==============================================================================
+/// This saves the *.mot file for the ground reaction forces we've processed through our dynamics fitter.
+void OpenSimParser::saveProcessedGRFMot(
+    const std::string& outputPath,
+    const std::vector<double>& timestamps,
+    const std::vector<dynamics::BodyNode*> contactBodies,
+    s_t groundHeight,
+    const Eigen::MatrixXs wrenches)
+{
+  std::ofstream motFile;
+  motFile.open(outputPath);
+  motFile << "nColumns=" << (9 * contactBodies.size()) + 1 << "\n";
+  motFile << "nRows=" << timestamps.size() << "\n";
+  motFile << "DataType=double\n";
+  motFile << "version=3\n";
+  motFile << "OpenSimVersion=4.1\n";
+  motFile << "endheader\n";
+
+  motFile << "time";
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    std::string name = contactBodies[i]->getName();
+    motFile << "\t"
+            << "ground_force_" + name + "_vx";
+    motFile << "\t"
+            << "ground_force_" + name + "_vy";
+    motFile << "\t"
+            << "ground_force_" + name + "_vz";
+    motFile << "\t"
+            << "ground_force_" + name + "_px";
+    motFile << "\t"
+            << "ground_force_" + name + "_py";
+    motFile << "\t"
+            << "ground_force_" + name + "_pz";
+    motFile << "\t"
+            << "ground_force_" + name + "_mx";
+    motFile << "\t"
+            << "ground_force_" + name + "_my";
+    motFile << "\t"
+            << "ground_force_" + name + "_mz";
+  }
+  motFile << "\n";
+
+  for (int t = 0; t < timestamps.size(); t++)
+  {
+    motFile << timestamps[t];
+    for (int i = 0; i < contactBodies.size(); i++)
+    {
+      Eigen::Vector6s worldWrench = wrenches.block<6,1>(i*6, t);
+      Eigen::Vector3s worldTau = worldWrench.head<3>();
+      Eigen::Vector3s worldF = worldWrench.tail<3>();
+      Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+      Eigen::Vector3s rightSide = worldTau - crossF.col(1) * groundHeight;
+      Eigen::Matrix3s leftSide = -crossF;
+      leftSide.col(1) = worldF;
+      Eigen::Vector3s p
+          = leftSide.completeOrthogonalDecomposition().solve(rightSide);
+      s_t k = p(1);
+      p(1) = 0;
+      Eigen::Vector3s expectedTau = worldF * k;
+      Eigen::Vector3s cop = p;
+      cop(1) = groundHeight;
+
+      motFile << "\t" << zeroIfNan((double)worldF(0));
+      motFile << "\t" << zeroIfNan((double)worldF(1));
+      motFile << "\t" << zeroIfNan((double)worldF(2));
+      motFile << "\t"
+              << zeroIfNan((double)cop(0));
+      motFile << "\t"
+              << zeroIfNan((double)cop(1));
+      motFile << "\t"
+              << zeroIfNan((double)cop(2));
+      motFile << "\t" << zeroIfNan((double)expectedTau(0));
+      motFile << "\t" << zeroIfNan((double)expectedTau(1));
+      motFile << "\t" << zeroIfNan((double)expectedTau(2));
     }
     motFile << "\n";
   }

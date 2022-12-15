@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <IpAlgTypes.hpp>
@@ -2824,6 +2825,68 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         init,
         trajectoryIndex,
         (int)round(1.0 / init->trialTimesteps[trajectoryIndex]));
+  }
+
+  // OpenSimParser::saveOsimScalingXMLFile("subject", skel, skel->getMass(),
+  // skel->getHeight(skel->getRestPositions()), "./unscaled_generic.osim", "",
+  // "./scaled.osim", "../../../scaling.xml");
+  // OpenSimParser::saveOsimInverseDynamicsProcessedForcesXMLFile("subject",
+  // init->grfBodyNodes, "./grf_forces.mot", "../../../id_forces.xml");
+  // std::vector<double> timesteps;
+  // for (int i = 0; i < init->grfTrials[0].cols(); i++) {
+  //   timesteps.push_back(init->trialTimesteps[0] * i);
+  // }
+  // OpenSimParser::saveMot(skel, "../../../mot.mot", timesteps,
+  // init->poseTrials[0]);
+  // OpenSimParser::saveProcessedGRFMot("../../../grf_forces.mot", timesteps,
+  // init->grfBodyNodes, init->groundHeight[0], init->grfTrials[0]);
+
+  const bool exportOsim = false;
+  if (exportOsim)
+  {
+    std::vector<std::vector<s_t>> timestamps;
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      timestamps.emplace_back();
+      for (int t = 0; t < init->poseTrials[i].cols(); t++)
+      {
+        timestamps[i].push_back((s_t)t * init->trialTimesteps[i]);
+      }
+    }
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      std::cout << "Saving IK Mot " << i << std::endl;
+      OpenSimParser::saveMot(
+          skel,
+          "./_ik" + std::to_string(i) + ".mot",
+          timestamps[i],
+          init->poseTrials[i]);
+      std::cout << "Saving GRF Mot " << i << std::endl;
+      OpenSimParser::saveProcessedGRFMot(
+          "./_grf" + std::to_string(i) + ".mot",
+          timestamps[i],
+          init->grfBodyNodes,
+          init->groundHeight[i],
+          init->grfTrials[i]);
+    }
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
+      OpenSimParser::saveOsimInverseDynamicsProcessedForcesXMLFile(
+          "test_name",
+          init->grfBodyNodes,
+          "_grf" + std::to_string(i) + ".mot",
+          "./_external_forces.xml");
+    }
+    std::cout << "Saving OpenSim ID XML" << std::endl;
+    OpenSimParser::saveOsimInverseDynamicsXMLFile(
+        "trial",
+        "Models/optimized_scale_and_markers.osim",
+        "./_ik.mot",
+        "./_external_forces.xml",
+        "_id.sto",
+        "_id_body_forces.sto",
+        "./_id_setup.xml");
   }
 
   // Attempt writing out the data
@@ -5938,12 +6001,12 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
 TEST(DynamicsFitter, OPENCAP_SCALING)
 {
   std::vector<std::string> trialNames;
-  trialNames.push_back("DJ1");
-  trialNames.push_back("DJ4");
-  trialNames.push_back("DJ5");
+  // trialNames.push_back("DJ1");
+  // trialNames.push_back("DJ4");
+  // trialNames.push_back("DJ5");
   trialNames.push_back("walking2");
-  trialNames.push_back("walking3");
-  trialNames.push_back("walking4");
+  // trialNames.push_back("walking3");
+  // trialNames.push_back("walking4");
 
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
