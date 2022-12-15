@@ -1604,7 +1604,9 @@ std::vector<MarkerInitialization> runEngine(
       "./_external_forces.xml",
       "_id.sto",
       "_id_body_forces.sto",
-      "./_id_setup.xml");
+      "./_id_setup.xml",
+      0,
+      2);
 
   if (saveGUI)
   {
@@ -5563,6 +5565,26 @@ TEST(MarkerFitter, SINGLE_TRIAL_HARVARD)
       77,
       1.829,
       "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, PITCHING)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back("dart://sample/osim/Pitcher/S1_static_02_D_trimmed.trc");
+  trcFiles.push_back("dart://sample/osim/Pitcher/S1_static_03_N_trimmed.trc");
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/Pitcher/model.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      54.6,
+      1.65,
+      "female",
       true);
 }
 #endif

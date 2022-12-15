@@ -834,7 +834,9 @@ TEST(OpenSimParser, SAVE_ID_FILE)
       "JA1Gait35_external_forces.xml",
       "JA1Gait35_id_output.sto",
       "JA1Gait35_id_body_forces.sto",
-      "../../../data/osim/JA1GaitResults/JA1Gait35_id_setup.xml");
+      "../../../data/osim/JA1GaitResults/JA1Gait35_id_setup.xml",
+      0,
+      3.2);
 }
 #endif
 

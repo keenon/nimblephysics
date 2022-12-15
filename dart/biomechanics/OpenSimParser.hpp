@@ -133,7 +133,9 @@ public:
       const std::string& osimForcesXmlPath,
       const std::string& osimOutputStoPath,
       const std::string& osimOutputBodyForcesStoPath,
-      const std::string& idInstructionsOutputPath);
+      const std::string& idInstructionsOutputPath,
+      const s_t startTime,
+      const s_t endTime);
 
   /// This gets called by rationalizeJoints()
   static void updateRootJointLimits(
@@ -239,7 +241,8 @@ public:
       const std::vector<double>& timestamps,
       const std::vector<biomechanics::ForcePlate> forcePlates);
 
-  /// This saves the *.mot file for the ground reaction forces we've processed through our dynamics fitter.
+  /// This saves the *.mot file for the ground reaction forces we've processed
+  /// through our dynamics fitter.
   static void saveProcessedGRFMot(
       const std::string& outputPath,
       const std::vector<double>& timestamps,

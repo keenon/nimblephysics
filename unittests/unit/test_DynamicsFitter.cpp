@@ -2877,16 +2877,18 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           init->grfBodyNodes,
           "_grf" + std::to_string(i) + ".mot",
           "./_external_forces.xml");
+      std::cout << "Saving OpenSim ID XML" << std::endl;
+      OpenSimParser::saveOsimInverseDynamicsXMLFile(
+          "trial",
+          "Models/optimized_scale_and_markers.osim",
+          "./_ik.mot",
+          "./_external_forces.xml",
+          "_id.sto",
+          "_id_body_forces.sto",
+          "./_id_setup.xml",
+          0,
+          init->trialTimesteps[i] * init->poseTrials[i].cols());
     }
-    std::cout << "Saving OpenSim ID XML" << std::endl;
-    OpenSimParser::saveOsimInverseDynamicsXMLFile(
-        "trial",
-        "Models/optimized_scale_and_markers.osim",
-        "./_ik.mot",
-        "./_external_forces.xml",
-        "_id.sto",
-        "_id_body_forces.sto",
-        "./_id_setup.xml");
   }
 
   // Attempt writing out the data

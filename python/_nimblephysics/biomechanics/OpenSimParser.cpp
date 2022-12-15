@@ -204,7 +204,9 @@ void OpenSimParser(py::module& m)
           const std::string& osimForcesXmlPath,
           const std::string& osimOutputStoPath,
           const std::string& osimOutputBodyForcesStoPath,
-          const std::string& idInstructionsOutputPath) {
+          const std::string& idInstructionsOutputPath,
+          const s_t startTime,
+          const s_t endTime) {
         return dart::biomechanics::OpenSimParser::
             saveOsimInverseDynamicsXMLFile(
                 subjectName,
@@ -213,7 +215,9 @@ void OpenSimParser(py::module& m)
                 osimForcesXmlPath,
                 osimOutputStoPath,
                 osimOutputBodyForcesStoPath,
-                idInstructionsOutputPath);
+                idInstructionsOutputPath,
+                startTime,
+                endTime);
       },
       ::py::arg("subjectName"),
       ::py::arg("osimInputModelPath"),
@@ -221,7 +225,9 @@ void OpenSimParser(py::module& m)
       ::py::arg("osimForcesXmlPath"),
       ::py::arg("osimOutputStoPath"),
       ::py::arg("osimOutputBodyForcesStoPath"),
-      ::py::arg("idInstructionsOutputPath"));
+      ::py::arg("idInstructionsOutputPath"),
+      ::py::arg("startTime"),
+      ::py::arg("endTime"));
 
   sm.def(
       "rationalizeJoints",

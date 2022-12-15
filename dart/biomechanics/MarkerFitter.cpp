@@ -2813,10 +2813,25 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
     {
       result.markerOffsets[name]
           = markerObservationsSum[name] / markerNumObservations[name];
+      Eigen::Vector3s updatedMarkers
+          = mMarkerMap[name].second + result.markerOffsets[name];
       result.updatedMarkerMap[name]
           = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               mMarkerMap[name].first,
               mMarkerMap[name].second + result.markerOffsets[name]);
+      std::cout << "Adjusting marker " << name << ": [" << updatedMarkers(0)
+                << "," << updatedMarkers(1) << "," << updatedMarkers(2)
+                << "] = original [" << mMarkerMap[name].second(0) << ","
+                << mMarkerMap[name].second(1) << ","
+                << mMarkerMap[name].second(2) << "] + offset ["
+                << result.markerOffsets[name](0) << ","
+                << result.markerOffsets[name](1) << ","
+                << result.markerOffsets[name](2) << "]" << std::endl;
+    }
+    else
+    {
+      std::cout << "Skipping adjusting marker " << name
+                << " with 0 observations" << std::endl;
     }
   }
 

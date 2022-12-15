@@ -447,6 +447,13 @@ void OpenSimParser::saveOsimScalingXMLFile(
   genericModelMaker_markerSetFile->SetText(osimInputMarkersPath.c_str());
   genericModelMaker->InsertEndChild(genericModelMaker_markerSetFile);
 
+  XMLElement* markerPlacer = xmlDoc.NewElement("MarkerPlacer");
+  scaleToolRoot->InsertEndChild(markerPlacer);
+
+  XMLElement* markerPlacerApply = xmlDoc.NewElement("apply");
+  markerPlacerApply->SetText("false");
+  markerPlacer->InsertEndChild(markerPlacerApply);
+
   XMLElement* modelScaler = xmlDoc.NewElement("ModelScaler");
   scaleToolRoot->InsertEndChild(modelScaler);
 
@@ -930,7 +937,9 @@ void OpenSimParser::saveOsimInverseDynamicsXMLFile(
     const std::string& osimForcesXmlPath,
     const std::string& osimOutputStoPath,
     const std::string& osimOutputBodyForcesStoPath,
-    const std::string& idInstructionsOutputPath)
+    const std::string& idInstructionsOutputPath,
+    const s_t startTime,
+    const s_t endTime)
 {
   using namespace tinyxml2;
 
@@ -949,8 +958,8 @@ void OpenSimParser::saveOsimInverseDynamicsXMLFile(
       <external_loads_file>Setup_EL_DJ1.xml</external_loads_file>
       <!--The name of the file containing coordinate data. Can be a motion (.mot) or a states (.sto) file.-->
       <coordinates_file>ik.mot</coordinates_file>
-      <!--Low-pass cut-off frequency for filtering the coordinates_file data (currently does not apply to states_file or speeds_file). A negative value results in no filtering. The default value is -1.0, so no filtering.-->
-      <lowpass_cutoff_frequency_for_coordinates>30</lowpass_cutoff_frequency_for_coordinates>
+      <!--The time range to consider for inverse dynamics, in seconds-->
+      <time_range> 0 1.3</time_range>
       <!--Name of the storage file (.sto) to which the generalized forces are written.-->
       <output_gen_force_file>DJ1.sto</output_gen_force_file>
       <!--List of joints (keyword All, for all joints) to report body forces acting at the joint frame expressed in ground.-->
@@ -980,9 +989,11 @@ void OpenSimParser::saveOsimInverseDynamicsXMLFile(
   forcesToExclude->SetText("Muscles");
   toolRoot->InsertEndChild(forcesToExclude);
 
-  XMLElement* lowPassFilterFreq = xmlDoc.NewElement("lowpass_cutoff_frequency_for_coordinates");
-  lowPassFilterFreq->SetText("1000");
-  toolRoot->InsertEndChild(lowPassFilterFreq);
+  XMLElement* timeRange = xmlDoc.NewElement("time_range");
+  timeRange->SetText(
+      (" " + std::to_string(startTime) + " " + std::to_string(endTime))
+          .c_str());
+  toolRoot->InsertEndChild(timeRange);
 
   XMLElement* externalLoadsFile = xmlDoc.NewElement("external_loads_file");
   externalLoadsFile->SetText(osimForcesXmlPath.c_str());
@@ -2505,7 +2516,8 @@ void OpenSimParser::saveRawGRFMot(
 }
 
 //==============================================================================
-/// This saves the *.mot file for the ground reaction forces we've processed through our dynamics fitter.
+/// This saves the *.mot file for the ground reaction forces we've processed
+/// through our dynamics fitter.
 void OpenSimParser::saveProcessedGRFMot(
     const std::string& outputPath,
     const std::vector<double>& timestamps,
@@ -2552,7 +2564,7 @@ void OpenSimParser::saveProcessedGRFMot(
     motFile << timestamps[t];
     for (int i = 0; i < contactBodies.size(); i++)
     {
-      Eigen::Vector6s worldWrench = wrenches.block<6,1>(i*6, t);
+      Eigen::Vector6s worldWrench = wrenches.block<6, 1>(i * 6, t);
       Eigen::Vector3s worldTau = worldWrench.head<3>();
       Eigen::Vector3s worldF = worldWrench.tail<3>();
       Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
@@ -2570,12 +2582,9 @@ void OpenSimParser::saveProcessedGRFMot(
       motFile << "\t" << zeroIfNan((double)worldF(0));
       motFile << "\t" << zeroIfNan((double)worldF(1));
       motFile << "\t" << zeroIfNan((double)worldF(2));
-      motFile << "\t"
-              << zeroIfNan((double)cop(0));
-      motFile << "\t"
-              << zeroIfNan((double)cop(1));
-      motFile << "\t"
-              << zeroIfNan((double)cop(2));
+      motFile << "\t" << zeroIfNan((double)cop(0));
+      motFile << "\t" << zeroIfNan((double)cop(1));
+      motFile << "\t" << zeroIfNan((double)cop(2));
       motFile << "\t" << zeroIfNan((double)expectedTau(0));
       motFile << "\t" << zeroIfNan((double)expectedTau(1));
       motFile << "\t" << zeroIfNan((double)expectedTau(2));
