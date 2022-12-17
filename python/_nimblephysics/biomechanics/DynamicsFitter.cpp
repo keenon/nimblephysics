@@ -118,6 +118,9 @@ void DynamicsFitter(py::module& m)
       .def_readwrite(
           "poseTrials", &dart::biomechanics::DynamicsInitialization::poseTrials)
       .def_readwrite(
+          "groupMasses",
+          &dart::biomechanics::DynamicsInitialization::groupMasses)
+      .def_readwrite(
           "groupScales",
           &dart::biomechanics::DynamicsInitialization::groupScales)
       .def_readwrite(
@@ -526,6 +529,11 @@ protected:
       .def(
           "optimizeMarkerOffsets",
           &dart::biomechanics::DynamicsFitter::optimizeMarkerOffsets,
+          ::py::arg("init"))
+      .def(
+          "applyInitToSkeleton",
+          &dart::biomechanics::DynamicsFitter::applyInitToSkeleton,
+          ::py::arg("skel"),
           ::py::arg("init"))
       .def(
           "boundPush",

@@ -14284,6 +14284,16 @@ void DynamicsFitter::writeSubjectOnDisk(
 }
 
 //==============================================================================
+// This saves all the attributes on the init to the skeleton
+void DynamicsFitter::applyInitToSkeleton(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  skel->setGroupScales(init->groupScales);
+  skel->setLinkMasses(init->bodyMasses);
+}
+
+//==============================================================================
 // This computes the inverse dynamics control forces for a trial, and returns
 // it.
 Eigen::MatrixXs DynamicsFitter::computeInverseDynamics(

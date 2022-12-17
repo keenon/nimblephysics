@@ -1449,6 +1449,11 @@ public:
       std::string href = "",
       std::string notes = "");
 
+  // This saves all the attributes on the init to the skeleton
+  void applyInitToSkeleton(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      std::shared_ptr<DynamicsInitialization> init);
+
   // This computes the inverse dynamics control forces for a trial, and returns
   // it.
   Eigen::MatrixXs computeInverseDynamics(

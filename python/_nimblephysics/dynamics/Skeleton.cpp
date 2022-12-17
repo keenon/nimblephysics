@@ -858,6 +858,11 @@ void Skeleton(py::module& m)
           ::py::arg("bodyNode"),
           ::py::arg("uniform") = true)
       .def(
+          "setLinkMasses",
+          &dart::dynamics::Skeleton::setLinkMasses,
+          ::py::arg("masses"))
+      .def("getLinkMasses", &dart::dynamics::Skeleton::getLinkMasses)
+      .def(
           "setGroupScales",
           &dart::dynamics::Skeleton::setGroupScales,
           ::py::arg("scales"),

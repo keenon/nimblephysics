@@ -231,6 +231,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setMaxMarkerOffset,
           ::py::arg("offset"))
       .def(
+          "setIgnoreJointLimits",
+          &dart::biomechanics::MarkerFitter::setIgnoreJointLimits,
+          ::py::arg("ignore"))
+      .def(
+          "setDebugLoss",
+          &dart::biomechanics::MarkerFitter::setDebugLoss,
+          ::py::arg("debug"))
+      .def(
           "setIterationLimit",
           &dart::biomechanics::MarkerFitter::setIterationLimit,
           ::py::arg("iters"))

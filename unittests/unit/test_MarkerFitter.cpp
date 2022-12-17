@@ -1386,6 +1386,9 @@ std::vector<MarkerInitialization> runEngine(
 
   // Create MarkerFitter
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
+
+  fitter.setIgnoreJointLimits(true);
+
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
   fitter.setIterationLimit(400);
@@ -1508,18 +1511,18 @@ std::vector<MarkerInitialization> runEngine(
         150);
   }
 
-  for (int i = 0; i < reports.size(); i++)
-  {
-    std::cout << "Trial " << std::to_string(i) << std::endl;
-    for (std::string& warning : reports[i]->warnings)
-    {
-      std::cout << "Warning: " << warning << std::endl;
-    }
-    for (std::string& info : reports[i]->info)
-    {
-      std::cout << "Info: " << info << std::endl;
-    }
-  }
+  // for (int i = 0; i < reports.size(); i++)
+  // {
+  //   std::cout << "Trial " << std::to_string(i) << std::endl;
+  //   for (std::string& warning : reports[i]->warnings)
+  //   {
+  //     std::cout << "Warning: " << warning << std::endl;
+  //   }
+  //   for (std::string& info : reports[i]->info)
+  //   {
+  //     std::cout << "Info: " << info << std::endl;
+  //   }
+  // }
 
   IKErrorReport finalKinematicsReport(
       standard.skeleton,
@@ -6086,6 +6089,27 @@ TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_SPRINTER)
       79.4,
       1.85,
       "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_BALLET)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  c3dFiles.push_back("dart://sample/c3d/dance1.c3d");
+
+  runEngine(
+      "dart://sample/osim/CompleteHumanModel/CompleteHumanModel.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      68,
+      1.65,
+      "female",
       true);
 }
 #endif

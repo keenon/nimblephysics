@@ -26,6 +26,8 @@
 #include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIStateMachine.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
+#include "dart/utils/AccelerationSmoother.hpp"
+#include "dart/utils/VelocityMinimizingSmoother.hpp"
 
 namespace dart {
 
@@ -528,6 +530,8 @@ MarkerFitter::MarkerFitter(
     mAnthropometricWeight(0.001),
     mInitialIKSatisfactoryLoss(0.003),
     mInitialIKMaxRestarts(100),
+    mDebugLoss(false),
+    mIgnoreJointLimits(false),
     mMaxMarkerOffset(0.2),
     mMinVarianceCutoff(3.0),
     mMinSphereFitScore(0.01),
@@ -541,6 +545,7 @@ MarkerFitter::MarkerFitter(
     mRegularizeAnatomicalMarkerOffsets(10.0),
     mRegularizeIndividualBodyScales(0.2),
     mRegularizeAllBodyScales(0.2),
+    mRegularizeJointBounds(0),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
@@ -702,6 +707,37 @@ MarkerFitter::MarkerFitter(
     s_t k = state->bodyScales.cols();
     avgScale /= k;
 
+    // 6. If we're ignoring joint bounds, then at least provide a soft loss
+    // incentive to stay inside the bounds
+    s_t jointBoundsRegularization = 0.0;
+    if (mRegularizeJointBounds > 0)
+    {
+      Eigen::VectorXs upperBound = mSkeleton->getPositionUpperLimits();
+      Eigen::VectorXs lowerBound = mSkeleton->getPositionLowerLimits();
+      for (int t = 0; t < state->posesAtTimesteps.cols(); t++)
+      {
+        for (int i = 0; i < upperBound.size(); i++)
+        {
+          s_t pos = state->posesAtTimesteps(i, t);
+          if (pos > upperBound(i))
+          {
+            s_t diff = pos - upperBound(i);
+            jointBoundsRegularization += mRegularizeJointBounds * diff * diff;
+            state->posesAtTimestepsGrad(i, t)
+                += 2 * mRegularizeJointBounds * diff;
+          }
+          if (pos < lowerBound(i))
+          {
+            s_t diff = lowerBound(i) - pos;
+            jointBoundsRegularization += mRegularizeJointBounds * diff * diff;
+            state->posesAtTimestepsGrad(i, t)
+                -= 2 * mRegularizeJointBounds * diff;
+          }
+        }
+      }
+    }
+    loss += jointBoundsRegularization;
+
     // avg = (sum)/K
     // d/dx = (K-1)*2 / (K^2) * (K*x - sum)
     // d/dx = (K-1)*2 / (K) * (x - avg)
@@ -735,11 +771,15 @@ MarkerFitter::MarkerFitter(
     }
     loss += bodyScaleReg;
 
-    // std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
-    //           << ",axs=" << axisErrors << ",mkrR=" << markerRegularization
-    //           << ",anthR=" << anthroRegularization
-    //           << ",bodyEvenR=" << bodyEvenRegularization
-    //           << ",bodyR=" << bodyScaleReg << "]" << std::endl;
+    if (mDebugLoss)
+    {
+      std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
+                << ",axs=" << axisErrors << ",mkrR=" << markerRegularization
+                << ",anthR=" << anthroRegularization
+                << ",bodyEvenR=" << bodyEvenRegularization
+                << ",bodyR=" << bodyScaleReg
+                << ",boundsR=" << jointBoundsRegularization << "]" << std::endl;
+    }
 
     return loss;
   };
@@ -1288,8 +1328,8 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
     bool skipFinalIK)
 {
   // 1. Find the initial scaling + IK
-  MarkerInitialization init
-      = getInitialization(markerObservations, newClip, params);
+  MarkerInitialization init = getInitialization(
+      markerObservations, newClip, InitialMarkerFitParams(params));
   mSkeleton->setGroupScales(init.groupScales);
 
   // 2. Find the joint centers
@@ -1407,8 +1447,11 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
           .setInitPoses(init.poses)
           .setDontRescaleBodies(true)
           .setDontMoveMarkers(true));
+  // 3. Do a final smoothing pass
+  MarkerInitialization smoothed
+      = smoothOutIK(markerObservations, newClip, reinit);
 
-  return reinit;
+  return smoothed;
 }
 
 //==============================================================================
@@ -2839,7 +2882,7 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   std::cout << "Done completing bilevel fit!" << std::endl;
 
   std::cout << "Running final smoothing IK" << std::endl;
-  return smoothOutIK(markerObservations, result);
+  return smoothOutIK(markerObservations, newClip, result);
 
   // return result;
 }
@@ -3012,6 +3055,7 @@ MarkerInitialization MarkerFitter::fineTuneIK(
 MarkerInitialization MarkerFitter::smoothOutIK(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
+    const std::vector<bool>& newClip,
     MarkerInitialization& initialization)
 {
   MarkerInitialization smoothed(initialization);
@@ -3020,95 +3064,119 @@ MarkerInitialization MarkerFitter::smoothOutIK(
 
   std::vector<std::future<void>> ikFutures;
 
-  int numBlocks = 12;
-  int cursor = 0;
-  int blockDim = (initialization.poses.cols() / numBlocks);
-
-  for (int j = 0; j < numBlocks; j++)
+  // Smooth each trial
+  int trialStart = 0;
+  std::vector<int> trialStarts;
+  std::vector<int> trialSizes;
+  for (int t = 0; t < newClip.size(); t++)
   {
-    std::shared_ptr<dynamics::Skeleton> skelClone = mSkeleton->cloneSkeleton();
-    int size = std::min(blockDim, (int)initialization.poses.cols() - cursor);
-    int thisCursor = cursor;
-
-    ikFutures.push_back(std::async([&, size, thisCursor, skelClone]() {
-      for (int i = thisCursor; i < thisCursor + size; i++)
+    if (newClip[t])
+    {
+      int size = (t - trialStart) + 1;
+      if (size > 1)
       {
-        std::vector<std::string> observedMarkerNames;
-        std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-            observedMarkers;
-
-        for (auto& pair : markerObservations[i])
-        {
-          if (initialization.updatedMarkerMap.count(pair.first))
-          {
-            observedMarkerNames.push_back(pair.first);
-            auto markerPair = initialization.updatedMarkerMap.at(pair.first);
-            observedMarkers.push_back(std::make_pair(
-                skelClone->getBodyNode(markerPair.first->getName()),
-                markerPair.second));
-          }
-        }
-
-        Eigen::VectorXs markerPoses
-            = Eigen::VectorXs::Zero(observedMarkerNames.size() * 3);
-
-        for (int k = 0; k < observedMarkerNames.size(); k++)
-        {
-          markerPoses.segment<3>(k * 3)
-              = markerObservations[i].at(observedMarkerNames[k]);
-        }
-
-        s_t finalLoss = math::solveIK(
-            // Initial guess
-            initialization.poses.col(i),
-            skelClone->getPositionUpperLimits(),
-            skelClone->getPositionLowerLimits(),
-            // Output dimension
-            observedMarkerNames.size() * 3,
-            // Set positions
-            [&skelClone](
-                /* in*/ const Eigen::VectorXs pos, bool clamp) {
-              skelClone->setPositions(pos);
-
-              if (clamp)
-              {
-                skelClone->clampPositionsToLimits();
-              }
-
-              // Return the clamped position
-              return skelClone->getPositions();
-            },
-            [&observedMarkers, &markerPoses, &skelClone](
-                /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
-                /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
-              diff.segment(0, markerPoses.size())
-                  = skelClone->getMarkerWorldPositions(observedMarkers)
-                    - markerPoses;
-              jac.block(0, 0, jac.rows(), jac.cols())
-                  = skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
-                      observedMarkers);
-            },
-            [](Eigen::Ref<Eigen::VectorXs> val) {
-              (void)val;
-              assert(false && "This should never be called");
-            },
-            math::IKConfig()
-                .setMaxStepCount(50)
-                .setConvergenceThreshold(1e-6)
-                .setDontExitTranspose(true)
-                .setLossLowerBound(1e-8)
-                .setMaxRestarts(1)
-                .setStartClamped(true)
-                .setLogOutput(false));
-
-        // 2.3. Record this outcome
-        smoothed.poses.col(i) = skelClone->getPositions();
-        smoothed.poseScores(i) = finalLoss;
+        trialStarts.push_back(trialStart);
+        trialSizes.push_back(size);
       }
-    }));
-
-    cursor += size;
+      trialStart = t;
+    }
   }
+  int size = newClip.size() - trialStart;
+  if (size > 1)
+  {
+    trialStarts.push_back(trialStart);
+    trialSizes.push_back(size);
+  }
+
+  (void)markerObservations;
+  // for (int j = 0; j < trialStarts.size(); j++)
+  // {
+  //   std::cout << "Single-threaded fitting trial poses for trial " << j << "/"
+  //             << trialStarts.size() << std::endl;
+
+  //   std::shared_ptr<dynamics::Skeleton> skelClone =
+  //   mSkeleton->cloneSkeleton(); int size = trialSizes[j]; int thisCursor =
+  //   trialStarts[j];
+
+  //   ikFutures.push_back(std::async([&, size, thisCursor, skelClone]() {
+  //     for (int i = thisCursor; i < thisCursor + size; i++)
+  //     {
+  //       std::vector<std::string> observedMarkerNames;
+  //       std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+  //           observedMarkers;
+
+  //       for (auto& pair : markerObservations[i])
+  //       {
+  //         if (initialization.updatedMarkerMap.count(pair.first))
+  //         {
+  //           observedMarkerNames.push_back(pair.first);
+  //           auto markerPair = initialization.updatedMarkerMap.at(pair.first);
+  //           observedMarkers.push_back(std::make_pair(
+  //               skelClone->getBodyNode(markerPair.first->getName()),
+  //               markerPair.second));
+  //         }
+  //       }
+
+  //       Eigen::VectorXs markerPoses
+  //           = Eigen::VectorXs::Zero(observedMarkerNames.size() * 3);
+
+  //       for (int k = 0; k < observedMarkerNames.size(); k++)
+  //       {
+  //         markerPoses.segment<3>(k * 3)
+  //             = markerObservations[i].at(observedMarkerNames[k]);
+  //       }
+
+  //       const bool ignoreJointLimits = mIgnoreJointLimits;
+  //       s_t finalLoss = math::solveIK(
+  //           // Initial guess
+  //           initialization.poses.col(i),
+  //           skelClone->getPositionUpperLimits(),
+  //           skelClone->getPositionLowerLimits(),
+  //           // Output dimension
+  //           observedMarkerNames.size() * 3,
+  //           // Set positions
+  //           [&skelClone, ignoreJointLimits](
+  //               /* in*/ const Eigen::VectorXs pos, bool clamp) {
+  //             skelClone->setPositions(pos);
+
+  //             if (clamp && !ignoreJointLimits)
+  //             {
+  //               skelClone->clampPositionsToLimits();
+  //             }
+
+  //             // Return the clamped position
+  //             return skelClone->getPositions();
+  //           },
+  //           [&observedMarkers, &markerPoses, &skelClone](
+  //               /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+  //               /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+  //             diff.segment(0, markerPoses.size())
+  //                 = skelClone->getMarkerWorldPositions(observedMarkers)
+  //                   - markerPoses;
+  //             jac.block(0, 0, jac.rows(), jac.cols())
+  //                 =
+  //                 skelClone->getMarkerWorldPositionsJacobianWrtJointPositions(
+  //                     observedMarkers);
+  //           },
+  //           [](Eigen::Ref<Eigen::VectorXs> val) {
+  //             (void)val;
+  //             assert(false && "This should never be called");
+  //           },
+  //           math::IKConfig()
+  //               .setMaxStepCount(50)
+  //               .setConvergenceThreshold(1e-6)
+  //               .setDontExitTranspose(true)
+  //               .setLossLowerBound(1e-8)
+  //               .setMaxRestarts(1)
+  //               .setStartClamped(true)
+  //               .setLogOutput(false));
+
+  //       // 2.3. Record this outcome
+  //       smoothed.poses.col(i) = skelClone->getPositions();
+  //       smoothed.poseScores(i) = finalLoss;
+  //     }
+  //   }));
+  // }
 
   // Join all the futures
   for (int i = 0; i < ikFutures.size(); i++)
@@ -3125,6 +3193,17 @@ MarkerInitialization MarkerFitter::smoothOutIK(
           joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
           = joint->getInitialPositions();
     }
+  }
+
+  for (int i = 0; i < trialStarts.size(); i++)
+  {
+    std::cout << "Smoothing trial poses for trial " << i << "/"
+              << trialStarts.size() << std::endl;
+    int start = trialStarts[i];
+    int size = trialStarts[i];
+    AccelerationSmoother smoother(size, 1.0, 0.001);
+    smoother.smooth(
+        smoothed.poses.block(0, start, smoothed.poses.rows(), size));
   }
 
   return smoothed;
@@ -3317,6 +3396,69 @@ MarkerInitialization MarkerFitter::getInitialization(
     cursor += blocks[i].size();
   }
 
+  // Divide everything up into trials, instead of blocks.
+
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> trials;
+  std::vector<std::vector<Eigen::VectorXs>> jointCenterTrials;
+  std::vector<std::vector<Eigen::VectorXs>> jointAxisTrials;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    // This means we've just started a new clip, so we need a new block
+    if (newClip[i] || i == 0)
+    {
+      trials.emplace_back();
+      jointCenterTrials.emplace_back();
+      jointAxisTrials.emplace_back();
+    }
+    // Append our state to whatever the current block is
+    int mapIndex = trials[trials.size() - 1].size();
+    trials[trials.size() - 1].emplace_back();
+    for (std::string& marker : anatomicalMarkerNames)
+    {
+      if (markerObservations[i].count(marker) > 0)
+      {
+        assert(markerObservations[i].count(marker));
+        trials[trials.size() - 1][mapIndex].emplace(
+            marker, markerObservations[i].at(marker));
+      }
+    }
+    assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
+    if (params.jointCenters.cols() > i)
+    {
+      assert(params.jointCenters.rows() == params.joints.size() * 3);
+      jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
+          params.jointCenters.col(i));
+    }
+    else
+    {
+      assert(params.jointCenters.cols() == 0);
+      jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
+          Eigen::VectorXs::Zero(0));
+    }
+    if (params.jointAxis.cols() > i)
+    {
+      jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
+          params.jointAxis.col(i));
+    }
+    else
+    {
+      jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
+          Eigen::VectorXs::Zero(0));
+    }
+  }
+
+  int numTrials = trials.size();
+
+  std::vector<int> trialStartIndices;
+  std::vector<int> trialSizeIndices;
+  int trialCursor = 0;
+  for (int i = 0; i < trials.size(); i++)
+  {
+    trialStartIndices.push_back(trialCursor);
+    trialSizeIndices.push_back(trials[i].size());
+    trialCursor += trials[i].size();
+  }
+
   // 2. Find IK+scaling for the beginning of each block independently
   std::vector<ScaleAndFitResult> posesAndScales;
   std::vector<std::future<ScaleAndFitResult>> posesAndScalesFutures;
@@ -3379,22 +3521,25 @@ MarkerInitialization MarkerFitter::getInitialization(
     ScaleAndFitResult result = posesAndScalesFutures[i].get();
 
     // Do some error checking on the results
-    Eigen::VectorXs posLowerLimits = mSkeleton->getPositionLowerLimits();
-    Eigen::VectorXs posUpperLimits = mSkeleton->getPositionUpperLimits();
-    for (int j = 0; j < mSkeleton->getNumDofs(); j++)
+    if (!mIgnoreJointLimits)
     {
-      s_t posJ = result.pose(j);
-      if (posJ < posLowerLimits(j))
+      Eigen::VectorXs posLowerLimits = mSkeleton->getPositionLowerLimits();
+      Eigen::VectorXs posUpperLimits = mSkeleton->getPositionUpperLimits();
+      for (int j = 0; j < mSkeleton->getNumDofs(); j++)
       {
-        std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
-                  << ") below lower limit! " << posJ << " < "
-                  << posLowerLimits(j) << std::endl;
-      }
-      if (posJ > posUpperLimits(j))
-      {
-        std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
-                  << ") above upper limit! " << posJ << " > "
-                  << posUpperLimits(j) << std::endl;
+        s_t posJ = result.pose(j);
+        if (posJ < posLowerLimits(j))
+        {
+          std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                    << ") below lower limit! " << posJ << " < "
+                    << posLowerLimits(j) << std::endl;
+        }
+        if (posJ > posUpperLimits(j))
+        {
+          std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                    << ") above upper limit! " << posJ << " > "
+                    << posUpperLimits(j) << std::endl;
+        }
       }
     }
     // End: error checking
@@ -3549,6 +3694,61 @@ MarkerInitialization MarkerFitter::getInitialization(
     if (!foundGap)
     {
       break;
+    }
+  }
+
+  bool shouldResmooth = false;
+  for (int t = 1; t < result.poses.cols(); t++)
+  {
+    if (!newClip[t])
+    {
+      s_t diff = (result.poses.col(t) - result.poses.col(t - 1)).norm();
+      if (diff > 0.1)
+      {
+        shouldResmooth = true;
+        break;
+      }
+    }
+  }
+
+  if (shouldResmooth)
+  {
+    std::cout << "Fixing jitters by running a round of single-threaded IK"
+              << std::endl;
+
+    std::vector<std::future<void>> trialFitFutures;
+    for (int i = 0; i < numTrials; i++)
+    {
+      std::cout << "Starting fit for whole trial " << i << "/" << numTrials
+                << std::endl;
+
+      trialFitFutures.push_back(std::async(
+          &MarkerFitter::fitTrajectory,
+          this,
+          result.groupScales,
+          result.poses.col(trialStartIndices[i]),
+          trials[i],
+          params.markerWeights,
+          params.markerOffsets,
+          params.joints,
+          jointCenterTrials[i],
+          params.jointWeights,
+          jointAxisTrials[i],
+          params.axisWeights,
+          result.observedJoints,
+          result.poses.block(
+              0,
+              trialStartIndices[i],
+              mSkeleton->getNumDofs(),
+              trialSizeIndices[i]),
+          result.poseScores.segment(trialStartIndices[i], trialSizeIndices[i]),
+          false));
+    }
+    for (int i = 0; i < numTrials; i++)
+    {
+      trialFitFutures[i].get();
+      std::cout << "Finished fit for whole trial " << i << "/" << numTrials
+                << std::endl;
     }
   }
 
@@ -3881,6 +4081,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 #endif
     }
 
+    const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
@@ -3895,7 +4096,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          &markerPoses,
          &markerVector,
          &jointsForSkeletonBallJoints,
-         &jointCenters](
+         &jointCenters,
+         ignoreJointLimits](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(pos);
           if (clamp)
@@ -3903,12 +4105,15 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // 1. Map the position back into eulerian space
             skeleton->setPositions(
                 skeleton->convertPositionsFromBallSpace(pos));
-            // 2. Clamp the position to limits
-            skeleton->clampPositionsToLimits();
-            // 3. Map the position back into SO3 space
-            skeletonBallJoints->setPositions(
-                skeleton->convertPositionsToBallSpace(
-                    skeleton->getPositions()));
+            if (!ignoreJointLimits)
+            {
+              // 2. Clamp the position to limits
+              skeleton->clampPositionsToLimits();
+              // 3. Map the position back into SO3 space
+              skeletonBallJoints->setPositions(
+                  skeleton->convertPositionsToBallSpace(
+                      skeleton->getPositions()));
+            }
           }
           if (saveToGUI)
           {
@@ -4091,6 +4296,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 #endif
     }
 
+    const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
@@ -4105,7 +4311,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          &markerPoses,
          &markerVector,
          &jointsForSkeletonBallJoints,
-         &jointCenters](
+         &jointCenters,
+         ignoreJointLimits](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
               pos.segment(0, skeletonBallJoints->getNumDofs()));
@@ -4157,12 +4364,15 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // 1. Map the position back into eulerian space
             skeleton->setPositions(skeleton->convertPositionsFromBallSpace(
                 pos.segment(0, skeletonBallJoints->getNumDofs())));
-            // 2. Clamp the position to limits
-            skeleton->clampPositionsToLimits();
-            // 3. Map the position back into SO3 space
-            skeletonBallJoints->setPositions(
-                skeleton->convertPositionsToBallSpace(
-                    skeleton->getPositions()));
+            if (!ignoreJointLimits)
+            {
+              // 2. Clamp the position to limits
+              skeleton->clampPositionsToLimits();
+              // 3. Map the position back into SO3 space
+              skeletonBallJoints->setPositions(
+                  skeleton->convertPositionsToBallSpace(
+                      skeleton->getPositions()));
+            }
           }
 
           // Set scales
@@ -4513,13 +4723,14 @@ void MarkerFitter::fitTrajectory(
       // 2.2. Actually run the IK solver
       // Initialize at the old config
 
+      const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
       s_t finalLoss = math::solveIK(
           initialGuess,
           skeletonBallJoints->getPositionUpperLimits(),
           skeletonBallJoints->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
-          [skeletonBallJoints, skeleton](
+          [skeletonBallJoints, skeleton, ignoreJointLimits](
               /* in*/ const Eigen::VectorXs pos, bool clamp) {
             skeletonBallJoints->setPositions(pos);
             if (clamp)
@@ -4527,12 +4738,15 @@ void MarkerFitter::fitTrajectory(
               // 1. Map the position back into eulerian space
               skeleton->setPositions(
                   skeleton->convertPositionsFromBallSpace(pos));
-              // 2. Clamp the position to limits
-              skeleton->clampPositionsToLimits();
-              // 3. Map the position back into SO3 space
-              skeletonBallJoints->setPositions(
-                  skeleton->convertPositionsToBallSpace(
-                      skeleton->getPositions()));
+              if (!ignoreJointLimits)
+              {
+                // 2. Clamp the position to limits
+                skeleton->clampPositionsToLimits();
+                // 3. Map the position back into SO3 space
+                skeletonBallJoints->setPositions(
+                    skeleton->convertPositionsToBallSpace(
+                        skeleton->getPositions()));
+              }
             }
 
             // Return the clamped position
@@ -4691,17 +4905,18 @@ void MarkerFitter::fitTrajectory(
       // 2.2. Actually run the IK solver
       // Initialize at the old config
 
+      const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
       s_t finalLoss = math::solveIK(
           initialGuess,
           skeleton->getPositionUpperLimits(),
           skeleton->getPositionLowerLimits(),
           (markerVector.size() * 3) + (joints.size() * 3),
           // Set positions
-          [skeleton](
+          [skeleton, ignoreJointLimits](
               /* in*/ const Eigen::VectorXs pos, bool clamp) {
             skeleton->setPositions(pos);
 
-            if (clamp)
+            if (clamp && !ignoreJointLimits)
             {
               // Clamp the position to limits
               skeleton->clampPositionsToLimits();
@@ -5231,6 +5446,14 @@ void MarkerFitter::setRegularizeAllBodyScales(s_t weight)
 }
 
 //==============================================================================
+/// If we've disabled joint limits, this provides the option for a soft penalty
+/// instead
+void MarkerFitter::setRegularizeJointBounds(s_t weight)
+{
+  mRegularizeJointBounds = weight;
+}
+
+//==============================================================================
 /// If set to true, we print the pair observation counts and data for
 /// computing joint variability.
 void MarkerFitter::setDebugJointVariability(bool debug)
@@ -5542,6 +5765,14 @@ Eigen::VectorXs MarkerFitter::getIKLossGradWrtMarkerError(
 }
 
 //==============================================================================
+/// This lets us print the components of the loss, to allow easier tuning of
+/// different weights
+void MarkerFitter::setDebugLoss(bool debug)
+{
+  mDebugLoss = debug;
+}
+
+//==============================================================================
 /// During random-restarts on IK, when we find solutions below this loss we'll
 /// stop doing restarts early, to speed up the process.
 void MarkerFitter::setInitialIKSatisfactoryLoss(s_t loss)
@@ -5554,6 +5785,14 @@ void MarkerFitter::setInitialIKSatisfactoryLoss(s_t loss)
 void MarkerFitter::setInitialIKMaxRestarts(int restarts)
 {
   mInitialIKMaxRestarts = restarts;
+}
+
+//==============================================================================
+/// This gives us a configuration option to ignore the joint limits in the
+/// uploaded model, and then set them after the fit.
+void MarkerFitter::setIgnoreJointLimits(bool ignore)
+{
+  mIgnoreJointLimits = ignore;
 }
 
 //==============================================================================
@@ -7689,12 +7928,15 @@ bool BilevelFitProblem::get_bounds_info(
       .setConstant((double)mFitter->mMaxMarkerOffset);
   lowerBounds.segment(scaleGroupDim, markerOffsetDim)
       .setConstant((double)-mFitter->mMaxMarkerOffset);
-  for (int i = 0; i < mMarkerObservations.size(); i++)
+  if (!mFitter->mIgnoreJointLimits)
   {
-    upperBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
-        = mFitter->mSkeleton->getPositionUpperLimits().cast<double>();
-    lowerBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
-        = mFitter->mSkeleton->getPositionLowerLimits().cast<double>();
+    for (int i = 0; i < mMarkerObservations.size(); i++)
+    {
+      upperBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
+          = mFitter->mSkeleton->getPositionUpperLimits().cast<double>();
+      lowerBounds.segment(scaleGroupDim + markerOffsetDim + (i * dofs), dofs)
+          = mFitter->mSkeleton->getPositionLowerLimits().cast<double>();
+    }
   }
 
   // std::cout << "Group scales upper bound: " << std::endl

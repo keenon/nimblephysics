@@ -313,19 +313,76 @@ OpenSimFile OpenSimParser::parseOsim(
   }
   tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
 
+  OpenSimFile result;
   if (jointSet != nullptr)
   {
     // This is the older format, where JointSet specifies the joints separately
     // from the body hierarchy
-    return readOsim30(
+    result = readOsim30(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
   else
   {
     // This is the newer format, where Joints are specified as childen of Bodies
-    return readOsim40(
+    result = readOsim40(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
+
+  tinyxml2::XMLElement* constraintSet
+      = modelElement->FirstChildElement("ConstraintSet");
+  if (constraintSet != nullptr)
+  {
+    tinyxml2::XMLElement* objectsList
+        = constraintSet->FirstChildElement("objects");
+    if (objectsList != nullptr)
+    {
+      constraintSet = objectsList;
+    }
+
+    tinyxml2::XMLElement* couplerConstraintCursor
+        = objectsList->FirstChildElement("CoordinateCouplerConstraint");
+    while (couplerConstraintCursor != nullptr)
+    {
+      std::string name(couplerConstraintCursor->Attribute("name"));
+      tinyxml2::XMLElement* independentCoordinates
+          = couplerConstraintCursor->FirstChildElement(
+              "independent_coordinate_names");
+      tinyxml2::XMLElement* dependentCoordinate
+          = couplerConstraintCursor->FirstChildElement(
+              "dependent_coordinate_name");
+      if (independentCoordinates != nullptr && dependentCoordinate != nullptr)
+      {
+        std::string independent(independentCoordinates->GetText());
+        std::string dependent(dependentCoordinate->GetText());
+
+        // We can special case the patella, and only the patella, because it's
+        // so tiny
+        if ((independent == "knee_angle_r" && dependent == "knee_angle_r_beta")
+            || (independent == "knee_angle_l" && dependent == "knee_angle_l"))
+        {
+          result.jointsDrivenBy.emplace_back(dependent, independent);
+        }
+        else
+        {
+          result.warnings.push_back(
+              "Constraints are not supported by AddBiomechanics. Ignoring "
+              "CoordinateCouplerConstraint \""
+              + name + "\"");
+        }
+      }
+      else
+      {
+        result.warnings.push_back(
+            "Constraints are not supported by AddBiomechanics. Ignoring "
+            "CoordinateCouplerConstraint \""
+            + name + "\"");
+      }
+      couplerConstraintCursor = couplerConstraintCursor->NextSiblingElement(
+          "CoordinateCouplerConstraint");
+    }
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -4385,6 +4442,8 @@ OpenSimFile OpenSimParser::readOsim40(
     return file;
   }
 
+  OpenSimFile file;
+
   //--------------------------------------------------------------------------
   // Build out the physical structure
   unordered_map<string, dynamics::BodyNode*> bodyLookupMap;
@@ -4405,6 +4464,10 @@ OpenSimFile OpenSimParser::readOsim40(
     // Skip the kneecaps
     if (name == "patella_r" || name == "patella_l")
     {
+      file.ignoredBodies.push_back(name);
+      file.warnings.push_back(
+          "Ignoring body \"" + name
+          + "\" because it is driven by a constrained joint.");
       bodyCursor = bodyCursor->NextSiblingElement();
       continue;
     }
@@ -4534,7 +4597,6 @@ OpenSimFile OpenSimParser::readOsim40(
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
   */
 
-  OpenSimFile file;
   file.skeleton = skel;
 
   tinyxml2::XMLElement* markerSet

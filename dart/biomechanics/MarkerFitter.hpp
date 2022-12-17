@@ -586,6 +586,10 @@ public:
   /// outliers.
   void setRegularizeAllBodyScales(s_t weight);
 
+  /// If we've disabled joint limits, this provides the option for a soft
+  /// penalty instead
+  void setRegularizeJointBounds(s_t weight);
+
   /// If set to true, we print the pair observation counts and data for
   /// computing joint variability.
   void setDebugJointVariability(bool debug);
@@ -653,6 +657,7 @@ public:
   MarkerInitialization smoothOutIK(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      const std::vector<bool>& newClip,
       MarkerInitialization& initialization);
 
   ///////////////////////////////////////////////////////////////////////////
@@ -732,12 +737,20 @@ public:
   /// This returns the gradient for the simple IK loss term
   Eigen::VectorXs getIKLossGradWrtMarkerError(Eigen::VectorXs markerError);
 
+  /// This lets us print the components of the loss, to allow easier tuning of
+  /// different weights
+  void setDebugLoss(bool debug);
+
   /// During random-restarts on IK, when we find solutions below this loss we'll
   /// stop doing restarts early, to speed up the process.
   void setInitialIKSatisfactoryLoss(s_t loss);
 
   /// This sets the maximum number of restarts allowed for the initial IK solver
   void setInitialIKMaxRestarts(int restarts);
+
+  /// This gives us a configuration option to ignore the joint limits in the
+  /// uploaded model, and then set them after the fit.
+  void setIgnoreJointLimits(bool ignore);
 
   /// Sets the maximum that we'll allow markers to move from their original
   /// position, in meters
@@ -959,8 +972,10 @@ protected:
   std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
   s_t mAnthropometricWeight;
 
+  bool mDebugLoss;
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;
+  bool mIgnoreJointLimits;
   s_t mMaxMarkerOffset;
   // Parameters for joint weighting
   s_t mMinVarianceCutoff;
@@ -973,6 +988,7 @@ protected:
   s_t mRegularizeAnatomicalMarkerOffsets;
   s_t mRegularizeIndividualBodyScales;
   s_t mRegularizeAllBodyScales;
+  s_t mRegularizeJointBounds;
   s_t mAnatomicalMarkerDefaultWeight;
   s_t mTrackingMarkerDefaultWeight;
 
