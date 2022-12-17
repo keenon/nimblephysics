@@ -2775,9 +2775,12 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
     // Set the unobserved joints to default angles
     for (auto* joint : result.unobservedJoints)
     {
-      result.poses.col(i).segment(
-          joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
-          = joint->getInitialPositions();
+      if (joint->getNumDofs() > 0)
+      {
+        result.poses.col(i).segment(
+            joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+            = joint->getInitialPositions();
+      }
     }
   }
   // Overwrite with the poses from the solution
@@ -3189,9 +3192,12 @@ MarkerInitialization MarkerFitter::smoothOutIK(
   {
     for (auto* joint : smoothed.unobservedJoints)
     {
-      smoothed.poses.col(i).segment(
-          joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
-          = joint->getInitialPositions();
+      if (joint->getNumDofs() > 0)
+      {
+        smoothed.poses.col(i).segment(
+            joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+            = joint->getInitialPositions();
+      }
     }
   }
 
