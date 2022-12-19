@@ -8208,60 +8208,14 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
+    // std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
 
     Eigen::MatrixXs& poses = init->poseTrials[trial];
 
     Eigen::MatrixXs GRF
         = Eigen::MatrixXs::Zero(grfNodes.size() * 6, poses.cols());
-
-    for (int t = 0; t < poses.cols(); t++)
-    {
-      skel->setPositions(poses.col(t));
-
-      for (int i = 0; i < forcePlates.size(); i++)
-      {
-        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
-        Eigen::Vector3s force = forcePlates[i].forces[t];
-        Eigen::Vector3s moments = forcePlates[i].moments[t];
-        // Ignore timesteps where the force plate has a 0 force, those don't
-        // need to be assigned to anything
-        if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
-            || moments.hasNaN())
-        {
-          continue;
-        }
-        Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
-        wrench.head<3>() = moments;
-        wrench.tail<3>() = force;
-        Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
-        wrenchT.translation() = cop;
-        Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
-
-        // Every force from force plates must be accounted for somewhere.
-        // Simply assign it to the nearest foot
-        int closestFoot = -1;
-        s_t minDist = (s_t)std::numeric_limits<double>::infinity();
-        for (int i = 0; i < grfNodes.size(); i++)
-        {
-          Eigen::Vector3s footLoc
-              = grfNodes[i]->getWorldTransform().translation();
-          s_t dist = (footLoc - cop).norm();
-          if (dist < minDist)
-          {
-            minDist = dist;
-            closestFoot = i;
-          }
-        }
-        assert(closestFoot != -1);
-
-        // If multiple force plates assign to the same foot, sum up the forces
-        GRF.block<6, 1>(closestFoot * 6, t) += worldWrench;
-      }
-      // std::cout << "Trial " << trial << " t=" << t << ": GRF norm "
-      //           << GRF.col(t).norm() << std::endl;
-    }
     init->grfTrials.push_back(GRF);
+    recomputeGRFs(init, skel, trial);
   }
 
   // Make copies of data to report how things change later
@@ -11837,7 +11791,7 @@ void DynamicsFitter::recalibrateForcePlates(
                "error) by "
             << shift(0) << "m X, " << shift(2) << "m Z" << std::endl;
 
-  recomputeGRFs(init, trial);
+  recomputeGRFs(init, mSkeleton, trial);
 }
 
 //==============================================================================
@@ -11910,7 +11864,9 @@ void DynamicsFitter::optimizeMarkerOffsets(
 //==============================================================================
 // This utility recomputes the GRF world wrenches, in case we changed the data
 void DynamicsFitter::recomputeGRFs(
-    std::shared_ptr<DynamicsInitialization> init, int trial)
+    std::shared_ptr<DynamicsInitialization> init,
+    std::shared_ptr<dynamics::Skeleton> skel,
+    int trial)
 {
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
 
@@ -11918,48 +11874,115 @@ void DynamicsFitter::recomputeGRFs(
 
   init->grfTrials[trial].setZero();
 
+  // Precompute the foot locations over time
+  std::vector<std::vector<Eigen::Vector3s>> footLocations;
   for (int t = 0; t < poses.cols(); t++)
   {
-    mSkeleton->setPositions(poses.col(t));
-
-    for (int i = 0; i < forcePlates.size(); i++)
+    skel->setPositions(poses.col(t));
+    std::vector<Eigen::Vector3s> footLocationsThisTimestep;
+    for (int i = 0; i < init->grfBodyNodes.size(); i++)
     {
-      Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+      Eigen::Vector3s footLoc
+          = skel->getBodyNode(init->grfBodyNodes[i]->getName())
+                ->getWorldTransform()
+                .translation();
+      footLocationsThisTimestep.push_back(footLoc);
+    }
+    footLocations.push_back(footLocationsThisTimestep);
+  }
+
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    int lastStartedTrack = -1;
+    Eigen::VectorXs sumSquaredDistances
+        = Eigen::VectorXs::Zero(init->grfBodyNodes.size());
+
+    for (int t = 0; t < poses.cols(); t++)
+    {
       Eigen::Vector3s force = forcePlates[i].forces[t];
       Eigen::Vector3s moments = forcePlates[i].moments[t];
-      // Ignore timesteps where the force plate has a 0 force, those don't
-      // need to be assigned to anything
-      if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
+      Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+
+      // Timesteps where the force plate has a 0 force (we use 3 newtons
+      // as our threshold), don't need to be assigned to anything
+      if (force.norm() < 3.0 || force.hasNaN() || cop.hasNaN()
           || moments.hasNaN())
       {
+        if (lastStartedTrack > -1)
+        {
+          Eigen::Index closestFoot;
+          sumSquaredDistances.minCoeff(&closestFoot);
+
+          std::cout << "Force Plate " << i << " time range ["
+                    << lastStartedTrack << "," << (t - 1)
+                    << "] Closest foot: " << closestFoot << " with distances "
+                    << sumSquaredDistances.transpose() << std::endl;
+
+          // Now assign everything in that track to the foot that was closest
+          // over the whole track
+          for (int assignT = lastStartedTrack; assignT < t; assignT++)
+          {
+            Eigen::Vector3s force = forcePlates[i].forces[assignT];
+            Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
+            Eigen::Vector3s moments = forcePlates[i].moments[assignT];
+
+            Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
+            wrench.head<3>() = moments;
+            wrench.tail<3>() = force;
+            Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
+            wrenchT.translation() = cop;
+            Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
+
+            // If multiple force plates assign to the same foot, sum up the
+            // forces
+            init->grfTrials[trial].block<6, 1>(closestFoot * 6, assignT)
+                += worldWrench;
+          }
+        }
+        lastStartedTrack = -1;
+        sumSquaredDistances.setZero();
         continue;
       }
-      Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
-      wrench.head<3>() = moments;
-      wrench.tail<3>() = force;
-      Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
-      wrenchT.translation() = cop;
-      Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
 
-      // Every force from force plates must be accounted for somewhere. Simply
-      // assign it to the nearest foot
-      int closestFoot = -1;
-      s_t minDist = (s_t)std::numeric_limits<double>::infinity();
-      for (int i = 0; i < init->grfBodyNodes.size(); i++)
+      if (lastStartedTrack == -1)
+        lastStartedTrack = t;
+      for (int b = 0; b < init->grfBodyNodes.size(); b++)
       {
-        Eigen::Vector3s footLoc
-            = init->grfBodyNodes[i]->getWorldTransform().translation();
-        s_t dist = (footLoc - cop).norm();
-        if (dist < minDist)
-        {
-          minDist = dist;
-          closestFoot = i;
-        }
+        sumSquaredDistances(b) += (footLocations[t][b] - cop).squaredNorm();
       }
-      assert(closestFoot != -1);
+    }
 
-      // If multiple force plates assign to the same foot, sum up the forces
-      init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
+    // Do one last pass, in case we ended the trajectory with active contact
+    if (lastStartedTrack > -1)
+    {
+      Eigen::Index closestFoot;
+      sumSquaredDistances.minCoeff(&closestFoot);
+
+      std::cout << "Force Plate " << i << " time range [" << lastStartedTrack
+                << "," << (poses.cols() - 1)
+                << "] Closest foot: " << closestFoot << " with distances "
+                << sumSquaredDistances.transpose() << std::endl;
+
+      // Now assign everything in that track to the foot that was closest
+      // over the whole track
+      for (int assignT = lastStartedTrack; assignT < poses.cols(); assignT++)
+      {
+        Eigen::Vector3s force = forcePlates[i].forces[assignT];
+        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
+        Eigen::Vector3s moments = forcePlates[i].moments[assignT];
+
+        Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
+        wrench.head<3>() = moments;
+        wrench.tail<3>() = force;
+        Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
+        wrenchT.translation() = cop;
+        Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
+
+        // If multiple force plates assign to the same foot, sum up the
+        // forces
+        init->grfTrials[trial].block<6, 1>(closestFoot * 6, assignT)
+            += worldWrench;
+      }
     }
   }
 }
@@ -14041,6 +14064,7 @@ void DynamicsFitter::writeCSVData(
     csvFile << "," << mFootNodes[i]->getName() << "_contact_force_y";
     csvFile << "," << mFootNodes[i]->getName() << "_contact_force_z";
   }
+  csvFile << ",marker_error_rms,marker_error_max,residual_norm";
 
   /*
   Eigen::Vector3s cop
@@ -14056,6 +14080,8 @@ void DynamicsFitter::writeCSVData(
   s_t dt = init->trialTimesteps[trial];
 
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
+  time += dt;
 
   for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
   {
@@ -14083,41 +14109,12 @@ void DynamicsFitter::writeCSVData(
     }
     else
     {
-      // Compute the CoP/Torque/Force combo for the "un-perfected" data.
-
-      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      for (int i = 0; i < init->grfBodyIndices.size(); i++)
       {
-        Eigen::Vector3s cop
-            = init->forcePlateTrials[trial][i].centersOfPressure[t];
-        Eigen::Vector3s force = init->forcePlateTrials[trial][i].forces[t];
-        Eigen::Vector3s moments = init->forcePlateTrials[trial][i].moments[t];
-        // Ignore timesteps where the force plate has a 0 force, those don't
-        // need to be assigned to anything
-        if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
-            || moments.hasNaN())
-        {
-          continue;
-        }
-        // Every force from force plates must be accounted for somewhere. Simply
-        // assign it to the nearest foot
-        int closestFoot = -1;
-        s_t minDist = (s_t)std::numeric_limits<double>::infinity();
-        for (int i = 0; i < init->grfBodyNodes.size(); i++)
-        {
-          Eigen::Vector3s footLoc
-              = init->grfBodyNodes[i]->getWorldTransform().translation();
-          s_t dist = (footLoc - cop).norm();
-          if (dist < minDist)
-          {
-            minDist = dist;
-            closestFoot = i;
-          }
-        }
-        assert(closestFoot != -1);
-
-        footContactData.segment<3>(closestFoot * 9) = cop;
-        footContactData.segment<3>(closestFoot * 9 + 3) = moments;
-        footContactData.segment<3>(closestFoot * 9 + 6) = force;
+        footContactData.segment<9>(i * 9) = math::projectWrenchToCoP(
+            init->grfTrials[trial].col(t).segment<6>(i * 6),
+            init->groundHeight[trial],
+            1);
       }
     }
 
@@ -14132,6 +14129,30 @@ void DynamicsFitter::writeCSVData(
           || init->grfBodySphereInContact[trial][t][i];
     }
     writeVectorToCSV(csvFile, footContactData);
+
+    // Compute marker errors
+    mSkeleton->setPositions(init->poseTrials[trial].col(t));
+    auto modelMarkers
+        = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
+    auto observedMarkers = init->markerObservationTrials[trial][t];
+    s_t rms = 0.0;
+    s_t max = 0.0;
+    int count = 0;
+    for (auto& modelPair : modelMarkers)
+    {
+      if (observedMarkers.count(modelPair.first) > 0)
+      {
+        s_t dist = (modelPair.second - observedMarkers[modelPair.first]).norm();
+        rms += dist * dist;
+        if (dist > max)
+          max = dist;
+        count++;
+      }
+    }
+    rms /= count;
+    csvFile << "," << rms << "," << max;
+    // Write out the residuals
+    csvFile << "," << tau.head<6>().norm();
 
     time += dt;
   }
@@ -15437,6 +15458,37 @@ void DynamicsFitter::saveDynamicsToGUI(
                 "contact_sphere_" + std::to_string(i) + "_" + std::to_string(j),
                 groundContactLayerColor);
           }
+        }
+
+        Eigen::Vector6s worldWrench
+            = init->grfTrials[trialIndex].col(timestep).segment<6>(i * 6);
+        Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+            worldWrench, init->groundHeight[trialIndex], 1);
+        Eigen::Vector3s f = copWrench.tail<3>();
+        if (f.norm() > 1e-9)
+        {
+          Eigen::Vector3s cop = copWrench.head<3>();
+          Eigen::Vector3s target
+              = init->contactBodies[i][0]->getWorldTransform().translation();
+          std::vector<Eigen::Vector3s> points;
+          points.push_back(cop);
+          points.push_back(target);
+          server.createLine(
+              "contact_line_" + std::to_string(i),
+              points,
+              Eigen::Vector4s(0, 1, 0, 1),
+              groundContactLayerName);
+          server.createSphere(
+              "contact_root_" + std::to_string(i),
+              0.03,
+              cop,
+              Eigen::Vector4s(0, 1, 0, 0.5),
+              groundContactLayerName);
+        }
+        else
+        {
+          server.deleteObject("contact_line_" + std::to_string(i));
+          server.deleteObject("contact_root_" + std::to_string(i));
         }
       }
     }

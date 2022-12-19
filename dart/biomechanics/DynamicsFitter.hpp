@@ -1349,7 +1349,10 @@ public:
   void optimizeMarkerOffsets(std::shared_ptr<DynamicsInitialization> init);
 
   // This utility recomputes the GRF world wrenches, in case we changed the data
-  void recomputeGRFs(std::shared_ptr<DynamicsInitialization> init, int trial);
+  static void recomputeGRFs(
+      std::shared_ptr<DynamicsInitialization> init,
+      std::shared_ptr<dynamics::Skeleton> skel,
+      int trial);
 
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
