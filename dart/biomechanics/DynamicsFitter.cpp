@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include <Eigen/IterativeLinearSolvers>
 #include <Eigen/Sparse>
 #include <Eigen/SparseQR>
 #include <asio/ip/udp.hpp>
@@ -9957,9 +9958,22 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::cout << "Solving linear COM trajectory map: size="
               << unifiedLinearMap.rows() << "x" << unifiedLinearMap.cols()
               << std::endl;
+
     // Now that we've formulated our problem, we can attempt to solve:
-    Eigen::VectorXs tentativeResult = unifiedLinearMap.householderQr().solve(
-        unifiedPositions - unifiedGravityOffset);
+
+    // Old version, direct solve:
+    // Eigen::VectorXs tentativeResult = unifiedLinearMap.householderQr().solve(
+    //     unifiedPositions - unifiedGravityOffset);
+
+    // New version, iterative solve:
+    Eigen::MatrixXs squaredMatrix
+        = unifiedLinearMap.transpose() * unifiedLinearMap;
+    Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> solver;
+    solver.compute(squaredMatrix);
+    Eigen::VectorXs tentativeResult = solver.solve(
+        unifiedLinearMap.transpose()
+        * (unifiedPositions - unifiedGravityOffset));
+
     std::cout << "Solved!" << std::endl;
 
     // The linear map is in terms of "inverse mass", so we need to invert to
@@ -10031,8 +10045,17 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         desired.segment(0, trialOriginalPositions[trial].size())
             += trialOriginalPositions[trial];
 
-        Eigen::VectorXs localResult
-            = AFixedMass.householderQr().solve(desired - bFixedMass);
+        // Old version, direct solve:
+        // Eigen::VectorXs localResult
+        //     = AFixedMass.householderQr().solve(desired - bFixedMass);
+
+        // New version, iterative solve:
+        Eigen::MatrixXs squaredMatrix = AFixedMass.transpose() * AFixedMass;
+        Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> solver;
+        solver.compute(squaredMatrix);
+        Eigen::VectorXs localResult = solver.solve(
+            AFixedMass.transpose() * (unifiedPositions - unifiedGravityOffset));
+
         Eigen::VectorXs recoveredTrajectory
             = AFixedMass * localResult + bFixedMass;
         for (int t = 0; t < originalCOMs.size(); t++)
@@ -10500,9 +10523,19 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
           = projectMassToConstantSum;
 
       Eigen::MatrixXs bottDuffinRHS = (A * totalProjector);
+
+      // Old version, direct solve:
+      // Eigen::VectorXs unconstrainedSolution
+      //     = bottDuffinRHS.completeOrthogonalDecomposition().solve(
+      //         target - offsetB);
+
+      // New version, iterative solve:
+      Eigen::MatrixXs squaredMatrix = bottDuffinRHS.transpose() * bottDuffinRHS;
+      Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> solver;
+      solver.compute(squaredMatrix);
       Eigen::VectorXs unconstrainedSolution
-          = bottDuffinRHS.completeOrthogonalDecomposition().solve(
-              target - offsetB);
+          = solver.solve(bottDuffinRHS.transpose() * (target - offsetB));
+
       centeredSolution = totalProjector * unconstrainedSolution;
 
 #ifndef NDEBUG
@@ -10526,8 +10559,15 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     }
     else
     {
-      centeredSolution
-          = A.completeOrthogonalDecomposition().solve(target - offsetB);
+      // Old version, direct solve:
+      // centeredSolution
+      //     = A.completeOrthogonalDecomposition().solve(target - offsetB);
+
+      // New version, iterative solve:
+      Eigen::MatrixXs squaredMatrix = A.transpose() * A;
+      Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> solver;
+      solver.compute(squaredMatrix);
+      centeredSolution = solver.solve(A.transpose() * (target - offsetB));
     }
     Eigen::VectorXs solution = centeredSolution + centering;
     if (solution.hasNaN())
@@ -10832,8 +10872,17 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // motion"
     //           << std::endl;
     // Solve the system
+
+    // Old version, direct solve:
+    // Eigen::VectorXs solution
+    //     = sampledA.householderQr().solve(sampledTarget - sampledB);
+    // New version, iterative solve:
+    Eigen::MatrixXs squaredMatrix = sampledA.transpose() * sampledA;
+    Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> solver;
+    solver.compute(squaredMatrix);
     Eigen::VectorXs solution
-        = sampledA.householderQr().solve(sampledTarget - sampledB);
+        = solver.solve(sampledA.transpose() * (sampledTarget - sampledB));
+
     // Get the new (original size, not sampled down) trajectory
     Eigen::VectorXs recovered
         = (linearSystem.first * solution) + linearSystem.second;
