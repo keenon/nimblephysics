@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include <Eigen/IterativeLinearSolvers>
+
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
@@ -18,11 +20,13 @@ VelocityMinimizingSmoother::VelocityMinimizingSmoother(
     int timesteps,
     s_t smoothingWeight,
     s_t regularizationWeight,
-    bool useSparse)
+    bool useSparse,
+    bool useIterativeSolver)
   : mTimesteps(timesteps),
     mSmoothingWeight(smoothingWeight),
     mRegularizationWeight(regularizationWeight),
-    mUseSparse(useSparse)
+    mUseSparse(useSparse),
+    mUseIterativeSolver(useIterativeSolver)
 {
   Eigen::Vector2s stamp;
   stamp << -1, 1;
@@ -48,14 +52,17 @@ VelocityMinimizingSmoother::VelocityMinimizingSmoother(
         = Eigen::SparseMatrix<s_t>(mSmoothedTimesteps + mTimesteps, mTimesteps);
     mB_sparse.setFromTriplets(tripletList.begin(), tripletList.end());
     mB_sparse.makeCompressed();
-    mB_sparseSolver.analyzePattern(mB_sparse);
-    mB_sparseSolver.factorize(mB_sparse);
-    if (mB_sparseSolver.info() != Eigen::Success)
+    if (!mUseIterativeSolver)
     {
-      std::cout << "mB_sparseSolver.factorize(mB_sparse) error: "
-                << mB_sparseSolver.lastErrorMessage() << std::endl;
+      mB_sparseSolver.analyzePattern(mB_sparse);
+      mB_sparseSolver.factorize(mB_sparse);
+      if (mB_sparseSolver.info() != Eigen::Success)
+      {
+        std::cout << "mB_sparseSolver.factorize(mB_sparse) error: "
+                  << mB_sparseSolver.lastErrorMessage() << std::endl;
+      }
+      assert(mB_sparseSolver.info() == Eigen::Success);
     }
-    assert(mB_sparseSolver.info() == Eigen::Success);
   }
   else
   {
@@ -67,7 +74,10 @@ VelocityMinimizingSmoother::VelocityMinimizingSmoother(
     mB.block(mSmoothedTimesteps, 0, mTimesteps, mTimesteps)
         = Eigen::MatrixXs::Identity(mTimesteps, mTimesteps);
 
-    mFactoredB = Eigen::HouseholderQR<Eigen::MatrixXs>(mB);
+    if (!mUseIterativeSolver)
+    {
+      mFactoredB = Eigen::HouseholderQR<Eigen::MatrixXs>(mB);
+    }
   }
 };
 
@@ -91,16 +101,38 @@ Eigen::MatrixXs VelocityMinimizingSmoother::smooth(Eigen::MatrixXs series)
     Eigen::VectorXs c = Eigen::VectorXs::Zero(mSmoothedTimesteps + mTimesteps);
     c.segment(mSmoothedTimesteps, mTimesteps)
         = mRegularizationWeight * series.row(row);
-    // Eigen::VectorXs deltas = mB.completeOrthogonalDecomposition().solve(c);
-    if (mUseSparse)
+    if (mUseIterativeSolver)
     {
-      smoothed.row(row)
-          = mB_sparseSolver.solve(c) * (1.0 / mRegularizationWeight);
-      assert(mB_sparseSolver.info() == Eigen::Success);
+      if (mUseSparse)
+      {
+        Eigen::BiCGSTAB<Eigen::SparseMatrix<s_t>, Eigen::IdentityPreconditioner>
+            solver;
+        solver.compute(mB_sparse.transpose() * mB_sparse);
+        smoothed.row(row)
+            = solver.solveWithGuess(mB_sparse.transpose() * c, series.row(row))
+              * (1.0 / mRegularizationWeight);
+      }
+      else
+      {
+        Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> cg;
+        cg.compute(mB.transpose() * mB);
+        smoothed.row(row)
+            = cg.solve(mB.transpose() * c) * (1.0 / mRegularizationWeight);
+      }
     }
     else
     {
-      smoothed.row(row) = mFactoredB.solve(c) * (1.0 / mRegularizationWeight);
+      // Eigen::VectorXs deltas = mB.completeOrthogonalDecomposition().solve(c);
+      if (mUseSparse)
+      {
+        smoothed.row(row)
+            = mB_sparseSolver.solve(c) * (1.0 / mRegularizationWeight);
+        assert(mB_sparseSolver.info() == Eigen::Success);
+      }
+      else
+      {
+        smoothed.row(row) = mFactoredB.solve(c) * (1.0 / mRegularizationWeight);
+      }
     }
   }
 

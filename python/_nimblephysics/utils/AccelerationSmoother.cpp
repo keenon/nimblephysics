@@ -43,10 +43,12 @@ void AccelerationSmoother(py::module& m)
 {
   ::py::class_<dart::utils::AccelerationSmoother>(m, "AccelerationSmoother")
       .def(
-          ::py::init<int, s_t, s_t>(),
+          ::py::init<int, s_t, s_t, bool, bool>(),
           ::py::arg("timesteps"),
           ::py::arg("smoothingWeight"),
-          ::py::arg("regularizationWeight"))
+          ::py::arg("regularizationWeight"),
+          ::py::arg("useSparse") = true,
+          ::py::arg("useIterative") = true)
       .def(
           "smooth",
           &dart::utils::AccelerationSmoother::smooth,

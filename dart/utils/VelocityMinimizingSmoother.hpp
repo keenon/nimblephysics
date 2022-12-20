@@ -20,7 +20,8 @@ public:
       int timesteps,
       s_t smoothingWeight,
       s_t regularizationWeight,
-      bool useSparse = true);
+      bool useSparse = true,
+      bool useIterativeSolver = true);
 
   /**
    * Adjust a time series of points to minimize the jerk (d/dt of acceleration)
@@ -55,6 +56,7 @@ private:
   s_t mSmoothingWeight;
   s_t mRegularizationWeight;
   bool mUseSparse;
+  bool mUseIterativeSolver;
   Eigen::MatrixXs mB;
   Eigen::HouseholderQR<Eigen::MatrixXs> mFactoredB;
 

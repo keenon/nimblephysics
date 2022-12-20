@@ -11,6 +11,9 @@
 using namespace dart;
 using namespace utils;
 
+#define ALL_TESTS
+
+#ifdef ALL_TESTS
 TEST(ACCEL_SMOOTHER, SCORING)
 {
   int dofs = 1;
@@ -22,7 +25,9 @@ TEST(ACCEL_SMOOTHER, SCORING)
 
   smoother.getLoss(series, perturb, true);
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(ACCEL_SMOOTHER, BASIC)
 {
   int dofs = 1;
@@ -38,7 +43,9 @@ TEST(ACCEL_SMOOTHER, BASIC)
 
   EXPECT_EQ(smoothed.cols(), timesteps);
 }
+#endif
 
+#ifdef ALL_TESTS
 TEST(ACCEL_SMOOTHER, SPARSE_V_DENSE)
 {
   int dofs = 1;
@@ -60,3 +67,22 @@ TEST(ACCEL_SMOOTHER, SPARSE_V_DENSE)
     EXPECT_TRUE(equals(smoothedDense, smoothedSparse, 1e-8));
   }
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(ACCEL_SMOOTHER, HUGE_TRAJECTORY)
+{
+  int dofs = 1;
+  int timesteps = 300;
+  Eigen::MatrixXs data = Eigen::MatrixXs::Random(dofs, timesteps);
+
+  AccelerationSmoother smootherIterative(timesteps, 1, 0.05, true, true);
+  Eigen::MatrixXs smoothedIterative = smootherIterative.smooth(data);
+
+  AccelerationSmoother smootherSparse(timesteps, 1, 0.05, true, false);
+  Eigen::MatrixXs smoothedSparse = smootherSparse.smooth(data);
+
+  std::cout << "Diff: " << (smoothedIterative - smoothedSparse).squaredNorm()
+            << std::endl;
+}
+#endif

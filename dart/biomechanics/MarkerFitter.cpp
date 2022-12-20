@@ -27,7 +27,6 @@
 #include "dart/server/GUIStateMachine.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/AccelerationSmoother.hpp"
-#include "dart/utils/VelocityMinimizingSmoother.hpp"
 
 namespace dart {
 

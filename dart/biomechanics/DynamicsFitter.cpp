@@ -9268,7 +9268,6 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       grfsAndAccs.col(t).tail<3>() = accs[t];
     }
 
-    // VelocityMinimizingSmoother smoother(accs.size(), 1, 0.001);
     VelocityMinimizingSmoother smoother(accs.size(), 1, 0.01);
 
     s_t zeroThreshold = 0.005; // anything <0.5% of max force
