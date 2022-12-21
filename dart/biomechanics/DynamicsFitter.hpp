@@ -826,6 +826,7 @@ public:
   DynamicsFitProblemConfig& setMaxBlockSize(int value);
   DynamicsFitProblemConfig& setMaxNumTrials(int value);
   DynamicsFitProblemConfig& setOnlyOneTrial(int value);
+  DynamicsFitProblemConfig& setMaxNumBlocksPerTrial(int value);
 
   DynamicsFitProblemConfig& setNumThreads(int value);
 
@@ -877,6 +878,7 @@ public:
   int mMaxBlockSize;
   int mMaxNumTrials;
   int mOnlyOneTrial;
+  int mMaxNumBlocksPerTrial;
 
   int mNumThreads;
 };

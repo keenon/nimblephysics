@@ -2620,7 +2620,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   (void)maxNumTrials;
 
   // Re - run as L1
-  fitter.setIterationLimit(400);
+  fitter.setIterationLimit(150);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
@@ -2629,31 +2629,32 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeMarkerOffsets(true)
   //         .setIncludePoses(true));
 
-  // fitter.setLBFGSHistoryLength(250);
-  // fitter.runIPOPTOptimization(
-  //     init,
-  //     DynamicsFitProblemConfig(skel)
-  //         .setDefaults(true)
-  //         // Add extra slack to all the bounds
-  //         .setMaxNumTrials(maxNumTrials)
-  //         .setIncludeMasses(true)
-  //         // .setIncludeCOMs(true)
-  //         // .setIncludeInertias(true)
-  //         // .setPoseSubsetLen(6)
-  //         // .setPoseSubsetStartIndex(0)
-  //         // .setIncludeBodyScales(true)
-  //         .setIncludeMarkerOffsets(true)
-  //         .setIncludePoses(true));
+  fitter.setLBFGSHistoryLength(250);
+  fitter.runIPOPTOptimization(
+      init,
+      DynamicsFitProblemConfig(skel)
+          .setDefaults(true)
+          // Add extra slack to all the bounds
+          .setMaxNumTrials(maxNumTrials)
+          .setMaxNumBlocksPerTrial(20)
+          .setIncludeMasses(true)
+          // .setIncludeCOMs(true)
+          // .setIncludeInertias(true)
+          // .setPoseSubsetLen(6)
+          // .setPoseSubsetStartIndex(0)
+          // .setIncludeBodyScales(true)
+          .setIncludeMarkerOffsets(true)
+          .setIncludePoses(true));
 
-  // for (int i = maxNumTrials; i < init->poseTrials.size(); i++)
-  // {
-  //   fitter.runIPOPTOptimization(
-  //       init,
-  //       DynamicsFitProblemConfig(skel)
-  //           .setDefaults(true)
-  //           .setOnlyOneTrial(i)
-  //           .setIncludePoses(true));
-  // }
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    fitter.runIPOPTOptimization(
+        init,
+        DynamicsFitProblemConfig(skel)
+            .setDefaults(true)
+            .setOnlyOneTrial(i)
+            .setIncludePoses(true));
+  }
 
   // // Do a final polishing pass on the marker offsets
   // fitter.optimizeMarkerOffsets(init);

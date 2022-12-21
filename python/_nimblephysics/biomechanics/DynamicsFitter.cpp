@@ -421,6 +421,11 @@ protected:
           &dart::biomechanics::DynamicsFitProblemConfig::setMaxBlockSize,
           ::py::arg("value"))
       .def(
+          "setMaxNumBlocksPerTrial",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setMaxNumBlocksPerTrial,
+          ::py::arg("value"))
+      .def(
           "setNumThreads",
           &dart::biomechanics::DynamicsFitProblemConfig::setNumThreads,
           ::py::arg("value"));

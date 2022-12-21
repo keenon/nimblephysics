@@ -4128,6 +4128,7 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
   int blockSize = config.mMaxBlockSize;
   int maxNumTrials = config.mMaxNumTrials;
   int onlyOneTrial = config.mOnlyOneTrial;
+  int maxBlocksPerTrial = config.mMaxNumBlocksPerTrial;
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
@@ -4137,8 +4138,18 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
       continue;
 
     int cursor = 0;
+    int blockIndex = 0;
     while (cursor < init->poseTrials[trial].cols())
     {
+      if (maxBlocksPerTrial > -1 && blockIndex >= maxBlocksPerTrial)
+      {
+        if (blocks.size() > 0)
+        {
+          struct DynamicsFitProblemBlock& lastBlock = blocks[blocks.size() - 1];
+          lastBlock.constrainToNextBlock = false;
+          break;
+        }
+      }
       int len = blockSize;
       bool isLastBlock = false;
       if (cursor + len >= init->poseTrials[trial].cols())
@@ -4156,6 +4167,7 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
       newBlock.constrainToNextBlock = !isLastBlock;
 
       cursor += len;
+      blockIndex++;
     }
   }
 
@@ -7368,6 +7380,7 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mMaxBlockSize(20),
     mMaxNumTrials(-1),
     mOnlyOneTrial(-1),
+    mMaxNumBlocksPerTrial(-1),
     mNumThreads(16)
 // mResidualWeight(0.1),
 // mLinearNewtonWeight(0.1),
@@ -7717,6 +7730,14 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxNumTrials(int value)
 DynamicsFitProblemConfig& DynamicsFitProblemConfig::setOnlyOneTrial(int value)
 {
   mOnlyOneTrial = value;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig& DynamicsFitProblemConfig::setMaxNumBlocksPerTrial(
+    int value)
+{
+  mMaxNumBlocksPerTrial = value;
   return *(this);
 }
 
@@ -9198,8 +9219,7 @@ void DynamicsFitter::smoothAccelerations(
     }
 
     // 0.05
-    AccelerationSmoother smoother(
-        init->poseTrials[trial].cols(), 1, 0.05, false);
+    AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.05);
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
@@ -12977,6 +12997,17 @@ void DynamicsFitter::runIPOPTOptimization(
     return;
   }
 
+  // If we're sub-sampling blocks, then save/restore all the trajectory
+  // information
+  std::vector<Eigen::MatrixXs> restorablePoses;
+  if (config.mMaxNumBlocksPerTrial > -1)
+  {
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      restorablePoses.push_back(init->poseTrials[i]);
+    }
+  }
+
   // This will automatically free the problem object when finished,
   // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will
   // crash. If you try to leave `problem` on the stack, you'll get invalid
@@ -13017,6 +13048,18 @@ void DynamicsFitter::runIPOPTOptimization(
 
   // This will automatically write results back to `init` on success.
   status = app->OptimizeTNLP(problemPtr);
+
+  if (config.mMaxNumBlocksPerTrial > -1)
+  {
+    std::cout << "Restoring the position values to their pre-optimization "
+                 "values, because we sub-sampled just parts of trials during "
+                 "this optimization."
+              << std::endl;
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      init->poseTrials[i] = restorablePoses[i];
+    }
+  }
 
   if (status == Solve_Succeeded)
   {
