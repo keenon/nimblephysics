@@ -105,19 +105,17 @@ Eigen::MatrixXs VelocityMinimizingSmoother::smooth(Eigen::MatrixXs series)
     {
       if (mUseSparse)
       {
-        Eigen::BiCGSTAB<Eigen::SparseMatrix<s_t>, Eigen::IdentityPreconditioner>
-            solver;
-        solver.compute(mB_sparse.transpose() * mB_sparse);
-        smoothed.row(row)
-            = solver.solveWithGuess(mB_sparse.transpose() * c, series.row(row))
-              * (1.0 / mRegularizationWeight);
+        Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<s_t>> solver;
+        solver.compute(mB_sparse);
+        smoothed.row(row) = solver.solveWithGuess(c, series.row(row))
+                            * (1.0 / mRegularizationWeight);
       }
       else
       {
-        Eigen::BiCGSTAB<Eigen::MatrixXs, Eigen::IdentityPreconditioner> cg;
-        cg.compute(mB.transpose() * mB);
-        smoothed.row(row)
-            = cg.solve(mB.transpose() * c) * (1.0 / mRegularizationWeight);
+        Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> cg;
+        cg.compute(mB);
+        smoothed.row(row) = cg.solveWithGuess(c, series.row(row))
+                            * (1.0 / mRegularizationWeight);
       }
     }
     else

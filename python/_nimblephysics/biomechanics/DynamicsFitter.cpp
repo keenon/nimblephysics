@@ -619,7 +619,7 @@ protected:
           ::py::arg("regularizeResiduals") = true)
       .def(
           "recalibrateForcePlates",
-          &dart::biomechanics::DynamicsFitter::recalibrateForcePlates,
+          &dart::biomechanics::DynamicsFitter::recalibrateForcePlatesOffset,
           ::py::arg("init"),
           ::py::arg("trial"),
           ::py::arg("maxMovement") = 0.03)

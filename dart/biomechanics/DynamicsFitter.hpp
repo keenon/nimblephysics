@@ -1261,7 +1261,8 @@ public:
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
-      std::shared_ptr<DynamicsInitialization> init);
+      std::shared_ptr<DynamicsInitialization> init,
+      bool detectExternalForce = true);
 
   // 1. Adjust the total mass of the body and the individual link masses for
   // each body, and change the initial positions and velocities of the body to
@@ -1342,7 +1343,7 @@ public:
   // optimizeSpatialResidualsOnCOMTrajectory(), we can estimate the
   // miscalibration on the force plates, if there's consistent error on the
   // marker matches.
-  void recalibrateForcePlates(
+  void recalibrateForcePlatesOffset(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       s_t maxMovement = 0.03);

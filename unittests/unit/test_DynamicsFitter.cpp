@@ -2481,7 +2481,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.smoothAccelerations(init);
   // fitter.markMissingImpacts(init, 3, true);
 
-  fitter.timeSyncAndInitializePipeline(init);
+  fitter.zeroLinearResidualsOnCOMTrajectory(init, false);
+  // fitter.timeSyncAndInitializePipeline(init);
   /*
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
   fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
@@ -2521,11 +2522,13 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   std::cout << "Avg GRF Force: " << secondPair.first << " N" << std::endl;
   std::cout << "Avg GRF Torque: " << secondPair.second << " Nm" << std::endl;
 
+  /*
   if (!testRelationshipBetweenResidualAndLinear(skel, init))
   {
     std::cout << "The residual norm doesn't map!" << std::endl;
     return init;
   }
+  */
 
   // skel->setGroupInertias(skel->getGroupInertias());
 
@@ -2616,45 +2619,45 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   //         .setIncludeInertias(true)
   //         .setIncludePoses(true));
 
-  int maxNumTrials = 3;
-  (void)maxNumTrials;
+  // int maxNumTrials = 3;
+  // (void)maxNumTrials;
 
-  // Re - run as L1
-  fitter.setIterationLimit(150);
+  // // Re - run as L1
+  // fitter.setIterationLimit(150);
+  // // fitter.runIPOPTOptimization(
+  // //     init,
+  // //     DynamicsFitProblemConfig(skel)
+  // //         .setDefaults(true)
+  // //         .setMaxNumTrials(maxNumTrials)
+  // //         .setIncludeMarkerOffsets(true)
+  // //         .setIncludePoses(true));
+
+  // fitter.setLBFGSHistoryLength(250);
   // fitter.runIPOPTOptimization(
   //     init,
   //     DynamicsFitProblemConfig(skel)
   //         .setDefaults(true)
+  //         // Add extra slack to all the bounds
   //         .setMaxNumTrials(maxNumTrials)
+  //         .setMaxNumBlocksPerTrial(20)
+  //         .setIncludeMasses(true)
+  //         // .setIncludeCOMs(true)
+  //         // .setIncludeInertias(true)
+  //         // .setPoseSubsetLen(6)
+  //         // .setPoseSubsetStartIndex(0)
+  //         // .setIncludeBodyScales(true)
   //         .setIncludeMarkerOffsets(true)
   //         .setIncludePoses(true));
 
-  fitter.setLBFGSHistoryLength(250);
-  fitter.runIPOPTOptimization(
-      init,
-      DynamicsFitProblemConfig(skel)
-          .setDefaults(true)
-          // Add extra slack to all the bounds
-          .setMaxNumTrials(maxNumTrials)
-          .setMaxNumBlocksPerTrial(20)
-          .setIncludeMasses(true)
-          // .setIncludeCOMs(true)
-          // .setIncludeInertias(true)
-          // .setPoseSubsetLen(6)
-          // .setPoseSubsetStartIndex(0)
-          // .setIncludeBodyScales(true)
-          .setIncludeMarkerOffsets(true)
-          .setIncludePoses(true));
-
-  for (int i = 0; i < init->poseTrials.size(); i++)
-  {
-    fitter.runIPOPTOptimization(
-        init,
-        DynamicsFitProblemConfig(skel)
-            .setDefaults(true)
-            .setOnlyOneTrial(i)
-            .setIncludePoses(true));
-  }
+  // for (int i = 0; i < init->poseTrials.size(); i++)
+  // {
+  //   fitter.runIPOPTOptimization(
+  //       init,
+  //       DynamicsFitProblemConfig(skel)
+  //           .setDefaults(true)
+  //           .setOnlyOneTrial(i)
+  //           .setIncludePoses(true));
+  // }
 
   // // Do a final polishing pass on the marker offsets
   // fitter.optimizeMarkerOffsets(init);
@@ -6032,6 +6035,43 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
 
   runEngine(
       "dart://sample/grf/OpenCapUnfiltered/Models/"
+      "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, CARMAGO_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("treadmill_01_01");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    motFiles.push_back("dart://sample/grf/CarmagoTest/IK/" + name + "_ik.mot");
+    trcFiles.push_back(
+        "dart://sample/grf/CarmagoTest/MarkerData/" + name + ".trc");
+    grfFiles.push_back("dart://sample/grf/CarmagoTest/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/CarmagoTest/Models/"
       "optimized_scale_and_markers.osim",
       footNames,
       motFiles,
