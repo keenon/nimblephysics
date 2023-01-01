@@ -28,6 +28,7 @@
 #include "dart/biomechanics/SubjectOnDisk.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -686,6 +687,81 @@ Eigen::Matrix3s ResidualForceHelper::
 //==============================================================================
 // Computes the Jacobian relating changes in the root position to changes in
 // the residual torque
+Eigen::Matrix<s_t, 3, 2>
+ResidualForceHelper::calculateRootAngularResidualJacobianWrtCoPChange(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    Eigen::Vector3s f,
+    int footIndex,
+    Eigen::Matrix<s_t, 3, 2> basis)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::Matrix<s_t, 3, 2> result = Eigen::Matrix<s_t, 3, 2>::Zero();
+  for (int i = 0; i < 2; i++)
+  {
+    Eigen::Vector6s dWrench = Eigen::Vector6s::Zero();
+    dWrench.head<3>() = basis.col(i).cross(f);
+    Eigen::VectorXs dTau = mForces[footIndex].computeTau(dWrench);
+    result.col(i) = -dTau.head<3>();
+  }
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  return result;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix<s_t, 3, 2>
+ResidualForceHelper::finiteDifferenceRootAngularResidualJacobianWrtCoPChange(
+    Eigen::VectorXs q,
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddq,
+    Eigen::VectorXs forcesConcat,
+    Eigen::Vector3s f,
+    int footIndex,
+    Eigen::Matrix<s_t, 3, 2> basis)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 2);
+  Eigen::VectorXs original = q;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof == 0 || dof == 1);
+        Eigen::Vector3s pos = basis.col(dof) * eps;
+        Eigen::VectorXs tweakedForces = forcesConcat;
+        tweakedForces.segment<3>(footIndex * 6) += pos.cross(f);
+        perturbed = calculateResidual(q, dq, ddq, tweakedForces).head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix<s_t, 3, 2> fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
 Eigen::Matrix6s ResidualForceHelper::calculateRootResidualJacobianWrtPosition(
     Eigen::VectorXs q,
     Eigen::VectorXs dq,
@@ -1213,6 +1289,82 @@ Eigen::Matrix3s ResidualForceHelper::
       useRidders);
 
   Eigen::Matrix3s fixedSizeResult = result;
+  return fixedSizeResult;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix<s_t, 3, 2> ResidualForceHelper::
+    calculateResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat,
+        Eigen::Vector3s f,
+        int footIndex,
+        Eigen::Matrix<s_t, 3, 2> basis)
+{
+  (void)q;
+  (void)dq;
+  (void)ddq;
+  (void)forcesConcat;
+
+  Eigen::VectorXs originalPos = mSkel->getPositions();
+  Eigen::VectorXs originalVel = mSkel->getVelocities();
+
+  mSkel->setPositions(q);
+  mSkel->setVelocities(dq);
+
+  Eigen::Matrix3s M = mSkel->getMassMatrix().block<3, 3>(0, 0);
+  auto Mdecomp = M.completeOrthogonalDecomposition();
+  Eigen::Matrix<s_t, 3, 2> result
+      = -calculateRootAngularResidualJacobianWrtCoPChange(
+          q, dq, ddq, forcesConcat, f, footIndex, basis);
+  result.col(0) = Mdecomp.solve(result.col(0));
+  result.col(1) = Mdecomp.solve(result.col(1));
+
+  mSkel->setPositions(originalPos);
+  mSkel->setVelocities(originalVel);
+  return result;
+}
+
+//==============================================================================
+// Computes the Jacobian relating changes in the root position to changes in
+// the residual torque
+Eigen::Matrix<s_t, 3, 2> ResidualForceHelper::
+    finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+        Eigen::VectorXs q,
+        Eigen::VectorXs dq,
+        Eigen::VectorXs ddq,
+        Eigen::VectorXs forcesConcat,
+        Eigen::Vector3s f,
+        int footIndex,
+        Eigen::Matrix<s_t, 3, 2> basis)
+{
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 2);
+  Eigen::VectorXs original = q;
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        assert(dof == 0 || dof == 1);
+        Eigen::Vector3s pos = basis.col(dof) * eps;
+        Eigen::VectorXs tweakedForces = forcesConcat;
+        tweakedForces.segment<3>(footIndex * 6) += pos.cross(f);
+        perturbed = calculateResidualFreeAngularAcceleration(
+                        q, dq, ddq, tweakedForces)
+                        .head<3>();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  Eigen::Matrix<s_t, 3, 2> fixedSizeResult = result;
   return fixedSizeResult;
 }
 
@@ -2365,7 +2517,7 @@ Eigen::MatrixXs ResidualForceHelper::getResidualFreePoses(
 // initial conditions, so it's possible to solve this whole system in one
 // shot. This won't produce something legal, but it well let you get your
 // angular accelerations quite close to the desired trajectory.
-std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
 ResidualForceHelper::getLinearTrajectoryLinearSystem(
     s_t dt,
     Eigen::MatrixXs qs,
@@ -2373,6 +2525,11 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
+    bool useReactionWheels,
+    std::vector<ForcePlate> driftCorrectForcePlates,
+    std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody,
+    int driftCorrectionBlurRadius,
+    int driftCorrectionBlurInterval,
     int maxBuckets)
 {
   int numTimesteps = qs.cols();
@@ -2532,42 +2689,198 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
   Eigen::VectorXs angularOffset = Eigen::VectorXs::Zero(numTimesteps * 3);
   Eigen::MatrixXs linearMapToAngularOffset
       = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + (numMissingSteps * 3));
+  const s_t reactionWheelMOI = 100.0;
+  if (useReactionWheels)
+  {
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      // Compute the residual values, on the main thread
+      Eigen::VectorXs q = qs.col(t);
+      Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+      q.segment<3>(3) += comMoves;
+
+      Eigen::VectorXs dq = dqs.col(t);
+      dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+
+      mSkel->setPositions(qs.col(t));
+      mSkel->setVelocities(dqs.col(t));
+      const Eigen::Vector3s angularResidual
+          = calculateResidual(q, dq, ddqs.col(t), forces.col(t)).head<3>();
+      const Eigen::Matrix3s angResidualWrtPos
+          = calculateRootAngularResidualJacobianWrtLinearPosition(
+              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+      const Eigen::Matrix3s angResidualWrtVel
+          = calculateRootAngularResidualJacobianWrtLinearVelocity(
+              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+
+      angularOffset.segment<3>(t * 3) = angularPos;
+
+      angularVel += angularResidual * (dt / reactionWheelMOI);
+      angularPos += angularVel * dt;
+
+      for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
+      {
+        Eigen::Matrix3s dResidual
+            = angResidualWrtPos
+                  * trialLinearMapToPositions.block<3, 3>(t * 3, i * 3)
+              + angResidualWrtVel
+                    * trialLinearMapToVelocities.block<3, 3>(t * 3, i * 3);
+        for (int offset = 1; offset < numTimesteps - t; offset++)
+        {
+          linearMapToAngularOffset.block<3, 3>((t + offset) * 3, i * 3)
+              += offset * dt * dt * (1.0 / reactionWheelMOI) * dResidual;
+        }
+      }
+    }
+  }
+  else
+  {
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      // Compute the residual values, on the main thread
+      Eigen::VectorXs q = qs.col(t);
+      Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+      q.segment<3>(3) += comMoves;
+
+      Eigen::VectorXs dq = dqs.col(t);
+      dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+      const Eigen::Vector3s angularAcc
+          = calculateResidualFreeAngularAcceleration(
+              q, dq, ddqs.col(t), forces.col(t));
+
+      mSkel->setPositions(qs.col(t));
+      mSkel->setVelocities(dqs.col(t));
+      const Eigen::Matrix3s angAccWrtPos
+          = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+      const Eigen::Matrix3s angAccWrtVel
+          = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+              qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+
+      angularOffset.segment<3>(t * 3) = angularPos;
+
+      angularVel += angularAcc * dt;
+      angularPos += angularVel * dt;
+
+      for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
+      {
+        Eigen::Matrix3s dAngAcc
+            = angAccWrtPos * trialLinearMapToPositions.block<3, 3>(t * 3, i * 3)
+              + angAccWrtVel
+                    * trialLinearMapToVelocities.block<3, 3>(t * 3, i * 3);
+        for (int offset = 1; offset < numTimesteps - t; offset++)
+        {
+          linearMapToAngularOffset.block<3, 3>((t + offset) * 3, i * 3)
+              += offset * dt * dt * dAngAcc;
+        }
+      }
+    }
+  }
+
+  // Ang residual wrt CoP changes.
+  int numBlurs = (int)floor((s_t)numTimesteps / driftCorrectionBlurInterval);
+  // Each FP gets a set of drift correction blurs over time, with 2 axis of
+  // movement per blur, depending on force plate orientation
+  int numBlurCoefficients = driftCorrectForcePlates.size() * numBlurs * 2;
+  // Each FP has a basis defined by two vector directions which the CoP can
+  // shift along.
+  std::vector<Eigen::Matrix<s_t, 3, 2>> forcePlateBasis;
+  for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+  {
+    Eigen::Matrix<s_t, 3, 2> basis = Eigen::Matrix<s_t, 3, 2>::Zero();
+    // TODO: handle rotated force plates correctly. For now, assume all force
+    // plates are flat on the ground
+    basis.col(0) = Eigen::Vector3s::UnitX();
+    basis.col(1) = Eigen::Vector3s::UnitZ();
+
+    forcePlateBasis.push_back(basis);
+  }
+  // Each force plate blur gets an independent counter to integrate its effect
+  // on angular residuals
+  std::vector<Eigen::Vector3s> blurVelocity;
+  std::vector<Eigen::Vector3s> blurPosition;
+  for (int i = 0; i < numBlurCoefficients; i++)
+  {
+    blurVelocity.push_back(Eigen::Vector3s::Zero());
+    blurPosition.push_back(Eigen::Vector3s::Zero());
+  }
+  std::vector<Eigen::MatrixXs> blurMapCopChanges;
+  for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+  {
+    blurMapCopChanges.push_back(
+        Eigen::MatrixXs::Zero(numTimesteps * 3, numBlurCoefficients));
+  }
+
+  Eigen::MatrixXs blurMapToAngularOffsets
+      = Eigen::MatrixXs::Zero(numTimesteps * 3, numBlurCoefficients);
   for (int t = 0; t < numTimesteps; t++)
   {
-    // Compute the residual values, on the main thread
-    Eigen::VectorXs q = qs.col(t);
-    Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
-    q.segment<3>(3) += comMoves;
-
-    Eigen::VectorXs dq = dqs.col(t);
-    dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
-    const Eigen::Vector3s angularAcc = calculateResidualFreeAngularAcceleration(
-        q, dq, ddqs.col(t), forces.col(t));
-
-    mSkel->setPositions(qs.col(t));
-    mSkel->setVelocities(dqs.col(t));
-    const Eigen::Matrix3s angAccWrtPos
-        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-    const Eigen::Matrix3s angAccWrtVel
-        = calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
-            qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-
-    angularOffset.segment<3>(t * 3) = angularPos;
-
-    angularVel += angularAcc * dt;
-    angularPos += angularVel * dt;
-
-    for (int i = 0; i < linearMapToAngularOffset.cols() / 3; i++)
+    for (int i = 0; i < driftCorrectForcePlates.size(); i++)
     {
-      Eigen::Matrix3s dAngAcc
-          = angAccWrtPos * trialLinearMapToPositions.block<3, 3>(t * 3, i * 3)
-            + angAccWrtVel
-                  * trialLinearMapToVelocities.block<3, 3>(t * 3, i * 3);
-      for (int offset = 1; offset < numTimesteps - t; offset++)
+      Eigen::Vector3s f = driftCorrectForcePlates[i].forces[t];
+      int footIndex = driftCorrectForcePlatesAssignedToContactBody[i][t];
+
+      for (int b = 0; b < numBlurs; b++)
       {
-        linearMapToAngularOffset.block<3, 3>((t + offset) * 3, i * 3)
-            += offset * dt * dt * dAngAcc;
+        int blurOffset = (i * numBlurs + b) * 2;
+
+        int blurCenter = (b + 1) * driftCorrectionBlurInterval;
+        int blurDistance = abs(t - blurCenter);
+        if (blurDistance < driftCorrectionBlurRadius)
+        {
+          s_t percentage = (s_t)blurDistance / driftCorrectionBlurRadius;
+          s_t weight
+              = (cos(percentage * M_PI) + 1.0)
+                / 2.0; // Use a full wave, shifted to output between 1 and 0
+
+          blurMapCopChanges[i].block<3, 2>(t * 3, blurOffset)
+              = weight * forcePlateBasis[i];
+
+          Eigen::Matrix<s_t, 3, 2> angResWrtCoP
+              = Eigen::Matrix<s_t, 3, 2>::Zero();
+          if (footIndex >= 0)
+          {
+            if (useReactionWheels)
+            {
+              angResWrtCoP = calculateRootAngularResidualJacobianWrtCoPChange(
+                                 qs.col(t),
+                                 dqs.col(t),
+                                 ddqs.col(t),
+                                 forces.col(t),
+                                 f,
+                                 footIndex,
+                                 forcePlateBasis[i])
+                             * (1.0 / reactionWheelMOI);
+            }
+            else
+            {
+              angResWrtCoP
+                  = calculateResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+                      qs.col(t),
+                      dqs.col(t),
+                      ddqs.col(t),
+                      forces.col(t),
+                      f,
+                      footIndex,
+                      forcePlateBasis[i]);
+            }
+          }
+
+          for (int axis = 0; axis < 2; axis++)
+          {
+            int col = blurOffset + axis;
+            blurVelocity[col] += dt * weight * angResWrtCoP.col(axis);
+          }
+        }
+
+        for (int axis = 0; axis < 2; axis++)
+        {
+          int col = blurOffset + axis;
+          // Record positions _before_ integrating
+          blurMapToAngularOffsets.block<3, 1>(t * 3, col) = blurPosition[col];
+
+          blurPosition[col] += dt * blurVelocity[col];
+        }
       }
     }
   }
@@ -2580,8 +2893,8 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
 
   Eigen::MatrixXs A = Eigen::MatrixXs::Zero(
       trialLinearMapToPositions.rows() * 2,
-      trialLinearMapToPositions.cols() * 2);
-  Eigen::VectorXs b = Eigen::VectorXs(comOffset.size() * 2);
+      trialLinearMapToPositions.cols() * 2 + numBlurCoefficients);
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(comOffset.size() * 2);
   // Set up linear positions
   A.block(
       0, 0, trialLinearMapToPositions.rows(), trialLinearMapToPositions.cols())
@@ -2600,9 +2913,17 @@ ResidualForceHelper::getLinearTrajectoryLinearSystem(
       trialLinearMapToPositions.rows(),
       trialLinearMapToPositions.cols())
       = trialLinearMapToPositions;
+  A.block(
+      trialLinearMapToPositions.rows(),
+      trialLinearMapToPositions.cols() * 2,
+      blurMapToAngularOffsets.rows(),
+      blurMapToAngularOffsets.cols())
+      = blurMapToAngularOffsets;
   b.segment(comOffset.size(), comOffset.size()) = angularOffset;
 
-  return std::make_pair(A, b);
+  return std::
+      tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>(
+          A, b, blurMapCopChanges);
 }
 
 //==============================================================================
@@ -2615,6 +2936,7 @@ ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
+    bool useReactionWheels,
     int maxBuckets)
 {
   int numTimesteps = qs.cols();
@@ -2800,49 +3122,104 @@ ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
   std::vector<std::future<void>> futures;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    futures.push_back(std::async([threadIdx,
-                                  numTimesteps,
-                                  numThreads,
-                                  &comOffset,
-                                  &coms,
-                                  &comVelOffset,
-                                  &qs,
-                                  &dqs,
-                                  &ddqs,
-                                  &forces,
-                                  &residualFreeAngularAccs,
-                                  &angAccWrtPoses,
-                                  &angAccWrtVels,
-                                  this] {
-      std::shared_ptr<dynamics::Skeleton> skel = mThreadSkels[threadIdx];
-      ResidualForceHelper& threadHelper = mThreadHelpers[threadIdx];
-      for (int t = 0; t < numTimesteps; t++)
-      {
-        if ((t + threadIdx) % numThreads == 0)
+    if (useReactionWheels)
+    {
+      futures.push_back(std::async([threadIdx,
+                                    numTimesteps,
+                                    numThreads,
+                                    &comOffset,
+                                    &coms,
+                                    &comVelOffset,
+                                    &qs,
+                                    &dqs,
+                                    &ddqs,
+                                    &forces,
+                                    &residualFreeAngularAccs,
+                                    &angAccWrtPoses,
+                                    &angAccWrtVels,
+                                    this] {
+        std::shared_ptr<dynamics::Skeleton> skel = mThreadSkels[threadIdx];
+        ResidualForceHelper& threadHelper = mThreadHelpers[threadIdx];
+        s_t reactionWheelMOI = 100.0;
+
+        for (int t = 0; t < numTimesteps; t++)
         {
-          Eigen::VectorXs q = qs.col(t);
-          Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
-          q.segment<3>(3) += comMoves;
+          if ((t + threadIdx) % numThreads == 0)
+          {
+            Eigen::VectorXs q = qs.col(t);
+            Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+            q.segment<3>(3) += comMoves;
 
-          Eigen::VectorXs dq = dqs.col(t);
-          dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
-          residualFreeAngularAccs[t]
-              = threadHelper.calculateResidualFreeAngularAcceleration(
-                  q, dq, ddqs.col(t), forces.col(t));
+            Eigen::VectorXs dq = dqs.col(t);
+            dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
 
-          skel->setPositions(qs.col(t));
-          skel->setVelocities(dqs.col(t));
-          angAccWrtPoses[t]
-              = threadHelper
-                    .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
-                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
-          angAccWrtVels[t]
-              = threadHelper
-                    .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
-                        qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+            skel->setPositions(qs.col(t));
+            skel->setVelocities(dqs.col(t));
+            residualFreeAngularAccs[t]
+                = threadHelper
+                      .calculateResidual(q, dq, ddqs.col(t), forces.col(t))
+                      .head<3>()
+                  * (1.0 / reactionWheelMOI);
+            angAccWrtPoses[t]
+                = threadHelper
+                      .calculateRootAngularResidualJacobianWrtLinearPosition(
+                          qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t))
+                  * (1.0 / reactionWheelMOI);
+            angAccWrtVels[t]
+                = threadHelper
+                      .calculateRootAngularResidualJacobianWrtLinearVelocity(
+                          qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t))
+                  * (1.0 / reactionWheelMOI);
+          }
         }
-      }
-    }));
+      }));
+    }
+    else
+    {
+      futures.push_back(std::async([threadIdx,
+                                    numTimesteps,
+                                    numThreads,
+                                    &comOffset,
+                                    &coms,
+                                    &comVelOffset,
+                                    &qs,
+                                    &dqs,
+                                    &ddqs,
+                                    &forces,
+                                    &residualFreeAngularAccs,
+                                    &angAccWrtPoses,
+                                    &angAccWrtVels,
+                                    this] {
+        std::shared_ptr<dynamics::Skeleton> skel = mThreadSkels[threadIdx];
+        ResidualForceHelper& threadHelper = mThreadHelpers[threadIdx];
+        for (int t = 0; t < numTimesteps; t++)
+        {
+          if ((t + threadIdx) % numThreads == 0)
+          {
+            Eigen::VectorXs q = qs.col(t);
+            Eigen::Vector3s comMoves = comOffset.segment<3>(t * 3) - coms[t];
+            q.segment<3>(3) += comMoves;
+
+            Eigen::VectorXs dq = dqs.col(t);
+            dq.segment<3>(3) = comVelOffset.segment<3>(t * 3);
+            residualFreeAngularAccs[t]
+                = threadHelper.calculateResidualFreeAngularAcceleration(
+                    q, dq, ddqs.col(t), forces.col(t));
+
+            skel->setPositions(qs.col(t));
+            skel->setVelocities(dqs.col(t));
+            angAccWrtPoses[t]
+                = threadHelper
+                      .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearPosition(
+                          qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+            angAccWrtVels[t]
+                = threadHelper
+                      .calculateResidualFreeRootAngularAccelerationJacobianWrtLinearVelocity(
+                          qs.col(t), dqs.col(t), ddqs.col(t), forces.col(t));
+          }
+        }
+      }));
+    }
   }
 
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
@@ -2919,7 +3296,7 @@ ResidualForceHelper::getLinearTrajectoryLinearSystemParallel(
 //==============================================================================
 // This returns the same thing as getLinearTrajectoryLinearSystem(), in
 // theory.
-std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
 ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
     s_t dt,
     Eigen::MatrixXs qs,
@@ -2927,6 +3304,11 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
+    bool useReactionWheels,
+    std::vector<ForcePlate> driftCorrectForcePlates,
+    std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody,
+    int driftCorrectionBlurRadius,
+    int driftCorrectionBlurInterval,
     int maxBuckets)
 {
   (void)qs;
@@ -2953,6 +3335,9 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
       = math::getConsolidatedMapping(missingStepIndices, maxBuckets);
   assert(numMissingSteps <= maxBuckets);
 
+  int numBlurs = (int)floor((s_t)qs.cols() / driftCorrectionBlurInterval);
+  int blurDim = driftCorrectForcePlates.size() * numBlurs * 2;
+
   Eigen::VectorXs zeroPoint = getLinearTrajectoryLinearSystemTestOutput(
       dt,
       Eigen::Vector3s::Zero(),
@@ -2965,10 +3350,17 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
       dqs,
       ddqs,
       forces,
-      probablyMissingGRF);
+      probablyMissingGRF,
+      useReactionWheels,
+      Eigen::VectorXs::Zero(blurDim),
+      driftCorrectForcePlates,
+      driftCorrectForcePlatesAssignedToContactBody,
+      driftCorrectionBlurRadius,
+      driftCorrectionBlurInterval,
+      maxBuckets);
 
-  Eigen::MatrixXs result
-      = Eigen::MatrixXs::Zero(zeroPoint.size(), (6 + numMissingSteps * 3) * 2);
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(
+      zeroPoint.size(), ((6 + (numMissingSteps * 3)) * 2) + blurDim);
 
   const bool useRidders = true;
   s_t eps = useRidders ? 0.01 : 1e-6;
@@ -2990,7 +3382,14 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         else if (dof < 6)
         {
@@ -3006,7 +3405,14 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         else if (dof < 6 + numMissingSteps * 3)
         {
@@ -3022,7 +3428,14 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         else if (dof < (6 + numMissingSteps * 3) + 3)
         {
@@ -3038,7 +3451,14 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         else if (dof < (6 + numMissingSteps * 3) + 6)
         {
@@ -3055,7 +3475,14 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         else if (dof < (6 + numMissingSteps * 3) + (6 + numMissingSteps * 3))
         {
@@ -3073,7 +3500,41 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
               dqs,
               ddqs,
               forces,
-              probablyMissingGRF);
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Zero(blurDim),
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
+        }
+        else if (
+            dof
+            < (6 + numMissingSteps * 3) + (6 + numMissingSteps * 3) + blurDim)
+        {
+          perturbed = getLinearTrajectoryLinearSystemTestOutput(
+              dt,
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              Eigen::Vector3s::Zero(),
+              Eigen::Vector3s::Zero(),
+              Eigen::VectorXs::Zero(numMissingSteps * 3),
+              qs,
+              dqs,
+              ddqs,
+              forces,
+              probablyMissingGRF,
+              useReactionWheels,
+              Eigen::VectorXs::Unit(
+                  blurDim, dof - ((6 + numMissingSteps * 3) * 2))
+                  * eps,
+              driftCorrectForcePlates,
+              driftCorrectForcePlatesAssignedToContactBody,
+              driftCorrectionBlurRadius,
+              driftCorrectionBlurInterval,
+              maxBuckets);
         }
         return true;
       },
@@ -3081,7 +3542,41 @@ ResidualForceHelper::finiteDifferenceLinearTrajectoryLinearSystem(
       eps,
       useRidders);
 
-  return std::make_pair(result, zeroPoint);
+  std::vector<Eigen::MatrixXs> recoverCops;
+  int numTimesteps = qs.cols();
+  for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+  {
+    Eigen::Matrix<s_t, 3, 2> basis = Eigen::Matrix<s_t, 3, 2>::Zero();
+    basis.col(0) = Eigen::Vector3s::UnitX();
+    basis.col(1) = Eigen::Vector3s::UnitZ();
+
+    Eigen::MatrixXs recover = Eigen::MatrixXs::Zero(numTimesteps * 3, blurDim);
+    for (int b = 0; b < numBlurs; b++)
+    {
+      int blurCenter = (b + 1) * driftCorrectionBlurInterval;
+
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        int blurDistance = abs(t - blurCenter);
+        if (blurDistance < driftCorrectionBlurRadius)
+        {
+          s_t percentage = (s_t)blurDistance / driftCorrectionBlurRadius;
+
+          s_t weight
+              = (cos(percentage * M_PI) + 1.0)
+                / 2.0; // Use a full wave, shifted to output between 1 and 0
+
+          recover.block<3, 2>(t * 3, (i * numBlurs * 2) + (b * 2))
+              = basis * weight;
+        }
+      }
+    }
+    recoverCops.push_back(recover);
+  }
+
+  return std::
+      tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>(
+          result, zeroPoint, recoverCops);
 }
 
 //==============================================================================
@@ -3100,6 +3595,12 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     Eigen::MatrixXs ddqs,
     Eigen::MatrixXs forces,
     std::vector<bool> probablyMissingGRF,
+    bool useReactionWheels,
+    Eigen::VectorXs blurCoeffs,
+    std::vector<ForcePlate> driftCorrectForcePlates,
+    std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody,
+    int driftCorrectionBlurRadius,
+    int driftCorrectionBlurInterval,
     int maxBuckets)
 {
   std::vector<int> missingStepIndices;
@@ -3166,6 +3667,17 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
   Eigen::Vector3s angVel = angVelOffset;
   Eigen::VectorXs angPoses = Eigen::VectorXs::Zero(qs.cols() * 3);
 
+  int numBlurs = (int)floor((s_t)qs.cols() / driftCorrectionBlurInterval);
+  assert(blurCoeffs.size() == numBlurs * driftCorrectForcePlates.size() * 2);
+  std::vector<Eigen::Matrix<s_t, 3, 2>> basis;
+  for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+  {
+    Eigen::Matrix<s_t, 3, 2> fpBasis = Eigen::Matrix<s_t, 3, 2>::Zero();
+    fpBasis.col(0) = Eigen::Vector3s::UnitX();
+    fpBasis.col(1) = Eigen::Vector3s::UnitZ();
+    basis.push_back(fpBasis);
+  }
+
   int residualCursor = 0;
   for (int t = 0; t < qs.cols(); t++)
   {
@@ -3179,7 +3691,6 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     dq.segment<3>(3) = linVel;
 
     // Integrate pos
-
     Eigen::Vector3s linAcc = gravity + grfs[t] / mass;
     if (t > 0 && t < qs.cols() - 1)
     {
@@ -3193,10 +3704,49 @@ Eigen::VectorXs ResidualForceHelper::getLinearTrajectoryLinearSystemTestOutput(
     }
     linPos += dt * linVel;
 
-    // Integrate acc
+    // Handle CoP shift from drift compensating blurs
+    Eigen::VectorXs grfs = forces.col(t);
+    for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+    {
+      for (int b = 0; b < numBlurs; b++)
+      {
+        int blurCenter = (b + 1) * driftCorrectionBlurInterval;
 
-    Eigen::Vector3s angAcc = calculateResidualFreeAngularAcceleration(
-        q, dq, ddqs.col(t), forces.col(t));
+        int blurDistance = abs(t - blurCenter);
+        if (blurDistance < driftCorrectionBlurRadius)
+        {
+          s_t percentage = (s_t)blurDistance / driftCorrectionBlurRadius;
+
+          s_t weight
+              = (cos(percentage * M_PI) + 1.0)
+                / 2.0; // Use a full wave, shifted to output between 1 and 0
+
+          for (int axis = 0; axis < 2; axis++)
+          {
+            s_t finalWeight = blurCoeffs(((i * numBlurs + b) * 2) + axis);
+            Eigen::Vector3s shiftCop
+                = basis[i].col(axis) * weight * finalWeight;
+            int foot = driftCorrectForcePlatesAssignedToContactBody[i][t];
+            grfs.segment<3>(6 * foot)
+                += shiftCop.cross(driftCorrectForcePlates[i].forces[t]);
+          }
+        }
+      }
+    }
+
+    // Integrate acc
+    Eigen::Vector3s angAcc = Eigen::Vector3s::Zero();
+    if (useReactionWheels)
+    {
+      const s_t reactionWheelMOI = 100.0;
+      angAcc = calculateResidual(q, dq, ddqs.col(t), grfs).head<3>()
+               * (1.0 / reactionWheelMOI);
+    }
+    else
+    {
+      angAcc
+          = calculateResidualFreeAngularAcceleration(q, dq, ddqs.col(t), grfs);
+    }
     angVel += dt * angAcc;
     if (probablyMissingGRF[t])
     {
@@ -3286,8 +3836,8 @@ ResidualForceHelper::getMultiMassLinearSystem(
     mSkel->setAccelerations(ddqs.col(t));
 
     comOffset.push_back(
-        qs.col(t).segment<3>(3)); // Unnormalized COMs start at 0, so the offset
-                                  // at 0 is just the original root pos
+        qs.col(t).segment<3>(3)); // Unnormalized COMs start at 0, so the
+                                  // offset at 0 is just the original root pos
     comOffsetJac.push_back(
         -mSkel->getUnnormalizedCOMJacobianWrtLinearizedMasses());
 
@@ -3400,10 +3950,10 @@ ResidualForceHelper::getMultiMassLinearSystem(
   }
 
   // Construct a complete A,b system.
-  // For columns, we concatenate all the variables for the linear pos and linear
-  // residuals first, then all the variables for angular pos and angular
-  // residuals second. Likewise for rows, we concatenate all the linear output
-  // poses first, then all the angular output poses.
+  // For columns, we concatenate all the variables for the linear pos and
+  // linear residuals first, then all the variables for angular pos and
+  // angular residuals second. Likewise for rows, we concatenate all the
+  // linear output poses first, then all the angular output poses.
 
   Eigen::MatrixXs A = trialLinearMapToPositions;
   Eigen::VectorXs b = zeroInitialStateOffset;
@@ -4062,8 +4612,9 @@ DynamicsFitProblem::DynamicsFitProblem(
       }
     }
 
-    // If this block starts the trial, we need to initialize the first timestep
-    // so that time integration will work for positions and velocities
+    // If this block starts the trial, we need to initialize the first
+    // timestep so that time integration will work for positions and
+    // velocities
     if (block.start == 0)
     {
       block.vel.col(0) = mSkeleton->getPositionDifferences(
@@ -4551,8 +5102,9 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     compare.col(1) = mInit->originalGroupMasses;
     compare.col(2) = mSkeleton->getGroupMassesUpperBound();
     compare.col(3) = mSkeleton->getGroupMassesLowerBound();
-    compare.col(4) = (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
-    std::cout << "masses - orig - upper - lower - diff" << std::endl
+    compare.col(4) = (mSkeleton->getGroupMasses() -
+  mInit->originalGroupMasses); std::cout << "masses - orig - upper - lower -
+  diff" << std::endl
               << compare << std::endl;
   }
   */
@@ -4829,8 +5381,9 @@ s_t DynamicsFitProblem::computeLossParallel(
     compare.col(1) = mInit->originalGroupMasses;
     compare.col(2) = mSkeleton->getGroupMassesUpperBound();
     compare.col(3) = mSkeleton->getGroupMassesLowerBound();
-    compare.col(4) = (mSkeleton->getGroupMasses() - mInit->originalGroupMasses);
-    std::cout << "masses - orig - upper - lower - diff" << std::endl
+    compare.col(4) = (mSkeleton->getGroupMasses() -
+  mInit->originalGroupMasses); std::cout << "masses - orig - upper - lower -
+  diff" << std::endl
               << compare << std::endl;
   }
   */
@@ -8177,6 +8730,41 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   std::shared_ptr<DynamicsInitialization> init
       = std::make_shared<DynamicsInitialization>();
   init->forcePlateTrials = forcePlateTrials;
+
+  bool anyAntiparallel = false;
+  for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
+  {
+    init->reactionWheels.push_back(Eigen::MatrixXs::Zero(0, 0));
+    for (int f = 0; f < init->forcePlateTrials[trial].size(); f++)
+    {
+      ForcePlate& plate = init->forcePlateTrials[trial][f];
+      for (int t = 0; t < plate.forces.size(); t++)
+      {
+        Eigen::Vector3s f = plate.forces[t];
+        Eigen::Vector3s m = plate.moments[t];
+        // Check for the section of the moment that is not parallel with force
+        Eigen::Vector3s parallelComponent
+            = f.normalized().dot(m) * f.normalized();
+        Eigen::Vector3s antiParallelComponent = m - parallelComponent;
+        s_t percentageAntiparallel
+            = antiParallelComponent.norm() / parallelComponent.norm();
+        if (percentageAntiparallel > 0.01)
+        {
+          anyAntiparallel = true;
+          // Keep only the parallel component of the moment
+          plate.moments[t].setZero();
+          // plate.moments[t] = parallelComponent;
+        }
+      }
+    }
+  }
+  if (anyAntiparallel)
+  {
+    std::cout << "Found moments that were signficantly not parallel to the "
+                 "GRF force."
+              << std::endl;
+  }
+
   init->originalPoses = poseTrials;
   init->regularizePosesTo = poseTrials;
   init->markerObservationTrials = markerObservationTrials;
@@ -8237,6 +8825,21 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     Eigen::MatrixXs GRF
         = Eigen::MatrixXs::Zero(grfNodes.size() * 6, poses.cols());
     init->grfTrials.push_back(GRF);
+
+    // This is a map of [trial][forcePlate][timestep], which we initialize
+    // with all -1
+    std::vector<std::vector<int>> assignedToContactBody;
+    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+    {
+      std::vector<int> assignment;
+      for (int t = 0; t < poses.cols(); t++)
+      {
+        assignment.push_back(-1);
+      }
+      assignedToContactBody.push_back(assignment);
+    }
+    init->forcePlatesAssignedToContactBody.push_back(assignedToContactBody);
+
     recomputeGRFs(init, skel, trial);
   }
 
@@ -8970,8 +9573,9 @@ void DynamicsFitter::estimateFootGroundContacts(
           if (!overPlate)
           {
             // If we're not over a force plate, use a more generous margin to
-            // detect foot-ground contact, since we almost certainly are missing
-            // data here, and we want to prioritize recall on those timesteps.
+            // detect foot-ground contact, since we almost certainly are
+            // missing data here, and we want to prioritize recall on those
+            // timesteps.
             dist -= offForcePlateHeightSafetyMargin;
           }
 
@@ -9503,7 +10107,10 @@ void DynamicsFitter::moveComsToMinimizeAngularResiduals(
 // velocities of the body to achieve a least-squares closest COM trajectory to
 // the current kinematic fit.
 void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
-    std::shared_ptr<DynamicsInitialization> init, bool detectExternalForce)
+    std::shared_ptr<DynamicsInitialization> init,
+    bool detectExternalForce,
+    int driftCorrectionBlurRadius,
+    int driftCorrectionBlurInterval)
 {
   if (mSkeleton->getRootJoint()->getType()
           != dynamics::EulerFreeJoint::getStaticType()
@@ -9757,89 +10364,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         originalCOMPositions(zRow) = trialOriginalCOMs[i][t](2);
       }
 
-#ifndef NDEBUG
-      // Check that the ResidualHelper system gets the same matrix for the
-      // related section
-      Eigen::MatrixXs q = init->poseTrials[i];
-      Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-      Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-      for (int t = 0; t < init->poseTrials[i].cols(); t++)
-      {
-        // Compute the offset from the difference between a
-        // finite-difference's COM acceleration and an analytical one
-        if (t > 0 && t < init->poseTrials[i].cols() - 1)
-        {
-          dq.col(t)
-              = mSkeleton->getPositionDifferences(
-                    init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
-                / dt;
-          ddq.col(t)
-              = (mSkeleton->getPositionDifferences(
-                     init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
-                 - mSkeleton->getPositionDifferences(
-                     init->poseTrials[i].col(t),
-                     init->poseTrials[i].col(t - 1)))
-                / (dt * dt);
-        }
-      }
-      // TODO: these don't match up when we're creating a DynamicsInit from the
-      // result of a marker fitter pass. Why not I wonder?
-      Eigen::VectorXs thisOffset
-          = comGravityOffset
-            + (1.0 / mSkeleton->getMass())
-                  * trialLinearMapToPositions.col(massCol).segment(
-                      0, numTimesteps * 3);
-      auto pair = helper.getLinearTrajectoryLinearSystem(
-          dt, q, dq, ddq, init->grfTrials[i], init->probablyMissingGRF[i]);
-      Eigen::VectorXs compareOffset = pair.second.segment(0, thisOffset.size());
-      Eigen::VectorXs offsetDiff = compareOffset - thisOffset;
-      if (offsetDiff.cwiseAbs().maxCoeff() > 1e-8)
-      {
-        for (int t = 0; t < offsetDiff.size() / 3; t++)
-        {
-          if (offsetDiff.segment<3>(t * 3).norm() > 1e-8)
-          {
-            std::cout << "Disagreement on b at t=" << t << ":" << std::endl;
-            Eigen::Matrix3s compare;
-            compare.col(0) = thisOffset.segment<3>(t * 3);
-            compare.col(1) = compareOffset.segment<3>(t * 3);
-            compare.col(2) = offsetDiff.segment<3>(t * 3);
-            std::cout << "Original - ResidualHelper - Diff" << std::endl
-                      << compare << std::endl;
-          }
-        }
-
-        assert(offsetDiff.cwiseAbs().maxCoeff() < 1e-8);
-      }
-
-      Eigen::MatrixXs compareLinearSystem
-          = pair.first.block(0, 0, numTimesteps * 3, 6);
-      Eigen::MatrixXs diff
-          = compareLinearSystem
-            - trialLinearMapToPositions.block(0, 0, numTimesteps * 3, 6);
-      if (diff.cwiseAbs().maxCoeff() > 1e-8)
-      {
-        for (int t = 0; t < diff.rows() / 3; t++)
-        {
-          for (int col = 0; col < diff.cols() / 3; col++)
-          {
-            Eigen::Matrix3s original
-                = trialLinearMapToPositions.block<3, 3>(t * 3, col * 3);
-            Eigen::Matrix3s reconstructed
-                = compareLinearSystem.block<3, 3>(t * 3, col * 3);
-            std::cout << "Disagreement on A at t=" << t << ", var=" << col
-                      << ":" << std::endl;
-            std::cout << "Original:" << std::endl << original << std::endl;
-            std::cout << "Reconstructed:" << std::endl
-                      << reconstructed << std::endl;
-            std::cout << "Diff:" << std::endl
-                      << diff.block<3, 3>(t * 3, col * 3) << std::endl;
-          }
-        }
-        assert(diff.cwiseAbs().maxCoeff() < 1e-8);
-      }
-#endif
-
       // Output the force plate rotations to the output, so we can
       // regularize it
       for (int j = 0; j < numForcePlates; j++)
@@ -9860,9 +10384,9 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                     << trialLinearMapToPositions.row(angleXRow).transpose()
                     << std::endl;
         }
-        assert(trialLinearMapToPositions.row(missingXRow).isZero());
-        assert(trialLinearMapToPositions.row(missingYRow).isZero());
-        assert(trialLinearMapToPositions.row(missingZRow).isZero());
+        assert(trialLinearMapToPositions.row(angleXRow).isZero());
+        assert(trialLinearMapToPositions.row(angleYRow).isZero());
+        assert(trialLinearMapToPositions.row(angleZRow).isZero());
 
         trialLinearMapToPositions(angleXRow, angleXCol)
             = regularizeForcePlateRotations * numTimesteps;
@@ -10060,9 +10584,12 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
     // Now that we've formulated our problem, we can attempt to solve:
 
-    // Eigen::VectorXs tentativeResult = unifiedLinearMap.householderQr().solve(
+    // Eigen::VectorXs tentativeResult =
+    // unifiedLinearMap.householderQr().solve(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+    solver.setTolerance(1e-9);
+    solver.setMaxIterations(200);
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -10117,8 +10644,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
     std::cout << "Found skeleton mass: " << foundMass << "kg" << std::endl;
 
-    // Go through and read out the solution values for each trial (or solve mini
-    // problems, if these trials were trimmed out)
+    // Go through and read out the solution values for each trial (or solve
+    // mini problems, if these trials were trimmed out)
     std::vector<Eigen::VectorXs> trialSolutionInput;
     std::vector<Eigen::VectorXs> trialSolutionOutput;
     colCursor = 0;
@@ -10160,6 +10687,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         // Eigen::VectorXs localResult
         //     = AFixedMass.householderQr().solve(desired - bFixedMass);
         Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+        solver.setTolerance(1e-9);
+        solver.setMaxIterations(200);
         solver.compute(AFixedMass);
         Eigen::VectorXs localResult
             = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -10218,12 +10747,12 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     }
 
     std::vector<Eigen::VectorXs> finalCOMTrajectory;
-    // Set up and solve "drift correction" problems, for very long trials (> 500
-    // timesteps) where drift can become a major issue.
+    // Set up and solve "drift correction" problems, for very long trials (>
+    // twice the blur radius timesteps) where drift can become a major issue.
     for (int trial = 0; trial < numTrials; trial++)
     {
       int trialLength = init->poseTrials[trial].cols();
-      if (trialLength < 500)
+      if (trialLength < driftCorrectionBlurRadius * 2)
       {
         finalCOMTrajectory.push_back(
             trialSolutionOutput[trial].segment(0, trialLength * 3));
@@ -10235,9 +10764,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                      "correct for GRF-integration drift on long trajectory "
                   << trial << " (len = " << trialLength << ")." << std::endl;
 
-        int blurRadius = 250;
-        int blurEvery = 250;
-        int numBlurs = (int)floor((s_t)trialLength / blurEvery);
+        int numBlurs
+            = (int)floor((s_t)trialLength / driftCorrectionBlurInterval);
         const s_t dt = init->trialTimesteps[trial];
         s_t regularizeBlurs = 0.001 * trialLength;
 
@@ -10291,14 +10819,14 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
           // Time integrate the blurs
           for (int f = 0; f < numBlurs; f++)
           {
-            int blurCenter = (f + 1) * blurEvery;
+            int blurCenter = (f + 1) * driftCorrectionBlurInterval;
             int blurDistance = abs(t - blurCenter);
-            if (blurDistance < blurRadius)
+            if (blurDistance < driftCorrectionBlurRadius)
             {
-              s_t percentage = (s_t)blurDistance / blurRadius;
-              s_t weight
-                  = (cos(percentage * M_PI) + 1.0)
-                    / 2.0; // Use a full wave, shifted to output between 1 and 0
+              s_t percentage = (s_t)blurDistance / driftCorrectionBlurRadius;
+              s_t weight = (cos(percentage * M_PI) + 1.0)
+                           / 2.0; // Use a full wave, shifted to output
+                                  // between 1 and 0
               s_t forceMagnitude = grfNorms[t];
               blurVelocity[f]
                   += weight
@@ -10316,6 +10844,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         }
 
         Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+        solver.setTolerance(1e-9);
+        solver.setMaxIterations(200);
         solver.compute(A);
         Eigen::VectorXs driftCorrectedResult = solver.solve(target - b);
         Eigen::VectorXs driftCorrectedTrajectory = A * driftCorrectedResult + b;
@@ -10340,14 +10870,14 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
             Eigen::Vector3s blurWeights
                 = driftCorrectedResult.segment<3>(6 + f * 3);
 
-            int blurCenter = (f + 1) * blurEvery;
+            int blurCenter = (f + 1) * driftCorrectionBlurInterval;
             int blurDistance = abs(t - blurCenter);
-            if (blurDistance < blurRadius)
+            if (blurDistance < driftCorrectionBlurRadius)
             {
-              s_t percentage = (s_t)blurDistance / blurRadius;
-              s_t weight
-                  = (cos(percentage * M_PI) + 1.0)
-                    / 2.0; // Use a full wave, shifted to output between 1 and 0
+              s_t percentage = (s_t)blurDistance / driftCorrectionBlurRadius;
+              s_t weight = (cos(percentage * M_PI) + 1.0)
+                           / 2.0; // Use a full wave, shifted to output
+                                  // between 1 and 0
               totalWeight += weight * blurWeights;
             }
           }
@@ -10436,8 +10966,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               = trialAdjustedForcePlateForces[trial][f].segment<3>(t * 3);
         }
       }
-      // This will have changed the GRF data (by rotating the force plates, and
-      // doing drift correction on longer trials), so it's important to
+      // This will have changed the GRF data (by rotating the force plates,
+      // and doing drift correction on longer trials), so it's important to
       // recompute world wrenches here
       recomputeGRFs(init, mSkeleton, trial);
     }
@@ -10500,7 +11030,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
   const int outputDims
       = (totalTimesteps * 3) + (totalMissingSteps * 3) + massCols;
 
-  // This is the original (uncentered, unconstrained) consolidated linear system
+  // This is the original (uncentered, unconstrained) consolidated linear
+  // system
   Eigen::MatrixXs A = Eigen::MatrixXs::Zero(outputDims, inputDims);
   Eigen::VectorXs b = Eigen::VectorXs::Zero(outputDims);
   Eigen::VectorXs target = Eigen::VectorXs::Zero(outputDims);
@@ -10636,8 +11167,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     // Now we want to linearly constrain the mass percentage changes to always
     // sum to 0. This is done with an orthogonal projector.
 
-    const bool useBottDuffin
-        = true; // Only disable this for experiments, results will not be valid
+    const bool useBottDuffin = true; // Only disable this for experiments,
+                                     // results will not be valid
     if (useBottDuffin)
     {
       Eigen::MatrixXs projectMassToConstantSum
@@ -10673,6 +11204,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
       //         target - offsetB);
 
       Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+      solver.setTolerance(1e-9);
+      solver.setMaxIterations(200);
       solver.compute(bottDuffinRHS);
       Eigen::VectorXs unconstrainedSolution = solver.solve(target - offsetB);
 
@@ -10703,6 +11236,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
       // centeredSolution
       //     = A.completeOrthogonalDecomposition().solve(target - offsetB);
       Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+      solver.setTolerance(1e-9);
+      solver.setMaxIterations(200);
       solver.compute(A);
       centeredSolution = solver.solve(target - offsetB);
     }
@@ -10834,16 +11369,27 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     Eigen::MatrixXs targetPoses,
+    bool useReactionWheels,
     s_t weightLinear,
     s_t weightAngular,
     s_t regularizeLinearResiduals,
     s_t regularizeAngularResiduals,
+    s_t regularizeCopDriftCompensation,
     int maxBuckets,
+    bool commitCopDriftCompensation,
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
     s_t avgAngularChangeThreshold)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
+
+  // If we're using reaction wheels, the offset numbers tend to get pretty big,
+  // since we usually have decent residuals, or we wouldn't be resorting to
+  // wheels in the first place.
+  if (useReactionWheels)
+  {
+    weightAngular *= 0.001;
+  }
 
   s_t dt = init->trialTimesteps[trial];
   mSkeleton->setTimeStep(dt);
@@ -10895,7 +11441,8 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
   if (countedSteps == 0)
   {
     std::cout
-        << "Attempting to zero linear and minimize angular residuals for trial "
+        << "Attempting to zero linear and minimize angular residuals for "
+           "trial "
         << trial
         << ", but we don't have any timesteps remaining with GRF data (that "
            "haven't been filtered out by previous heuristics). Returning."
@@ -10926,15 +11473,28 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     //              "motion for "
     //           << numTimesteps << " timesteps with " << numMissing
     //           << " timesteps with unmeasured external force" << std::endl;
-    std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
-        = helper.getLinearTrajectoryLinearSystemParallel(
+    std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
+        linearSystem = helper.getLinearTrajectoryLinearSystem(
             dt,
             q,
             dq,
             ddq,
             init->grfTrials[trial],
             init->probablyMissingGRF[trial],
+            useReactionWheels,
+            init->forcePlateTrials[trial],
+            init->forcePlatesAssignedToContactBody[trial],
+            250,
+            250,
             maxBuckets);
+    Eigen::MatrixXs A = std::get<0>(linearSystem);
+    Eigen::VectorXs b = std::get<1>(linearSystem);
+    std::vector<Eigen::MatrixXs> copRecovery = std::get<2>(linearSystem);
+    int numBlurCoefficients = 0;
+    if (copRecovery.size() > 0)
+    {
+      numBlurCoefficients = copRecovery[0].cols();
+    }
 
     // We're going to sub-sample the rows of the linear system, and add
     // outputs for the residuals, so we can regularize them.
@@ -10948,25 +11508,21 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       indices.push_back(q.cols() - grabLast + i);
     }
     int numRows = (indices.size() * 3) + (indices.size() * 3) + (numMissing * 3)
-                  + (numMissing * 3);
+                  + (numMissing * 3) + numBlurCoefficients;
 
     // std::cout
     //     << "Sub-sampling linear system for optimizing linear + angular
     //     motion"
     //     << std::endl;
-    Eigen::MatrixXs sampledA
-        = Eigen::MatrixXs::Zero(numRows, linearSystem.first.cols());
+    Eigen::MatrixXs sampledA = Eigen::MatrixXs::Zero(numRows, A.cols());
     Eigen::VectorXs sampledB = Eigen::VectorXs::Zero(numRows);
     Eigen::VectorXs sampledTarget = Eigen::VectorXs::Zero(numRows);
     // Grab the linear outputs
     for (int i = 0; i < indices.size(); i++)
     {
       sampledA.block(i * 3, 0, 3, sampledA.cols())
-          = weightLinear
-            * linearSystem.first.block(
-                indices[i] * 3, 0, 3, linearSystem.first.cols());
-      sampledB.segment<3>(i * 3)
-          = weightLinear * linearSystem.second.segment<3>(indices[i] * 3);
+          = weightLinear * A.block(indices[i] * 3, 0, 3, A.cols());
+      sampledB.segment<3>(i * 3) = weightLinear * b.segment<3>(indices[i] * 3);
 
       mSkeleton->setPositions(targetPoses.col(indices[i]));
       sampledTarget.segment<3>(i * 3) = weightLinear * mSkeleton->getCOM();
@@ -10976,14 +11532,9 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     {
       sampledA.block((indices.size() + i) * 3, 0, 3, sampledA.cols())
           = weightAngular
-            * linearSystem.first.block(
-                (numTimesteps + indices[i]) * 3,
-                0,
-                3,
-                linearSystem.first.cols());
+            * A.block((numTimesteps + indices[i]) * 3, 0, 3, A.cols());
       sampledB.segment<3>((indices.size() + i) * 3)
-          = weightAngular
-            * linearSystem.second.segment<3>((numTimesteps + indices[i]) * 3);
+          = weightAngular * b.segment<3>((numTimesteps + indices[i]) * 3);
       sampledTarget.segment<3>((indices.size() + i) * 3)
           = weightAngular * targetPoses.col(indices[i]).head<3>();
     }
@@ -11004,6 +11555,13 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       sampledA(angularResidualsStartRow + i, angularResidualsStartCol + i)
           = regularizeAngularResiduals;
     }
+    // Remember, sampledA.rows() and sampleA.cols() is OOB, because we're 0
+    // indexed
+    for (int i = 1; i <= numBlurCoefficients; i++)
+    {
+      sampledA(sampledA.rows() - i, sampledA.cols() - i)
+          = regularizeCopDriftCompensation;
+    }
 
     // std::cout << "Solving linear system for optimizing linear + angular
     // motion"
@@ -11014,18 +11572,24 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // Eigen::VectorXs solution
     //     = sampledA.householderQr().solve(sampledTarget - sampledB);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+    solver.setTolerance(1e-9);
+    solver.setMaxIterations(200);
     solver.compute(sampledA);
     Eigen::VectorXs solution = solver.solve(sampledTarget - sampledB);
 
     // Get the new (original size, not sampled down) trajectory
-    Eigen::VectorXs recovered
-        = (linearSystem.first * solution) + linearSystem.second;
+    Eigen::VectorXs recovered = (A * solution) + b;
 
     // std::cout << "Decoding optimized linear + angular motion" << std::endl;
 
     // Measure the total change
-    s_t totalPosChange = 0.0;
-    s_t totalAngChange = 0.0;
+    s_t totalPosOffset = 0.0;
+    s_t totalAngOffset = 0.0;
+
+    if (useReactionWheels)
+    {
+      init->reactionWheels[trial] = Eigen::MatrixXs::Zero(3, numTimesteps);
+    }
 
     // Write the trajectory out to the positions
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
@@ -11034,26 +11598,34 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       {
         Eigen::Vector3s angularPos
             = recovered.segment<3>((numTimesteps + t) * 3);
-        Eigen::Vector3s angularChange
-            = init->poseTrials[trial].col(t).head<3>() - angularPos;
-        totalAngChange += angularChange.norm();
+        if (useReactionWheels)
+        {
+          init->reactionWheels[trial].col(t) = angularPos;
+          totalAngOffset += angularPos.norm();
+        }
+        else
+        {
+          Eigen::Vector3s angularChange
+              = init->poseTrials[trial].col(t).head<3>() - angularPos;
+          totalAngOffset += angularChange.norm();
+        }
       }
       if (weightLinear > 0)
       {
         Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
         Eigen::Vector3s change = comPos - originalCOMs[t];
-        totalPosChange += change.norm();
+        totalPosOffset += change.norm();
       }
     }
-    totalPosChange /= init->poseTrials[trial].cols();
-    totalAngChange /= init->poseTrials[trial].cols();
+    totalPosOffset /= init->poseTrials[trial].cols();
+    totalAngOffset /= init->poseTrials[trial].cols();
 
-    if ((totalPosChange > avgPositionChangeThreshold
-         || totalAngChange > avgAngularChangeThreshold)
+    if ((totalPosOffset > avgPositionChangeThreshold
+         || totalAngOffset > avgAngularChangeThreshold)
         && detectUnmeasuredTorque)
     {
       std::cout << "Trial pos/angle changed too much! (pos change="
-                << totalPosChange << ", angle change=" << totalAngChange << ")"
+                << totalPosOffset << ", angle change=" << totalAngOffset << ")"
                 << std::endl;
       std::cout << "Estimating unmeasured external torques with threshold at "
                 << (threshold * 100) << " percent of nominal" << std::endl;
@@ -11064,31 +11636,53 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       }
       else
       {
-        std::cout
-            << "Found no additional frames with suspicious torques even after "
-               "reducing the threshold to "
-            << (threshold * 100)
-            << " percent of nominal, exiting the optimization early "
-            << std::endl;
+        std::cout << "Found no additional frames with suspicious torques "
+                     "even after "
+                     "reducing the threshold to "
+                  << (threshold * 100)
+                  << " percent of nominal, exiting the optimization early "
+                  << std::endl;
         return false;
       }
+    }
+
+    if (numBlurCoefficients > 0)
+    {
+      Eigen::VectorXs blurs = solution.segment(
+          solution.size() - numBlurCoefficients, numBlurCoefficients);
+      // Write the CoP changes out
+      for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+      {
+        s_t avgChange = 0.0;
+        Eigen::VectorXs copChanges = copRecovery[i] * blurs;
+        for (int t = 0; t < numTimesteps; t++)
+        {
+          Eigen::Vector3s change = copChanges.segment<3>(t * 3);
+          avgChange += change.norm();
+          if (commitCopDriftCompensation)
+          {
+            init->forcePlateTrials[trial][i].centersOfPressure[t] += change;
+          }
+        }
+        avgChange /= numTimesteps;
+        std::cout << "CoP for force plate " << i << " moved by an average of "
+                  << avgChange << "m" << std::endl;
+      }
+      recomputeGRFs(init, mSkeleton, trial);
     }
 
     // Write the trajectory out to the positions
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
     {
-      if (weightAngular > 0)
+      if (!useReactionWheels)
       {
         Eigen::Vector3s angularPos
             = recovered.segment<3>((numTimesteps + t) * 3);
         init->poseTrials[trial].col(t).head<3>() = angularPos;
       }
-      if (weightLinear > 0)
-      {
-        Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
-        Eigen::Vector3s change = comPos - originalCOMs[t];
-        init->poseTrials[trial].col(t).segment<3>(3) += change;
-      }
+      Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
+      Eigen::Vector3s change = comPos - originalCOMs[t];
+      init->poseTrials[trial].col(t).segment<3>(3) += change;
     }
     break;
   }
@@ -11103,6 +11697,7 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 void DynamicsFitter::timeSyncTrialGRF(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
+    bool useReactionWheels,
     int maxShiftGRFEarlier,
     int maxShiftGRFLater,
     int iterationsPerShift,
@@ -11110,6 +11705,7 @@ void DynamicsFitter::timeSyncTrialGRF(
     s_t weightAngular,
     s_t regularizeLinearResiduals,
     s_t regularizeAngularResiduals,
+    s_t regularizeCopDriftCompensation,
     int maxBuckets)
 {
   Eigen::MatrixXs originalGRFTrial = init->grfTrials[trial];
@@ -11142,26 +11738,46 @@ void DynamicsFitter::timeSyncTrialGRF(
     init->poseTrials[trial] = originalPoseTrial;
     init->grfTrials[trial] = shiftedGRFTrial;
 
+    // Reaction wheels make the problem perfectly linear, so we don't need any
+    // iterations if we're using them.
+    if (useReactionWheels)
+    {
+      iterationsPerShift = 1;
+    }
+
     for (int i = 0; i < iterationsPerShift; i++)
     {
       bool success = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
           originalPoseTrial,
+          useReactionWheels,
           weightLinear,
           weightAngular,
           regularizeLinearResiduals,
           regularizeAngularResiduals,
+          regularizeCopDriftCompensation,
           maxBuckets,
+          false,
           false);
       if (!success)
         break;
     }
 
     // Now score the trial
-    s_t score = computeAverageTrialMarkerRMSE(init, trial);
-    std::cout << "Shift " << shiftGRF << " got " << score << "m RMSE"
-              << std::endl;
+    s_t score = 0;
+    if (useReactionWheels)
+    {
+      score = computeAverageReactionWheelRMSE(init, trial);
+      std::cout << "Shift " << shiftGRF << " got " << score
+                << "rad (reaction wheel RMSE)" << std::endl;
+    }
+    else
+    {
+      score = computeAverageTrialMarkerRMSE(init, trial);
+      std::cout << "Shift " << shiftGRF << " got " << score << "m RMSE"
+                << std::endl;
+    }
     if (score < bestShiftGRFScore)
     {
       bestShiftGRFScore = score;
@@ -11187,8 +11803,8 @@ void DynamicsFitter::timeSyncTrialGRF(
       for (int t = 0; t < bestShiftGRFTrial.cols(); t++)
       {
         // We want a shift of "-2" to result in the shiftedGRFTrial having its
-        // entries shifted to the left by 2, so that means grabbing "+2" columns
-        // from the original relative to itself.
+        // entries shifted to the left by 2, so that means grabbing "+2"
+        // columns from the original relative to itself.
         int originalT = t - bestShiftGRF;
         if (originalT < 0 || originalT >= originalGRFTrial.cols())
         {
@@ -11207,6 +11823,7 @@ void DynamicsFitter::timeSyncTrialGRF(
       plate.forces = shiftedForces;
       plate.moments = shiftedMoments;
     }
+    recomputeGRFs(init, mSkeleton, trial);
   }
 }
 
@@ -11216,6 +11833,7 @@ void DynamicsFitter::timeSyncTrialGRF(
 // the time sync'd data, using some sensible values.
 void DynamicsFitter::timeSyncAndInitializePipeline(
     std::shared_ptr<DynamicsInitialization> init,
+    bool useReactionWheels,
     int maxShiftGRFEarlier,
     int maxShiftGRFLater,
     int iterationsPerShift,
@@ -11223,6 +11841,7 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
     s_t weightAngular,
     s_t regularizeLinearResiduals,
     s_t regularizeAngularResiduals,
+    s_t regularizeCopDriftCompensation,
     int maxBuckets,
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
@@ -11242,11 +11861,18 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
     init->poseTrials[i] = originalPoseTrials[i];
   }
   multimassZeroLinearResidualsOnCOMTrajectory(init);
+
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     timeSyncTrialGRF(
-        init, trial, maxShiftGRFEarlier, maxShiftGRFLater, iterationsPerShift);
+        init,
+        trial,
+        useReactionWheels,
+        maxShiftGRFEarlier,
+        maxShiftGRFLater,
+        iterationsPerShift);
   }
+
   // Reset the pose trials now that we've found the GRF data, and start again
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
@@ -11256,30 +11882,42 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
   multimassZeroLinearResidualsOnCOMTrajectory(init);
   init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
 
+  // If we're using reaction wheels, we're accepting that you can't get this
+  // trial to be perfectly physically consistent, and we're ok with that.
+  if (useReactionWheels)
+  {
+    detectUnmeasuredTorque = false;
+  }
+
   // Get rid of the rest of the angular residuals
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    for (int i = 0; i < 100; i++)
+    int iterations = useReactionWheels ? 1 : 100;
+    for (int i = 0; i < iterations; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
+      bool commitDriftCompensation = i == iterations - 1;
       bool success = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
           originalPoseTrials[trial],
+          useReactionWheels,
           weightLinear,
           weightAngular,
           regularizeLinearResiduals,
           regularizeAngularResiduals,
+          regularizeCopDriftCompensation,
           maxBuckets,
+          commitDriftCompensation,
           detectUnmeasuredTorque,
           avgPositionChangeThreshold,
           avgAngularChangeThreshold);
       if (!success)
         break;
     }
-    // Adjust the regularization target to match our newly solved trajectory, so
-    // we're not trying to pull the root away from the solved trajectory
+    // Adjust the regularization target to match our newly solved trajectory,
+    // so we're not trying to pull the root away from the solved trajectory
     init->regularizePosesTo[trial] = init->poseTrials[trial];
 
     recalibrateForcePlatesOffset(init, trial);
@@ -12097,7 +12735,8 @@ void DynamicsFitter::recomputeGRFs(
 
           // std::cout << "Force Plate " << i << " time range ["
           //           << lastStartedTrack << "," << (t - 1)
-          //           << "] Closest foot: " << closestFoot << " with distances
+          //           << "] Closest foot: " << closestFoot << " with
+          //           distances
           //           "
           //           << sumSquaredDistances.transpose() << std::endl;
 
@@ -12105,6 +12744,10 @@ void DynamicsFitter::recomputeGRFs(
           // over the whole track
           for (int assignT = lastStartedTrack; assignT < t; assignT++)
           {
+            // This is a map of [trial][forcePlate][timestep]
+            init->forcePlatesAssignedToContactBody[trial][i][assignT]
+                = closestFoot;
+
             Eigen::Vector3s force = forcePlates[i].forces[assignT];
             Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
             Eigen::Vector3s moments = forcePlates[i].moments[assignT];
@@ -12141,7 +12784,8 @@ void DynamicsFitter::recomputeGRFs(
       Eigen::Index closestFoot;
       sumSquaredDistances.minCoeff(&closestFoot);
 
-      // std::cout << "Force Plate " << i << " time range [" << lastStartedTrack
+      // std::cout << "Force Plate " << i << " time range [" <<
+      // lastStartedTrack
       //           << "," << (poses.cols() - 1)
       //           << "] Closest foot: " << closestFoot << " with distances "
       //           << sumSquaredDistances.transpose() << std::endl;
@@ -12150,6 +12794,9 @@ void DynamicsFitter::recomputeGRFs(
       // over the whole track
       for (int assignT = lastStartedTrack; assignT < poses.cols(); assignT++)
       {
+        // This is a map of [trial][forcePlate][timestep]
+        init->forcePlatesAssignedToContactBody[trial][i][assignT] = closestFoot;
+
         Eigen::Vector3s force = forcePlates[i].forces[assignT];
         Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
         Eigen::Vector3s moments = forcePlates[i].moments[assignT];
@@ -14624,6 +15271,20 @@ s_t DynamicsFitter::computeAverageTrialMarkerRMSE(
 }
 
 //==============================================================================
+// Get the average RMSE, in radians, of the reaction wheels
+s_t DynamicsFitter::computeAverageReactionWheelRMSE(
+    std::shared_ptr<DynamicsInitialization> init, int trial)
+{
+  s_t score = 0.0;
+  for (int t = 0; t < init->reactionWheels[trial].cols(); t++)
+  {
+    score += init->reactionWheels[trial].col(t).norm();
+  }
+  score /= init->reactionWheels[trial].cols();
+  return score;
+}
+
+//==============================================================================
 // Get the average max marker error on each frame, in meters, of the markers
 s_t DynamicsFitter::computeAverageMarkerMaxError(
     std::shared_ptr<DynamicsInitialization> init)
@@ -15195,6 +15856,9 @@ void DynamicsFitter::saveDynamicsToGUI(
   std::string perfectForcePlateLayerName = "'Zero Residual' Force Plates";
   Eigen::Vector4s perfectForcePlateLayerColor
       = Eigen::Vector4s(1.0, 0.0, 1.0, 1.0);
+  std::string reactionWheelsLayerName = "Reaction Wheels";
+  Eigen::Vector4s reactionWheelsLayerColor
+      = Eigen::Vector4s(1.0, 0.0, 0.0, 0.5);
   std::string measuredForcesLayerName = "Measured Forces";
   Eigen::Vector4s measuredForcesLayerColor
       = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
@@ -15245,6 +15909,7 @@ void DynamicsFitter::saveDynamicsToGUI(
   server.createLayer(forcePlateLayerName, forcePlateLayerColor, true);
   server.createLayer(
       perfectForcePlateLayerName, perfectForcePlateLayerColor, false);
+  server.createLayer(reactionWheelsLayerName, reactionWheelsLayerColor, false);
   server.createLayer(measuredForcesLayerName, measuredForcesLayerColor, false);
   if (renderResidualForces)
   {
@@ -15361,7 +16026,49 @@ void DynamicsFitter::saveDynamicsToGUI(
   std::vector<Eigen::VectorXs> bodyLinearAccs;
   std::vector<Eigen::VectorXs> bodySpatialVels;
   std::vector<Eigen::VectorXs> bodyPoses;
+  std::vector<Eigen::Vector3s> rootPoses;
+  std::vector<Eigen::Matrix3s> reactionWheelEulerAngles;
   s_t residualNorm = 0.0;
+  Eigen::Vector3s reactionWheelPosition = Eigen::Vector3s::Zero();
+  Eigen::Vector3s reactionWheelVelocity = Eigen::Vector3s::Zero();
+
+  dynamics::EulerJoint::AxisOrder order = dynamics::EulerJoint::AxisOrder::XYZ;
+  dynamics::EulerFreeJoint* rootJoint
+      = dynamic_cast<dynamics::EulerFreeJoint*>(mSkeleton->getJoint(0));
+  if (rootJoint != nullptr)
+  {
+    order = rootJoint->getAxisOrder();
+  }
+
+  std::vector<int> axisOrders;
+  if (order == dynamics::EulerJoint::AxisOrder::XYZ)
+  {
+    axisOrders.push_back(0);
+    axisOrders.push_back(1);
+    axisOrders.push_back(2);
+  }
+  else if (order == dynamics::EulerJoint::AxisOrder::XZY)
+  {
+    axisOrders.push_back(0);
+    axisOrders.push_back(2);
+    axisOrders.push_back(1);
+  }
+  else if (order == dynamics::EulerJoint::AxisOrder::ZXY)
+  {
+    // Want to map ZXY back to XYZ, so need to swap [1]->[0], [2]->[1],
+    // [0]->[2]
+    axisOrders.push_back(2);
+    axisOrders.push_back(0);
+    axisOrders.push_back(1);
+  }
+  else if (order == dynamics::EulerJoint::AxisOrder::ZYX)
+  {
+    // Want to map ZYX back to XYZ, so need to swap 2 and 0
+    axisOrders.push_back(2);
+    axisOrders.push_back(1);
+    axisOrders.push_back(0);
+  }
+
   for (int timestep = 1; timestep < poses.cols() - 1; timestep++)
   {
     s_t dt = init->trialTimesteps[trialIndex];
@@ -15418,6 +16125,65 @@ void DynamicsFitter::saveDynamicsToGUI(
     residualTorques.push_back(spatialTorque);
     residualForces.push_back(residual.tail<3>());
     residualNorm += residual.squaredNorm();
+
+    // Set up reaction wheels to be about twice the size of the upper body
+    // (very very roughly), to make it easier to visually track them
+    s_t reactionWheelMass = 80.0;
+    s_t reactionWheelRadius = 1.0;
+    s_t reactionWheelMOI
+        = 0.5 * reactionWheelMass * reactionWheelRadius * reactionWheelRadius;
+
+    // Integrate our reaction wheels
+    reactionWheelVelocity += residual.head<3>() * dt / reactionWheelMOI;
+    reactionWheelPosition += reactionWheelVelocity * dt;
+
+    if (init->reactionWheels[trialIndex].cols() > timestep)
+    {
+      reactionWheelPosition = init->reactionWheels[trialIndex].col(timestep);
+    }
+
+    Eigen::Matrix3s reactionWheelAngles = Eigen::Matrix3s::Zero();
+    for (int axis = 0; axis < 3; axis++)
+    {
+      // Fill in prior euler angles, to track axis
+      reactionWheelAngles.col(axis).segment(0, axis)
+          = q.head<3>().segment(0, axis);
+      // Copy in reaction wheel position
+      reactionWheelAngles(axis, axis) = reactionWheelPosition(axis);
+    }
+    if (order == dynamics::EulerJoint::AxisOrder::XYZ)
+    {
+      // Do nothing
+    }
+    else if (order == dynamics::EulerJoint::AxisOrder::XZY)
+    {
+      for (int axis = 0; axis < 3; axis++)
+      {
+        reactionWheelAngles.col(axis) = math::matrixToEulerXYZ(
+            math::eulerXZYToMatrix(reactionWheelAngles.col(axis)));
+      }
+    }
+    else if (order == dynamics::EulerJoint::AxisOrder::ZXY)
+    {
+      // Want to map ZXY back to XYZ, so need to swap [1]->[0], [2]->[1],
+      // [0]->[2]
+      for (int axis = 0; axis < 3; axis++)
+      {
+        reactionWheelAngles.col(axis) = math::matrixToEulerXYZ(
+            math::eulerZXYToMatrix(reactionWheelAngles.col(axis)));
+      }
+    }
+    else if (order == dynamics::EulerJoint::AxisOrder::ZYX)
+    {
+      // Want to map ZYX back to XYZ, so need to swap 2 and 0
+      for (int axis = 0; axis < 3; axis++)
+      {
+        reactionWheelAngles.col(axis) = math::matrixToEulerXYZ(
+            math::eulerZYXToMatrix(reactionWheelAngles.col(axis)));
+      }
+    }
+    reactionWheelEulerAngles.push_back(reactionWheelAngles);
+    rootPoses.push_back(mSkeleton->getJointWorldPosition(0));
   }
 
   // Render the marker traces
@@ -15477,6 +16243,25 @@ void DynamicsFitter::saveDynamicsToGUI(
         mSkeleton->getBodyNode(b)->getWorldTransform().translation(),
         accLayerColor,
         accLayerName);
+  }
+
+  for (int i = 0; i < 3; i++)
+  {
+    int axis = axisOrders[i];
+
+    Eigen::Vector3s size = Eigen::Vector3s::Ones() * 0.3;
+    size(axis) = 0.01;
+    Eigen::Vector4s color = Eigen::Vector4s::Zero();
+    color(axis) = 1.0;
+    color(3) = reactionWheelsLayerColor(3);
+
+    server.createBox(
+        "reaction_wheel_" + std::to_string(i),
+        size,
+        rootPoses[0],
+        reactionWheelEulerAngles[0].col(i),
+        color,
+        reactionWheelsLayerName);
   }
 
   for (int i = 0; i < impliedForces.size(); i++)
@@ -15775,6 +16560,18 @@ void DynamicsFitter::saveDynamicsToGUI(
       accVector.push_back(com);
       accVector.push_back(com + totalForce * 0.001);
       server.createLine("com_acc", accVector, accLayerColor, accLayerName);
+    }
+    // Render reaction wheels
+    if (timestep > 0 && timestep < poses.cols() - 1)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        server.setObjectPosition(
+            "reaction_wheel_" + std::to_string(i), rootPoses[timestep - 1]);
+        server.setObjectRotation(
+            "reaction_wheel_" + std::to_string(i),
+            reactionWheelEulerAngles[timestep - 1].col(i));
+      }
     }
 
     // Move the markers

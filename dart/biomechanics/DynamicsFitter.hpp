@@ -193,6 +193,31 @@ public:
   ////////////////////////////////////////////
   // Computes the Jacobian relating changes in the root position to changes in
   // the residual torque
+  Eigen::Matrix<s_t, 3, 2> calculateRootAngularResidualJacobianWrtCoPChange(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      Eigen::Vector3s f,
+      int footIndex,
+      Eigen::Matrix<s_t, 3, 2> basis);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix<s_t, 3, 2>
+  finiteDifferenceRootAngularResidualJacobianWrtCoPChange(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      Eigen::Vector3s f,
+      int footIndex,
+      Eigen::Matrix<s_t, 3, 2> basis);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
   Eigen::Matrix6s calculateRootResidualJacobianWrtPosition(
       Eigen::VectorXs q,
       Eigen::VectorXs dq,
@@ -335,6 +360,32 @@ public:
       Eigen::VectorXs dq,
       Eigen::VectorXs ddq,
       Eigen::VectorXs forcesConcat);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix<s_t, 3, 2>
+  calculateResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      Eigen::Vector3s f,
+      int footIndex,
+      Eigen::Matrix<s_t, 3, 2> basis);
+
+  ////////////////////////////////////////////
+  // Computes the Jacobian relating changes in the root position to changes in
+  // the residual torque
+  Eigen::Matrix<s_t, 3, 2>
+  finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+      Eigen::VectorXs q,
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddq,
+      Eigen::VectorXs forcesConcat,
+      Eigen::Vector3s f,
+      int footIndex,
+      Eigen::Matrix<s_t, 3, 2> basis);
 
   ////////////////////////////////////////////
   // This computes the change in angular acceleration as we change the root
@@ -489,6 +540,12 @@ public:
   ////////////////////////////////////////////
   // This returns a matrix A and vector b, such that Ax+b gives you a trajectory
   // with zero linear residuals, along with a "hypothetical" angular trajectory.
+  //
+  // If you pass in `driftCorrectForcePlates`, then you also get a set of
+  // CoP deltas over time for each force plate you pass in, concatenated to the
+  // end of the output.
+  //
+  // If you have `useReactionWheels = false`:
   // The angular trajectory is "hypothetical" in that changing the angles of the
   // root at any timestep will break the linear residuals, so this is just the
   // integration of the "residual free angular acceleration" computed at each
@@ -496,13 +553,25 @@ public:
   // initial conditions, so it's possible to solve this whole system in one
   // shot. This won't produce something legal, but it well let you get your
   // angular accelerations quite close to the desired trajectory.
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs> getLinearTrajectoryLinearSystem(
+  //
+  // If you have `useReactionWheels = true`:
+  // The angular trajectory is NOT the trajectory of the root body, but of the
+  // reaction wheels for each euler axis attached to the root.
+  std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
+  getLinearTrajectoryLinearSystem(
       s_t dt,
       Eigen::MatrixXs qs,
       Eigen::MatrixXs dqs,
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
+      bool useReactionWheels,
+      std::vector<ForcePlate> driftCorrectForcePlates
+      = std::vector<ForcePlate>(),
+      std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody
+      = std::vector<std::vector<int>>(),
+      int driftCorrectionBlurRadius = 250,
+      int driftCorrectionBlurInterval = 250,
       int maxBuckets = 16);
 
   ////////////////////////////////////////////
@@ -515,12 +584,13 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
+      bool useReactionWheels,
       int maxBuckets = 16);
 
   ////////////////////////////////////////////
   // This returns the same thing as getLinearTrajectoryLinearSystem(), in
   // theory.
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
   finiteDifferenceLinearTrajectoryLinearSystem(
       s_t dt,
       Eigen::MatrixXs qs,
@@ -528,6 +598,13 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
+      bool useReactionWheels,
+      std::vector<ForcePlate> driftCorrectForcePlates
+      = std::vector<ForcePlate>(),
+      std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody
+      = std::vector<std::vector<int>>(),
+      int driftCorrectionBlurRadius = 250,
+      int driftCorrectionBlurInterval = 250,
       int maxBuckets = 16);
 
   ////////////////////////////////////////////
@@ -546,6 +623,13 @@ public:
       Eigen::MatrixXs ddqs,
       Eigen::MatrixXs forces,
       std::vector<bool> probablyMissingGRF,
+      bool useReactionWheels,
+      Eigen::VectorXs blurCoeffs,
+      std::vector<ForcePlate> driftCorrectForcePlates,
+      std::vector<std::vector<int>>
+          driftCorrectForcePlatesAssignedToContactBody,
+      int driftCorrectionBlurRadius = 250,
+      int driftCorrectionBlurInterval = 250,
       int maxBuckets = 16);
 
   ////////////////////////////////////////////
@@ -728,6 +812,13 @@ struct DynamicsInitialization
   // This is the critical value, telling us if we think we're receiving support
   // from off a force plate on this frame
   std::vector<std::vector<bool>> probablyMissingGRF;
+  // This is a map of [trial][forcePlate][timestep], where each force plate is
+  // assigned to one of the contact bodies.
+  std::vector<std::vector<std::vector<int>>> forcePlatesAssignedToContactBody;
+
+  ///////////////////////////////////////////
+  // Rendering reaction wheel positions, if needed
+  std::vector<Eigen::MatrixXs> reactionWheels;
 
   ///////////////////////////////////////////
   // Pure dynamics values
@@ -1262,7 +1353,9 @@ public:
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
-      bool detectExternalForce = true);
+      bool detectExternalForce = true,
+      int driftCorrectionBlurRadius = 250,
+      int driftCorrectionBlurInterval = 250);
 
   // 1. Adjust the total mass of the body and the individual link masses for
   // each body, and change the initial positions and velocities of the body to
@@ -1281,11 +1374,14 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       Eigen::MatrixXs targetPoses,
+      bool useReactionWheels = false,
       s_t weightLinear = 1.0,
       s_t weightAngular = 0.5,
       s_t regularizeLinearResiduals = 0.1,
       s_t regularizeAngularResiduals = 0.1,
+      s_t regularizeCopDriftCompensation = 0.1,
       int maxBuckets = 100,
+      bool commitCopDriftCompensation = false,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
       s_t avgAngularChangeThreshold = 0.15);
@@ -1297,6 +1393,7 @@ public:
   void timeSyncTrialGRF(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
+      bool useReactionWheels = false,
       int maxShiftGRFEarlier = -4,
       int maxShiftGRFLater = 4,
       int iterationsPerShift = 20,
@@ -1304,6 +1401,7 @@ public:
       s_t weightAngular = 1.0,
       s_t regularizeLinearResiduals = 0.5,
       s_t regularizeAngularResiduals = 0.5,
+      s_t regularizeCopDriftCompensation = 1.0,
       int maxBuckets = 16);
 
   // This runs the initial pipeline, which does an approximate mass optimization
@@ -1311,6 +1409,7 @@ public:
   // the time sync'd data, using some sensible values.
   void timeSyncAndInitializePipeline(
       std::shared_ptr<DynamicsInitialization> init,
+      bool useReactionWheels = false,
       int maxShiftGRFEarlier = -4,
       int maxShiftGRFLater = 4,
       int iterationsPerShift = 20,
@@ -1318,6 +1417,7 @@ public:
       s_t weightAngular = 0.5,
       s_t regularizeLinearResiduals = 0.1,
       s_t regularizeAngularResiduals = 0.1,
+      s_t regularizeCopDriftCompensation = 1.0,
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
@@ -1470,6 +1570,10 @@ public:
 
   // Get the average RMSE, in meters, of the markers
   s_t computeAverageTrialMarkerRMSE(
+      std::shared_ptr<DynamicsInitialization> init, int trial);
+
+  // Get the average RMSE, in radians, of the reaction wheels
+  s_t computeAverageReactionWheelRMSE(
       std::shared_ptr<DynamicsInitialization> init, int trial);
 
   // Get the average max marker error on each frame, in meters, of the markers

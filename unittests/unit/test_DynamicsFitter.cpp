@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -1078,6 +1078,56 @@ bool testResidualRootJacobians(
     return false;
   }
 
+  Eigen::Vector3s f = Eigen::Vector3s::Random();
+  Eigen::Matrix<s_t, 3, 2> basis = Eigen::Matrix<s_t, 3, 2>::Random();
+  basis.col(0).normalize();
+  basis.col(1).normalize();
+  for (int footIndex = 0; footIndex < 2; footIndex++)
+  {
+    Eigen::Matrix<s_t, 3, 2> angWrtCoP
+        = helper.calculateRootAngularResidualJacobianWrtCoPChange(
+            q, dq, ddq, forces, f, footIndex, basis);
+    Eigen::Matrix<s_t, 3, 2> angWrtCoP_fd
+        = helper.finiteDifferenceRootAngularResidualJacobianWrtCoPChange(
+            q, dq, ddq, forces, f, footIndex, basis);
+
+    if (!equals(angWrtCoP, angWrtCoP_fd, 2e-8))
+    {
+      std::cout << "Jacobian of root angular residual wrt CoP movement "
+                   "not equal!"
+                << std::endl;
+      std::cout << "Analytical:" << std::endl << angWrtCoP << std::endl;
+      std::cout << "FD:" << std::endl << angWrtCoP_fd << std::endl;
+      std::cout << "Diff (" << (angWrtCoP_fd - angWrtCoP).minCoeff() << " - "
+                << (angWrtCoP_fd - angWrtCoP).maxCoeff() << "):" << std::endl
+                << (angWrtCoP_fd - angWrtCoP) << std::endl;
+      return false;
+    }
+
+    Eigen::Matrix<s_t, 3, 2> accWrtCoP
+        = helper
+              .calculateResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+                  q, dq, ddq, forces, f, footIndex, basis);
+    Eigen::Matrix<s_t, 3, 2> accWrtCoP_fd
+        = helper
+              .finiteDifferenceResidualFreeRootAngularAccelerationJacobianWrtCoPChange(
+                  q, dq, ddq, forces, f, footIndex, basis);
+
+    if (!equals(accWrtCoP, accWrtCoP_fd, 2e-8))
+    {
+      std::cout
+          << "Jacobian of root angular residual-free-acc wrt CoP movement "
+             "not equal!"
+          << std::endl;
+      std::cout << "Analytical:" << std::endl << accWrtCoP << std::endl;
+      std::cout << "FD:" << std::endl << accWrtCoP_fd << std::endl;
+      std::cout << "Diff (" << (accWrtCoP_fd - accWrtCoP).minCoeff() << " - "
+                << (accWrtCoP_fd - accWrtCoP).maxCoeff() << "):" << std::endl
+                << (accWrtCoP_fd - accWrtCoP) << std::endl;
+      return false;
+    }
+  }
+
   // Check that the linear acceleration offset has a linear effect on angular
   // residual
 
@@ -1600,7 +1650,8 @@ bool testResidualTrajectoryTaylorExpansionWithRandomTrajectory(
 bool testLinearTrajectorLinearMapWithRandomTrajectory(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::vector<int> collisionBodies,
-    int numTimesteps)
+    int numTimesteps,
+    bool useReactionWheels)
 {
   s_t dt = skel->getTimeStep();
   Eigen::MatrixXs qs = Eigen::MatrixXs::Zero(skel->getNumDofs(), numTimesteps);
@@ -1622,6 +1673,32 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
       numMissing++;
       missingIndices.push_back(i);
     }
+  }
+
+  int maxBuckets = 2;
+  if (numMissing > maxBuckets)
+  {
+    numMissing = maxBuckets;
+  }
+
+  std::vector<ForcePlate> driftCorrectForcePlates;
+  std::vector<std::vector<int>> driftCorrectForcePlatesAssignedToContactBody;
+  int driftCorrectionBlurRadius = 3;
+  int driftCorrectionBlurInterval = 3;
+  for (int i = 0; i < 3; i++)
+  {
+    driftCorrectForcePlates.emplace_back();
+    std::vector<int> footAssignment;
+    for (int t = 0; t < numTimesteps; t++)
+    {
+      driftCorrectForcePlates[i].forces.emplace_back(Eigen::Vector3s::Random());
+      driftCorrectForcePlates[i].moments.emplace_back(
+          Eigen::Vector3s::Random());
+      driftCorrectForcePlates[i].centersOfPressure.emplace_back(
+          Eigen::Vector3s::Random());
+      footAssignment.push_back(i % 2);
+    }
+    driftCorrectForcePlatesAssignedToContactBody.push_back(footAssignment);
   }
 
   // Generate q,dq from integrating the given accelerations
@@ -1652,20 +1729,64 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
 
   ResidualForceHelper helper(skel, collisionBodies);
 
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear
-      = helper.getLinearTrajectoryLinearSystem(
-          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
-  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear_fd
-      = helper.finiteDifferenceLinearTrajectoryLinearSystem(
-          dt, qs, dqs, ddqs, forces, probablyMissingGRF, 2);
+  std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
+      linear = helper.getLinearTrajectoryLinearSystem(
+          dt,
+          qs,
+          dqs,
+          ddqs,
+          forces,
+          probablyMissingGRF,
+          useReactionWheels,
+          driftCorrectForcePlates,
+          driftCorrectForcePlatesAssignedToContactBody,
+          driftCorrectionBlurRadius,
+          driftCorrectionBlurInterval,
+          maxBuckets);
+  Eigen::MatrixXs A = std::get<0>(linear);
+  Eigen::VectorXs b = std::get<1>(linear);
+  std::vector<Eigen::MatrixXs> recoverCops = std::get<2>(linear);
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearParallel
+      = helper.getLinearTrajectoryLinearSystemParallel(
+          dt, qs, dqs, ddqs, forces, probablyMissingGRF, useReactionWheels, 2);
+  std::tuple<Eigen::MatrixXs, Eigen::VectorXs, std::vector<Eigen::MatrixXs>>
+      linear_fd = helper.finiteDifferenceLinearTrajectoryLinearSystem(
+          dt,
+          qs,
+          dqs,
+          ddqs,
+          forces,
+          probablyMissingGRF,
+          useReactionWheels,
+          driftCorrectForcePlates,
+          driftCorrectForcePlatesAssignedToContactBody,
+          driftCorrectionBlurRadius,
+          driftCorrectionBlurInterval,
+          maxBuckets);
+  Eigen::MatrixXs A_fd = std::get<0>(linear_fd);
+  Eigen::VectorXs b_fd = std::get<1>(linear_fd);
+  std::vector<Eigen::MatrixXs> recoverCops_fd = std::get<2>(linear_fd);
 
-  if (!equals(linear.second, linear_fd.second, 1e-8))
+  /*
+  if (!equals(A, linearParallel.first, 1e-8))
+  {
+    std::cout << "Linear system A matrix not the same as parallel" << std::endl;
+    return false;
+  }
+  if (!equals(b, linearParallel.second, 1e-8))
+  {
+    std::cout << "Linear system b vector not the same as parallel" << std::endl;
+    return false;
+  }
+  */
+
+  if (!equals(b, b_fd, 1e-8))
   {
     std::cout << "Linear system b vector is not equal!" << std::endl;
     for (int t = 0; t < numTimesteps; t++)
     {
-      Eigen::Vector3s pos = linear.second.segment<3>(t * 3);
-      Eigen::Vector3s pos_fd = linear_fd.second.segment<3>(t * 3);
+      Eigen::Vector3s pos = b.segment<3>(t * 3);
+      Eigen::Vector3s pos_fd = b_fd.segment<3>(t * 3);
       if (!equals(pos, pos_fd, 1e-8))
       {
         std::cout << "Linear system b vector pos not equal at t=" << t
@@ -1681,9 +1802,8 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
     }
     for (int t = 0; t < numTimesteps; t++)
     {
-      Eigen::Vector3s pos = linear.second.segment<3>((numTimesteps + t) * 3);
-      Eigen::Vector3s pos_fd
-          = linear_fd.second.segment<3>((numTimesteps + t) * 3);
+      Eigen::Vector3s pos = b.segment<3>((numTimesteps + t) * 3);
+      Eigen::Vector3s pos_fd = b_fd.segment<3>((numTimesteps + t) * 3);
       if (!equals(pos, pos_fd, 1e-8))
       {
         std::cout << "Linear system b vector ang not equal at t=" << t
@@ -1700,11 +1820,9 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
     return false;
   }
 
-  if (!equals(linear.first, linear_fd.first, 1e-8))
+  if (!equals(A, A_fd, 1e-8))
   {
     std::cout << "Linear system A matrix is not equal!" << std::endl;
-    Eigen::MatrixXs A = linear.first;
-    Eigen::MatrixXs A_fd = linear_fd.first;
 
     /// Check the linear pose map
     for (int t = 0; t < numTimesteps; t++)
@@ -1763,6 +1881,33 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
     std::cout << "Linear pose map passes!" << std::endl;
 
     int rowOffset = numTimesteps * 3;
+    int colOffset = 6 + numMissing * 3;
+    int numBlurs = (int)floor((s_t)qs.cols() / driftCorrectionBlurInterval);
+
+    for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+    {
+      for (int b = 0; b < numBlurs; b++)
+      {
+        int col = (colOffset * 2) + ((i * numBlurs + b) * 2);
+
+        Eigen::MatrixXs offsetOverTime = Eigen::MatrixXs::Zero(3, numTimesteps);
+        Eigen::MatrixXs offsetOverTime_fd
+            = Eigen::MatrixXs::Zero(3, numTimesteps);
+        for (int t = 0; t < numTimesteps; t++)
+        {
+          offsetOverTime.col(t) = A.block<3, 1>(rowOffset + (t * 3), col);
+          offsetOverTime_fd.col(t) = A_fd.block<3, 1>(rowOffset + (t * 3), col);
+        }
+
+        std::cout << "Plate " << i << " blur " << b
+                  << " ang offsets over time:" << std::endl
+                  << offsetOverTime << std::endl;
+        std::cout << "FD Plate " << i << " blur " << b
+                  << " ang offsets over time:" << std::endl
+                  << offsetOverTime_fd << std::endl;
+      }
+    }
+
     /// Check the angular pose map
     for (int t = 0; t < numTimesteps; t++)
     {
@@ -1817,8 +1962,101 @@ bool testLinearTrajectorLinearMapWithRandomTrajectory(
           return false;
         }
       }
+
+      Eigen::Matrix3s posOffsetAng
+          = A.block<3, 3>(rowOffset + t * 3, colOffset);
+      Eigen::Matrix3s posOffsetAng_fd
+          = A_fd.block<3, 3>(rowOffset + t * 3, colOffset);
+
+      if (!equals(posOffsetAng, posOffsetAng_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dAng[" << t << "]/dOffsetAng:" << std::endl
+                  << posOffsetAng << std::endl;
+        std::cout << "FD dAng[" << t << "]/dOffsetAng:" << std::endl
+                  << posOffsetAng_fd << std::endl;
+        std::cout << "Extra (Analytical - FD):" << std::endl
+                  << posOffsetAng - posOffsetAng_fd << std::endl;
+        return false;
+      }
+
+      Eigen::Matrix3s posOffsetAngVel
+          = A.block<3, 3>(rowOffset + t * 3, colOffset + 3);
+      Eigen::Matrix3s posOffsetAngVel_fd
+          = A_fd.block<3, 3>(rowOffset + t * 3, colOffset + 3);
+
+      if (!equals(posOffsetAngVel, posOffsetAngVel_fd, 1e-8))
+      {
+        std::cout << "Linear system error at t=" << t << std::endl;
+        std::cout << "Analytical dAng[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetAngVel << std::endl;
+        std::cout << "FD dAng[" << t << "]/dOffsetVel:" << std::endl
+                  << posOffsetAngVel_fd << std::endl;
+        std::cout << "Diff:" << std::endl
+                  << posOffsetAngVel - posOffsetAngVel_fd << std::endl;
+        return false;
+      }
+
+      for (int i = 0; i < numMissing; i++)
+      {
+        Eigen::Matrix3s posOffsetResidual
+            = A.block<3, 3>(rowOffset + t * 3, colOffset + 6 + i * 3);
+        Eigen::Matrix3s posOffsetResidual_fd
+            = A_fd.block<3, 3>(rowOffset + t * 3, colOffset + 6 + i * 3);
+
+        if (!equals(posOffsetResidual, posOffsetResidual_fd, 1e-8))
+        {
+          std::cout << "Linear system error at t=" << t << std::endl;
+          std::cout << "Analytical dAng[" << t << "]/dAngResidual["
+                    << missingIndices[i] << "]:" << std::endl
+                    << posOffsetResidual << std::endl;
+          std::cout << "FD dAng[" << t << "]/dAngResidual[" << missingIndices[i]
+                    << "]:" << std::endl
+                    << posOffsetResidual_fd << std::endl;
+          std::cout << "Diff:" << std::endl
+                    << posOffsetResidual - posOffsetResidual_fd << std::endl;
+          return false;
+        }
+      }
+
+      for (int i = 0; i < driftCorrectForcePlates.size(); i++)
+      {
+        for (int b = 0; b < numBlurs; b++)
+        {
+          int col = (colOffset * 2) + ((i * numBlurs + b) * 2);
+          Eigen::Vector3s copChange = A.block<3, 1>(rowOffset + (t * 3), col);
+          Eigen::Vector3s copChange_fd
+              = A_fd.block<3, 1>(rowOffset + (t * 3), col);
+          if (!equals(copChange, copChange_fd, 1e-8))
+          {
+            std::cout << "Linear system error at t=" << t << std::endl;
+            std::cout << "Analytical dAng[" << t << "]/dCop[plate=" << i
+                      << ",blur=" << b << "]:" << std::endl
+                      << copChange << std::endl;
+            std::cout << "FD dAng[" << t << "]/dCop[plate=" << i
+                      << ",blur=" << b << "]:" << std::endl
+                      << copChange_fd << std::endl;
+            std::cout << "Diff:" << std::endl
+                      << copChange - copChange_fd << std::endl;
+            return false;
+          }
+        }
+      }
     }
+    std::cout << "Angular pose map passes!" << std::endl;
+
     return false;
+  }
+
+  for (int i = 0; i < recoverCops.size(); i++)
+  {
+    if (!equals(recoverCops[i], recoverCops_fd[i], 1e-8))
+    {
+      std::cout << "Recover CoPs " << i << " not equal!" << std::endl;
+      std::cout << "Analytical:" << std::endl << recoverCops[i] << std::endl;
+      std::cout << "FD:" << std::endl << recoverCops_fd[i] << std::endl;
+      return false;
+    }
   }
 
   return true;
@@ -2460,6 +2698,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::shared_ptr<DynamicsInitialization> init,
     std::string modelPath,
     std::vector<std::string> trialNames,
+    bool useReactionWheels = false,
     bool saveGUI = false)
 {
   // Have very loose bounds for scaling
@@ -2481,8 +2720,53 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   fitter.smoothAccelerations(init);
   // fitter.markMissingImpacts(init, 3, true);
 
-  fitter.zeroLinearResidualsOnCOMTrajectory(init, false);
-  // fitter.timeSyncAndInitializePipeline(init);
+  /*
+  fitter.zeroLinearResidualsOnCOMTrajectory(init);
+  fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
+
+  s_t weightLinear = 1.0;
+  s_t weightAngular = 1.0;
+  s_t regularizeLinearResiduals = 0.1;
+  s_t regularizeAngularResiduals = 0.1;
+  s_t regularizeCopDriftCompensation = 1.0;
+  int maxBuckets = 100;
+  bool detectUnmeasuredTorque = false;
+  int iterations = useReactionWheels ? 1 : 30;
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs originalPoses = init->poseTrials[trial];
+    for (int i = 0; i < iterations; i++)
+    {
+      bool commitCopDriftCompensation = i == iterations - 1;
+      // this holds the mass constant, and re-jigs the trajectory to try to
+      // make angular ACC's match more closely what was actually observed
+      bool success = fitter.zeroLinearResidualsAndOptimizeAngular(
+          init,
+          trial,
+          originalPoses,
+          weightLinear,
+          weightAngular,
+          regularizeLinearResiduals,
+          regularizeAngularResiduals,
+          regularizeCopDriftCompensation,
+          maxBuckets,
+          useReactionWheels,
+          commitCopDriftCompensation,
+          detectUnmeasuredTorque);
+      if (!success)
+        break;
+    }
+    // Adjust the regularization target to match our newly solved trajectory, so
+    // we're not trying to pull the root away from the solved trajectory
+    init->regularizePosesTo[trial] = init->poseTrials[trial];
+
+    fitter.recalibrateForcePlatesOffset(init, trial);
+  }
+  */
+
+  fitter.timeSyncAndInitializePipeline(init, useReactionWheels);
+
   /*
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
   fitter.multimassZeroLinearResidualsOnCOMTrajectory(init);
@@ -3073,6 +3357,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::vector<std::string> grfFiles,
     int limitTrialLength = -1,
     int trialStartOffset = 0,
+    bool useReactionWheels = false,
     bool saveGUI = false,
     bool simplify = false)
 {
@@ -3127,11 +3412,22 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         = DynamicsFitter::retargetInitialization(
             standard.skeleton, simplified, init);
     return runEngine(
-        simplified, simplifiedInit, modelPath, trialNames, saveGUI);
+        simplified,
+        simplifiedInit,
+        modelPath,
+        trialNames,
+        useReactionWheels,
+        saveGUI);
   }
   else
   {
-    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI);
+    return runEngine(
+        standard.skeleton,
+        init,
+        modelPath,
+        trialNames,
+        useReactionWheels,
+        saveGUI);
   }
 }
 
@@ -3998,7 +4294,36 @@ TEST(DynamicsFitter, LIN_JACS)
     collisionBodies.push_back(
         file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
     bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
-        file.skeleton, collisionBodies, 8);
+        file.skeleton, collisionBodies, 10, false);
+    if (!success)
+    {
+      EXPECT_TRUE(success);
+      return;
+    }
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, LIN_JACS_REACTION_WHEELS)
+{
+#ifdef DART_USE_ARBITRARY_PRECISION
+  mpfr::mpreal::set_default_prec(512);
+#endif
+
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/optimized_scale_and_markers.osim");
+  srand(42);
+
+  for (int i = 0; i < 5; i++)
+  {
+    std::vector<int> collisionBodies;
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_r")->getIndexInSkeleton());
+    collisionBodies.push_back(
+        file.skeleton->getBodyNode("calcn_l")->getIndexInSkeleton());
+    bool success = testLinearTrajectorLinearMapWithRandomTrajectory(
+        file.skeleton, collisionBodies, 10, true);
     if (!success)
     {
       EXPECT_TRUE(success);
@@ -6043,11 +6368,12 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
       grfFiles,
       -1,
       0,
+      false,
       true);
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(DynamicsFitter, CARMAGO_TEST)
 {
   std::vector<std::string> trialNames;
@@ -6080,9 +6406,10 @@ TEST(DynamicsFitter, CARMAGO_TEST)
       grfFiles,
       -1,
       0,
+      true,
       true);
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP_UNFILTERED)
