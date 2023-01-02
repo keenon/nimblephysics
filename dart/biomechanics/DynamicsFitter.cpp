@@ -11376,6 +11376,7 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     s_t regularizeAngularResiduals,
     s_t regularizeCopDriftCompensation,
     int maxBuckets,
+    int maxLeastSquaresIters,
     bool commitCopDriftCompensation,
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
@@ -11572,8 +11573,8 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // Eigen::VectorXs solution
     //     = sampledA.householderQr().solve(sampledTarget - sampledB);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
-    solver.setTolerance(1e-9);
-    solver.setMaxIterations(200);
+    solver.setTolerance(1e-15);
+    solver.setMaxIterations(maxLeastSquaresIters);
     solver.compute(sampledA);
     Eigen::VectorXs solution = solver.solve(sampledTarget - sampledB);
 
@@ -11711,6 +11712,30 @@ void DynamicsFitter::timeSyncTrialGRF(
   Eigen::MatrixXs originalGRFTrial = init->grfTrials[trial];
   Eigen::MatrixXs originalPoseTrial = init->poseTrials[trial];
 
+  std::vector<std::vector<Eigen::Vector3s>> originalCOPs;
+  std::vector<std::vector<Eigen::Vector3s>> originalForces;
+  std::vector<std::vector<Eigen::Vector3s>> originalMoments;
+  for (auto& originalPlate : init->forcePlateTrials[trial])
+  {
+    std::vector<Eigen::Vector3s> cops;
+    std::vector<Eigen::Vector3s> forces;
+    std::vector<Eigen::Vector3s> moments;
+    for (int t = 0; t < originalPlate.centersOfPressure.size(); t++)
+    {
+      cops.push_back(originalPlate.centersOfPressure[t]);
+      forces.push_back(originalPlate.forces[t]);
+      moments.push_back(originalPlate.moments[t]);
+    }
+    originalCOPs.push_back(cops);
+    originalForces.push_back(forces);
+    originalMoments.push_back(moments);
+  }
+  std::vector<bool> originalProbablyMissingGRF;
+  for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+  {
+    originalProbablyMissingGRF.push_back(init->probablyMissingGRF[trial][t]);
+  }
+
   int bestShiftGRF = 0;
   s_t bestShiftGRFScore = std::numeric_limits<s_t>::infinity();
   Eigen::MatrixXs bestShiftGRFTrial = originalGRFTrial;
@@ -11728,11 +11753,41 @@ void DynamicsFitter::timeSyncTrialGRF(
       if (originalT < 0 || originalT >= originalGRFTrial.cols())
       {
         shiftedGRFTrial.col(t).setZero();
+        init->probablyMissingGRF[trial][t] = true;
       }
       else
       {
         shiftedGRFTrial.col(t) = originalGRFTrial.col(originalT);
+        init->probablyMissingGRF[trial][t]
+            = originalProbablyMissingGRF[originalT];
       }
+    }
+
+    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
+    {
+      auto& plate = init->forcePlateTrials[trial][i];
+      std::vector<Eigen::Vector3s> shiftedCOPs;
+      std::vector<Eigen::Vector3s> shiftedForces;
+      std::vector<Eigen::Vector3s> shiftedMoments;
+      for (int t = 0; t < shiftedGRFTrial.cols(); t++)
+      {
+        int originalT = t - shiftGRF;
+        if (originalT < 0 || originalT >= originalGRFTrial.cols())
+        {
+          shiftedCOPs.push_back(Eigen::Vector3s::Zero());
+          shiftedForces.push_back(Eigen::Vector3s::Zero());
+          shiftedMoments.push_back(Eigen::Vector3s::Zero());
+        }
+        else
+        {
+          shiftedCOPs.push_back(originalCOPs[i][originalT]);
+          shiftedForces.push_back(originalForces[i][originalT]);
+          shiftedMoments.push_back(originalMoments[i][originalT]);
+        }
+      }
+      plate.centersOfPressure = shiftedCOPs;
+      plate.forces = shiftedForces;
+      plate.moments = shiftedMoments;
     }
 
     init->poseTrials[trial] = originalPoseTrial;
@@ -11758,6 +11813,7 @@ void DynamicsFitter::timeSyncTrialGRF(
           regularizeAngularResiduals,
           regularizeCopDriftCompensation,
           maxBuckets,
+          50,
           false,
           false);
       if (!success)
@@ -11787,44 +11843,66 @@ void DynamicsFitter::timeSyncTrialGRF(
     }
   }
 
-  std::cout << "Best shift was: " << bestShiftGRF << " timesteps, with "
-            << bestShiftGRFScore << "m RMSE" << std::endl;
+  if (useReactionWheels)
+  {
+    std::cout << "Best shift was: " << bestShiftGRF << " timesteps, with "
+              << bestShiftGRFScore << "rad (reaction wheel RMSE)" << std::endl;
+  }
+  else
+  {
+    std::cout << "Best shift was: " << bestShiftGRF << " timesteps, with "
+              << bestShiftGRFScore << "m RMSE" << std::endl;
+  }
   init->grfTrials[trial] = bestShiftGRFTrial;
   init->poseTrials[trial] = bestShiftPoseTrial;
 
   // update force plates to reflect shift
-  if (bestShiftGRF != 0)
+  for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
   {
-    for (auto& plate : init->forcePlateTrials[trial])
+    auto& plate = init->forcePlateTrials[trial][i];
+    std::vector<Eigen::Vector3s> shiftedCOPs;
+    std::vector<Eigen::Vector3s> shiftedForces;
+    std::vector<Eigen::Vector3s> shiftedMoments;
+    for (int t = 0; t < bestShiftGRFTrial.cols(); t++)
     {
-      std::vector<Eigen::Vector3s> shiftedCOPs;
-      std::vector<Eigen::Vector3s> shiftedForces;
-      std::vector<Eigen::Vector3s> shiftedMoments;
-      for (int t = 0; t < bestShiftGRFTrial.cols(); t++)
+      // We want a shift of "-2" to result in the shiftedGRFTrial having its
+      // entries shifted to the left by 2, so that means grabbing "+2"
+      // columns from the original relative to itself.
+      int originalT = t - bestShiftGRF;
+      if (originalT < 0 || originalT >= originalGRFTrial.cols())
       {
-        // We want a shift of "-2" to result in the shiftedGRFTrial having its
-        // entries shifted to the left by 2, so that means grabbing "+2"
-        // columns from the original relative to itself.
-        int originalT = t - bestShiftGRF;
-        if (originalT < 0 || originalT >= originalGRFTrial.cols())
-        {
-          shiftedCOPs.push_back(Eigen::Vector3s::Zero());
-          shiftedForces.push_back(Eigen::Vector3s::Zero());
-          shiftedMoments.push_back(Eigen::Vector3s::Zero());
-        }
-        else
-        {
-          shiftedCOPs.push_back(plate.centersOfPressure[originalT]);
-          shiftedForces.push_back(plate.forces[originalT]);
-          shiftedMoments.push_back(plate.moments[originalT]);
-        }
+        shiftedCOPs.push_back(Eigen::Vector3s::Zero());
+        shiftedForces.push_back(Eigen::Vector3s::Zero());
+        shiftedMoments.push_back(Eigen::Vector3s::Zero());
       }
-      plate.centersOfPressure = shiftedCOPs;
-      plate.forces = shiftedForces;
-      plate.moments = shiftedMoments;
+      else
+      {
+        shiftedCOPs.push_back(originalCOPs[i][originalT]);
+        shiftedForces.push_back(originalForces[i][originalT]);
+        shiftedMoments.push_back(originalMoments[i][originalT]);
+      }
     }
-    recomputeGRFs(init, mSkeleton, trial);
+    plate.centersOfPressure = shiftedCOPs;
+    plate.forces = shiftedForces;
+    plate.moments = shiftedMoments;
   }
+  for (int t = 0; t < bestShiftGRFTrial.cols(); t++)
+  {
+    // We want a shift of "-2" to result in the shiftedGRFTrial having its
+    // entries shifted to the left by 2, so that means grabbing "+2"
+    // columns from the original relative to itself.
+    int originalT = t - bestShiftGRF;
+    if (originalT < 0 || originalT >= originalGRFTrial.cols())
+    {
+      init->probablyMissingGRF[trial][t] = true;
+    }
+    else
+    {
+      init->probablyMissingGRF[trial][t]
+          = originalProbablyMissingGRF[originalT];
+    }
+  }
+  // recomputeGRFs(init, mSkeleton, trial);
 }
 
 //==============================================================================
@@ -11898,6 +11976,7 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       bool commitDriftCompensation = i == iterations - 1;
+      (void)regularizeCopDriftCompensation;
       bool success = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
@@ -11909,6 +11988,7 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
           regularizeAngularResiduals,
           regularizeCopDriftCompensation,
           maxBuckets,
+          800,
           commitDriftCompensation,
           detectUnmeasuredTorque,
           avgPositionChangeThreshold,

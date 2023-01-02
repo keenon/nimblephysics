@@ -1381,6 +1381,7 @@ public:
       s_t regularizeAngularResiduals = 0.1,
       s_t regularizeCopDriftCompensation = 0.1,
       int maxBuckets = 100,
+      int maxLeastSquaresIters = 200,
       bool commitCopDriftCompensation = false,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,

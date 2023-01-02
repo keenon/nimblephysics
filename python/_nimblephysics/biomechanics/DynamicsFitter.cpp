@@ -554,7 +554,10 @@ protected:
           "zeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
               zeroLinearResidualsOnCOMTrajectory,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("detectExternalForce") = true,
+          ::py::arg("driftCorrectionBlurRadius") = 250,
+          ::py::arg("driftCorrectionBlurInterval") = 250)
       .def(
           "multimassZeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
@@ -568,11 +571,15 @@ protected:
           ::py::arg("init"),
           ::py::arg("trial"),
           ::py::arg("targetPoses"),
+          ::py::arg("useReactionWheels") = false,
           ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 0.5,
           ::py::arg("regularizeLinearResiduals") = 0.1,
           ::py::arg("regularizeAngularResiduals") = 0.1,
+          ::py::arg("regularizeCopDriftCompensation") = 1.0,
           ::py::arg("maxBuckets") = 40,
+          ::py::arg("maxLeastSquaresIters") = 200,
+          ::py::arg("commitCopDriftCompensation") = false,
           ::py::arg("detectUnmeasuredTorque") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15)
@@ -581,6 +588,7 @@ protected:
           &dart::biomechanics::DynamicsFitter::timeSyncTrialGRF,
           ::py::arg("init"),
           ::py::arg("trial"),
+          ::py::arg("useReactionWheels") = false,
           ::py::arg("maxShiftGRFEarlier") = -4,
           ::py::arg("maxShiftGRFLater") = 4,
           ::py::arg("iterationsPerShift") = 20,
@@ -588,11 +596,13 @@ protected:
           ::py::arg("weightAngular") = 1.0,
           ::py::arg("regularizeLinearResiduals") = 0.5,
           ::py::arg("regularizeAngularResiduals") = 0.5,
+          ::py::arg("regularizeCopDriftCompensation") = 1.0,
           ::py::arg("maxBuckets") = 20)
       .def(
           "timeSyncAndInitializePipeline",
           &dart::biomechanics::DynamicsFitter::timeSyncAndInitializePipeline,
           ::py::arg("init"),
+          ::py::arg("useReactionWheels") = false,
           ::py::arg("maxShiftGRFEarlier") = -4,
           ::py::arg("maxShiftGRFLater") = 4,
           ::py::arg("iterationsPerShift") = 20,
@@ -600,6 +610,7 @@ protected:
           ::py::arg("weightAngular") = 0.5,
           ::py::arg("regularizeLinearResiduals") = 0.1,
           ::py::arg("regularizeAngularResiduals") = 0.1,
+          ::py::arg("regularizeCopDriftCompensation") = 1.0,
           ::py::arg("maxBuckets") = 100,
           ::py::arg("detectUnmeasuredTorque") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
