@@ -2916,6 +2916,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // //         .setIncludeMarkerOffsets(true)
   // //         .setIncludePoses(true));
 
+  /*
   fitter.setLBFGSHistoryLength(250);
   fitter.runIPOPTOptimization(
       init,
@@ -2942,6 +2943,7 @@ std::shared_ptr<DynamicsInitialization> runEngine(
             .setOnlyOneTrial(i)
             .setIncludePoses(true));
   }
+  */
 
   // // Do a final polishing pass on the marker offsets
   // fitter.optimizeMarkerOffsets(init);

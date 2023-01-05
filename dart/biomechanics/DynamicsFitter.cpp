@@ -8735,26 +8735,172 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
   {
     init->reactionWheels.push_back(Eigen::MatrixXs::Zero(0, 0));
-    for (int f = 0; f < init->forcePlateTrials[trial].size(); f++)
+    for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
     {
-      ForcePlate& plate = init->forcePlateTrials[trial][f];
+      ForcePlate& plate = init->forcePlateTrials[trial][i];
+
+      // Try to figure out the coordinate system of the moments data on this
+      // force plate
+
+      int numParallelMoments = 0;
+      int numVerticalMoments = 0;
+      int numWorldMoments = 0;
+      int numOffsetMoments = 0;
+      std::vector<Eigen::Vector3s> copOffsets;
       for (int t = 0; t < plate.forces.size(); t++)
       {
         Eigen::Vector3s f = plate.forces[t];
         Eigen::Vector3s m = plate.moments[t];
+        Eigen::Vector3s cop = plate.centersOfPressure[t];
         // Check for the section of the moment that is not parallel with force
         Eigen::Vector3s parallelComponent
             = f.normalized().dot(m) * f.normalized();
         Eigen::Vector3s antiParallelComponent = m - parallelComponent;
         s_t percentageAntiparallel
             = antiParallelComponent.norm() / parallelComponent.norm();
-        if (percentageAntiparallel > 0.01)
+        // Check for the "moment is in world space" interpretation
+        Eigen::Vector3s tau = cop.cross(f);
+        Eigen::Vector3s worldM = m - tau;
+        if (f.norm() < 3 || cop.isZero())
         {
-          anyAntiparallel = true;
-          // Keep only the parallel component of the moment
-          plate.moments[t].setZero();
-          // plate.moments[t] = parallelComponent;
+          // Zero out this data
+          // plate.forces[t].setZero();
+          // plate.moments[t].setZero();
         }
+        else if (percentageAntiparallel < 0.1)
+        {
+          // This is parallel GRF data
+          numParallelMoments++;
+        }
+        else if (abs(m(0)) < 1e-5 && abs(m(2)) < 1e-5)
+        {
+          // This is vertical GRF data
+          numVerticalMoments++;
+        }
+        else if (
+            worldM.norm() < m.norm() * 0.3
+            || (worldM.norm() < 15 && worldM.norm() < m.norm()))
+        {
+          // This is parallel GRF data if the moment is interpreted as a world
+          // frame moment
+          numWorldMoments++;
+        }
+        else
+        {
+          numOffsetMoments++;
+
+          Eigen::Vector3s recoveredCop
+              = Eigen::Vector3s(m(2) / f(1), 0, -m(0) / f(1));
+          Eigen::Vector3s copDiff = recoveredCop - cop;
+          copOffsets.push_back(copDiff);
+        }
+      }
+
+      // Now we try to decide how to interpret this force plate
+      if (numParallelMoments >= numOffsetMoments
+          && numParallelMoments >= numVerticalMoments
+          && numParallelMoments >= numWorldMoments)
+      {
+        std::cout << "Interpreting force plate " << i << " in trial " << trial
+                  << " as having centers-of-pressure that are calculated so "
+                     "that remaining moment is PARALLEL to forces."
+                  << std::endl;
+      }
+      else if (
+          numVerticalMoments >= numOffsetMoments
+          && numVerticalMoments >= numParallelMoments
+          && numVerticalMoments >= numWorldMoments)
+      {
+        std::cout << "Interpreting force plate " << i << " in trial " << trial
+                  << " as having centers-of-pressure that are calculated so "
+                     "that remaining moment is VERTICAL."
+                  << std::endl;
+      }
+      else if (
+          numWorldMoments >= numOffsetMoments
+          && numWorldMoments >= numParallelMoments
+          && numWorldMoments >= numVerticalMoments)
+      {
+        std::cout
+            << "Interpreting force plate " << i << " in trial " << trial
+            << " as having moments expressed in WORLD SPACE. We will recompute "
+               "the moments to be expressed at the center of pressure."
+            << std::endl;
+        for (int t = 0; t < plate.forces.size(); t++)
+        {
+          Eigen::Vector3s f = plate.forces[t];
+          Eigen::Vector3s m = plate.moments[t];
+          Eigen::Vector3s cop = plate.centersOfPressure[t];
+          Eigen::Vector3s tau = cop.cross(f);
+          Eigen::Vector3s worldM = m - tau;
+          if (f.norm() < 3 || cop.isZero())
+            continue;
+          plate.moments[t] = worldM;
+        }
+      }
+      else if (
+          numOffsetMoments >= numWorldMoments
+          && numOffsetMoments >= numParallelMoments
+          && numOffsetMoments >= numVerticalMoments)
+      {
+        // Before we pronouce a judgement, we need to compute some statistics
+        // about the CoP offset. If it's consistent around a particular offset,
+        // then we can be confident that's where the force plate is supposed to
+        // offset to. If not, then this is an error case and needs to get zero'd
+        // out.
+        Eigen::Vector3s averageOffset = Eigen::Vector3s::Zero();
+        for (Eigen::Vector3s& v : copOffsets)
+        {
+          averageOffset += v;
+        }
+        averageOffset /= copOffsets.size();
+
+        Eigen::Vector3s offsetVariance = Eigen::Vector3s::Zero();
+        for (Eigen::Vector3s& v : copOffsets)
+        {
+          offsetVariance += (v - averageOffset).cwiseProduct(v - averageOffset);
+        }
+        offsetVariance /= copOffsets.size();
+
+        if (offsetVariance.norm() < 0.2)
+        {
+          std::cout
+              << "Interpreting force plate " << i << " in trial " << trial
+              << " as having moments expressed in OFFSET WORLD SPACE (offset = "
+              << averageOffset(0) << "," << averageOffset(1) << ","
+              << averageOffset(2) << "; variance = " << offsetVariance.norm()
+              << "). We will recompute the "
+                 "moments to be expressed at the center of pressure."
+              << std::endl;
+
+          for (int t = 0; t < plate.forces.size(); t++)
+          {
+            Eigen::Vector3s f = plate.forces[t];
+            Eigen::Vector3s m = plate.moments[t];
+            Eigen::Vector3s cop = plate.centersOfPressure[t];
+            cop += averageOffset;
+            Eigen::Vector3s tau = cop.cross(f);
+            Eigen::Vector3s worldM = m - tau;
+            if (f.norm() < 3 || cop.isZero())
+              continue;
+            plate.moments[t] = worldM;
+          }
+        }
+        else
+        {
+          std::cout
+              << "BAD INPUT DATA DETECTED!! Could not find an interpretation "
+                 "for "
+                 "force plate "
+              << i << " in trial " << trial
+              << " where the moments, forces, and centers of pressure are "
+                 "consistent. Continuing anyways, but EXPECT BAD RESULTS!"
+              << std::endl;
+        }
+      }
+      else
+      {
+        assert(false && "this should be impossible to reach");
       }
     }
   }
@@ -9823,7 +9969,7 @@ void DynamicsFitter::smoothAccelerations(
     }
 
     // 0.05
-    AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.05);
+    AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.02);
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
@@ -10185,7 +10331,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
   for (s_t threshold = 1.0; threshold > 0.4; threshold *= 0.5)
   {
     const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
-    s_t regularizeForcePlateRotations = 100.0;
+    s_t regularizeForcePlateRotations = 10.0;
     s_t regularizeUnobservedTimesteps = 0.1;
 
     const s_t originalMass = mSkeleton->getMass();
@@ -10429,108 +10575,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
             = regularizeUnobservedTimesteps;
       }
 
-#ifndef NDEBUG
-      Eigen::VectorXs testConfig
-          = Eigen::VectorXs::Random(trialLinearMapToPositions.cols());
-      testConfig.head<3>() = trialOriginalCOMs[i][0];
-      testConfig.segment<3>(3)
-          = (trialOriginalCOMs[i][1] - trialOriginalCOMs[i][0]);
-      testConfig(testConfig.size() - 1) = 1.0 / originalMass;
-
-      Eigen::VectorXs recoveredComPoses
-          = trialLinearMapToPositions * testConfig;
-      recoveredComPoses.segment(0, comGravityOffset.size()) += comGravityOffset;
-
-      for (int j = 0; j < missingStepIndices.size(); j++)
-      {
-        int missingXCol = 6 + j * 3;
-        int missingYCol = 6 + j * 3 + 1;
-        int missingZCol = 6 + j * 3 + 2;
-
-        int missingXRow = (numTimesteps * 3) + j * 3;
-        int missingYRow = (numTimesteps * 3) + j * 3 + 1;
-        int missingZRow = (numTimesteps * 3) + j * 3 + 2;
-
-        if (recoveredComPoses.size() <= missingZRow)
-        {
-          std::cout << "Our recovered poses data doesn't seem long enough to "
-                       "contain missing step delta V ["
-                    << j << " / " << missingStepIndices.size() << "]. Needs "
-                    << missingZRow << ", but is only len "
-                    << recoveredComPoses.size() << std::endl;
-        }
-        assert(recoveredComPoses.size() > missingZRow);
-        if (testConfig.size() <= missingZCol)
-        {
-          std::cout << "Our test configuration doesn't seem long enough to "
-                       "contain missing step delta V ["
-                    << j << " / " << missingStepIndices.size() << "]. Needs "
-                    << missingZCol << ", but is only len " << testConfig.size()
-                    << std::endl;
-        }
-        assert(testConfig.size() > missingZCol);
-
-        if (abs(recoveredComPoses(missingXRow)
-                - testConfig(missingXCol) * regularizeUnobservedTimesteps)
-            > 1e-12)
-        {
-          std::cout << "Failed to recoverd deltaV X for missing timestep[" << j
-                    << "] = " << missingStepIndices[j] << ", expected "
-                    << testConfig(missingXCol) * regularizeUnobservedTimesteps
-                    << " but got " << recoveredComPoses(missingXRow)
-                    << std::endl;
-        }
-        if (abs(recoveredComPoses(missingYRow)
-                - testConfig(missingYCol) * regularizeUnobservedTimesteps)
-            > 1e-12)
-        {
-          std::cout << "Failed to recoverd deltaV Y for missing timestep[" << j
-                    << "] = " << missingStepIndices[j] << ", expected "
-                    << testConfig(missingYCol) * regularizeUnobservedTimesteps
-                    << " but got " << recoveredComPoses(missingYRow)
-                    << std::endl;
-        }
-        if (abs(recoveredComPoses(missingZRow)
-                - testConfig(missingZCol) * regularizeUnobservedTimesteps)
-            > 1e-12)
-        {
-          std::cout << "Failed to recoverd deltaV Z for missing timestep[" << j
-                    << "] = " << missingStepIndices[j] << ", expected "
-                    << testConfig(missingZCol) * regularizeUnobservedTimesteps
-                    << " but got " << recoveredComPoses(missingZRow)
-                    << std::endl;
-        }
-      }
-
-      for (int t = 1; t < numTimesteps - 1; t++)
-      {
-        if (init->probablyMissingGRF.size() > i
-            && init->probablyMissingGRF[i][t])
-          continue;
-        Eigen::Vector3s acc = (recoveredComPoses.segment<3>((t + 1) * 3)
-                               - 2 * recoveredComPoses.segment<3>(t * 3)
-                               + recoveredComPoses.segment<3>((t - 1) * 3))
-                              / (dt * dt);
-        acc += trialOriginalAccOffsets[i][t - 1];
-        Eigen::Vector3s impliedForce = acc * originalMass;
-        Eigen::Vector3s expectedForce
-            = (gravity * originalMass) + trialGRFs[i][t];
-        Eigen::Vector3s diff = impliedForce - expectedForce;
-        if (diff.norm() > 1e-7)
-        {
-          std::cout << "Bug detected in zeroResidualsOnCOMTrajectory() linear "
-                       "formulation!"
-                    << std::endl;
-          Eigen::Matrix3s comp;
-          comp.col(0) = impliedForce;
-          comp.col(1) = expectedForce;
-          comp.col(2) = diff;
-          std::cout << "t=" << t << ": implied - expected - diff" << std::endl
-                    << comp << std::endl;
-        }
-      }
-#endif
-
       trialLinearMaps.push_back(trialLinearMapToPositions);
       trialOriginalPositions.push_back(originalCOMPositions);
       trialOriginalGravityOffsets.push_back(comGravityOffset);
@@ -10767,7 +10811,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         int numBlurs
             = (int)floor((s_t)trialLength / driftCorrectionBlurInterval);
         const s_t dt = init->trialTimesteps[trial];
-        s_t regularizeBlurs = 0.001 * trialLength;
+        s_t regularizeBlurs = 1.0;
 
         // For handling small force plate rotations, which can be important to
         // correct for calibration errors in the force plates.
