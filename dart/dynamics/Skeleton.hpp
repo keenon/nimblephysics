@@ -937,6 +937,40 @@ public:
   void zeroTranslationInCustomFunctions();
 
   //----------------------------------------------------------------------------
+  // Utilities for featurizing diverse skeletons consistently
+  //----------------------------------------------------------------------------
+
+  /// This is a utility that will find a body with this mesh attached, if one
+  /// exists, and also the transform which relates the geometry frame to the
+  /// body frame.
+  ///
+  /// WARNING: Do not expose this to Python, because the pybind11 ownership
+  /// scheme can't handle mixed ownership, and it'll try to free the BodyNode
+  /// pointer when the pair goes out of use in Python, which is bad. Expose the
+  /// below methods instead.
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* getBodyAndTransformForMesh(
+      std::string meshFileName);
+
+  /// This is a utility that will find a body with this mesh attached, if one
+  /// exists.
+  dynamics::BodyNode* getBodyForMesh(std::string meshFileName);
+
+  /// This is a utility that will transform an isometry in the frame of a mesh
+  /// to a transform in the parent body's frame.
+  Eigen::Isometry3s getTransformFromMeshToParentBody(
+      std::string meshFileName, Eigen::Isometry3s relativeToGeometry);
+
+  /// This is a utility that will transform a translation in the frame of a mesh
+  /// to a translation in the parent body's frame.
+  Eigen::Vector3s getTranslationFromMeshToParentBody(
+      std::string meshFileName, Eigen::Vector3s relativeToGeometry);
+
+  /// This is a utility that will transform a rotation in the frame of a mesh
+  /// to a rotation in the parent body's frame.
+  Eigen::Matrix3s getRotationFromMeshToParentBody(
+      std::string meshFileName, Eigen::Matrix3s relativeToGeometry);
+
+  //----------------------------------------------------------------------------
   // Constraining links to have the same scale
   //----------------------------------------------------------------------------
 
@@ -2515,6 +2549,11 @@ protected:
 
   /// This is a cache for the data around our group scales
   std::vector<BodyScaleGroupAndIndex> mGroupScaleIndices;
+
+  /// This is a cache for looking up meshes attached to bodies
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      mMeshBodyCache;
+  std::map<std::string, bool> mMeshExistsCache;
 
   struct DirtyFlags
   {

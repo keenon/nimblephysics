@@ -3691,6 +3691,99 @@ void Skeleton::zeroTranslationInCustomFunctions()
 }
 
 //==============================================================================
+/// This is a utility that will find a body with this mesh attached, if one
+/// exists, and also the transform which relates the geometry frame to the
+/// body frame.
+std::pair<dynamics::BodyNode*, Eigen::Isometry3s>*
+Skeleton::getBodyAndTransformForMesh(std::string meshFileName)
+{
+  if (mMeshExistsCache.count(meshFileName)
+      && !mMeshExistsCache.at(meshFileName))
+  {
+    return nullptr;
+  }
+  if (mMeshBodyCache.count(meshFileName))
+  {
+    return &mMeshBodyCache.at(meshFileName);
+  }
+
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* node = getBodyNode(i);
+    for (int j = 0; j < node->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapePtr shape = node->getShapeNode(j)->getShape();
+      dynamics::MeshShape* mesh
+          = dynamic_cast<dynamics::MeshShape*>(shape.get());
+      if (mesh == nullptr)
+        continue;
+      if (mesh->getMeshPath().find(meshFileName) != std::string::npos)
+      {
+        // Found it!
+        mMeshExistsCache[meshFileName] = true;
+        mMeshBodyCache[meshFileName] = std::make_pair(
+            node, node->getShapeNode(j)->getRelativeTransform());
+        return &mMeshBodyCache.at(meshFileName);
+      }
+    }
+  }
+
+  mMeshExistsCache[meshFileName] = false;
+  return nullptr;
+}
+
+//==============================================================================
+/// This is a utility that will find a body with this mesh attached, if one
+/// exists.
+dynamics::BodyNode* Skeleton::getBodyForMesh(std::string meshFileName)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return nullptr;
+  return pair->first;
+}
+
+//==============================================================================
+/// This is a utility that will transform an isometry in the frame of a mesh
+/// to a transform in the parent body's frame.
+Eigen::Isometry3s Skeleton::getTransformFromMeshToParentBody(
+    std::string meshFileName, Eigen::Isometry3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
+/// This is a utility that will transform a translation in the frame of a mesh
+/// to a translation in the parent body's frame.
+Eigen::Vector3s Skeleton::getTranslationFromMeshToParentBody(
+    std::string meshFileName, Eigen::Vector3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
+/// This is a utility that will transform a rotation in the frame of a mesh
+/// to a rotation in the parent body's frame.
+Eigen::Matrix3s Skeleton::getRotationFromMeshToParentBody(
+    std::string meshFileName, Eigen::Matrix3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
 const std::vector<BodyScaleGroup>& Skeleton::getBodyScaleGroups() const
 {
   return mBodyScaleGroups;

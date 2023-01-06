@@ -814,6 +814,25 @@ void Skeleton(py::module& m)
       .def(
           "clampPositionsToLimits",
           &dart::dynamics::Skeleton::clampPositionsToLimits)
+      .def(
+          "getBodyForMesh",
+          &dart::dynamics::Skeleton::getBodyForMesh,
+          ::py::arg("meshFileName"))
+      .def(
+          "getTransformFromMeshToParentBody",
+          &dart::dynamics::Skeleton::getTransformFromMeshToParentBody,
+          ::py::arg("meshFileName"),
+          ::py::arg("relativeToGeometry"))
+      .def(
+          "getTranslationFromMeshToParentBody",
+          &dart::dynamics::Skeleton::getTranslationFromMeshToParentBody,
+          ::py::arg("meshFileName"),
+          ::py::arg("relativeToGeometry"))
+      .def(
+          "getRotationFromMeshToParentBody",
+          &dart::dynamics::Skeleton::getRotationFromMeshToParentBody,
+          ::py::arg("meshFileName"),
+          ::py::arg("relativeToGeometry"))
       .def("getBodyScaleGroups", &dart::dynamics::Skeleton::getBodyScaleGroups)
       .def(
           "getBodyScaleGroup",
@@ -1328,6 +1347,19 @@ void Skeleton(py::module& m)
           ::py::arg("localOffset"),
           ::py::arg("inCoordinatesOf"))
       .def(
+          "getLinearJacobian",
+          +[](const dart::dynamics::Skeleton* self,
+              const dart::dynamics::JacobianNode* _node,
+              const Eigen::Vector3s& _localOffset,
+              const Eigen::Matrix3s& _localRotation)
+              -> dart::math::LinearJacobian {
+            return _localRotation
+                   * self->getLinearJacobian(_node, _localOffset);
+          },
+          ::py::arg("node"),
+          ::py::arg("localOffset"),
+          ::py::arg("rotation"))
+      .def(
           "getAngularJacobian",
           +[](const dart::dynamics::Skeleton* self,
               const dart::dynamics::JacobianNode* _node)
@@ -1345,6 +1377,15 @@ void Skeleton(py::module& m)
           },
           ::py::arg("node"),
           ::py::arg("inCoordinatesOf"))
+      .def(
+          "getAngularJacobian",
+          +[](const dart::dynamics::Skeleton* self,
+              const dart::dynamics::JacobianNode* _node,
+              const Eigen::Matrix3s& _rotation) -> dart::math::AngularJacobian {
+            return _rotation * self->getAngularJacobian(_node);
+          },
+          ::py::arg("node"),
+          ::py::arg("rotation"))
       .def(
           "getJacobianSpatialDeriv",
           +[](const dart::dynamics::Skeleton* self,
