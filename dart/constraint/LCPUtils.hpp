@@ -10,9 +10,20 @@
 namespace dart {
 namespace constraint {
 
+enum LCPSolutionType
+{
+  SUCCESS,
+  FAILURE_IGNORE_FRICTION,
+  FAILURE_LOWER_BOUND,
+  FAILURE_UPPER_BOUND,
+  FAILURE_WITHIN_BOUNDS,
+  FAILURE_OUT_OF_BOUNDS
+};
+
 class LCPUtils
 {
 public:
+  // This checks whether a solution to an LCP problem is valid.
   static bool isLCPSolutionValid(
       const Eigen::MatrixXs& mA,
       const Eigen::VectorXs& mX,
@@ -21,6 +32,33 @@ public:
       const Eigen::VectorXs& mLo,
       const Eigen::VectorXi& mFIndex,
       bool ignoreFrictionIndices);
+
+  // This determines the solution types of an LCP problem.
+  static std::vector<LCPSolutionType> getLCPSolutionTypes(
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mX,
+      const Eigen::VectorXs& mB,
+      const Eigen::VectorXs& mHi,
+      const Eigen::VectorXs& mLo,
+      const Eigen::VectorXi& mFIndex,
+      bool ignoreFrictionIndices);
+
+  // This determines the type of a solution to an LCP problem.
+  static LCPSolutionType getLCPSolutionType(
+      int i,
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mX,
+      const Eigen::VectorXs& mB,
+      const Eigen::VectorXs& mHi,
+      const Eigen::VectorXs& mLo,
+      const Eigen::VectorXi& mFIndex,
+      bool ignoreFrictionIndices);
+
+  // This computes the slack variable from the LCP solution.
+  static Eigen::VectorXs computeSlackFromLCPSolution(
+      const Eigen::MatrixXs& mA,
+      const Eigen::VectorXs& mX,
+      const Eigen::VectorXs& mB);
 
   /// This applies a simple algorithm to guess the solution to the LCP problem.
   /// It's not guaranteed to be correct, but it often can be if there is no
