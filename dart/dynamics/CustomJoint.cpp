@@ -1,5 +1,6 @@
 #include "dart/dynamics/CustomJoint.hpp"
 
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -1366,17 +1367,26 @@ Eigen::VectorXs CustomJoint<Dimension>::getNearestPositionToDesiredRotation(
 
   // Do gradient descent to get as close as possible to the euler angles
   Eigen::VectorXs x = this->getPositions();
+  s_t lastLoss = std::numeric_limits<s_t>::infinity();
   for (int iter = 0; iter < 100; iter++)
   {
     Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
+    s_t loss = 0.0;
     for (int i = 0; i < 3; i++)
     {
       int drivenByDof = mFunctionDrivenByDof[i];
-      s_t diff = mFunctions[i]->calcValue(x(drivenByDof));
-      grad(i, drivenByDof)
+      s_t value = mFunctions[i]->calcValue(x(drivenByDof));
+      s_t diff = eulerAngles(i) - value;
+      loss += diff * diff;
+      grad(drivenByDof)
           += 2 * diff * mFunctions[i]->calcDerivative(1, x(drivenByDof));
     }
-    x -= grad * 0.1;
+    s_t improvement = lastLoss - loss;
+    if (improvement < 1e-12)
+      break;
+    lastLoss = loss;
+    // std::cout << iter << ": " << improvement << std::endl;
+    x += grad * 0.1;
   }
 
   // Now we must find the closest point in the relative curves

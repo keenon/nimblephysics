@@ -6,6 +6,7 @@
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
 #include "dart/dynamics/ConstantCurveJoint.hpp"
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/EllipsoidJoint.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
@@ -16,6 +17,7 @@
 #include "dart/dynamics/UniversalJoint.hpp"
 #include "dart/dynamics/detail/BodyNodePtr.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/LinearFunction.hpp"
 #include "dart/math/MathTypes.hpp"
 
 #include "TestHelpers.hpp"
@@ -27,12 +29,14 @@ using namespace dynamics;
 
 template <typename JointType>
 bool testNearestPosition(
-    std::function<void(JointType* joint)> randomizeJoint = [](JointType*) {})
+    std::function<void(JointType* joint)> randomizeJoint = [](JointType*) {},
+    std::function<void(JointType* joint)> initJoint = [](JointType*) {})
 {
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
   std::pair<JointType*, dynamics::BodyNode*> pair
       = skel->createJointAndBodyNodePair<JointType>();
   JointType* joint = pair.first;
+  initJoint(joint);
 
   for (int k = 0; k < 5; k++)
   {
@@ -200,3 +204,23 @@ TEST(NEAREST_POSITION_TO_ROTATION, CONSTANT_CURVE_INCOMPRESSIBLE_JOINT)
       testNearestPosition<dynamics::ConstantCurveIncompressibleJoint>());
 }
 #endif
+
+/*
+// #ifdef ALL_TESTS
+TEST(NEAREST_POSITION_TO_ROTATION, CUSTOM_JOINT)
+{
+  EXPECT_TRUE(testNearestPosition<dynamics::CustomJoint<1>>(
+      [](dynamics::CustomJoint<1>* joint) {
+        (void)joint;
+        // Do nothing to randomize the joint
+      },
+      [](dynamics::CustomJoint<1>* joint) {
+        std::shared_ptr<math::LinearFunction> lin
+            = std::make_shared<math::LinearFunction>(1.0, 0.0);
+        joint->setCustomFunction(0, lin, 0);
+        joint->setCustomFunction(1, lin, 0);
+        joint->setCustomFunction(2, lin, 0);
+      }));
+}
+// #endif
+*/
