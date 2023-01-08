@@ -105,6 +105,11 @@ public:
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index) const override;
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
   ////////////////////////////////////////////////////////////////////////////
   // Public static helper methods, which are used here and in CustomJoint
   ////////////////////////////////////////////////////////////////////////////

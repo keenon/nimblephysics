@@ -154,6 +154,11 @@ public:
   Eigen::MatrixXs analyticalScratch(int firstIndex, int secondIndex);
   Eigen::MatrixXs finiteDifferenceScratch(int firstIndex, int secondIndex);
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
 protected:
   dynamics::EulerJoint::AxisOrder mAxisOrder;
 

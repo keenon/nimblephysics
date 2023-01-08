@@ -270,6 +270,19 @@ Eigen::Matrix3s EulerJoint::convertToRotation(
 }
 
 //==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs EulerJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return convertToPositions(relativeRotation);
+}
+
+//==============================================================================
 /// This is a truly static method to compute the relative Jacobian, which gets
 /// reused in CustomJoint
 Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(

@@ -37,6 +37,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -1231,6 +1232,21 @@ Eigen::Vector6s FreeJoint::getScrewAxisGradientForForce(
   }
   return math::AdT(
       parentTransform * Joint::mAspectProperties.mT_ParentBodyToJoint, grad);
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs FreeJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  Eigen::Vector6s pos = getPositionsStatic();
+  pos.head<3>() = math::logMap(relativeRotation);
+  return pos;
 }
 
 } // namespace dynamics

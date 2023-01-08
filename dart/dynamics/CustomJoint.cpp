@@ -1350,6 +1350,39 @@ Eigen::Vector6s CustomJoint<Dimension>::getScrewAxisGradientForForce(
   return Joint::finiteDifferenceScrewAxisGradientForForce(axisDof, rotateDof);
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+template <std::size_t Dimension>
+Eigen::VectorXs CustomJoint<Dimension>::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  Eigen::Vector3s eulerAngles = EulerJoint::convertToPositions(
+      relativeRotation, getAxisOrder(), getFlipAxisMap());
+
+  // Do gradient descent to get as close as possible to the euler angles
+  Eigen::VectorXs x = this->getPositions();
+  for (int iter = 0; iter < 100; iter++)
+  {
+    Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
+    for (int i = 0; i < 3; i++)
+    {
+      int drivenByDof = mFunctionDrivenByDof[i];
+      s_t diff = mFunctions[i]->calcValue(x(drivenByDof));
+      grad(i, drivenByDof)
+          += 2 * diff * mFunctions[i]->calcDerivative(1, x(drivenByDof));
+    }
+    x -= grad * 0.1;
+  }
+
+  // Now we must find the closest point in the relative curves
+  return x;
+}
+
 // Instantiate templates
 template class dart::dynamics::CustomJoint<1>;
 template class dart::dynamics::CustomJoint<2>;

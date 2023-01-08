@@ -2850,6 +2850,22 @@ Eigen::Vector6s ConstantCurveJoint::getScrewAxisGradientForForce(
   return Joint::finiteDifferenceScrewAxisGradientForForce(axisDof, rotateDof);
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs ConstantCurveJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  Eigen::VectorXs positions = getPositions();
+  positions.head<3>() = EulerJoint::convertToPositions(
+      relativeRotation, EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
+  return positions;
+}
+
 // For testing
 Eigen::MatrixXs ConstantCurveJoint::getScratch(int firstIndex)
 {

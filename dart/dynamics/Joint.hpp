@@ -604,6 +604,18 @@ public:
   /// \}
 
   //----------------------------------------------------------------------------
+  /// \{ \name Integrating sensor observations
+  //----------------------------------------------------------------------------
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  virtual Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation)
+      = 0;
+
+  /// \}
+
+  //----------------------------------------------------------------------------
   /// \{ \name Passive forces - spring, viscous friction, Coulomb friction
   //----------------------------------------------------------------------------
 

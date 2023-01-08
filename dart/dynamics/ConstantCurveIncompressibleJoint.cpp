@@ -1627,6 +1627,21 @@ Eigen::Vector6s ConstantCurveIncompressibleJoint::getScrewAxisGradientForForce(
   return Joint::finiteDifferenceScrewAxisGradientForForce(axisDof, rotateDof);
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs
+ConstantCurveIncompressibleJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return EulerJoint::convertToPositions(
+      relativeRotation, EulerJoint::AxisOrder::XZY, mFlipAxisMap.head<3>());
+}
+
 // For testing
 Eigen::MatrixXs ConstantCurveIncompressibleJoint::getScratch(int firstIndex)
 {

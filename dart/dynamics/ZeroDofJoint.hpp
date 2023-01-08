@@ -588,6 +588,11 @@ protected:
 
   /// \}
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
 private:
   /// Used by getDofName()
   const std::string emptyString;

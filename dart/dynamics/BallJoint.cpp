@@ -470,6 +470,19 @@ void BallJoint::updateRelativeJacobianTimeDeriv() const
 #endif
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs BallJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return math::logMap(relativeRotation);
+}
+
 /*
 //==============================================================================
 Eigen::Vector6s BallJoint::getWorldAxisScrewForPosition(int dof) const

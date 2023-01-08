@@ -32,11 +32,13 @@
 
 #include "dart/dynamics/UniversalJoint.hpp"
 
+#include <limits>
 #include <string>
 
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -484,6 +486,57 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
       useRidders);
 
   return result;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs UniversalJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+
+  // mT = Joint::mAspectProperties.mT_ParentBodyToJoint
+  //      * Eigen::AngleAxis_s(positions[0], getAxis1())
+  //      * Eigen::AngleAxis_s(positions[1], getAxis2())
+  //      * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+
+  s_t ang1 = 0.0;
+  s_t ang2 = 0.0;
+  Eigen::Matrix3s remainingRotation = relativeRotation;
+
+  s_t lastDist = std::numeric_limits<s_t>::infinity();
+  for (int i = 0; i < 50; i++)
+  {
+    Eigen::Matrix3s rot1 = math::expMapRot(ang1 * getAxis1());
+    remainingRotation = rot1.inverse() * relativeRotation;
+    ang2 = math::getClosestRotationalApproximation(
+        getAxis2(), remainingRotation);
+    Eigen::Matrix3s rot2 = math::expMapRot(ang2 * getAxis2());
+    remainingRotation = relativeRotation * rot2.inverse();
+    ang1 = math::getClosestRotationalApproximation(
+        getAxis1(), remainingRotation);
+
+    Eigen::Matrix3s R = math::expMapRot(ang1 * getAxis1())
+                        * math::expMapRot(ang2 * getAxis2());
+    s_t dist = (R - relativeRotation).squaredNorm();
+    s_t improvement = lastDist - dist;
+    lastDist = dist;
+
+    // #ifndef NDEBUG
+    //     std::cout << "Improvement[" << i << "]: " << improvement <<
+    //     std::endl;
+    // #endif
+
+    if (improvement == 0)
+    {
+      break;
+    }
+  }
+  return Eigen::Vector2s(ang1, ang2);
 }
 
 } // namespace dynamics

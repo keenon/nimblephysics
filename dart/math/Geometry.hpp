@@ -897,6 +897,11 @@ s_t distanceToSegment(
     const Eigen::Vector3s& segmentPointB,
     const Eigen::Vector3s& goalPoint);
 
+/// This gets the closest approximation to `desiredRotation` that we can get,
+/// rotating around `axis`
+s_t getClosestRotationalApproximation(
+    const Eigen::Vector3s& axis, const Eigen::Matrix3s& desiredRotation);
+
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox
 {

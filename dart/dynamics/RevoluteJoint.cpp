@@ -38,6 +38,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -148,6 +149,20 @@ RevoluteJoint::getRelativeJacobianStatic(
   assert(!math::isNan(jacobian));
 
   return jacobian;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs RevoluteJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return Eigen::VectorXs::Ones(1)
+         * math::getClosestRotationalApproximation(getAxis(), relativeRotation);
 }
 
 //==============================================================================

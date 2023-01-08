@@ -936,5 +936,28 @@ Eigen::MatrixXs EllipsoidJoint::finiteDifferenceScratch(
   return result;
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs EllipsoidJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  // This joint does its XYZ rotation in +90Z space
+  Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
+  eulerR(1, 0) = -1.0;
+  eulerR(0, 1) = 1.0;
+  eulerR(2, 2) = 1.0;
+  Eigen::Matrix3s targetRotation
+      = eulerR * relativeRotation * eulerR.transpose();
+  Eigen::VectorXs pos = getPositions();
+
+  return EulerJoint::convertToPositions(
+      targetRotation, getAxisOrder(), getFlipAxisMap());
+}
+
 } // namespace dynamics
 } // namespace dart

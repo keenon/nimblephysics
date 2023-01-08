@@ -161,6 +161,11 @@ public:
 
   Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions) const;
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
   /// This is a truly static method to compute the relative Jacobian, which gets
   /// reused in CustomJoint
   static Eigen::Matrix<s_t, 6, 3> computeRelativeJacobianStatic(

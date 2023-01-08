@@ -4473,6 +4473,46 @@ s_t distanceToSegment(
   }
 }
 
+//==============================================================================
+/// This gets the closest approximation to `desiredRotation` that we can get,
+/// rotating around `axis`
+s_t getClosestRotationalApproximation(
+    const Eigen::Vector3s& axis, const Eigen::Matrix3s& desiredRotation)
+{
+  // We can treat this like a 2D rotation, by establishing a basis around the
+  // rotational axis, and then doing all our work projected onto the
+  // orthogonal plane.
+  Eigen::Vector3s arbitraryFirstAxis = Eigen::Vector3s::UnitZ();
+  // If we're too close to parallel, pick another axis
+  if (axis.dot(arbitraryFirstAxis) > 0.99
+      || axis.dot(arbitraryFirstAxis) < -0.99)
+  {
+    arbitraryFirstAxis = Eigen::Vector3s::UnitX();
+  }
+
+  // Get an orthogonal plane to the rotation axis
+  Eigen::Vector3s x = axis.cross(arbitraryFirstAxis);
+  Eigen::Vector3s y = axis.cross(x);
+
+  // A basis where the `axis` as always the Z axis
+  Eigen::Matrix3s R_bw = Eigen::Matrix3s::Zero();
+  R_bw.col(0) = x;
+  R_bw.col(1) = y;
+  R_bw.col(2) = axis;
+
+  // Get our desired rotation in the coordinate space of the `axis` basis
+  Eigen::Matrix3s R_b = R_bw.transpose() * desiredRotation * R_bw;
+
+  // Now the top left corner of R_b is our rotation matrix in 2D, about the
+  // `axis` basis
+  Eigen::Matrix2s twoDimensionalRotation = R_b.block<2, 2>(0, 0);
+  Eigen::Transform<s_t, 2, Eigen::Affine> t(twoDimensionalRotation);
+  Eigen::Matrix2s normalizedTwoDimensional = t.rotation();
+  s_t angle
+      = atan2(normalizedTwoDimensional(1, 0), normalizedTwoDimensional(0, 0));
+  return angle;
+}
+
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)
 {
 }

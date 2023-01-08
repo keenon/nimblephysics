@@ -94,6 +94,11 @@ public:
   GenericJoint<math::R1Space>::JacobianMatrix getRelativeJacobianStatic(
       const GenericJoint<math::R1Space>::Vector& positions) const override;
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
 protected:
   /// Constructor called by Skeleton class
   PrismaticJoint(const Properties& properties);

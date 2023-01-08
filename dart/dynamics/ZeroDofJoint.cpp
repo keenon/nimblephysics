@@ -1010,5 +1010,16 @@ Eigen::VectorXs ZeroDofJoint::getSpatialToGeneralized(
   return Eigen::VectorXs::Zero(0);
 }
 
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs ZeroDofJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  (void)relativeRotation;
+  // Return zero size vector
+  return Eigen::VectorXs::Zero(0);
+}
+
 } // namespace dynamics
 } // namespace dart

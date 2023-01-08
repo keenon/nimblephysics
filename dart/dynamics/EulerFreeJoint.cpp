@@ -5,6 +5,7 @@
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/LinearFunction.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -301,6 +302,22 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
       getAxisOrder(),
       getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs EulerFreeJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  Eigen::Vector6s pos = getPositions();
+  pos.head<3>() = EulerJoint::convertToPositions(
+      relativeRotation, getAxisOrder(), getFlipAxisMap());
+  return pos;
 }
 
 //==============================================================================

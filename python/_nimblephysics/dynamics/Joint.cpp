@@ -340,8 +340,9 @@ void Joint(py::module& m)
               -> std::size_t { return self->getNumDofs(); })
       .def(
           "setCommand",
-          +[](dart::dynamics::Joint* self, std::size_t index, s_t command)
-              -> void { return self->setCommand(index, command); },
+          +[](dart::dynamics::Joint* self,
+              std::size_t index,
+              s_t command) -> void { return self->setCommand(index, command); },
           ::py::arg("index"),
           ::py::arg("command"))
       .def(
@@ -574,11 +575,8 @@ void Joint(py::module& m)
           })
       .def(
           "setAcceleration",
-          +[](dart::dynamics::Joint* self,
-              std::size_t index,
-              s_t acceleration) -> void {
-            return self->setAcceleration(index, acceleration);
-          },
+          +[](dart::dynamics::Joint* self, std::size_t index, s_t acceleration)
+              -> void { return self->setAcceleration(index, acceleration); },
           ::py::arg("index"),
           ::py::arg("acceleration"))
       .def(
@@ -653,9 +651,8 @@ void Joint(py::module& m)
           })
       .def(
           "setControlForce",
-          +[](dart::dynamics::Joint* self,
-              std::size_t index,
-              s_t force) -> void { return self->setControlForce(index, force); },
+          +[](dart::dynamics::Joint* self, std::size_t index, s_t force)
+              -> void { return self->setControlForce(index, force); },
           ::py::arg("index"),
           ::py::arg("force"))
       .def(
@@ -790,9 +787,9 @@ void Joint(py::module& m)
           ::py::arg("q1"))
       .def(
           "setSpringStiffness",
-          +[](dart::dynamics::Joint* self,
-              std::size_t index,
-              s_t k) -> void { return self->setSpringStiffness(index, k); },
+          +[](dart::dynamics::Joint* self, std::size_t index, s_t k) -> void {
+            return self->setSpringStiffness(index, k);
+          },
           ::py::arg("index"),
           ::py::arg("k"))
       .def(
@@ -803,9 +800,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "setRestPosition",
-          +[](dart::dynamics::Joint* self,
-              std::size_t index,
-              s_t q0) -> void { return self->setRestPosition(index, q0); },
+          +[](dart::dynamics::Joint* self, std::size_t index, s_t q0) -> void {
+            return self->setRestPosition(index, q0);
+          },
           ::py::arg("index"),
           ::py::arg("q0"))
       .def(
@@ -897,6 +894,12 @@ void Joint(py::module& m)
           "notifyAccelerationUpdated",
           +[](dart::dynamics::Joint* self) -> void {
             return self->notifyAccelerationUpdated();
+          })
+      .def(
+          "getNearestPositionToDesiredRotation",
+          +[](dart::dynamics::Joint* self,
+              const Eigen::Matrix3s& relativeRotation) -> Eigen::VectorXs {
+            return self->getNearestPositionToDesiredRotation(relativeRotation);
           })
       .def_readonly_static("FORCE", &dart::dynamics::Joint::FORCE)
       .def_readonly_static("PASSIVE", &dart::dynamics::Joint::PASSIVE)

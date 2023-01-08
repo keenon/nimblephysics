@@ -1134,5 +1134,65 @@ Eigen::MatrixXs ScapulathoracicJoint::finiteDifferenceScratch(
   return result;
 }
 
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs ScapulathoracicJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+
+  Eigen::VectorXs pos = getPositions();
+
+  Eigen::Vector3s wingDirection = Eigen::Vector3s(
+      -sin(mWingingAxisDirection), cos(mWingingAxisDirection), 0);
+  Eigen::Vector3s wingOriginInIntermediateFrame
+      = Eigen::Vector3s(mWingingAxisOffset(0), mWingingAxisOffset(1), 0);
+  Eigen::Isometry3s wingAxisT = Eigen::Isometry3s::Identity();
+  wingAxisT.translation() = wingOriginInIntermediateFrame;
+  Eigen::Matrix3s winging
+      = math::expMapRot(wingDirection * pos(3) * mFlipAxisMap(3));
+
+  // Remove the winging angle
+  relativeRotation = relativeRotation * winging.transpose();
+
+  // This joint does its XYZ rotation in +90Z space
+  Eigen::Matrix3s eulerR = Eigen::Matrix3s::Zero();
+  eulerR(1, 0) = -1.0;
+  eulerR(0, 1) = 1.0;
+  eulerR(2, 2) = 1.0;
+  Eigen::Matrix3s targetRotation
+      = eulerR * relativeRotation * eulerR.transpose();
+
+  switch (getAxisOrder())
+  {
+    case EulerJoint::AxisOrder::XYZ:
+      pos.head<3>() = math::matrixToEulerXYZ(targetRotation)
+                          .cwiseProduct(getFlipAxisMap().head<3>());
+      break;
+    case EulerJoint::AxisOrder::ZYX:
+      pos.head<3>() = math::matrixToEulerZYX(targetRotation)
+                          .cwiseProduct(getFlipAxisMap().head<3>());
+      break;
+    case EulerJoint::AxisOrder::ZXY:
+      pos.head<3>() = math::matrixToEulerZXY(targetRotation)
+                          .cwiseProduct(getFlipAxisMap().head<3>());
+      break;
+    case EulerJoint::AxisOrder::XZY:
+      pos.head<3>() = math::matrixToEulerXZY(targetRotation)
+                          .cwiseProduct(getFlipAxisMap().head<3>());
+      break;
+    default:
+      dtwarn << "[ScapulathoracicJoint::convertToPositions] Unsupported "
+                "AxisOrder ("
+             << static_cast<int>(getAxisOrder())
+             << "), returning a zero vector\n";
+      pos.head<3>().setZero();
+  }
+  return pos;
+}
+
 } // namespace dynamics
 } // namespace dart

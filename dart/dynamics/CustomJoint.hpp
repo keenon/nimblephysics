@@ -298,6 +298,11 @@ public:
   Eigen::Vector6s getScrewAxisGradientForForce(
       int axisDof, int rotateDof) override;
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
   ///////////////////////////////////////////////////////////////////////////
   // Only for use during development and testing of Jacobians.
   ///////////////////////////////////////////////////////////////////////////
