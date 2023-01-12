@@ -943,6 +943,12 @@ void BodyNode(py::module& m)
             return self->getParentBodyNode();
           },
           ::py::return_value_policy::reference_internal)
+      .def(
+          "getChildJoint",
+          +[](dart::dynamics::BodyNode* self, int index)
+              -> dart::dynamics::Joint* { return self->getChildJoint(index); },
+          ::py::arg("index"),
+          ::py::return_value_policy::reference_internal)
       // clang-format off
       DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(WeldJoint)
       DARTPY_DEFINE_CREATE_CHILD_JOINT_AND_BODY_NODE_PAIR(RevoluteJoint)

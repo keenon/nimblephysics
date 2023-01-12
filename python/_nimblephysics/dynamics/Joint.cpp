@@ -841,6 +841,16 @@ void Joint(py::module& m)
             return self->computePotentialEnergy();
           })
       .def(
+          "getTransformFromChildBodyNode",
+          +[](const dart::dynamics::Joint* self) -> const Eigen::Isometry3s& {
+            return self->getTransformFromChildBodyNode();
+          })
+      .def(
+          "getTransformFromParentBodyNode",
+          +[](const dart::dynamics::Joint* self) -> const Eigen::Isometry3s& {
+            return self->getTransformFromParentBodyNode();
+          })
+      .def(
           "getRelativeTransform",
           +[](const dart::dynamics::Joint* self) -> const Eigen::Isometry3s& {
             return self->getRelativeTransform();
