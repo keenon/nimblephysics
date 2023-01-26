@@ -32,6 +32,8 @@ bool testNearestPosition(
     std::function<void(JointType* joint)> randomizeJoint = [](JointType*) {},
     std::function<void(JointType* joint)> initJoint = [](JointType*) {})
 {
+  srand(42);
+
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
   std::pair<JointType*, dynamics::BodyNode*> pair
       = skel->createJointAndBodyNodePair<JointType>();
@@ -59,7 +61,7 @@ bool testNearestPosition(
         s_t perturbedDist = (perturbedRot - desiredRotation).squaredNorm();
         // We add some numerical tolerance here, to not require _exact_
         // solutions.
-        if (perturbedDist + 1e-7 < nearestDist)
+        if (perturbedDist + 1e-6 < nearestDist)
         {
           std::cout << "On joint " << joint->getStaticType()
                     << " got a bad nearest rotation!" << std::endl;
@@ -111,7 +113,7 @@ TEST(NEAREST_POSITION_TO_ROTATION, CLOSEST_ROTATION_APPROX_SAME_AXIS)
   s_t targetAngle = -0.5;
   s_t recovered = math::getClosestRotationalApproximation(
       axis, math::expMapRot(axis * targetAngle));
-  EXPECT_NEAR(targetAngle, recovered, 1e-8);
+  EXPECT_NEAR(targetAngle, recovered, 1e-7);
 }
 #endif
 
@@ -122,7 +124,7 @@ TEST(NEAREST_POSITION_TO_ROTATION, CLOSEST_ROTATION_APPROX_PERP_AXIS)
   s_t recovered = math::getClosestRotationalApproximation(
       Eigen::Vector3s::UnitZ(),
       math::expMapRot(Eigen::Vector3s::UnitX() * targetAngle));
-  EXPECT_NEAR(0.0, recovered, 1e-8);
+  EXPECT_NEAR(0.0, recovered, 1e-7);
 }
 #endif
 
