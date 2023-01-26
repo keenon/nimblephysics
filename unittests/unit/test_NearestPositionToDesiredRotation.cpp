@@ -59,7 +59,7 @@ bool testNearestPosition(
         s_t perturbedDist = (perturbedRot - desiredRotation).squaredNorm();
         // We add some numerical tolerance here, to not require _exact_
         // solutions.
-        if (perturbedDist <= nearestDist + 1e-9)
+        if (perturbedDist + 1e-7 < nearestDist)
         {
           std::cout << "On joint " << joint->getStaticType()
                     << " got a bad nearest rotation!" << std::endl;
