@@ -57,7 +57,9 @@ bool testNearestPosition(
         joint->setPositions(perturbed);
         Eigen::Matrix3s perturbedRot = joint->getRelativeTransform().linear();
         s_t perturbedDist = (perturbedRot - desiredRotation).squaredNorm();
-        if (perturbedDist < nearestDist)
+        // We add some numerical tolerance here, to not require _exact_
+        // solutions.
+        if (perturbedDist <= nearestDist + 1e-9)
         {
           std::cout << "On joint " << joint->getStaticType()
                     << " got a bad nearest rotation!" << std::endl;
