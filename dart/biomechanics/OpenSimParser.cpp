@@ -1255,9 +1255,9 @@ void OpenSimParser::updateCustomJointXML(
               joint->getCustomFunction(index).get());
 
       std::string coeffString = "";
-      for (int i = 0; i < polynomial->mCoeffs.size(); i++)
+      for (int i = polynomial->mCoeffs.size()-1; i >= 0; --i)
       {
-        if (i > 0)
+        if (i < polynomial->mCoeffs.size()-1)
           coeffString += " ";
         coeffString += to_string((double)polynomial->mCoeffs[i]);
       }
@@ -3572,6 +3572,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         allLocked = false;
         std::vector<s_t> coeffs
             = readVecX(polynomialFunction->FirstChildElement("coefficients"));
+        std::reverse(coeffs.begin(), coeffs.end());
         for (int i = 0; i < coeffs.size(); i++)
         {
           coeffs[i] *= scale;
