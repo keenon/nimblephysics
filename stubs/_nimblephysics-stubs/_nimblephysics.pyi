@@ -1,6 +1,6 @@
 """nimblephysics: Python API of Nimble"""
 from __future__ import annotations
-import _nimblephysics
+import nimblephysics_libs._nimblephysics
 import typing
 
 __all__ = [

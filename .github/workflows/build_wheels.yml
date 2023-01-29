@@ -53,7 +53,7 @@ jobs:
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
       - name: Install pytest, wheel and auditwheel
-        run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel==5.1.2
+        run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel==5.1.2 pybind11-stubgen
       - name: Install Pybind11 for this Python version
         run: |
           git clone https://github.com/pybind/pybind11.git

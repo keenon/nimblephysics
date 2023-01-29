@@ -1,5 +1,5 @@
 from __future__ import annotations
-import _nimblephysics.common
+import nimblephysics_libs._nimblephysics.common
 import typing
 
 __all__ = [

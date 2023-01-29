@@ -1,5 +1,15 @@
 #!/bin/bash
 set -e
+export LC_CTYPE=C 
+export LANG=C
 
-PYTHONPATH=`pwd`/build/python/_nimblephysics/ python3 -c "import _nimblephysics"
-PYTHONPATH=`pwd`/build/python/_nimblephysics/ pybind11-stubgen -o stubs _nimblephysics
+PP=$1:`pwd`/build/python/_nimblephysics/
+echo $PP
+PYTHONPATH=$PP python3 -c "import _nimblephysics"
+PYTHONPATH=$PP pybind11-stubgen --no-setup-py -o stubs _nimblephysics
+touch stubs/_nimblephysics-stubs/py.typed
+mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
+# rm -rf stubs/nimblephysics-stubs
+# mv stubs/_nimblephysics-stubs stubs/nimblephysics-stubs
+find stubs/_nimblephysics-stubs -type f | xargs sed -i '.bak' 's/_nimblephysics/nimblephysics_libs\._nimblephysics/g'
+find stubs/_nimblephysics-stubs -name "*.bak" -type f -delete

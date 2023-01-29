@@ -1,6 +1,6 @@
 """This provides performance measurement utilities, to aid performance optimization work."""
 from __future__ import annotations
-import _nimblephysics.performance
+import nimblephysics_libs._nimblephysics.performance
 import typing
 
 __all__ = [

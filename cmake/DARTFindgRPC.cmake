@@ -21,8 +21,8 @@ if(APPLE)
     list(APPEND LIB_LIST /usr/local/Cellar/openssl@1.1/1.1.1d/lib/libcrypto.dylib)
     message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
 
-  # ARM64 macs
-  elseif(EXISTS "/opt/homebrew/Cellar/openssl@1.1/")
+  # ARM64 macs v1
+  elseif(EXISTS "/opt/homebrew/Cellar/openssl@1.1/1.1.1q")
     message(STATUS "Setting root dir for OpenSSL")
     set(OPENSSL_ROOT_DIR /opt/homebrew/Cellar/openssl@1.1/1.1.1q)
 
@@ -30,6 +30,17 @@ if(APPLE)
     include_directories(/opt/homebrew/Cellar/openssl@1.1/1.1.1q/include)
     list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1q/lib/libssl.dylib)
     list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1q/lib/libcrypto.dylib)
+    message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
+
+  # ARM64 macs v1
+  elseif(EXISTS "/opt/homebrew/Cellar/openssl@1.1/1.1.1s")
+    message(STATUS "Setting root dir for OpenSSL")
+    set(OPENSSL_ROOT_DIR /opt/homebrew/Cellar/openssl@1.1/1.1.1s)
+
+    find_package(OpenSSL REQUIRED)
+    include_directories(/opt/homebrew/Cellar/openssl@1.1/1.1.1s/include)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1s/lib/libssl.dylib)
+    list(APPEND LIB_LIST /opt/homebrew/Cellar/openssl@1.1/1.1.1s/lib/libcrypto.dylib)
     message(STATUS "OpenSSL Version: ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES}")
   endif()
 endif()

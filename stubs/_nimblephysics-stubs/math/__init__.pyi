@@ -1,6 +1,6 @@
 """Bindings for Eigen geometric types."""
 from __future__ import annotations
-import _nimblephysics.math
+import nimblephysics_libs._nimblephysics.math
 import typing
 import numpy
 _Shape = typing.Tuple[int, ...]

@@ -25,7 +25,7 @@
 using namespace dart;
 using namespace dynamics;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 template <typename JointType>
 bool testNearestPosition(

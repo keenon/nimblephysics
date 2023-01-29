@@ -1,8 +1,8 @@
 from __future__ import annotations
-import _nimblephysics.utils.SdfParser
+import nimblephysics_libs._nimblephysics.utils.SdfParser
 import typing
-import _nimblephysics.dynamics
-import _nimblephysics.simulation
+import nimblephysics_libs._nimblephysics.dynamics
+import nimblephysics_libs._nimblephysics.simulation
 
 __all__ = [
     "readSkeleton",
@@ -11,9 +11,9 @@ __all__ = [
 ]
 
 
-def readSkeleton(path: str) -> _nimblephysics.dynamics.Skeleton:
+def readSkeleton(path: str) -> nimblephysics_libs._nimblephysics.dynamics.Skeleton:
     pass
-def readWorld(path: str) -> _nimblephysics.simulation.World:
+def readWorld(path: str) -> nimblephysics_libs._nimblephysics.simulation.World:
     pass
-def writeSkeleton(path: str, skeleton: _nimblephysics.dynamics.Skeleton) -> None:
+def writeSkeleton(path: str, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> None:
     pass
