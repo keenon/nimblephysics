@@ -11,5 +11,9 @@ touch stubs/_nimblephysics-stubs/py.typed
 mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
 # rm -rf stubs/nimblephysics-stubs
 # mv stubs/_nimblephysics-stubs stubs/nimblephysics-stubs
-find stubs/_nimblephysics-stubs -type f | xargs sed -i '.bak' 's/_nimblephysics/nimblephysics_libs\._nimblephysics/g'
+if [[ $OSTYPE == 'darwin'* ]]; then
+  find stubs/_nimblephysics-stubs -type f | xargs sed -i '.bak' 's/_nimblephysics/nimblephysics_libs\._nimblephysics/g'
+else
+  find stubs/_nimblephysics-stubs -type f | xargs sed -i 's/_nimblephysics/nimblephysics_libs\._nimblephysics/g'
+fi
 find stubs/_nimblephysics-stubs -name "*.bak" -type f -delete
