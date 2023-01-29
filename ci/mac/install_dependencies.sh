@@ -336,7 +336,7 @@ fi
 # echo "Symbolic links complete"
 
 # Install our build tools
-pip3 install pytest delocate pybind11-stubgen
+pip3 install pytest delocate pybind11-stubgen numpy torch
 
 # Install pkgconfig, which CMake uses to look for dependencies
 brew install pkgconfig

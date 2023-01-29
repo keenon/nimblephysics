@@ -41,8 +41,8 @@ jobs:
         run: |
           echo "VERSION=${{ env.VERSION }}"
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
-      - name: Install pytest, wheel and auditwheel
-        run: python -m pip install pytest wheel auditwheel
+      - name: Install pytest, wheel, auditwheel, pybind11-stubgen, numpy and torch
+        run: python -m pip install pytest wheel auditwheel numpy torch
       - name: Install dependencies
         run: ci/mac/install_dependencies.sh
       - name: Build wheel
