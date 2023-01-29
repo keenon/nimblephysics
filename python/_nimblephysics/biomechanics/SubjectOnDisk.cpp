@@ -21,6 +21,31 @@ namespace python {
 void SubjectOnDisk(py::module& m)
 {
   ::py::class_<
+      dart::biomechanics::Frame,
+      std::shared_ptr<dart::biomechanics::Frame>>(m, "Frame")
+      .def_readwrite("trial", &dart::biomechanics::Frame::trial)
+      .def_readwrite("t", &dart::biomechanics::Frame::t)
+      .def_readwrite(
+          "probablyMissingGRF", &dart::biomechanics::Frame::probablyMissingGRF)
+      .def_readwrite("pos", &dart::biomechanics::Frame::pos)
+      .def_readwrite("vel", &dart::biomechanics::Frame::vel)
+      .def_readwrite("acc", &dart::biomechanics::Frame::acc)
+      .def_readwrite("tau", &dart::biomechanics::Frame::tau)
+      .def_readwrite(
+          "groundContactWrenches",
+          &dart::biomechanics::Frame::groundContactWrenches)
+      .def_readwrite(
+          "groundContactCenterOfPressure",
+          &dart::biomechanics::Frame::groundContactCenterOfPressure)
+      .def_readwrite(
+          "groundContactTorque",
+          &dart::biomechanics::Frame::groundContactTorque)
+      .def_readwrite(
+          "groundContactForce", &dart::biomechanics::Frame::groundContactForce)
+      .def_readwrite("dt", &dart::biomechanics::Frame::dt)
+      .def_readwrite("customValues", &dart::biomechanics::Frame::customValues);
+
+  ::py::class_<
       dart::biomechanics::SubjectOnDisk,
       std::shared_ptr<dart::biomechanics::SubjectOnDisk>>(m, "SubjectOnDisk")
       .def(
@@ -91,31 +116,6 @@ void SubjectOnDisk(py::module& m)
           "getCustomValueDim",
           &dart::biomechanics::SubjectOnDisk::getCustomValueDim,
           ::py::arg("customValue"));
-
-  ::py::class_<
-      dart::biomechanics::Frame,
-      std::shared_ptr<dart::biomechanics::Frame>>(m, "Frame")
-      .def_readwrite("trial", &dart::biomechanics::Frame::trial)
-      .def_readwrite("t", &dart::biomechanics::Frame::t)
-      .def_readwrite(
-          "probablyMissingGRF", &dart::biomechanics::Frame::probablyMissingGRF)
-      .def_readwrite("pos", &dart::biomechanics::Frame::pos)
-      .def_readwrite("vel", &dart::biomechanics::Frame::vel)
-      .def_readwrite("acc", &dart::biomechanics::Frame::acc)
-      .def_readwrite("tau", &dart::biomechanics::Frame::tau)
-      .def_readwrite(
-          "groundContactWrenches",
-          &dart::biomechanics::Frame::groundContactWrenches)
-      .def_readwrite(
-          "groundContactCenterOfPressure",
-          &dart::biomechanics::Frame::groundContactCenterOfPressure)
-      .def_readwrite(
-          "groundContactTorque",
-          &dart::biomechanics::Frame::groundContactTorque)
-      .def_readwrite(
-          "groundContactForce", &dart::biomechanics::Frame::groundContactForce)
-      .def_readwrite("dt", &dart::biomechanics::Frame::dt)
-      .def_readwrite("customValues", &dart::biomechanics::Frame::customValues);
 }
 
 } // namespace python

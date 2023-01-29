@@ -44,11 +44,17 @@ namespace python {
 
 void EulerJoint(py::module& m)
 {
+  ::py::enum_<dart::dynamics::EulerJoint::AxisOrder>(m, "AxisOrder")
+      .value("XYZ", dart::dynamics::EulerJoint::AxisOrder::XYZ)
+      .value("XZY", dart::dynamics::EulerJoint::AxisOrder::XZY)
+      .value("ZYX", dart::dynamics::EulerJoint::AxisOrder::ZYX)
+      .value("ZXY", dart::dynamics::EulerJoint::AxisOrder::ZXY);
+
   ::py::class_<dart::dynamics::EulerJoint::UniqueProperties>(
       m, "EulerJointUniqueProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<dart::dynamics::detail::AxisOrder>(),
+          ::py::init<dart::dynamics::EulerJoint::AxisOrder>(),
           ::py::arg("axisOrder"));
 
   ::py::class_<
@@ -80,37 +86,39 @@ void EulerJoint(py::module& m)
           dart::dynamics::detail::EulerJointUniqueProperties,
           dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>,
       std::shared_ptr<dart::dynamics::EulerJoint>>(m, "EulerJoint")
+      /*
       .def(
           "hasEulerJointAspect",
           +[](const dart::dynamics::EulerJoint* self) -> bool {
             return self->hasEulerJointAspect();
           })
-      .def(
-          "setEulerJointAspect",
-          +[](dart::dynamics::EulerJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::EulerJoint,
-                  dart::dynamics::detail::EulerJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<3>>>::Aspect* aspect) {
-            self->setEulerJointAspect(aspect);
-          },
-          ::py::arg("aspect"))
+    .def(
+        "setEulerJointAspect",
+        +[](dart::dynamics::EulerJoint* self,
+            const dart::common::EmbedPropertiesOnTopOf<
+                dart::dynamics::EulerJoint,
+                dart::dynamics::detail::EulerJointUniqueProperties,
+                dart::dynamics::GenericJoint<
+                    dart::math::RealVectorSpace<3>>>::Aspect* aspect) {
+          self->setEulerJointAspect(aspect);
+        },
+        ::py::arg("aspect"))
       .def(
           "removeEulerJointAspect",
           +[](dart::dynamics::EulerJoint* self) {
             self->removeEulerJointAspect();
           })
-      .def(
-          "releaseEulerJointAspect",
-          +[](dart::dynamics::EulerJoint* self)
-              -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::EulerJoint,
-                  dart::dynamics::detail::EulerJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<3>>>::Aspect> {
-            return self->releaseEulerJointAspect();
-          })
+        .def(
+            "releaseEulerJointAspect",
+            +[](dart::dynamics::EulerJoint* self)
+                -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
+                    dart::dynamics::EulerJoint,
+                    dart::dynamics::detail::EulerJointUniqueProperties,
+                    dart::dynamics::GenericJoint<
+                        dart::math::RealVectorSpace<3>>>::Aspect> {
+              return self->releaseEulerJointAspect();
+            })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::EulerJoint* self,
@@ -124,16 +132,6 @@ void EulerJoint(py::module& m)
               const dart::dynamics::EulerJoint::UniqueProperties& _properties) {
             self->setProperties(_properties);
           },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::EulerJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::EulerJoint,
-                  dart::dynamics::detail::EulerJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<3>>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getEulerJointProperties",
@@ -207,10 +205,9 @@ void EulerJoint(py::module& m)
           ::py::arg("positions"))
       .def_static(
           "getStaticType",
-          +[]() -> const std::
-                    string& {
-                      return dart::dynamics::EulerJoint::getStaticType();
-                    },
+          +[]() -> const std::string& {
+            return dart::dynamics::EulerJoint::getStaticType();
+          },
           ::py::return_value_policy::reference_internal)
       .def_static(
           "convertToTransformOf",

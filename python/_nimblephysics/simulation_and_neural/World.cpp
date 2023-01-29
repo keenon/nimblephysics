@@ -39,18 +39,21 @@
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void World(py::module& m)
+void World(
+    py::module& m,
+    ::py::class_<
+        dart::simulation::World,
+        std::shared_ptr<dart::simulation::World>>& world)
 {
-  ::py::class_<
-      dart::simulation::World,
-      std::shared_ptr<dart::simulation::World>>(m, "World")
-      .def(::py::init<>())
+  (void)m;
+  world.def(::py::init<>())
       .def(::py::init<const std::string&>(), ::py::arg("name"))
       .def(::py::init(+[]() -> dart::simulation::WorldPtr {
         return dart::simulation::World::create();
@@ -339,8 +342,9 @@ void World(py::module& m)
           })
       .def(
           "getMasses",
-          +[](dart::simulation::World* self)
-              -> Eigen::VectorXs { return self->getMasses(); })
+          +[](dart::simulation::World* self) -> Eigen::VectorXs {
+            return self->getMasses();
+          })
       .def(
           "getControlForceUpperLimits",
           +[](dart::simulation::World* self) -> Eigen::VectorXs {
@@ -517,8 +521,7 @@ void World(py::module& m)
           &dart::simulation::World::addDofToActionSpace,
           ::py::arg("dofIndex"))
       .def("getStateJacobian", &dart::simulation::World::getStateJacobian)
-      .def("getActionJacobian", &dart::simulation::World::getActionJacobian)
-      .def_readonly("onNameChanged", &dart::simulation::World::onNameChanged);
+      .def("getActionJacobian", &dart::simulation::World::getActionJacobian);
 }
 
 } // namespace python

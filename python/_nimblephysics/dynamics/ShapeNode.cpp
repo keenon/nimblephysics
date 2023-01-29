@@ -43,6 +43,8 @@ namespace python {
 
 void ShapeNode(py::module& m)
 {
+  ::py::class_<dart::dynamics::ShapeNode::Properties>(m, "ShapeNodeProperties");
+
   ::py::class_<
       dart::dynamics::ShapeNode,
       dart::dynamics::ShapeFrame,

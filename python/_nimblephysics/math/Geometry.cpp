@@ -35,6 +35,8 @@
 #include <dart/math/Geometry.hpp>
 #include <pybind11/pybind11.h>
 
+#include "dart/math/MathTypes.hpp"
+
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
 
@@ -227,6 +229,18 @@ void Geometry(py::module& m)
           const Eigen::Vector3s& p) -> Eigen::Vector3s { return T * p; },
       ::py::arg("T"),
       ::py::arg("p"));
+
+  ::py::class_<dart::math::BoundingBox>(m, "BoundingBox")
+      .def(::py::init())
+      .def(
+          ::py::init<const Eigen::Vector3s&, const Eigen::Vector3s&>(),
+          ::py::arg("min"),
+          ::py::arg("max"))
+      .def("getMax", &dart::math::BoundingBox::getMax)
+      .def("getMin", &dart::math::BoundingBox::getMin)
+      .def("computeCenter", &dart::math::BoundingBox::computeCenter)
+      .def("computeFullExtents", &dart::math::BoundingBox::computeFullExtents)
+      .def("computeHalfExtents", &dart::math::BoundingBox::computeHalfExtents);
 }
 
 } // namespace python

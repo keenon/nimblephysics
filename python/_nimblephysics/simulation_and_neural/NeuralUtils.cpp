@@ -90,27 +90,6 @@ void NeuralUtils(py::module& m)
       .value("POS_LINEAR", dart::neural::ConvertToSpace::POS_LINEAR)
       .value("POS_SPATIAL", dart::neural::ConvertToSpace::POS_SPATIAL)
       .export_values();
-
-  m.def(
-      "forwardPass",
-      &dart::neural::forwardPass,
-      ::py::arg("world"),
-      ::py::arg("idempotent") = false);
-  m.def(
-      "mappedForwardPass",
-      &dart::neural::mappedForwardPass,
-      ::py::arg("world"),
-      ::py::arg("mappings"),
-      ::py::arg("idempotent") = false);
-  m.def(
-      "convertJointSpaceToWorldSpace",
-      &dart::neural::convertJointSpaceToWorldSpace,
-      ::py::arg("world"),
-      ::py::arg("in"),
-      ::py::arg("nodes"),
-      ::py::arg("space"),
-      ::py::arg("backprop") = false,
-      ::py::arg("useIK") = true);
 }
 
 } // namespace python

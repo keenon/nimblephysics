@@ -40,7 +40,6 @@
 #include <dart/dynamics/RevoluteJoint.hpp>
 #include <dart/dynamics/ScrewJoint.hpp>
 #include <dart/dynamics/Skeleton.hpp>
-#include <dart/dynamics/SoftBodyNode.hpp>
 #include <dart/dynamics/TranslationalJoint.hpp>
 #include <dart/dynamics/TranslationalJoint2D.hpp>
 #include <dart/dynamics/UniversalJoint.hpp>
@@ -117,8 +116,18 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Skeleton(py::module& m)
+void Skeleton(
+    py::module& m,
+    ::py::class_<
+        dart::dynamics::Skeleton,
+        dart::dynamics::MetaSkeleton,
+        std::shared_ptr<dart::dynamics::Skeleton>>& skeleton)
 {
+  ::py::class_<dart::dynamics::BodyScaleGroup>(m, "BodyScaleGroup")
+      .def_readwrite("nodes", &dart::dynamics::BodyScaleGroup::nodes)
+      .def_readwrite("flipAxis", &dart::dynamics::BodyScaleGroup::flipAxis)
+      .def_readwrite(
+          "uniformScaling", &dart::dynamics::BodyScaleGroup::uniformScaling);
   ::py::class_<dart::dynamics::Skeleton::ContactInverseDynamicsResult>(
       m, "ContactInverseDynamicsResult")
       .def(::py::init<>())
@@ -233,10 +242,7 @@ void Skeleton(py::module& m)
           &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
               computeSmoothnessLoss);
 
-  ::py::class_<
-      dart::dynamics::Skeleton,
-      dart::dynamics::MetaSkeleton,
-      std::shared_ptr<dart::dynamics::Skeleton>>(m, "Skeleton")
+  skeleton
       .def(::py::init(+[]() -> dart::dynamics::SkeletonPtr {
         return dart::dynamics::Skeleton::create();
       }))
@@ -246,13 +252,6 @@ void Skeleton(py::module& m)
                 return dart::dynamics::Skeleton::create(_name);
               }),
           ::py::arg("name"))
-      .def(
-          ::py::init(
-              +[](const dart::dynamics::Skeleton::AspectPropertiesData&
-                      properties) -> dart::dynamics::SkeletonPtr {
-                return dart::dynamics::Skeleton::create(properties);
-              }),
-          ::py::arg("properties"))
       .def(
           "getPtr",
           +[](dart::dynamics::Skeleton* self) -> dart::dynamics::SkeletonPtr {
@@ -273,12 +272,14 @@ void Skeleton(py::module& m)
               -> dart::dynamics::ConstSkeletonPtr {
             return self->getSkeleton();
           })
+      /*
       .def(
           "getLockableReference",
           +[](const dart::dynamics::Skeleton* self)
               -> std::unique_ptr<dart::common::LockableReference> {
             return self->getLockableReference();
           })
+    */
       .def(
           "clone",
           +[](const dart::dynamics::Skeleton* self)
@@ -300,6 +301,7 @@ void Skeleton(py::module& m)
           },
           ::py::arg("cloneName"),
           ::py::arg("mergeBodiesInto"))
+      /*
       .def(
           "setConfiguration",
           +[](dart::dynamics::Skeleton* self,
@@ -347,6 +349,7 @@ void Skeleton(py::module& m)
           "getState",
           +[](const dart::dynamics::Skeleton* self)
               -> dart::dynamics::Skeleton::State { return self->getState(); })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::Skeleton* self,
@@ -363,14 +366,9 @@ void Skeleton(py::module& m)
       .def(
           "setProperties",
           +[](dart::dynamics::Skeleton* self,
-              const dart::dynamics::Skeleton::AspectProperties& properties)
-              -> void { return self->setProperties(properties); },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::Skeleton* self,
-              const dart::dynamics::Skeleton::AspectProperties& properties)
-              -> void { return self->setAspectProperties(properties); },
+              const dart::dynamics::Skeleton::Properties& properties) -> void {
+            return self->setProperties(properties);
+          },
           ::py::arg("properties"))
       .def(
           "setName",
@@ -1222,21 +1220,24 @@ void Skeleton(py::module& m)
           ::py::arg("imp1"),
           ::py::arg("bodyNode2"),
           ::py::arg("imp2"))
-      .def(
-          "updateBiasImpulse",
-          +[](dart::dynamics::Skeleton* self,
-              dart::dynamics::SoftBodyNode* _softBodyNode,
-              dart::dynamics::PointMass* _pointMass,
-              const Eigen::Vector3s& _imp) -> void {
-            return self->updateBiasImpulse(_softBodyNode, _pointMass, _imp);
-          },
-          ::py::arg("softBodyNode"),
-          ::py::arg("pointMass"),
-          ::py::arg("imp"))
+      /*
+        .def(
+            "updateBiasImpulse",
+            +[](dart::dynamics::Skeleton* self,
+                dart::dynamics::SoftBodyNode* _softBodyNode,
+                dart::dynamics::PointMass* _pointMass,
+                const Eigen::Vector3s& _imp) -> void {
+              return self->updateBiasImpulse(_softBodyNode, _pointMass, _imp);
+            },
+            ::py::arg("softBodyNode"),
+            ::py::arg("pointMass"),
+            ::py::arg("imp"))
+            */
       .def(
           "updateVelocityChange",
-          +[](dart::dynamics::Skeleton* self)
-              -> void { return self->updateVelocityChange(); })
+          +[](dart::dynamics::Skeleton* self) -> void {
+            return self->updateVelocityChange();
+          })
       .def(
           "setImpulseApplied",
           +[](dart::dynamics::Skeleton* self, bool _val) -> void {
@@ -1823,8 +1824,9 @@ void Skeleton(py::module& m)
           "resetUnion",
           +[](dart::dynamics::Skeleton* self)
               -> void { return self->resetUnion(); })
-      .def_readwrite(
-          "mUnionRootSkeleton", &dart::dynamics::Skeleton::mUnionRootSkeleton)
+      //   .def_readwrite(
+      //       "mUnionRootSkeleton",
+      //       &dart::dynamics::Skeleton::mUnionRootSkeleton)
       .def_readwrite("mUnionSize", &dart::dynamics::Skeleton::mUnionSize)
       .def_readwrite("mUnionIndex", &dart::dynamics::Skeleton::mUnionIndex);
 }

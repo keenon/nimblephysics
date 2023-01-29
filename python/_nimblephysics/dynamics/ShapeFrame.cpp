@@ -86,6 +86,16 @@ namespace python {
 
 void ShapeFrame(py::module& m)
 {
+  auto visualAspect
+      = ::py::class_<dart::dynamics::VisualAspect>(m, "VisualAspect");
+  auto collisionAspect
+      = ::py::class_<dart::dynamics::CollisionAspect>(m, "CollisionAspect");
+  auto dynamicsAspect
+      = ::py::class_<dart::dynamics::DynamicsAspect>(m, "DynamicsAspect");
+
+  ::py::class_<dart::dynamics::ShapeFrame::Properties>(
+      m, "ShapeFrameProperties");
+
   ::py::class_<
       dart::dynamics::ShapeFrame,
       // dart::common::EmbedPropertiesOnTopOf<
@@ -103,18 +113,6 @@ void ShapeFrame(py::module& m)
               const dart::dynamics::ShapeFrame::UniqueProperties& properties) {
             self->setProperties(properties);
           },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::ShapeFrame* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::ShapeFrame,
-                  dart::dynamics::detail::ShapeFrameProperties,
-                  dart::common::SpecializedForAspect<
-                      dart::dynamics::VisualAspect,
-                      dart::dynamics::CollisionAspect,
-                      dart::dynamics::DynamicsAspect>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "setShape",
@@ -140,8 +138,10 @@ void ShapeFrame(py::module& m)
             return self->isShapeNode();
           });
 
-  ::py::class_<dart::dynamics::VisualAspect>(m, "VisualAspect")
-      .def(::py::init<>())
+  ::py::class_<dart::dynamics::detail::VisualAspectProperties>(
+      m, "VisualAspectProperties");
+
+  visualAspect.def(::py::init<>())
       .def(
           ::py::init<const dart::common::detail::AspectWithVersionedProperties<
               dart::common::CompositeTrackingAspect<dart::dynamics::ShapeFrame>,
@@ -239,8 +239,10 @@ void ShapeFrame(py::module& m)
             return self->isHidden();
           });
 
-  ::py::class_<dart::dynamics::CollisionAspect>(m, "CollisionAspect")
-      .def(::py::init<>())
+  ::py::class_<dart::dynamics::detail::CollisionAspectProperties>(
+      m, "CollisionAspectProperties");
+
+  collisionAspect.def(::py::init<>())
       .def(
           ::py::init<const dart::common::detail::AspectWithVersionedProperties<
               dart::common::CompositeTrackingAspect<dart::dynamics::ShapeFrame>,
@@ -266,8 +268,10 @@ void ShapeFrame(py::module& m)
             return self->isCollidable();
           });
 
-  ::py::class_<dart::dynamics::DynamicsAspect>(m, "DynamicsAspect")
-      .def(::py::init<>())
+  ::py::class_<dart::dynamics::detail::DynamicsAspectProperties>(
+      m, "DynamicsAspectProperties");
+
+  dynamicsAspect.def(::py::init<>())
       .def(
           ::py::init<const dart::common::detail::AspectWithVersionedProperties<
               dart::common::CompositeTrackingAspect<dart::dynamics::ShapeFrame>,

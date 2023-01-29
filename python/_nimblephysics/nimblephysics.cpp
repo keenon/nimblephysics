@@ -47,7 +47,7 @@ void dart_collision(py::module& m);
 void dart_constraint(py::module& m);
 void dart_simulation(py::module& m);
 void dart_utils(py::module& m);
-void dart_neural(py::module& m);
+void dart_simulation_and_neural(py::module& m);
 void dart_trajectory(py::module& m);
 void dart_performance(py::module& m);
 void dart_realtime(py::module& m);
@@ -62,14 +62,13 @@ PYBIND11_MODULE(_nimblephysics, m)
 
   dart_common(m);
   dart_math(m);
+  dart_performance(m);
   dart_dynamics(m);
   dart_collision(m);
   dart_constraint(m);
-  dart_simulation(m);
+  dart_simulation_and_neural(m);
   dart_utils(m);
-  dart_neural(m);
   dart_trajectory(m);
-  dart_performance(m);
   dart_realtime(m);
   dart_server(m);
   dart_biomechanics(m);

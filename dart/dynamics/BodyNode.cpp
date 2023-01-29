@@ -1390,6 +1390,26 @@ const std::vector<const DegreeOfFreedom*>& BodyNode::getDependentDofs() const
 }
 
 //==============================================================================
+// Documentation inherited
+const std::vector<DegreeOfFreedom*> BodyNode::getChainDofs()
+{
+  Chain::Criteria criteria(const_cast<BodyNode*>(this), nullptr);
+  std::vector<BodyNode*> bn_chain = criteria.satisfy();
+  std::vector<DegreeOfFreedom*> dofs;
+  dofs.reserve(getNumDependentGenCoords());
+  for (std::vector<BodyNode*>::reverse_iterator rit = bn_chain.rbegin();
+       rit != bn_chain.rend();
+       ++rit)
+  {
+    std::size_t nDofs = (*rit)->getParentJoint()->getNumDofs();
+    for (std::size_t i = 0; i < nDofs; ++i)
+      dofs.push_back((*rit)->getParentJoint()->getDof(i));
+  }
+
+  return dofs;
+}
+
+//==============================================================================
 const std::vector<const DegreeOfFreedom*> BodyNode::getChainDofs() const
 {
   // TODO(MXG): Consider templating the Criteria for const BodyNodes so that we

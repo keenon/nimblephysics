@@ -34,6 +34,7 @@
 #include <eigen_geometry_pybind.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -575,30 +576,6 @@ namespace py = pybind11;
       std::shared_ptr<dart::dynamics::GenericJoint<space>>>(                   \
       m, "GenericJoint_" #name)                                                \
       .def(                                                                    \
-          "hasGenericJointAspect",                                             \
-          +[](const dart::dynamics::GenericJoint<space>* self) -> bool {       \
-            return self->hasGenericJointAspect();                              \
-          })                                                                   \
-      .def(                                                                    \
-          "setGenericJointAspect",                                             \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::Aspect* aspect) {     \
-            self->setGenericJointAspect(aspect);                               \
-          },                                                                   \
-          ::py::arg("aspect"))                                                 \
-      .def(                                                                    \
-          "removeGenericJointAspect",                                          \
-          +[](dart::dynamics::GenericJoint<space>* self) {                     \
-            self->removeGenericJointAspect();                                  \
-          })                                                                   \
-      .def(                                                                    \
-          "releaseGenericJointAspect",                                         \
-          +[](dart::dynamics::GenericJoint<space>* self)                       \
-              -> std::unique_ptr<                                              \
-                  dart::dynamics::GenericJoint<space>::Aspect> {               \
-            return self->releaseGenericJointAspect();                          \
-          })                                                                   \
-      .def(                                                                    \
           "setProperties",                                                     \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               const dart::dynamics::GenericJoint<space>::Properties&           \
@@ -609,19 +586,6 @@ namespace py = pybind11;
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               const dart::dynamics::GenericJoint<space>::UniqueProperties&     \
                   properties) { self->setProperties(properties); },            \
-          ::py::arg("properties"))                                             \
-      .def(                                                                    \
-          "setAspectState",                                                    \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::AspectState& state) { \
-            self->setAspectState(state);                                       \
-          },                                                                   \
-          ::py::arg("state"))                                                  \
-      .def(                                                                    \
-          "setAspectProperties",                                               \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::AspectProperties&     \
-                  properties) { self->setAspectProperties(properties); },      \
           ::py::arg("properties"))                                             \
       .def(                                                                    \
           "getGenericJointProperties",                                         \

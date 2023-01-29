@@ -79,6 +79,7 @@ void PrismaticJoint(py::module& m)
           dart::dynamics::detail::PrismaticJointUniqueProperties,
           dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>,
       std::shared_ptr<dart::dynamics::PrismaticJoint>>(m, "PrismaticJoint")
+      /*
       .def(
           "hasPrismaticJointAspect",
           +[](const dart::dynamics::PrismaticJoint* self) -> bool {
@@ -110,6 +111,7 @@ void PrismaticJoint(py::module& m)
                       dart::math::RealVectorSpace<1>>>::Aspect> {
             return self->releasePrismaticJointAspect();
           })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::PrismaticJoint* self,
@@ -123,16 +125,18 @@ void PrismaticJoint(py::module& m)
               const dart::dynamics::PrismaticJoint::UniqueProperties&
                   _properties) { self->setProperties(_properties); },
           ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::PrismaticJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::PrismaticJoint,
-                  dart::dynamics::detail::PrismaticJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<1>>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
-          ::py::arg("properties"))
+      /*
+        .def(
+            "setAspectProperties",
+            +[](dart::dynamics::PrismaticJoint* self,
+                const dart::common::EmbedPropertiesOnTopOf<
+                    dart::dynamics::PrismaticJoint,
+                    dart::dynamics::detail::PrismaticJointUniqueProperties,
+                    dart::dynamics::GenericJoint<
+                        dart::math::RealVectorSpace<1>>>::AspectProperties&
+                    properties) { self->setAspectProperties(properties); },
+            ::py::arg("properties"))
+      */
       .def(
           "getPrismaticJointProperties",
           +[](const dart::dynamics::PrismaticJoint* self)

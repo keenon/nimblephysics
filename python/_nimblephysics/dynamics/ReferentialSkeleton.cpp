@@ -37,6 +37,7 @@
 #include <dart/dynamics/ReferentialSkeleton.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
@@ -53,12 +54,14 @@ void ReferentialSkeleton(py::module& m)
       dart::dynamics::MetaSkeleton,
       std::shared_ptr<dart::dynamics::ReferentialSkeleton>>(
       m, "ReferentialSkeleton")
+      /*
       .def(
           "getLockableReference",
           +[](const dart::dynamics::ReferentialSkeleton* self)
               -> std::unique_ptr<dart::common::LockableReference> {
             return self->getLockableReference();
           })
+      */
       .def(
           "setName",
           +[](dart::dynamics::ReferentialSkeleton* self,

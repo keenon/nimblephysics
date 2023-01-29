@@ -42,12 +42,13 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Entity(py::module& m)
+void Entity(
+    py::module& m,
+    ::py::class_<
+        dart::dynamics::Entity,
+        std::shared_ptr<dart::dynamics::Entity>>& entity)
 {
-  ::py::class_<
-      dart::dynamics::Entity,
-      dart::common::Subject,
-      std::shared_ptr<dart::dynamics::Entity>>(m, "Entity")
+  entity
       .def(
           "setName",
           +[](dart::dynamics::Entity* self, const std::string& name)

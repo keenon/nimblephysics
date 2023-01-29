@@ -33,6 +33,8 @@
 #include <dart/collision/CollisionDetector.hpp>
 #include <pybind11/pybind11.h>
 
+#include "dart/collision/SmartPointer.hpp"
+
 namespace py = pybind11;
 
 namespace dart {

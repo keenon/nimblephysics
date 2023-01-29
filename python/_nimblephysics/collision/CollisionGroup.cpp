@@ -30,9 +30,16 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dart/collision/CollisionDetector.hpp>
+// #include <dart/collision/CollisionDetector.hpp>
 #include <dart/collision/CollisionGroup.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include "dart/collision/DistanceFilter.hpp"
+#include "dart/collision/DistanceOption.hpp"
+#include "dart/collision/DistanceResult.hpp"
+#include "dart/collision/RaycastResult.hpp"
 
 namespace py = pybind11;
 
@@ -41,9 +48,61 @@ namespace python {
 
 void CollisionGroup(py::module& m)
 {
+  ::py::class_<dart::collision::DistanceOption>(m, "DistanceOption")
+      .def_readwrite(
+          "enableNearestPoints",
+          &dart::collision::DistanceOption::enableNearestPoints)
+      .def_readwrite(
+          "distanceLowerBound",
+          &dart::collision::DistanceOption::distanceLowerBound);
+
+  ::py::class_<dart::collision::DistanceResult>(m, "DistanceResult")
+      .def_readwrite(
+          "minDistance", &dart::collision::DistanceResult::minDistance)
+      .def_readwrite(
+          "unclampedMinDistance",
+          &dart::collision::DistanceResult::unclampedMinDistance)
+      .def_readwrite(
+          "nearestPoint1", &dart::collision::DistanceResult::nearestPoint1)
+      .def_readwrite(
+          "nearestPoint2", &dart::collision::DistanceResult::nearestPoint2)
+      .def("clear", &dart::collision::DistanceResult::clear)
+      .def("found", &dart::collision::DistanceResult::found)
+      .def(
+          "isMinDistanceClamped",
+          &dart::collision::DistanceResult::isMinDistanceClamped);
+
+  ::py::class_<dart::collision::RaycastOption>(m, "RaycastOption")
+      .def_readwrite(
+          "mEnableAllHits", &dart::collision::RaycastOption::mEnableAllHits)
+      .def_readwrite(
+          "mSortByClosest", &dart::collision::RaycastOption::mSortByClosest);
+
+  ::py::class_<dart::collision::RayHit>(m, "RayHit")
+      .def(::py::init<>())
+      .def_readwrite(
+          "mNormal",
+          &dart::collision::RayHit::mNormal,
+          "The normal at the hit point in the world coordinates")
+      .def_readwrite(
+          "mPoint",
+          &dart::collision::RayHit::mPoint,
+          "The hit point in the world coordinates")
+      .def_readwrite(
+          "mFraction",
+          &dart::collision::RayHit::mFraction,
+          "The fraction from `from` point to `to` point");
+
+  ::py::class_<dart::collision::RaycastResult>(m, "RaycastResult")
+      .def(::py::init<>())
+      .def("hasHit", &dart::collision::RaycastResult::hasHit)
+      .def("clear", &dart::collision::RaycastResult::clear)
+      .def_readwrite("mRayHits", &dart::collision::RaycastResult::mRayHits);
+
   ::py::class_<
       dart::collision::CollisionGroup,
-      std::shared_ptr<dart::collision::CollisionGroup> >(m, "CollisionGroup")
+      std::shared_ptr<dart::collision::CollisionGroup>>(m, "CollisionGroup")
+      /*
       .def(
           "getCollisionDetector",
           +[](dart::collision::CollisionGroup* self)
@@ -56,6 +115,7 @@ void CollisionGroup(py::module& m)
               -> dart::collision::ConstCollisionDetectorPtr {
             return self->getCollisionDetector();
           })
+      */
       .def(
           "addShapeFrame",
           +[](dart::collision::CollisionGroup* self,
@@ -66,8 +126,15 @@ void CollisionGroup(py::module& m)
       .def(
           "addShapeFrames",
           +[](dart::collision::CollisionGroup* self,
-              const std::vector<const dart::dynamics::ShapeFrame*>&
-                  shapeFrames) { self->addShapeFrames(shapeFrames); },
+              const std::vector<std::shared_ptr<dart::dynamics::ShapeFrame>>&
+                  shapeFrames) {
+            std::vector<const dart::dynamics::ShapeFrame*> converted;
+            for (auto& frame : shapeFrames)
+            {
+              converted.push_back(frame.get());
+            }
+            self->addShapeFrames(converted);
+          },
           ::py::arg("shapeFrames"))
       .def(
           "addShapeFramesOf",
@@ -161,8 +228,8 @@ void CollisionGroup(py::module& m)
               const Eigen::Vector3s& to) -> bool {
             return self->raycast(from, to);
           },
-          ::py::arg("from"),
-          ::py::arg("to"))
+          ::py::arg("from_point"),
+          ::py::arg("to_point"))
       .def(
           "raycast",
           +[](dart::collision::CollisionGroup* self,
@@ -171,8 +238,8 @@ void CollisionGroup(py::module& m)
               const dart::collision::RaycastOption& option) -> bool {
             return self->raycast(from, to, option);
           },
-          ::py::arg("from"),
-          ::py::arg("to"),
+          ::py::arg("from_point"),
+          ::py::arg("to_point"),
           ::py::arg("option"))
       .def(
           "raycast",
@@ -183,8 +250,8 @@ void CollisionGroup(py::module& m)
               dart::collision::RaycastResult* result) -> bool {
             return self->raycast(from, to, option, result);
           },
-          ::py::arg("from"),
-          ::py::arg("to"),
+          ::py::arg("from_point"),
+          ::py::arg("to_point"),
           ::py::arg("option"),
           ::py::arg("result"))
       .def(

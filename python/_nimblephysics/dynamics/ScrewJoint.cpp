@@ -84,6 +84,7 @@ void ScrewJoint(py::module& m)
           dart::dynamics::detail::ScrewJointUniqueProperties,
           dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>,
       std::shared_ptr<dart::dynamics::ScrewJoint>>(m, "ScrewJoint")
+      /*
       .def(
           "hasScrewJointAspect",
           +[](const dart::dynamics::ScrewJoint* self) -> bool {
@@ -115,6 +116,7 @@ void ScrewJoint(py::module& m)
                       dart::math::RealVectorSpace<1>>>::Aspect> {
             return self->releaseScrewJointAspect();
           })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::ScrewJoint* self,
@@ -128,16 +130,6 @@ void ScrewJoint(py::module& m)
               const dart::dynamics::ScrewJoint::UniqueProperties& _properties) {
             self->setProperties(_properties);
           },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::ScrewJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::ScrewJoint,
-                  dart::dynamics::detail::ScrewJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<1>>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getScrewJointProperties",
@@ -197,10 +189,9 @@ void ScrewJoint(py::module& m)
           ::py::arg("positions"))
       .def_static(
           "getStaticType",
-          +[]() -> const std::
-                    string& {
-                      return dart::dynamics::ScrewJoint::getStaticType();
-                    },
+          +[]() -> const std::string& {
+            return dart::dynamics::ScrewJoint::getStaticType();
+          },
           ::py::return_value_policy::reference_internal);
 }
 

@@ -45,11 +45,14 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void MetaSkeleton(py::module& m)
+void MetaSkeleton(
+    py::module& m,
+    ::py::class_<
+        dart::dynamics::MetaSkeleton,
+        std::shared_ptr<dart::dynamics::MetaSkeleton>>& metaSkeleton)
 {
-  ::py::class_<
-      dart::dynamics::MetaSkeleton,
-      std::shared_ptr<dart::dynamics::MetaSkeleton>>(m, "MetaSkeleton")
+  (void)m;
+  metaSkeleton
       .def(
           "cloneMetaSkeleton",
           +[](const dart::dynamics::MetaSkeleton* self,
@@ -63,12 +66,14 @@ void MetaSkeleton(py::module& m)
               -> dart::dynamics::MetaSkeletonPtr {
             return self->cloneMetaSkeleton();
           })
+      /*
       .def(
           "getLockableReference",
           +[](const dart::dynamics::MetaSkeleton* self)
               -> std::unique_ptr<dart::common::LockableReference> {
             return self->getLockableReference();
           })
+      */
       .def(
           "setName",
           +[](dart::dynamics::MetaSkeleton* self, const std::string& _name)
@@ -246,8 +251,8 @@ void MetaSkeleton(py::module& m)
           ::py::arg("command"))
       .def(
           "getCommand",
-          +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getCommand(_index); },
+          +[](const dart::dynamics::MetaSkeleton* self,
+              std::size_t _index) -> s_t { return self->getCommand(_index); },
           ::py::arg("index"))
       .def(
           "setCommands",
@@ -289,8 +294,8 @@ void MetaSkeleton(py::module& m)
           ::py::arg("position"))
       .def(
           "getPosition",
-          +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getPosition(_index); },
+          +[](const dart::dynamics::MetaSkeleton* self,
+              std::size_t _index) -> s_t { return self->getPosition(_index); },
           ::py::arg("index"))
       .def(
           "setPositions",
@@ -416,8 +421,8 @@ void MetaSkeleton(py::module& m)
           ::py::arg("velocity"))
       .def(
           "getVelocity",
-          +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getVelocity(_index); },
+          +[](const dart::dynamics::MetaSkeleton* self,
+              std::size_t _index) -> s_t { return self->getVelocity(_index); },
           ::py::arg("index"))
       .def(
           "setVelocities",
@@ -477,8 +482,9 @@ void MetaSkeleton(py::module& m)
           ::py::arg("velocities"))
       .def(
           "getVelocityLowerLimit",
-          +[](dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getVelocityLowerLimit(_index); },
+          +[](dart::dynamics::MetaSkeleton* self, std::size_t _index) -> s_t {
+            return self->getVelocityLowerLimit(_index);
+          },
           ::py::arg("index"))
       .def(
           "getVelocityLowerLimits",
@@ -519,8 +525,9 @@ void MetaSkeleton(py::module& m)
           ::py::arg("velocities"))
       .def(
           "getVelocityUpperLimit",
-          +[](dart::dynamics::MetaSkeleton* self, std::size_t _index)
-              -> s_t { return self->getVelocityUpperLimit(_index); },
+          +[](dart::dynamics::MetaSkeleton* self, std::size_t _index) -> s_t {
+            return self->getVelocityUpperLimit(_index);
+          },
           ::py::arg("index"))
       .def(
           "getVelocityUpperLimits",
@@ -578,8 +585,9 @@ void MetaSkeleton(py::module& m)
           ::py::arg("indices"))
       .def(
           "resetAccelerations",
-          +[](dart::dynamics::MetaSkeleton*
-                  self) { self->resetAccelerations(); })
+          +[](dart::dynamics::MetaSkeleton* self) {
+            self->resetAccelerations();
+          })
       .def(
           "setAccelerationLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,
@@ -673,13 +681,15 @@ void MetaSkeleton(py::module& m)
           ::py::arg("force"))
       .def(
           "getControlForce",
-          +[](const dart::dynamics::MetaSkeleton* self,
-              std::size_t _index) -> s_t { return self->getControlForce(_index); },
+          +[](const dart::dynamics::MetaSkeleton* self, std::size_t _index)
+              -> s_t { return self->getControlForce(_index); },
           ::py::arg("index"))
       .def(
           "setControlForces",
           +[](dart::dynamics::MetaSkeleton* self,
-              const Eigen::VectorXs& _forces) { self->setControlForces(_forces); },
+              const Eigen::VectorXs& _forces) {
+            self->setControlForces(_forces);
+          },
           ::py::arg("forces"))
       .def(
           "setControlForces",
@@ -704,8 +714,9 @@ void MetaSkeleton(py::module& m)
           ::py::arg("indices"))
       .def(
           "resetGeneralizedForces",
-          +[](dart::dynamics::MetaSkeleton*
-                  self) { self->resetGeneralizedForces(); })
+          +[](dart::dynamics::MetaSkeleton* self) {
+            self->resetGeneralizedForces();
+          })
       .def(
           "setControlForceLowerLimit",
           +[](dart::dynamics::MetaSkeleton* self,

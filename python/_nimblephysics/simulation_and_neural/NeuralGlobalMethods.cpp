@@ -30,7 +30,11 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <Eigen/Dense>
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/neural/BackpropSnapshot.hpp>
+#include <dart/neural/MappedBackpropSnapshot.hpp>
+#include <dart/neural/Mapping.hpp>
+#include <dart/neural/NeuralUtils.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -40,29 +44,30 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void NeuralUtils(py::module& sm);
-void Mapping(py::module& sm);
-void IKMapping(py::module& sm);
-void IdentityMapping(py::module& sm);
-void BackpropSnapshot(py::module& sm);
-void MappedBackpropSnapshot(py::module& sm);
-void WithRespectToMass(py::module& sm);
-
-void dart_neural(py::module& m)
+void NeuralGlobalMethods(py::module& m)
 {
-  auto sm = m.def_submodule("neural");
-
-  sm.doc()
-      = "This provides gradients to DART, with an eye on embedding DART as a "
-        "non-linearity in neural networks.";
-
-  NeuralUtils(sm);
-  Mapping(sm);
-  IKMapping(sm);
-  IdentityMapping(sm);
-  BackpropSnapshot(sm);
-  MappedBackpropSnapshot(sm);
-  WithRespectToMass(sm);
+  m.def(
+      "forwardPass",
+      &dart::neural::forwardPass,
+      ::py::arg("world"),
+      ::py::arg("idempotent") = false);
+  m.def(
+      "mappedForwardPass",
+      &dart::neural::mappedForwardPass,
+      ::py::arg("world"),
+      ::py::arg("mappings"),
+      ::py::arg("idempotent") = false);
+  m.def(
+      "convertJointSpaceToWorldSpace",
+      &dart::neural::convertJointSpaceToWorldSpace,
+      ::py::arg("world"),
+      ::py::arg("jointSpace"),
+      ::py::arg("nodes"),
+      ::py::arg("space"),
+      ::py::arg("backprop") = false,
+      ::py::arg("useIK") = true,
+      "Convert a set of joint positions to a vector of body positions in world "
+      "space (expressed in log space).");
 }
 
 } // namespace python

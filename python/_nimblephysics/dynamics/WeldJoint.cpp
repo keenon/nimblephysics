@@ -34,6 +34,7 @@
 #include <eigen_geometry_pybind.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+
 #include "Joint.hpp"
 
 namespace py = pybind11;
@@ -43,6 +44,8 @@ namespace python {
 
 void WeldJoint(py::module& m)
 {
+  ::py::class_<dart::dynamics::WeldJoint::Properties>(m, "WeldJointProperties");
+
   ::py::class_<
       dart::dynamics::WeldJoint,
       dart::dynamics::ZeroDofJoint,

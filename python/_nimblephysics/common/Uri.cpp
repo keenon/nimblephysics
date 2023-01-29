@@ -30,8 +30,13 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <memory>
+#include <string>
+
 #include <dart/common/Uri.hpp>
 #include <pybind11/pybind11.h>
+
+#include "dart/common/ResourceRetriever.hpp"
 
 namespace py = pybind11;
 
@@ -40,6 +45,18 @@ namespace python {
 
 void Uri(py::module& m)
 {
+  ::py::class_<dart::common::UriComponent>(m, "UriComponent")
+      .def(::py::init<>())
+      .def(
+          "get",
+          +[](dart::common::UriComponent* self) -> std::string {
+            return self->get();
+          })
+      .def(
+          "getOrDefault",
+          +[](dart::common::UriComponent* self, std::string orDefault)
+              -> std::string { return self->get_value_or(orDefault); },
+          ::py::arg("orDefault"));
   ::py::class_<dart::common::Uri>(m, "Uri")
       .def(::py::init<>())
       .def(::py::init<const std::string&>(), ::py::arg("input"))
@@ -319,6 +336,10 @@ void Uri(py::module& m)
       .def_readwrite("mFragment", &dart::common::Uri::mFragment);
 
   ::py::implicitly_convertible<std::string, dart::common::Uri>();
+
+  ::py::class_<
+      dart::common::ResourceRetriever,
+      std::shared_ptr<dart::common::ResourceRetriever>>(m, "ResourceRetriever");
 }
 
 } // namespace python

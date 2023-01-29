@@ -44,6 +44,12 @@ namespace python {
 
 void PlanarJoint(py::module& m)
 {
+  ::py::enum_<dart::dynamics::PlanarJoint::PlaneType>(m, "PlaneType")
+      .value("XY", dart::dynamics::PlanarJoint::PlaneType::XY)
+      .value("YZ", dart::dynamics::PlanarJoint::PlaneType::YZ)
+      .value("ZX", dart::dynamics::PlanarJoint::PlaneType::ZX)
+      .value("ARBITRARY", dart::dynamics::PlanarJoint::PlaneType::ARBITRARY);
+
   ::py::class_<dart::dynamics::PlanarJoint::UniqueProperties>(
       m, "PlanarJointUniqueProperties")
       .def(::py::init<>());
@@ -86,6 +92,7 @@ void PlanarJoint(py::module& m)
           dart::dynamics::detail::PlanarJointUniqueProperties,
           dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>,
       std::shared_ptr<dart::dynamics::PlanarJoint>>(m, "PlanarJoint")
+      /*
       .def(
           "hasPlanarJointAspect",
           +[](const dart::dynamics::PlanarJoint* self) -> bool {
@@ -107,16 +114,17 @@ void PlanarJoint(py::module& m)
           +[](dart::dynamics::PlanarJoint* self) {
             self->removePlanarJointAspect();
           })
-      .def(
-          "releasePlanarJointAspect",
-          +[](dart::dynamics::PlanarJoint* self)
-              -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::PlanarJoint,
-                  dart::dynamics::detail::PlanarJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<3>>>::Aspect> {
-            return self->releasePlanarJointAspect();
-          })
+        .def(
+            "releasePlanarJointAspect",
+            +[](dart::dynamics::PlanarJoint* self)
+                -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
+                    dart::dynamics::PlanarJoint,
+                    dart::dynamics::detail::PlanarJointUniqueProperties,
+                    dart::dynamics::GenericJoint<
+                        dart::math::RealVectorSpace<3>>>::Aspect> {
+              return self->releasePlanarJointAspect();
+            })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::PlanarJoint* self,
@@ -129,16 +137,6 @@ void PlanarJoint(py::module& m)
           +[](dart::dynamics::PlanarJoint* self,
               const dart::dynamics::PlanarJoint::UniqueProperties&
                   _properties) { self->setProperties(_properties); },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::PlanarJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::PlanarJoint,
-                  dart::dynamics::detail::PlanarJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<3>>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getPlanarJointProperties",
@@ -239,17 +237,15 @@ void PlanarJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::PlanarJoint* self,
-              const Eigen::Vector3s& _positions)
-              -> Eigen::Matrix<s_t, 6, 3> {
+              const Eigen::Vector3s& _positions) -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))
       .def_static(
           "getStaticType",
-          +[]() -> const std::
-                    string& {
-                      return dart::dynamics::PlanarJoint::getStaticType();
-                    },
+          +[]() -> const std::string& {
+            return dart::dynamics::PlanarJoint::getStaticType();
+          },
           ::py::return_value_policy::reference_internal);
 }
 

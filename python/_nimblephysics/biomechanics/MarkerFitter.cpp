@@ -120,6 +120,13 @@ void MarkerFitter(py::module& m)
   ::py::class_<dart::biomechanics::InitialMarkerFitParams>(
       m, "InitialMarkerFitParams")
       .def(::py::init<>())
+      .def(
+          "__repr__",
+          [](dart::biomechanics::InitialMarkerFitParams* self) -> std::string {
+            // TODO: add remaining params
+            return "InitialMarkerFitParams(numBlocks="
+                   + std::to_string(self->numBlocks) + ")";
+          })
       .def_readwrite(
           "markerWeights",
           &dart::biomechanics::InitialMarkerFitParams::markerWeights)

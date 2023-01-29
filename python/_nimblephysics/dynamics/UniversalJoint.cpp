@@ -34,6 +34,7 @@
 #include <eigen_geometry_pybind.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "Joint.hpp"
 
@@ -79,37 +80,6 @@ void UniversalJoint(py::module& m)
           dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2> > >,
       std::shared_ptr<dart::dynamics::UniversalJoint> >(m, "UniversalJoint")
       .def(
-          "hasUniversalJointAspect",
-          +[](const dart::dynamics::UniversalJoint* self) -> bool {
-            return self->hasUniversalJointAspect();
-          })
-      .def(
-          "setUniversalJointAspect",
-          +[](dart::dynamics::UniversalJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::UniversalJoint,
-                  dart::dynamics::detail::UniversalJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::Aspect* aspect) {
-            self->setUniversalJointAspect(aspect);
-          },
-          ::py::arg("aspect"))
-      .def(
-          "removeUniversalJointAspect",
-          +[](dart::dynamics::UniversalJoint* self) {
-            self->removeUniversalJointAspect();
-          })
-      .def(
-          "releaseUniversalJointAspect",
-          +[](dart::dynamics::UniversalJoint* self)
-              -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::UniversalJoint,
-                  dart::dynamics::detail::UniversalJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::Aspect> {
-            return self->releaseUniversalJointAspect();
-          })
-      .def(
           "setProperties",
           +[](dart::dynamics::UniversalJoint* self,
               const dart::dynamics::UniversalJoint::Properties& _properties) {
@@ -121,16 +91,6 @@ void UniversalJoint(py::module& m)
           +[](dart::dynamics::UniversalJoint* self,
               const dart::dynamics::UniversalJoint::UniqueProperties&
                   _properties) { self->setProperties(_properties); },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::UniversalJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::UniversalJoint,
-                  dart::dynamics::detail::UniversalJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getUniversalJointProperties",
@@ -178,8 +138,7 @@ void UniversalJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::UniversalJoint* self,
-              const Eigen::Vector2s& _positions)
-              -> Eigen::Matrix<s_t, 6, 2> {
+              const Eigen::Vector2s& _positions) -> Eigen::Matrix<s_t, 6, 2> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))

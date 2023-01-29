@@ -45,10 +45,10 @@ namespace python {
 
 void Node(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::Node,
-      /*dart::common::VersionCounter,*/ dart::common::Subject,
-      std::shared_ptr<dart::dynamics::Node> >(m, "Node")
+  ::py::class_<dart::dynamics::Node::Properties>(m, "NodeProperties");
+  ::py::class_<dart::dynamics::Node::State>(m, "NodeState");
+  ::py::class_<dart::dynamics::Node, std::shared_ptr<dart::dynamics::Node> >(
+      m, "Node")
       .def(
           "setName",
           +[](dart::dynamics::Node* self, const std::string& newName)
@@ -86,17 +86,6 @@ void Node(py::module& m)
           +[](const dart::dynamics::Node* self)
               -> std::unique_ptr<dart::dynamics::Node::Properties> {
             return self->getNodeProperties();
-          })
-      .def(
-          "getBodyNodePtr",
-          +[](dart::dynamics::Node* self) -> dart::dynamics::BodyNodePtr {
-            return self->getBodyNodePtr();
-          })
-      .def(
-          "getBodyNodePtr",
-          +[](const dart::dynamics::Node* self)
-              -> dart::dynamics::ConstBodyNodePtr {
-            return self->getBodyNodePtr();
           })
       .def(
           "isRemoved",

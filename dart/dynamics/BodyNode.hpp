@@ -722,6 +722,9 @@ public:
   const std::vector<DegreeOfFreedom*>& getDependentDofs() override;
 
   // Documentation inherited
+  const std::vector<DegreeOfFreedom*> getChainDofs() override;
+
+  // Documentation inherited
   const std::vector<const DegreeOfFreedom*>& getDependentDofs() const override;
 
   // Documentation inherited

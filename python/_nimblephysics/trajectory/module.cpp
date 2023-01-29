@@ -57,15 +57,15 @@ void dart_trajectory(py::module& m)
       = "This provides a native trajectory optimization framework to DART, "
         "transcribing DART trajectory problems into IPOPT for solutions.";
 
+  TrajectoryRollout(sm);
+  LossFn(sm);
+  Solution(sm);
+  Problem(sm);
   Optimizer(sm);
   IPOptOptimizer(sm);
   SGDOptimizer(sm);
-  LossFn(sm);
-  Problem(sm);
   MultiShot(sm);
   SingleShot(sm);
-  TrajectoryRollout(sm);
-  Solution(sm);
 }
 
 } // namespace python

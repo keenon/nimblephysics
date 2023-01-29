@@ -63,6 +63,8 @@ void dart_biomechanics(py::module& m)
         "dynamics and (eventually) mocap support and muscle estimation.";
 
   ForcePlate(sm);
+  C3DLoader(sm);
+  Anthropometrics(sm);
   LilypadSolver(sm);
   BatchGaitInverseDynamics(sm);
   OpenSimParser(sm);
@@ -72,8 +74,6 @@ void dart_biomechanics(py::module& m)
   DynamicsFitter(sm);
   MarkerLabeller(sm);
   IKErrorReport(sm);
-  Anthropometrics(sm);
-  C3DLoader(sm);
   SubjectOnDisk(sm);
 }
 

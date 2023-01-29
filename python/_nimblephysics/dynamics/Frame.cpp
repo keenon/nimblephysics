@@ -32,6 +32,7 @@
 
 #include <dart/dynamics/Frame.hpp>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
@@ -41,12 +42,15 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Frame(py::module& m)
+void Frame(
+    py::module& m,
+    ::py::class_<
+        dart::dynamics::Frame,
+        dart::dynamics::Entity,
+        std::shared_ptr<dart::dynamics::Frame>>& frame)
 {
-  ::py::class_<
-      dart::dynamics::Frame,
-      dart::dynamics::Entity,
-      std::shared_ptr<dart::dynamics::Frame> >(m, "Frame")
+  (void)m;
+  frame
       .def(
           "getRelativeTransform",
           +[](const dart::dynamics::Frame* self) -> Eigen::Isometry3s {

@@ -30,20 +30,59 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <Eigen/Dense>
+#include <dart/simulation/World.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void World(py::module& sm);
+// Neural
+void WithRespectTo(py::module& sm);
+void WithRespectToMass(py::module& sm);
+void NeuralUtils(py::module& sm);
+void NeuralGlobalMethods(py::module& sm);
+void Mapping(py::module& sm);
+void IKMapping(py::module& sm);
+void IdentityMapping(py::module& sm);
+void BackpropSnapshot(py::module& sm);
+void MappedBackpropSnapshot(py::module& sm);
 
-void dart_simulation(py::module& m)
+// Simulation
+void World(
+    py::module& sm,
+    ::py::class_<
+        dart::simulation::World,
+        std::shared_ptr<dart::simulation::World>>& world);
+
+void dart_simulation_and_neural(py::module& m)
 {
-  auto sm = m.def_submodule("simulation");
+  auto simulation = m.def_submodule("simulation");
+  auto neural = m.def_submodule("neural");
 
-  World(sm);
+  neural.doc()
+      = "This provides gradients to DART, with an eye on embedding DART as a "
+        "non-linearity in neural networks.";
+
+  auto world = ::py::
+      class_<dart::simulation::World, std::shared_ptr<dart::simulation::World>>(
+          simulation, "World");
+
+  NeuralUtils(neural);
+  WithRespectTo(neural);
+  WithRespectToMass(neural);
+  Mapping(neural);
+  IKMapping(neural);
+  IdentityMapping(neural);
+  BackpropSnapshot(neural);
+  MappedBackpropSnapshot(neural);
+  NeuralGlobalMethods(neural);
+
+  World(simulation, world);
 }
 
 } // namespace python

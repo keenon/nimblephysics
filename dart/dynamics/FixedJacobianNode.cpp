@@ -109,10 +109,18 @@ const std::vector<const DegreeOfFreedom*>& FixedJacobianNode::getDependentDofs()
 }
 
 //==============================================================================
+/// Returns a DegreeOfFreedom vector containing the dofs that form a Chain
+/// leading up to this JacobianNode from the root of the Skeleton.
+const std::vector<DegreeOfFreedom*> FixedJacobianNode::getChainDofs()
+{
+  return mBodyNode->getChainDofs();
+}
+
+//==============================================================================
 const std::vector<const DegreeOfFreedom*> FixedJacobianNode::getChainDofs()
     const
 {
-  return mBodyNode->getChainDofs();
+  return static_cast<const BodyNode*>(mBodyNode)->getChainDofs();
 }
 
 //==============================================================================

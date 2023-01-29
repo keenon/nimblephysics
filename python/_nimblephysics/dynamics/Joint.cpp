@@ -42,10 +42,30 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Joint(py::module& m)
+void Joint(
+    py::module& m,
+    ::py::class_<dart::dynamics::detail::JointProperties>& jointProps,
+    ::py::class_<
+        dart::dynamics::Joint,
+        dart::common::Subject,
+        dart::common::EmbedProperties<
+            dart::dynamics::Joint,
+            dart::dynamics::detail::JointProperties>,
+        std::shared_ptr<dart::dynamics::Joint>>& joint)
 {
-  ::py::class_<dart::dynamics::detail::JointProperties>(m, "JointProperties")
-      .def(::py::init<>())
+  auto attr = m.attr("Joint");
+
+  ::py::enum_<dart::dynamics::detail::ActuatorType>(attr, "ActuatorType")
+      .value("FORCE", dart::dynamics::detail::ActuatorType::FORCE)
+      .value("PASSIVE", dart::dynamics::detail::ActuatorType::PASSIVE)
+      .value("SERVO", dart::dynamics::detail::ActuatorType::SERVO)
+      .value("MIMIC", dart::dynamics::detail::ActuatorType::MIMIC)
+      .value("ACCELERATION", dart::dynamics::detail::ActuatorType::ACCELERATION)
+      .value("VELOCITY", dart::dynamics::detail::ActuatorType::VELOCITY)
+      .value("LOCKED", dart::dynamics::detail::ActuatorType::LOCKED);
+
+  (void)m;
+  jointProps.def(::py::init<>())
       .def(::py::init<const std::string&>(), ::py::arg("name"))
       .def_readwrite("mName", &dart::dynamics::detail::JointProperties::mName)
       .def_readwrite(
@@ -69,92 +89,17 @@ void Joint(py::module& m)
           "mMimicOffset",
           &dart::dynamics::detail::JointProperties::mMimicOffset);
 
-  ::py::class_<
-      dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      dart::common::Composite,
-      std::shared_ptr<dart::common::SpecializedForAspect<
-          dart::common::EmbeddedPropertiesAspect<
-              dart::dynamics::Joint,
-              dart::dynamics::detail::JointProperties>>>>(
-      m, "SpecializedForAspect_EmbeddedPropertiesAspect_Joint_JointProperties")
-      .def(::py::init<>());
-
-  ::py::class_<
-      dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      std::shared_ptr<
-          dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-              dart::dynamics::Joint,
-              dart::dynamics::detail::JointProperties>>>>(
-      m, "RequiresAspect_EmbeddedPropertiesAspect_Joint_JointProperties")
-      .def(::py::init<>());
-
-  ::py::class_<
-      dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>,
-      dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      std::shared_ptr<dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>>(
-      m, "EmbedProperties_Joint_JointProperties");
-
-  ::py::class_<
-      dart::dynamics::Joint,
-      dart::common::Subject,
-      dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>,
-      std::shared_ptr<dart::dynamics::Joint>>(m, "Joint")
-      .def(
-          "hasJointAspect",
-          +[](const dart::dynamics::Joint* self) -> bool {
-            return self->hasJointAspect();
-          })
-      .def(
-          "setJointAspect",
-          +[](dart::dynamics::Joint* self,
-              const dart::common::EmbedProperties<
-                  dart::dynamics::Joint,
-                  dart::dynamics::detail::JointProperties>::Aspect* aspect)
-              -> void { return self->setJointAspect(aspect); },
-          ::py::arg("aspect"))
+  joint
       .def(
           "removeJointAspect",
           +[](dart::dynamics::Joint* self) -> void {
             return self->removeJointAspect();
           })
       .def(
-          "releaseJointAspect",
-          +[](dart::dynamics::Joint* self)
-              -> std::unique_ptr<dart::common::EmbedProperties<
-                  dart::dynamics::Joint,
-                  dart::dynamics::detail::JointProperties>::Aspect> {
-            return self->releaseJointAspect();
-          })
-      .def(
           "setProperties",
           +[](dart::dynamics::Joint* self,
               const dart::dynamics::Joint::Properties& properties) -> void {
             return self->setProperties(properties);
-          },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::Joint* self,
-              const dart::common::EmbedProperties<
-                  dart::dynamics::Joint,
-                  dart::dynamics::detail::JointProperties>::AspectProperties&
-                  properties) -> void {
-            return self->setAspectProperties(properties);
           },
           ::py::arg("properties"))
       .def(
@@ -336,8 +281,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "getNumDofs",
-          +[](const dart::dynamics::Joint* self)
-              -> std::size_t { return self->getNumDofs(); })
+          +[](const dart::dynamics::Joint* self) -> std::size_t {
+            return self->getNumDofs();
+          })
       .def(
           "setCommand",
           +[](dart::dynamics::Joint* self,
@@ -363,8 +309,9 @@ void Joint(py::module& m)
           })
       .def(
           "resetCommands",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetCommands(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetCommands();
+          })
       .def(
           "setPosition",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t position)
@@ -451,8 +398,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "resetPositions",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetPositions(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetPositions();
+          })
       .def(
           "setInitialPosition",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t initial)
@@ -549,8 +497,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "resetVelocities",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetVelocities(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetVelocities();
+          })
       .def(
           "setInitialVelocity",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t initial)
@@ -597,8 +546,9 @@ void Joint(py::module& m)
           })
       .def(
           "resetAccelerations",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetAccelerations(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetAccelerations();
+          })
       .def(
           "setAccelerationLowerLimit",
           +[](dart::dynamics::Joint* self,
@@ -673,8 +623,9 @@ void Joint(py::module& m)
           })
       .def(
           "resetControlForces",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetControlForces(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetControlForces();
+          })
       .def(
           "setControlForceLowerLimit",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t force)
@@ -721,8 +672,9 @@ void Joint(py::module& m)
           })
       .def(
           "checkSanity",
-          +[](const dart::dynamics::Joint* self)
-              -> bool { return self->checkSanity(); })
+          +[](const dart::dynamics::Joint* self) -> bool {
+            return self->checkSanity();
+          })
       .def(
           "checkSanity",
           +[](const dart::dynamics::Joint* self, bool printWarnings) -> bool {
@@ -746,8 +698,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "resetVelocityChanges",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetVelocityChanges(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetVelocityChanges();
+          })
       .def(
           "setConstraintImpulse",
           +[](dart::dynamics::Joint* self, std::size_t index, s_t impulse)
@@ -762,8 +715,9 @@ void Joint(py::module& m)
           ::py::arg("index"))
       .def(
           "resetConstraintImpulses",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->resetConstraintImpulses(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->resetConstraintImpulses();
+          })
       .def(
           "integratePositions",
           +[](dart::dynamics::Joint* self, s_t dt) -> void {
@@ -894,12 +848,14 @@ void Joint(py::module& m)
           })
       .def(
           "notifyPositionUpdated",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->notifyPositionUpdated(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->notifyPositionUpdated();
+          })
       .def(
           "notifyVelocityUpdated",
-          +[](dart::dynamics::Joint* self)
-              -> void { return self->notifyVelocityUpdated(); })
+          +[](dart::dynamics::Joint* self) -> void {
+            return self->notifyVelocityUpdated();
+          })
       .def(
           "notifyAccelerationUpdated",
           +[](dart::dynamics::Joint* self) -> void {
@@ -919,17 +875,6 @@ void Joint(py::module& m)
       .def_readonly_static("LOCKED", &dart::dynamics::Joint::LOCKED)
       .def_readonly_static(
           "DefaultActuatorType", &dart::dynamics::Joint::DefaultActuatorType);
-
-  auto attr = m.attr("Joint");
-
-  ::py::enum_<dart::dynamics::detail::ActuatorType>(attr, "ActuatorType")
-      .value("FORCE", dart::dynamics::detail::ActuatorType::FORCE)
-      .value("PASSIVE", dart::dynamics::detail::ActuatorType::PASSIVE)
-      .value("SERVO", dart::dynamics::detail::ActuatorType::SERVO)
-      .value("MIMIC", dart::dynamics::detail::ActuatorType::MIMIC)
-      .value("ACCELERATION", dart::dynamics::detail::ActuatorType::ACCELERATION)
-      .value("VELOCITY", dart::dynamics::detail::ActuatorType::VELOCITY)
-      .value("LOCKED", dart::dynamics::detail::ActuatorType::LOCKED);
 }
 
 } // namespace python

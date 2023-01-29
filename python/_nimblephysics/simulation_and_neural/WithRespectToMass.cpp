@@ -43,17 +43,6 @@ namespace python {
 
 void WithRespectToMass(py::module& m)
 {
-  ::py::class_<
-      dart::neural::WithRespectToMass,
-      std::shared_ptr<dart::neural::WithRespectToMass>>(m, "WithRespectToMass")
-      .def(
-          "registerNode",
-          &dart::neural::WithRespectToMass::registerNode,
-          ::py::arg("node"),
-          ::py::arg("type"),
-          ::py::arg("upperBound"),
-          ::py::arg("lowerBound"));
-
   ::py::enum_<dart::neural::WrtMassBodyNodeEntryType>(
       m, "WrtMassBodyNodeEntryType")
       .value("MASS", dart::neural::WrtMassBodyNodeEntryType::INERTIA_MASS)
@@ -67,12 +56,24 @@ void WithRespectToMass(py::module& m)
       .value(
           "INERTIA_FULL", dart::neural::WrtMassBodyNodeEntryType::INERTIA_FULL)
       .export_values();
-  ::py::class_<dart::neural::WrtMassBodyNodyEntry>(
-      m, "WrtMassBodyNodyEntry")
+
+  ::py::class_<dart::neural::WrtMassBodyNodyEntry>(m, "WrtMassBodyNodyEntry")
       .def(::py::init<
-            const std::string &, dart::neural::WrtMassBodyNodeEntryType>())
+           const std::string&,
+           dart::neural::WrtMassBodyNodeEntryType>())
       .def_readwrite("linkName", &dart::neural::WrtMassBodyNodyEntry::linkName)
       .def_readwrite("type", &dart::neural::WrtMassBodyNodyEntry::type);
+
+  ::py::class_<
+      dart::neural::WithRespectToMass,
+      std::shared_ptr<dart::neural::WithRespectToMass>>(m, "WithRespectToMass")
+      .def(
+          "registerNode",
+          &dart::neural::WithRespectToMass::registerNode,
+          ::py::arg("node"),
+          ::py::arg("type"),
+          ::py::arg("upperBound"),
+          ::py::arg("lowerBound"));
 }
 
 } // namespace python

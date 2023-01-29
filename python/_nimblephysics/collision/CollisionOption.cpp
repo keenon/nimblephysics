@@ -41,6 +41,10 @@ namespace python {
 
 void CollisionOption(py::module& m)
 {
+  ::py::class_<
+      dart::collision::CollisionFilter,
+      std::shared_ptr<dart::collision::CollisionFilter>>(m, "CollisionFilter");
+
   ::py::class_<dart::collision::CollisionOption>(m, "CollisionOption")
       .def(::py::init<>())
       .def(::py::init<bool>(), ::py::arg("enableContact"))

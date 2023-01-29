@@ -33,6 +33,7 @@
 #include <dart/neural/MappedBackpropSnapshot.hpp>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -92,7 +93,8 @@ void MappedBackpropSnapshot(py::module& m)
           ::py::arg("perfLog") = nullptr)
       .def(
           "getControlForceMappedVelJacobian",
-          &dart::neural::MappedBackpropSnapshot::getControlForceMappedVelJacobian,
+          &dart::neural::MappedBackpropSnapshot::
+              getControlForceMappedVelJacobian,
           ::py::arg("world"),
           ::py::arg("mapAfter") = "identity",
           ::py::arg("perfLog") = nullptr)

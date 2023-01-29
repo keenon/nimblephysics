@@ -77,37 +77,6 @@ void TranslationalJoint2D(py::module& m)
       std::shared_ptr<dart::dynamics::TranslationalJoint2D> >(
       m, "TranslationalJoint2D")
       .def(
-          "hasTranslationalJoint2DAspect",
-          +[](const dart::dynamics::TranslationalJoint2D* self) -> bool {
-            return self->hasTranslationalJoint2DAspect();
-          })
-      .def(
-          "setTranslationalJoint2DAspect",
-          +[](dart::dynamics::TranslationalJoint2D* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::TranslationalJoint2D,
-                  dart::dynamics::detail::TranslationalJoint2DUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::Aspect* aspect) {
-            self->setTranslationalJoint2DAspect(aspect);
-          },
-          ::py::arg("aspect"))
-      .def(
-          "removeTranslationalJoint2DAspect",
-          +[](dart::dynamics::TranslationalJoint2D* self) {
-            self->removeTranslationalJoint2DAspect();
-          })
-      .def(
-          "releaseTranslationalJoint2DAspect",
-          +[](dart::dynamics::TranslationalJoint2D* self)
-              -> std::unique_ptr<dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::TranslationalJoint2D,
-                  dart::dynamics::detail::TranslationalJoint2DUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::Aspect> {
-            return self->releaseTranslationalJoint2DAspect();
-          })
-      .def(
           "setProperties",
           +[](dart::dynamics::TranslationalJoint2D* self,
               const dart::dynamics::TranslationalJoint2D::Properties&
@@ -118,16 +87,6 @@ void TranslationalJoint2D(py::module& m)
           +[](dart::dynamics::TranslationalJoint2D* self,
               const dart::dynamics::TranslationalJoint2D::UniqueProperties&
                   properties) { self->setProperties(properties); },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::TranslationalJoint2D* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::TranslationalJoint2D,
-                  dart::dynamics::detail::TranslationalJoint2DUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<2> > >::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getTranslationalJoint2DProperties",

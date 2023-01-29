@@ -42,6 +42,14 @@ namespace python {
 
 void Solution(py::module& m)
 {
+  ::py::class_<dart::trajectory::OptimizationStep>(m, "OptimizationStep")
+      .def_readonly("index", &dart::trajectory::OptimizationStep::index)
+      .def_readonly("rollout", &dart::trajectory::OptimizationStep::rollout)
+      .def_readonly("loss", &dart::trajectory::OptimizationStep::loss)
+      .def_readonly(
+          "constraintViolation",
+          &dart::trajectory::OptimizationStep::constraintViolation);
+
   ::py::class_<
       dart::trajectory::Solution,
       std::shared_ptr<dart::trajectory::Solution>>(m, "Solution")
@@ -57,14 +65,6 @@ void Solution(py::module& m)
           &dart::trajectory::Solution::getPerfLog,
           ::py::return_value_policy::reference)
       .def("reoptimize", &dart::trajectory::Solution::reoptimize);
-
-  ::py::class_<dart::trajectory::OptimizationStep>(m, "OptimizationStep")
-      .def_readonly("index", &dart::trajectory::OptimizationStep::index)
-      .def_readonly("rollout", &dart::trajectory::OptimizationStep::rollout)
-      .def_readonly("loss", &dart::trajectory::OptimizationStep::loss)
-      .def_readonly(
-          "constraintViolation",
-          &dart::trajectory::OptimizationStep::constraintViolation);
 }
 
 } // namespace python
