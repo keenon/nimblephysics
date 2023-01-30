@@ -185,3 +185,8 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.autosummary']
+
+autodoc_docstring_signature = True
+autodoc_typehints = "description"

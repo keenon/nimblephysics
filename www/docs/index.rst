@@ -22,3 +22,5 @@ This documentation was written for Nimble :code:`v0.5.3`, and may or may not wor
   inverse-dynamics
   system-identification
   accessing-raw-jacobians
+  working-with-addbiomechanics-data
+  process-mocap-data
