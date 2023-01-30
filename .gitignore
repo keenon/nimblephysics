@@ -1,4 +1,6 @@
 build/
+cmake-build-debug/
+cmake-build-release/
 syntax: glob
 *.swp
 *.swo
