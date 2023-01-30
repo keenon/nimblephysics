@@ -182,6 +182,7 @@ class NimbleStandalone {
    */
   keyboardListener = (e: KeyboardEvent) => {
     if (e.key.toString() == " ") {
+      e.preventDefault();
       this.togglePlay();
     }
   };
@@ -356,6 +357,7 @@ class NimbleStandalone {
           setTimeout(() => {
             this.hideLoadingBar();
             this.setLoadingType("loading");
+            this.setFrame(0);
             this.view.view.onWindowResize();
             if (!this.playing) {
               this.togglePlay();
