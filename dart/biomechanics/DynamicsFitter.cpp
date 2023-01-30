@@ -11495,6 +11495,15 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     return false;
   }
   totalResidual /= countedSteps;
+
+  // If the residuals are already NaN or Inf, then we have no hope of
+  // succeeding.
+  if (std::isnan(totalResidual) || std::isinf(totalResidual)) {
+    std::cout << "Total residual is NaN or Inf, unable to proceed with "
+                 "residual minimization. Returning. " << std::endl;
+    return false;
+  }
+
   std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
                "residuals: "
             << totalResidual << std::endl;
@@ -12014,6 +12023,13 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
   // Get rid of the rest of the angular residuals
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    // Save current state, in case angular residual minimization fails.
+    Eigen::MatrixXs reactionWheels = init->reactionWheels[trial];
+    std::vector<ForcePlate> forcePlate = init->forcePlateTrials[trial];
+    Eigen::MatrixXs pose = init->poseTrials[trial];
+
+    // Attempt residual minimization.
+    bool residualMinimizationSuccess = true;
     int iterations = useReactionWheels ? 1 : 100;
     for (int i = 0; i < iterations; i++)
     {
@@ -12038,13 +12054,27 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
           avgPositionChangeThreshold,
           avgAngularChangeThreshold);
       if (!success)
+      {
+        residualMinimizationSuccess = false;
         break;
+      }
     }
-    // Adjust the regularization target to match our newly solved trajectory,
-    // so we're not trying to pull the root away from the solved trajectory
-    init->regularizePosesTo[trial] = init->poseTrials[trial];
 
-    recalibrateForcePlatesOffset(init, trial);
+    if (residualMinimizationSuccess) {
+      // Adjust the regularization target to match our newly solved trajectory,
+      // so we're not trying to pull the root away from the solved trajectory
+      init->regularizePosesTo[trial] = init->poseTrials[trial];
+      recalibrateForcePlatesOffset(init, trial);
+    } else {
+      // If we failed, restore the data structures from the linear residual
+      // elimination and proceed.
+      std::cout << "Minimizing angular residuals failed. Proceeding with "
+                << "results from linear residual elimination only."
+                << std::endl;
+      init->reactionWheels[trial] = reactionWheels;
+      init->forcePlateTrials[trial] = forcePlate;
+      init->poseTrials[trial] = pose;
+    }
   }
 
   // Recompute the marker offsets to minimize error

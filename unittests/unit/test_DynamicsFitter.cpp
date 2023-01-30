@@ -6292,9 +6292,9 @@ TEST(DynamicsFitter, KirstenTest)
   std::vector<std::string> grfFiles;
 
   std::string prefix = "dart://sample/osim/KirstenTest/";
-  trcFiles.push_back(prefix + "DL Squat.trc");
-  grfFiles.push_back(prefix + "DLS01_forces_filt999Hz.mot");
-  motFiles.push_back(prefix + "DL Squat_ik.mot");
+  trcFiles.push_back(prefix + "DLS01.trc");
+  grfFiles.push_back(prefix + "DLS01_grf.mot");
+  motFiles.push_back(prefix + "DLS01_ik.mot");
 
   std::vector<std::string> footNames;
   footNames.push_back("calcn_r");
