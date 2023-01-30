@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+//#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -3323,7 +3323,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     }
 
     // 2. Find the joint centers
-
+    fitter.setJointFitSGDIterations(50); // TODO comment out in Release build
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
@@ -6282,6 +6282,36 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
       true);
 }
 #endif
+
+//#ifdef ALL_TESTS
+TEST(DynamicsFitter, KirstenTest)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  std::string prefix = "dart://sample/osim/KirstenTest/";
+  trcFiles.push_back(prefix + "DL Squat.trc");
+  grfFiles.push_back(prefix + "DLS01_forces_filt999Hz.mot");
+  motFiles.push_back(prefix + "DL Squat_ik.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/osim/KirstenTest/final.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+//#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
