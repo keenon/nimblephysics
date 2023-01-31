@@ -11409,10 +11409,12 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 // 1. Change the initial positions and velocities of the body to achieve a
 // least-squares closest COM trajectory to the current kinematic fit, taking
 // into account approximate angular positions.
-bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
+std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     Eigen::MatrixXs targetPoses,
+    s_t previousTotalResidual,
+    int iteration,
     bool useReactionWheels,
     s_t weightLinear,
     s_t weightAngular,
@@ -11492,7 +11494,7 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         << ", but we don't have any timesteps remaining with GRF data (that "
            "haven't been filtered out by previous heuristics). Returning."
         << std::endl;
-    return false;
+    return {false, totalResidual};
   }
   totalResidual /= countedSteps;
 
@@ -11501,8 +11503,34 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
   if (std::isnan(totalResidual) || std::isinf(totalResidual)) {
     std::cout << "Total residual is NaN or Inf, unable to proceed with "
                  "residual minimization. Returning. " << std::endl;
-    return false;
+    return {false, totalResidual};
   }
+
+  // If the residuals seem to be increasing rapidly, abort.
+  if (!std::isinf(previousTotalResidual))
+  {
+    s_t deltaTotalResidual = totalResidual - previousTotalResidual;
+    s_t percentDeltaTotalResidual
+        = std::abs(deltaTotalResidual / previousTotalResidual);
+
+    int iterationThreshold = 2;
+    if (deltaTotalResidual > 0 && iteration > iterationThreshold)
+    {
+      std::cout << "Residuals increasing after " << (iterationThreshold + 1)
+                << " iterations. Aborting..." << std::endl;
+      return {false, totalResidual};
+    }
+
+    double percentThreshold = 10.0;
+    if (deltaTotalResidual > 0 && percentDeltaTotalResidual > percentThreshold)
+    {
+      std::cout << "Residuals increased greater than "
+                << (percentThreshold * 100) << "% "
+                << "from previous iteration. Aborting..." << std::endl;
+      return {false, totalResidual};
+    }
+  }
+
 
   std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
                "residuals: "
@@ -11696,7 +11724,7 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                   << (threshold * 100)
                   << " percent of nominal, exiting the optimization early "
                   << std::endl;
-        return false;
+        return {false, totalResidual};
       }
     }
 
@@ -11740,7 +11768,7 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     break;
   }
-  return true;
+  return {true, totalResidual};
 }
 
 //==============================================================================
@@ -11748,12 +11776,11 @@ bool DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 // each with different number of timesteps offset between the force plates and
 // the marker data, and returns the best match (minimum marker error at 0
 // residuals).
-void DynamicsFitter::timeSyncTrialGRF(
+bool DynamicsFitter::timeSyncTrialGRF(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     bool useReactionWheels,
-    int maxShiftGRFEarlier,
-    int maxShiftGRFLater,
+    int maxShiftGRF,
     int iterationsPerShift,
     s_t weightLinear,
     s_t weightAngular,
@@ -11789,12 +11816,20 @@ void DynamicsFitter::timeSyncTrialGRF(
     originalProbablyMissingGRF.push_back(init->probablyMissingGRF[trial][t]);
   }
 
+  bool atLeastOneShiftSucceeded = false;
   int bestShiftGRF = 0;
   s_t bestShiftGRFScore = std::numeric_limits<s_t>::infinity();
   Eigen::MatrixXs bestShiftGRFTrial = originalGRFTrial;
   Eigen::MatrixXs bestShiftPoseTrial = originalPoseTrial;
-  for (int shiftGRF = maxShiftGRFEarlier; shiftGRF <= maxShiftGRFLater;
-       shiftGRF++)
+  // Start with the smallest shifts away from zero first, so if we abort early,
+  // we know it's not because we shifted too far to start with.
+  std::vector<int> shifts;
+  shifts.push_back(0);
+  for (int i = 1; i <= maxShiftGRF; ++i) {
+    shifts.push_back(i);
+    shifts.push_back(-i);
+  }
+  for (int shiftGRF : shifts)
   {
     Eigen::MatrixXs shiftedGRFTrial = originalGRFTrial;
     for (int t = 0; t < shiftedGRFTrial.cols(); t++)
@@ -11853,12 +11888,17 @@ void DynamicsFitter::timeSyncTrialGRF(
       iterationsPerShift = 1;
     }
 
+    bool residualMinimizationSuccess = true;
+    s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     for (int i = 0; i < iterationsPerShift; i++)
     {
-      bool success = zeroLinearResidualsAndOptimizeAngular(
+
+      auto output = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
           originalPoseTrial,
+          previousTotalResidual,
+          i,
           useReactionWheels,
           weightLinear,
           weightAngular,
@@ -11869,12 +11909,22 @@ void DynamicsFitter::timeSyncTrialGRF(
           50,
           false,
           false);
-      if (!success)
+      previousTotalResidual = output.second;
+      std::cout << "DEBUG previousTotalResidual: " << previousTotalResidual << std::endl;
+
+      if (!output.first)
+      {
+        residualMinimizationSuccess = false;
         break;
+      }
     }
+
+    // Don't include this trial if residual minimization failed.
+    if (!residualMinimizationSuccess) break;
 
     // Now score the trial
     s_t score = 0;
+    atLeastOneShiftSucceeded = true;
     if (useReactionWheels)
     {
       score = computeAverageReactionWheelRMSE(init, trial);
@@ -11955,18 +12005,20 @@ void DynamicsFitter::timeSyncTrialGRF(
           = originalProbablyMissingGRF[originalT];
     }
   }
-  // recomputeGRFs(init, mSkeleton, trial);
+
+  // Return failure if no shifts succeed.
+  if (!atLeastOneShiftSucceeded) return false;
+  return true;
 }
 
 //==============================================================================
 // This runs the initial pipeline, which does an approximate mass optimization
 // and time syncs the GRF data, then re-optimizes the mass and trajectory on
 // the time sync'd data, using some sensible values.
-void DynamicsFitter::timeSyncAndInitializePipeline(
+bool DynamicsFitter::timeSyncAndInitializePipeline(
     std::shared_ptr<DynamicsInitialization> init,
     bool useReactionWheels,
-    int maxShiftGRFEarlier,
-    int maxShiftGRFLater,
+    int maxShiftGRF,
     int iterationsPerShift,
     s_t weightLinear,
     s_t weightAngular,
@@ -11993,15 +12045,15 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
   }
   multimassZeroLinearResidualsOnCOMTrajectory(init);
 
+  // Attempt to time sync the GRFs relative to the coordinate data.
+  bool timeSyncSuccess;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    timeSyncTrialGRF(
-        init,
-        trial,
-        useReactionWheels,
-        maxShiftGRFEarlier,
-        maxShiftGRFLater,
-        iterationsPerShift);
+    timeSyncSuccess = timeSyncTrialGRF(
+        init, trial, useReactionWheels, maxShiftGRF, iterationsPerShift);
+
+    if (!timeSyncSuccess)
+      return false;
   }
 
   // Reset the pose trials now that we've found the GRF data, and start again
@@ -12020,27 +12072,32 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
     detectUnmeasuredTorque = false;
   }
 
+  // Save current state, in case angular residual minimization fails.
+  originalPoseTrials = init->poseTrials;
+  std::vector<Eigen::MatrixXs> originalReactionWheels = init->reactionWheels;
+  std::vector<std::vector<ForcePlate>> originalForcePlateTrials
+      = init->forcePlateTrials;
+  std::vector<Eigen::MatrixXs> originalRegularizePosesTo
+      = init->regularizePosesTo;
+
   // Get rid of the rest of the angular residuals
+  bool residualMinimizationSuccess = true;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    // Save current state, in case angular residual minimization fails.
-    Eigen::MatrixXs reactionWheels = init->reactionWheels[trial];
-    std::vector<ForcePlate> forcePlate = init->forcePlateTrials[trial];
-    Eigen::MatrixXs pose = init->poseTrials[trial];
-
-    // Attempt residual minimization.
-    bool residualMinimizationSuccess = true;
     int iterations = useReactionWheels ? 1 : 100;
+    s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     for (int i = 0; i < iterations; i++)
     {
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       bool commitDriftCompensation = i == iterations - 1;
       (void)regularizeCopDriftCompensation;
-      bool success = zeroLinearResidualsAndOptimizeAngular(
+      auto output = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
           originalPoseTrials[trial],
+          previousTotalResidual,
+          i,
           useReactionWheels,
           weightLinear,
           weightAngular,
@@ -12053,32 +12110,38 @@ void DynamicsFitter::timeSyncAndInitializePipeline(
           detectUnmeasuredTorque,
           avgPositionChangeThreshold,
           avgAngularChangeThreshold);
-      if (!success)
+      previousTotalResidual = output.second;
+      if (!output.first)
       {
         residualMinimizationSuccess = false;
         break;
       }
     }
+    if (!residualMinimizationSuccess)
+      break;
+  }
 
-    if (residualMinimizationSuccess) {
-      // Adjust the regularization target to match our newly solved trajectory,
-      // so we're not trying to pull the root away from the solved trajectory
-      init->regularizePosesTo[trial] = init->poseTrials[trial];
-      recalibrateForcePlatesOffset(init, trial);
-    } else {
-      // If we failed, restore the data structures from the linear residual
-      // elimination and proceed.
-      std::cout << "Minimizing angular residuals failed. Proceeding with "
-                << "results from linear residual elimination only."
-                << std::endl;
-      init->reactionWheels[trial] = reactionWheels;
-      init->forcePlateTrials[trial] = forcePlate;
-      init->poseTrials[trial] = pose;
-    }
+  // If ANY trial failed, restore original values for ALL trials.
+  // TODO make trial-specific.
+  if (!residualMinimizationSuccess)
+  {
+    init->reactionWheels = originalReactionWheels;
+    init->forcePlateTrials = originalForcePlateTrials;
+    init->poseTrials = originalPoseTrials;
+    init->regularizePosesTo = originalRegularizePosesTo;
+    return false;
+  }
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++) {
+    // Adjust the regularization target to match our newly solved trajectory,
+    // so we're not trying to pull the root away from the solved trajectory
+    init->regularizePosesTo[trial] = init->poseTrials[trial];
+    recalibrateForcePlatesOffset(init, trial);
   }
 
   // Recompute the marker offsets to minimize error
   optimizeMarkerOffsets(init);
+  return true;
 }
 
 //==============================================================================
