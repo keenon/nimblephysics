@@ -102,17 +102,7 @@ void BodyNode(
     ::py::class_<dart::dynamics::detail::BodyNodeAspectProperties>&
         bodyNodeAspectProps,
     ::py::class_<dart::dynamics::BodyNode::Properties>& bodyNodeProps,
-    ::py::class_<
-        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-        dart::dynamics::JacobianNode,
-        std::shared_ptr<
-            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>>>&
-        templatedJacobianBodyNode,
-    ::py::class_<
-        dart::dynamics::BodyNode,
-        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-        dart::dynamics::Frame,
-        std::shared_ptr<dart::dynamics::BodyNode>>& bodyNode)
+    ::py::class_<dart::dynamics::BodyNode, dart::dynamics::Frame>& bodyNode)
 {
   (void)m;
   bodyNodeAspectProps.def(::py::init<>())
@@ -186,7 +176,7 @@ void BodyNode(
           ::py::init<const dart::dynamics::detail::BodyNodeAspectProperties&>(),
           ::py::arg("aspectProperties"));
 
-  templatedJacobianBodyNode
+  bodyNode
       .def(
           "getJacobian",
           +[](const dart::dynamics::TemplatedJacobianNode<

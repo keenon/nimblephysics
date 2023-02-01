@@ -45,13 +45,7 @@ namespace python {
 void Joint(
     py::module& m,
     ::py::class_<dart::dynamics::detail::JointProperties>& jointProps,
-    ::py::class_<
-        dart::dynamics::Joint,
-        dart::common::Subject,
-        dart::common::EmbedProperties<
-            dart::dynamics::Joint,
-            dart::dynamics::detail::JointProperties>,
-        std::shared_ptr<dart::dynamics::Joint>>& joint)
+    ::py::class_<dart::dynamics::Joint>& joint)
 {
   auto attr = m.attr("Joint");
 

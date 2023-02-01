@@ -35,8 +35,6 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
-#include "Joint.hpp"
-
 namespace py = pybind11;
 
 namespace dart {
@@ -48,14 +46,10 @@ void TranslationalJoint(py::module& m)
       m, "TranslationalJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::RealVectorSpace<3>>::Properties&>(),
+          ::py::init<const dart::dynamics::TranslationalJoint::Properties&>(),
           ::py::arg("properties"));
 
-  ::py::class_<
-      dart::dynamics::TranslationalJoint,
-      dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>,
-      std::shared_ptr<dart::dynamics::TranslationalJoint>>(
+  ::py::class_<dart::dynamics::TranslationalJoint, dart::dynamics::Joint>(
       m, "TranslationalJoint")
       .def(
           "getTranslationalJointProperties",
@@ -76,8 +70,7 @@ void TranslationalJoint(py::module& m)
       .def(
           "getRelativeJacobianStatic",
           +[](const dart::dynamics::TranslationalJoint* self,
-              const Eigen::Vector3s& _positions)
-              -> Eigen::Matrix<s_t, 6, 3> {
+              const Eigen::Vector3s& _positions) -> Eigen::Matrix<s_t, 6, 3> {
             return self->getRelativeJacobianStatic(_positions);
           },
           ::py::arg("positions"))

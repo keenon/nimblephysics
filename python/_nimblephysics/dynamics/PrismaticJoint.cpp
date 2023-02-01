@@ -35,7 +35,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
-#include "Joint.hpp"
+#include "dart/dynamics/Joint.hpp"
 
 namespace py = pybind11;
 
@@ -51,18 +51,15 @@ void PrismaticJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::PrismaticJoint::Properties,
-      dart::dynamics::GenericJoint<math::R1Space>::Properties,
       dart::dynamics::PrismaticJoint::UniqueProperties>(
       m, "PrismaticJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R1Space>::Properties&>(),
+          ::py::init<const dart::dynamics::PrismaticJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R1Space>::Properties&,
+              const dart::dynamics::PrismaticJoint::Properties&,
               const dart::dynamics::PrismaticJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("revoluteProperties"))
@@ -70,15 +67,8 @@ void PrismaticJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::PrismaticJointUniqueProperties::mAxis);
 
-  DARTPY_DEFINE_JOINT_COMMON_BASE(PrismaticJoint, R1Space)
-
-  ::py::class_<
-      dart::dynamics::PrismaticJoint,
-      dart::common::EmbedPropertiesOnTopOf<
-          dart::dynamics::PrismaticJoint,
-          dart::dynamics::detail::PrismaticJointUniqueProperties,
-          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>,
-      std::shared_ptr<dart::dynamics::PrismaticJoint>>(m, "PrismaticJoint")
+  ::py::class_<dart::dynamics::PrismaticJoint, dart::dynamics::Joint>(
+      m, "PrismaticJoint")
       /*
       .def(
           "hasPrismaticJointAspect",

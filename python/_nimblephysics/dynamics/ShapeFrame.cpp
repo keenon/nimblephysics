@@ -105,8 +105,7 @@ void ShapeFrame(py::module& m)
       //         dart::dynamics::VisualAspect,
       //         dart::dynamics::CollisionAspect,
       //         dart::dynamics::DynamicsAspect> >,
-      dart::dynamics::Frame,
-      std::shared_ptr<dart::dynamics::ShapeFrame>>(m, "ShapeFrame")
+      dart::dynamics::Frame>(m, "ShapeFrame")
       .def(
           "setProperties",
           +[](dart::dynamics::ShapeFrame* self,

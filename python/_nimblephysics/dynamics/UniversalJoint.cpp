@@ -36,7 +36,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "Joint.hpp"
+#include "dart/dynamics/Joint.hpp"
 
 namespace py = pybind11;
 
@@ -51,18 +51,15 @@ void UniversalJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::UniversalJoint::Properties,
-      dart::dynamics::GenericJoint<math::R2Space>::Properties,
       dart::dynamics::UniversalJoint::UniqueProperties>(
       m, "UniversalJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R2Space>::Properties&>(),
+          ::py::init<const dart::dynamics::UniversalJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R2Space>::Properties&,
+              const dart::dynamics::UniversalJoint::Properties&,
               const dart::dynamics::UniversalJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"))
@@ -70,15 +67,8 @@ void UniversalJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::UniversalJointUniqueProperties::mAxis);
 
-  DARTPY_DEFINE_JOINT_COMMON_BASE(UniversalJoint, R2Space)
-
-  ::py::class_<
-      dart::dynamics::UniversalJoint,
-      dart::common::EmbedPropertiesOnTopOf<
-          dart::dynamics::UniversalJoint,
-          dart::dynamics::detail::UniversalJointUniqueProperties,
-          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2> > >,
-      std::shared_ptr<dart::dynamics::UniversalJoint> >(m, "UniversalJoint")
+  ::py::class_<dart::dynamics::UniversalJoint, dart::dynamics::Joint>(
+      m, "UniversalJoint")
       .def(
           "setProperties",
           +[](dart::dynamics::UniversalJoint* self,
