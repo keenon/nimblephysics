@@ -1370,10 +1370,12 @@ public:
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
   // into account approximate angular positions.
-  bool zeroLinearResidualsAndOptimizeAngular(
+  std::pair<bool, double> zeroLinearResidualsAndOptimizeAngular(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       Eigen::MatrixXs targetPoses,
+      s_t previousTotalResidual,
+      int iteration,
       bool useReactionWheels = false,
       s_t weightLinear = 1.0,
       s_t weightAngular = 0.5,
@@ -1391,12 +1393,11 @@ public:
   // each with different number of timesteps offset between the force plates and
   // the marker data, and returns the best match (minimum marker error at 0
   // residuals).
-  void timeSyncTrialGRF(
+  bool timeSyncTrialGRF(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       bool useReactionWheels = false,
-      int maxShiftGRFEarlier = -4,
-      int maxShiftGRFLater = 4,
+      int maxShiftGRF = 4,
       int iterationsPerShift = 20,
       s_t weightLinear = 1.0,
       s_t weightAngular = 1.0,
@@ -1408,11 +1409,10 @@ public:
   // This runs the initial pipeline, which does an approximate mass optimization
   // and time syncs the GRF data, then re-optimizes the mass and trajectory on
   // the time sync'd data, using some sensible values.
-  void timeSyncAndInitializePipeline(
+  bool timeSyncAndInitializePipeline(
       std::shared_ptr<DynamicsInitialization> init,
       bool useReactionWheels = false,
-      int maxShiftGRFEarlier = -4,
-      int maxShiftGRFLater = 4,
+      int maxShiftGRF = 4,
       int iterationsPerShift = 20,
       s_t weightLinear = 1.0,
       s_t weightAngular = 0.5,
