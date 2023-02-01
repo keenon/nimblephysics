@@ -67,7 +67,7 @@ void UniversalJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::UniversalJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::UniversalJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::UniversalJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>(
       m, "UniversalJoint")
       .def(
           "setProperties",

@@ -48,7 +48,7 @@ void BallJoint(py::module& m)
           ::py::init<const dart::dynamics::BallJoint::Properties&>(),
           ::py::arg("properties"));
 
-  ::py::class_<dart::dynamics::BallJoint, dart::dynamics::Joint>(m, "BallJoint")
+  ::py::class_<dart::dynamics::BallJoint, dart::dynamics::GenericJoint<dart::math::SO3Space>>(m, "BallJoint")
       .def(
           "getType",
           +[](const dart::dynamics::BallJoint* self) -> const std::string& {

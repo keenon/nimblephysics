@@ -66,7 +66,7 @@ void setWingingAxisDirection(s_t radians);
 
 s_t getWingingAxisDirection();
 */
-  ::py::class_<dart::dynamics::ScapulathoracicJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::ScapulathoracicJoint, dart::dynamics::GenericJoint<dart::math::R4Space>>(
       m, "ScapulothoracicJoint")
       .def(
           "getType",

@@ -700,110 +700,207 @@ class ForcePlate():
         pass
     pass
 class Frame():
+    """
+    This is for doing ML and large-scale data analysis. This is a single frame of data, returned in a list by :code:`SubjectOnDisk.readFrames()`, which contains everything needed to reconstruct all the dynamics of a snapshot in time.
+    """
     @property
     def acc(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
+        The joint accelerations on this frame.
+
         :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
         """
     @acc.setter
     def acc(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
+        """
+        The joint accelerations on this frame.
+        """
     @property
     def customValues(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]:
         """
+        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
+
         :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]
         """
     @customValues.setter
     def customValues(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None:
-        pass
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
+        """
     @property
     def dt(self) -> float:
         """
+        This is the size of the simulation timestep at this frame.
+
         :type: float
         """
     @dt.setter
     def dt(self, arg0: float) -> None:
-        pass
+        """
+        This is the size of the simulation timestep at this frame.
+        """
     @property
     def groundContactCenterOfPressure(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
         """
+                    This is a list of pairs of (:code:`body name`, :code:`CoP`), where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+                    expressed in the world frame.
+                
+
         :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
         """
     @groundContactCenterOfPressure.setter
     def groundContactCenterOfPressure(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
-        pass
+        """
+        This is a list of pairs of (:code:`body name`, :code:`CoP`), where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+        expressed in the world frame.
+        """
     @property
     def groundContactForce(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
         """
+                    This is a list of pairs of (:code:`body name`, :code:`f`), where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+                    expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+                  
+
         :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
         """
     @groundContactForce.setter
     def groundContactForce(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
-        pass
+        """
+        This is a list of pairs of (:code:`body name`, :code:`f`), where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+        expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+        """
     @property
     def groundContactTorque(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
         """
+                    This is a list of pairs of (:code:`body name`, :code:`tau`), where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+                    expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+                  
+
         :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
         """
     @groundContactTorque.setter
     def groundContactTorque(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
-        pass
+        """
+        This is a list of pairs of (:code:`body name`, :code:`tau`), where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+        expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+        """
     @property
     def groundContactWrenches(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[6, 1]]]]:
         """
+        This is a list of pairs of (:code:`body_name`, :code:`body_wrench`), where :code:`body_wrench` is a 6 vector (first 3 are torque, last 3 are force). 
+        :code:`body_wrench` is expressed in the local frame of the body at :code:`body_name`, and assumes that the skeleton is set to positions `pos`.
+
+        Here's an example usage
+        .. code-block::
+            for name, wrench in frame.groundContactWrenches:
+                body: nimble.dynamics.BodyNode = skel.getBodyNode(name)
+                torque_local = wrench[:3]
+                force_local = wrench[3:]
+                # For example, to rotate the force to the world frame
+                R_wb = body.getWorldTransform().rotation()
+                force_world = R_wb @ force_local
+
+        Note that these are specified in the local body frame, acting on the body at its origin, so transforming them to the world frame requires a transformation!
+
         :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[6, 1]]]]
         """
     @groundContactWrenches.setter
     def groundContactWrenches(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[6, 1]]]]) -> None:
-        pass
+        """
+        This is a list of pairs of (:code:`body_name`, :code:`body_wrench`), where :code:`body_wrench` is a 6 vector (first 3 are torque, last 3 are force). 
+        :code:`body_wrench` is expressed in the local frame of the body at :code:`body_name`, and assumes that the skeleton is set to positions `pos`.
+
+        Here's an example usage
+        .. code-block::
+            for name, wrench in frame.groundContactWrenches:
+                body: nimble.dynamics.BodyNode = skel.getBodyNode(name)
+                torque_local = wrench[:3]
+                force_local = wrench[3:]
+                # For example, to rotate the force to the world frame
+                R_wb = body.getWorldTransform().rotation()
+                force_world = R_wb @ force_local
+
+        Note that these are specified in the local body frame, acting on the body at its origin, so transforming them to the world frame requires a transformation!
+        """
     @property
     def pos(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
+        The joint positions on this frame.
+
         :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
         """
     @pos.setter
     def pos(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
+        """
+        The joint positions on this frame.
+        """
     @property
     def probablyMissingGRF(self) -> bool:
         """
+                    This is true if this frame probably has unmeasured forces acting on the body. For example, if a subject
+                    steps off of the available force plates during this frame, this will probably be true.
+
+                    WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
+                  
+
         :type: bool
         """
     @probablyMissingGRF.setter
     def probablyMissingGRF(self, arg0: bool) -> None:
-        pass
+        """
+        This is true if this frame probably has unmeasured forces acting on the body. For example, if a subject
+        steps off of the available force plates during this frame, this will probably be true.
+
+        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
+        """
     @property
     def t(self) -> int:
         """
+        The frame number in this trial.
+
         :type: int
         """
     @t.setter
     def t(self, arg0: int) -> None:
-        pass
+        """
+        The frame number in this trial.
+        """
     @property
     def tau(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
+        The joint control forces on this frame.
+
         :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
         """
     @tau.setter
     def tau(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
+        """
+        The joint control forces on this frame.
+        """
     @property
     def trial(self) -> int:
         """
+        The index of the trial in the containing SubjectOnDisk.
+
         :type: int
         """
     @trial.setter
     def trial(self, arg0: int) -> None:
-        pass
+        """
+        The index of the trial in the containing SubjectOnDisk.
+        """
     @property
     def vel(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
+        The joint velocities on this frame.
+
         :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
         """
     @vel.setter
     def vel(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
+        """
+        The joint velocities on this frame.
+        """
     pass
 class IKErrorReport():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], poses: numpy.ndarray[numpy.float64, _Shape[m, n]], observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
@@ -1464,19 +1561,71 @@ class SkeletonConverter():
     def rescaleAndPrepTarget(self, addFakeMarkers: int = 3, weightFakeMarkers: float = 0.1, convergenceThreshold: float = 1e-15, maxStepCount: int = 1000, leastSquaresDamping: float = 0.01, lineSearch: bool = True, logOutput: bool = False) -> None: ...
     pass
 class SubjectOnDisk():
+    """
+    This is for doing ML and large-scale data analysis. The idea here is to
+    create a lazy-loadable view of a subject, where everything remains on disk
+    until asked for. That way we can instantiate thousands of these in memory,
+    and not worry about OOM'ing a machine.
+    """
     def __init__(self, path: str, printDebuggingDetails: bool = False) -> None: ...
-    def getContactBodies(self) -> typing.List[str]: ...
-    def getCustomValueDim(self, customValue: str) -> int: ...
-    def getCustomValues(self) -> typing.List[str]: ...
-    def getHref(self) -> str: ...
-    def getNotes(self) -> str: ...
-    def getNumDofs(self) -> int: ...
-    def getNumTrials(self) -> int: ...
-    def getProbablyMissingGRF(self, trial: int) -> typing.List[bool]: ...
-    def getTrialLength(self, trial: int) -> int: ...
-    def getTrialName(self, trial: int) -> str: ...
-    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1) -> typing.List[Frame]: ...
-    def readSkel(self, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: ...
+    def getContactBodies(self) -> typing.List[str]: 
+        """
+        A list of the :code:`body_name`'s for each body that was assumed to be able to take ground-reaction-force from force plates.
+        """
+    def getCustomValueDim(self, valueName: str) -> int: 
+        """
+        This returns the dimension of the custom value specified by :code:`valueName`
+        """
+    def getCustomValues(self) -> typing.List[str]: 
+        """
+        A list of all the different types of custom values that this SubjectOnDisk contains. These are unspecified, and are intended to allow an easy extension of the format to unusual types of data (like exoskeleton torques or unusual physical sensors) that may be present on some subjects but not others.
+        """
+    def getHref(self) -> str: 
+        """
+        The AddBiomechanics link for this subject's data.
+        """
+    def getNotes(self) -> str: 
+        """
+        The notes (if any) added by the person who uploaded this data to AddBiomechanics.
+        """
+    def getNumDofs(self) -> int: 
+        """
+        This returns the number of DOFs for the model on this Subject
+        """
+    def getNumTrials(self) -> int: 
+        """
+        This returns the number of trials that are in this file.
+        """
+    def getProbablyMissingGRF(self, trial: int) -> typing.List[bool]: 
+        """
+        This returns an array of boolean values, one per frame in the specified trial.
+        Each frame is :code:`True` if this frame probably has unmeasured forces acting on the body. For example, if a subject
+        steps off of the available force plates during this frame, this will probably be true.
+
+        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on the corresponding frame!!
+
+        This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
+        the more expensive :code:`loadFrames()`
+        """
+    def getTrialLength(self, trial: int) -> int: 
+        """
+        This returns the length of the trial requested
+        """
+    def getTrialName(self, trial: int) -> str: 
+        """
+        This returns the human readable name of the specified trial, given by the person who uploaded the data to AddBiomechanics. This isn't necessary for training, but may be useful for analyzing the data.
+        """
+    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1) -> typing.List[Frame]: 
+        """
+        This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
+        """
+    def readSkel(self, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: 
+        """
+        This will read the skeleton from the binary, and optionally use the passed in :code:`geometryFolder` to load meshes. We do not bundle meshes with :code:`SubjectOnDisk` files, to save space. If you do not pass in :code:`geometryFolder`, expect to get warnings about being unable to load meshes, and expect that your skeleton will not display if you attempt to visualize it.
+        """
     @staticmethod
-    def writeSubject(outputPath: str, openSimFilePath: str, trialTimesteps: typing.List[float], trialPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], probablyMissingGRF: typing.List[typing.List[bool]], trialTaus: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], groundForceBodies: typing.List[str], trialGroundBodyWrenches: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialGroundBodyCopTorqueForce: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], customValueNames: typing.List[str], customValues: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], trialNames: typing.List[str] = [], sourceHref: str = '', notes: str = '') -> None: ...
+    def writeSubject(outputPath: str, openSimFilePath: str, trialTimesteps: typing.List[float], trialPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], probablyMissingGRF: typing.List[typing.List[bool]], trialTaus: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], groundForceBodies: typing.List[str], trialGroundBodyWrenches: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialGroundBodyCopTorqueForce: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], customValueNames: typing.List[str], customValues: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], trialNames: typing.List[str] = [], sourceHref: str = '', notes: str = '') -> None: 
+        """
+        This writes a subject out to disk in a compressed and random-seekable binary format.
+        """
     pass

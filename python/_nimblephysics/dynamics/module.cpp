@@ -64,7 +64,14 @@ void BodyNode(
     ::py::class_<dart::dynamics::detail::BodyNodeAspectProperties>&
         bodyNodeAspectProps,
     ::py::class_<dart::dynamics::BodyNode::Properties>& bodyNodeProps,
-    ::py::class_<dart::dynamics::BodyNode, dart::dynamics::Frame>& bodyNode);
+    ::py::class_<
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>&
+            templatedJacobianBodyNode,
+    ::py::class_<
+        dart::dynamics::BodyNode,
+        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+        dart::dynamics::Frame>& bodyNode);
 void Inertia(py::module& sm);
 
 void Joint(
@@ -73,7 +80,7 @@ void Joint(
     ::py::class_<dart::dynamics::Joint>& joint);
 void ZeroDofJoint(py::module& sm);
 void WeldJoint(py::module& sm);
-// void GenericJoint(py::module& sm);
+void GenericJoint(py::module& sm);
 void RevoluteJoint(py::module& sm);
 void PrismaticJoint(py::module& sm);
 void ScrewJoint(py::module& sm);
@@ -150,8 +157,13 @@ void dart_dynamics(py::module& m)
   auto bodyNodeProps = ::py::class_<dart::dynamics::BodyNode::Properties>(
       sm, "BodyNodeProperties");
 
-  auto bodyNode = ::py::class_<dart::dynamics::BodyNode, dart::dynamics::Frame>(
-      sm, "BodyNode");
+    auto templatedJacobianBodyNode = ::py::class_<
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>(sm, "TemplatedJacobianBodyNode");
+    auto bodyNode = ::py::class_<
+        dart::dynamics::BodyNode,
+        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+        dart::dynamics::Frame>(sm, "BodyNode");
   /////////////////////////////////////////////////////////////////////////////////
 
   DegreeOfFreedom(sm);
@@ -161,7 +173,7 @@ void dart_dynamics(py::module& m)
   Joint(sm, jointProps, joint);
   ZeroDofJoint(sm);
   WeldJoint(sm);
-  //   GenericJoint(sm);
+  GenericJoint(sm);
   RevoluteJoint(sm);
   PrismaticJoint(sm);
   ScrewJoint(sm);
@@ -176,7 +188,7 @@ void dart_dynamics(py::module& m)
   TranslationalJoint(sm);
   FreeJoint(sm);
 
-  BodyNode(sm, bodyNodeAspectProps, bodyNodeProps, bodyNode);
+  BodyNode(sm, bodyNodeAspectProps, bodyNodeProps, templatedJacobianBodyNode, bodyNode);
 
   MetaSkeleton(sm, metaSkeleton);
   ReferentialSkeleton(sm);

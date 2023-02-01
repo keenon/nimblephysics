@@ -42,7 +42,7 @@ namespace python {
 
 void EulerFreeJoint(py::module& m)
 {
-  ::py::class_<dart::dynamics::EulerFreeJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::EulerFreeJoint, dart::dynamics::GenericJoint<dart::math::R6Space>>(
       m, "EulerFreeJoint")
       .def(
           "getType",

@@ -42,7 +42,7 @@ namespace python {
 
 void CustomJoint(py::module& m)
 {
-  ::py::class_<dart::dynamics::CustomJoint<1>, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::CustomJoint<1>, dart::dynamics::GenericJoint<math::RealVectorSpace<1>>>(
       m, "CustomJoint1")
       .def(
           "getType",
@@ -86,7 +86,7 @@ void CustomJoint(py::module& m)
           },
           ::py::return_value_policy::reference_internal);
 
-  ::py::class_<dart::dynamics::CustomJoint<2>, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::CustomJoint<2>, dart::dynamics::GenericJoint<dart::math::R2Space>>(
       m, "CustomJoint2")
       .def(
           "getType",

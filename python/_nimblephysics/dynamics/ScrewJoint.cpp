@@ -72,7 +72,7 @@ void ScrewJoint(py::module& m)
           "mPitch",
           &dart::dynamics::detail::ScrewJointUniqueProperties::mPitch);
 
-  ::py::class_<dart::dynamics::ScrewJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::ScrewJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>(
       m, "ScrewJoint")
       /*
       .def(

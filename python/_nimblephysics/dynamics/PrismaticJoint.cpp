@@ -67,7 +67,7 @@ void PrismaticJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::PrismaticJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::PrismaticJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::PrismaticJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>(
       m, "PrismaticJoint")
       /*
       .def(

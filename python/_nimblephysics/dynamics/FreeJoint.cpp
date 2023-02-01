@@ -49,7 +49,7 @@ void FreeJoint(py::module& m)
           ::py::init<const dart::dynamics::FreeJoint::Properties&>(),
           ::py::arg("properties"));
 
-  ::py::class_<dart::dynamics::FreeJoint, dart::dynamics::Joint>(m, "FreeJoint")
+  ::py::class_<dart::dynamics::FreeJoint, dart::dynamics::GenericJoint<dart::math::SE3Space>>(m, "FreeJoint")
       .def(
           "getFreeJointProperties",
           +[](const dart::dynamics::FreeJoint* self)

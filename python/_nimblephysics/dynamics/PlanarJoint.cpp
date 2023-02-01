@@ -80,7 +80,7 @@ void PlanarJoint(py::module& m)
           "mRotAxis",
           &dart::dynamics::detail::PlanarJointUniqueProperties::mRotAxis);
 
-  ::py::class_<dart::dynamics::PlanarJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::PlanarJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>(
       m, "PlanarJoint")
       /*
       .def(

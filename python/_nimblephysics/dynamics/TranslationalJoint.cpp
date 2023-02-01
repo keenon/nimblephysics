@@ -49,7 +49,7 @@ void TranslationalJoint(py::module& m)
           ::py::init<const dart::dynamics::TranslationalJoint::Properties&>(),
           ::py::arg("properties"));
 
-  ::py::class_<dart::dynamics::TranslationalJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::TranslationalJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>(
       m, "TranslationalJoint")
       .def(
           "getTranslationalJointProperties",

@@ -65,7 +65,7 @@ void RevoluteJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::RevoluteJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::RevoluteJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::RevoluteJoint, dart::dynamics::GenericJoint<math::RealVectorSpace<1>>>(
       m, "RevoluteJoint")
       /*
       .def(

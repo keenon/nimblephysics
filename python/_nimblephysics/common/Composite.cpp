@@ -41,7 +41,7 @@ namespace python {
 void Composite(py::module& m)
 {
   ::py::
-      class_<dart::common::Composite, std::shared_ptr<dart::common::Composite>>(
+      class_<dart::common::Composite>(
           m, "Composite")
           .def(::py::init<>());
   /*

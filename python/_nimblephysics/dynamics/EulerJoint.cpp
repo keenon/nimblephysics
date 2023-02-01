@@ -72,7 +72,7 @@ void EulerJoint(py::module& m)
           "mAxisOrder",
           &dart::dynamics::detail::EulerJointUniqueProperties::mAxisOrder);
 
-  ::py::class_<dart::dynamics::EulerJoint, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::EulerJoint, dart::dynamics::GenericJoint<dart::math::R3Space>>(
       m, "EulerJoint")
       /*
       .def(

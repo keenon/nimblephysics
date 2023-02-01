@@ -63,7 +63,7 @@ void TranslationalJoint2D(py::module& m)
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"));
 
-  ::py::class_<dart::dynamics::TranslationalJoint2D, dart::dynamics::Joint>(
+  ::py::class_<dart::dynamics::TranslationalJoint2D, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>(
       m, "TranslationalJoint2D")
       .def(
           "setProperties",
