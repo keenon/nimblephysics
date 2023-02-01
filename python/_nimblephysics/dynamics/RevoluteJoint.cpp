@@ -35,6 +35,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -65,8 +67,11 @@ void RevoluteJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::RevoluteJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::RevoluteJoint, dart::dynamics::GenericJoint<math::RealVectorSpace<1>>>(
-      m, "RevoluteJoint")
+  DARTPY_DEFINE_JOINT_COMMON_BASE(RevoluteJoint, R1Space)
+
+  ::py::class_<
+      dart::dynamics::RevoluteJoint,
+      dart::dynamics::detail::RevoluteJointBase>(m, "RevoluteJoint")
       /*
       .def(
           "hasRevoluteJointAspect",

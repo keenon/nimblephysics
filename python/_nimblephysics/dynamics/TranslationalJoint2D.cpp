@@ -37,6 +37,8 @@
 
 #include "dart/dynamics/Joint.hpp"
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -63,7 +65,14 @@ void TranslationalJoint2D(py::module& m)
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"));
 
-  ::py::class_<dart::dynamics::TranslationalJoint2D, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(TranslationalJoint2D, R2Space)
+
+  ::py::class_<
+      dart::dynamics::TranslationalJoint2D,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::TranslationalJoint2D,
+          dart::dynamics::detail::TranslationalJoint2DUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>>(
       m, "TranslationalJoint2D")
       .def(
           "setProperties",

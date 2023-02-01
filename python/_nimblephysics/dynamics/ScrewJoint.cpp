@@ -37,6 +37,8 @@
 
 #include "dart/dynamics/Joint.hpp"
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -72,7 +74,14 @@ void ScrewJoint(py::module& m)
           "mPitch",
           &dart::dynamics::detail::ScrewJointUniqueProperties::mPitch);
 
-  ::py::class_<dart::dynamics::ScrewJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(ScrewJoint, R1Space)
+
+  ::py::class_<
+      dart::dynamics::ScrewJoint,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::ScrewJoint,
+          dart::dynamics::detail::ScrewJointUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>>(
       m, "ScrewJoint")
       /*
       .def(

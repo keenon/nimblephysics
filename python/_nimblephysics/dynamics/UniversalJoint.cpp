@@ -38,6 +38,8 @@
 
 #include "dart/dynamics/Joint.hpp"
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -67,7 +69,14 @@ void UniversalJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::UniversalJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::UniversalJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(UniversalJoint, R2Space)
+
+  ::py::class_<
+      dart::dynamics::UniversalJoint,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::UniversalJoint,
+          dart::dynamics::detail::UniversalJointUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<2>>>>(
       m, "UniversalJoint")
       .def(
           "setProperties",

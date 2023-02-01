@@ -37,6 +37,8 @@
 
 #include "dart/dynamics/Joint.hpp"
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -80,7 +82,14 @@ void PlanarJoint(py::module& m)
           "mRotAxis",
           &dart::dynamics::detail::PlanarJointUniqueProperties::mRotAxis);
 
-  ::py::class_<dart::dynamics::PlanarJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(PlanarJoint, R3Space)
+
+  ::py::class_<
+      dart::dynamics::PlanarJoint,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::PlanarJoint,
+          dart::dynamics::detail::PlanarJointUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>>(
       m, "PlanarJoint")
       /*
       .def(

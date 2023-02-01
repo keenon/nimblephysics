@@ -37,6 +37,8 @@
 
 #include "dart/dynamics/Joint.hpp"
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -67,7 +69,14 @@ void PrismaticJoint(py::module& m)
           "mAxis",
           &dart::dynamics::detail::PrismaticJointUniqueProperties::mAxis);
 
-  ::py::class_<dart::dynamics::PrismaticJoint, dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(PrismaticJoint, R1Space)
+
+  ::py::class_<
+      dart::dynamics::PrismaticJoint,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::PrismaticJoint,
+          dart::dynamics::detail::PrismaticJointUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>>(
       m, "PrismaticJoint")
       /*
       .def(
