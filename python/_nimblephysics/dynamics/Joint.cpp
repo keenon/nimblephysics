@@ -112,16 +112,15 @@ void Joint(
           ::py::arg("otherJoint"))
       .def(
           "setName",
-          +[](dart::dynamics::Joint* self, const std::string& name)
-              -> void { self->setName(name); },
+          +[](dart::dynamics::Joint* self, const std::string& name) -> void {
+            self->setName(name);
+          },
           ::py::arg("name"))
       .def(
           "setName",
           +[](dart::dynamics::Joint* self,
               const std::string& name,
-              bool renameDofs) -> void {
-            self->setName(name, renameDofs);
-          },
+              bool renameDofs) -> void { self->setName(name, renameDofs); },
           ::py::arg("name"),
           ::py::arg("renameDofs"))
       .def(

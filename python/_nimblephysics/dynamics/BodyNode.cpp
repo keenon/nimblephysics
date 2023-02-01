@@ -64,7 +64,7 @@ namespace py = pybind11;
                     dart::dynamics::joint_type,                                \
                     dart::dynamics::BodyNode>();                               \
               },                                                               \
-      ::py::return_value_policy::reference)                           \
+      ::py::return_value_policy::reference)                                    \
       .def(                                                                    \
           "create" #joint_type "AndBodyNodePair",                              \
           +[](dart::dynamics::BodyNode* self,                                  \
@@ -76,7 +76,7 @@ namespace py = pybind11;
                 dart::dynamics::joint_type,                                    \
                 dart::dynamics::BodyNode>(jointProperties);                    \
           },                                                                   \
-          ::py::return_value_policy::reference,                       \
+          ::py::return_value_policy::reference,                                \
           ::py::arg("jointProperties"))                                        \
       .def(                                                                    \
           "create" #joint_type "AndBodyNodePair",                              \
@@ -90,7 +90,7 @@ namespace py = pybind11;
                 dart::dynamics::joint_type,                                    \
                 dart::dynamics::BodyNode>(jointProperties, bodyProperties);    \
           },                                                                   \
-          ::py::return_value_policy::reference,                       \
+          ::py::return_value_policy::reference,                                \
           ::py::arg("jointProperties"),                                        \
           ::py::arg("bodyProperties"))
 
@@ -104,8 +104,7 @@ void BodyNode(
     ::py::class_<dart::dynamics::BodyNode::Properties>& bodyNodeProps,
     ::py::class_<
         dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-        dart::dynamics::JacobianNode>&
-        templatedJacobianBodyNode,
+        dart::dynamics::JacobianNode>& templatedJacobianBodyNode,
     ::py::class_<
         dart::dynamics::BodyNode,
         dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
@@ -553,8 +552,8 @@ void BodyNode(
           ::py::arg("otherBodyNode"))
       .def(
           "setName",
-          +[](dart::dynamics::BodyNode* self, const std::string& _name)
-              -> void { self->setName(_name); },
+          +[](dart::dynamics::BodyNode* self,
+              const std::string& _name) -> void { self->setName(_name); },
           ::py::arg("name"))
       .def(
           "getName",

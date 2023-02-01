@@ -35,6 +35,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
+#include "Joint.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -72,7 +74,14 @@ void EulerJoint(py::module& m)
           "mAxisOrder",
           &dart::dynamics::detail::EulerJointUniqueProperties::mAxisOrder);
 
-  ::py::class_<dart::dynamics::EulerJoint, dart::dynamics::GenericJoint<dart::math::R3Space>>(
+  DARTPY_DEFINE_JOINT_COMMON_BASE(EulerJoint, R3Space)
+
+  ::py::class_<
+      dart::dynamics::EulerJoint,
+      dart::common::EmbedPropertiesOnTopOf<
+          dart::dynamics::EulerJoint,
+          dart::dynamics::detail::EulerJointUniqueProperties,
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>>(
       m, "EulerJoint")
       /*
       .def(
