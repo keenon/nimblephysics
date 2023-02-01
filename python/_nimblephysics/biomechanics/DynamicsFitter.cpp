@@ -604,7 +604,7 @@ protected:
           &dart::biomechanics::DynamicsFitter::timeSyncAndInitializePipeline,
           ::py::arg("init"),
           ::py::arg("useReactionWheels") = false,
-          ::py::arg("maxShiftGRF") = -4,
+          ::py::arg("maxShiftGRF") = 4,
           ::py::arg("iterationsPerShift") = 20,
           ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 0.5,

@@ -11514,7 +11514,9 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         = std::abs(deltaTotalResidual / previousTotalResidual);
 
     int iterationThreshold = 2;
-    if (deltaTotalResidual > 0 && iteration > iterationThreshold)
+    if (deltaTotalResidual > 0 &&
+        iteration > iterationThreshold &&
+        percentDeltaTotalResidual > 0.25)
     {
       std::cout << "Residuals increasing after " << (iterationThreshold + 1)
                 << " iterations. Aborting..." << std::endl;
@@ -11825,12 +11827,15 @@ bool DynamicsFitter::timeSyncTrialGRF(
   // we know it's not because we shifted too far to start with.
   std::vector<int> shifts;
   shifts.push_back(0);
-  for (int i = 1; i <= maxShiftGRF; ++i) {
+  for (int i = 1; i <= maxShiftGRF; ++i)
+  {
     shifts.push_back(i);
     shifts.push_back(-i);
   }
+
   for (int shiftGRF : shifts)
   {
+    std::cout << "Attempting GRF shift " << shiftGRF << "." << std::endl;
     Eigen::MatrixXs shiftedGRFTrial = originalGRFTrial;
     for (int t = 0; t < shiftedGRFTrial.cols(); t++)
     {
@@ -11892,7 +11897,6 @@ bool DynamicsFitter::timeSyncTrialGRF(
     s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     for (int i = 0; i < iterationsPerShift; i++)
     {
-
       auto output = zeroLinearResidualsAndOptimizeAngular(
           init,
           trial,
@@ -11906,14 +11910,15 @@ bool DynamicsFitter::timeSyncTrialGRF(
           regularizeAngularResiduals,
           regularizeCopDriftCompensation,
           maxBuckets,
-          50,
+          500,
           false,
           false);
       previousTotalResidual = output.second;
-      std::cout << "DEBUG previousTotalResidual: " << previousTotalResidual << std::endl;
 
       if (!output.first)
       {
+        std::cout << "Minimizing residuals for shift " << shiftGRF << " failed."
+                  << "Aborting..." << std::endl;
         residualMinimizationSuccess = false;
         break;
       }
@@ -12046,14 +12051,16 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   multimassZeroLinearResidualsOnCOMTrajectory(init);
 
   // Attempt to time sync the GRFs relative to the coordinate data.
-  bool timeSyncSuccess;
+  bool timeSyncSuccess = true;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     timeSyncSuccess = timeSyncTrialGRF(
-        init, trial, useReactionWheels, maxShiftGRF, iterationsPerShift);
-
-    if (!timeSyncSuccess)
-      return false;
+        init,
+        trial,
+        useReactionWheels,
+        maxShiftGRF,
+        iterationsPerShift);
+    if (!timeSyncSuccess) return false;
   }
 
   // Reset the pose trials now that we've found the GRF data, and start again
@@ -12084,7 +12091,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   bool residualMinimizationSuccess = true;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    int iterations = useReactionWheels ? 1 : 100;
+    int iterations = useReactionWheels ? 1 : 50;
     s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     for (int i = 0; i < iterations; i++)
     {
