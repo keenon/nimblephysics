@@ -35,8 +35,6 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
-#include "Joint.hpp"
-
 namespace py = pybind11;
 
 namespace dart {
@@ -68,10 +66,7 @@ void setWingingAxisDirection(s_t radians);
 
 s_t getWingingAxisDirection();
 */
-  ::py::class_<
-      dart::dynamics::ScapulathoracicJoint,
-      dart::dynamics::GenericJoint<dart::math::R4Space>,
-      std::shared_ptr<dart::dynamics::ScapulathoracicJoint>>(
+  ::py::class_<dart::dynamics::ScapulathoracicJoint, dart::dynamics::GenericJoint<dart::math::R4Space>>(
       m, "ScapulothoracicJoint")
       .def(
           "getType",

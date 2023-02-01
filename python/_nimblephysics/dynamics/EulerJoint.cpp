@@ -59,17 +59,14 @@ void EulerJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::EulerJoint::Properties,
-      dart::dynamics::GenericJoint<math::R3Space>::Properties,
       dart::dynamics::EulerJoint::UniqueProperties>(m, "EulerJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R3Space>::Properties&>(),
+          ::py::init<const dart::dynamics::EulerJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R3Space>::Properties&,
+              const dart::dynamics::EulerJoint::Properties&,
               const dart::dynamics::EulerJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"))
@@ -84,8 +81,8 @@ void EulerJoint(py::module& m)
       dart::common::EmbedPropertiesOnTopOf<
           dart::dynamics::EulerJoint,
           dart::dynamics::detail::EulerJointUniqueProperties,
-          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>,
-      std::shared_ptr<dart::dynamics::EulerJoint>>(m, "EulerJoint")
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>>(
+      m, "EulerJoint")
       /*
       .def(
           "hasEulerJointAspect",

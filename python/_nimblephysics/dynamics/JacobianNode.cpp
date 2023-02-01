@@ -43,11 +43,8 @@ namespace python {
 
 void JacobianNode(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::JacobianNode,
-      dart::dynamics::Frame,
-      dart::dynamics::Node,
-      std::shared_ptr<dart::dynamics::JacobianNode>>(m, "JacobianNode")
+  ::py::class_<dart::dynamics::JacobianNode, dart::dynamics::Frame>(
+      m, "JacobianNode")
       .def(
           "dependsOn",
           +[](const dart::dynamics::JacobianNode* self,

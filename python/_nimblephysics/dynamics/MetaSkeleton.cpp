@@ -96,13 +96,13 @@ void MetaSkeleton(
           +[](dart::dynamics::MetaSkeleton* self, std::size_t index)
               -> dart::dynamics::BodyNode* { return self->getBodyNode(index); },
           ::py::arg("index"),
-          py::return_value_policy::reference)
+          py::return_value_policy::reference_internal)
       .def(
           "getBodyNode",
           +[](dart::dynamics::MetaSkeleton* self, const std::string& name)
               -> dart::dynamics::BodyNode* { return self->getBodyNode(name); },
           ::py::arg("treeIndex"),
-          py::return_value_policy::reference)
+          py::return_value_policy::reference_internal)
       .def(
           "getBodyNodes",
           +[](dart::dynamics::MetaSkeleton* self, const std::string& name)

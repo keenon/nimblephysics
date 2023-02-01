@@ -815,7 +815,8 @@ void Skeleton(
       .def(
           "getBodyForMesh",
           &dart::dynamics::Skeleton::getBodyForMesh,
-          ::py::arg("meshFileName"))
+          ::py::arg("meshFileName"),
+          ::py::return_value_policy::reference_internal)
       .def(
           "getTransformFromMeshToParentBody",
           &dart::dynamics::Skeleton::getTransformFromMeshToParentBody,

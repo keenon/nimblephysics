@@ -35,6 +35,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
+#include "dart/dynamics/Joint.hpp"
+
 #include "Joint.hpp"
 
 namespace py = pybind11;
@@ -56,17 +58,14 @@ void PlanarJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::PlanarJoint::Properties,
-      dart::dynamics::GenericJoint<math::R3Space>::Properties,
       dart::dynamics::PlanarJoint::UniqueProperties>(m, "PlanarJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R3Space>::Properties&>(),
+          ::py::init<const dart::dynamics::PlanarJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R3Space>::Properties&,
+              const dart::dynamics::PlanarJoint::Properties&,
               const dart::dynamics::PlanarJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"))
@@ -90,8 +89,8 @@ void PlanarJoint(py::module& m)
       dart::common::EmbedPropertiesOnTopOf<
           dart::dynamics::PlanarJoint,
           dart::dynamics::detail::PlanarJointUniqueProperties,
-          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>,
-      std::shared_ptr<dart::dynamics::PlanarJoint>>(m, "PlanarJoint")
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<3>>>>(
+      m, "PlanarJoint")
       /*
       .def(
           "hasPlanarJointAspect",

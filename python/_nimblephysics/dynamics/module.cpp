@@ -46,17 +46,10 @@ namespace python {
 
 void Shape(py::module& sm);
 
-void Entity(
-    py::module& sm,
-    ::py::class_<
-        dart::dynamics::Entity,
-        std::shared_ptr<dart::dynamics::Entity>>& entity);
+void Entity(py::module& sm, ::py::class_<dart::dynamics::Entity>& entity);
 void Frame(
     py::module& sm,
-    ::py::class_<
-        dart::dynamics::Frame,
-        dart::dynamics::Entity,
-        std::shared_ptr<dart::dynamics::Frame>>& frame);
+    ::py::class_<dart::dynamics::Frame, dart::dynamics::Entity>& frame);
 void ShapeFrame(py::module& sm);
 void SimpleFrame(py::module& sm);
 
@@ -72,28 +65,19 @@ void BodyNode(
         bodyNodeAspectProps,
     ::py::class_<dart::dynamics::BodyNode::Properties>& bodyNodeProps,
     ::py::class_<
-        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-        dart::dynamics::JacobianNode,
-        std::shared_ptr<
-            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>>>&
-        templatedJacobianBodyNode,
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>&
+            templatedJacobianBodyNode,
     ::py::class_<
         dart::dynamics::BodyNode,
         dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-        dart::dynamics::Frame,
-        std::shared_ptr<dart::dynamics::BodyNode>>& bodyNode);
+        dart::dynamics::Frame>& bodyNode);
 void Inertia(py::module& sm);
 
 void Joint(
     py::module& sm,
     ::py::class_<dart::dynamics::detail::JointProperties>& jointProps,
-    ::py::class_<
-        dart::dynamics::Joint,
-        dart::common::Subject,
-        dart::common::EmbedProperties<
-            dart::dynamics::Joint,
-            dart::dynamics::detail::JointProperties>,
-        std::shared_ptr<dart::dynamics::Joint>>& joint);
+    ::py::class_<dart::dynamics::Joint>& joint);
 void ZeroDofJoint(py::module& sm);
 void WeldJoint(py::module& sm);
 void GenericJoint(py::module& sm);
@@ -133,13 +117,9 @@ void dart_dynamics(py::module& m)
   Shape(sm);
 
   //////////////////////////////////////////////////////////////////////////////////
-  auto entity = ::py::
-      class_<dart::dynamics::Entity, std::shared_ptr<dart::dynamics::Entity>>(
-          sm, "Entity");
-  auto frame = ::py::class_<
-      dart::dynamics::Frame,
-      dart::dynamics::Entity,
-      std::shared_ptr<dart::dynamics::Frame>>(sm, "Frame");
+  auto entity = ::py::class_<dart::dynamics::Entity>(sm, "Entity");
+  auto frame = ::py::class_<dart::dynamics::Frame, dart::dynamics::Entity>(
+      sm, "Frame");
   //////////////////////////////////////////////////////////////////////////////////
 
   Entity(sm, entity);
@@ -168,51 +148,7 @@ void dart_dynamics(py::module& m)
   auto jointProps = ::py::class_<dart::dynamics::detail::JointProperties>(
       sm, "JointProperties");
 
-  ::py::class_<
-      dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      dart::common::Composite,
-      std::shared_ptr<dart::common::SpecializedForAspect<
-          dart::common::EmbeddedPropertiesAspect<
-              dart::dynamics::Joint,
-              dart::dynamics::detail::JointProperties>>>>(
-      sm, "SpecializedForAspect_EmbeddedPropertiesAspect_Joint_JointProperties")
-      .def(::py::init<>());
-
-  ::py::class_<
-      dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      dart::common::SpecializedForAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      std::shared_ptr<
-          dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-              dart::dynamics::Joint,
-              dart::dynamics::detail::JointProperties>>>>(
-      sm, "RequiresAspect_EmbeddedPropertiesAspect_Joint_JointProperties")
-      .def(::py::init<>());
-
-  ::py::class_<
-      dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>,
-      dart::common::RequiresAspect<dart::common::EmbeddedPropertiesAspect<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>,
-      std::shared_ptr<dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>>>(
-      sm, "EmbedProperties_Joint_JointProperties");
-
-  auto joint = ::py::class_<
-      dart::dynamics::Joint,
-      dart::common::Subject,
-      dart::common::EmbedProperties<
-          dart::dynamics::Joint,
-          dart::dynamics::detail::JointProperties>,
-      std::shared_ptr<dart::dynamics::Joint>>(sm, "Joint");
+  auto joint = ::py::class_<dart::dynamics::Joint>(sm, "Joint");
 
   auto bodyNodeAspectProps
       = ::py::class_<dart::dynamics::detail::BodyNodeAspectProperties>(
@@ -221,18 +157,13 @@ void dart_dynamics(py::module& m)
   auto bodyNodeProps = ::py::class_<dart::dynamics::BodyNode::Properties>(
       sm, "BodyNodeProperties");
 
-  auto templatedJacobianBodyNode = ::py::class_<
-      dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-      dart::dynamics::JacobianNode,
-      std::shared_ptr<
-          dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>>>(
-      sm, "TemplatedJacobianBodyNode");
-
-  auto bodyNode = ::py::class_<
-      dart::dynamics::BodyNode,
-      dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
-      dart::dynamics::Frame,
-      std::shared_ptr<dynamics::BodyNode>>(sm, "BodyNode");
+    auto templatedJacobianBodyNode = ::py::class_<
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>(sm, "TemplatedJacobianBodyNode");
+    auto bodyNode = ::py::class_<
+        dart::dynamics::BodyNode,
+        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+        dart::dynamics::Frame>(sm, "BodyNode");
   /////////////////////////////////////////////////////////////////////////////////
 
   DegreeOfFreedom(sm);
@@ -257,12 +188,7 @@ void dart_dynamics(py::module& m)
   TranslationalJoint(sm);
   FreeJoint(sm);
 
-  BodyNode(
-      sm,
-      bodyNodeAspectProps,
-      bodyNodeProps,
-      templatedJacobianBodyNode,
-      bodyNode);
+  BodyNode(sm, bodyNodeAspectProps, bodyNodeProps, templatedJacobianBodyNode, bodyNode);
 
   MetaSkeleton(sm, metaSkeleton);
   ReferentialSkeleton(sm);

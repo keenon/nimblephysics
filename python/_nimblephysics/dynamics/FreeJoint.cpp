@@ -43,20 +43,13 @@ namespace python {
 
 void FreeJoint(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::FreeJoint::Properties,
-      dart::dynamics::GenericJoint<math::SE3Space>::Properties>(
-      m, "FreeJointProperties")
+  ::py::class_<dart::dynamics::FreeJoint::Properties>(m, "FreeJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::SE3Space>::Properties&>(),
+          ::py::init<const dart::dynamics::FreeJoint::Properties&>(),
           ::py::arg("properties"));
 
-  ::py::class_<
-      dart::dynamics::FreeJoint,
-      dart::dynamics::GenericJoint<dart::math::SE3Space>,
-      std::shared_ptr<dart::dynamics::FreeJoint>>(m, "FreeJoint")
+  ::py::class_<dart::dynamics::FreeJoint, dart::dynamics::GenericJoint<dart::math::SE3Space>>(m, "FreeJoint")
       .def(
           "getFreeJointProperties",
           +[](const dart::dynamics::FreeJoint* self)

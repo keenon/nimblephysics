@@ -43,11 +43,8 @@ namespace python {
 
 void SimpleFrame(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::SimpleFrame,
-      dart::dynamics::ShapeFrame,
-      dart::dynamics::Detachable,
-      std::shared_ptr<dart::dynamics::SimpleFrame> >(m, "SimpleFrame")
+  ::py::class_<dart::dynamics::SimpleFrame, dart::dynamics::ShapeFrame>(
+      m, "SimpleFrame")
       .def(::py::init<>())
       .def(::py::init<dart::dynamics::Frame*>(), ::py::arg("refFrame"))
       .def(

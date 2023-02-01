@@ -35,6 +35,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
+#include "dart/dynamics/Joint.hpp"
+
 #include "Joint.hpp"
 
 namespace py = pybind11;
@@ -55,17 +57,14 @@ void ScrewJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::ScrewJoint::Properties,
-      dart::dynamics::GenericJoint<math::R1Space>::Properties,
       dart::dynamics::ScrewJoint::UniqueProperties>(m, "ScrewJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R1Space>::Properties&>(),
+          ::py::init<const dart::dynamics::ScrewJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R1Space>::Properties&,
+              const dart::dynamics::ScrewJoint::Properties&,
               const dart::dynamics::ScrewJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("revoluteProperties"))
@@ -82,8 +81,8 @@ void ScrewJoint(py::module& m)
       dart::common::EmbedPropertiesOnTopOf<
           dart::dynamics::ScrewJoint,
           dart::dynamics::detail::ScrewJointUniqueProperties,
-          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>,
-      std::shared_ptr<dart::dynamics::ScrewJoint>>(m, "ScrewJoint")
+          dart::dynamics::GenericJoint<dart::math::RealVectorSpace<1>>>>(
+      m, "ScrewJoint")
       /*
       .def(
           "hasScrewJointAspect",

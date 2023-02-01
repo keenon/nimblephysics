@@ -48,8 +48,8 @@ SubjectOnDisk::SubjectOnDisk(
   }
 
   struct FileHeader header;
-  fread(&header, sizeof(struct FileHeader), 1, file);
-  if (header.magic != 424242)
+  int read_items = fread(&header, sizeof(struct FileHeader), 1, file);
+  if (header.magic != 424242 || read_items != 1)
   {
     std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
               << path << ": bad header.magic = " << header.magic << std::endl;
@@ -69,23 +69,24 @@ SubjectOnDisk::SubjectOnDisk(
 
   // Read the href
   int32_t hrefLen;
-  fread(&hrefLen, sizeof(int32_t), 1, file);
-  if (hrefLen < 0 || hrefLen > 2000)
+  read_items = fread(&hrefLen, sizeof(int32_t), 1, file);
+  if (hrefLen < 0 || hrefLen > 2000 || read_items != 1)
   {
     std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
               << path << ": bad string len for href = " << hrefLen << std::endl;
     throw new std::exception();
   }
   char* hrefRaw = (char*)malloc(sizeof(char) * (hrefLen + 1));
-  fread(hrefRaw, sizeof(char), hrefLen, file);
+  read_items = fread(hrefRaw, sizeof(char), hrefLen, file);
+  (void)read_items;
   hrefRaw[hrefLen] = 0;
   mHref = std::string(hrefRaw);
   free(hrefRaw);
 
   // Read the notes
   int32_t notesLen;
-  fread(&notesLen, sizeof(int32_t), 1, file);
-  if (notesLen < 0 || notesLen > 100000)
+  read_items = fread(&notesLen, sizeof(int32_t), 1, file);
+  if (notesLen < 0 || notesLen > 100000 || read_items != 1)
   {
     std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
               << path << ": bad string len for notes = " << notesLen
@@ -93,7 +94,8 @@ SubjectOnDisk::SubjectOnDisk(
     throw new std::exception();
   }
   char* notesRaw = (char*)malloc(sizeof(char) * (notesLen + 1));
-  fread(notesRaw, sizeof(char), notesLen, file);
+  read_items = fread(notesRaw, sizeof(char), notesLen, file);
+  (void)read_items;
   notesRaw[notesLen] = 0;
   mNotes = std::string(notesRaw);
   free(notesRaw);
@@ -102,8 +104,8 @@ SubjectOnDisk::SubjectOnDisk(
   for (int i = 0; i < mNumTrials; i++)
   {
     int32_t len;
-    fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 255)
+    read_items = fread(&len, sizeof(int32_t), 1, file);
+    if (len < 0 || len > 255 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -112,7 +114,14 @@ SubjectOnDisk::SubjectOnDisk(
       throw new std::exception();
     }
     char* rawTrialName = (char*)malloc(sizeof(char) * (len + 1));
-    fread(rawTrialName, sizeof(char), len, file);
+    read_items = fread(rawTrialName, sizeof(char), len, file);
+    if (read_items != len) {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << path << ": bad string len for trial [" << i << "] name = " << len
+          << ". Only read " << read_items << "/" << len << " chars" << std::endl;
+      throw new std::exception();
+    }
     rawTrialName[len] = 0;
     std::string trialName(rawTrialName);
     mTrialNames.push_back(trialName);
@@ -128,8 +137,8 @@ SubjectOnDisk::SubjectOnDisk(
   for (int i = 0; i < numContactBodies; i++)
   {
     int32_t len;
-    fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 255)
+    read_items = fread(&len, sizeof(int32_t), 1, file);
+    if (len < 0 || len > 255 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -138,7 +147,8 @@ SubjectOnDisk::SubjectOnDisk(
       throw new std::exception();
     }
     char* body = (char*)malloc(sizeof(char) * (len + 1));
-    fread(body, sizeof(char), len, file);
+    read_items = fread(body, sizeof(char), len, file);
+    (void)read_items;
     body[len] = 0;
     std::string bodyName(body);
     mGroundContactBodies.push_back(bodyName);
@@ -155,8 +165,8 @@ SubjectOnDisk::SubjectOnDisk(
   for (int i = 0; i < numCustomValues; i++)
   {
     int32_t dataLen;
-    fread(&dataLen, sizeof(int32_t), 1, file);
-    if (dataLen < 0 || dataLen > 100000)
+    read_items = fread(&dataLen, sizeof(int32_t), 1, file);
+    if (dataLen < 0 || dataLen > 100000 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -166,8 +176,8 @@ SubjectOnDisk::SubjectOnDisk(
     }
     customValuesTotalDim += dataLen;
     int32_t strLen;
-    fread(&strLen, sizeof(int32_t), 1, file);
-    if (strLen < 0 || strLen > 512)
+    read_items = fread(&strLen, sizeof(int32_t), 1, file);
+    if (strLen < 0 || strLen > 512 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -176,7 +186,8 @@ SubjectOnDisk::SubjectOnDisk(
       throw new std::exception();
     }
     char* custom = (char*)malloc(sizeof(char) * (strLen + 1));
-    fread(custom, sizeof(char), strLen, file);
+    read_items = fread(custom, sizeof(char), strLen, file);
+    (void)read_items;
     custom[strLen] = 0;
     std::string customValue(custom);
     mCustomValues.push_back(customValue);
@@ -193,8 +204,8 @@ SubjectOnDisk::SubjectOnDisk(
   for (int i = 0; i < mNumTrials; i++)
   {
     int32_t len;
-    fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 10000000)
+    read_items = fread(&len, sizeof(int32_t), 1, file);
+    if (len < 0 || len > 10000000 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -213,7 +224,15 @@ SubjectOnDisk::SubjectOnDisk(
   for (int i = 0; i < mNumTrials; i++)
   {
     double timestep;
-    fread(&timestep, sizeof(double), 1, file);
+    read_items = fread(&timestep, sizeof(double), 1, file);
+    if (read_items != 1)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << path << ": trial timesteps suddenly reached EOF" << std::endl;
+      throw new std::exception();
+    }
+    (void)read_items;
     if (printDebuggingDetails)
     {
       std::cout << "Read trial " << i << " timestep = " << timestep
@@ -227,8 +246,8 @@ SubjectOnDisk::SubjectOnDisk(
   {
     // Read a magic header, to make sure we don't get lost
     int32_t magic;
-    fread(&magic, sizeof(int32_t), 1, file);
-    if (magic != 424242)
+    read_items = fread(&magic, sizeof(int32_t), 1, file);
+    if (magic != 424242 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -241,14 +260,28 @@ SubjectOnDisk::SubjectOnDisk(
     for (int t = 0; t < mTrialLength[i]; t++)
     {
       int8_t b;
-      fread(&b, sizeof(int8_t), 1, file);
+      read_items = fread(&b, sizeof(int8_t), 1, file);
+      if (read_items != 1)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << path << ": probablyMissingGRF section suddenly reached EOF" << std::endl;
+        throw new std::exception();
+      }
       probablyMissingGRF.push_back(b);
     }
     mProbablyMissingGRF.push_back(probablyMissingGRF);
   }
 
   int32_t modelLen;
-  fread(&modelLen, sizeof(int32_t), 1, file);
+  read_items = fread(&modelLen, sizeof(int32_t), 1, file);
+  if (read_items != 1)
+  {
+    std::cout
+        << "SubjectOnDisk attempting to read a corrupted binary file at "
+        << path << ": model length section suddenly reached EOF" << std::endl;
+    throw new std::exception();
+  }
   mModelLength = modelLen;
   mModelSectionStart = ftell(file);
   mDataSectionStart = mModelSectionStart + modelLen;
@@ -279,7 +312,14 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 
   fseek(file, mModelSectionStart, SEEK_SET);
   char* rawOsimContents = (char*)malloc(sizeof(char) * (mModelLength + 1));
-  fread(rawOsimContents, sizeof(char), mModelLength, file);
+  int read_items = fread(rawOsimContents, sizeof(char), mModelLength, file);
+  if (read_items != mModelLength)
+  {
+    std::cout
+        << "SubjectOnDisk attempting to read a corrupted binary file at "
+        << mPath << ": model file text contained unexpected EOF" << std::endl;
+    throw new std::exception();
+  }
   rawOsimContents[mModelLength - 1] = 0;
   tinyxml2::XMLDocument osimFile;
   osimFile.Parse(rawOsimContents);
@@ -333,11 +373,13 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
 
   fseek(file, mDataSectionStart + (mFrameSize * linearFrameStart), SEEK_SET);
 
+  int read_items;
+
   for (int i = 0; i < numFramesToRead; i++)
   {
     int32_t magic;
-    fread(&magic, sizeof(int32_t), 1, file);
-    if (magic != 424242)
+    read_items = fread(&magic, sizeof(int32_t), 1, file);
+    if (magic != 424242 || read_items != 1)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
@@ -357,50 +399,113 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     frame->vel = Eigen::VectorXd(mNumDofs);
     frame->acc = Eigen::VectorXd(mNumDofs);
     frame->tau = Eigen::VectorXd(mNumDofs);
-    fread(frame->pos.data(), sizeof(float64_t), mNumDofs, file);
-    fread(frame->vel.data(), sizeof(float64_t), mNumDofs, file);
-    fread(frame->acc.data(), sizeof(float64_t), mNumDofs, file);
-    fread(frame->tau.data(), sizeof(float64_t), mNumDofs, file);
+    read_items = fread(frame->pos.data(), sizeof(float64_t), mNumDofs, file);
+    if (read_items != mNumDofs)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+      throw new std::exception();
+    }
+    read_items = fread(frame->vel.data(), sizeof(float64_t), mNumDofs, file);
+    if (read_items != mNumDofs)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+      throw new std::exception();
+    }
+    read_items = fread(frame->acc.data(), sizeof(float64_t), mNumDofs, file);
+    if (read_items != mNumDofs)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+      throw new std::exception();
+    }
+    read_items = fread(frame->tau.data(), sizeof(float64_t), mNumDofs, file);
+    if (read_items != mNumDofs)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+      throw new std::exception();
+    }
 
     for (int b = 0; b < mGroundContactBodies.size(); b++)
     {
       frame->groundContactWrenches.emplace_back(
           mGroundContactBodies[b], Eigen::Vector6d());
-      fread(
+      read_items = fread(
           frame->groundContactWrenches[b].second.data(),
           sizeof(float64_t),
           6,
           file);
+      if (read_items != 6)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+        throw new std::exception();
+      }
     }
     for (int b = 0; b < mGroundContactBodies.size(); b++)
     {
       frame->groundContactCenterOfPressure.emplace_back(
           mGroundContactBodies[b], Eigen::Vector3d());
-      fread(
+      read_items = fread(
           frame->groundContactCenterOfPressure[b].second.data(),
           sizeof(float64_t),
           3,
           file);
+      if (read_items != 3)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+        throw new std::exception();
+      }
       frame->groundContactTorque.emplace_back(
           mGroundContactBodies[b], Eigen::Vector3d());
-      fread(
+      read_items = fread(
           frame->groundContactTorque[b].second.data(),
           sizeof(float64_t),
           3,
           file);
+      if (read_items != 3)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+        throw new std::exception();
+      }
       frame->groundContactForce.emplace_back(
           mGroundContactBodies[b], Eigen::Vector3d());
-      fread(
+      read_items = fread(
           frame->groundContactForce[b].second.data(),
           sizeof(float64_t),
           3,
           file);
+      if (read_items != 3)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+        throw new std::exception();
+      }
     }
     for (int b = 0; b < mCustomValues.size(); b++)
     {
       int len = mCustomValueLengths[b];
       frame->customValues.emplace_back(mCustomValues[b], Eigen::VectorXd(len));
-      fread(frame->customValues[b].second.data(), sizeof(float64_t), len, file);
+      read_items = fread(frame->customValues[b].second.data(), sizeof(float64_t), len, file);
+      if (read_items != len)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
+        throw new std::exception();
+      }
     }
   }
 
