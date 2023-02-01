@@ -11533,7 +11533,6 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
   }
 
-
   std::cout << "Attempting to zero linear and minimize angular. Initial avg. "
                "residuals: "
             << totalResidual << std::endl;
@@ -12086,6 +12085,10 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
       = init->forcePlateTrials;
   std::vector<Eigen::MatrixXs> originalRegularizePosesTo
       = init->regularizePosesTo;
+  std::vector<Eigen::MatrixXs> originalGRFTrials = init->grfTrials;
+  auto originalForcePlatesAssignedToContactBody =
+      init->forcePlatesAssignedToContactBody;
+  auto originalProbablyMissingGRF = init->probablyMissingGRF;
 
   // Get rid of the rest of the angular residuals
   bool residualMinimizationSuccess = true;
@@ -12132,10 +12135,17 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   // TODO make trial-specific.
   if (!residualMinimizationSuccess)
   {
+    std::cout << "Residual moment minimization failed. Restoring results to "
+              << "linear center-of-mass trajectory fit."
+              << std::endl;
     init->reactionWheels = originalReactionWheels;
     init->forcePlateTrials = originalForcePlateTrials;
     init->poseTrials = originalPoseTrials;
     init->regularizePosesTo = originalRegularizePosesTo;
+    init->grfTrials = originalGRFTrials;
+    init->forcePlatesAssignedToContactBody =
+        originalForcePlatesAssignedToContactBody;
+    init->probablyMissingGRF = originalProbablyMissingGRF;
     return false;
   }
 
