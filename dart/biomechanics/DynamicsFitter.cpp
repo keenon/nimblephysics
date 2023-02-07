@@ -11506,25 +11506,29 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     return {false, totalResidual};
   }
 
-  // If the residuals seem to be increasing rapidly, abort.
+  // If the residuals are large and seem to be increasing rapidly, abort.
   if (!std::isinf(previousTotalResidual))
   {
     s_t deltaTotalResidual = totalResidual - previousTotalResidual;
     s_t percentDeltaTotalResidual
         = std::abs(deltaTotalResidual / previousTotalResidual);
 
-    int iterationThreshold = 2;
+    int iterationThreshold = 10;
+    double residualThreshold = 1e3;
     if (deltaTotalResidual > 0 &&
         iteration > iterationThreshold &&
-        percentDeltaTotalResidual > 0.25)
+        totalResidual > residualThreshold)
     {
-      std::cout << "Residuals increasing after " << (iterationThreshold + 1)
+      std::cout << "Residuals still increasing after "
+                << (iterationThreshold + 1)
                 << " iterations. Aborting..." << std::endl;
       return {false, totalResidual};
     }
 
     double percentThreshold = 10.0;
-    if (deltaTotalResidual > 0 && percentDeltaTotalResidual > percentThreshold)
+    if (deltaTotalResidual > 0 &&
+        percentDeltaTotalResidual > percentThreshold &&
+        totalResidual > residualThreshold)
     {
       std::cout << "Residuals increased greater than "
                 << (percentThreshold * 100) << "% "
