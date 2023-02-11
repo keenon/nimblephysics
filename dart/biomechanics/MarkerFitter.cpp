@@ -785,6 +785,42 @@ MarkerFitter::MarkerFitter(
 }
 
 //==============================================================================
+/// This is a copy constructor
+MarkerFitter::MarkerFitter(const MarkerFitter& toCopy)
+  : mSkeleton(toCopy.mSkeleton->cloneSkeleton()),
+    mAnthropometrics(nullptr),
+    mAnthropometricWeight(toCopy.mAnthropometricWeight),
+    mInitialIKSatisfactoryLoss(toCopy.mInitialIKSatisfactoryLoss),
+    mInitialIKMaxRestarts(toCopy.mInitialIKMaxRestarts),
+    mDebugLoss(toCopy.mDebugLoss),
+    mIgnoreJointLimits(toCopy.mIgnoreJointLimits),
+    mMaxMarkerOffset(toCopy.mMaxMarkerOffset),
+    mMinVarianceCutoff(toCopy.mMinVarianceCutoff),
+    mMinSphereFitScore(toCopy.mMinSphereFitScore),
+    mMinAxisFitScore(toCopy.mMinAxisFitScore),
+    mMaxJointWeight(toCopy.mMaxJointWeight),
+    mMaxAxisWeight(toCopy.mMaxAxisWeight),
+    mDebugJointVariability(toCopy.mDebugJointVariability),
+    mRegularizeTrackingMarkerOffsets(toCopy.mRegularizeTrackingMarkerOffsets),
+    mRegularizeAnatomicalMarkerOffsets(
+        toCopy.mRegularizeAnatomicalMarkerOffsets),
+    mRegularizeIndividualBodyScales(toCopy.mRegularizeIndividualBodyScales),
+    mRegularizeAllBodyScales(toCopy.mRegularizeAllBodyScales),
+    mRegularizeJointBounds(toCopy.mRegularizeJointBounds),
+    mTolerance(toCopy.mTolerance),
+    mIterationLimit(toCopy.mIterationLimit),
+    mLBFGSHistoryLength(toCopy.mLBFGSHistoryLength),
+    mJointFitSGDIterations(toCopy.mJointFitSGDIterations),
+    mCheckDerivatives(toCopy.mCheckDerivatives),
+    mPrintFrequency(toCopy.mPrintFrequency),
+    mSilenceOutput(toCopy.mSilenceOutput),
+    mDisableLinesearch(toCopy.mDisableLinesearch),
+    mAnatomicalMarkerDefaultWeight(toCopy.mAnatomicalMarkerDefaultWeight),
+    mTrackingMarkerDefaultWeight(toCopy.mTrackingMarkerDefaultWeight)
+{
+}
+
+//==============================================================================
 /// This just checks if there are enough markers in the data with the names
 /// expected by the model. Returns true if there are enough, and false
 /// otherwise.
@@ -1105,15 +1141,30 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
   // downsampling or not
   if (needToDownsample)
   {
-    // 3. Sort the trials by the amount of joint variability in each one
+    // The MarkerFitter is not threadsafe, so we'll make a copy for each thread
+    // we intend to run. Since we're parallelizing per-trial, we'll make one
+    // copy per trial.
+    std::vector<MarkerFitter> threadFitters;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      threadFitters.emplace_back(*this);
+    }
 
+    // 3. Sort the trials by the amount of joint variability in each one
     // 3.1. First, get the joint inits for all the trials, since we need to be
     // able to sort clips by joint variability
+    std::vector<std::future<MarkerInitialization>> jointInitFutures;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      jointInitFutures.push_back(std::async([&]() {
+        return threadFitters[i].runJointsPipeline(
+            markerObservationTrials[i], params);
+      }));
+    }
     std::vector<MarkerInitialization> jointInits;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      jointInits.push_back(
-          runJointsPipeline(markerObservationTrials[i], params));
+      jointInits.push_back(jointInitFutures[i].get());
     }
 
     // 3.2. Sort the trials by the amount of joint variability in each one
@@ -1203,50 +1254,55 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
               << std::endl;
 
     // 7. Use the scaling from overallInit to do IK on each skeleton
+    std::vector<std::future<MarkerInitialization>> separateInitsFutures;
+    for (int i = 0; i < markerObservationTrials.size(); i++)
+    {
+      separateInitsFutures.push_back(std::async([&]() {
+        std::cout << "## IK on trial " << i << "/"
+                  << markerObservationTrials.size() << std::endl;
+
+        if (trialSampledAtIndex[i] != -1)
+        {
+          int cursor = trialSampledAtIndex[i];
+          int size = markerObservationTrials[i].size();
+          jointInits[i].groupScales = overallInit.groupScales;
+          jointInits[i].markerOffsets = overallInit.markerOffsets;
+          jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
+          jointInits[i].joints = overallInit.joints;
+          jointInits[i].jointMarkerVariability
+              = overallInit.jointMarkerVariability;
+          jointInits[i].jointsAdjacentMarkers
+              = overallInit.jointsAdjacentMarkers;
+          jointInits[i].jointLoss = overallInit.jointLoss;
+          jointInits[i].jointWeights = overallInit.jointWeights;
+          jointInits[i].axisWeights = overallInit.axisWeights;
+          jointInits[i].axisLoss = overallInit.axisLoss;
+          jointInits[i].poses = overallInit.poses.block(
+              0, cursor, overallInit.poses.rows(), size);
+          jointInits[i].poseScores
+              = overallInit.poseScores.segment(cursor, size);
+          jointInits[i].jointCenters = overallInit.jointCenters.block(
+              0, cursor, overallInit.jointCenters.rows(), size);
+          jointInits[i].jointAxis = overallInit.jointAxis.block(
+              0, cursor, overallInit.jointAxis.rows(), size);
+          return jointInits[i];
+        }
+        else
+        {
+          return threadFitters[i].runPrescaledPipeline(
+              markerObservationTrials[i],
+              InitialMarkerFitParams(params)
+                  .setGroupScales(overallInit.groupScales)
+                  .setMarkerOffsets(overallInit.markerOffsets));
+        }
+      }));
+    }
     std::vector<MarkerInitialization> separateInits;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      std::cout << "## IK on trial " << i << "/"
-                << markerObservationTrials.size() << std::endl;
-
-      if (trialSampledAtIndex[i] != -1)
-      {
-        int cursor = trialSampledAtIndex[i];
-        int size = markerObservationTrials[i].size();
-        jointInits[i].groupScales = overallInit.groupScales;
-        jointInits[i].markerOffsets = overallInit.markerOffsets;
-        jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
-        jointInits[i].joints = overallInit.joints;
-        jointInits[i].jointMarkerVariability
-            = overallInit.jointMarkerVariability;
-        jointInits[i].jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
-        jointInits[i].jointLoss = overallInit.jointLoss;
-        jointInits[i].jointWeights = overallInit.jointWeights;
-        jointInits[i].axisWeights = overallInit.axisWeights;
-        jointInits[i].axisLoss = overallInit.axisLoss;
-        jointInits[i].poses = overallInit.poses.block(
-            0, cursor, overallInit.poses.rows(), size);
-        jointInits[i].poseScores = overallInit.poseScores.segment(cursor, size);
-        jointInits[i].jointCenters = overallInit.jointCenters.block(
-            0, cursor, overallInit.jointCenters.rows(), size);
-        jointInits[i].jointAxis = overallInit.jointAxis.block(
-            0, cursor, overallInit.jointAxis.rows(), size);
-        separateInits.push_back(jointInits[i]);
-      }
-      else
-      {
-        separateInits.push_back(runPrescaledPipeline(
-            markerObservationTrials[i],
-            InitialMarkerFitParams(params)
-                .setGroupScales(overallInit.groupScales)
-                .setMarkerOffsets(overallInit.markerOffsets)));
-        // separateInits.push_back(fineTuneIK(
-        //     markerObservationTrials[i],
-        //     params.numBlocks,
-        //     params.markerWeights,
-        //     jointInits[i]));
-      }
+      separateInits.push_back(separateInitsFutures[i].get());
     }
+
     std::cout << "Finished IKs" << std::endl;
     return separateInits;
   }

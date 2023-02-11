@@ -336,6 +336,9 @@ public:
       dynamics::MarkerMap markers,
       bool ignoreVirtualJointCenterMarkers = false);
 
+  /// This is a copy constructor
+  MarkerFitter(const MarkerFitter& toCopy);
+
   /// This just checks if there are enough markers in the data with the names
   /// expected by the model. Returns true if there are enough, and false
   /// otherwise.
