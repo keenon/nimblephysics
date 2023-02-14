@@ -5664,6 +5664,38 @@ TEST(MarkerFitter, BUG1)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, MICHAEL_PERFORMANCE_TEST)
+{
+  std::vector<std::string> c3dFiles;
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN101.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN102.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN103.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN104.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN105.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN106.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN107.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN108.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN109.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN110.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN111.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN112.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN113.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN114.c3d");
+  c3dFiles.push_back("dart://sample/osim/MichaelTest4/C3D/S02DN115.c3d");
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  runEngine(
+      "dart://sample/osim/MichaelTest3/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      59,
+      1.72,
+      "female");
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, BUG2)
 {
   // CustomJoint "Abdjnt" has a funny 5-DOF structure, which breaks a the loader

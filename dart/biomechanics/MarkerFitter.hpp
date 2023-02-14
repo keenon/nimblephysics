@@ -748,6 +748,11 @@ public:
   /// This sets the maximum number of restarts allowed for the initial IK solver
   void setInitialIKMaxRestarts(int restarts);
 
+  /// If true, this processes "single threaded" IK tasks 32 timesteps at a time
+  /// (a "warp"), in parallel, using the first timestep of the warp as the
+  /// initialization for the whole warp. Defaults to false.
+  void setParallelIKWarps(bool parallelWarps);
+
   /// This gives us a configuration option to ignore the joint limits in the
   /// uploaded model, and then set them after the fit.
   void setIgnoreJointLimits(bool ignore);
@@ -977,6 +982,8 @@ protected:
   int mInitialIKMaxRestarts;
   bool mIgnoreJointLimits;
   s_t mMaxMarkerOffset;
+  bool mUseParallelIKWarps;
+
   // Parameters for joint weighting
   s_t mMinVarianceCutoff;
   s_t mMinSphereFitScore;
