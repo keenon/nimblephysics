@@ -234,6 +234,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setInitialIKMaxRestarts,
           ::py::arg("starts"))
       .def(
+          "setParallelIKWarps",
+          &dart::biomechanics::MarkerFitter::setParallelIKWarps,
+          ::py::arg("parallelWarps"),
+          R"pydoc(If True, this processes "single threaded" IK tasks 32 timesteps at a time
+            (a "warp"), in parallel, using the first timestep of the warp as the
+            initialization for the whole warp. Defaults to False.
+          )pydoc")
+      .def(
           "setMaxMarkerOffset",
           &dart::biomechanics::MarkerFitter::setMaxMarkerOffset,
           ::py::arg("offset"))

@@ -551,6 +551,7 @@ MarkerFitter::MarkerFitter(
     mLBFGSHistoryLength(8),
     mJointFitSGDIterations(500),
     mCheckDerivatives(false),
+    mUseParallelIKWarps(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
     mDisableLinesearch(false),
@@ -4646,9 +4647,7 @@ void MarkerFitter::fitTrajectory(
     assert(result.rows() == skeleton->getNumDofs());
     assert(result.cols() == markerObservations.size());
 
-    bool useMultithreading = true;
-
-    if (useMultithreading)
+    if (fitter->mUseParallelIKWarps)
     {
       int numThreads = 32;
       int numWarps = ceil((s_t)markerObservations.size() / numThreads);
@@ -6747,6 +6746,12 @@ void MarkerFitter::setLBFGSHistory(int hist)
 void MarkerFitter::setCheckDerivatives(bool checkDerivatives)
 {
   mCheckDerivatives = checkDerivatives;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+void MarkerFitter::setParallelIKWarps(bool parallelWarps)
+{
+  mUseParallelIKWarps = parallelWarps;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
