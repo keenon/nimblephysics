@@ -55,6 +55,9 @@ RUN git clone https://github.com/pybind/pybind11.git && \
 # Install pytest
 RUN ${PYTHON} -m pip install pytest
 RUN ${PYTHON} -m pip install auditwheel
+RUN ${PYTHON} -m pip install pybind11-stubgen
+RUN ${PYTHON} -m pip install patchelf
+RUN ${PYTHON} -m pip install numpy
 RUN git clone https://github.com/keenon/diffdart
 RUN cd diffdart
 
