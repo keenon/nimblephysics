@@ -2100,7 +2100,7 @@ OpenSimTRC OpenSimParser::loadTRC(
     int frames = result.timestamps.size();
     s_t elapsed = result.timestamps[result.timestamps.size() - 1]
                   - result.timestamps[0];
-    result.framesPerSecond = (int)round(frames / elapsed);
+    result.framesPerSecond = roundToNearestMultiple(frames / elapsed, 10);
   }
 
   return result;
@@ -3035,7 +3035,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   {
     int frames = timestamps.size();
     s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
-    int framesPerSecond = (int)round((double)frames / elapsed);
+    int framesPerSecond = roundToNearestMultiple((double)frames / elapsed, 10);
     if (framesPerSecond < targetFramesPerSecond)
     {
       std::cout << "WARNING!!! OpenSimParser is trying to load "
