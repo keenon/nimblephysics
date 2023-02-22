@@ -10723,7 +10723,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         Eigen::VectorXs b = trialOriginalGravityOffsets[trial];
 
         Eigen::MatrixXs AFixedMass = A.block(0, 0, A.rows(), A.cols() - 1);
-        Eigen::VectorXs bFixedMass = A.col(A.cols() - 1) * (1 / foundMass);
+        Eigen::VectorXs bFixedMass = A.col(A.cols() - 1) * (1.0 / foundMass);
         bFixedMass.segment(0, b.size()) += b;
 
         Eigen::VectorXs desired = Eigen::VectorXs::Zero(bFixedMass.size());
