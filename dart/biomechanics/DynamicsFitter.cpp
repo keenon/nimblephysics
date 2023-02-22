@@ -10254,6 +10254,7 @@ void DynamicsFitter::moveComsToMinimizeAngularResiduals(
 // the current kinematic fit.
 void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init,
+    int maxTrialsToSolveMassOver,
     bool detectExternalForce,
     int driftCorrectionBlurRadius,
     int driftCorrectionBlurInterval)
@@ -10277,6 +10278,10 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 #ifndef NDEBUG
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 #endif
+
+  int numTrials = init->poseTrials.size();
+  int numTrialsToSolveMassOver = numTrials < maxTrialsToSolveMassOver ?
+          numTrials : maxTrialsToSolveMassOver;
 
   std::vector<std::vector<Eigen::Vector3s>> trialGRFs;
   std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
@@ -10340,8 +10345,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::vector<Eigen::VectorXs> trialOriginalPositions;
     std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
 
-    const int maxTrajectoriesToSolveMassOver = 1;
-
     int totalSampledColsWithoutMass = 0;
     int totalSampledRows = 0;
 
@@ -10391,11 +10394,14 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
       // This has one col each for start COM positions, start COM velocities,
       // and total mass. It outputs the physically consistent X, Y, Z
-      // coordinates of COM over time, given those inputs.
+      // coordinates of COM over time, given those inputs. Additionally, there
+      // are columns to account for small force plate rotation errors (3 angles
+      // per force plate) and for instantaneous COM velocities at time steps with
+      // missing ground reaction force data.
       Eigen::MatrixXs trialLinearMapToPositions = Eigen::MatrixXs::Zero(
           numTimesteps * 3 + (numForcePlates * 3) + (numMissingSteps * 3),
           6 + (numForcePlates * 3) + (numMissingSteps * 3) + 1);
-      if (i < maxTrajectoriesToSolveMassOver)
+      if (i < maxTrialsToSolveMassOver)
       {
         totalSampledColsWithoutMass += trialLinearMapToPositions.cols() - 1;
         totalSampledRows += trialLinearMapToPositions.rows();
@@ -10579,7 +10585,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       trialOriginalPositions.push_back(originalCOMPositions);
       trialOriginalGravityOffsets.push_back(comGravityOffset);
     }
-    int numTrials = trialLinearMaps.size();
 
     std::cout << "Assembling the unified linear COM trajectory map across "
               << numTrials << " trials" << std::endl;
@@ -10589,7 +10594,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     // trial separate, but collapses each trial's mass quantity into a single
     // column, so that we can solve them together for a single unified
     // skeleton mass that is least-squares best across all the trials at once.
-
     Eigen::MatrixXs unifiedLinearMap = Eigen::MatrixXs::Zero(
         totalSampledRows, totalSampledColsWithoutMass + 1);
     Eigen::VectorXs unifiedPositions = Eigen::VectorXs::Zero(totalSampledRows);
@@ -10600,8 +10604,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     int colCursor = 0;
     int massCol = unifiedLinearMap.cols() - 1;
     for (int trial = 0;
-         trial < numTrials && trial < maxTrajectoriesToSolveMassOver;
-         trial++)
+         trial < numTrials && trial < maxTrialsToSolveMassOver; trial++)
     {
       int trialTimestepRows = trialOriginalPositions[trial].size();
       int trialRows = trialLinearMaps[trial].rows();
@@ -10622,8 +10625,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     }
     assert(colCursor == totalSampledColsWithoutMass);
 
-    std::cout << "Solving linear COM trajectory map: size="
-              << unifiedLinearMap.rows() << "x" << unifiedLinearMap.cols()
+    std::cout << "Solving unified linear COM trajectory map: size = "
+              << unifiedLinearMap.rows() << " x " << unifiedLinearMap.cols()
               << std::endl;
 
     // Now that we've formulated our problem, we can attempt to solve:
@@ -10633,7 +10636,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(200);
+    solver.setMaxIterations(200 * numTrialsToSolveMassOver);
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -10696,7 +10699,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     rowCursor = 0;
     for (int trial = 0; trial < numTrials; trial++)
     {
-      if (trial < maxTrajectoriesToSolveMassOver)
+      if (trial < maxTrialsToSolveMassOver)
       {
         int trialCols = trialLinearMaps[trial].cols();
         int trialRows = trialLinearMaps[trial].rows();
@@ -10724,8 +10727,9 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         bFixedMass.segment(0, b.size()) += b;
 
         Eigen::VectorXs desired = Eigen::VectorXs::Zero(bFixedMass.size());
-        desired.segment(0, trialOriginalPositions[trial].size())
-            += trialOriginalPositions[trial];
+        desired.segment(0, trialOriginalPositions[trial].size()) +=
+            trialOriginalPositions[trial];
+        desired -= bFixedMass;
 
         // Old version, direct solve:
         // Eigen::VectorXs localResult
@@ -10734,8 +10738,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         solver.setTolerance(1e-9);
         solver.setMaxIterations(200);
         solver.compute(AFixedMass);
-        Eigen::VectorXs localResult
-            = solver.solve(unifiedPositions - unifiedGravityOffset);
+        Eigen::VectorXs localResult = solver.solve(desired);
         Eigen::VectorXs recoveredTrajectory
             = AFixedMass * localResult + bFixedMass;
 
@@ -11030,7 +11033,9 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 // least `boundPush` distance away from their bounds. This makes subsequent
 // interior-point optimizations converge more quickly.
 void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
-    std::shared_ptr<DynamicsInitialization> init, s_t boundPush)
+    std::shared_ptr<DynamicsInitialization> init,
+    int maxTrialsToSolveMassOver,
+    s_t boundPush)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -11339,7 +11344,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
         std::cout << "Above regularization boundary. Falling back to a "
                      "linear solve (holding link masses constant)."
                   << std::endl;
-        zeroLinearResidualsOnCOMTrajectory(init);
+        zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
         return;
       }
       continue;
@@ -12026,8 +12031,10 @@ bool DynamicsFitter::timeSyncTrialGRF(
 bool DynamicsFitter::timeSyncAndInitializePipeline(
     std::shared_ptr<DynamicsInitialization> init,
     bool useReactionWheels,
+    bool shiftGRF,
     int maxShiftGRF,
     int iterationsPerShift,
+    int maxTrialsToSolveMassOver,
     s_t weightLinear,
     s_t weightAngular,
     s_t regularizeLinearResiduals,
@@ -12044,26 +12051,26 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     originalPoseTrials.push_back(init->poseTrials[i]);
   }
   // First detect external force
-  zeroLinearResidualsOnCOMTrajectory(init);
+  zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
 
   // Now reset positions and re-run with multi-mass
   for (int i = 0; i < init->poseTrials.size(); i++)
   {
     init->poseTrials[i] = originalPoseTrials[i];
   }
-  multimassZeroLinearResidualsOnCOMTrajectory(init);
+  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
 
   // Attempt to time sync the GRFs relative to the coordinate data.
-  bool timeSyncSuccess = true;
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  if (shiftGRF)
   {
-    timeSyncSuccess = timeSyncTrialGRF(
-        init,
-        trial,
-        useReactionWheels,
-        maxShiftGRF,
-        iterationsPerShift);
-    if (!timeSyncSuccess) return false;
+    bool timeSyncSuccess = true;
+    for (int trial = 0; trial < init->poseTrials.size(); trial++)
+    {
+      timeSyncSuccess = timeSyncTrialGRF(
+          init, trial, useReactionWheels, maxShiftGRF, iterationsPerShift);
+      if (!timeSyncSuccess)
+        return false;
+    }
   }
 
   // Reset the pose trials now that we've found the GRF data, and start again
@@ -12072,7 +12079,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     init->poseTrials[trial] = originalPoseTrials[trial];
   }
   // Re-find the link masses, with updated GRF offsets
-  multimassZeroLinearResidualsOnCOMTrajectory(init);
+  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
   init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
 
   // If we're using reaction wheels, we're accepting that you can't get this

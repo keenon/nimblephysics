@@ -1353,6 +1353,7 @@ public:
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
+      int maxTrialsToSolveMassOver = 4,
       bool detectExternalForce = true,
       int driftCorrectionBlurRadius = 250,
       int driftCorrectionBlurInterval = 250);
@@ -1365,7 +1366,9 @@ public:
   // least `boundPush` distance away from their bounds. This makes subsequent
   // interior-point optimizations converge more quickly.
   void multimassZeroLinearResidualsOnCOMTrajectory(
-      std::shared_ptr<DynamicsInitialization> init, s_t boundPush = 0.01);
+      std::shared_ptr<DynamicsInitialization> init,
+      int maxTrialsToSolveMassOver = 4,
+      s_t boundPush = 0.01);
 
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
@@ -1412,8 +1415,10 @@ public:
   bool timeSyncAndInitializePipeline(
       std::shared_ptr<DynamicsInitialization> init,
       bool useReactionWheels = false,
+      bool shiftGRF = false,
       int maxShiftGRF = 4,
       int iterationsPerShift = 20,
+      int maxTrialsToSolveMassOver = 4,
       s_t weightLinear = 1.0,
       s_t weightAngular = 0.5,
       s_t regularizeLinearResiduals = 0.1,

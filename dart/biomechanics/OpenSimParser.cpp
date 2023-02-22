@@ -104,6 +104,14 @@ std::string to_string(double d)
   return ss.str();
 }
 
+// https://www.geeksforgeeks.org/round-the-given-number-to-nearest-multiple-of-10/
+int roundToNearestMultiple(int n, int multiple)
+{
+    int a = (n / multiple) * multiple;
+    int b = a + multiple;
+    return (n - a > b - n) ? b : a;
+}
+
 //==============================================================================
 OpenSimFile::OpenSimFile(
     dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
@@ -2092,7 +2100,7 @@ OpenSimTRC OpenSimParser::loadTRC(
     int frames = result.timestamps.size();
     s_t elapsed = result.timestamps[result.timestamps.size() - 1]
                   - result.timestamps[0];
-    result.framesPerSecond = (int)round(frames / elapsed);
+    result.framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
   }
 
   return result;
@@ -3027,7 +3035,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   {
     int frames = timestamps.size();
     s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
-    int framesPerSecond = (int)round((double)frames / elapsed);
+    int framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
     if (framesPerSecond < targetFramesPerSecond)
     {
       std::cout << "WARNING!!! OpenSimParser is trying to load "
