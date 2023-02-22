@@ -1355,7 +1355,8 @@ public:
       std::shared_ptr<DynamicsInitialization> init,
       bool detectExternalForce = true,
       int driftCorrectionBlurRadius = 250,
-      int driftCorrectionBlurInterval = 250);
+      int driftCorrectionBlurInterval = 250,
+      int maxTrialsToSolveMassOver = 4);
 
   // 1. Adjust the total mass of the body and the individual link masses for
   // each body, and change the initial positions and velocities of the body to

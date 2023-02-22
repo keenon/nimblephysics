@@ -6283,7 +6283,7 @@ TEST(DynamicsFitter, OPENCAP_SCALING)
 }
 #endif
 
-//#ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, KirstenTest)
 {
   std::vector<std::string> motFiles;
@@ -6302,6 +6302,39 @@ TEST(DynamicsFitter, KirstenTest)
 
   runEngine(
       "dart://sample/osim/KirstenTest/final.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+#endif
+
+//#ifdef ALL_TESTS
+TEST(DynamicsFitter, HamnerMultipleTrials)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  std::string prefix = "dart://sample/osim/HamnerMultipleTrials/";
+  trcFiles.push_back(prefix + "run200.trc");
+  trcFiles.push_back(prefix + "run300.trc");
+  grfFiles.push_back(prefix + "run200_grf.mot");
+  grfFiles.push_back(prefix + "run300_grf.mot");
+  motFiles.push_back(prefix + "run200_ik.mot");
+  motFiles.push_back(prefix + "run300_ik.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/osim/HamnerMultipleTrials/final.osim",
       footNames,
       motFiles,
       c3dFiles,

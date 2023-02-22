@@ -557,7 +557,8 @@ protected:
           ::py::arg("init"),
           ::py::arg("detectExternalForce") = true,
           ::py::arg("driftCorrectionBlurRadius") = 250,
-          ::py::arg("driftCorrectionBlurInterval") = 250)
+          ::py::arg("driftCorrectionBlurInterval") = 250,
+          ::py::arg("maxTrialsToSolveMassOver") = 4)
       .def(
           "multimassZeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
