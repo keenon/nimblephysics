@@ -1353,10 +1353,10 @@ public:
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
+      int maxTrialsToSolveMassOver,
       bool detectExternalForce = true,
       int driftCorrectionBlurRadius = 250,
-      int driftCorrectionBlurInterval = 250,
-      int maxTrialsToSolveMassOver = 4);
+      int driftCorrectionBlurInterval = 250);
 
   // 1. Adjust the total mass of the body and the individual link masses for
   // each body, and change the initial positions and velocities of the body to
@@ -1366,7 +1366,9 @@ public:
   // least `boundPush` distance away from their bounds. This makes subsequent
   // interior-point optimizations converge more quickly.
   void multimassZeroLinearResidualsOnCOMTrajectory(
-      std::shared_ptr<DynamicsInitialization> init, s_t boundPush = 0.01);
+      std::shared_ptr<DynamicsInitialization> init,
+      int maxTrialsToSolveMassOver,
+      s_t boundPush = 0.01);
 
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
@@ -1413,6 +1415,7 @@ public:
   bool timeSyncAndInitializePipeline(
       std::shared_ptr<DynamicsInitialization> init,
       bool useReactionWheels = false,
+      bool shiftGRFs = false,
       int maxShiftGRF = 4,
       int iterationsPerShift = 20,
       s_t weightLinear = 1.0,
@@ -1423,7 +1426,8 @@ public:
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
-      s_t avgAngularChangeThreshold = 0.15);
+      s_t avgAngularChangeThreshold = 0.15,
+      int maxTrialsToSolveMassOver = 4);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external

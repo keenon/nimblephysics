@@ -6313,7 +6313,7 @@ TEST(DynamicsFitter, KirstenTest)
 }
 #endif
 
-//#ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, HamnerMultipleTrials)
 {
   std::vector<std::string> motFiles;
@@ -6344,7 +6344,7 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
       0,
       true);
 }
-//#endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
