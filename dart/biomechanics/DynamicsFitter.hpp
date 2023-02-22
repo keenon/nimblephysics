@@ -1418,6 +1418,7 @@ public:
       bool shiftGRFs = false,
       int maxShiftGRF = 4,
       int iterationsPerShift = 20,
+      int maxTrialsToSolveMassOver = 4,
       s_t weightLinear = 1.0,
       s_t weightAngular = 0.5,
       s_t regularizeLinearResiduals = 0.1,
@@ -1426,8 +1427,7 @@ public:
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
-      s_t avgAngularChangeThreshold = 0.15,
-      int maxTrialsToSolveMassOver = 4);
+      s_t avgAngularChangeThreshold = 0.15);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external

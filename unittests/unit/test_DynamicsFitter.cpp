@@ -2699,7 +2699,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::string modelPath,
     std::vector<std::string> trialNames,
     bool useReactionWheels = false,
-    bool saveGUI = false)
+    bool saveGUI = false,
+    int maxTrialsToSolveMassOver = 4)
 {
   // Have very loose bounds for scaling
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
@@ -2765,7 +2766,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   }
   */
 
-  fitter.timeSyncAndInitializePipeline(init, useReactionWheels);
+  bool shiftGRFs = false;
+  int maxShiftGRF = 4;
+  int iterationsPerShift = 20;
+  fitter.timeSyncAndInitializePipeline(init, useReactionWheels, shiftGRFs,
+                                       maxShiftGRF, iterationsPerShift,
+                                       maxTrialsToSolveMassOver);
 
   /*
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
@@ -3361,7 +3367,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     int trialStartOffset = 0,
     bool useReactionWheels = false,
     bool saveGUI = false,
-    bool simplify = false)
+    bool simplify = false,
+    int maxTrialsToSolveMassOver = 4)
 {
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
@@ -3419,7 +3426,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         modelPath,
         trialNames,
         useReactionWheels,
-        saveGUI);
+        saveGUI,
+        maxTrialsToSolveMassOver);
   }
   else
   {
@@ -3429,7 +3437,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         modelPath,
         trialNames,
         useReactionWheels,
-        saveGUI);
+        saveGUI,
+        maxTrialsToSolveMassOver);
   }
 }
 
@@ -3747,7 +3756,8 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
     int limitTrialSizes = -1,
     int trialStartOffset = 0,
     bool saveGUI = false,
-    bool simplify = false)
+    bool simplify = false,
+    int maxTrialsToSolveMassOver = 4)
 {
   std::vector<C3D> c3ds;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
@@ -3882,11 +3892,13 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
         = DynamicsFitter::retargetInitialization(
             standard.skeleton, simplified, init);
     return runEngine(
-        simplified, simplifiedInit, modelPath, trialNames, saveGUI);
+        simplified, simplifiedInit, modelPath, trialNames, saveGUI,
+        maxTrialsToSolveMassOver);
   }
   else
   {
-    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI);
+    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI,
+                     maxTrialsToSolveMassOver);
   }
 }
 
@@ -6313,7 +6325,7 @@ TEST(DynamicsFitter, KirstenTest)
 }
 #endif
 
-#ifdef ALL_TESTS
+//#ifdef ALL_TESTS
 TEST(DynamicsFitter, HamnerMultipleTrials)
 {
   std::vector<std::string> motFiles;
@@ -6333,6 +6345,7 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
   footNames.push_back("calcn_r");
   footNames.push_back("calcn_l");
 
+  int maxTrialsToSolveMassOver = 1;
   runEngine(
       "dart://sample/osim/HamnerMultipleTrials/final.osim",
       footNames,
@@ -6342,9 +6355,12 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
       grfFiles,
       -1,
       0,
-      true);
+      false,
+      false,
+      false,
+      maxTrialsToSolveMassOver);
 }
-#endif
+//#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)

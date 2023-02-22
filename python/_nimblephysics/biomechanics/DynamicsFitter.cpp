@@ -609,6 +609,7 @@ protected:
           ::py::arg("shiftGRFs") = false,
           ::py::arg("maxShiftGRF") = 4,
           ::py::arg("iterationsPerShift") = 20,
+          ::py::arg("maxTrialsToSolveMassOver") = 4,
           ::py::arg("weightLinear") = 1.0,
           ::py::arg("weightAngular") = 0.5,
           ::py::arg("regularizeLinearResiduals") = 0.1,
@@ -617,8 +618,7 @@ protected:
           ::py::arg("maxBuckets") = 100,
           ::py::arg("detectUnmeasuredTorque") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
-          ::py::arg("avgAngularChangeThreshold") = 0.15,
-          ::py::arg("maxTrialsToSolveMassOver") = 4)
+          ::py::arg("avgAngularChangeThreshold") = 0.15)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::

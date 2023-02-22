@@ -12035,6 +12035,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     bool shiftGRFs,
     int maxShiftGRF,
     int iterationsPerShift,
+    int maxTrialsToSolveMassOver,
     s_t weightLinear,
     s_t weightAngular,
     s_t regularizeLinearResiduals,
@@ -12043,8 +12044,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     int maxBuckets,
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
-    s_t avgAngularChangeThreshold,
-    int maxTrialsToSolveMassOver)
+    s_t avgAngularChangeThreshold)
 {
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   for (int i = 0; i < init->poseTrials.size(); i++)
