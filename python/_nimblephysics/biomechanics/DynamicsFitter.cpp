@@ -555,7 +555,7 @@ protected:
           &dart::biomechanics::DynamicsFitter::
               zeroLinearResidualsOnCOMTrajectory,
           ::py::arg("init"),
-          ::py::arg("maxTrialsToSolveMassOver"),
+          ::py::arg("maxTrialsToSolveMassOver") = 4,
           ::py::arg("detectExternalForce") = true,
           ::py::arg("driftCorrectionBlurRadius") = 250,
           ::py::arg("driftCorrectionBlurInterval") = 250)
@@ -564,7 +564,7 @@ protected:
           &dart::biomechanics::DynamicsFitter::
               multimassZeroLinearResidualsOnCOMTrajectory,
           ::py::arg("init"),
-          ::py::arg("maxTrialsToSolveMassOver"),
+          ::py::arg("maxTrialsToSolveMassOver") = 4,
           ::py::arg("boundPush") = 0.01)
       .def(
           "zeroLinearResidualsAndOptimizeAngular",

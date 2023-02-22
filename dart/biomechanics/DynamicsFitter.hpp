@@ -1353,7 +1353,7 @@ public:
   // the current kinematic fit.
   void zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
-      int maxTrialsToSolveMassOver,
+      int maxTrialsToSolveMassOver = 4,
       bool detectExternalForce = true,
       int driftCorrectionBlurRadius = 250,
       int driftCorrectionBlurInterval = 250);
@@ -1367,7 +1367,7 @@ public:
   // interior-point optimizations converge more quickly.
   void multimassZeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
-      int maxTrialsToSolveMassOver,
+      int maxTrialsToSolveMassOver = 4,
       s_t boundPush = 0.01);
 
   // 1. Change the initial positions and velocities of the body to achieve a

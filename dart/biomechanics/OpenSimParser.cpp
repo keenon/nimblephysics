@@ -109,7 +109,7 @@ int roundToNearestMultiple(int n, int multiple)
 {
     int a = (n / multiple) * multiple;
     int b = a + multiple;
-    return (n - a > b - n)? b : a;
+    return (n - a > b - n) ? b : a;
 }
 
 //==============================================================================
@@ -2100,7 +2100,7 @@ OpenSimTRC OpenSimParser::loadTRC(
     int frames = result.timestamps.size();
     s_t elapsed = result.timestamps[result.timestamps.size() - 1]
                   - result.timestamps[0];
-    result.framesPerSecond = roundToNearestMultiple(frames / elapsed, 10);
+    result.framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
   }
 
   return result;
@@ -3035,7 +3035,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   {
     int frames = timestamps.size();
     s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
-    int framesPerSecond = roundToNearestMultiple((double)frames / elapsed, 10);
+    int framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
     if (framesPerSecond < targetFramesPerSecond)
     {
       std::cout << "WARNING!!! OpenSimParser is trying to load "
