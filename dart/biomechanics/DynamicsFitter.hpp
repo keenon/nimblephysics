@@ -1415,7 +1415,7 @@ public:
   bool timeSyncAndInitializePipeline(
       std::shared_ptr<DynamicsInitialization> init,
       bool useReactionWheels = false,
-      bool shiftGRFs = false,
+      bool shiftGRF = false,
       int maxShiftGRF = 4,
       int iterationsPerShift = 20,
       int maxTrialsToSolveMassOver = 4,

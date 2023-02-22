@@ -12032,7 +12032,7 @@ bool DynamicsFitter::timeSyncTrialGRF(
 bool DynamicsFitter::timeSyncAndInitializePipeline(
     std::shared_ptr<DynamicsInitialization> init,
     bool useReactionWheels,
-    bool shiftGRFs,
+    bool shiftGRF,
     int maxShiftGRF,
     int iterationsPerShift,
     int maxTrialsToSolveMassOver,
@@ -12062,7 +12062,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
 
   // Attempt to time sync the GRFs relative to the coordinate data.
-  if (shiftGRFs)
+  if (shiftGRF)
   {
     bool timeSyncSuccess = true;
     for (int trial = 0; trial < init->poseTrials.size(); trial++)

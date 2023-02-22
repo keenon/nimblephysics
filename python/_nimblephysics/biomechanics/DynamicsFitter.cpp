@@ -606,7 +606,7 @@ protected:
           &dart::biomechanics::DynamicsFitter::timeSyncAndInitializePipeline,
           ::py::arg("init"),
           ::py::arg("useReactionWheels") = false,
-          ::py::arg("shiftGRFs") = false,
+          ::py::arg("shiftGRF") = false,
           ::py::arg("maxShiftGRF") = 4,
           ::py::arg("iterationsPerShift") = 20,
           ::py::arg("maxTrialsToSolveMassOver") = 4,

@@ -2766,10 +2766,10 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   }
   */
 
-  bool shiftGRFs = false;
+  bool shiftGRF = false;
   int maxShiftGRF = 4;
   int iterationsPerShift = 20;
-  fitter.timeSyncAndInitializePipeline(init, useReactionWheels, shiftGRFs,
+  fitter.timeSyncAndInitializePipeline(init, useReactionWheels, shiftGRF,
                                        maxShiftGRF, iterationsPerShift,
                                        maxTrialsToSolveMassOver);
 
