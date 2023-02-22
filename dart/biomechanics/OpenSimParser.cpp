@@ -104,6 +104,14 @@ std::string to_string(double d)
   return ss.str();
 }
 
+// https://www.geeksforgeeks.org/round-the-given-number-to-nearest-multiple-of-10/
+int roundToNearestMultiple(int n, int multiple)
+{
+    int a = (n / multiple) * multiple;
+    int b = a + multiple;
+    return (n - a > b - n)? b : a;
+}
+
 //==============================================================================
 OpenSimFile::OpenSimFile(
     dynamics::SkeletonPtr skeleton, dynamics::MarkerMap markersMap)
