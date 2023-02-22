@@ -11799,7 +11799,6 @@ bool DynamicsFitter::timeSyncTrialGRF(
     s_t regularizeCopDriftCompensation,
     int maxBuckets)
 {
-  return true;
   Eigen::MatrixXs originalGRFTrial = init->grfTrials[trial];
   Eigen::MatrixXs originalPoseTrial = init->poseTrials[trial];
 
