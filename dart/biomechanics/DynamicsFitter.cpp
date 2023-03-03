@@ -15227,9 +15227,9 @@ void DynamicsFitter::writeCSVData(
     if (timestamps.size() == init->poseTrials[trial].cols()) {
       useTimestamps = true;
     } else {
-      std::cout << "writeCSVData -- WARNING: The timestamps vector does not "
+      std::cout << "WARNING, writeCSVData: The timestamps vector does not "
                 << "match the number of row in the trajectory. Using a generic "
-                << "time column."
+                << "time column instead..."
                 << std::endl;
     }
   }
