@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-//#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -3115,7 +3115,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         "Generated in test_DynamicsFitter");
 
     fitter.writeCSVData(
-        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex);
+        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex,
+        false);
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
         init,
@@ -4915,6 +4916,67 @@ TEST(DynamicsFitter, FIT_PROBLEM_GRAD_SPATIAL_ACC_REG)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, FIT_PROBLEM_GRAD_JOINT_ACC_REG)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/Subject4/IK/walking1_ik.mot");
+  trcFiles.push_back("dart://sample/grf/Subject4/MarkerData/walking1.trc");
+  grfFiles.push_back("dart://sample/grf/Subject4/ID/walking1_grf.mot");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Subject4/Models/"
+      "optimized_scale_and_markers.osim");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      20);
+
+  DynamicsFitProblemConfig config(standard.skeleton);
+  config.setRegularizeJointAcc(1);
+
+  config.setIncludeBodyScales(true);
+  config.setIncludeCOMs(true);
+  config.setIncludeInertias(true);
+  config.setIncludeMarkerOffsets(true);
+  config.setIncludeMasses(true);
+  config.setIncludePoses(true);
+
+  DynamicsFitProblem problem(
+      init, standard.skeleton, standard.trackingMarkers, config);
+
+  std::cout << "Problem dim: " << problem.getProblemSize() << std::endl;
+
+  Eigen::VectorXs x = problem.flatten();
+  Eigen::VectorXs analytical = problem.computeGradient(x);
+  Eigen::VectorXs fd = problem.finiteDifferenceGradient(x);
+
+  bool result = problem.debugErrors(fd, analytical, 1e-6);
+  if (result)
+  {
+    std::cout << "Gradient of DynamicsFitProblem linear Newton not equal!"
+              << std::endl;
+    EXPECT_FALSE(result);
+    return;
+  }
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, FIT_PROBLEM_GRAD_MARKERS_L2)
 {
   std::vector<std::string> motFiles;
@@ -6325,7 +6387,7 @@ TEST(DynamicsFitter, KirstenTest)
 }
 #endif
 
-//#ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, HamnerMultipleTrials)
 {
   std::vector<std::string> motFiles;
@@ -6360,7 +6422,7 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
       false,
       maxTrialsToSolveMassOver);
 }
-//#endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)

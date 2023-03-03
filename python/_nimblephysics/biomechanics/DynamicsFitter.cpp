@@ -758,7 +758,8 @@ protected:
           ::py::arg("path"),
           ::py::arg("init"),
           ::py::arg("trialIndex"),
-          ::py::arg("useAdjustedGRFs") = false)
+          ::py::arg("useAdjustedGRFs") = false,
+          ::py::arg("timestamps") = ::py::list())
       .def(
           "writeSubjectOnDisk",
           &dart::biomechanics::DynamicsFitter::writeSubjectOnDisk,

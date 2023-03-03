@@ -5200,6 +5200,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   s_t markerRMS = 0.0;
   s_t poseRegularization = 0.0;
   s_t accRegularization = 0.0;
+  s_t jointAccRegularization = 0.0;
   s_t jointRMS = 0.0;
   s_t axisRMS = 0.0;
   int markerCount = 0;
@@ -5253,6 +5254,14 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
                          mConfig.mRegularizeAccUseL1);
           accRegularization += cost;
           assert(!isnan(accRegularization));
+        }
+        if (mConfig.mRegularizeJointAcc > 0)
+        {
+          jointAccRegularization +=
+              mConfig.mRegularizeJointAcc *
+              (1.0 / totalAccTimesteps) *
+              block.acc.col(t).squaredNorm();
+          assert(!isnan(jointAccRegularization));
         }
       }
 
@@ -5319,6 +5328,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   sum += linearNewtonError;
   sum += residualRMS;
   sum += accRegularization;
+  sum += jointAccRegularization;
   markerRMS *= mConfig.mMarkerWeight;
   if (markerCount > 0)
   {
@@ -5356,6 +5366,7 @@ struct LossExplanation
   s_t markerRMS;
   s_t poseRegularization;
   s_t accRegularization;
+  s_t jointAccRegularization;
   s_t jointRMS;
   s_t axisRMS;
   int markerCount;
@@ -5484,6 +5495,7 @@ s_t DynamicsFitProblem::computeLossParallel(
     threadLoss.markerRMS = 0.0;
     threadLoss.poseRegularization = 0.0;
     threadLoss.accRegularization = 0.0;
+    threadLoss.jointAccRegularization = 0.0;
     threadLoss.jointRMS = 0.0;
     threadLoss.axisRMS = 0.0;
     threadLoss.markerCount = 0;
@@ -5562,6 +5574,14 @@ s_t DynamicsFitProblem::computeLossParallel(
                                    mConfig.mRegularizeAccUseL1);
               threadLoss.accRegularization += cost;
               assert(!isnan(threadLoss.accRegularization));
+            }
+            if (mConfig.mRegularizeJointAcc > 0)
+            {
+              threadLoss.jointAccRegularization +=
+                  mConfig.mRegularizeJointAcc *
+                  (1.0 / totalAccTimesteps) *
+                  block.acc.col(t).squaredNorm();
+              assert(!isnan(threadLoss.jointAccRegularization));
             }
           }
 
@@ -5642,6 +5662,7 @@ s_t DynamicsFitProblem::computeLossParallel(
   s_t markerRMS = 0.0;
   s_t poseRegularization = 0.0;
   s_t accRegularization = 0.0;
+  s_t jointAccRegularization = 0.0;
   s_t jointRMS = 0.0;
   s_t axisRMS = 0.0;
   int markerCount = 0;
@@ -5652,6 +5673,8 @@ s_t DynamicsFitProblem::computeLossParallel(
     markerRMS += threadLossExplanations[threadIdx].markerRMS;
     poseRegularization += threadLossExplanations[threadIdx].poseRegularization;
     accRegularization += threadLossExplanations[threadIdx].accRegularization;
+    jointAccRegularization +=
+        threadLossExplanations[threadIdx].jointAccRegularization;
     jointRMS += threadLossExplanations[threadIdx].jointRMS;
     axisRMS += threadLossExplanations[threadIdx].axisRMS;
     markerCount += threadLossExplanations[threadIdx].markerCount;
@@ -5660,6 +5683,7 @@ s_t DynamicsFitProblem::computeLossParallel(
   sum += linearNewtonError;
   sum += residualRMS;
   sum += accRegularization;
+  sum += jointAccRegularization;
   markerRMS *= mConfig.mMarkerWeight;
   if (markerCount > 0)
   {
@@ -6252,6 +6276,12 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
                          mConfig.mRegularizeAccBodyWeights,
                          neural::WithRespectTo::ACCELERATION,
                          mConfig.mRegularizeAccUseL1);
+            }
+            if (mConfig.mRegularizeJointAcc > 0)
+            {
+              accGrad += mConfig.mRegularizeJointAcc *
+                         (2.0 / totalAccTimesteps) *
+                         block.acc.col(t);
             }
           }
 
@@ -6970,6 +7000,13 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
                                        mConfig.mRegularizeAccBodyWeights,
                                        neural::WithRespectTo::ACCELERATION,
                                        mConfig.mRegularizeAccUseL1);
+                }
+                if (mConfig.mRegularizeJointAcc > 0)
+                {
+                  accGrad +=
+                      mConfig.mRegularizeJointAcc *
+                      (2.0 / totalAccTimesteps) *
+                      block.acc.col(t);
                 }
               }
 
@@ -7922,6 +7959,7 @@ DynamicsFitProblemConfig::DynamicsFitProblemConfig(
     mRegularizeAccBodyWeights(
         Eigen::VectorXs::Ones(skeleton->getNumBodyNodes())),
     mRegularizeAccUseL1(false),
+    mRegularizeJointAcc(0.0),
     mRegularizeMasses(0.0),
     mRegularizeCOMs(0.0),
     mRegularizeInertias(0.0),
@@ -7987,6 +8025,7 @@ DynamicsFitProblemConfig& DynamicsFitProblemConfig::setDefaults(bool l1)
   mResidualTorqueMultiple = 2.0;
   mRegularizeAcc = 0;
   mRegularizeAccUseL1 = false;
+  mRegularizeJointAcc = 0;
   mRegularizeMasses = 1.0;
   mRegularizeCOMs = 1.0;
   mRegularizeInertias = 1.0;
@@ -8183,6 +8222,14 @@ DynamicsFitProblemConfig&
 DynamicsFitProblemConfig::setRegularizeSpatialAccUseL1(bool l1)
 {
   mRegularizeAccUseL1 = l1;
+  return *(this);
+}
+
+//==============================================================================
+DynamicsFitProblemConfig&
+DynamicsFitProblemConfig::setRegularizeJointAcc(s_t value)
+{
+  mRegularizeJointAcc = value;
   return *(this);
 }
 
@@ -15122,7 +15169,8 @@ void DynamicsFitter::writeCSVData(
     std::string path,
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
-    bool useAdjustedGRFs)
+    bool useAdjustedGRFs,
+    std::vector<double> timestamps)
 {
   // time, pos, vel, acc, [contact] * feet, [cop, wrench] * feet
   std::ofstream csvFile;
@@ -15174,31 +15222,51 @@ void DynamicsFitter::writeCSVData(
   (void)init;
   (void)trial;
 
-  s_t time = 0.0;
-  s_t dt = init->trialTimesteps[trial];
+  bool useTimestamps = false;
+  if (!timestamps.empty()) {
+    if (timestamps.size() == init->poseTrials[trial].cols()) {
+      useTimestamps = true;
+    } else {
+      std::cout << "WARNING, writeCSVData: The timestamps vector does not "
+                << "match the number of row in the trajectory. Using a generic "
+                << "time column instead..."
+                << std::endl;
+    }
+  }
 
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
-  time += dt;
-
-  for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
+  s_t time = 0.0;
+  s_t dt = init->trialTimesteps[trial];
+  int nrows = init->poseTrials[trial].cols();
+  for (int t = 0; t < nrows; t++)
   {
     csvFile << std::endl;
 
-    csvFile << time;
+    if (useTimestamps) {
+      csvFile << timestamps[t];
+    } {
+      csvFile << time;
+    }
 
     Eigen::VectorXs q = init->poseTrials[trial].col(t);
-    Eigen::VectorXs dq
-        = (init->poseTrials[trial].col(t) - init->poseTrials[trial].col(t - 1))
-          / dt;
-    Eigen::VectorXs ddq = (init->poseTrials[trial].col(t + 1)
-                           - 2 * init->poseTrials[trial].col(t)
-                           + init->poseTrials[trial].col(t - 1))
-                          / (dt * dt);
-    Eigen::VectorXs tau = useAdjustedGRFs
-                              ? init->perfectTorques[trial].col(t)
-                              : helper.calculateInverseDynamics(
-                                  q, dq, ddq, init->grfTrials[trial].col(t));
+    Eigen::VectorXs dq = Eigen::VectorXs::Zero(q.size());
+    Eigen::VectorXs ddq = Eigen::VectorXs::Zero(q.size());
+    Eigen::VectorXs tau = Eigen::VectorXs::Zero(q.size());
+    if (t > 0 || t < nrows-1) {
+      dq = (init->poseTrials[trial].col(t)
+            - init->poseTrials[trial].col(t - 1))
+           / dt;
+      ddq = (init->poseTrials[trial].col(t + 1)
+             - 2 * init->poseTrials[trial].col(t)
+             + init->poseTrials[trial].col(t - 1))
+             / (dt * dt);
+      tau = useAdjustedGRFs
+            ? init->perfectTorques[trial].col(t)
+            : helper.calculateInverseDynamics(
+                q, dq, ddq, init->grfTrials[trial].col(t));
+    }
+
     Eigen::VectorXs footContactData
         = Eigen::VectorXs::Zero(9 * init->grfBodyIndices.size());
     if (useAdjustedGRFs)
