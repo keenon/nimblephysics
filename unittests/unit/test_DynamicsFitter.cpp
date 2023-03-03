@@ -40,7 +40,7 @@
 #include "TestHelpers.hpp"
 
 // #define JACOBIAN_TESTS
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
