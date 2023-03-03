@@ -5258,7 +5258,9 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
         if (mConfig.mRegularizeJointAcc > 0)
         {
           jointAccRegularization +=
-              mConfig.mRegularizeJointAcc * block.acc.col(t).norm();
+              mConfig.mRegularizeJointAcc *
+              (1.0 / totalAccTimesteps) *
+              block.acc.col(t).squaredNorm();
           assert(!isnan(jointAccRegularization));
         }
       }
@@ -5326,6 +5328,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   sum += linearNewtonError;
   sum += residualRMS;
   sum += accRegularization;
+  sum += jointAccRegularization;
   markerRMS *= mConfig.mMarkerWeight;
   if (markerCount > 0)
   {
@@ -5575,7 +5578,9 @@ s_t DynamicsFitProblem::computeLossParallel(
             if (mConfig.mRegularizeJointAcc > 0)
             {
               threadLoss.jointAccRegularization +=
-                  mConfig.mRegularizeJointAcc * block.acc.col(t).norm();
+                  mConfig.mRegularizeJointAcc *
+                  (1.0 / totalAccTimesteps) *
+                  block.acc.col(t).squaredNorm();
               assert(!isnan(threadLoss.jointAccRegularization));
             }
           }
@@ -5657,6 +5662,7 @@ s_t DynamicsFitProblem::computeLossParallel(
   s_t markerRMS = 0.0;
   s_t poseRegularization = 0.0;
   s_t accRegularization = 0.0;
+  s_t jointAccRegularization = 0.0;
   s_t jointRMS = 0.0;
   s_t axisRMS = 0.0;
   int markerCount = 0;
@@ -5667,6 +5673,8 @@ s_t DynamicsFitProblem::computeLossParallel(
     markerRMS += threadLossExplanations[threadIdx].markerRMS;
     poseRegularization += threadLossExplanations[threadIdx].poseRegularization;
     accRegularization += threadLossExplanations[threadIdx].accRegularization;
+    jointAccRegularization +=
+        threadLossExplanations[threadIdx].jointAccRegularization;
     jointRMS += threadLossExplanations[threadIdx].jointRMS;
     axisRMS += threadLossExplanations[threadIdx].axisRMS;
     markerCount += threadLossExplanations[threadIdx].markerCount;
@@ -5675,6 +5683,7 @@ s_t DynamicsFitProblem::computeLossParallel(
   sum += linearNewtonError;
   sum += residualRMS;
   sum += accRegularization;
+  sum += jointAccRegularization;
   markerRMS *= mConfig.mMarkerWeight;
   if (markerCount > 0)
   {
@@ -6270,7 +6279,9 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
             }
             if (mConfig.mRegularizeJointAcc > 0)
             {
-              accGrad += mConfig.mRegularizeJointAcc * 2.0 * block.acc.col(t);
+              accGrad += mConfig.mRegularizeJointAcc *
+                         (2.0 / totalAccTimesteps) *
+                         block.acc.col(t);
             }
           }
 
@@ -6993,7 +7004,9 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
                 if (mConfig.mRegularizeJointAcc > 0)
                 {
                   accGrad +=
-                      mConfig.mRegularizeJointAcc * 2.0 * block.acc.col(t);
+                      mConfig.mRegularizeJointAcc *
+                      (2.0 / totalAccTimesteps) *
+                      block.acc.col(t);
                 }
               }
 
