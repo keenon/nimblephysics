@@ -900,6 +900,7 @@ public:
   DynamicsFitProblemConfig& setRegularizeSpatialAccBodyWeights(
       Eigen::VectorXs bodyWeights);
   DynamicsFitProblemConfig& setRegularizeSpatialAccUseL1(bool l1);
+  DynamicsFitProblemConfig& setRegularizeJointAcc(s_t value);
 
   DynamicsFitProblemConfig& setResidualTorqueMultiple(s_t value);
   DynamicsFitProblemConfig& setRegularizeMasses(s_t value);
@@ -952,6 +953,7 @@ public:
   s_t mRegularizeAcc;
   Eigen::VectorXs mRegularizeAccBodyWeights;
   bool mRegularizeAccUseL1;
+  s_t mRegularizeJointAcc;
 
   s_t mResidualTorqueMultiple;
   s_t mRegularizeMasses;
@@ -1549,7 +1551,8 @@ public:
       std::string path,
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
-      bool useAdjustedGRFs = false);
+      bool useAdjustedGRFs = false,
+      std::vector<double> timestamps = {});
 
   // This writes a random-seekable binary format to disk
   void writeSubjectOnDisk(

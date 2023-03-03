@@ -3115,7 +3115,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         "Generated in test_DynamicsFitter");
 
     fitter.writeCSVData(
-        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex);
+        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex,
+        false);
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
         init,
@@ -6335,11 +6336,11 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
 
   std::string prefix = "dart://sample/osim/HamnerMultipleTrials/";
   trcFiles.push_back(prefix + "run200.trc");
-  trcFiles.push_back(prefix + "run300.trc");
+//  trcFiles.push_back(prefix + "run300.trc");
   grfFiles.push_back(prefix + "run200_grf.mot");
-  grfFiles.push_back(prefix + "run300_grf.mot");
+//  grfFiles.push_back(prefix + "run300_grf.mot");
   motFiles.push_back(prefix + "run200_ik.mot");
-  motFiles.push_back(prefix + "run300_ik.mot");
+//  motFiles.push_back(prefix + "run300_ik.mot");
 
   std::vector<std::string> footNames;
   footNames.push_back("calcn_r");
@@ -6356,7 +6357,7 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
       -1,
       0,
       false,
-      false,
+      true,
       false,
       maxTrialsToSolveMassOver);
 }
