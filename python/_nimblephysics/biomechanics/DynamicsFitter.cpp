@@ -336,6 +336,11 @@ protected:
               setRegularizeSpatialAccBodyWeights,
           ::py::arg("bodyWeights"))
       .def(
+          "setRegularizeJointAcc",
+          &dart::biomechanics::DynamicsFitProblemConfig::
+              setRegularizeSpatialAcc,
+          ::py::arg("value"))
+      .def(
           "setResidualTorqueMultiple",
           &dart::biomechanics::DynamicsFitProblemConfig::
               setResidualTorqueMultiple,
