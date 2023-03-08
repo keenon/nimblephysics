@@ -9449,7 +9449,8 @@ std::vector<Eigen::Vector3s> DynamicsFitter::measuredGRFForces(
 // to infer when we're missing GRF data on certain timesteps, so we don't let
 // it mess with our optimization.
 void DynamicsFitter::estimateFootGroundContacts(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init,
+    bool allowSusContact)
 {
   Eigen::VectorXs originalPose = mSkeleton->getPositions();
 
@@ -9789,10 +9790,11 @@ void DynamicsFitter::estimateFootGroundContacts(
         {
           // 4.3.2. If we're NOT over a plate, then register this frame as
           // suspicious
-          if (!anyInPlate)
+          if (!anyInPlate && !allowSusContact)
           {
             contactIsSus = true;
             anyContactIsSus = true;
+            std::cout << "DEBUG estimateFootGroundContacts: GRF and contact detected, but no force plate detected. Ignoring frame " << t << "..." << std::endl;
           }
         }
 
@@ -9852,6 +9854,7 @@ void DynamicsFitter::markMissingImpacts(
           int offsetT = t + i;
           if (offsetT < init->probablyMissingGRF[trial].size())
           {
+            std::cout << "DEBUG markMissingImpacts: impact or liftoff detected, but ??? on frame" << t << "..." << std::endl;
             init->probablyMissingGRF[trial][offsetT] = true;
           }
         }
@@ -9899,6 +9902,7 @@ void DynamicsFitter::fillInMissingGRFBlips(
             if (scanT < init->probablyMissingGRF[trial].size())
             {
               init->probablyMissingGRF[trial][scanT] = true;
+              std::cout << "DEBUG fillMissingGRFBlips: ??? on frame " << t << "..." << std::endl;
             }
           }
         }
@@ -11082,6 +11086,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init,
     int maxTrialsToSolveMassOver,
+    bool detectExternalForce,
     s_t boundPush)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
@@ -11391,7 +11396,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
         std::cout << "Above regularization boundary. Falling back to a "
                      "linear solve (holding link masses constant)."
                   << std::endl;
-        zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+        zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver,
+                                           detectExternalForce);
         return;
       }
       continue;
@@ -12089,6 +12095,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     s_t regularizeCopDriftCompensation,
     int maxBuckets,
     bool detectUnmeasuredTorque,
+    bool detectExternalForce,
     s_t avgPositionChangeThreshold,
     s_t avgAngularChangeThreshold)
 {
@@ -12098,14 +12105,16 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     originalPoseTrials.push_back(init->poseTrials[i]);
   }
   // First detect external force
-  zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver,
+                                     detectExternalForce);
 
   // Now reset positions and re-run with multi-mass
   for (int i = 0; i < init->poseTrials.size(); i++)
   {
     init->poseTrials[i] = originalPoseTrials[i];
   }
-  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver,
+                                              detectExternalForce);
 
   // Attempt to time sync the GRFs relative to the coordinate data.
   if (shiftGRF)
@@ -12126,7 +12135,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     init->poseTrials[trial] = originalPoseTrials[trial];
   }
   // Re-find the link masses, with updated GRF offsets
-  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver,
+                                              detectExternalForce);
   init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
 
   // If we're using reaction wheels, we're accepting that you can't get this
@@ -15245,7 +15255,7 @@ void DynamicsFitter::writeCSVData(
 
     if (useTimestamps) {
       csvFile << timestamps[t];
-    } {
+    } else {
       csvFile << time;
     }
 

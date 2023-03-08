@@ -531,7 +531,8 @@ protected:
       .def(
           "estimateFootGroundContacts",
           &dart::biomechanics::DynamicsFitter::estimateFootGroundContacts,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("allowSusContact") = false)
       .def(
           "smoothAccelerations",
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,
@@ -570,6 +571,7 @@ protected:
               multimassZeroLinearResidualsOnCOMTrajectory,
           ::py::arg("init"),
           ::py::arg("maxTrialsToSolveMassOver") = 4,
+          ::py::arg("detectExternalForce") = true,
           ::py::arg("boundPush") = 0.01)
       .def(
           "zeroLinearResidualsAndOptimizeAngular",
@@ -622,6 +624,7 @@ protected:
           ::py::arg("regularizeCopDriftCompensation") = 1.0,
           ::py::arg("maxBuckets") = 100,
           ::py::arg("detectUnmeasuredTorque") = true,
+          ::py::arg("detectExternalForce") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15)
       .def(

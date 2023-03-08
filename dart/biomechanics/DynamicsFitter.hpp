@@ -1298,7 +1298,8 @@ public:
   // 0. Estimate when each foot is in contact with the ground, which we can use
   // to infer when we're missing GRF data on certain timesteps, so we don't let
   // it mess with our optimization.
-  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
+  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init,
+                                  bool allowSusContact = false);
 
   // 0. This goes through and marks any "impact" GRF timesteps (defined as
   // `windowLen` steps after the first non-zero step after a flight phase with
@@ -1370,6 +1371,7 @@ public:
   void multimassZeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
       int maxTrialsToSolveMassOver = 4,
+      bool detectExternalForce = true,
       s_t boundPush = 0.01);
 
   // 1. Change the initial positions and velocities of the body to achieve a
@@ -1428,6 +1430,7 @@ public:
       s_t regularizeCopDriftCompensation = 1.0,
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
+      bool detectExternalForce = true,
       s_t avgPositionChangeThreshold = 0.08,
       s_t avgAngularChangeThreshold = 0.15);
 
