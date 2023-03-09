@@ -10,6 +10,7 @@
 
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
+#include "dart/biomechanics/enums.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
@@ -770,6 +771,8 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
 };
 
+
+
 /**
  * We create a single initialization object, and pass it around to optimization
  * problems to re-use, because it's not super cheap to construct.
@@ -812,6 +815,7 @@ struct DynamicsInitialization
   // This is the critical value, telling us if we think we're receiving support
   // from off a force plate on this frame
   std::vector<std::vector<bool>> probablyMissingGRF;
+  std::vector<std::vector<MissingGRFReason>> missingGRFReason;
   // This is a map of [trial][forcePlate][timestep], where each force plate is
   // assigned to one of the contact bodies.
   std::vector<std::vector<std::vector<int>>> forcePlatesAssignedToContactBody;

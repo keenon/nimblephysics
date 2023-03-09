@@ -9,6 +9,7 @@
 
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/biomechanics/enums.hpp"
 
 namespace dart {
 namespace biomechanics {
@@ -18,6 +19,7 @@ struct Frame
   int trial;
   int t;
   bool probablyMissingGRF;
+  MissingGRFReason missingGRFReason;
 
   Eigen::VectorXd pos;
   Eigen::VectorXd vel;
@@ -74,6 +76,7 @@ public:
       std::vector<Eigen::MatrixXs>& trialVels,
       std::vector<Eigen::MatrixXs>& trialAccs,
       std::vector<std::vector<bool>>& probablyMissingGRF,
+      std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
       std::vector<Eigen::MatrixXs>& trialTaus,
       // These are generalized 6-dof wrenches applied to arbitrary bodies
       // (generally by foot-ground contact, though other things too)
@@ -103,6 +106,10 @@ public:
   /// heuristically detected to be missing external forces (which means that the
   /// inverse dynamics cannot be trusted).
   std::vector<bool> getProbablyMissingGRF(int trial);
+
+  /// This returns the vector of enums of type 'MissingGRFReason', which labels
+  /// why each time step was identified as 'probablyMissingGRF'.
+  std::vector<MissingGRFReason> getMissingGRFReason(int trial);
 
   /// This returns the list of contact body names for this Subject
   std::vector<std::string> getGroundContactBodies();
@@ -141,6 +148,7 @@ protected:
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.
   std::vector<std::vector<bool>> mProbablyMissingGRF;
+  std::vector<std::vector<MissingGRFReason>> mMissingGRFReason;
   // The trial names, if provided, or empty strings
   std::vector<std::string> mTrialNames;
   // An optional link to the web where this subject came from

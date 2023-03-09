@@ -160,6 +160,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("trialVels"),
                 ::py::arg("trialAccs"),
                 ::py::arg("probablyMissingGRF"),
+                ::py::arg("missingGRFReason"),
                 ::py::arg("trialTaus"),
                 // These are generalized 6-dof wrenches applied to arbitrary
                 // bodies (generally by foot-ground contact, though other things
@@ -205,6 +206,14 @@ Note that these are specified in the local body frame, acting on the body at its
 
             This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
             the more expensive :code:`loadFrames()`
+          )doc")
+            .def(
+                "getMissingGRFReason",
+                &dart::biomechanics::SubjectOnDisk::getMissingGRFReason,
+                ::py::arg("trial"),
+                R"doc(
+            This returns an array of enum values, one per frame in the specified trial,
+            each corresponding to the reason why a frame was marked as `probablyMissingGRF`.
           )doc")
             .def(
                 "getTrialName",
