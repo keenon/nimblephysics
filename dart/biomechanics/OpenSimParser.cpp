@@ -107,9 +107,9 @@ std::string to_string(double d)
 // https://www.geeksforgeeks.org/round-the-given-number-to-nearest-multiple-of-10/
 int roundToNearestMultiple(int n, int multiple)
 {
-    int a = (n / multiple) * multiple;
-    int b = a + multiple;
-    return (n - a > b - n) ? b : a;
+  int a = (n / multiple) * multiple;
+  int b = a + multiple;
+  return (n - a > b - n) ? b : a;
 }
 
 //==============================================================================
@@ -1263,9 +1263,9 @@ void OpenSimParser::updateCustomJointXML(
               joint->getCustomFunction(index).get());
 
       std::string coeffString = "";
-      for (int i = polynomial->mCoeffs.size()-1; i >= 0; --i)
+      for (int i = polynomial->mCoeffs.size() - 1; i >= 0; --i)
       {
-        if (i < polynomial->mCoeffs.size()-1)
+        if (i < polynomial->mCoeffs.size() - 1)
           coeffString += " ";
         coeffString += to_string((double)polynomial->mCoeffs[i]);
       }
@@ -2054,7 +2054,8 @@ OpenSimTRC OpenSimParser::loadTRC(
           markerSwapSpace(axisNumber) = atof(token.c_str()) * unitsMultiplier;
           if (axisNumber == 2)
           {
-            if (!markerSwapSpace.hasNaN())
+            if (!markerSwapSpace.hasNaN()
+                && (markerSwapSpace != Eigen::Vector3s::Zero()))
             {
               markerPositions[markerNames[markerNumber]]
                   = Eigen::Vector3s(markerSwapSpace);
@@ -2100,7 +2101,8 @@ OpenSimTRC OpenSimParser::loadTRC(
     int frames = result.timestamps.size();
     s_t elapsed = result.timestamps[result.timestamps.size() - 1]
                   - result.timestamps[0];
-    result.framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
+    result.framesPerSecond
+        = roundToNearestMultiple((int)(frames / elapsed), 10);
   }
 
   return result;

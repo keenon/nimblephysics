@@ -90,13 +90,26 @@ public:
   /// acceleration.
   void filterTimestepsBasedOnAcc(s_t dt, s_t accThreshold);
 
+  /// If a marker is below a certain velocity for a certain number of timesteps
+  /// (or more) then mark all the timesteps where the marker is still as
+  /// filtered out.
+  void filterTimestepsBasedOnProlongedStillness(
+      s_t dt, s_t velThreshold, int numTimesteps);
+
+  /// This is a useful measurement to test if the marker just never moves from
+  /// its starting point (generally if your optical setup accidentally captured
+  /// a shiny object that is fixed in place as a marker).
+  s_t getMaxMarkerMovementFromStart();
+
 public:
   int mMinTime;
   int mMaxTime;
   std::vector<int> mTimes;
   std::vector<Eigen::Vector3s> mPoints;
   std::vector<s_t> mAccNorm;
-  std::vector<bool> mDropPoint;
+  std::vector<bool> mDropPointForAcc;
+  std::vector<s_t> mVelNorm;
+  std::vector<bool> mDropPointForStillness;
   std::vector<std::string> mMarkerLabels;
 };
 

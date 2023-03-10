@@ -9652,8 +9652,8 @@ void DynamicsFitter::estimateFootGroundContacts(
         }
       }
 
-      // Add 10cm to each side, to be very conservative
-      s_t padding = 0.10;
+      // Add 20cm to each side, to be very conservative
+      s_t padding = 0.20;
       minX -= padding;
       maxX += padding;
       minZ -= padding;
@@ -9793,6 +9793,12 @@ void DynamicsFitter::estimateFootGroundContacts(
 
         offForcePlate.push_back(contactIsSus);
       }
+      if (anyContactIsSus)
+      {
+        std::cout << "Marking trial " << trial << ", timestep " << t
+                  << " as probably missing GRF, due to contact heuristic"
+                  << std::endl;
+      }
 
       trialForceActive.push_back(forceActive);
       trialSphereInContact.push_back(sphereInContact);
@@ -9888,6 +9894,8 @@ void DynamicsFitter::fillInMissingGRFBlips(
         }
         if (isBlip)
         {
+          std::cout << "Filling in GRF blip on trial " << trial << ", timestep "
+                    << t << std::endl;
           for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
           {
             int scanT = t + scanForward;
