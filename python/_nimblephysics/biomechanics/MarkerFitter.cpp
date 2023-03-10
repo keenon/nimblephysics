@@ -366,6 +366,10 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setRegularizeAllBodyScales,
           ::py::arg("weight"))
       .def(
+          "setRegularizeJointBounds",
+          &dart::biomechanics::MarkerFitter::setRegularizeJointBounds,
+          ::py::arg("weight"))
+      .def(
           "setDebugJointVariability",
           &dart::biomechanics::MarkerFitter::setDebugJointVariability,
           ::py::arg("debug"))

@@ -2769,9 +2769,13 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   bool shiftGRF = false;
   int maxShiftGRF = 4;
   int iterationsPerShift = 20;
-  fitter.timeSyncAndInitializePipeline(init, useReactionWheels, shiftGRF,
-                                       maxShiftGRF, iterationsPerShift,
-                                       maxTrialsToSolveMassOver);
+  fitter.timeSyncAndInitializePipeline(
+      init,
+      useReactionWheels,
+      shiftGRF,
+      maxShiftGRF,
+      iterationsPerShift,
+      maxTrialsToSolveMassOver);
 
   /*
   // fitter.zeroLinearResidualsOnCOMTrajectory(init);
@@ -3115,7 +3119,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         "Generated in test_DynamicsFitter");
 
     fitter.writeCSVData(
-        "../../../javascript/src/data/movement2.csv", init, trajectoryIndex,
+        "../../../javascript/src/data/movement2.csv",
+        init,
+        trajectoryIndex,
         false);
     fitter.saveDynamicsToGUI(
         "../../../javascript/src/data/movement2.bin",
@@ -3499,7 +3505,8 @@ std::pair<std::vector<MarkerInitialization>, OpenSimFile> runMarkerFitter(
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
-  fitter.setIterationLimit(500);
+  // TODO: revert me back up to 500
+  fitter.setIterationLimit(200);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
@@ -3893,13 +3900,22 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
         = DynamicsFitter::retargetInitialization(
             standard.skeleton, simplified, init);
     return runEngine(
-        simplified, simplifiedInit, modelPath, trialNames, saveGUI,
+        simplified,
+        simplifiedInit,
+        modelPath,
+        trialNames,
+        saveGUI,
         maxTrialsToSolveMassOver);
   }
   else
   {
-    return runEngine(standard.skeleton, init, modelPath, trialNames, saveGUI,
-                     maxTrialsToSolveMassOver);
+    return runEngine(
+        standard.skeleton,
+        init,
+        modelPath,
+        trialNames,
+        saveGUI,
+        maxTrialsToSolveMassOver);
   }
 }
 
@@ -6252,6 +6268,48 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
       grfFiles,
       20,
       87,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/grf/Hamner_subject17/"
+      "unscaled_generic.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
       true);
 }
 #endif
