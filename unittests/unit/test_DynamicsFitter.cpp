@@ -3505,8 +3505,7 @@ std::pair<std::vector<MarkerInitialization>, OpenSimFile> runMarkerFitter(
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
   fitter.setInitialIKSatisfactoryLoss(0.005);
   fitter.setInitialIKMaxRestarts(50);
-  // TODO: revert me back up to 500
-  fitter.setIterationLimit(200);
+  fitter.setIterationLimit(500);
   if (standard.anatomicalMarkers.size() > 10)
   {
     // If there are at least 10 tracking markers
