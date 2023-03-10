@@ -160,6 +160,7 @@ bool testWriteSubjectToDisk(
         grfReason.push_back(MissingGRFReason::notMissingGRF);
       }
     }
+    missingGRFReason.push_back(grfReason);
     probablyMissingGRFData.push_back(missingGRF);
   }
 
@@ -250,6 +251,12 @@ bool testWriteSubjectToDisk(
       if (frame->probablyMissingGRF != probablyMissingGRFData[trial][frame->t])
       {
         std::cout << "missing GRF not recovered" << std::endl;
+        return false;
+      }
+
+      if (frame->missingGRFReason != missingGRFReason[trial][frame->t])
+      {
+        std::cout << "missing GRF reason not recovered" << std::endl;
         return false;
       }
 
