@@ -3102,6 +3102,20 @@ std::shared_ptr<DynamicsInitialization> runEngine(
             << fitter.computeAverageForceMagnitudeChange(init) << " N"
             << std::endl;
 
+  for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
+  {
+    int totalFrames = 0;
+    for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        totalFrames++;
+      }
+    }
+    std::cout << "Trial " << trial << " missing GRF: " << totalFrames
+              << std::endl;
+  }
+
   if (saveGUI)
   {
     int trajectoryIndex = 0;
@@ -6273,7 +6287,7 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
 #endif
 
 #ifdef ALL_TESTS
-TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SAM_DATA)
 {
   std::vector<std::string> motFiles;
   std::vector<std::string> c3dFiles;
