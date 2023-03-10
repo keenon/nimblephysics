@@ -64,6 +64,7 @@ bool testWriteSubjectToDisk(
   std::vector<Eigen::MatrixXs> groundBodyWrenchTrials;
   std::vector<Eigen::MatrixXs> groundBodyCopTorqueForceTrials;
   std::vector<std::vector<bool>> probablyMissingGRFData;
+  std::vector<std::vector<MissingGRFReason>> missingGRFReason;
   std::vector<std::string> customValueNames;
   std::vector<std::vector<Eigen::MatrixXs>> customValueTrials;
 
@@ -149,9 +150,15 @@ bool testWriteSubjectToDisk(
     customValueTrials.push_back(trialCustomValues);
 
     std::vector<bool> missingGRF;
+    std::vector<MissingGRFReason> grfReason;
     for (int t = 0; t < poseTrials[trial].cols(); t++)
     {
       missingGRF.push_back(t % 10 == 0);
+      if (t % 10 == 0) {
+        grfReason.push_back(MissingGRFReason::missingGRF);
+      } else {
+        grfReason.push_back(MissingGRFReason::notMissingGRF);
+      }
     }
     probablyMissingGRFData.push_back(missingGRF);
   }
@@ -176,6 +183,7 @@ bool testWriteSubjectToDisk(
       velTrials,
       accTrials,
       probablyMissingGRFData,
+      missingGRFReason,
       tauTrials,
       groundForceBodies,
       groundBodyWrenchTrials,
