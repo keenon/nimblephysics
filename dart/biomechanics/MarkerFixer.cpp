@@ -310,7 +310,7 @@ void LabeledMarkerTrace::filterTimestepsBasedOnAcc(s_t dt, s_t accThreshold)
 /// If a marker is below a certain velocity for a certain number of timesteps
 /// (or more) then mark all the timesteps where the marker is still as
 /// filtered out.
-void LabeledMarkerTrace::filterTimestepsBasedOnProlongedStillnes(
+void LabeledMarkerTrace::filterTimestepsBasedOnProlongedStillness(
     s_t dt, s_t velThreshold, int numTimesteps)
 {
   for (int i = 0; i < mPoints.size(); i++)
@@ -829,7 +829,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     }
     std::string bestLabel = traces[i].getBestLabel(alreadyTakenLabels);
     traces[i].filterTimestepsBasedOnAcc(dt, 1000.0);
-    traces[i].filterTimestepsBasedOnProlongedStillnes(dt, 0.001, 10);
+    traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
     traceLabels.push_back(bestLabel);
   }
 

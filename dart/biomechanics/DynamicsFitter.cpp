@@ -9793,12 +9793,12 @@ void DynamicsFitter::estimateFootGroundContacts(
 
         offForcePlate.push_back(contactIsSus);
       }
-      // if (anyContactIsSus)
-      // {
-      //   std::cout << "Marking trial " << trial << ", timestep " << t
-      //             << " as probably missing GRF, due to contact heuristic"
-      //             << std::endl;
-      // }
+      if (anyContactIsSus)
+      {
+        std::cout << "Marking trial " << trial << ", timestep " << t
+                  << " as probably missing GRF, due to contact heuristic"
+                  << std::endl;
+      }
 
       trialForceActive.push_back(forceActive);
       trialSphereInContact.push_back(sphereInContact);

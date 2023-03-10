@@ -93,7 +93,7 @@ public:
   /// If a marker is below a certain velocity for a certain number of timesteps
   /// (or more) then mark all the timesteps where the marker is still as
   /// filtered out.
-  void filterTimestepsBasedOnProlongedStillnes(
+  void filterTimestepsBasedOnProlongedStillness(
       s_t dt, s_t velThreshold, int numTimesteps);
 
   /// This is a useful measurement to test if the marker just never moves from
