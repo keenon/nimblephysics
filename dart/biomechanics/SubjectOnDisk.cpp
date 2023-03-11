@@ -273,6 +273,39 @@ SubjectOnDisk::SubjectOnDisk(
     mProbablyMissingGRF.push_back(probablyMissingGRF);
   }
 
+  // Read the `missingGRFReason` data
+  for (int i = 0; i < mNumTrials; i++)
+  {
+    // Read a magic header, to make sure we don't get lost
+    int32_t magic;
+    read_items = fread(&magic, sizeof(int32_t), 1, file);
+    if (magic != 424242 || read_items != 1)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << path << ": before the missingGRFReason array for trial " << i
+          << ", got bad magic = " << magic << std::endl;
+      throw new std::exception();
+    }
+
+    std::vector<MissingGRFReason> missingGRFReason;
+    for (int t = 0; t < mTrialLength[i]; t++)
+    {
+      int8_t b;
+      read_items = fread(&b, sizeof(int8_t), 1, file);
+      if (read_items != 1)
+      {
+        std::cout
+            << "SubjectOnDisk attempting to read a corrupted binary file at "
+            << path << ": missingGRFReason section suddenly reached EOF" << std::endl;
+        throw new std::exception();
+      }
+      auto b_enum = static_cast<MissingGRFReason>(b);
+      missingGRFReason.push_back(b_enum);
+    }
+    mMissingGRFReason.push_back(missingGRFReason);
+  }
+
   int32_t modelLen;
   read_items = fread(&modelLen, sizeof(int32_t), 1, file);
   if (read_items != 1)
@@ -395,6 +428,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     frame->t = startFrame + i;
     frame->dt = mTrialTimesteps[trial];
     frame->probablyMissingGRF = mProbablyMissingGRF[trial][frame->t];
+    frame->missingGRFReason = mMissingGRFReason[trial][frame->t];
     frame->pos = Eigen::VectorXd(mNumDofs);
     frame->vel = Eigen::VectorXd(mNumDofs);
     frame->acc = Eigen::VectorXd(mNumDofs);
@@ -527,6 +561,7 @@ void SubjectOnDisk::writeSubject(
     std::vector<Eigen::MatrixXs>& trialVels,
     std::vector<Eigen::MatrixXs>& trialAccs,
     std::vector<std::vector<bool>>& probablyMissingGRF,
+    std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
     std::vector<Eigen::MatrixXs>& trialTaus,
     // These are generalized 6-dof wrenches applied to arbitrary bodies
     // (generally by foot-ground contact, though other things too)
@@ -554,6 +589,7 @@ void SubjectOnDisk::writeSubject(
   (void)trialGroundBodyCopTorqueForce;
   (void)trialTimesteps;
   (void)probablyMissingGRF;
+  (void)missingGRFReason;
   (void)customValueNames;
   (void)customValues;
 
@@ -647,6 +683,20 @@ void SubjectOnDisk::writeSubject(
     for (int t = 0; t < probablyMissingGRF[i].size(); t++)
     {
       int8_t b = probablyMissingGRF[i][t];
+      fwrite(&b, sizeof(int8_t), 1, file);
+    }
+  }
+
+  // Write the `missingGRFReason` data
+  for (int i = 0; i < trialPoses.size(); i++)
+  {
+    // Write a magic header, to make sure we don't get lost
+    int32_t magic = 424242;
+    fwrite(&magic, sizeof(int32_t), 1, file);
+
+    for (int t = 0; t < missingGRFReason[i].size(); t++)
+    {
+      int8_t b = missingGRFReason[i][t];
       fwrite(&b, sizeof(int8_t), 1, file);
     }
   }
@@ -763,6 +813,17 @@ std::vector<bool> SubjectOnDisk::getProbablyMissingGRF(int trial)
     return std::vector<bool>();
   }
   return mProbablyMissingGRF[trial];
+}
+
+/// This returns the vector of enums of type 'MissingGRFReason', which labels
+/// why each time step was identified as 'probablyMissingGRF'.
+std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRFReason(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<MissingGRFReason>();
+  }
+  return mMissingGRFReason[trial];
 }
 
 /// This returns the list of contact body names for this Subject
