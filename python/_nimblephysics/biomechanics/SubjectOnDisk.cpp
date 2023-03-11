@@ -258,7 +258,27 @@ Note that these are specified in the local body frame, acting on the body at its
         until asked for. That way we can instantiate thousands of these in memory,
         and not worry about OOM'ing a machine.
       )doc";
-}
 
+  py::enum_<dart::biomechanics::MissingGRFReason>(subjectOnDisk, "MissingGRFReason")
+      .value("notMissingGRF",
+             dart::biomechanics::MissingGRFReason::notMissingGRF)
+      .value("measuredGrfZeroWhenAccelerationNonZero",
+             dart::biomechanics::MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero)
+      .value("unmeasuredExternalForceDetected",
+             dart::biomechanics::MissingGRFReason::unmeasuredExternalForceDetected)
+      .value("torqueDiscrepancy",
+             dart::biomechanics::MissingGRFReason::torqueDiscrepancy)
+      .value("forceDiscrepancy",
+             dart::biomechanics::MissingGRFReason::forceDiscrepancy)
+      .value("notOverForcePlate",
+             dart::biomechanics::MissingGRFReason::notOverForcePlate)
+      .value("missingImpact",
+             dart::biomechanics::MissingGRFReason::missingImpact)
+      .value("missingBlip",
+             dart::biomechanics::MissingGRFReason::missingBlip)
+      .value("shiftGRF",
+             dart::biomechanics::MissingGRFReason::shiftGRF)
+      .export_values();
+}
 } // namespace python
 } // namespace dart

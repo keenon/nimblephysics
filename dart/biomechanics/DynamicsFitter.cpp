@@ -10153,7 +10153,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                   << trial << " at time " << t << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1] = MissingGRFReason::unmeasuredForce;
+        init->missingGRFReason[trial][t + 1] =
+            MissingGRFReason::unmeasuredExternalForceDetected;
         continue;
       }
       else if (!isEstimatedZero && isMeasuredZero)
@@ -10164,7 +10165,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                     << std::endl;
           filteredTimesteps.push_back(t + 1);
           init->probablyMissingGRF[trial][t + 1] = true;
-          init->missingGRFReason[trial][t + 1] = MissingGRFReason::missingGRF;
+          init->missingGRFReason[trial][t + 1] =
+              MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
         }
         continue;
       }
@@ -10267,7 +10269,7 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
         if (init->probablyMissingGRF.size() > trial)
         {
           init->probablyMissingGRF[trial][t] = true;
-          init->missingGRFReason[trial][t] = MissingGRFReason::unmeasuredTorque;
+          init->missingGRFReason[trial][t] = MissingGRFReason::torqueDiscrepancy;
         }
       }
       std::cout << "Ang badness " << t << ": " << badness << std::endl;

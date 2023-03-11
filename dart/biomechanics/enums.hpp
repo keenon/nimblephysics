@@ -5,9 +5,9 @@ namespace dart {
 namespace biomechanics {
 
 enum MissingGRFReason { notMissingGRF,
-                        missingGRF,
-                        unmeasuredForce,
-                        unmeasuredTorque,
+                        measuredGrfZeroWhenAccelerationNonZero,
+                        unmeasuredExternalForceDetected,
+                        torqueDiscrepancy,
                         forceDiscrepancy,
                         notOverForcePlate,
                         missingImpact,
