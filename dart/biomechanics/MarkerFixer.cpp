@@ -302,8 +302,89 @@ void LabeledMarkerTrace::filterTimestepsBasedOnAcc(s_t dt, s_t accThreshold)
       mAccNorm.push_back(0);
     }
 
-    mDropPoint.push_back(shouldDrop);
+    mDropPointForAcc.push_back(shouldDrop);
   }
+}
+
+//==============================================================================
+/// If a marker is below a certain velocity for a certain number of timesteps
+/// (or more) then mark all the timesteps where the marker is still as
+/// filtered out.
+void LabeledMarkerTrace::filterTimestepsBasedOnProlongedStillness(
+    s_t dt, s_t velThreshold, int numTimesteps)
+{
+  for (int i = 0; i < mPoints.size(); i++)
+    mDropPointForStillness.push_back(false);
+
+  int startDrop = -1;
+  for (int i = 0; i < mPoints.size(); i++)
+  {
+    if (i > 0)
+    {
+      Eigen::Vector3s vel = (mPoints[i] - mPoints[i - 1]) / dt;
+      s_t velNorm = vel.norm();
+      mVelNorm.push_back(velNorm);
+      if (velNorm < velThreshold)
+      {
+        if (startDrop == -1)
+        {
+          startDrop = i;
+        }
+      }
+      else if (startDrop != -1)
+      {
+        int duration = i - startDrop;
+        if (duration >= numTimesteps)
+        {
+          for (int j = startDrop; j < i; j++)
+          {
+            mDropPointForStillness[j] = true;
+          }
+        }
+        startDrop = -1;
+      }
+    }
+    else
+    {
+      mVelNorm.push_back(0);
+    }
+  }
+  if (startDrop != -1)
+  {
+    int duration = mPoints.size() - startDrop;
+    if (duration >= numTimesteps)
+    {
+      for (int j = startDrop; j < mPoints.size(); j++)
+      {
+        mDropPointForStillness[j] = true;
+      }
+    }
+    startDrop = -1;
+  }
+}
+
+//==============================================================================
+/// This is a useful measurement to test if the marker just never moves from
+/// its starting point (generally if your optical setup accidentally captured
+/// a shiny object that is fixed in place as a marker).
+s_t LabeledMarkerTrace::getMaxMarkerMovementFromStart()
+{
+  if (mPoints.size() < 2)
+  {
+    return 0.0;
+  }
+
+  s_t maxDist = 0.0;
+  Eigen::Vector3s startPoint = mPoints[0];
+  for (int i = 1; i < mPoints.size(); i++)
+  {
+    s_t dist = (mPoints[i] - startPoint).norm();
+    if (dist > maxDist)
+    {
+      maxDist = dist;
+    }
+  }
+  return maxDist;
 }
 
 //==============================================================================
@@ -748,6 +829,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     }
     std::string bestLabel = traces[i].getBestLabel(alreadyTakenLabels);
     traces[i].filterTimestepsBasedOnAcc(dt, 1000.0);
+    traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
     traceLabels.push_back(bestLabel);
   }
 
@@ -763,7 +845,8 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
       if (index != -1)
       {
         // Ignore points that we specifically asked to drop
-        if (index < traces[j].mDropPoint.size() && traces[j].mDropPoint[index])
+        if (index < traces[j].mDropPointForAcc.size()
+            && traces[j].mDropPointForAcc[index])
         {
           report->warnings.push_back(
               "Marker " + traceLabels[j]
@@ -771,14 +854,20 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
               + std::to_string((double)traces[j].mAccNorm[index])
               + " m/s^2) on frame " + std::to_string(t));
         }
+        else if (
+            index < traces[j].mDropPointForStillness.size()
+            && traces[j].mDropPointForStillness[index])
+        {
+          report->warnings.push_back(
+              "Marker " + traceLabels[j] + " dropped for velocity too slow ("
+              + std::to_string((double)traces[j].mVelNorm[index])
+              + " m/s) on sequential frame " + std::to_string(t));
+        }
         else
         {
           Eigen::Vector3s point = traces[j].mPoints[index];
           frame[traceLabels[j]] = point;
         }
-
-        Eigen::Vector3s point = traces[j].mPoints[index];
-        frame[traceLabels[j]] = point;
       }
     }
     correctedObservations.push_back(frame);
