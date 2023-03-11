@@ -9793,7 +9793,6 @@ void DynamicsFitter::estimateFootGroundContacts(
             contactIsSus = true;
             anyContactIsSus = true;
             reason = MissingGRFReason::notOverForcePlate;
-            std::cout << "DEBUG estimateFootGroundContacts: GRF and contact detected, but no force plate detected. Ignoring frame " << t << "..." << std::endl;
           }
         }
 
@@ -9861,9 +9860,9 @@ void DynamicsFitter::markMissingImpacts(
           int offsetT = t + i;
           if (offsetT < init->probablyMissingGRF[trial].size())
           {
-            std::cout << "DEBUG markMissingImpacts: impact or liftoff detected, but ??? on frame" << t << "..." << std::endl;
             init->probablyMissingGRF[trial][offsetT] = true;
-            init->missingGRFReason[trial][offsetT] = MissingGRFReason::missingImpact;
+            init->missingGRFReason[trial][offsetT] =
+                MissingGRFReason::missingImpact;
           }
         }
       }
@@ -9912,8 +9911,8 @@ void DynamicsFitter::fillInMissingGRFBlips(
             if (scanT < init->probablyMissingGRF[trial].size())
             {
               init->probablyMissingGRF[trial][scanT] = true;
-              init->missingGRFReason[trial][scanT] = MissingGRFReason::missingBlip;
-              std::cout << "DEBUG fillMissingGRFBlips: ??? on frame " << t << "..." << std::endl;
+              init->missingGRFReason[trial][scanT] =
+                  MissingGRFReason::missingBlip;
             }
           }
         }
@@ -10205,7 +10204,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
             << threshold << ")" << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1] = MissingGRFReason::forceDiscrepancy;
+        init->missingGRFReason[trial][t + 1] =
+            MissingGRFReason::forceDiscrepancy;
       }
     }
     if (filteredTimesteps.size() > 0)
