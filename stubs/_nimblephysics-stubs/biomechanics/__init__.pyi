@@ -33,6 +33,7 @@ __all__ = [
     "MarkerLabellerMock",
     "MarkerTrace",
     "MarkersErrorReport",
+    "MissingGRFReason",
     "NeuralMarkerLabeller",
     "OpenSimFile",
     "OpenSimMot",
@@ -41,7 +42,16 @@ __all__ = [
     "OpenSimTRC",
     "ResidualForceHelper",
     "SkeletonConverter",
-    "SubjectOnDisk"
+    "SubjectOnDisk",
+    "forceDiscrepancy",
+    "measuredGrfZeroWhenAccelerationNonZero",
+    "missingBlip",
+    "missingImpact",
+    "notMissingGRF",
+    "notOverForcePlate",
+    "shiftGRF",
+    "torqueDiscrepancy",
+    "unmeasuredExternalForceDetected"
 ]
 
 
@@ -259,6 +269,7 @@ class DynamicsFitProblemConfig():
     def setRegularizeCOMs(self, value: float) -> DynamicsFitProblemConfig: ...
     def setRegularizeImpliedDensity(self, value: float) -> DynamicsFitProblemConfig: ...
     def setRegularizeInertias(self, value: float) -> DynamicsFitProblemConfig: ...
+    def setRegularizeJointAcc(self, value: float) -> DynamicsFitProblemConfig: ...
     def setRegularizeMasses(self, value: float) -> DynamicsFitProblemConfig: ...
     def setRegularizePoses(self, value: float) -> DynamicsFitProblemConfig: ...
     def setRegularizeSpatialAcc(self, value: float) -> DynamicsFitProblemConfig: ...
@@ -303,7 +314,7 @@ class DynamicsFitter():
     def estimateLinkMassesFromAcceleration(self, init: DynamicsInitialization, regularizationWeight: float = 50.0) -> None: ...
     def impliedCOMForces(self, init: DynamicsInitialization, trial: int, includeGravity: numpy.ndarray[numpy.float64, _Shape[3, 1]] = True) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
     def measuredGRFForces(self, init: DynamicsInitialization, trial: int) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
-    def multimassZeroLinearResidualsOnCOMTrajectory(self, init: DynamicsInitialization, boundPush: float = 0.01) -> None: ...
+    def multimassZeroLinearResidualsOnCOMTrajectory(self, init: DynamicsInitialization, maxTrialsToSolveMassOver: int = 4, boundPush: float = 0.01) -> None: ...
     def optimizeMarkerOffsets(self, init: DynamicsInitialization) -> None: ...
     def optimizeSpatialResidualsOnCOMTrajectory(self, init: DynamicsInitialization, trial: int, satisfactoryThreshold: float = 1e-05, numIters: int = 600, missingResidualRegularization: float = 1000, weightAngular: float = 2.0, weightLastFewTimesteps: float = 5.0, offsetRegularization: float = 0.001, regularizeResiduals: bool = True) -> bool: ...
     def recalibrateForcePlates(self, init: DynamicsInitialization, trial: int, maxMovement: float = 0.03) -> None: ...
@@ -320,12 +331,12 @@ class DynamicsFitter():
     def setSilenceOutput(self, value: bool) -> None: ...
     def setTolerance(self, value: float) -> None: ...
     def smoothAccelerations(self, init: DynamicsInitialization) -> None: ...
-    def timeSyncAndInitializePipeline(self, init: DynamicsInitialization, useReactionWheels: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 100, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15) -> bool: ...
+    def timeSyncAndInitializePipeline(self, init: DynamicsInitialization, useReactionWheels: bool = False, shiftGRF: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, maxTrialsToSolveMassOver: int = 4, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 100, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15) -> bool: ...
     def timeSyncTrialGRF(self, init: DynamicsInitialization, trial: int, useReactionWheels: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, weightLinear: float = 1.0, weightAngular: float = 1.0, regularizeLinearResiduals: float = 0.5, regularizeAngularResiduals: float = 0.5, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 20) -> bool: ...
-    def writeCSVData(self, path: str, init: DynamicsInitialization, trialIndex: int, useAdjustedGRFs: bool = False) -> None: ...
+    def writeCSVData(self, path: str, init: DynamicsInitialization, trialIndex: int, useAdjustedGRFs: bool = False, timestamps: typing.List[float] = []) -> None: ...
     def writeSubjectOnDisk(self, outputPath: str, openSimFilePath: str, init: DynamicsInitialization, useAdjustedGRFs: bool = False, trialNames: typing.List[str] = [], href: str = '', notes: str = '') -> None: ...
     def zeroLinearResidualsAndOptimizeAngular(self, init: DynamicsInitialization, trial: int, targetPoses: numpy.ndarray[numpy.float64, _Shape[m, n]], previousTotalResidual: float, iteration: int, useReactionWheels: bool = False, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 40, maxLeastSquaresIters: int = 200, commitCopDriftCompensation: bool = False, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15) -> typing.Tuple[bool, float]: ...
-    def zeroLinearResidualsOnCOMTrajectory(self, init: DynamicsInitialization, detectExternalForce: bool = True, driftCorrectionBlurRadius: int = 250, driftCorrectionBlurInterval: int = 250) -> None: ...
+    def zeroLinearResidualsOnCOMTrajectory(self, init: DynamicsInitialization, maxTrialsToSolveMassOver: int = 4, detectExternalForce: bool = True, driftCorrectionBlurRadius: int = 250, driftCorrectionBlurInterval: int = 250) -> None: ...
     pass
 class DynamicsInitialization():
     @property
@@ -1149,6 +1160,7 @@ class MarkerFitter():
     def setRegularizeAllBodyScales(self, weight: float) -> None: ...
     def setRegularizeAnatomicalMarkerOffsets(self, weight: float) -> None: ...
     def setRegularizeIndividualBodyScales(self, weight: float) -> None: ...
+    def setRegularizeJointBounds(self, weight: float) -> None: ...
     def setRegularizeTrackingMarkerOffsets(self, weight: float) -> None: ...
     def setTrackingMarkerDefaultWeight(self, weight: float) -> None: ...
     def setTrackingMarkers(self, trackingMarkerNames: typing.List[str]) -> None: ...
@@ -1398,6 +1410,58 @@ class MarkersErrorReport():
     def warnings(self, arg0: typing.List[str]) -> None:
         pass
     pass
+class MissingGRFReason():
+    """
+    Members:
+
+      notMissingGRF
+
+      measuredGrfZeroWhenAccelerationNonZero
+
+      unmeasuredExternalForceDetected
+
+      torqueDiscrepancy
+
+      forceDiscrepancy
+
+      notOverForcePlate
+
+      missingImpact
+
+      missingBlip
+
+      shiftGRF
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    __members__: dict # value = {'notMissingGRF': <MissingGRFReason.notMissingGRF: 0>, 'measuredGrfZeroWhenAccelerationNonZero': <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>, 'unmeasuredExternalForceDetected': <MissingGRFReason.unmeasuredExternalForceDetected: 2>, 'torqueDiscrepancy': <MissingGRFReason.torqueDiscrepancy: 3>, 'forceDiscrepancy': <MissingGRFReason.forceDiscrepancy: 4>, 'notOverForcePlate': <MissingGRFReason.notOverForcePlate: 5>, 'missingImpact': <MissingGRFReason.missingImpact: 6>, 'missingBlip': <MissingGRFReason.missingBlip: 7>, 'shiftGRF': <MissingGRFReason.shiftGRF: 8>}
+    forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 4>
+    measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
+    missingBlip: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingBlip: 7>
+    missingImpact: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingImpact: 6>
+    notMissingGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notMissingGRF: 0>
+    notOverForcePlate: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notOverForcePlate: 5>
+    shiftGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.shiftGRF: 8>
+    torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 3>
+    unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
+    pass
 class NeuralMarkerLabeller(MarkerLabeller):
     def __init__(self, jointCenterPredictor: typing.Callable[[typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]]) -> None: ...
     pass
@@ -1591,6 +1655,11 @@ class SubjectOnDisk():
         """
         The AddBiomechanics link for this subject's data.
         """
+    def getMissingGRFReason(self, trial: int) -> typing.List[MissingGRFReason]: 
+        """
+        This returns an array of enum values, one per frame in the specified trial,
+        each corresponding to the reason why a frame was marked as `probablyMissingGRF`.
+        """
     def getNotes(self) -> str: 
         """
         The notes (if any) added by the person who uploaded this data to AddBiomechanics.
@@ -1631,8 +1700,17 @@ class SubjectOnDisk():
         This will read the skeleton from the binary, and optionally use the passed in :code:`geometryFolder` to load meshes. We do not bundle meshes with :code:`SubjectOnDisk` files, to save space. If you do not pass in :code:`geometryFolder`, expect to get warnings about being unable to load meshes, and expect that your skeleton will not display if you attempt to visualize it.
         """
     @staticmethod
-    def writeSubject(outputPath: str, openSimFilePath: str, trialTimesteps: typing.List[float], trialPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], probablyMissingGRF: typing.List[typing.List[bool]], trialTaus: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], groundForceBodies: typing.List[str], trialGroundBodyWrenches: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialGroundBodyCopTorqueForce: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], customValueNames: typing.List[str], customValues: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], trialNames: typing.List[str] = [], sourceHref: str = '', notes: str = '') -> None: 
+    def writeSubject(outputPath: str, openSimFilePath: str, trialTimesteps: typing.List[float], trialPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], probablyMissingGRF: typing.List[typing.List[bool]], missingGRFReason: typing.List[typing.List[MissingGRFReason]], trialTaus: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], groundForceBodies: typing.List[str], trialGroundBodyWrenches: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialGroundBodyCopTorqueForce: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], customValueNames: typing.List[str], customValues: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], trialNames: typing.List[str] = [], sourceHref: str = '', notes: str = '') -> None: 
         """
         This writes a subject out to disk in a compressed and random-seekable binary format.
         """
     pass
+forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 4>
+measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
+missingBlip: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingBlip: 7>
+missingImpact: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingImpact: 6>
+notMissingGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notMissingGRF: 0>
+notOverForcePlate: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notOverForcePlate: 5>
+shiftGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.shiftGRF: 8>
+torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 3>
+unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
