@@ -4,15 +4,15 @@
 namespace dart {
 namespace biomechanics {
 
-enum MissingGRFReason { notMissingGRF = 0,
-                        missingGRF = 1,
-                        unmeasuredForce = 2,
-                        unmeasuredTorque = 3,
-                        forceDiscrepancy = 4,
-                        notOverForcePlate = 5,
-                        missingImpact = 6,
-                        missingBlip = 7,
-                        shiftGRF = 8};
+enum MissingGRFReason { notMissingGRF,
+                        missingGRF,
+                        unmeasuredForce,
+                        unmeasuredTorque,
+                        forceDiscrepancy,
+                        notOverForcePlate,
+                        missingImpact,
+                        missingBlip,
+                        shiftGRF};
 
 }
 }
