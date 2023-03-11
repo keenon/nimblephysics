@@ -1302,7 +1302,7 @@ public:
   // 0. Estimate when each foot is in contact with the ground, which we can use
   // to infer when we're missing GRF data on certain timesteps, so we don't let
   // it mess with our optimization.
-  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization>);
+  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init);
 
   // 0. This goes through and marks any "impact" GRF timesteps (defined as
   // `windowLen` steps after the first non-zero step after a flight phase with
@@ -1432,7 +1432,6 @@ public:
       s_t regularizeCopDriftCompensation = 1.0,
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
-      bool detectExternalForce = true,
       s_t avgPositionChangeThreshold = 0.08,
       s_t avgAngularChangeThreshold = 0.15);
 

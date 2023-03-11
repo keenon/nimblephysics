@@ -622,7 +622,6 @@ protected:
           ::py::arg("regularizeCopDriftCompensation") = 1.0,
           ::py::arg("maxBuckets") = 100,
           ::py::arg("detectUnmeasuredTorque") = true,
-          ::py::arg("detectExternalForce") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15)
       .def(
