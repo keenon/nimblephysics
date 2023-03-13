@@ -155,7 +155,8 @@ bool testWriteSubjectToDisk(
     {
       missingGRF.push_back(t % 10 == 0);
       if (t % 10 == 0) {
-        grfReason.push_back(MissingGRFReason::missingGRF);
+        grfReason.push_back(
+            MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero);
       } else {
         grfReason.push_back(MissingGRFReason::notMissingGRF);
       }
