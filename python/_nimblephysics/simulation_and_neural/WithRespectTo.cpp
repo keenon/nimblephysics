@@ -45,10 +45,10 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void WithRespectTo(py::module& m)
+void WithRespectTo(
+    py::module& m, ::py::class_<dart::neural::WithRespectTo>& WithRespectTo)
 {
-  ::py::class_<dart::neural::WithRespectTo>(m, "WithRespectTo")
-      .def("name", &dart::neural::WithRespectTo::name)
+  WithRespectTo.def("name", &dart::neural::WithRespectTo::name)
       .def(
           "get",
           +[](dart::neural::WithRespectTo* self, simulation::World* world)
