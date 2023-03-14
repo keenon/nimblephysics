@@ -96,7 +96,7 @@ WithRespectToVelocity::WithRespectToVelocity()
 /// A printable name for this WRT object
 std::string WithRespectToVelocity::name()
 {
-  return "VELOCUTY";
+  return "VELOCITY";
 }
 
 /// This returns this WRT from the world as a vector

@@ -7551,6 +7551,327 @@ s_t Skeleton::fitMarkersToWorldPositions(
 }
 
 //==============================================================================
+/// These are a set of bodies, and offsets in local body space where gyros
+/// are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getGyroMapReadings(
+    const SensorMap& gyros)
+{
+  std::map<std::string, Eigen::Vector3s> results;
+  for (auto& pair : gyros)
+  {
+    Eigen::Vector3s gyroInBodyFrame = pair.second.first->getAngularVelocity(
+        pair.second.first, pair.second.first);
+    Eigen::Isometry3s T_gb = pair.second.second.inverse();
+    T_gb.translation()
+        = T_gb.translation().cwiseProduct(pair.second.first->getScale());
+    results[pair.first] = T_gb * gyroInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where gyros
+/// are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getAccMapReadings(
+    const SensorMap& accs)
+{
+  std::map<std::string, Eigen::Vector3s> results;
+  for (auto& pair : accs)
+  {
+    Eigen::Vector3s accInBodyFrame = pair.second.first->getLinearAcceleration(
+        pair.second.first, pair.second.first);
+    Eigen::Isometry3s T_ab = pair.second.second.inverse();
+    T_ab.translation()
+        = T_ab.translation().cwiseProduct(pair.second.first->getScale());
+    results[pair.first] = T_ab * accInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
+/// This converts markers from a source skeleton to the current, doing a
+/// simple mapping based on body node names. Any markers that don't find a
+/// body node in the current skeleton with the same name are dropped.
+SensorMap Skeleton::convertSensorMap(
+    const SensorMap& sensorMap, bool warnOnDrop)
+{
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      result;
+  for (auto pair : sensorMap)
+  {
+    dynamics::BodyNode* node = getBodyNode(pair.second.first->getName());
+    if (node != nullptr)
+    {
+      Eigen::Isometry3s T = pair.second.second;
+      T.translation()
+          = T.translation().cwiseQuotient(pair.second.first->getScale());
+      result[pair.first] = std::make_pair(node, T);
+    }
+    else if (warnOnDrop)
+    {
+      std::cout
+          << "WARNING: sensor \"" << pair.first
+          << "\" attaches to a node named \"" << pair.second.first->getName()
+          << "\", for which there is no equivalent in the current skeleton. "
+             "This sensor will be dropped in the converted sensors map."
+          << std::endl;
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where gyros
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getGyroReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros)
+{
+  Eigen::VectorXs results = Eigen::VectorXs::Zero(gyros.size() * 3);
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  for (int i = 0; i < gyros.size(); i++)
+  {
+    Eigen::Vector3s gyroInBodyFrame
+        = bodyVels.segment<3>(gyros[i].first->getIndexInSkeleton() * 6);
+#ifndef NDEBUG
+    Eigen::Vector3s gyroInBodyFrameDirect
+        = gyros[i].first->getAngularVelocity(Frame::World(), gyros[i].first);
+    assert(gyroInBodyFrame == gyroInBodyFrameDirect);
+#endif
+    Eigen::Isometry3s T_gb = gyros[i].second.inverse();
+    results.segment<3>(i * 3) = T_gb.linear() * gyroInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::getGyroReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs bodyVelWrt = getBodyLocalVelocitiesJacobian(wrt);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(gyros.size() * 3, wrt->dim(this));
+  for (int i = 0; i < gyros.size(); i++)
+  {
+    Eigen::Isometry3s T_gb = gyros[i].second.inverse();
+    T_gb.translation()
+        = T_gb.translation().cwiseProduct(gyros[i].first->getScale());
+    // TODO: if we're taking the jacobian wrt body scales and that could change
+    // T_gb, we need to take that into account here.
+    J.block(i * 3, 0, 3, J.cols())
+        = math::AdTJac(
+              T_gb,
+              bodyVelWrt.block<6, Eigen::Dynamic>(
+                  gyros[i].first->getIndexInSkeleton() * 6,
+                  0,
+                  6,
+                  bodyVelWrt.cols()))
+              .block(0, 0, 3, bodyVelWrt.cols());
+  }
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::finiteDifferenceGyroReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(gyros.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getGyroReadings(gyros);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where accs
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getAccelerometerReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs)
+{
+  Eigen::VectorXs results = Eigen::VectorXs::Zero(accs.size() * 3);
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  Eigen::VectorXs bodyAccs = getBodyLocalAccelerations();
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_ba = accs[i].second;
+    Eigen::Vector3s offset = T_ba.translation();
+    offset = offset.cwiseProduct(accs[i].first->getScale());
+
+    // Explicit formulation
+    Eigen::Vector6s velInBodyFrame
+        = bodyVels.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::Vector6s accInBodyFrame
+        = bodyAccs.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::Vector6s velInAccFrame = velInBodyFrame;
+    velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
+    Eigen::Vector6s accInAccFrame = accInBodyFrame;
+    accInAccFrame.tail<3>().noalias() += accInBodyFrame.head<3>().cross(offset);
+    Eigen::Vector3s accTail = accInAccFrame.tail<3>();
+    Eigen::Vector3s contributionFromVel
+        = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
+    Eigen::Vector3s acc = accTail + contributionFromVel;
+    acc = T_ba.linear().transpose() * acc;
+
+    results.segment<3>(i * 3) = acc;
+
+#ifndef NDEBUG
+    Eigen::Vector3s accInBodyFrameDirect
+        = T_ba.linear().transpose()
+          * accs[i].first->getLinearAcceleration(
+              offset, Frame::World(), accs[i].first);
+    assert(acc == accInBodyFrameDirect);
+#endif
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs Skeleton::getAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(accs.size() * 3, wrt->dim(this));
+
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  Eigen::MatrixXs bodyVelWrt = getBodyLocalVelocitiesJacobian(wrt);
+  Eigen::VectorXs bodyAccs = getBodyLocalAccelerations();
+  Eigen::MatrixXs bodyAccWrt = getBodyLocalAccelerationsJacobian(wrt);
+
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_ba = accs[i].second;
+    Eigen::Vector3s offset = T_ba.translation();
+    offset = offset.cwiseProduct(accs[i].first->getScale());
+    Eigen::MatrixXs offsetWrt = Eigen::MatrixXs::Zero(3, wrt->dim(this));
+    if (wrt == neural::WithRespectTo::GROUP_SCALES)
+    {
+      int index = getScaleGroupIndex(accs[i].first);
+      offsetWrt.block(0, index * 3, 3, 3) = T_ba.translation().asDiagonal();
+    }
+
+    // Explicit formulation
+    Eigen::Vector6s velInBodyFrame
+        = bodyVels.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::MatrixXs velInBodyFrameWrt = bodyVelWrt.block(
+        accs[i].first->getIndexInSkeleton() * 6, 0, 6, bodyVelWrt.cols());
+    Eigen::Vector6s accInBodyFrame
+        = bodyAccs.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::MatrixXs accInBodyFrameWrt = bodyAccWrt.block(
+        accs[i].first->getIndexInSkeleton() * 6, 0, 6, bodyAccWrt.cols());
+
+    Eigen::Vector6s velInAccFrame = velInBodyFrame;
+    velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
+    Eigen::MatrixXs velInAccFrameWrt = velInBodyFrameWrt;
+    for (int col = 0; col < velInAccFrameWrt.cols(); col++)
+    {
+      velInAccFrameWrt.col(col).tail<3>().noalias()
+          += velInBodyFrameWrt.col(col).head<3>().cross(offset)
+             + velInBodyFrame.head<3>().cross(offsetWrt.col(col).head<3>());
+    }
+
+    Eigen::Vector6s accInAccFrame = accInBodyFrame;
+    accInAccFrame.tail<3>().noalias() += accInBodyFrame.head<3>().cross(offset);
+    Eigen::MatrixXs accInAccFrameWrt = accInBodyFrameWrt;
+    for (int col = 0; col < accInAccFrameWrt.cols(); col++)
+    {
+      accInAccFrameWrt.col(col).tail<3>().noalias()
+          += accInAccFrameWrt.col(col).head<3>().cross(offset)
+             + accInBodyFrame.head<3>().cross(offsetWrt.col(col).head<3>());
+    }
+
+    Eigen::Vector3s accTail = accInAccFrame.tail<3>();
+    Eigen::MatrixXs accTailWrt
+        = accInAccFrameWrt.block(3, 0, 3, accInAccFrameWrt.cols());
+
+    Eigen::Vector3s contributionFromVel
+        = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
+    Eigen::MatrixXs contributionFromVelWrt
+        = Eigen::MatrixXs::Zero(3, velInAccFrameWrt.cols());
+    for (int col = 0; col < velInAccFrameWrt.cols(); col++)
+    {
+      contributionFromVelWrt.col(col)
+          = velInAccFrame.head<3>().cross(velInAccFrameWrt.col(col).tail<3>())
+            + velInAccFrameWrt.col(col).head<3>().cross(
+                velInAccFrame.tail<3>());
+    }
+
+    Eigen::Vector3s acc = accTail + contributionFromVel;
+    acc = T_ba.linear().transpose() * acc;
+
+    Eigen::MatrixXs accWrt
+        = Eigen::MatrixXs::Zero(3, contributionFromVelWrt.cols());
+    for (int col = 0; col < accWrt.cols(); col++)
+    {
+      accWrt.col(col)
+          = T_ba.linear().transpose()
+            * (accTailWrt.col(col) + contributionFromVelWrt.col(col));
+    }
+
+    J.block(i * 3, 0, 3, J.cols()) = accWrt;
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs Skeleton::finiteDifferenceAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(accs.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getAccelerometerReadings(accs);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
 /// This measures the distance between two markers in world space, at the
 /// current configuration and scales.
 s_t Skeleton::getDistanceInWorldSpace(
@@ -7707,6 +8028,155 @@ Skeleton::finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
       result,
       eps,
       useRidders);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the spatial velocities (6 vecs) of the bodies each in local
+/// body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalVelocities()
+{
+  Eigen::VectorXs vels = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    vels.segment<6>(i * 6) = body->getSpatialVelocity(Frame::World(), body);
+  }
+  return vels;
+}
+
+//==============================================================================
+/// This returns the spatial accelerations (6 vecs) of the bodies in each in
+/// local body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    accs.segment<6>(i * 6) = body->getSpatialAcceleration(Frame::World(), body);
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local velocities for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_V_p;
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local velocities jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalVelocities();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local accelerations for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      jac.block(i * 6, 0, 6, dim) = getJacobian(bodyNodes[i], bodyNodes[i]);
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_dV_p;
+    }
+  }
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
 
   return result;
 }

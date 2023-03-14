@@ -63,6 +63,9 @@ namespace dynamics {
 typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
     MarkerMap;
 
+typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+    SensorMap;
+
 struct BodyScaleGroup
 {
   std::vector<dynamics::BodyNode*> nodes;
@@ -1568,6 +1571,62 @@ public:
       bool scaleBodies = false,
       math::IKConfig config = math::IKConfig());
 
+  /// These are a set of bodies, and offsets in local body space where gyros
+  /// are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getGyroMapReadings(
+      const SensorMap& gyros);
+
+  /// These are a set of bodies, and offsets in local body space where gyros
+  /// are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getAccMapReadings(
+      const SensorMap& accs);
+
+  /// This converts markers from a source skeleton to the current, doing a
+  /// simple mapping based on body node names. Any markers that don't find a
+  /// body node in the current skeleton with the same name are dropped.
+  SensorMap convertSensorMap(
+      const SensorMap& sensorMap, bool warnOnDrop = true);
+
+  /// These are a set of bodies, and offsets in local body space where gyros
+  /// are mounted on the body
+  Eigen::VectorXs getGyroReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs getGyroReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs finiteDifferenceGyroReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros,
+      neural::WithRespectTo* wrt);
+
+  /// These are a set of bodies, and offsets in local body space where accs
+  /// are mounted on the body
+  Eigen::VectorXs getAccelerometerReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs getAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs finiteDifferenceAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
   //----------------------------------------------------------------------------
   // Handling anthropometric measurements
   //----------------------------------------------------------------------------
@@ -1616,6 +1675,30 @@ public:
   //----------------------------------------------------------------------------
   // Handling translation of velocities and accelerations into body space
   //----------------------------------------------------------------------------
+
+  /// This returns the spatial velocities (6 vecs) of the bodies each in local
+  /// body space, concatenated
+  Eigen::VectorXs getBodyLocalVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the bodies in each in
+  /// local body space, concatenated
+  Eigen::VectorXs getBodyLocalAccelerations();
+
+  /// This computes the jacobian of the local velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our local velocities jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the local accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our local accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
 
   /// This returns the spatial velocities (6 vecs) of the bodies in world space,
   /// concatenated
