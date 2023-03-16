@@ -16491,6 +16491,7 @@ void DynamicsFitter::saveDynamicsToGUI(
                                         .eval()
                                         .completeOrthogonalDecomposition()
                                         .solve(residual.head<3>());
+
     residualTorques.push_back(spatialTorque);
     residualForces.push_back(residual.tail<3>());
     residualNorm += residual.squaredNorm();
@@ -16592,7 +16593,7 @@ void DynamicsFitter::saveDynamicsToGUI(
     server.setObjectTooltip(pair.first + "_marker", pair.first);
   }
 
-  std::cout << "Residual norm: " << residualNorm << std::endl;
+  std::cout << "Residual norm: " << (residualNorm / poses.cols()) << std::endl;
 
   std::vector<Eigen::Vector3s> coms = comPositions(init, trialIndex);
   std::vector<Eigen::Vector3s> comAccs = comAccelerations(init, trialIndex);
