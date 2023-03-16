@@ -7570,8 +7570,8 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getGyroMapReadings(
 }
 
 //==============================================================================
-/// These are a set of bodies, and offsets in local body space where gyros
-/// are mounted on the body
+/// These are a set of bodies, and offsets in local body space where
+/// accelerometers are mounted on the body
 std::map<std::string, Eigen::Vector3s> Skeleton::getAccMapReadings(
     const SensorMap& accs)
 {
