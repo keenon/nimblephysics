@@ -109,6 +109,9 @@ void DynamicsFitter(py::module& m)
           "probablyMissingGRF",
           &dart::biomechanics::DynamicsInitialization::probablyMissingGRF)
       .def_readwrite(
+          "missingGRFReason",
+          &dart::biomechanics::DynamicsInitialization::missingGRFReason)
+      .def_readwrite(
           "bodyMasses", &dart::biomechanics::DynamicsInitialization::bodyMasses)
       .def_readwrite(
           "bodyCom", &dart::biomechanics::DynamicsInitialization::bodyCom)
