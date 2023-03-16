@@ -16491,7 +16491,6 @@ void DynamicsFitter::saveDynamicsToGUI(
                                         .eval()
                                         .completeOrthogonalDecomposition()
                                         .solve(residual.head<3>());
-
     residualTorques.push_back(spatialTorque);
     residualForces.push_back(residual.tail<3>());
     residualNorm += residual.squaredNorm();
