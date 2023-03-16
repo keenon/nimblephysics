@@ -3,6 +3,7 @@ import nimblephysics_libs._nimblephysics.dynamics
 import typing
 import nimblephysics_libs._nimblephysics.common
 import nimblephysics_libs._nimblephysics.math
+import nimblephysics_libs._nimblephysics.neural
 import numpy
 _Shape = typing.Tuple[int, ...]
 
@@ -4397,6 +4398,13 @@ class Skeleton(MetaSkeleton):
     def computeKineticEnergy(self) -> float: ...
     def computePotentialEnergy(self) -> float: ...
     def convertMarkerMap(self, markerMap: typing.Dict[str, typing.Tuple[BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], warnOnDrop: bool = True) -> typing.Dict[str, typing.Tuple[BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]: ...
+    def convertSensorMap(self, sensorMap: typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]], warnOnDrop: bool = True) -> typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]: 
+        """
+        This converts markers from a source skeleton to the current, doing a
+        simple mapping based on body node names. Any markers that don't find a
+        body node in the current skeleton with the same name are dropped.
+            
+        """
     @typing.overload
     def createBallJointAndBodyNodePair(self) -> typing.Tuple[BallJoint, BodyNode]: ...
     @typing.overload
@@ -4493,6 +4501,22 @@ class Skeleton(MetaSkeleton):
     def enableSelfCollisionCheck(self) -> None: ...
     def fitJointsToWorldPositions(self, positionJoints: typing.List[Joint], targetPositions: numpy.ndarray[numpy.float64, _Shape[m, 1]], scaleBodies: bool = False, convergenceThreshold: float = 1e-07, maxStepCount: int = 100, leastSquaresDamping: float = 0.01, lineSearch: bool = True, logOutput: bool = False) -> float: ...
     def fitMarkersToWorldPositions(self, markers: typing.List[typing.Tuple[BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], targetPositions: numpy.ndarray[numpy.float64, _Shape[m, 1]], markerWeights: numpy.ndarray[numpy.float64, _Shape[m, 1]], scaleBodies: bool = False, convergenceThreshold: float = 1e-07, maxStepCount: int = 100, leastSquaresDamping: float = 0.01, lineSearch: bool = True, logOutput: bool = False) -> float: ...
+    def getAccMapReadings(self, accelerometers: typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+        """
+        These are a set of bodies, and offsets in local body space where gyros
+        are mounted on the body
+            
+        """
+    def getAccelerometerReadings(self, accelerometers: typing.List[typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
+        """
+        These are a set of bodies, and offsets in local body space where accs are mounted on the body.
+            
+        """
+    def getAccelerometerReadingsJacobianWrt(self, accs: typing.List[typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]], wrt: nimblephysics_libs._nimblephysics.neural.WithRespectTo) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
+        """
+        This returns the Jacobian relating changes in the `wrt` quantity to changes in acc readings.
+            
+        """
     def getAdjacentBodyCheck(self) -> bool: ...
     @typing.overload
     def getAngularJacobian(self, node: JacobianNode) -> numpy.ndarray[numpy.float64, _Shape[3, n]]: ...
@@ -4601,6 +4625,22 @@ class Skeleton(MetaSkeleton):
     def getGroupMassesUpperBound(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def getGroupScaleDim(self) -> int: ...
     def getGroupScales(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
+    def getGyroMapReadings(self, gyros: typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+        """
+        These are a set of bodies, and offsets in local body space where gyros
+        are mounted on the body
+            
+        """
+    def getGyroReadings(self, gyros: typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+        """
+        These are a set of bodies, and offsets in local body space where gyros are mounted on the body.
+            
+        """
+    def getGyroReadingsJacobianWrt(self, gyros: typing.List[typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]], wrt: nimblephysics_libs._nimblephysics.neural.WithRespectTo) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
+        """
+        This returns the Jacobian relating changes in the `wrt` quantity to changes in gyro readings.
+            
+        """
     def getHeight(self, pos: numpy.ndarray[numpy.float64, _Shape[m, 1]], up: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0., 1., 0.])) -> float: ...
     @typing.overload
     def getIndexOf(self, bn: BodyNode) -> int: ...

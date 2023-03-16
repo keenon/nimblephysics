@@ -1025,6 +1025,62 @@ void Skeleton(
           ::py::arg("lineSearch") = true,
           ::py::arg("logOutput") = false)
       .def(
+          "getGyroMapReadings",
+          &dart::dynamics::Skeleton::getGyroMapReadings,
+          ::py::arg("gyros"),
+          R"docs(
+These are a set of bodies, and offsets in local body space where gyros
+are mounted on the body
+    )docs")
+      .def(
+          "getAccMapReadings",
+          &dart::dynamics::Skeleton::getAccMapReadings,
+          ::py::arg("accelerometers"),
+          R"docs(
+These are a set of bodies, and offsets in local body space where gyros
+are mounted on the body
+    )docs")
+      .def(
+          "convertSensorMap",
+          &dart::dynamics::Skeleton::convertSensorMap,
+          ::py::arg("sensorMap"),
+          ::py::arg("warnOnDrop") = true,
+          R"docs(
+This converts markers from a source skeleton to the current, doing a
+simple mapping based on body node names. Any markers that don't find a
+body node in the current skeleton with the same name are dropped.
+    )docs")
+      .def(
+          "getGyroReadings",
+          &dart::dynamics::Skeleton::getGyroMapReadings,
+          ::py::arg("gyros"),
+          R"docs(
+These are a set of bodies, and offsets in local body space where gyros are mounted on the body.
+    )docs")
+      .def(
+          "getGyroReadingsJacobianWrt",
+          &dart::dynamics::Skeleton::getGyroReadingsJacobianWrt,
+          ::py::arg("gyros"),
+          ::py::arg("wrt"),
+          R"docs(
+This returns the Jacobian relating changes in the `wrt` quantity to changes in gyro readings.
+    )docs")
+      .def(
+          "getAccelerometerReadings",
+          &dart::dynamics::Skeleton::getAccelerometerReadings,
+          ::py::arg("accelerometers"),
+          R"docs(
+These are a set of bodies, and offsets in local body space where accs are mounted on the body.
+    )docs")
+      .def(
+          "getAccelerometerReadingsJacobianWrt",
+          &dart::dynamics::Skeleton::getAccelerometerReadingsJacobianWrt,
+          ::py::arg("accs"),
+          ::py::arg("wrt"),
+          R"docs(
+This returns the Jacobian relating changes in the `wrt` quantity to changes in acc readings.
+    )docs")
+      .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
             self->setVelocityUpperLimits(limits);

@@ -42,7 +42,8 @@ namespace dart {
 namespace python {
 
 // Neural
-void WithRespectTo(py::module& sm);
+void WithRespectTo(
+    py::module& sm, ::py::class_<dart::neural::WithRespectTo>& withRespectTo);
 void WithRespectToMass(py::module& sm);
 void NeuralUtils(py::module& sm);
 void NeuralGlobalMethods(py::module& sm);
@@ -59,10 +60,12 @@ void World(
         dart::simulation::World,
         std::shared_ptr<dart::simulation::World>>& world);
 
-void dart_simulation_and_neural(py::module& m)
+void dart_simulation_and_neural(
+    py::module& m,
+    py::module& neural,
+    ::py::class_<dart::neural::WithRespectTo>& withRespectTo)
 {
   auto simulation = m.def_submodule("simulation");
-  auto neural = m.def_submodule("neural");
 
   neural.doc()
       = "This provides gradients to DART, with an eye on embedding DART as a "
@@ -73,7 +76,7 @@ void dart_simulation_and_neural(py::module& m)
           simulation, "World");
 
   NeuralUtils(neural);
-  WithRespectTo(neural);
+  WithRespectTo(neural, withRespectTo);
   WithRespectToMass(neural);
   Mapping(neural);
   IKMapping(neural);
