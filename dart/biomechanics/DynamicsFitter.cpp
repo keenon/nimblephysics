@@ -12134,7 +12134,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     int maxBuckets,
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
-    s_t avgAngularChangeThreshold)
+    s_t avgAngularChangeThreshold,
+    bool reoptimizeMarkerOffsets)
 {
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   for (int i = 0; i < init->poseTrials.size(); i++)
@@ -12261,7 +12262,9 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   }
 
   // Recompute the marker offsets to minimize error
-  optimizeMarkerOffsets(init);
+  if (reoptimizeMarkerOffsets) {
+    optimizeMarkerOffsets(init);
+  }
   return true;
 }
 

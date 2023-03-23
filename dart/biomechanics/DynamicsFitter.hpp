@@ -1433,7 +1433,8 @@ public:
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
-      s_t avgAngularChangeThreshold = 0.15);
+      s_t avgAngularChangeThreshold = 0.15,
+      bool reoptimizeMarkerOffsets = true);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external
