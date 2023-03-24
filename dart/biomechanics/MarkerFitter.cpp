@@ -67,9 +67,14 @@ MarkerFitterState::MarkerFitterState(
   int markerOffsetDim = fitter->mMarkers.size() * 3;
   // poses
   int posesDim = skeleton->getNumDofs() * markerObservations.size();
+  // the root position for the static calibration pose
+  int staticRootDim = 6;
 
-  (void)posesDim; // Don't break the compile when we strip out asserts
-  assert(flat.size() == groupScaleDim + markerOffsetDim + posesDim);
+  (void)posesDim;      // Don't break the compile when we strip out asserts
+  (void)staticRootDim; // Don't break the compile when we strip out asserts
+  assert(
+      flat.size()
+      == groupScaleDim + markerOffsetDim + posesDim + staticRootDim);
 
   /*
   std::map<std::string, Eigen::Vector3s> bodyScales;
@@ -203,6 +208,13 @@ MarkerFitterState::MarkerFitterState(
     }
   }
 
+  // Grab the root position for the static calibration pose
+
+  staticPoseRoot = flat.segment<6>(
+      groupScaleDim + markerOffsetDim
+      + (skeleton->getNumDofs() * posesAtTimesteps.cols()));
+  staticPoseRootGrad = Eigen::Vector6s::Zero();
+
   skeleton->setPositions(originalPos);
   skeleton->setGroupScales(originalScales);
 }
@@ -217,9 +229,11 @@ Eigen::VectorXs MarkerFitterState::flattenState()
   int markerOffsetDim = markerOrder.size() * 3;
   // poses
   int posesDim = skeleton->getNumDofs() * posesAtTimesteps.cols();
+  // the root position for the static calibration pose
+  int staticRootDim = 6;
 
-  Eigen::VectorXs flat
-      = Eigen::VectorXs::Zero(groupScaleDim + markerOffsetDim + posesDim);
+  Eigen::VectorXs flat = Eigen::VectorXs::Zero(
+      groupScaleDim + markerOffsetDim + posesDim + staticRootDim);
 
   // Collapse body scales into group scales
 
@@ -248,6 +262,13 @@ Eigen::VectorXs MarkerFitterState::flattenState()
         = posesAtTimesteps.col(i);
   }
 
+  // Write the static calibration pose root position
+
+  flat.segment<6>(
+      groupScaleDim + markerOffsetDim
+      + (skeleton->getNumDofs() * posesAtTimesteps.cols()))
+      = staticPoseRoot;
+
   return flat;
 }
 
@@ -262,11 +283,13 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
   int markerOffsetDim = markerOrder.size() * 3;
   // poses
   int posesDim = skeleton->getNumDofs() * posesAtTimesteps.cols();
+  // the root position for the static calibration pose
+  int staticRootDim = 6;
 
   // 1. Write scale grad
 
-  Eigen::VectorXs grad
-      = Eigen::VectorXs::Zero(groupScaleDim + markerOffsetDim + posesDim);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(
+      groupScaleDim + markerOffsetDim + posesDim + staticRootDim);
 
   std::map<std::string, Eigen::Vector3s> bodyScalesGradMap;
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
@@ -364,6 +387,13 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
 
   skeleton->setGroupScales(originalScales);
   skeleton->setPositions(originalPos);
+
+  // Write the static calibration pose root position
+
+  grad.segment<6>(
+      groupScaleDim + markerOffsetDim
+      + (skeleton->getNumDofs() * posesAtTimesteps.cols()))
+      = staticPoseRootGrad;
 
   return grad;
 }
@@ -556,7 +586,9 @@ MarkerFitter::MarkerFitter(
     mSilenceOutput(false),
     mDisableLinesearch(false),
     mAnatomicalMarkerDefaultWeight(1.0),
-    mTrackingMarkerDefaultWeight(0.02)
+    mTrackingMarkerDefaultWeight(0.02),
+    mStaticTrialWeight(10.0),
+    mStaticTrialEnabled(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
 
@@ -772,6 +804,112 @@ MarkerFitter::MarkerFitter(
     }
     loss += bodyScaleReg;
 
+    // 7. If we've included a static pose, then we want to compute the loss at
+    // the static pose for our current scaling and marker offsets.
+    s_t staticPoseRegularization = 0.0;
+    if (mStaticTrialEnabled)
+    {
+      Eigen::VectorXs oldBodyScales = this->mSkeleton->getBodyScales();
+      Eigen::VectorXs oldPose = this->mSkeleton->getPositions();
+
+      // 7.1. Set the skeleton to the static pose and the current scales in the
+      // problem.
+      for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
+      {
+        this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
+      }
+      Eigen::VectorXs staticPose = mStaticTrialPose;
+      staticPose.head<6>() = state->staticPoseRoot;
+      this->mSkeleton->setPositions(staticPose);
+
+      // 7.2. Construct the most up-to-date list of markers for the static trial
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+          staticTrialMarkers;
+      std::vector<int> staticMarkerIndexes;
+      for (int i = 0; i < mStaticTrialMarkerNames.size(); i++)
+      {
+        bool foundMarker = false;
+        for (int j = 0; j < mMarkerNames.size(); j++)
+        {
+          if (mStaticTrialMarkerNames[i] == mMarkerNames[j])
+          {
+            staticMarkerIndexes.push_back(j);
+            staticTrialMarkers.push_back(std::make_pair(
+                mMarkers[j].first,
+                mMarkers[j].second + state->markerOffsets.col(j)));
+            foundMarker = true;
+            break;
+          }
+        }
+        assert(foundMarker);
+        if (!foundMarker)
+        {
+          std::cout << "ERROR: static trial marker "
+                    << mStaticTrialMarkerNames[i]
+                    << " did not appear in the markerset. This is a runtime "
+                       "error, because it should have been filtered out in "
+                       "MarkerFitter::setStaticTrial(). Exit 1"
+                    << std::endl;
+          exit(1);
+        }
+      }
+
+      // 7.3. Actually compute the loss, which is just over the marker positions
+      // in the static pose.
+      Eigen::VectorXs computedStaticMarkerPosition
+          = this->mSkeleton->getMarkerWorldPositions(staticTrialMarkers);
+      Eigen::VectorXs staticMarkerError
+          = computedStaticMarkerPosition - this->mStaticTrialMarkerPositions;
+      staticPoseRegularization
+          = mStaticTrialWeight * staticMarkerError.squaredNorm();
+
+      // 7.4. Translate gradients from vector back to matrix form for the state
+      // object
+      Eigen::VectorXs staticMarkerErrorGrad
+          = mStaticTrialWeight * 2 * staticMarkerError;
+
+      // 7.4.1. Body scales
+      Eigen::VectorXs bodyScalesGradVector
+          = this->mSkeleton
+                ->getMarkerWorldPositionsJacobianWrtBodyScales(
+                    staticTrialMarkers)
+                .transpose()
+            * staticMarkerErrorGrad;
+      for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
+      {
+        state->bodyScalesGrad.col(i) += bodyScalesGradVector.segment<3>(i * 3);
+      }
+      // 7.4.2. Marker offsets
+      Eigen::VectorXs markerOffsetsGradVector
+          = this->mSkeleton
+                ->getMarkerWorldPositionsJacobianWrtMarkerOffsets(
+                    staticTrialMarkers)
+                .transpose()
+            * staticMarkerErrorGrad;
+      for (int i = 0; i < staticMarkerIndexes.size(); i++)
+      {
+        state->markerOffsetsGrad.col(staticMarkerIndexes[i])
+            += markerOffsetsGradVector.segment<3>(i * 3);
+      }
+      // 7.4.3. Root translation
+      Eigen::VectorXs jointGradVector
+          = this->mSkeleton
+                ->getMarkerWorldPositionsJacobianWrtJointPositions(
+                    staticTrialMarkers)
+                .transpose()
+            * staticMarkerErrorGrad;
+      state->staticPoseRootGrad = jointGradVector.head<6>();
+
+      // 7.5. Reset
+      this->mSkeleton->setPositions(oldPose);
+      this->mSkeleton->setBodyScales(oldBodyScales);
+    }
+    else
+    {
+      state->staticPoseRootGrad.setZero();
+    }
+    loss += staticPoseRegularization;
+
     if (mDebugLoss)
     {
       std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
@@ -779,11 +917,18 @@ MarkerFitter::MarkerFitter(
                 << ",anthR=" << anthroRegularization
                 << ",bodyEvenR=" << bodyEvenRegularization
                 << ",bodyR=" << bodyScaleReg
-                << ",boundsR=" << jointBoundsRegularization << "]" << std::endl;
+                << ",boundsR=" << jointBoundsRegularization
+                << ",staticR=" << staticPoseRegularization << "]" << std::endl;
     }
 
     return loss;
   };
+}
+
+//==============================================================================
+MarkerInitialization::MarkerInitialization()
+  : staticPoseRoot(Eigen::Vector6s::Zero())
+{
 }
 
 //==============================================================================
@@ -3875,6 +4020,87 @@ MarkerInitialization MarkerFitter::getInitialization(
     }
   }
 
+  // 6. Find a good initial value for the root position for the static pose,
+  // given all the other configuration we've found.
+
+  if (mStaticTrialEnabled)
+  {
+    Eigen::VectorXs originalPositions = mSkeleton->getPositions();
+
+    // 6.1. Construct the most up-to-date list of markers for the static trial
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+        staticTrialMarkers;
+    for (int i = 0; i < mStaticTrialMarkerNames.size(); i++)
+    {
+      bool foundMarker = false;
+      for (int j = 0; j < mMarkerNames.size(); j++)
+      {
+        if (mStaticTrialMarkerNames[i] == mMarkerNames[j])
+        {
+          staticTrialMarkers.push_back(
+              result.updatedMarkerMap[mMarkerNames[j]]);
+          foundMarker = true;
+          break;
+        }
+      }
+      assert(foundMarker);
+      if (!foundMarker)
+      {
+        std::cout << "ERROR: static trial marker " << mStaticTrialMarkerNames[i]
+                  << " did not appear in the markerset. This is a runtime "
+                     "error, because it should have been filtered out in "
+                     "MarkerFitter::setStaticTrial(). Exit 1"
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    Eigen::VectorXs rootPos = mStaticTrialPose.head(6);
+    math::solveIK(
+        rootPos,
+        mSkeleton->getPositionUpperLimits().head(6),
+        mSkeleton->getPositionLowerLimits().head(6),
+        (staticTrialMarkers.size() * 3),
+        // Set positions
+        [this](
+            /* in*/ const Eigen::VectorXs pos, bool clamp) {
+          (void)clamp;
+          // Complete the root position to the rest of the skeleton
+          Eigen::VectorXs fullPos = mStaticTrialPose;
+          fullPos.head(6) = pos;
+          mSkeleton->setPositions(fullPos);
+          // Return the root position
+          return pos;
+        },
+        // Compute the Jacobian
+        [this, &staticTrialMarkers](
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          diff.segment(0, staticTrialMarkers.size())
+              = mSkeleton->getMarkerWorldPositions(staticTrialMarkers)
+                - mStaticTrialMarkerPositions;
+          assert(jac.cols() == 6);
+          assert(jac.rows() == (staticTrialMarkers.size() * 3));
+          jac.setZero();
+          jac.block(0, 0, staticTrialMarkers.size() * 3, 6)
+              = mSkeleton
+                    ->getMarkerWorldPositionsJacobianWrtJointPositions(
+                        staticTrialMarkers)
+                    .block(0, 0, staticTrialMarkers.size() * 3, 6);
+        },
+        // Generate a random restart position
+        [this](Eigen::Ref<Eigen::VectorXs> val) {
+          val = mSkeleton->getRandomPose().head(6);
+        },
+        math::IKConfig()
+            .setMaxStepCount(150)
+            .setConvergenceThreshold(1e-10)
+            // .setLossLowerBound(1e-8)
+            .setLogOutput(true));
+    result.staticPoseRoot = mSkeleton->getPositions().head<6>();
+    mSkeleton->setPositions(originalPositions);
+  }
+
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
   result.jointWeights = params.jointWeights;
@@ -6115,6 +6341,41 @@ void MarkerFitter::setAnthropometricPrior(
 }
 
 //==============================================================================
+/// This sets the data from a static trial, which we can use to resolve some
+/// forms of pelvis and foot ambiguity.
+void MarkerFitter::setStaticTrial(
+    std::map<std::string, Eigen::Vector3s> markerObservations,
+    Eigen::VectorXs pose)
+{
+  mStaticTrialEnabled = true;
+  mStaticTrialPose = pose;
+
+  mStaticTrialMarkerNames.clear();
+  for (auto& pair : mMarkerMap)
+  {
+    if (markerObservations.count(pair.first))
+    {
+      mStaticTrialMarkerNames.push_back(pair.first);
+    }
+  }
+  mStaticTrialMarkerPositions
+      = Eigen::VectorXs::Zero(mStaticTrialMarkerNames.size() * 3);
+  for (int i = 0; i < mStaticTrialMarkerNames.size(); i++)
+  {
+    mStaticTrialMarkerPositions.segment<3>(i * 3)
+        = markerObservations.at(mStaticTrialMarkerNames[i]);
+  }
+}
+
+//==============================================================================
+/// This sets how heavily to weight the static trial in our optimization,
+/// compared to other terms.
+void MarkerFitter::setStaticTrialWeight(s_t weight)
+{
+  mStaticTrialWeight = weight;
+}
+
+//==============================================================================
 /// Sets the loss and gradient function
 void MarkerFitter::setCustomLossAndGrad(
     std::function<s_t(MarkerFitterState*)> customLossAndGrad)
@@ -7682,7 +7943,8 @@ int BilevelFitProblem::getProblemSize()
   int scaleGroupDims = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDims = mFitter->mMarkers.size() * 3;
   int poseDims = mFitter->mSkeleton->getNumDofs() * mSampleIndices.size();
-  return scaleGroupDims + markerOffsetDims + poseDims;
+  int staticPoseRootDims = 6;
+  return scaleGroupDims + markerOffsetDims + poseDims + staticPoseRootDims;
 }
 
 //==============================================================================
@@ -7698,7 +7960,7 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
   int dofs = mFitter->mSkeleton->getNumDofs();
 
   Eigen::VectorXs init = Eigen::VectorXs::Zero(
-      groupScaleDim + markerOffsetDim + (mSampleIndices.size() * dofs));
+      groupScaleDim + markerOffsetDim + (mSampleIndices.size() * dofs) + 6);
 
   // Copy group scales
   init.segment(0, groupScaleDim) = mInitialization.groupScales;
@@ -7721,6 +7983,11 @@ Eigen::VectorXs BilevelFitProblem::getInitialization()
     init.segment(groupScaleDim + markerOffsetDim + (i * dofs), dofs)
         = mInitialization.poses.col(mSampleIndices[i]);
   }
+
+  // Copy static pose root
+  init.segment<6>(
+      groupScaleDim + markerOffsetDim + (mSampleIndices.size() * dofs))
+      = mInitialization.staticPoseRoot;
 
   // std::cout << "Init group scales: " << std::endl
   //           << init.segment(0, groupScaleDim) << std::endl;
