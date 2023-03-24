@@ -296,7 +296,11 @@ bool testBilevelFitProblemGradients(
         std::string,
         std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markersMap)
 {
-  const s_t THRESHOLD = 5e-8;
+  // const s_t THRESHOLD = 5e-8;
+  // This threshold had to get looser after we added the static pose, because it
+  // makes the loss a bit higher (and therefore gradient finite differencing
+  // works a tad less well)
+  const s_t THRESHOLD = 5e-7;
 
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   for (auto pair : markersMap)
@@ -365,6 +369,7 @@ bool testBilevelFitProblemGradients(
       = goldJointCenters
         + Eigen::MatrixXs::Random(joints.size() * 3, numPoses) * 0.07;
   init.groupScales = originalGroupScales;
+  init.staticPoseRoot = Eigen::Vector6s::Zero();
 
   BilevelFitProblem problem(
       &fitter,
@@ -381,13 +386,13 @@ bool testBilevelFitProblemGradients(
 
   if (!equals(grad, grad_fd, THRESHOLD))
   {
-    std::cout << "Error on BilevelFitProblem grad" << std::endl
-              << "Analytical:" << std::endl
-              << grad << std::endl
-              << "FD:" << std::endl
-              << grad_fd << std::endl
-              << "Diff:" << std::endl
-              << grad - grad_fd << std::endl;
+    std::cout << "Error on BilevelFitProblem grad" << std::endl;
+    // << "Analytical:" << std::endl
+    // << grad << std::endl
+    // << "FD:" << std::endl
+    // << grad_fd << std::endl
+    // << "Diff:" << std::endl
+    // << grad - grad_fd << std::endl;
 
     Eigen::VectorXs diff = grad - grad_fd;
     int scaleDim = skel->getGroupScaleDim();
@@ -419,6 +424,20 @@ bool testBilevelFitProblemGradients(
                 << compare << std::endl;
     }
 
+    Eigen::VectorXs rootPoseGrad = grad.tail(6);
+    Eigen::VectorXs rootPoseGrad_fd = grad_fd.tail(6);
+    if (!equals(rootPoseGrad, rootPoseGrad_fd, THRESHOLD))
+    {
+      Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
+      compare.col(0) = rootPoseGrad;
+      compare.col(1) = rootPoseGrad_fd;
+      compare.col(2) = rootPoseGrad - rootPoseGrad_fd;
+      std::cout << "Error on BilevelFitProblem static root pose grad"
+                << std::endl
+                << "Analytical - FD - Diff" << std::endl
+                << compare << std::endl;
+    }
+
     return false;
   }
 
@@ -427,6 +446,8 @@ bool testBilevelFitProblemGradients(
 
   if (!equals(jac, jac_fd, THRESHOLD))
   {
+    std::cout << "Error on BilevelFitProblem constraint jac" << std::endl;
+
     Eigen::MatrixXs jacScales
         = jac.block(0, 0, jac.rows(), skel->getGroupScaleDim());
     Eigen::MatrixXs jacScales_fd
@@ -476,6 +497,26 @@ bool testBilevelFitProblemGradients(
                   << jacPos_fd << std::endl
                   << "Diff:" << std::endl
                   << jacPos - jacPos_fd << std::endl;
+      }
+    }
+
+    offset = (skel->getGroupScaleDim()) + (markers.size() * 3)
+             + (skel->getNumDofs() * numPoses);
+    for (int i = 0; i < numPoses; i++)
+    {
+      Eigen::MatrixXs jacRootPose = jac.block(0, offset, jac.rows(), 6);
+      Eigen::MatrixXs jacRootPose_fd = jac_fd.block(0, offset, jac.rows(), 6);
+      if (!equals(jacRootPose, jacRootPose_fd, THRESHOLD))
+      {
+        std::cout << "Error on BilevelFitProblem constraint jac, state pose "
+                     "root block"
+                  << std::endl
+                  << "Analytical:" << std::endl
+                  << jacRootPose << std::endl
+                  << "FD:" << std::endl
+                  << jacRootPose_fd << std::endl
+                  << "Diff:" << std::endl
+                  << jacRootPose - jacRootPose_fd << std::endl;
       }
     }
 
@@ -1346,7 +1387,10 @@ std::vector<MarkerInitialization> runEngine(
     s_t heightM,
     std::string sex,
     bool saveGUI = false,
-    bool runGUI = false)
+    bool runGUI = false,
+    std::map<std::string, Eigen::Vector3s> staticPoseMarkers
+    = std::map<std::string, Eigen::Vector3s>(),
+    Eigen::VectorXs staticPose = Eigen::VectorXs::Zero(0))
 {
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
@@ -1387,10 +1431,12 @@ std::vector<MarkerInitialization> runEngine(
   // Create MarkerFitter
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
 
-  fitter.setIgnoreJointLimits(true);
+  // fitter.setIgnoreJointLimits(true);
 
-  fitter.setInitialIKSatisfactoryLoss(0.005);
-  fitter.setInitialIKMaxRestarts(50);
+  // fitter.setInitialIKSatisfactoryLoss(0.005);
+  // fitter.setInitialIKMaxRestarts(50);
+  fitter.setInitialIKSatisfactoryLoss(1e-5);
+  fitter.setInitialIKMaxRestarts(150);
   fitter.setIterationLimit(400);
   if (standard.anatomicalMarkers.size() > 10)
   {
@@ -1415,6 +1461,8 @@ std::vector<MarkerInitialization> runEngine(
   fitter.setMinAxisFitScore(0.001);
   // Default max joint weight is 0.5, so this is 2x the default value
   fitter.setMaxJointWeight(1.0);
+
+  // fitter.setDebugLoss(true);
 
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
@@ -1451,6 +1499,13 @@ std::vector<MarkerInitialization> runEngine(
   gauss = gauss->condition(observedValues);
   anthropometrics->setDistribution(gauss);
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
+
+  (void)staticPoseMarkers;
+  (void)staticPose;
+  if (staticPoseMarkers.size() > 0)
+  {
+    fitter.setStaticTrial(staticPoseMarkers, staticPose);
+  }
 
   std::vector<std::shared_ptr<MarkersErrorReport>> reports;
   for (int i = 0; i < markerObservationTrials.size(); i++)
@@ -1765,6 +1820,12 @@ void evaluateOnSyntheticData(
 
   s_t heightM = scaled.skeleton->getHeight(scaled.skeleton->getPositions());
 
+  Eigen::VectorXs staticPos
+      = Eigen::VectorXs::Zero(scaled.skeleton->getNumDofs());
+  scaled.skeleton->setPositions(staticPos);
+  std::map<std::string, Eigen::Vector3s> staticMarkers
+      = scaled.skeleton->getMarkerMapWorldPositions(scaled.markersMap);
+
   /////////////////////////////////////////////////////////////////
   // Do the fit
   /////////////////////////////////////////////////////////////////
@@ -1778,7 +1839,9 @@ void evaluateOnSyntheticData(
       heightM,
       sex,
       true,
-      false);
+      false,
+      staticMarkers,
+      staticPos);
 
   /////////////////////////////////////////////////////////////////
   // Do the evaluation
@@ -2440,6 +2503,14 @@ TEST(MarkerFitter, DERIVATIVES)
   observedMarkers["4"] = Eigen::Vector3s::Random();
   observedMarkers["5"] = Eigen::Vector3s::Random();
 
+  std::map<std::string, Eigen::Vector3s> staticMarkers;
+  staticMarkers["0"] = Eigen::Vector3s::Random();
+  staticMarkers["1"] = Eigen::Vector3s::Random();
+  staticMarkers["2"] = Eigen::Vector3s::Random();
+  staticMarkers["3"] = Eigen::Vector3s::Random();
+  fitter.setStaticTrial(
+      staticMarkers, Eigen::VectorXs::Zero(osim->getNumDofs()));
+
   /*
   Eigen::VectorXs pose = Eigen::VectorXs(37);
   pose << 1.28514, 0.599806, 0.709412, -3.31116, 1.96564, 2.61346, -0.363238,
@@ -2515,6 +2586,9 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   observedMarkers["4"] = Eigen::Vector3s::Random();
   observedMarkers["5"] = Eigen::Vector3s::Random();
 
+  fitter.setStaticTrial(
+      observedMarkers, Eigen::VectorXs::Zero(osim->getNumDofs()));
+
   std::vector<dynamics::Joint*> joints;
   joints.push_back(osimBallJoints->getJoint("walker_knee_l"));
   joints.push_back(osimBallJoints->getJoint("walker_knee_r"));
@@ -2580,6 +2654,9 @@ TEST(MarkerFitter, DERIVATIVES_COMPLETE_HUMAN)
   observedMarkers["3"] = Eigen::Vector3s::Random();
   observedMarkers["4"] = Eigen::Vector3s::Random();
   observedMarkers["5"] = Eigen::Vector3s::Random();
+
+  fitter.setStaticTrial(
+      observedMarkers, Eigen::VectorXs::Zero(osim->getNumDofs()));
 
   /*
   Eigen::VectorXs pose = Eigen::VectorXs(37);

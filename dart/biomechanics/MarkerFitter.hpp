@@ -67,6 +67,7 @@ struct MarkerFitterState
   std::vector<std::string> jointOrder;
   Eigen::MatrixXs jointErrorsAtTimesteps;
   Eigen::MatrixXs axisErrorsAtTimesteps;
+  Eigen::Vector6s staticPoseRoot;
 
   // The gradient of the current state, which is not always used, but can help
   // shuttling information back and forth from friendly PyTorch APIs.
@@ -76,6 +77,7 @@ struct MarkerFitterState
   Eigen::MatrixXs posesAtTimestepsGrad;
   Eigen::MatrixXs jointErrorsAtTimestepsGrad;
   Eigen::MatrixXs axisErrorsAtTimestepsGrad;
+  Eigen::Vector6s staticPoseRootGrad;
 
   /// This unflattens an input vector, given some information about the problm
   MarkerFitterState(
@@ -117,6 +119,7 @@ struct MarkerInitialization
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       updatedMarkerMap;
+  Eigen::Vector6s staticPoseRoot;
 
   std::vector<dynamics::Joint*> joints;
   std::vector<std::vector<std::string>> jointsAdjacentMarkers;
@@ -131,6 +134,8 @@ struct MarkerInitialization
   std::vector<std::string> observedMarkers;
   std::vector<dynamics::Joint*> observedJoints;
   std::vector<dynamics::Joint*> unobservedJoints;
+
+  MarkerInitialization();
 };
 
 /**
@@ -773,6 +778,16 @@ public:
   void setAnthropometricPrior(
       std::shared_ptr<biomechanics::Anthropometrics> prior, s_t weight = 0.001);
 
+  /// This sets the data from a static trial, which we can use to resolve some
+  /// forms of pelvis and foot ambiguity.
+  void setStaticTrial(
+      std::map<std::string, Eigen::Vector3s> markerObservations,
+      Eigen::VectorXs pose);
+
+  /// This sets how heavily to weight the static trial in our optimization,
+  /// compared to other terms.
+  void setStaticTrialWeight(s_t weight);
+
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
       std::function<s_t(MarkerFitterState*)> customLossAndGrad);
@@ -977,6 +992,13 @@ protected:
   std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
   s_t mAnthropometricWeight;
 
+  /// This is an optional prior for a static pose trial, which can be used to
+  /// help address ambiguity about feet and pelvis offsets
+  bool mStaticTrialEnabled;
+  std::vector<std::string> mStaticTrialMarkerNames;
+  Eigen::VectorXs mStaticTrialMarkerPositions;
+  Eigen::VectorXs mStaticTrialPose;
+
   bool mDebugLoss;
   s_t mInitialIKSatisfactoryLoss;
   int mInitialIKMaxRestarts;
@@ -998,6 +1020,7 @@ protected:
   s_t mRegularizeJointBounds;
   s_t mAnatomicalMarkerDefaultWeight;
   s_t mTrackingMarkerDefaultWeight;
+  s_t mStaticTrialWeight;
 
   // These are IPOPT settings
   double mTolerance;

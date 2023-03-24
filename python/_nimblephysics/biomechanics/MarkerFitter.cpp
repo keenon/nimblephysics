@@ -263,6 +263,15 @@ void MarkerFitter(py::module& m)
           ::py::arg("prior"),
           ::py::arg("weight") = 0.001)
       .def(
+          "setStaticTrial",
+          &dart::biomechanics::MarkerFitter::setStaticTrial,
+          ::py::arg("markerObservationsMapAtStaticPose"),
+          ::py::arg("staticPose"))
+      .def(
+          "setStaticTrialWeight",
+          &dart::biomechanics::MarkerFitter::setStaticTrialWeight,
+          ::py::arg("weight"))
+      .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))
