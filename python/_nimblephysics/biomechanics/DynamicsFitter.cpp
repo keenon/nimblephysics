@@ -341,7 +341,7 @@ protected:
       .def(
           "setRegularizeJointAcc",
           &dart::biomechanics::DynamicsFitProblemConfig::
-              setRegularizeSpatialAcc,
+              setRegularizeJointAcc,
           ::py::arg("value"))
       .def(
           "setResidualTorqueMultiple",
