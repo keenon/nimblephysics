@@ -2908,6 +2908,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
           int wrench = -1;
 
           std::string empty = "";
+          std::string underscore = "_";
           std::string prefixSuffix = token;
 
           if (token.find("px") != std::string::npos)
@@ -2956,6 +2957,27 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
           {
             prefixSuffix.replace(
                 token.find("torque_z"), std::string("torque_z").size(), empty);
+            wrench = 2;
+          }
+          if (token.find("torque_r_x") != std::string::npos ||
+              token.find("torque_l_x") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("_x"), std::string("_x").size(), underscore);
+            wrench = 0;
+          }
+          if (token.find("torque_r_y") != std::string::npos ||
+              token.find("torque_l_y") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("_y"), std::string("_y").size(), underscore);
+            wrench = 1;
+          }
+          if (token.find("torque_r_z") != std::string::npos ||
+              token.find("torque_l_z") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("_z"), std::string("_z").size(), underscore);
             wrench = 2;
           }
           if (token.find("vx") != std::string::npos)
