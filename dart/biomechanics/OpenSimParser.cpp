@@ -4316,6 +4316,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
             coordinateCursor->FirstChildElement("default_value")->GetText());
         dof->setPositionLowerLimit(defaultValue);
         dof->setPositionUpperLimit(defaultValue);
+        dof->setVelocityLowerLimit(0);
+        dof->setVelocityUpperLimit(0);
+        dof->setAccelerationLowerLimit(0);
+        dof->setAccelerationUpperLimit(0);
         // This prevents warnings when copying the skeleton about out-of-bounds
         // rest positions
         dof->setRestPosition(defaultValue);
