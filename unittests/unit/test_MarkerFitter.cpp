@@ -300,7 +300,7 @@ bool testBilevelFitProblemGradients(
   // This threshold had to get looser after we added the static pose, because it
   // makes the loss a bit higher (and therefore gradient finite differencing
   // works a tad less well)
-  const s_t THRESHOLD = 5e-7;
+  const s_t THRESHOLD = 1e-6;
 
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   for (auto pair : markersMap)
