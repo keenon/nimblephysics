@@ -9445,7 +9445,8 @@ std::vector<Eigen::Vector3s> DynamicsFitter::measuredGRFForces(
 // to infer when we're missing GRF data on certain timesteps, so we don't let
 // it mess with our optimization.
 void DynamicsFitter::estimateFootGroundContacts(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init,
+    bool ignoreFootNotOverForcePlate)
 {
   Eigen::VectorXs originalPose = mSkeleton->getPositions();
 
@@ -9787,7 +9788,7 @@ void DynamicsFitter::estimateFootGroundContacts(
         {
           // 4.3.2. If we're NOT over a plate, then register this frame as
           // suspicious
-          if (!anyInPlate)
+          if (!anyInPlate && !ignoreFootNotOverForcePlate)
           {
             contactIsSus = true;
             anyContactIsSus = true;

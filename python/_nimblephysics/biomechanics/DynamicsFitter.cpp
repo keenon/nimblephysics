@@ -534,7 +534,8 @@ protected:
       .def(
           "estimateFootGroundContacts",
           &dart::biomechanics::DynamicsFitter::estimateFootGroundContacts,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("ignoreFootNotOverForcePlate") = false)
       .def(
           "smoothAccelerations",
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,
