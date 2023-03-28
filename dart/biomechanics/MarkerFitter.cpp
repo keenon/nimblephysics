@@ -587,7 +587,7 @@ MarkerFitter::MarkerFitter(
     mDisableLinesearch(false),
     mAnatomicalMarkerDefaultWeight(1.0),
     mTrackingMarkerDefaultWeight(0.02),
-    mStaticTrialWeight(10.0),
+    mStaticTrialWeight(50.0),
     mStaticTrialEnabled(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
@@ -8439,7 +8439,7 @@ bool BilevelFitProblem::get_nlp_info(
 {
   // Set the number of decision variables
   n = mFitter->mSkeleton->getGroupScaleDim() + mFitter->mMarkers.size() * 3
-      + (mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size());
+      + (mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size()) + 6;
 
   // Set the total number of constraints
   m = mFitter->mSkeleton->getNumDofs() + mFitter->mZeroConstraints.size();
@@ -8465,11 +8465,13 @@ bool BilevelFitProblem::get_bounds_info(
     Ipopt::Number* g_l,
     Ipopt::Number* g_u)
 {
+  // We default bounds to a large finite value, rather than infinity, to prevent NaNs from creeping into computations where they're not wanted.
+  s_t LARGE_FINITE_VALUE = 10000000;
   // Lower and upper bounds on X
   Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
-  upperBounds.setConstant(std::numeric_limits<double>::infinity());
+  upperBounds.setConstant(LARGE_FINITE_VALUE);
   Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
-  lowerBounds.setConstant(-1 * std::numeric_limits<double>::infinity());
+  lowerBounds.setConstant(-LARGE_FINITE_VALUE);
 
   int scaleGroupDim = mFitter->mSkeleton->getGroupScaleDim();
   int markerOffsetDim = mFitter->mMarkers.size() * 3;
@@ -8497,6 +8499,11 @@ bool BilevelFitProblem::get_bounds_info(
           = mFitter->mSkeleton->getPositionLowerLimits().cast<double>();
     }
   }
+  // Add bounds for the static pose value
+  upperBounds.segment(scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs), 6)
+      = mFitter->mSkeleton->getPositionUpperLimits().head<6>().cast<double>();
+  lowerBounds.segment(scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs), 6)
+      = mFitter->mSkeleton->getPositionLowerLimits().head<6>().cast<double>();
 
   // std::cout << "Group scales upper bound: " << std::endl
   //           << upperBounds.segment(0, scaleGroupDim) << std::endl;
