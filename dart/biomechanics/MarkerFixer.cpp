@@ -394,18 +394,17 @@ s_t LabeledMarkerTrace::getMaxMarkerMovementFromStart()
 std::vector<LabeledMarkerTrace> LabeledMarkerTrace::createRawTraces(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
-    s_t mergeDistance,
-    int mergeFrames)
+    s_t mergeDistance)
 {
   std::vector<LabeledMarkerTrace> traces;
   std::vector<int> activeTraces;
   for (int t = 0; t < markerObservations.size(); t++)
   {
-    // 1. Only count as "active" the traces that are within `mergeFrames` of now
+    // 1. Only count as "active" the traces that had a point on the last frame
     std::vector<int> tracesToRemove;
     for (int i = 0; i < activeTraces.size(); i++)
     {
-      if (traces[activeTraces[i]].lastTimestep() < t - mergeFrames)
+      if (traces[activeTraces[i]].lastTimestep() < t - 1)
       {
         // This needs to be deactivated
         tracesToRemove.push_back(i);
@@ -559,7 +558,7 @@ int RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
         {
           report->warnings.push_back(
               "Dropping marker " + markerName
-              + " for suspicious acceleration on frame "
+              + " for suspicious acceleration (" + std::to_string(acc.norm()) + "m/s^2) on frame "
               + std::to_string(observedTimesteps[i]));
         }
         dropped++;
@@ -811,9 +810,9 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
 
   // 1. Attempt to detect marker flips that occur partway through the trajectory
 
-  // 1.1. Collect markers into continuous traces
+  // 1.1. Collect markers into continuous traces. Break marker traces that imply a velocity greater than 20 m/s
   std::vector<LabeledMarkerTrace> traces
-      = LabeledMarkerTrace::createRawTraces(immutableMarkerObservations);
+      = LabeledMarkerTrace::createRawTraces(immutableMarkerObservations, dt * 20.0);
 
   // 1.2. Label the traces based on their majority label during the trace
   std::vector<std::string> traceLabels;

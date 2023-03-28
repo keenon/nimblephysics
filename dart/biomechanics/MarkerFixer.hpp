@@ -58,8 +58,7 @@ public:
   static std::vector<LabeledMarkerTrace> createRawTraces(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      s_t mergeDistance = 0.01,
-      int mergeFrames = 5);
+      s_t mergeDistance = 0.01);
 
   /// Returns true if these traces overlap in time
   bool overlap(LabeledMarkerTrace& toAppend);

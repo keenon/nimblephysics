@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -85,7 +86,7 @@ TEST(MarkerFixer, FIX_SPRINT_MARKERS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFixer, FIX_CMU_MARKERS)
 {
   // Get the raw marker trajectory data
@@ -108,7 +109,7 @@ TEST(MarkerFixer, FIX_CMU_MARKERS)
     }
   }
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFixer, COMPARISON_TEST)
@@ -142,3 +143,22 @@ TEST(MarkerFixer, COMPARISON_TEST)
   }
 }
 #endif
+
+// #ifdef ALL_TESTS
+TEST(MarkerFixer, PASS_THROUGH_UNCHANGED)
+{
+  // Get the raw marker trajectory data
+  auto markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/grf/AddBiomechanicsTutorialFiles/motion_capture_walk_trimmed.trc");
+
+  auto report = MarkerFixer::generateDataErrorsReport(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
+  for (std::string warning : report->warnings) {
+    std::cout << "WARN: " << warning << std::endl;
+  }
+
+  EXPECT_EQ(0, report->warnings.size());
+  EXPECT_EQ(0, report->info.size());
+}
+// #endif
