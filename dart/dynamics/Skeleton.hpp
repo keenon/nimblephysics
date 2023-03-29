@@ -1414,6 +1414,21 @@ public:
   Eigen::VectorXs getJointDistanceToOtherJoints(
       const std::vector<dynamics::Joint*>& joints, int jointIndex);
 
+  /// This gets the Jacobian relating changes in the joint world positions
+  /// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+  /// world) to the changes in the joint distance measurement vector for joint
+  /// `jointIndex`.
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This gets the Jacobian relating changes in the joint world positions
+  /// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+  /// world) to the changes in the joint distance measurement vector for joint
+  /// `jointIndex`.
+  Eigen::MatrixXs
+  finiteDifferenceJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
   /// This returns a Jacobian of the distance to every joint in the body with
   /// respect to WRT
   Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrt(

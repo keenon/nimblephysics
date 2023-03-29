@@ -5878,8 +5878,8 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointPositions(
     math::Jacobian bodyJac = getWorldPositionJacobian(
         joints[i]->getChildBodyNode(),
         joints[i]->getTransformFromChildBodyNode().translation());
-    jac.block(3 * i, 0, 3, bodyJac.cols() - 1)
-        = bodyJac.block(3, 0, 3, bodyJac.cols() - 1);
+    jac.block(3 * i, 0, 3, bodyJac.cols())
+        = bodyJac.block(3, 0, 3, bodyJac.cols());
   }
 
   return jac;
@@ -5928,6 +5928,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointChildAngles(
   {
     math::Jacobian bodyJac
         = getWorldPositionJacobian(joints[i]->getChildBodyNode());
+    assert(bodyJac.cols() == getNumDofs());
     jac.block(3 * i, 0, 3, bodyJac.cols())
         = bodyJac.block(0, 0, 3, bodyJac.cols());
   }
@@ -6138,7 +6139,7 @@ Eigen::VectorXs Skeleton::finiteDifferenceJointForceFieldToOtherJointsGradient(
 
   Eigen::VectorXs originalWrt = wrt->get(this);
 
-  s_t eps = 1e-3;
+  s_t eps = 1e-2;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
           /* in*/ int dof,
@@ -6247,6 +6248,63 @@ Eigen::VectorXs Skeleton::getJointDistanceToOtherJoints(
 }
 
 //==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs
+Skeleton::getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  for (int i = 0; i < joints.size(); i++)
+  {
+    Eigen::Vector3s diff
+        = (jointLocations.segment<3>(i * 3)
+           - jointLocations.segment<3>(jointIndex * 3));
+    dDistance_dJointLocations.block<1, 3>(i, i * 3) = 2 * diff;
+    dDistance_dJointLocations.block<1, 3>(i, jointIndex * 3) = -2 * diff;
+  }
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+        const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedJointLocations = jointLocations;
+        perturbedJointLocations(dof) += eps;
+        perturbed = Eigen::VectorXs::Zero(joints.size());
+        for (int i = 0; i < joints.size(); i++)
+        {
+          perturbed(i) = (perturbedJointLocations.segment<3>(i * 3)
+                          - perturbedJointLocations.segment<3>(jointIndex * 3))
+                             .squaredNorm();
+        }
+        return true;
+      },
+      dDistance_dJointLocations,
+      eps,
+      false);
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
 /// This returns a Jacobian of the distance to every joint in the body with
 /// respect to WRT
 Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrt(
@@ -6258,16 +6316,8 @@ Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrt(
       || wrt == neural::WithRespectTo::GROUP_SCALES)
   {
     Eigen::MatrixXs dDistance_dJointLocations
-        = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
-    Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
-    for (int i = 0; i < joints.size(); i++)
-    {
-      Eigen::Vector3s diff
-          = (jointLocations.segment<3>(i * 3)
-             - jointLocations.segment<3>(jointIndex * 3));
-      dDistance_dJointLocations.block<1, 3>(i, i * 3) = 2 * diff;
-      dDistance_dJointLocations.block<1, 3>(i, jointIndex * 3) = -2 * diff;
-    }
+        = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+            joints, jointIndex);
 
     if (wrt == neural::WithRespectTo::POSITION)
     {
@@ -6328,17 +6378,8 @@ Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrtBodyScales(
     const std::vector<dynamics::Joint*>& joints, int jointIndex)
 {
   Eigen::MatrixXs dDistance_dJointLocations
-      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
-  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
-  for (int i = 0; i < joints.size(); i++)
-  {
-    Eigen::Vector3s diff
-        = (jointLocations.segment<3>(i * 3)
-           - jointLocations.segment<3>(jointIndex * 3));
-    dDistance_dJointLocations.block<1, 3>(i, i * 3) = 2 * diff;
-    dDistance_dJointLocations.block<1, 3>(i, jointIndex * 3) = -2 * diff;
-  }
-
+      = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+          joints, jointIndex);
   Eigen::MatrixXs dJointLocations
       = getJointWorldPositionsJacobianWrtBodyScales(joints);
   return dDistance_dJointLocations * dJointLocations;

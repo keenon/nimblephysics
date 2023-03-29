@@ -771,12 +771,12 @@ Eigen::Vector3s dLogMap(const Eigen::Matrix3s& _R, const Eigen::Matrix3s& dR)
   s_t diagSum = 0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0);
   s_t d_diagSum = 0.5 * (dR(0, 0) + dR(1, 1) + dR(2, 2));
   s_t d_theta = 0.0;
-  if (diagSum > 1.0)
+  if (diagSum >= 1.0)
   {
     diagSum = 1.0;
     d_theta = 0.0;
   }
-  else if (diagSum < -1.0)
+  else if (diagSum <= -1.0)
   {
     diagSum = -1.0;
     d_theta = 0.0;
