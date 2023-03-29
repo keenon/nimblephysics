@@ -1363,6 +1363,84 @@ public:
   Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
       const std::vector<dynamics::Joint*>& joints);
 
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  s_t getJointForceFieldToOtherJoints(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  Eigen::VectorXs getJointForceFieldToOtherJointsGradient(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  Eigen::VectorXs finiteDifferenceJointForceFieldToOtherJointsGradient(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance with respect to body scales, which for
+  /// historical reasons is not supported in the neural::WithRespectTo API.
+  /// TODO: correct that
+  Eigen::VectorXs getJointForceFieldToOtherJointsGradientWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance with respect to body scales, which for
+  /// historical reasons is not supported in the neural::WithRespectTo API.
+  /// TODO: correct that
+  Eigen::VectorXs
+  finiteDifferenceJointForceFieldToOtherJointsGradientWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a vector of the distance to all joints after the joint
+  Eigen::VectorXs getJointDistanceToOtherJoints(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to WRT
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrt(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to WRT
+  Eigen::MatrixXs finiteDifferenceJointDistanceToOtherJointsJacobianWrt(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to body scales, which for historical reasons is not supported in
+  /// the neural::WithRespectTo API. TODO: correct that
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to body scales, which for historical reasons is not supported in
+  /// the neural::WithRespectTo API. TODO: correct that
+  Eigen::MatrixXs
+  finiteDifferenceJointDistanceToOtherJointsJacobianWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
   /// These are a set of bodies, and offsets in local body space where markers
   /// are mounted on the body
   std::map<std::string, Eigen::Vector3s> getMarkerMapWorldPositions(

@@ -272,6 +272,26 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setStaticTrialWeight,
           ::py::arg("weight"))
       .def(
+          "setJointForceFieldThresholdDistance",
+          &dart::biomechanics::MarkerFitter::
+              setJointForceFieldThresholdDistance,
+          ::py::arg("minDistance"),
+          R"pydoc(
+  This sets the minimum distance joints have to be apart in order to get
+  zero "force field" loss. Any joints closer than this (in world space) will
+  incur a penalty.
+          )pydoc")
+      .def(
+          "setJointForceFieldSoftness",
+          &dart::biomechanics::MarkerFitter::setJointForceFieldSoftness,
+          ::py::arg("softness"),
+          R"pydoc(
+  Larger values will increase the softness of the threshold penalty. Smaller
+  values, as they approach zero, will have an almost perfectly vertical
+  penality for going below the threshold distance. That would be hard to
+  optimize, so don't make it too small.
+          )pydoc")
+      .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))

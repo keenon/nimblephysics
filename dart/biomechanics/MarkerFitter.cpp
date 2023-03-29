@@ -23,6 +23,7 @@
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIStateMachine.hpp"
@@ -588,6 +589,9 @@ MarkerFitter::MarkerFitter(
     mAnatomicalMarkerDefaultWeight(1.0),
     mTrackingMarkerDefaultWeight(0.02),
     mStaticTrialWeight(50.0),
+    mJointForceFieldThresholdDistance(0.07),
+    mJointForceFieldSoftness(0.2),
+    // mJointForceFieldSoftness(20.0),
     mStaticTrialEnabled(false)
 {
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
@@ -910,6 +914,58 @@ MarkerFitter::MarkerFitter(
     }
     loss += staticPoseRegularization;
 
+    // 8. Run the force field loss
+    s_t jointForceFieldLoss = 0.0;
+    if (mJointForceFieldThresholdDistance > 0 || true)
+    {
+      Eigen::VectorXs oldBodyScales = this->mSkeleton->getBodyScales();
+      Eigen::VectorXs oldPose = this->mSkeleton->getPositions();
+
+      // 8.1. Set the skeleton to the current scales in the problem.
+      for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
+      {
+        this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
+      }
+
+      // 8.2. Collect joint force field loss at each timestep.
+      for (int t = 0; t < state->posesAtTimesteps.cols(); t++)
+      {
+        mSkeleton->setPositions(state->posesAtTimesteps.col(t));
+
+        for (int i = 0; i < mSkeleton->getNumJoints(); i++)
+        {
+          jointForceFieldLoss += mSkeleton->getJointForceFieldToOtherJoints(
+              mSkeleton->getJoints(),
+              i,
+              mJointForceFieldThresholdDistance,
+              mJointForceFieldSoftness);
+          state->posesAtTimestepsGrad.col(t)
+              += mSkeleton->getJointForceFieldToOtherJointsGradient(
+                  mSkeleton->getJoints(),
+                  i,
+                  mJointForceFieldThresholdDistance,
+                  mJointForceFieldSoftness,
+                  neural::WithRespectTo::POSITION);
+
+          Eigen::VectorXs bodyScalesGrad
+              = mSkeleton->getJointForceFieldToOtherJointsGradientWrtBodyScales(
+                  mSkeleton->getJoints(),
+                  i,
+                  mJointForceFieldThresholdDistance,
+                  mJointForceFieldSoftness);
+          for (int b = 0; b < mSkeleton->getNumBodyNodes(); b++)
+          {
+            state->bodyScalesGrad.col(b) += bodyScalesGrad.segment<3>(b * 3);
+          }
+        }
+      }
+
+      // 8.3. Reset
+      this->mSkeleton->setPositions(oldPose);
+      this->mSkeleton->setBodyScales(oldBodyScales);
+    }
+    loss += jointForceFieldLoss;
+
     if (mDebugLoss)
     {
       std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
@@ -918,7 +974,9 @@ MarkerFitter::MarkerFitter(
                 << ",bodyEvenR=" << bodyEvenRegularization
                 << ",bodyR=" << bodyScaleReg
                 << ",boundsR=" << jointBoundsRegularization
-                << ",staticR=" << staticPoseRegularization << "]" << std::endl;
+                << ",staticR=" << staticPoseRegularization
+                << ",jointForceField=" << jointForceFieldLoss << "]"
+                << std::endl;
     }
 
     return loss;
@@ -6376,6 +6434,25 @@ void MarkerFitter::setStaticTrialWeight(s_t weight)
 }
 
 //==============================================================================
+/// This sets the minimum distance joints have to be apart in order to get zero
+/// "force field" loss. Any joints closer than this (in world space) will incur
+/// a penalty.
+void MarkerFitter::setJointForceFieldThresholdDistance(s_t minDistance)
+{
+  mJointForceFieldThresholdDistance = minDistance;
+}
+
+//==============================================================================
+/// Larger values will increase the softness of the threshold penalty. Smaller
+/// values, as they approach zero, will have an almost perfectly vertical
+/// penality for going below the threshold distance. That would be hard to
+/// optimize, so don't make it too small.
+void MarkerFitter::setJointForceFieldSoftness(s_t softness)
+{
+  mJointForceFieldSoftness = softness;
+}
+
+//==============================================================================
 /// Sets the loss and gradient function
 void MarkerFitter::setCustomLossAndGrad(
     std::function<s_t(MarkerFitterState*)> customLossAndGrad)
@@ -8465,7 +8542,8 @@ bool BilevelFitProblem::get_bounds_info(
     Ipopt::Number* g_l,
     Ipopt::Number* g_u)
 {
-  // We default bounds to a large finite value, rather than infinity, to prevent NaNs from creeping into computations where they're not wanted.
+  // We default bounds to a large finite value, rather than infinity, to prevent
+  // NaNs from creeping into computations where they're not wanted.
   s_t LARGE_FINITE_VALUE = 10000000;
   // Lower and upper bounds on X
   Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
@@ -8500,9 +8578,13 @@ bool BilevelFitProblem::get_bounds_info(
     }
   }
   // Add bounds for the static pose value
-  upperBounds.segment(scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs), 6)
+  upperBounds.segment(
+      scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs),
+      6)
       = mFitter->mSkeleton->getPositionUpperLimits().head<6>().cast<double>();
-  lowerBounds.segment(scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs), 6)
+  lowerBounds.segment(
+      scaleGroupDim + markerOffsetDim + (mMarkerMapObservations.size() * dofs),
+      6)
       = mFitter->mSkeleton->getPositionLowerLimits().head<6>().cast<double>();
 
   // std::cout << "Group scales upper bound: " << std::endl

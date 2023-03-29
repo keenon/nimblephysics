@@ -239,7 +239,7 @@ Eigen::VectorXs WithRespectToGroupScales::get(dynamics::Skeleton* skel)
 void WithRespectToGroupScales::set(
     simulation::World* world, Eigen::VectorXs value)
 {
-  world->setAccelerations(value);
+  world->setGroupScales(value);
 }
 
 /// This sets the world's state based on our WRT

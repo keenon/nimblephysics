@@ -788,6 +788,17 @@ public:
   /// compared to other terms.
   void setStaticTrialWeight(s_t weight);
 
+  /// This sets the minimum distance joints have to be apart in order to get
+  /// zero "force field" loss. Any joints closer than this (in world space) will
+  /// incur a penalty.
+  void setJointForceFieldThresholdDistance(s_t minDistance);
+
+  /// Larger values will increase the softness of the threshold penalty. Smaller
+  /// values, as they approach zero, will have an almost perfectly vertical
+  /// penality for going below the threshold distance. That would be hard to
+  /// optimize, so don't make it too small.
+  void setJointForceFieldSoftness(s_t softness);
+
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
       std::function<s_t(MarkerFitterState*)> customLossAndGrad);
@@ -1021,6 +1032,8 @@ protected:
   s_t mAnatomicalMarkerDefaultWeight;
   s_t mTrackingMarkerDefaultWeight;
   s_t mStaticTrialWeight;
+  s_t mJointForceFieldThresholdDistance;
+  s_t mJointForceFieldSoftness;
 
   // These are IPOPT settings
   double mTolerance;
