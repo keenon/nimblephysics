@@ -5878,8 +5878,8 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointPositions(
     math::Jacobian bodyJac = getWorldPositionJacobian(
         joints[i]->getChildBodyNode(),
         joints[i]->getTransformFromChildBodyNode().translation());
-    jac.block(3 * i, 0, 3, bodyJac.cols() - 1)
-        = bodyJac.block(3, 0, 3, bodyJac.cols() - 1);
+    jac.block(3 * i, 0, 3, bodyJac.cols())
+        = bodyJac.block(3, 0, 3, bodyJac.cols());
   }
 
   return jac;
@@ -5928,6 +5928,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointChildAngles(
   {
     math::Jacobian bodyJac
         = getWorldPositionJacobian(joints[i]->getChildBodyNode());
+    assert(bodyJac.cols() == getNumDofs());
     jac.block(3 * i, 0, 3, bodyJac.cols())
         = bodyJac.block(0, 0, 3, bodyJac.cols());
   }
@@ -6059,6 +6060,362 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
       false);
 
   return result;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+s_t Skeleton::getJointForceFieldToOtherJoints(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  s_t cost = 0.0;
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    // Only apply cost if we're inside the "barrier distance"
+    if (dist >= barrierDistance)
+    {
+      cost += 0.0;
+    }
+    else
+    {
+      double diff = dist - barrierDistance;
+      cost += (diff * diff) / (2.0 * softness);
+    }
+  }
+  return cost;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+Eigen::VectorXs Skeleton::getJointForceFieldToOtherJointsGradient(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(distances.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    if (dist >= barrierDistance)
+    {
+      grad(i) = 0.0;
+    }
+    else
+    {
+      grad(i) = (dist - barrierDistance) / softness;
+    }
+  }
+
+  Eigen::MatrixXs jac
+      = getJointDistanceToOtherJointsJacobianWrt(joints, jointIndex, wrt);
+  return jac.transpose() * grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+Eigen::VectorXs Skeleton::finiteDifferenceJointForceFieldToOtherJointsGradient(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(dim);
+
+  Eigen::VectorXs originalWrt = wrt->get(this);
+
+  s_t eps = 1e-2;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        wrt->set(this, perturbedWrt);
+        perturbed = getJointForceFieldToOtherJoints(
+            joints, jointIndex, barrierDistance, softness);
+        return true;
+      },
+      grad,
+      eps,
+      true);
+
+  wrt->set(this, originalWrt);
+
+  return grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance with respect to body scales, which for
+/// historical reasons is not supported in the neural::WithRespectTo API. TODO:
+/// correct that
+Eigen::VectorXs Skeleton::getJointForceFieldToOtherJointsGradientWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(distances.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    if (dist >= barrierDistance)
+    {
+      grad(i) = 0.0;
+    }
+    else
+    {
+      grad(i) = (dist - barrierDistance) / softness;
+    }
+  }
+
+  Eigen::MatrixXs jac
+      = getJointDistanceToOtherJointsJacobianWrtBodyScales(joints, jointIndex);
+  return jac.transpose() * grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance with respect to body scales, which for
+/// historical reasons is not supported in the neural::WithRespectTo API. TODO:
+/// correct that
+Eigen::VectorXs
+Skeleton::finiteDifferenceJointForceFieldToOtherJointsGradientWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  int dim = getNumBodyNodes() * 3;
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(dim);
+
+  Eigen::VectorXs originalWrt = getBodyScales();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        setBodyScales(perturbedWrt);
+        perturbed = getJointForceFieldToOtherJoints(
+            joints, jointIndex, barrierDistance, softness);
+        return true;
+      },
+      grad,
+      eps,
+      true);
+
+  setBodyScales(originalWrt);
+
+  return grad;
+}
+
+//==============================================================================
+/// This returns a vector of the distance to all joints after the joint
+Eigen::VectorXs Skeleton::getJointDistanceToOtherJoints(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  Eigen::VectorXs distances = Eigen::VectorXs::Zero(joints.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    distances(i) = (jointLocations.segment<3>(i * 3)
+                    - jointLocations.segment<3>(jointIndex * 3))
+                       .squaredNorm();
+  }
+  return distances;
+}
+
+//==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs
+Skeleton::getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  for (int i = 0; i < joints.size(); i++)
+  {
+    Eigen::Vector3s diff
+        = (jointLocations.segment<3>(i * 3)
+           - jointLocations.segment<3>(jointIndex * 3));
+    dDistance_dJointLocations.block<1, 3>(i, i * 3) = 2 * diff;
+    dDistance_dJointLocations.block<1, 3>(i, jointIndex * 3) = -2 * diff;
+  }
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+        const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedJointLocations = jointLocations;
+        perturbedJointLocations(dof) += eps;
+        perturbed = Eigen::VectorXs::Zero(joints.size());
+        for (int i = 0; i < joints.size(); i++)
+        {
+          perturbed(i) = (perturbedJointLocations.segment<3>(i * 3)
+                          - perturbedJointLocations.segment<3>(jointIndex * 3))
+                             .squaredNorm();
+        }
+        return true;
+      },
+      dDistance_dJointLocations,
+      eps,
+      false);
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to WRT
+Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrt(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    neural::WithRespectTo* wrt)
+{
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    Eigen::MatrixXs dDistance_dJointLocations
+        = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+            joints, jointIndex);
+
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      Eigen::MatrixXs dJointLocations
+          = getJointWorldPositionsJacobianWrtJointPositions(joints);
+      return dDistance_dJointLocations * dJointLocations;
+    }
+    else if (wrt == neural::WithRespectTo::GROUP_SCALES)
+    {
+      Eigen::MatrixXs dJointLocations
+          = getJointWorldPositionsJacobianWrtGroupScales(joints);
+      return dDistance_dJointLocations * dJointLocations;
+    }
+  }
+
+  int dim = wrt->dim(this);
+  return Eigen::MatrixXs::Zero(joints.size(), dim);
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to WRT
+Eigen::MatrixXs Skeleton::finiteDifferenceJointDistanceToOtherJointsJacobianWrt(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size(), dim);
+
+  Eigen::VectorXs originalWrt = wrt->get(this);
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        wrt->set(this, perturbedWrt);
+        perturbed = getJointDistanceToOtherJoints(joints, jointIndex);
+        return true;
+      },
+      jac,
+      eps,
+      false);
+
+  wrt->set(this, originalWrt);
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to body scales, which for historical reasons is not supported in the
+/// neural::WithRespectTo API. TODO: correct that
+Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::MatrixXs dDistance_dJointLocations
+      = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+          joints, jointIndex);
+  Eigen::MatrixXs dJointLocations
+      = getJointWorldPositionsJacobianWrtBodyScales(joints);
+  return dDistance_dJointLocations * dJointLocations;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to body scales, which for historical reasons is not supported in the
+/// neural::WithRespectTo API. TODO: correct that
+Eigen::MatrixXs
+Skeleton::finiteDifferenceJointDistanceToOtherJointsJacobianWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  int dim = getNumBodyNodes() * 3;
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size(), dim);
+
+  Eigen::VectorXs originalWrt = getBodyScales();
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        setBodyScales(perturbedWrt);
+        perturbed = getJointDistanceToOtherJoints(joints, jointIndex);
+        return true;
+      },
+      jac,
+      eps,
+      false);
+
+  setBodyScales(originalWrt);
+
+  return jac;
 }
 
 //==============================================================================

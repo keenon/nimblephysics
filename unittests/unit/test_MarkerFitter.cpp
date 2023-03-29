@@ -1462,6 +1462,8 @@ std::vector<MarkerInitialization> runEngine(
   // Default max joint weight is 0.5, so this is 2x the default value
   fitter.setMaxJointWeight(1.0);
 
+  fitter.setStaticTrialWeight(0.1);
+
   // fitter.setDebugLoss(true);
 
   // Create Anthropometric prior
@@ -2487,6 +2489,7 @@ TEST(MarkerFitter, DERIVATIVES)
 
   MarkerFitter fitter(osim, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
+  fitter.setStaticTrialWeight(0.1);
   fitter.setInitialIKMaxRestarts(2);
   fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
     (void)state;
@@ -2571,6 +2574,7 @@ TEST(MarkerFitter, DERIVATIVES_BALL_JOINTS)
   MarkerFitter fitter(osimBallJoints, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(2);
+  fitter.setStaticTrialWeight(0.1);
   fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
     (void)state;
     return 0.0;
@@ -2640,6 +2644,7 @@ TEST(MarkerFitter, DERIVATIVES_COMPLETE_HUMAN)
   MarkerFitter fitter(osim, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(2);
+  fitter.setStaticTrialWeight(0.1);
   fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
     (void)state;
     return 0.0;
@@ -2733,6 +2738,7 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD)
   MarkerFitter fitter(osim, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(2);
+  fitter.setStaticTrialWeight(0.1);
   fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
     (void)state;
     return 0.0;
@@ -2808,6 +2814,9 @@ TEST(MarkerFitter, DERIVATIVES_ARNOLD_BALL_JOINTS)
   MarkerFitter fitter(osimBallJoints, markers);
   fitter.setInitialIKSatisfactoryLoss(0.05);
   fitter.setInitialIKMaxRestarts(2);
+  fitter.setStaticTrialWeight(0.01);
+  fitter.setJointForceFieldThresholdDistance(0);
+  fitter.setJointForceFieldSoftness(100.0);
   fitter.addZeroConstraint("trivial", [&](MarkerFitterState* state) {
     (void)state;
     return 0.0;
