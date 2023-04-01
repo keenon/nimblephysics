@@ -46,6 +46,7 @@ module.exports = {
       template: path.join(__dirname, "src", "index.html")
     })
   ],
+  mode: 'development',
   devServer: {
     static: path.join(__dirname, "dist"),
     client: {
