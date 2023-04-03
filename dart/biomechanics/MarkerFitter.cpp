@@ -3088,11 +3088,6 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   // 7. Do one final "polishing pass" on all the IK
   std::cout << "Done completing bilevel fit!" << std::endl;
 
-  std::cout << "Running final smoothing IK" << std::endl;
-  std::cout << "  " << result.poses.cols() << " poses" << std::endl;
-  std::cout << "  " << result.joints.size() << " joints" << std::endl;
-  std::cout << "  " << markerObservations.size() << " marker observations"
-            << std::endl;
   return smoothOutIK(markerObservations, newClip, result);
 
   // return result;
