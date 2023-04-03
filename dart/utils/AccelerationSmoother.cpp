@@ -101,6 +101,11 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
 
   for (int row = 0; row < series.rows(); row++)
   {
+    // If all the values in this row are identical, it's probably a locked joint, and we can't smooth it.
+    if (series.row(row).maxCoeff() == series.row(row).minCoeff()) {
+      smoothed.row(row) = series.row(row);
+      continue;
+    }
     Eigen::VectorXs c = Eigen::VectorXs::Zero(mSmoothedTimesteps + mTimesteps);
     c.segment(mSmoothedTimesteps, mTimesteps)
         = mRegularizationWeight * series.row(row);
