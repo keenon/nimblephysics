@@ -3089,6 +3089,10 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   std::cout << "Done completing bilevel fit!" << std::endl;
 
   std::cout << "Running final smoothing IK" << std::endl;
+  std::cout << "  " << result.poses.cols() << " poses" << std::endl;
+  std::cout << "  " << result.joints.size() << " joints" << std::endl;
+  std::cout << "  " << markerObservations.size() << " marker observations"
+            << std::endl;
   return smoothOutIK(markerObservations, newClip, result);
 
   // return result;
@@ -3410,10 +3414,10 @@ MarkerInitialization MarkerFitter::smoothOutIK(
     std::cout << "Smoothing trial poses for trial " << i << "/"
               << trialStarts.size() << std::endl;
     int start = trialStarts[i];
-    int size = trialStarts[i];
     AccelerationSmoother smoother(size, 1.0, 0.001);
     smoother.smooth(
-        smoothed.poses.block(0, start, smoothed.poses.rows(), size));
+        smoothed.poses.block(0, start, smoothed.poses.rows(),
+                                       smoothed.poses.cols()));
   }
 
   return smoothed;
