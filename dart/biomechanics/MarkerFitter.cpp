@@ -3410,7 +3410,7 @@ MarkerInitialization MarkerFitter::smoothOutIK(
     std::cout << "Smoothing trial poses for trial " << i << "/"
               << trialStarts.size() << std::endl;
     int start = trialStarts[i];
-    int size = trialStarts[i];
+    int size = trialSizes[i];
     AccelerationSmoother smoother(size, 1.0, 0.001);
     smoother.smooth(
         smoothed.poses.block(0, start, smoothed.poses.rows(), size));
