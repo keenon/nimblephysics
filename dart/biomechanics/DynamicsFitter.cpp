@@ -10034,7 +10034,7 @@ void DynamicsFitter::smoothAccelerations(
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
-    // #ifndef NDEBUG
+    #ifndef NDEBUG
     // Warn if we're over a bound after acceleration smoothing
     s_t eps = 1e-6;
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
@@ -10058,7 +10058,7 @@ void DynamicsFitter::smoothAccelerations(
         }
       }
     }
-    // #endif
+    #endif
 
     // Smooth the regularization target, too, so we're not regularizing
     // our positions back to something jittery later

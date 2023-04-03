@@ -86,3 +86,19 @@ TEST(ACCEL_SMOOTHER, HUGE_TRAJECTORY)
             << std::endl;
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(ACCEL_SMOOTHER, LOCKED_ROW)
+{
+  int dofs = 2;
+  int timesteps = 300;
+  Eigen::MatrixXs data = Eigen::MatrixXs::Random(dofs, timesteps);
+  // Set row 1 to a constant 0.0
+  data.row(1).setConstant(0.0);
+
+  AccelerationSmoother smootherIterative(timesteps, 1, 0.05, true, true);
+  Eigen::MatrixXs smoothedIterative = smootherIterative.smooth(data);
+
+  EXPECT_TRUE(smoothedIterative.row(1).isConstant(0.0));
+}
+#endif
