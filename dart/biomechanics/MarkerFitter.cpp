@@ -589,7 +589,7 @@ MarkerFitter::MarkerFitter(
     mAnatomicalMarkerDefaultWeight(1.0),
     mTrackingMarkerDefaultWeight(0.02),
     mStaticTrialWeight(50.0),
-    mJointForceFieldThresholdDistance(0.07),
+    mJointForceFieldThresholdDistance(0.0),
     mJointForceFieldSoftness(0.2),
     // mJointForceFieldSoftness(20.0),
     mStaticTrialEnabled(false)
@@ -916,7 +916,7 @@ MarkerFitter::MarkerFitter(
 
     // 8. Run the force field loss
     s_t jointForceFieldLoss = 0.0;
-    if (mJointForceFieldThresholdDistance > 0 || true)
+    if (mJointForceFieldThresholdDistance > 0)
     {
       Eigen::VectorXs oldBodyScales = this->mSkeleton->getBodyScales();
       Eigen::VectorXs oldPose = this->mSkeleton->getPositions();
