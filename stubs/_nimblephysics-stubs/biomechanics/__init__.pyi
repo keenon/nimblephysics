@@ -1151,6 +1151,21 @@ class MarkerFitter():
     def setInitialIKMaxRestarts(self, starts: int) -> None: ...
     def setInitialIKSatisfactoryLoss(self, loss: float) -> None: ...
     def setIterationLimit(self, iters: int) -> None: ...
+    def setJointForceFieldSoftness(self, softness: float) -> None: 
+        """
+        Larger values will increase the softness of the threshold penalty. Smaller
+        values, as they approach zero, will have an almost perfectly vertical
+        penality for going below the threshold distance. That would be hard to
+        optimize, so don't make it too small.
+                
+        """
+    def setJointForceFieldThresholdDistance(self, minDistance: float) -> None: 
+        """
+        This sets the minimum distance joints have to be apart in order to get
+        zero "force field" loss. Any joints closer than this (in world space) will
+        incur a penalty.
+                
+        """
     def setMarkerIsTracking(self, marker: str, isTracking: bool = True) -> None: ...
     def setMaxAxisWeight(self, weight: float) -> None: ...
     def setMaxJointWeight(self, weight: float) -> None: ...

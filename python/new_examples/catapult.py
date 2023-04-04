@@ -4,8 +4,6 @@ import nimblephysics as nimble
 import numpy as np
 import torch
 
-import env
-
 
 def create_world():
     # Create and configure world.
