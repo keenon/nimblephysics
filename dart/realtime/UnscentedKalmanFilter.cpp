@@ -16,87 +16,114 @@ UnscentedKalmanFilter::UnscentedKalmanFilter(
     Eigen::VectorXd initialState,
     Eigen::MatrixXd initialCovariance,
     Eigen::MatrixXd processNoiseCovariance,
-    Eigen::MatrixXd measurementNoiseCovariance)
-  : fx_(stateTransitionFunction),
-    hx_(measurementFunction),
-    state_(initialState),
-    stateCovariance_(initialCovariance),
-    processNoiseCovariance_(processNoiseCovariance),
-    measurementNoiseCovariance_(measurementNoiseCovariance)
+    Eigen::MatrixXd measurementNoiseCovariance,
+    double scalingFactorAlpha,
+    double priorKnowledgeFactorBeta,
+    double secondaryScalingFactorKappa)
+  : mStateTransitionFunction(stateTransitionFunction),
+    mMeasurementFunction(measurementFunction),
+    mState(initialState),
+    mStateCovariance(initialCovariance),
+    mProcessNoiseCovariance(processNoiseCovariance),
+    mMeasurementNoiseCovariance(measurementNoiseCovariance),
+    mScalingFactorAlpha(scalingFactorAlpha),
+    mPriorKnowledgeFactorBeta(priorKnowledgeFactorBeta),
+    mSecondaryScalingFactorKappa(secondaryScalingFactorKappa)
 {
+  // Check dimensions
+  int stateSize = mState.size();
+  assert(
+      initialCovariance.rows() == stateSize
+      && initialCovariance.cols() == stateSize);
+  assert(
+      processNoiseCovariance.rows() == stateSize
+      && processNoiseCovariance.cols() == stateSize);
+  assert(
+      measurementNoiseCovariance.rows() == measurementNoiseCovariance.cols());
+
   initWeights();
 }
 
 void UnscentedKalmanFilter::predict(const Eigen::VectorXd& controlInput)
 {
   Eigen::MatrixXd sigmaPoints = generateSigmaPoints();
-  Eigen::MatrixXd predictedSigmaPoints(state_.rows(), sigmaPoints.cols());
+  assert(!sigmaPoints.hasNaN());
+  Eigen::MatrixXd predictedSigmaPoints(mState.rows(), sigmaPoints.cols());
+  assert(!predictedSigmaPoints.hasNaN());
 
   for (int i = 0; i < sigmaPoints.cols(); ++i)
   {
-    predictedSigmaPoints.col(i) = fx_(sigmaPoints.col(i), controlInput);
+    predictedSigmaPoints.col(i)
+        = mStateTransitionFunction(sigmaPoints.col(i), controlInput);
+    assert(!predictedSigmaPoints.col(i).hasNaN());
   }
 
-  state_ = predictedSigmaPoints * weightsMean_;
-  stateCovariance_ = (predictedSigmaPoints.colwise() - state_)
-                         * weightsCovariance_.asDiagonal()
-                         * (predictedSigmaPoints.colwise() - state_).transpose()
-                     + processNoiseCovariance_;
+  mState = predictedSigmaPoints * mWeightsMean;
+  assert(!mState.hasNaN());
+  mStateCovariance = (predictedSigmaPoints.colwise() - mState)
+                         * mWeightsCovariance.asDiagonal()
+                         * (predictedSigmaPoints.colwise() - mState).transpose()
+                     + mProcessNoiseCovariance;
+  assert(!mStateCovariance.hasNaN());
 }
 
 void UnscentedKalmanFilter::update(const Eigen::VectorXd& measurement)
 {
   Eigen::MatrixXd sigmaPoints = generateSigmaPoints();
-  Eigen::MatrixXd predictedMeasurements(state_.rows(), sigmaPoints.cols());
+  assert(!sigmaPoints.hasNaN());
+  Eigen::MatrixXd predictedMeasurements(
+      mMeasurementNoiseCovariance.rows(), sigmaPoints.cols());
+  assert(!predictedMeasurements.hasNaN());
 
   for (int i = 0; i < sigmaPoints.cols(); ++i)
   {
-    predictedMeasurements.col(i) = hx_(sigmaPoints.col(i));
+    predictedMeasurements.col(i) = mMeasurementFunction(sigmaPoints.col(i));
+    assert(!predictedMeasurements.col(i).hasNaN());
   }
 
-  Eigen::VectorXd measurementPrediction = predictedMeasurements * weightsMean_;
+  Eigen::VectorXd measurementPrediction = predictedMeasurements * mWeightsMean;
   Eigen::MatrixXd innovationCovariance
       = (predictedMeasurements.colwise() - measurementPrediction)
-            * weightsCovariance_.asDiagonal()
+            * mWeightsCovariance.asDiagonal()
             * (predictedMeasurements.colwise() - measurementPrediction)
                   .transpose()
-        + measurementNoiseCovariance_;
+        + mMeasurementNoiseCovariance;
   Eigen::MatrixXd crossCovariance
-      = (sigmaPoints.colwise() - state_) * weightsCovariance_.asDiagonal()
+      = (sigmaPoints.colwise() - mState) * mWeightsCovariance.asDiagonal()
         * (predictedMeasurements.colwise() - measurementPrediction).transpose();
   Eigen::MatrixXd kalmanGain = crossCovariance * innovationCovariance.inverse();
 
-  state_ += kalmanGain * (measurement - measurementPrediction);
-  stateCovariance_
+  mState += kalmanGain * (measurement - measurementPrediction);
+  mStateCovariance
       -= kalmanGain * innovationCovariance * kalmanGain.transpose();
 }
 
 const Eigen::VectorXd& UnscentedKalmanFilter::state() const
 {
-  return state_;
+  return mState;
 }
 
 const Eigen::MatrixXd& UnscentedKalmanFilter::stateCovariance() const
 {
-  return stateCovariance_;
+  return mStateCovariance;
 }
 
 Eigen::MatrixXd UnscentedKalmanFilter::generateSigmaPoints() const
 {
-  int stateSize = state_.size();
+  int stateSize = mState.size();
   double lambda = 3.0 - stateSize;
   Eigen::MatrixXd sigmaPoints(stateSize, 2 * stateSize + 1);
 
-  Eigen::LLT<Eigen::MatrixXd> cholesky(stateCovariance_);
+  Eigen::LLT<Eigen::MatrixXd> cholesky(mStateCovariance);
   Eigen::MatrixXd lowerTriangle = cholesky.matrixL();
 
-  sigmaPoints.col(0) = state_;
+  sigmaPoints.col(0) = mState;
   for (int i = 0; i < stateSize; ++i)
   {
     sigmaPoints.col(i + 1)
-        = state_ + sqrt(stateSize + lambda) * lowerTriangle.col(i);
+        = mState + sqrt(stateSize + lambda) * lowerTriangle.col(i);
     sigmaPoints.col(i + 1 + stateSize)
-        = state_ - sqrt(stateSize + lambda) * lowerTriangle.col(i);
+        = mState - sqrt(stateSize + lambda) * lowerTriangle.col(i);
   }
 
   return sigmaPoints;
@@ -104,19 +131,23 @@ Eigen::MatrixXd UnscentedKalmanFilter::generateSigmaPoints() const
 
 void UnscentedKalmanFilter::initWeights()
 {
-  int stateSize = state_.size();
-  double lambda = 3.0 - stateSize;
+  int stateSize = mState.size();
+  double lambda = mScalingFactorAlpha * mScalingFactorAlpha
+                      * (stateSize + mSecondaryScalingFactorKappa)
+                  - stateSize;
 
-  weightsMean_ = Eigen::VectorXd(2 * stateSize + 1);
-  weightsCovariance_ = Eigen::VectorXd(2 * stateSize + 1);
+  mWeightsMean = Eigen::VectorXd::Zero(2 * stateSize + 1);
+  mWeightsCovariance = Eigen::VectorXd::Zero(2 * stateSize + 1);
 
-  weightsMean_(0) = lambda / (stateSize + lambda);
-  weightsCovariance_(0) = lambda / (stateSize + lambda) + (1 - 1e-3 + 1e-3);
+  mWeightsMean(0) = lambda / (stateSize + lambda);
+  mWeightsCovariance(0) = lambda / (stateSize + lambda)
+                          + (1 - mScalingFactorAlpha * mScalingFactorAlpha
+                             + mPriorKnowledgeFactorBeta);
 
   for (int i = 1; i < 2 * stateSize + 1; ++i)
   {
-    weightsMean_(i) = 1.0 / (2 * (stateSize + lambda));
-    weightsCovariance_(i) = 1.0 / (2 * (stateSize + lambda));
+    mWeightsMean(i) = 1.0 / (2 * (stateSize + lambda));
+    mWeightsCovariance(i) = 1.0 / (2 * (stateSize + lambda));
   }
 }
 

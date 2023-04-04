@@ -31,7 +31,9 @@ TEST(UnscentedKalmanFilterTest, ConstantVelocityModel)
   Eigen::MatrixXd initialCovariance = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd processNoiseCovariance
       = 0.1 * Eigen::MatrixXd::Identity(2, 2);
-  Eigen::MatrixXd measurementNoiseCovariance = Eigen::MatrixXd::Identity(1, 1);
+
+  Eigen::MatrixXd measurementNoiseCovariance(1, 1);
+  measurementNoiseCovariance << 0.1;
 
   UnscentedKalmanFilter ukf(
       constantVelocityModel,
@@ -42,8 +44,8 @@ TEST(UnscentedKalmanFilterTest, ConstantVelocityModel)
       measurementNoiseCovariance);
 
   // Apply a series of predict and update steps
-  Eigen::VectorXd controlInput(1);
-  controlInput << 1.0;
+  Eigen::VectorXd controlInput(2);
+  controlInput << 1.0, 0.0;
 
   for (int i = 0; i < 10; ++i)
   {
@@ -57,11 +59,14 @@ TEST(UnscentedKalmanFilterTest, ConstantVelocityModel)
   // Check the final state estimate
   Eigen::VectorXd expectedState(2);
   expectedState << 10.0, 1.0;
+  std::cout << "State: " << ukf.state().transpose() << std::endl;
   EXPECT_TRUE(ukf.state().isApprox(expectedState, 1e-1));
 
   // Check the final state covariance
   Eigen::MatrixXd expectedCovariance = Eigen::MatrixXd::Zero(2, 2);
   expectedCovariance(0, 0) = 0.1;
   expectedCovariance(1, 1) = 0.1;
+  std::cout << "Covariance: " << std::endl
+            << ukf.stateCovariance() << std::endl;
   EXPECT_TRUE(ukf.stateCovariance().isApprox(expectedCovariance, 1e-1));
 }

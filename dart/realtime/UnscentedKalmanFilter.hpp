@@ -19,7 +19,10 @@ public:
       Eigen::VectorXd initialState,
       Eigen::MatrixXd initialCovariance,
       Eigen::MatrixXd processNoiseCovariance,
-      Eigen::MatrixXd measurementNoiseCovariance);
+      Eigen::MatrixXd measurementNoiseCovariance,
+      double alpha = 1e-3,
+      double beta = 2,
+      double kappa = 0);
 
   void predict(const Eigen::VectorXd& controlInput);
   void update(const Eigen::VectorXd& measurement);
@@ -29,14 +32,17 @@ public:
 
 private:
   std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&)>
-      fx_;
-  std::function<Eigen::VectorXd(const Eigen::VectorXd&)> hx_;
-  Eigen::VectorXd state_;
-  Eigen::MatrixXd stateCovariance_;
-  Eigen::MatrixXd processNoiseCovariance_;
-  Eigen::MatrixXd measurementNoiseCovariance_;
-  Eigen::VectorXd weightsMean_;
-  Eigen::VectorXd weightsCovariance_;
+      mStateTransitionFunction;
+  std::function<Eigen::VectorXd(const Eigen::VectorXd&)> mMeasurementFunction;
+  Eigen::VectorXd mState;
+  Eigen::MatrixXd mStateCovariance;
+  Eigen::MatrixXd mProcessNoiseCovariance;
+  Eigen::MatrixXd mMeasurementNoiseCovariance;
+  Eigen::VectorXd mWeightsMean;
+  Eigen::VectorXd mWeightsCovariance;
+  double mScalingFactorAlpha;
+  double mPriorKnowledgeFactorBeta;
+  double mSecondaryScalingFactorKappa;
 
   Eigen::MatrixXd generateSigmaPoints() const;
   void initWeights();
