@@ -411,6 +411,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setTrackingMarkerDefaultWeight,
           ::py::arg("weight"))
       .def(
+          "setJointSphereFitSGDIterations",
+          &dart::biomechanics::MarkerFitter::setJointSphereFitSGDIterations,
+          ::py::arg("iters"))
+      .def(
+          "setJointAxisFitSGDIterations",
+          &dart::biomechanics::MarkerFitter::setJointAxisFitSGDIterations,
+          ::py::arg("iters"))
+      .def(
           "debugTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
           ::py::arg("server"),

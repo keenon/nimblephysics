@@ -580,7 +580,8 @@ MarkerFitter::MarkerFitter(
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
-    mJointFitSGDIterations(500),
+    mJointSphereFitSGDIterations(500),
+    mJointAxisFitSGDIterations(2000),
     mCheckDerivatives(false),
     mUseParallelIKWarps(false),
     mPrintFrequency(1),
@@ -5683,7 +5684,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
 #endif
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < mJointFitSGDIterations; i++)
+  for (int i = 0; i < mJointSphereFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     Eigen::VectorXs newAccum = accum + grad.cwiseProduct(grad);
@@ -5819,7 +5820,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
 
   s_t loss = problem->getLoss();
   s_t initialLoss = loss;
-  for (int i = 0; i < mJointFitSGDIterations; i++)
+  for (int i = 0; i < mJointAxisFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
     accum += grad.cwiseProduct(grad);
@@ -5922,10 +5923,12 @@ void MarkerFitter::computeJointConfidences(
         initialization.axisWeights(i) = mMaxAxisWeight;
       }
 
-      // The axis fit is a strictly harder problem, so if we get a loss within a
-      // small constant factor of the joint loss, use the axis
-      // initialization.jointWeights(i) = 0;
-      if (initialization.axisLoss(i) < 5 * initialization.jointLoss(i))
+      // We'd rather use the axis to fit the joints, because it's less likely to get us into 
+      // trouble than a bad joint center. So if the axis fit is below a certain absolute loss 
+      // (indicating that the axis was fairly accurate, even if the sphere fit was better), 
+      // or if the axis fit is below a certain multiple of the joint fit, then we'll use the 
+      // axis fit.
+      if (initialization.axisLoss(i) < 0.005 || (initialization.axisLoss(i) < 5 * initialization.jointLoss(i)))
       {
         initialization.jointWeights(i) = 0;
       }
@@ -6381,11 +6384,19 @@ void MarkerFitter::setIterationLimit(int limit)
 }
 
 //==============================================================================
-/// Sets the number of SGD iterations to run when fitting joint center / axis
+/// Sets the number of SGD iterations to run when fitting joint center
 /// problems
-void MarkerFitter::setJointFitSGDIterations(int iters)
+void MarkerFitter::setJointSphereFitSGDIterations(int iters)
 {
-  mJointFitSGDIterations = iters;
+  mJointSphereFitSGDIterations = iters;
+}
+
+//==============================================================================
+/// Sets the number of SGD iterations to run when fitting joint axis
+/// problems
+void MarkerFitter::setJointAxisFitSGDIterations(int iters)
+{
+  mJointAxisFitSGDIterations = iters;
 }
 
 //==============================================================================
