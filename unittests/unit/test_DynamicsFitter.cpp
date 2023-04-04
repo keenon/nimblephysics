@@ -3350,7 +3350,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     }
 
     // 2. Find the joint centers
-    fitter.setJointFitSGDIterations(50); // TODO comment out in Release build
+    // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release build
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
@@ -3543,6 +3543,10 @@ std::pair<std::vector<MarkerInitialization>, OpenSimFile> runMarkerFitter(
   fitter.setMinAxisFitScore(0.001);
   // Default max joint weight is 0.5, so this is 2x the default value
   fitter.setMaxJointWeight(1.0);
+
+  // Try with a joint force field at 10cm
+  // fitter.setJointForceFieldThresholdDistance(0.1);
+  // fitter.setJointForceFieldSoftness(10.0);
 
   // Create Anthropometric prior
   std::shared_ptr<Anthropometrics> anthropometrics
