@@ -53,15 +53,14 @@ void World(
         std::shared_ptr<dart::simulation::World>>& world)
 {
   (void)m;
-  world.def(::py::init<>())
-      .def(::py::init<const std::string&>(), ::py::arg("name"))
+  world
       .def(::py::init(+[]() -> dart::simulation::WorldPtr {
         return dart::simulation::World::create();
       }))
       .def(::py::init(
           +[](const std::string& name) -> dart::simulation::WorldPtr {
             return dart::simulation::World::create(name);
-          }))
+          }), ::py::arg("name"))
       .def(
           "clone",
           +[](const dart::simulation::World* self)
