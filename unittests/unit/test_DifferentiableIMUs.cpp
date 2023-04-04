@@ -169,6 +169,41 @@ bool verifyIMUJacobians(
       }
       return false;
     }
+
+    Eigen::MatrixXs rotAccJ
+        = skel->getRotationalAccelerometerReadingsJacobianWrt(sensors, wrt);
+    Eigen::MatrixXs rotAccJ_fd
+        = skel->finiteDifferenceRotationalAccelerometerReadingsJacobianWrt(
+            sensors, wrt);
+    if (!equals(rotAccJ, rotAccJ_fd, 1e-8))
+    {
+      std::cout << "Rotational accelerometer wrt " << wrt->name() << " error!"
+                << std::endl;
+      for (int i = 0; i < sensors.size(); i++)
+      {
+        for (int dof = 0; dof < rotAccJ.cols(); dof++)
+        {
+          Eigen::Vector3s analytical = rotAccJ.block<3, 1>(i * 3, dof);
+          Eigen::Vector3s fd = rotAccJ_fd.block<3, 1>(i * 3, dof);
+          if (!equals(analytical, fd, 1e-8))
+          {
+            std::cout << "Sensor on body \"" << sensors[i].first->getName()
+                      << "\" @ [" << sensors[i].second.translation()(0) << ", "
+                      << sensors[i].second.translation()(1) << ", "
+                      << sensors[i].second.translation()(2)
+                      << "] disagrees WRT " << wrt->name() << "[" << i << "]"
+                      << std::endl;
+            Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(3, 3);
+            compare.col(0) = fd;
+            compare.col(1) = analytical;
+            compare.col(2) = analytical - fd;
+            std::cout << "FD - Analytical - Diff:" << std::endl
+                      << compare << std::endl;
+          }
+        }
+      }
+      return false;
+    }
   }
   return true;
 }

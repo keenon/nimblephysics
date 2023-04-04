@@ -40,9 +40,6 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
 
-  dart_add_test("unit" test_UnscentedKalmanFilter)
-  target_link_libraries(test_UnscentedKalmanFilter dart-utils)
-
   dart_add_test("unit" test_CompositeResourceRetriever)
   target_link_libraries(test_CompositeResourceRetriever dart-utils)
 

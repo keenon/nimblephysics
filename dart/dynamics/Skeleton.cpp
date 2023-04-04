@@ -7946,6 +7946,25 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getAccMapReadings(
 }
 
 //==============================================================================
+/// These are a set of bodies, and offsets in local body space where
+/// rotational accelerometers are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getRotAccMapReadings(
+    const SensorMap& accs)
+{
+  std::map<std::string, Eigen::Vector3s> results;
+  for (auto& pair : accs)
+  {
+    Eigen::Vector3s accInBodyFrame = pair.second.first->getAngularAcceleration(
+        pair.second.first, pair.second.first);
+    Eigen::Isometry3s T_ab = pair.second.second.inverse();
+    T_ab.translation()
+        = T_ab.translation().cwiseProduct(pair.second.first->getScale());
+    results[pair.first] = T_ab * accInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
 /// This converts markers from a source skeleton to the current, doing a
 /// simple mapping based on body node names. Any markers that don't find a
 /// body node in the current skeleton with the same name are dropped.
@@ -8216,6 +8235,89 @@ Eigen::MatrixXs Skeleton::finiteDifferenceAccelerometerReadingsJacobianWrt(
         tweaked(dof) += eps;
         wrt->set(this, tweaked);
         perturbed = getAccelerometerReadings(accs);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where accs
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getRotationalAccelerometerReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs)
+{
+  Eigen::VectorXs results = Eigen::VectorXs::Zero(accs.size() * 3);
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_ba = accs[i].second;
+    Eigen::Vector3s offset = T_ba.translation();
+    offset = offset.cwiseProduct(accs[i].first->getScale());
+
+    results.segment<3>(i * 3) = T_ba.linear().transpose()
+                                * accs[i].first->getAngularAcceleration(
+                                    Frame::World(), accs[i].first);
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs Skeleton::getRotationalAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs bodyAccWrt = getBodyLocalAccelerationsJacobian(wrt);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(accs.size() * 3, wrt->dim(this));
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_gb = accs[i].second.inverse();
+    T_gb.translation()
+        = T_gb.translation().cwiseProduct(accs[i].first->getScale());
+    // TODO: if we're taking the jacobian wrt body scales and that could change
+    // T_gb, we need to take that into account here.
+    J.block(i * 3, 0, 3, J.cols())
+        = math::AdTJac(
+              T_gb,
+              bodyAccWrt.block<6, Eigen::Dynamic>(
+                  accs[i].first->getIndexInSkeleton() * 6,
+                  0,
+                  6,
+                  bodyAccWrt.cols()))
+              .block(0, 0, 3, bodyAccWrt.cols());
+  }
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs
+Skeleton::finiteDifferenceRotationalAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(accs.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getRotationalAccelerometerReadings(accs);
         return true;
       },
       result,

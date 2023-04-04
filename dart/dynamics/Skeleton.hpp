@@ -1674,6 +1674,11 @@ public:
   std::map<std::string, Eigen::Vector3s> getAccMapReadings(
       const SensorMap& accs);
 
+  /// These are a set of bodies, and offsets in local body space where
+  /// rotational accelerometers are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getRotAccMapReadings(
+      const SensorMap& accs);
+
   /// This converts markers from a source skeleton to the current, doing a
   /// simple mapping based on body node names. Any markers that don't find a
   /// body node in the current skeleton with the same name are dropped.
@@ -1716,6 +1721,26 @@ public:
   /// This returns the Jacobian relating changes in joint
   /// positions to changes in acc readings
   Eigen::MatrixXs finiteDifferenceAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
+  /// These are a set of bodies, and offsets in local body space where accs
+  /// are mounted on the body
+  Eigen::VectorXs getRotationalAccelerometerReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs getRotationalAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs finiteDifferenceRotationalAccelerometerReadingsJacobianWrt(
       const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
           accs,
       neural::WithRespectTo* wrt);
