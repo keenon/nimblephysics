@@ -4602,6 +4602,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 #endif
     }
 
+    // The extra dimension is for the anthropometric penalty term
     const int outputDim
         = (markerObservations.size() * 3) + (joints.size() * 3) + 1;
     const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
@@ -4781,7 +4782,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               axisWeights);
 
           s_t logPdf = fitter->mAnthropometrics->getLogPDF(skeletonBallJoints);
-          // Do the sigmoid of the logPdf
+          // Do the negative exponent of the logPdf. The benefit here is that as
+          // the PDF gets to be a larger and larger value (more probable), this
+          // penalty will fall to zero.
           s_t alphaScale = 0.01;
           s_t expNegLogPdf = exp(-alphaScale * logPdf);
           diff(markerPoses.size() + jointCenters.size()) = expNegLogPdf;
@@ -4857,9 +4860,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           assert(groupScaleDim == expLogPdfGradient.size());
           assert(
               jac.cols() == skeletonBallJoints->getNumDofs() + groupScaleDim);
-          assert(
-              jac.rows() > (markerVector.size() * 3)
-                               + (jointsForSkeletonBallJoints.size() * 3));
+          assert(jac.rows() == outputDim);
           jac.block(
               (markerVector.size() * 3)
                   + (jointsForSkeletonBallJoints.size() * 3),
