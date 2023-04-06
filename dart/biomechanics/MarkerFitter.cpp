@@ -409,7 +409,13 @@ InitialMarkerFitParams::InitialMarkerFitParams()
     dontRescaleBodies(false),
     dontMoveMarkers(false),
     maxTrialsToUseForMultiTrialScaling(5),
-    maxTimestepsToUseForMultiTrialScaling(800)
+    maxTimestepsToUseForMultiTrialScaling(800),
+    initPoses(Eigen::MatrixXs::Zero(0, 0)),
+    groupScales(Eigen::VectorXs::Zero(0)),
+    jointCenters(Eigen::MatrixXs::Zero(0, 0)),
+    jointWeights(Eigen::VectorXs::Zero(0)),
+    jointAxis(Eigen::MatrixXs::Zero(0, 0)),
+    axisWeights(Eigen::VectorXs::Zero(0))
 {
 }
 
@@ -588,7 +594,7 @@ MarkerFitter::MarkerFitter(
     mSilenceOutput(false),
     mDisableLinesearch(false),
     mAnatomicalMarkerDefaultWeight(1.0),
-    mTrackingMarkerDefaultWeight(0.02),
+    mTrackingMarkerDefaultWeight(0.2),
     mStaticTrialWeight(50.0),
     mJointForceFieldThresholdDistance(0.0),
     mJointForceFieldSoftness(0.2),
@@ -3458,12 +3464,6 @@ MarkerInitialization MarkerFitter::getInitialization(
     numBlocks = markerObservations.size();
   }
   int blockLen = markerObservations.size() / numBlocks;
-  std::vector<std::string> anatomicalMarkerNames;
-  for (int j = 0; j < mMarkerNames.size(); j++)
-  {
-    // if (!mMarkerIsTracking[j])
-    anatomicalMarkerNames.push_back(mMarkerNames[j]);
-  }
 
   // Construct the observedMarkers list, for markers that appear in both the
   // data and the model
@@ -3560,7 +3560,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     // Append our state to whatever the current block is
     int mapIndex = blocks[blocks.size() - 1].size();
     blocks[blocks.size() - 1].emplace_back();
-    for (std::string& marker : anatomicalMarkerNames)
+    for (std::string& marker : mMarkerNames)
     {
       if (markerObservations[i].count(marker) > 0)
       {
@@ -3573,23 +3573,23 @@ MarkerInitialization MarkerFitter::getInitialization(
     if (params.jointCenters.cols() > i)
     {
       assert(params.jointCenters.rows() == params.joints.size() * 3);
-      jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
+      jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
           params.jointCenters.col(i));
     }
     else
     {
       assert(params.jointCenters.cols() == 0);
-      jointCenterBlocks[jointCenterBlocks.size() - 1].emplace_back(
+      jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
           Eigen::VectorXs::Zero(0));
     }
     if (params.jointAxis.cols() > i)
     {
-      jointAxisBlocks[jointAxisBlocks.size() - 1].emplace_back(
+      jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
           params.jointAxis.col(i));
     }
     else
     {
-      jointAxisBlocks[jointAxisBlocks.size() - 1].emplace_back(
+      jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
           Eigen::VectorXs::Zero(0));
     }
   }
@@ -3624,7 +3624,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     // Append our state to whatever the current block is
     int mapIndex = trials[trials.size() - 1].size();
     trials[trials.size() - 1].emplace_back();
-    for (std::string& marker : anatomicalMarkerNames)
+    for (std::string& marker : mMarkerNames)
     {
       if (markerObservations[i].count(marker) > 0)
       {
@@ -3772,6 +3772,7 @@ MarkerInitialization MarkerFitter::getInitialization(
   if (params.dontRescaleBodies && params.groupScales.size() > 0)
   {
     result.groupScales = params.groupScales;
+    mSkeleton->setGroupScales(result.groupScales);
   }
   else
   {
@@ -3786,6 +3787,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     }
     averageGroupScales /= totalWeight;
     result.groupScales = averageGroupScales;
+    mSkeleton->setGroupScales(result.groupScales);
   }
 
   // 4. Go through and run IK on each block
@@ -4332,6 +4334,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     outputNames.push_back(jointPrefix + " Y");
     outputNames.push_back(jointPrefix + " Z");
   }
+  outputNames.push_back("Sigmoid of log(anthropometric prior)");
   std::vector<std::string> inputNames;
   for (int i = 0; i < skeletonBallJoints->getNumDofs(); i++)
   {
@@ -4381,14 +4384,15 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         skeletonBallJoints->getPositionLowerLimits(),
         (markerObservations.size() * 3) + (joints.size() * 3),
         // Set positions
-        [&skeletonBallJoints,
-         &skeleton,
+        [skeletonBallJoints,
+         skeleton,
          saveToGUI,
          &server,
-         &markerPoses,
-         &markerVector,
-         &jointsForSkeletonBallJoints,
-         &jointCenters,
+         markerPoses,
+         markerVector,
+         jointsForSkeletonBallJoints,
+         jointCenters,
+         jointAxis,
          ignoreJointLimits](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(pos);
@@ -4436,6 +4440,16 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
                   points,
                   Eigen::Vector4s(0, 1, 0, 1));
             }
+            for (int i = 0; i < jointsForSkeletonBallJoints.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentJointPoses.segment<3>(i * 3));
+              points.push_back(jointAxis.segment<3>(i * 6));
+              server.createLine(
+                  "joint_axis_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(0, 0, 1, 1));
+            }
 
             server.saveFrame();
           }
@@ -4444,15 +4458,15 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           return skeletonBallJoints->getPositions();
         },
         // Compute the Jacobian
-        [&skeletonBallJoints,
-         &markerPoses,
-         &markerVector,
-         &markerWeightsVector,
-         &jointsForSkeletonBallJoints,
-         &jointCenters,
-         &jointWeights,
-         &jointAxis,
-         &axisWeights](
+        [skeletonBallJoints,
+         markerPoses,
+         markerVector,
+         markerWeightsVector,
+         jointsForSkeletonBallJoints,
+         jointCenters,
+         jointWeights,
+         jointAxis,
+         axisWeights](
             /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
             /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff.segment(0, markerPoses.size())
@@ -4588,22 +4602,25 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 #endif
     }
 
+    const int outputDim
+        = (markerObservations.size() * 3) + (joints.size() * 3) + 1;
     const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
     // 2. Actually solve the IK
     result.score = math::solveIK(
         initialPos,
         upperBound,
         lowerBound,
-        (markerObservations.size() * 3) + (joints.size() * 3),
+        outputDim,
         // Set positions
-        [&skeletonBallJoints,
-         &skeleton,
+        [skeletonBallJoints,
+         skeleton,
          saveToGUI,
          &server,
-         &markerPoses,
-         &markerVector,
-         &jointsForSkeletonBallJoints,
-         &jointCenters,
+         markerPoses,
+         markerVector,
+         jointsForSkeletonBallJoints,
+         jointCenters,
+         jointAxis,
          ignoreJointLimits](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
@@ -4709,6 +4726,16 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
                   points,
                   Eigen::Vector4s(0, 1, 0, 1));
             }
+            for (int i = 0; i < jointsForSkeletonBallJoints.size(); i++)
+            {
+              std::vector<Eigen::Vector3s> points;
+              points.push_back(currentJointPoses.segment<3>(i * 3));
+              points.push_back(jointAxis.segment<3>(i * 6));
+              server.createLine(
+                  "joint_axis_" + std::to_string(i),
+                  points,
+                  Eigen::Vector4s(0, 0, 1, 1));
+            }
 
             server.saveFrame();
           }
@@ -4724,17 +4751,21 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           return clampedPos;
         },
         // Compute the Jacobian
-        [&skeletonBallJoints,
-         &markerPoses,
-         &markerVector,
-         &markerWeightsVector,
-         &jointsForSkeletonBallJoints,
-         &jointCenters,
-         &jointWeights,
-         &jointAxis,
-         &axisWeights](
+        [skeletonBallJoints,
+         fitter,
+         markerPoses,
+         markerVector,
+         markerWeightsVector,
+         jointsForSkeletonBallJoints,
+         jointCenters,
+         jointWeights,
+         jointAxis,
+         axisWeights,
+         outputDim](
             /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
             /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          /// Compute the output diff (error)
+
           diff.segment(0, markerPoses.size())
               = skeletonBallJoints->getMarkerWorldPositions(markerVector)
                 - markerPoses;
@@ -4749,14 +4780,19 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               jointAxis,
               axisWeights);
 
+          s_t logPdf = fitter->mAnthropometrics->getLogPDF(skeletonBallJoints);
+          // Do the sigmoid of the logPdf
+          s_t alphaScale = 0.01;
+          s_t expNegLogPdf = exp(-alphaScale * logPdf);
+          diff(markerPoses.size() + jointCenters.size()) = expNegLogPdf;
+
           assert(
               jac.cols()
               == skeletonBallJoints->getNumDofs()
                      + skeletonBallJoints->getGroupScaleDim());
-          assert(
-              jac.rows()
-              == (markerVector.size() * 3)
-                     + (jointsForSkeletonBallJoints.size() * 3));
+          (void)outputDim;
+          assert(jac.rows() == outputDim);
+
           jac.setZero();
           jac.block(
               0, 0, markerVector.size() * 3, skeletonBallJoints->getNumDofs())
@@ -4811,6 +4847,26 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               jointWeights,
               jointAxis,
               axisWeights);
+
+          // Add group scales grad
+          Eigen::VectorXs expNegLogPdfGradient
+              = -alphaScale * expNegLogPdf
+                * fitter->mAnthropometrics->getGradientOfLogPDFWrtGroupScales(
+                    skeletonBallJoints);
+          int groupScaleDim = skeletonBallJoints->getGroupScaleDim();
+          assert(groupScaleDim == expLogPdfGradient.size());
+          assert(
+              jac.cols() == skeletonBallJoints->getNumDofs() + groupScaleDim);
+          assert(
+              jac.rows() > (markerVector.size() * 3)
+                               + (jointsForSkeletonBallJoints.size() * 3));
+          jac.block(
+              (markerVector.size() * 3)
+                  + (jointsForSkeletonBallJoints.size() * 3),
+              skeletonBallJoints->getNumDofs(),
+              1,
+              groupScaleDim)
+              = expNegLogPdfGradient.transpose();
         },
         // Generate a random restart position
         [&skeletonBallJoints, &skeleton, &observedJoints](
@@ -5923,12 +5979,13 @@ void MarkerFitter::computeJointConfidences(
         initialization.axisWeights(i) = mMaxAxisWeight;
       }
 
-      // We'd rather use the axis to fit the joints, because it's less likely to get us into 
-      // trouble than a bad joint center. So if the axis fit is below a certain absolute loss 
-      // (indicating that the axis was fairly accurate, even if the sphere fit was better), 
-      // or if the axis fit is below a certain multiple of the joint fit, then we'll use the 
-      // axis fit.
-      if (initialization.axisLoss(i) < 0.005 || (initialization.axisLoss(i) < 5 * initialization.jointLoss(i)))
+      // We'd rather use the axis to fit the joints, because it's less likely to
+      // get us into trouble than a bad joint center. So if the axis fit is
+      // below a certain absolute loss (indicating that the axis was fairly
+      // accurate, even if the sphere fit was better), or if the axis fit is
+      // below a certain multiple of the joint fit, then we'll use the axis fit.
+      if (initialization.axisLoss(i) < 0.005
+          || (initialization.axisLoss(i) < 5 * initialization.jointLoss(i)))
       {
         initialization.jointWeights(i) = 0;
       }
