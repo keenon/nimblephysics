@@ -6212,6 +6212,44 @@ TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_SPRINTER)
 #endif
 
 #ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_SAM_DATA)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/grf.mot");
+
+  runEngine(
+      "dart://sample/grf/Hamner_subject17/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      68.48,
+      1.68,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_BALLET)
 {
   std::vector<std::string> c3dFiles;

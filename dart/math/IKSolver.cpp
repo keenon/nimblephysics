@@ -203,7 +203,6 @@ s_t solveIK(
         getRandomRestart,
     IKConfig config)
 {
-  /*
 #ifndef NDEBUG
   verifyJacobian(
       initialPos,
@@ -214,7 +213,6 @@ s_t solveIK(
       eval,
       config);
 #endif
-  */
 
   s_t bestError = std::numeric_limits<s_t>::infinity();
   Eigen::VectorXs bestResult = initialPos;
@@ -331,6 +329,8 @@ IKResult refineIK(
     /////////////////////////////////////////////////////////////////////////////
 
     eval(diff, J);
+    assert(!diff.hasNaN());
+    assert(!J.hasNaN());
     s_t currentError = diff.squaredNorm();
 
     /////////////////////////////////////////////////////////////////////////////
@@ -437,6 +437,7 @@ IKResult refineIK(
     if (useTranspose)
     {
       delta = J.transpose() * diff;
+      assert(!delta.hasNaN());
     }
     else
     {
@@ -444,6 +445,7 @@ IKResult refineIK(
       if (config.leastSquaresDamping == 0)
       {
         delta = J.completeOrthogonalDecomposition().solve(diff);
+        assert(!delta.hasNaN());
       }
       else
       {
@@ -454,6 +456,7 @@ IKResult refineIK(
                 + config.leastSquaresDamping
                       * Eigen::MatrixXs::Identity(J.rows(), J.rows());
           delta = J.transpose() * toInvert.llt().solve(diff);
+          assert(!delta.hasNaN());
         }
         else
         {
@@ -462,6 +465,7 @@ IKResult refineIK(
                 + config.leastSquaresDamping
                       * Eigen::MatrixXs::Identity(J.cols(), J.cols());
           delta = toInvert.llt().solve(J.transpose() * diff);
+          assert(!delta.hasNaN());
         }
       }
     }
