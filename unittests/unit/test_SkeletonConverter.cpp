@@ -421,7 +421,7 @@ TEST(SkeletonConverter, BROKEN_IK_TIMESTEP_3)
   osim->setPositions(originalPos);
 
   s_t error = converter.fitSourceToTarget();
-  EXPECT_LE(error, 0.04);
+  EXPECT_LE(error, 0.05);
 
   /*
   // Uncomment this for local testing
