@@ -4604,7 +4604,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 
     // The extra dimension is for the anthropometric penalty term
     int outputDim
-        = (markerObservations.size() * 3) + (joints.size() * 3) ;
+        = (markerObservations.size() * 3) + (joints.size() * 3);
     if (fitter->mAnthropometrics != nullptr) {
       outputDim += 1;
     }
