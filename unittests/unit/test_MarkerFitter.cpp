@@ -6271,6 +6271,36 @@ TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_BALLET)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, ANTOINE_BUG_1)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0001/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0002/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0003/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0004/markers.trc");
+
+  //  {"massKg": 79.1, "heightM": 1.8, "sex": "male", "skeletonPreset":
+  //  "custom"}
+  runEngine(
+      "dart://sample/osim/Antoine_Subj03_input/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      79.1,
+      1.8,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)
 {
   bool isDebug = false;
