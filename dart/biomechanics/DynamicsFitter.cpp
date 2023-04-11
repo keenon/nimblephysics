@@ -9861,8 +9861,8 @@ void DynamicsFitter::markMissingImpacts(
           if (offsetT < init->probablyMissingGRF[trial].size())
           {
             init->probablyMissingGRF[trial][offsetT] = true;
-            init->missingGRFReason[trial][offsetT] =
-                MissingGRFReason::missingImpact;
+            init->missingGRFReason[trial][offsetT]
+                = MissingGRFReason::missingImpact;
           }
         }
       }
@@ -9911,8 +9911,8 @@ void DynamicsFitter::fillInMissingGRFBlips(
             if (scanT < init->probablyMissingGRF[trial].size())
             {
               init->probablyMissingGRF[trial][scanT] = true;
-              init->missingGRFReason[trial][scanT] =
-                  MissingGRFReason::missingBlip;
+              init->missingGRFReason[trial][scanT]
+                  = MissingGRFReason::missingBlip;
             }
           }
         }
@@ -10034,7 +10034,7 @@ void DynamicsFitter::smoothAccelerations(
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
-    #ifndef NDEBUG
+#ifndef NDEBUG
     // Warn if we're over a bound after acceleration smoothing
     s_t eps = 1e-6;
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
@@ -10058,7 +10058,7 @@ void DynamicsFitter::smoothAccelerations(
         }
       }
     }
-    #endif
+#endif
 
     // Smooth the regularization target, too, so we're not regularizing
     // our positions back to something jittery later
@@ -10154,8 +10154,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                   << trial << " at time " << t << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1] =
-            MissingGRFReason::unmeasuredExternalForceDetected;
+        init->missingGRFReason[trial][t + 1]
+            = MissingGRFReason::unmeasuredExternalForceDetected;
         continue;
       }
       else if (!isEstimatedZero && isMeasuredZero)
@@ -10166,8 +10166,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                     << std::endl;
           filteredTimesteps.push_back(t + 1);
           init->probablyMissingGRF[trial][t + 1] = true;
-          init->missingGRFReason[trial][t + 1] =
-              MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
+          init->missingGRFReason[trial][t + 1]
+              = MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
         }
         continue;
       }
@@ -10206,8 +10206,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
             << threshold << ")" << std::endl;
         filteredTimesteps.push_back(t + 1);
         init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1] =
-            MissingGRFReason::forceDiscrepancy;
+        init->missingGRFReason[trial][t + 1]
+            = MissingGRFReason::forceDiscrepancy;
       }
     }
     if (filteredTimesteps.size() > 0)
@@ -10270,7 +10270,8 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
         if (init->probablyMissingGRF.size() > trial)
         {
           init->probablyMissingGRF[trial][t] = true;
-          init->missingGRFReason[trial][t] = MissingGRFReason::torqueDiscrepancy;
+          init->missingGRFReason[trial][t]
+              = MissingGRFReason::torqueDiscrepancy;
         }
       }
       std::cout << "Ang badness " << t << ": " << badness << std::endl;
@@ -10407,7 +10408,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeForcePlateRotations = 10.0;
     s_t regularizeUnobservedTimesteps = 0.1;
-    s_t regularizeScaleGRF = 1000.0;
+    s_t regularizeScaleGRF = 2.0;
 
     const s_t originalMass = mSkeleton->getMass();
 
@@ -10657,7 +10658,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
       int scaleGRFRow
           = (numTimesteps * 3) + (numForcePlates * 3) + (numMissingSteps * 3);
-      trialLinearMapToPositions(scaleGRFRow, scaleGRFCol) = regularizeScaleGRF;
+      trialLinearMapToPositions(scaleGRFRow, scaleGRFCol)
+          = numTimesteps * regularizeScaleGRF;
 
       trialLinearMaps.push_back(trialLinearMapToPositions);
       trialOriginalPositions.push_back(originalCOMPositions);
@@ -10722,6 +10724,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         = (unifiedLinearMap * tentativeResult) + unifiedGravityOffset;
 
     std::cout << "Solved!" << std::endl;
+    std::cout << "Solution vector: " << std::endl
+              << tentativeResult << std::endl;
 
     // The linear map is in terms of "inverse mass", so we need to invert to
     // recover original mass.
@@ -11642,6 +11646,12 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     {
       numMissing = maxBuckets;
     }
+    if (numMissing > 200)
+    {
+      std::cout << "More than 200 timesteps marked as missing GRF. Aborting..."
+                << std::endl;
+      return {false, totalResidual};
+    }
 
     int numTimesteps = q.cols();
 
@@ -12107,7 +12117,7 @@ bool DynamicsFitter::timeSyncTrialGRF(
       init->probablyMissingGRF[trial][t]
           = originalProbablyMissingGRF[originalT];
       init->missingGRFReason[trial][t] = originalMissingGRFReason[originalT];
-     }
+    }
   }
 
   // Return failure if no shifts succeed.
@@ -12263,7 +12273,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   }
 
   // Recompute the marker offsets to minimize error
-  if (reoptimizeMarkerOffsets) {
+  if (reoptimizeMarkerOffsets)
+  {
     optimizeMarkerOffsets(init);
   }
   return true;
@@ -15300,7 +15311,9 @@ void DynamicsFitter::writeCSVData(
     if (useTimestamps)
     {
       csvFile << timestamps[t];
-    } else {
+    }
+    else
+    {
       csvFile << time;
     }
 
@@ -15308,9 +15321,9 @@ void DynamicsFitter::writeCSVData(
     Eigen::VectorXs dq = Eigen::VectorXs::Zero(q.size());
     Eigen::VectorXs ddq = Eigen::VectorXs::Zero(q.size());
     Eigen::VectorXs tau = Eigen::VectorXs::Zero(q.size());
-    if (t > 0 && t < nrows-1) {
-      dq = (init->poseTrials[trial].col(t)
-            - init->poseTrials[trial].col(t - 1))
+    if (t > 0 && t < nrows - 1)
+    {
+      dq = (init->poseTrials[trial].col(t) - init->poseTrials[trial].col(t - 1))
            / dt;
       ddq = (init->poseTrials[trial].col(t + 1)
              - 2 * init->poseTrials[trial].col(t)
