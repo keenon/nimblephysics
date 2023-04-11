@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -2102,7 +2102,7 @@ bool testMultiMassLinearMapWithRandomTrajectory(
   dqs += Eigen::MatrixXs::Random(skel->getNumDofs(), numTimesteps) * 0.001;
 
   skel->setLinearizedMasses(skel->getLinearizedMasses());
-  skel->setGravity(Eigen::Vector3s(0, 0, -9.81));
+  skel->setGravity(Eigen::Vector3s(0, -9.81, 0));
   ResidualForceHelper helper(skel, collisionBodies);
 
   std::pair<Eigen::MatrixXs, Eigen::VectorXs> linear
@@ -2718,7 +2718,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.addJointBoundSlack(skel, 0.1);
   fitter.boundPush(init);
+#ifdef NDEBUG
   fitter.smoothAccelerations(init);
+#endif
   // fitter.markMissingImpacts(init, 3, true);
 
   /*
@@ -3318,12 +3320,14 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     forcePlateTrials = trimmedForcePlateTrials;
   }
 
+#ifdef NDEBUG
   for (int i = 0; i < markerObservationTrials.size(); i++)
   {
     auto report = MarkerFixer::generateDataErrorsReport(
         markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
     markerObservationTrials[i] = report->markerObservationsAttemptedFixed;
   }
+#endif
 
   std::vector<dynamics::BodyNode*> footNodes;
   for (std::string& name : footNames)
@@ -3349,13 +3353,16 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
       newClip.push_back(t == 0);
     }
 
+#ifdef NDEBUG
     // 2. Find the joint centers
-    // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release build
+    // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release
+    // build
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.computeJointConfidences(fitterInit, markerObservationTrials[trial]);
+#endif
 
     kinematicInits.push_back(fitterInit);
   }
@@ -6625,6 +6632,40 @@ TEST(DynamicsFitter, CARMAGO_TEST)
       -1,
       0,
       true,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_CARMAGO)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("treadmill_01_01");
+
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/CarmagoTest/MarkerData/" + name + ".trc");
+    grfFiles.push_back("dart://sample/grf/CarmagoTest/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/grf/CarmagoTest/Models/"
+      "unscaled_generic.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
       true);
 }
 #endif

@@ -4603,9 +4603,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     }
 
     // The extra dimension is for the anthropometric penalty term
-    int outputDim
-        = (markerObservations.size() * 3) + (joints.size() * 3);
-    if (fitter->mAnthropometrics != nullptr) {
+    int outputDim = (markerObservations.size() * 3) + (joints.size() * 3);
+    if (fitter->mAnthropometrics != nullptr)
+    {
       outputDim += 1;
     }
 
@@ -4863,13 +4863,14 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               axisWeights);
 
           // Add group scales grad
-          if (fitter->mAnthropometrics != nullptr) {
+          if (fitter->mAnthropometrics != nullptr)
+          {
             Eigen::VectorXs expNegLogPdfGradient
                 = -alphaScale * expNegLogPdf
                   * fitter->mAnthropometrics->getGradientOfLogPDFWrtGroupScales(
                       skeletonBallJoints);
             int groupScaleDim = skeletonBallJoints->getGroupScaleDim();
-            assert(groupScaleDim == expLogPdfGradient.size());
+            assert(groupScaleDim == expNegLogPdfGradient.size());
             assert(
                 jac.cols() == skeletonBallJoints->getNumDofs() + groupScaleDim);
             jac.block(
@@ -4881,7 +4882,6 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
                 = expNegLogPdfGradient.transpose();
           }
           assert(jac.rows() == outputDim);
-
         },
         // Generate a random restart position
         [&skeletonBallJoints, &skeleton, &observedJoints](
