@@ -151,7 +151,8 @@ public:
   static std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
-      s_t dt);
+      s_t dt,
+      bool dropProlongedStillness = false);
 };
 
 } // namespace biomechanics

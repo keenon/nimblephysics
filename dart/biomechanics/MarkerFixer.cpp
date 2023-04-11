@@ -801,7 +801,8 @@ void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
 std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         immutableMarkerObservations,
-    s_t dt)
+    s_t dt,
+    bool dropProlongedStillness)
 {
   std::shared_ptr<MarkersErrorReport> report
       = std::make_shared<MarkersErrorReport>();
@@ -829,7 +830,10 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     }
     std::string bestLabel = traces[i].getBestLabel(alreadyTakenLabels);
     traces[i].filterTimestepsBasedOnAcc(dt, 1000.0);
-    // traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
+    if (dropProlongedStillness)
+    {
+      traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
+    }
     traceLabels.push_back(bestLabel);
   }
 
