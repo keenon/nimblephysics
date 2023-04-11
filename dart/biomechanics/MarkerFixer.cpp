@@ -557,8 +557,8 @@ int RippleReductionProblem::dropSuspiciousPoints(MarkersErrorReport* report)
         if (report != nullptr)
         {
           report->warnings.push_back(
-              "Dropping marker " + markerName
-              + " for suspicious acceleration (" + std::to_string(acc.norm()) + "m/s^2) on frame "
+              "Dropping marker " + markerName + " for suspicious acceleration ("
+              + std::to_string(acc.norm()) + "m/s^2) on frame "
               + std::to_string(observedTimesteps[i]));
         }
         dropped++;
@@ -810,9 +810,10 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
 
   // 1. Attempt to detect marker flips that occur partway through the trajectory
 
-  // 1.1. Collect markers into continuous traces. Break marker traces that imply a velocity greater than 20 m/s
-  std::vector<LabeledMarkerTrace> traces
-      = LabeledMarkerTrace::createRawTraces(immutableMarkerObservations, dt * 20.0);
+  // 1.1. Collect markers into continuous traces. Break marker traces that imply
+  // a velocity greater than 20 m/s
+  std::vector<LabeledMarkerTrace> traces = LabeledMarkerTrace::createRawTraces(
+      immutableMarkerObservations, dt * 20.0);
 
   // 1.2. Label the traces based on their majority label during the trace
   std::vector<std::string> traceLabels;
@@ -828,7 +829,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     }
     std::string bestLabel = traces[i].getBestLabel(alreadyTakenLabels);
     traces[i].filterTimestepsBasedOnAcc(dt, 1000.0);
-    traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
+    // traces[i].filterTimestepsBasedOnProlongedStillness(dt, 0.001, 10);
     traceLabels.push_back(bestLabel);
   }
 
