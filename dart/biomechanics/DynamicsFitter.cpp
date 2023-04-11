@@ -11646,12 +11646,14 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     {
       numMissing = maxBuckets;
     }
-    if (numMissing > 200)
-    {
-      std::cout << "More than 200 timesteps marked as missing GRF. Aborting..."
-                << std::endl;
-      return {false, totalResidual};
-    }
+    // TODO: test this and re-enable it
+    // if (numMissing > 200)
+    // {
+    //   std::cout << "More than 200 timesteps marked as missing GRF.
+    //   Aborting..."
+    //             << std::endl;
+    //   return {false, totalResidual};
+    // }
 
     int numTimesteps = q.cols();
 
