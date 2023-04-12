@@ -6625,7 +6625,7 @@ TEST(DynamicsFitter, CARMAGO_TEST)
       grfFiles,
       -1,
       0,
-      true,
+      false,
       true);
 }
 #endif

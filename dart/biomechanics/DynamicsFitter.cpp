@@ -11820,7 +11820,56 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       if (estimateUnmeasuredExternalTorques(init, trial, threshold) > 0
           || threshold > 0.0005)
       {
-        continue;
+        int numTimestepsAngularDetected = 0;
+        for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
+        {
+          for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+          {
+            if (init->probablyMissingGRF[trial][t])
+            {
+              if (init->missingGRFReason[trial][t]
+                  == MissingGRFReason::torqueDiscrepancy)
+              {
+                numTimestepsAngularDetected++;
+              }
+            }
+          }
+        }
+        std::cout << "Missing torques detected on frames: "
+                  << numTimestepsAngularDetected << std::endl;
+        const int maxTimestepsAngularDetected = 150;
+        if (numTimestepsAngularDetected > maxTimestepsAngularDetected)
+        {
+          std::cout << "Detected too many timesteps where we were experiencing "
+                       "unmeasured external torques ("
+                    << numTimestepsAngularDetected << " > "
+                    << maxTimestepsAngularDetected
+                    << "). Failing angular minimization, and resetting those "
+                       "missing GRF labels."
+                    << std::endl;
+
+          // Reset the missing GRF flags to false for angular discrepancies.
+          for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
+          {
+            for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+            {
+              if (init->probablyMissingGRF[trial][t])
+              {
+                if (init->missingGRFReason[trial][t]
+                    == MissingGRFReason::torqueDiscrepancy)
+                {
+                  init->probablyMissingGRF[trial][t] = false;
+                }
+              }
+            }
+          }
+          return {false, totalResidual};
+        }
+        else
+        {
+          // As long as we're below the threshold, keep going
+          continue;
+        }
       }
       else
       {
@@ -12215,6 +12264,10 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     for (int i = 0; i < iterations; i++)
     {
+      std::cout << "Running zeroLinearResidualsAndOptimizeAngular() iteration "
+                << i << " of " << iterations << " for trial " << trial << " of "
+                << init->poseTrials.size()
+                << " with useReactionWheels=" << useReactionWheels << std::endl;
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       bool commitDriftCompensation = i == iterations - 1;
@@ -12240,8 +12293,22 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
       previousTotalResidual = output.second;
       if (!output.first)
       {
-        residualMinimizationSuccess = false;
-        break;
+        std::cout << "zeroLinearResidualsAndOptimizeAngular() failed. "
+                     "useReactionWheels="
+                  << useReactionWheels << std::endl;
+        if (!useReactionWheels)
+        {
+          useReactionWheels = true;
+          detectUnmeasuredTorque = false;
+          i = -1;
+          iterations = 1;
+          continue;
+        }
+        else
+        {
+          residualMinimizationSuccess = false;
+          break;
+        }
       }
     }
     if (!residualMinimizationSuccess)
