@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -3350,7 +3350,8 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     }
 
     // 2. Find the joint centers
-    // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release build
+    // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release
+    // build
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
