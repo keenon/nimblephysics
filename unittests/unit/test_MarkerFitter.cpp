@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -30,6 +31,7 @@
 #include "dart/realtime/Ticker.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
+#include "dart/utils/AccelerationSmoother.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 
 #include "GradientTestUtils.hpp"
@@ -1381,6 +1383,10 @@ std::vector<MarkerInitialization> runEngine(
     std::string modelPath,
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
         markerObservationTrials,
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+        accObservations,
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+        gyroObservations,
     std::vector<int> framesPerSecond,
     std::vector<std::vector<ForcePlate>> forcePlates,
     s_t massKg,
@@ -1430,6 +1436,20 @@ std::vector<MarkerInitialization> runEngine(
 
   // Create MarkerFitter
   MarkerFitter fitter(standard.skeleton, standard.markersMap);
+
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      imuMap;
+  std::cout << "IMUs: " << standard.imuMap.size() << std::endl;
+  for (auto& pair : standard.imuMap)
+  {
+    imuMap[pair.first] = std::make_pair(
+        skelBallJoints->getBodyNode(pair.second.first), pair.second.second);
+    std::cout << "IMU loaded: " << pair.first << " ["
+              << imuMap[pair.first].first->getName() << ","
+              << imuMap[pair.first].second.translation().transpose() << "]"
+              << std::endl;
+  }
+  fitter.setImuMap(imuMap);
 
   // fitter.setIgnoreJointLimits(true);
 
@@ -1677,6 +1697,8 @@ std::vector<MarkerInitialization> runEngine(
         "../../../javascript/src/data/movement2.bin",
         results[0],
         markerObservationTrials[0],
+        accObservations[0],
+        gyroObservations[0],
         framesPerSecond[0],
         forcePlates[0]);
   }
@@ -1701,15 +1723,21 @@ std::vector<MarkerInitialization> runEngine(
     std::vector<std::string> c3dFiles,
     std::vector<std::string> trcFiles,
     std::vector<std::string> grfFiles,
+    std::vector<std::string> imuFiles,
     s_t massKg,
     s_t heightM,
     std::string sex,
     bool saveGUI = false,
-    bool runGUI = false)
+    bool runGUI = false,
+    int maxTrialLength = -1)
 {
   std::vector<C3D> c3ds;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      accObservationTrials;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      gyroObservationTrials;
   std::vector<int> framesPerSecond;
   std::vector<std::vector<ForcePlate>> forcePlates;
 
@@ -1717,7 +1745,16 @@ std::vector<MarkerInitialization> runEngine(
   {
     C3D c3d = C3DLoader::loadC3D(path);
     c3ds.push_back(c3d);
-    markerObservationTrials.push_back(c3d.markerTimesteps);
+    int len = c3d.markerTimesteps.size();
+    if (maxTrialLength > 0 && len > maxTrialLength)
+    {
+      len = maxTrialLength;
+    }
+    markerObservationTrials.emplace_back();
+    for (int i = 0; i < len; i++)
+    {
+      markerObservationTrials.back().push_back(c3d.markerTimesteps[i]);
+    }
     forcePlates.push_back(c3d.forcePlates);
     framesPerSecond.push_back(c3d.framesPerSecond);
   }
@@ -1727,7 +1764,16 @@ std::vector<MarkerInitialization> runEngine(
     OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[i]);
     framesPerSecond.push_back(trc.framesPerSecond);
 
-    markerObservationTrials.push_back(trc.markerTimesteps);
+    int len = trc.markerTimesteps.size();
+    if (maxTrialLength > 0 && len > maxTrialLength)
+    {
+      len = maxTrialLength;
+    }
+    markerObservationTrials.emplace_back();
+    for (int i = 0; i < len; i++)
+    {
+      markerObservationTrials.back().push_back(trc.markerTimesteps[i]);
+    }
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
@@ -1740,9 +1786,28 @@ std::vector<MarkerInitialization> runEngine(
     }
   }
 
+  for (int i = 0; i < imuFiles.size(); i++)
+  {
+    OpenSimIMUData imu = OpenSimParser::loadIMUFromCSV(imuFiles[i]);
+    int len = imu.accReadings.size();
+    if (maxTrialLength > 0 && len > maxTrialLength)
+    {
+      len = maxTrialLength;
+    }
+    accObservationTrials.emplace_back();
+    gyroObservationTrials.emplace_back();
+    for (int i = 0; i < len; i++)
+    {
+      accObservationTrials.back().push_back(imu.accReadings[i]);
+      gyroObservationTrials.back().push_back(imu.gyroReadings[i]);
+    }
+  }
+
   return runEngine(
       modelPath,
       markerObservationTrials,
+      accObservationTrials,
+      gyroObservationTrials,
       framesPerSecond,
       forcePlates,
       massKg,
@@ -1819,6 +1884,8 @@ void evaluateOnSyntheticData(
     }
     markerObservationTrials.push_back(trial);
   }
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> gyroTrials;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> accTrials;
 
   s_t heightM = scaled.skeleton->getHeight(scaled.skeleton->getPositions());
 
@@ -1835,6 +1902,8 @@ void evaluateOnSyntheticData(
   std::vector<MarkerInitialization> results = runEngine(
       modelPath,
       markerObservationTrials,
+      accTrials,
+      gyroTrials,
       goldFPS,
       goldForcePlates,
       massKg,
@@ -7420,6 +7489,118 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
   server->serve(8070);
   fitter.debugTrajectoryAndMarkersToGUI(server, init, subsetTimesteps);
   server->blockWhileServing();
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, CARMAGO_FINE_TUNE_ON_IMUS)
+{
+  OpenSimFile carmago = OpenSimParser::parseOsim(
+      "dart://sample/grf/CarmagoTest/Models/final.osim");
+  carmago.skeleton->autogroupSymmetricSuffixes();
+  carmago.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  // Get the raw marker trajectory data
+  OpenSimIMUData imuData = OpenSimParser::loadIMUFromCSV(
+      "dart://sample/grf/CarmagoTest/IMU/treadmill_01_01.csv", true);
+
+  OpenSimTRC trc = OpenSimParser::loadTRC(
+      "dart://sample/grf/CarmagoTest/MarkerData/treadmill_01_01.trc");
+
+  OpenSimMot mot = OpenSimParser::loadMot(
+      carmago.skeleton,
+      "dart://sample/grf/CarmagoTest/IK/treadmill_01_01_ik.mot");
+
+  MarkerFitter fitter(carmago.skeleton, carmago.markersMap);
+  fitter.setTrackingMarkers(carmago.trackingMarkers);
+
+  SensorMap imus;
+  // foot, shank, thigh, trunk
+  imus["foot"] = std::make_pair(
+      carmago.skeleton->getBodyNode("calcn_r"), Eigen::Isometry3s::Identity());
+  imus["shank"] = std::make_pair(
+      carmago.skeleton->getBodyNode("tibia_r"), Eigen::Isometry3s::Identity());
+  imus["thigh"] = std::make_pair(
+      carmago.skeleton->getBodyNode("femur_r"), Eigen::Isometry3s::Identity());
+  imus["trunk"] = std::make_pair(
+      carmago.skeleton->getBodyNode("torso"), Eigen::Isometry3s::Identity());
+
+  fitter.setImuMap(imus);
+
+  int limitTimesteps = 1000;
+  Eigen::MatrixXs poses
+      = mot.poses.block(0, 0, mot.poses.rows(), limitTimesteps);
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+  std::vector<std::map<std::string, Eigen::Vector3s>> accTimesteps;
+  std::vector<std::map<std::string, Eigen::Vector3s>> gyroTimesteps;
+  std::vector<bool> newClip;
+  for (int t = 0; t < limitTimesteps; t++)
+  {
+    markerTimesteps.push_back(trc.markerTimesteps[t]);
+    accTimesteps.push_back(imuData.accReadings[t]);
+    gyroTimesteps.push_back(imuData.gyroReadings[t]);
+    newClip.push_back(t == 0);
+  }
+
+  MarkerInitialization init;
+  AccelerationSmoother smoother(poses.cols(), 1e3, 1e-4, true, true);
+  smoother.setIterations(100000);
+  init.poses = smoother.smooth(poses);
+
+  const s_t dt = 0.005;
+
+  std::cout << "Original gyro RMS: "
+            << fitter.measureGyroRMS(gyroTimesteps, newClip, init, dt)
+            << std::endl;
+  std::cout << "Original acc RMS: "
+            << fitter.measureAccelerometerRMS(accTimesteps, newClip, init, dt)
+            << std::endl;
+
+  fitter.rotateIMUs(accTimesteps, gyroTimesteps, newClip, init, dt);
+
+  std::cout << "Resulting gyro RMS: "
+            << fitter.measureGyroRMS(gyroTimesteps, newClip, init, dt)
+            << std::endl;
+  std::cout << "Resulting acc RMS: "
+            << fitter.measureAccelerometerRMS(accTimesteps, newClip, init, dt)
+            << std::endl;
+
+  fitter.saveTrajectoryAndMarkersToGUI(
+      "../../../javascript/src/data/movement2.bin",
+      init,
+      markerTimesteps,
+      accTimesteps,
+      gyroTimesteps,
+      200);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, CARMAGO_TEST)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
+
+  trcFiles.push_back(
+      "dart://sample/grf/CarmagoTest/MarkerData/treadmill_01_01.trc");
+  imuFiles.push_back("dart://sample/grf/CarmagoTest/IMU/treadmill_01_01.csv");
+
+  //  {"massKg": 79.1, "heightM": 1.8, "sex": "male", "skeletonPreset":
+  //  "custom"}
+  runEngine(
+      "dart://sample/grf/CarmagoTest/Models/final_with_imu.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      imuFiles,
+      79.1,
+      1.8,
+      "male",
+      true,
+      false,
+      5000);
 }
 #endif
 

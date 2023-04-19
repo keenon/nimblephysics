@@ -1052,7 +1052,7 @@ body node in the current skeleton with the same name are dropped.
     )docs")
       .def(
           "getGyroReadings",
-          &dart::dynamics::Skeleton::getGyroMapReadings,
+          &dart::dynamics::Skeleton::getGyroReadings,
           ::py::arg("gyros"),
           R"docs(
 These are a set of bodies, and offsets in local body space where gyros are mounted on the body.

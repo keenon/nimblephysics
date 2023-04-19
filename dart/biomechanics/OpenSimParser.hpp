@@ -33,6 +33,9 @@ struct OpenSimFile
   std::vector<std::string> anatomicalMarkers;
   std::vector<std::string> trackingMarkers;
 
+  // IMU map
+  std::map<std::string, std::pair<std::string, Eigen::Isometry3s>> imuMap;
+
   std::vector<std::string> warnings;
   std::vector<std::string> ignoredBodies;
   std::vector<std::pair<std::string, std::string>> jointsDrivenBy;
@@ -69,6 +72,13 @@ struct OpenSimGRF
   std::vector<double> timestamps;
   std::vector<Eigen::Matrix<s_t, 3, Eigen::Dynamic>> plateCOPs;
   std::vector<Eigen::Matrix<s_t, 6, Eigen::Dynamic>> plateGRFs;
+};
+
+struct OpenSimIMUData
+{
+  std::vector<double> timestamps;
+  std::vector<std::map<std::string, Eigen::Vector3s>> gyroReadings;
+  std::vector<std::map<std::string, Eigen::Vector3s>> accReadings;
 };
 
 class OpenSimParser
@@ -273,6 +283,14 @@ public:
   static std::vector<ForcePlate> loadGRF(
       const common::Uri& uri,
       int targetFramesPerSecond = 100,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// This loads IMU data from a CSV file, where the headers of columns are
+  /// names of IMUs with axis suffixes (e.g. "IMU1_Accel_X", "IMU1_Accel_Y",
+  /// "IMU1_Accel_Z", "IMU1_Gyro_X", "IMU1_Gyro_Y", "IMU1_Gyro_Z")
+  static OpenSimIMUData loadIMUFromCSV(
+      const common::Uri& uri,
+      bool isAccelInG = true,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim

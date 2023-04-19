@@ -1,5 +1,6 @@
 #include "dart/biomechanics/OpenSimParser.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -110,6 +111,21 @@ int roundToNearestMultiple(int n, int multiple)
   int a = (n / multiple) * multiple;
   int b = a + multiple;
   return (n - a > b - n) ? b : a;
+}
+
+bool endsWith(std::string const& fullString, std::string const& ending)
+{
+  if (fullString.length() >= ending.length())
+  {
+    return (
+        0
+        == fullString.compare(
+            fullString.length() - ending.length(), ending.length(), ending));
+  }
+  else
+  {
+    return false;
+  }
 }
 
 //==============================================================================
@@ -2959,22 +2975,22 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
                 token.find("torque_z"), std::string("torque_z").size(), empty);
             wrench = 2;
           }
-          if (token.find("torque_r_x") != std::string::npos ||
-              token.find("torque_l_x") != std::string::npos)
+          if (token.find("torque_r_x") != std::string::npos
+              || token.find("torque_l_x") != std::string::npos)
           {
             prefixSuffix.replace(
                 token.find("_x"), std::string("_x").size(), underscore);
             wrench = 0;
           }
-          if (token.find("torque_r_y") != std::string::npos ||
-              token.find("torque_l_y") != std::string::npos)
+          if (token.find("torque_r_y") != std::string::npos
+              || token.find("torque_l_y") != std::string::npos)
           {
             prefixSuffix.replace(
                 token.find("_y"), std::string("_y").size(), underscore);
             wrench = 1;
           }
-          if (token.find("torque_r_z") != std::string::npos ||
-              token.find("torque_l_z") != std::string::npos)
+          if (token.find("torque_r_z") != std::string::npos
+              || token.find("torque_l_z") != std::string::npos)
           {
             prefixSuffix.replace(
                 token.find("_z"), std::string("_z").size(), underscore);
@@ -3116,6 +3132,135 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   }
 
   return forcePlates;
+}
+
+//==============================================================================
+/// This loads IMU data from a CSV file, where the headers of columns are
+/// names of IMUs with axis suffixes (e.g. "IMU1_Accel_X", "IMU1_Accel_Y",
+/// "IMU1_Accel_Z", "IMU1_Gyro_X", "IMU1_Gyro_Y", "IMU1_Gyro_Z")
+OpenSimIMUData OpenSimParser::loadIMUFromCSV(
+    const common::Uri& uri,
+    bool isAccelInG,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+  const std::string content = retriever->readAll(uri);
+
+  OpenSimIMUData imus;
+
+  const s_t g = 9.80665;
+  const s_t accelScale = isAccelInG ? g : 1.0;
+
+  // Split content into an array of lines
+  std::vector<std::string> lines;
+  std::istringstream f(content);
+  std::string line;
+  bool firstLine = true;
+  std::vector<std::string> colNames;
+  std::vector<std::string> colToIMU;
+  std::vector<int> colToAxis;
+  std::vector<bool> colToIsAcc;
+  while (std::getline(f, line))
+  {
+    std::istringstream lineF(line);
+    std::string token;
+
+    if (firstLine)
+    {
+      while (std::getline(lineF, token, ','))
+      {
+        colNames.push_back(token);
+        std::string imuName;
+        int imuAxis = -1;
+        bool isAcc = false;
+        if (endsWith(token, "_Accel_X"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Accel_X"));
+          imuAxis = 0;
+          isAcc = true;
+        }
+        else if (endsWith(token, "_Accel_Y"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Accel_Y"));
+          imuAxis = 1;
+          isAcc = true;
+        }
+        else if (endsWith(token, "_Accel_Z"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Accel_Z"));
+          imuAxis = 2;
+          isAcc = true;
+        }
+        if (endsWith(token, "_Gyro_X"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Gyro_X"));
+          imuAxis = 0;
+          isAcc = false;
+        }
+        else if (endsWith(token, "_Gyro_Y"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Gyro_Y"));
+          imuAxis = 1;
+          isAcc = false;
+        }
+        else if (endsWith(token, "_Gyro_Z"))
+        {
+          imuName = token.substr(0, token.size() - strlen("_Gyro_Z"));
+          imuAxis = 2;
+          isAcc = false;
+        }
+        colToIMU.push_back(imuName);
+        colToAxis.push_back(imuAxis);
+        colToIsAcc.push_back(isAcc);
+      }
+    }
+    else
+    {
+      int tokenIndex = 0;
+      std::map<std::string, Eigen::Vector3s> accelerometerData;
+      std::map<std::string, Eigen::Vector3s> gyroData;
+      while (std::getline(lineF, token, ','))
+      {
+        // First column is always time
+        if (tokenIndex == 0)
+        {
+          imus.timestamps.push_back(std::stod(token));
+          tokenIndex++;
+          continue;
+        }
+
+        std::string imuName = colToIMU[tokenIndex];
+        bool isAcc = colToIsAcc[tokenIndex];
+        int axis = colToAxis[tokenIndex];
+
+        if (isAcc)
+        {
+          if (accelerometerData.count(imuName) == 0)
+          {
+            accelerometerData[imuName] = Eigen::Vector3s::Zero();
+          }
+          accelerometerData[imuName](axis) = accelScale * std::stod(token);
+        }
+        else
+        {
+          if (gyroData.count(imuName) == 0)
+          {
+            gyroData[imuName] = Eigen::Vector3s::Zero();
+          }
+          gyroData[imuName](axis) = std::stod(token);
+        }
+
+        tokenIndex++;
+      }
+      imus.accReadings.push_back(accelerometerData);
+      imus.gyroReadings.push_back(gyroData);
+    }
+
+    firstLine = false;
+  }
+
+  return imus;
 }
 
 template <std::size_t Dimension>
@@ -4483,7 +4628,8 @@ OpenSimFile OpenSimParser::readOsim40(
 
   //--------------------------------------------------------------------------
   // Build out the physical structure
-  unordered_map<string, dynamics::BodyNode*> bodyLookupMap;
+  map<string, dynamics::BodyNode*> bodyLookupMap;
+  map<string, pair<string, Eigen::Isometry3s>> frameTransforms;
   dynamics::SkeletonPtr skel = dynamics::Skeleton::create();
 
   tinyxml2::XMLElement* bodySetList = bodySet->FirstChildElement("objects");
@@ -4507,6 +4653,40 @@ OpenSimFile OpenSimParser::readOsim40(
           + "\" because it is driven by a constrained joint.");
       bodyCursor = bodyCursor->NextSiblingElement();
       continue;
+    }
+
+    // Collect any frames that are attached to this body, which may be used for
+    // IMUs
+    tinyxml2::XMLElement* components
+        = bodyCursor->FirstChildElement("components");
+    if (components != nullptr)
+    {
+      tinyxml2::XMLElement* frameCursor
+          = components->FirstChildElement("PhysicalOffsetFrame");
+      while (frameCursor != nullptr)
+      {
+        std::string frameName
+            = trim(std::string(frameCursor->Attribute("name")));
+        std::string frameUri = name + "/" + frameName;
+        tinyxml2::XMLElement* frameTranslationElem
+            = frameCursor->FirstChildElement("translation");
+        Eigen::Isometry3s relativeT = Eigen::Isometry3s::Identity();
+        if (frameTranslationElem != nullptr)
+        {
+          Eigen::Vector3s translation = readVec3(frameTranslationElem);
+          relativeT.translation() = translation;
+        }
+        tinyxml2::XMLElement* frameOrientationElem
+            = frameCursor->FirstChildElement("orientation");
+        if (frameOrientationElem != nullptr)
+        {
+          Eigen::Vector3s orientation = readVec3(frameOrientationElem);
+          relativeT.linear() = math::eulerXYZToMatrix(orientation);
+        }
+        frameTransforms[frameUri]
+            = std::pair<std::string, Eigen::Isometry3s>(name, relativeT);
+        frameCursor = frameCursor->NextSiblingElement("PhysicalOffsetFrame");
+      }
     }
 
     tinyxml2::XMLElement* joint = bodyCursor->FirstChildElement("Joint");
@@ -4685,6 +4865,34 @@ OpenSimFile OpenSimParser::readOsim40(
     }
   }
 
+  tinyxml2::XMLElement* componentSet
+      = modelElement->FirstChildElement("ComponentSet");
+  if (componentSet != nullptr)
+  {
+    tinyxml2::XMLElement* objects = componentSet->FirstChildElement("objects");
+    if (objects != nullptr)
+    {
+      tinyxml2::XMLElement* imuCursor = objects->FirstChildElement("IMU");
+      while (imuCursor != nullptr)
+      {
+        std::string name = trim(std::string(imuCursor->Attribute("name")));
+        tinyxml2::XMLElement* socketFrame
+            = imuCursor->FirstChildElement("socket_frame");
+        if (socketFrame != nullptr)
+        {
+          std::string uri = std::string(socketFrame->GetText());
+          std::string socketFrameName = uri.substr(strlen("/bodyset/"));
+          if (frameTransforms.count(socketFrameName) > 0)
+          {
+            file.imuMap[name] = frameTransforms[socketFrameName];
+          }
+          frameTransforms[socketFrameName];
+        }
+        imuCursor = imuCursor->NextSiblingElement("IMU");
+      }
+    }
+  }
+
   return file;
 }
 
@@ -4830,7 +5038,8 @@ OpenSimFile OpenSimParser::readOsim30(
 
   //--------------------------------------------------------------------------
   // Read BodySet
-  unordered_map<string, OpenSimBodyXML> bodyLookupMap;
+  map<string, OpenSimBodyXML> bodyLookupMap;
+  map<string, pair<string, Eigen::Isometry3s>> frameTransforms;
 
   tinyxml2::XMLElement* bodySetList = bodySet->FirstChildElement("objects");
   tinyxml2::XMLElement* bodyCursor = bodySetList->FirstChildElement("Body");
@@ -4843,6 +5052,40 @@ OpenSimFile OpenSimParser::readOsim30(
     {
       bodyCursor = bodyCursor->NextSiblingElement();
       continue;
+    }
+
+    // Collect any frames that are attached to this body, which may be used for
+    // IMUs
+    tinyxml2::XMLElement* components
+        = bodyCursor->FirstChildElement("components");
+    if (components != nullptr)
+    {
+      tinyxml2::XMLElement* frameCursor
+          = components->FirstChildElement("PhysicalOffsetFrame");
+      while (frameCursor != nullptr)
+      {
+        std::string frameName
+            = trim(std::string(frameCursor->Attribute("name")));
+        std::string frameUri = name + "/" + frameName;
+        tinyxml2::XMLElement* frameTranslationElem
+            = frameCursor->FirstChildElement("translation");
+        Eigen::Isometry3s relativeT = Eigen::Isometry3s::Identity();
+        if (frameTranslationElem != nullptr)
+        {
+          Eigen::Vector3s translation = readVec3(frameTranslationElem);
+          relativeT.translation() = translation;
+        }
+        tinyxml2::XMLElement* frameOrientationElem
+            = frameCursor->FirstChildElement("orientation");
+        if (frameOrientationElem != nullptr)
+        {
+          Eigen::Vector3s orientation = readVec3(frameOrientationElem);
+          relativeT.linear() = math::eulerXYZToMatrix(orientation);
+        }
+        frameTransforms[frameUri]
+            = std::pair<std::string, Eigen::Isometry3s>(name, relativeT);
+        frameCursor = frameCursor->NextSiblingElement("PhysicalOffsetFrame");
+      }
     }
 
     bodyLookupMap["/bodyset/" + name].xml = bodyCursor;
@@ -5106,6 +5349,9 @@ OpenSimFile OpenSimParser::readOsim30(
   OpenSimFile file;
   file.skeleton = skel;
 
+  //--------------------------------------------------------------------------
+  // Read Marker set
+
   tinyxml2::XMLElement* markerSet
       = modelElement->FirstChildElement("MarkerSet");
   if (markerSet != nullptr)
@@ -5201,6 +5447,37 @@ OpenSimFile OpenSimParser::readOsim30(
         }
 
         markerCursor = markerCursor->NextSiblingElement();
+      }
+    }
+  }
+
+  //--------------------------------------------------------------------------
+  // Read IMUs
+
+  tinyxml2::XMLElement* componentSet
+      = modelElement->FirstChildElement("ComponentSet");
+  if (componentSet != nullptr)
+  {
+    tinyxml2::XMLElement* objects = componentSet->FirstChildElement("objects");
+    if (objects != nullptr)
+    {
+      tinyxml2::XMLElement* imuCursor = objects->FirstChildElement("IMU");
+      while (imuCursor != nullptr)
+      {
+        std::string name = trim(std::string(imuCursor->Attribute("name")));
+        tinyxml2::XMLElement* socketFrame
+            = imuCursor->FirstChildElement("socket_frame");
+        if (socketFrame != nullptr)
+        {
+          std::string uri = std::string(socketFrame->GetText());
+          std::string socketFrameName = uri.substr(strlen("/bodyset/"));
+          if (frameTransforms.count(socketFrameName) > 0)
+          {
+            file.imuMap[name] = frameTransforms[socketFrameName];
+          }
+          frameTransforms[socketFrameName];
+        }
+        imuCursor = imuCursor->NextSiblingElement("IMU");
       }
     }
   }

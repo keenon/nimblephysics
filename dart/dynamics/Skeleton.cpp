@@ -7917,7 +7917,7 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getGyroMapReadings(
   for (auto& pair : gyros)
   {
     Eigen::Vector3s gyroInBodyFrame = pair.second.first->getAngularVelocity(
-        pair.second.first, pair.second.first);
+        Frame::World(), pair.second.first);
     Eigen::Isometry3s T_gb = pair.second.second.inverse();
     T_gb.translation()
         = T_gb.translation().cwiseProduct(pair.second.first->getScale());
@@ -7936,13 +7936,31 @@ std::map<std::string, Eigen::Vector3s> Skeleton::getAccMapReadings(
   for (auto& pair : accs)
   {
     Eigen::Vector3s accInBodyFrame = pair.second.first->getLinearAcceleration(
-        pair.second.first, pair.second.first);
+        Frame::World(), pair.second.first);
+    Eigen::Vector3s worldGravity = getGravity();
+    Eigen::Vector3s localGravity
+        = pair.second.first->getWorldTransform().linear().transpose()
+          * worldGravity;
     Eigen::Isometry3s T_ab = pair.second.second.inverse();
     T_ab.translation()
         = T_ab.translation().cwiseProduct(pair.second.first->getScale());
-    results[pair.first] = T_ab * accInBodyFrame;
+    results[pair.first] = T_ab * (accInBodyFrame - localGravity);
   }
   return results;
+}
+
+//==============================================================================
+/// This returns the world positions and orientations of the sensors
+std::map<std::string, Eigen::Isometry3s> Skeleton::getSensorWorldPositions(
+    const SensorMap& sensors)
+{
+  std::map<std::string, Eigen::Isometry3s> sensorWorldPositions;
+  for (auto& pair : sensors)
+  {
+    sensorWorldPositions[pair.first]
+        = pair.second.first->getWorldTransform() * pair.second.second;
+  }
+  return sensorWorldPositions;
 }
 
 //==============================================================================
@@ -8089,7 +8107,11 @@ Eigen::VectorXs Skeleton::getAccelerometerReadings(
     Eigen::Vector3s accTail = accInAccFrame.tail<3>();
     Eigen::Vector3s contributionFromVel
         = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
-    Eigen::Vector3s acc = accTail + contributionFromVel;
+    Eigen::Vector3s worldGravity = getGravity();
+    Eigen::Vector3s localGravity
+        = accs[i].first->getWorldTransform().linear().transpose()
+          * worldGravity;
+    Eigen::Vector3s acc = accTail + contributionFromVel - localGravity;
     acc = T_ba.linear().transpose() * acc;
 
     results.segment<3>(i * 3) = acc;
@@ -8097,8 +8119,9 @@ Eigen::VectorXs Skeleton::getAccelerometerReadings(
 #ifndef NDEBUG
     Eigen::Vector3s accInBodyFrameDirect
         = T_ba.linear().transpose()
-          * accs[i].first->getLinearAcceleration(
-              offset, Frame::World(), accs[i].first);
+          * (accs[i].first->getLinearAcceleration(
+                 offset, Frame::World(), accs[i].first)
+             - localGravity);
     assert(acc == accInBodyFrameDirect);
 #endif
   }
@@ -8118,6 +8141,7 @@ Eigen::MatrixXs Skeleton::getAccelerometerReadingsJacobianWrt(
   Eigen::MatrixXs bodyVelWrt = getBodyLocalVelocitiesJacobian(wrt);
   Eigen::VectorXs bodyAccs = getBodyLocalAccelerations();
   Eigen::MatrixXs bodyAccWrt = getBodyLocalAccelerationsJacobian(wrt);
+  Eigen::MatrixXs bodyGravityWrt = getBodyLocalGravityVectorsJacobian(wrt);
 
   for (int i = 0; i < accs.size(); i++)
   {
@@ -8140,6 +8164,9 @@ Eigen::MatrixXs Skeleton::getAccelerometerReadingsJacobianWrt(
         = bodyAccs.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
     Eigen::MatrixXs accInBodyFrameWrt = bodyAccWrt.block(
         accs[i].first->getIndexInSkeleton() * 6, 0, 6, bodyAccWrt.cols());
+
+    Eigen::MatrixXs gravityInBodyFrameWrt = bodyGravityWrt.block(
+        accs[i].first->getIndexInSkeleton() * 3, 0, 3, bodyGravityWrt.cols());
 
     Eigen::Vector6s velInAccFrame = velInBodyFrame;
     velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
@@ -8184,9 +8211,9 @@ Eigen::MatrixXs Skeleton::getAccelerometerReadingsJacobianWrt(
         = Eigen::MatrixXs::Zero(3, contributionFromVelWrt.cols());
     for (int col = 0; col < accWrt.cols(); col++)
     {
-      accWrt.col(col)
-          = T_ba.linear().transpose()
-            * (accTailWrt.col(col) + contributionFromVelWrt.col(col));
+      accWrt.col(col) = T_ba.linear().transpose()
+                        * (accTailWrt.col(col) + contributionFromVelWrt.col(col)
+                           - gravityInBodyFrameWrt.col(col));
     }
 
     J.block(i * 3, 0, 3, J.cols()) = accWrt;
@@ -8418,6 +8445,21 @@ Eigen::VectorXs Skeleton::getBodyLocalAccelerations()
 }
 
 //==============================================================================
+/// This returns the linear accelerations due to gravity (3 vecs) of the
+/// bodies in each in local body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalGravityVectors()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 3);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    accs.segment<3>(i * 3)
+        = body->getWorldTransform().linear().transpose() * getGravity();
+  }
+  return accs;
+}
+
+//==============================================================================
 /// This computes the jacobian of the local velocities for each body with
 /// respect to `wrt`
 Eigen::MatrixXs Skeleton::getBodyLocalVelocitiesJacobian(
@@ -8526,6 +8568,82 @@ Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalAccelerationsJacobian(
         tweaked(dof) += eps;
         wrt->set(this, tweaked);
         perturbed = getBodyLocalAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local gravity vectors for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalGravityVectorsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 3, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    const Eigen::MatrixXi& parents = getJointParentMap();
+    for (int b = 0; b < bodyNodes.size(); b++)
+    {
+      int parentJointIndex
+          = bodyNodes[b]->getParentJoint()->getJointIndexInSkeleton();
+
+      // const math::Jacobian& H = getJacobianInPositionSpace(bodyNodes[b]);
+      Eigen::Isometry3s Tworld = bodyNodes[b]->getWorldTransform();
+      for (auto i = 0u; i < getNumDofs(); ++i)
+      {
+        const dynamics::DegreeOfFreedom* dof = getDof(i);
+        const dynamics::Joint* joint = dof->getJoint();
+        if (joint->getJointIndexInSkeleton() == parentJointIndex
+            || parents(joint->getJointIndexInSkeleton(), parentJointIndex) == 1)
+        {
+          Eigen::Vector3s worldRotationScrew
+              = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint())
+                    .head<3>();
+          Eigen::Vector3s localRotationScrew
+              = Tworld.linear().transpose() * worldRotationScrew;
+          // Derivative of gravity acceleration
+          Eigen::Vector3s localGravity
+              = Tworld.linear().transpose() * getGravity();
+          jac.block<3, 1>(b * 3, i)
+              = -1 * localRotationScrew.cross(localGravity);
+        }
+      }
+    }
+  }
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local gravity vectors jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalGravityVectorsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalGravityVectors();
         return true;
       },
       result,

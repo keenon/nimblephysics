@@ -36,6 +36,15 @@ public:
   Eigen::MatrixXs smooth(Eigen::MatrixXs series);
 
   /**
+   * If we're using an iterative solver, this sets the number of iterations that
+   * the iterative solver will use to find the least squares minimum-jerk
+   * solution. For particularly stiff problems (where the ratio between
+   * smoothingWeight and regularizationWeight is greater than 1e6 or so) we'll
+   * want to increase this number to something like 100,000.
+   */
+  void setIterations(int iterations);
+
+  /**
    * This computes the squared loss for this smoother, given a time series and a
    * set of perturbations `delta` to the time series.
    */
@@ -57,6 +66,7 @@ private:
   s_t mRegularizationWeight;
   bool mUseSparse;
   bool mUseIterativeSolver;
+  int mIterations;
   Eigen::MatrixXs mB;
   Eigen::HouseholderQR<Eigen::MatrixXs> mFactoredB;
 

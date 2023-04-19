@@ -2175,6 +2175,8 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
     MarkerInitialization init,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
     int framesPerSecond,
     std::vector<ForcePlate> forcePlates,
     const OpenSimFile* goldOsim,
@@ -2209,6 +2211,9 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   Eigen::Vector4s manualLayerColor
       = Eigen::Vector4s(59.0 / 255, 184.0 / 255, 92.0 / 255, 0.7);
 
+  std::string imuLayerName = "IMUs";
+  Eigen::Vector4s imuLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
+
   server::GUIRecording server;
   server.setFramesPerSecond(framesPerSecond);
   server.createLayer(autoFitLayerName, autoFitLayerColor, true);
@@ -2219,6 +2224,7 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
   server.createLayer(virtualMarkersLayerName, virtualMarkersLayerColor, false);
   server.createLayer(markersErrorLayerName, markersErrorLayerColor, true);
   server.createLayer(forcePlateLayerName, forcePlateLayerColor, true);
+  server.createLayer(imuLayerName, imuLayerColor, true);
 
   server.createLayer(
       functionalJointCenterLayerName, functionalJointCenterLayerColor, false);
@@ -2331,6 +2337,19 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
           (isTracking ? "Tracking Marker: " : "Anatomical Marker: ")
               + mMarkerNames[i]);
     }
+  }
+  std::map<std::string, Eigen::Isometry3s> sensorWorldMap
+      = mSkeleton->getSensorWorldPositions(mImuMap);
+  for (auto& pair : sensorWorldMap)
+  {
+    std::cout << "Rendering IMU: " << pair.first << std::endl;
+    server.createBox(
+        "imu_" + pair.first,
+        Eigen::Vector3s::Ones() * 0.03,
+        pair.second.translation(),
+        math::matrixToEulerXYZ(pair.second.linear()),
+        imuLayerColor);
+    server.setObjectTooltip("imu_" + pair.first, "IMU: " + pair.first);
   }
 
   for (int timestep = 0; timestep < init.poses.cols(); timestep++)
@@ -2448,6 +2467,15 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       }
     }
 
+    std::map<std::string, Eigen::Isometry3s> sensorWorldTransforms
+        = mSkeleton->getSensorWorldPositions(mImuMap);
+    for (auto& pair : sensorWorldTransforms)
+    {
+      server.setObjectPosition("imu_" + pair.first, pair.second.translation());
+      server.setObjectRotation(
+          "imu_" + pair.first, math::matrixToEulerXYZ(pair.second.linear()));
+    }
+
     if (goldOsim && goldPoses.size() > 0)
     {
       goldOsim->skeleton->setPositions(goldPoses.col(timestep));
@@ -2535,6 +2563,84 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
         R.col(0) = R.col(1).cross(R.col(2));
         server.setObjectRotation(
             "joint_axis_" + std::to_string(i), math::matrixToEulerXYZ(R));
+      }
+    }
+
+    s_t dt = 1.0 / framesPerSecond;
+    if (timestep > 0 && timestep < init.poses.cols() - 1)
+    {
+      Eigen::VectorXs q = init.poses.col(timestep);
+      Eigen::VectorXs dq
+          = mSkeleton->getPositionDifferences(
+                init.poses.col(timestep), init.poses.col(timestep - 1))
+            / dt;
+      Eigen::VectorXs ddq
+          = (mSkeleton->getPositionDifferences(
+                 init.poses.col(timestep + 1), init.poses.col(timestep))
+             - mSkeleton->getPositionDifferences(
+                 init.poses.col(timestep), init.poses.col(timestep - 1)))
+            / (dt * dt);
+      mSkeleton->setPositions(q);
+      mSkeleton->setVelocities(dq);
+      mSkeleton->setAccelerations(ddq);
+
+      std::map<std::string, Eigen::Vector3s> virtualAccMap
+          = mSkeleton->getAccMapReadings(mImuMap);
+      std::map<std::string, Eigen::Vector3s> realAccMap
+          = accObservations[timestep];
+      std::map<std::string, Eigen::Vector3s> virtualGyroMap
+          = mSkeleton->getGyroMapReadings(mImuMap);
+      std::map<std::string, Eigen::Vector3s> realGyroMap
+          = gyroObservations[timestep];
+
+      s_t renderScale = 0.2;
+      for (auto& pair : sensorWorldTransforms)
+      {
+        std::vector<Eigen::Vector3s> virtualAccLine;
+        virtualAccLine.push_back(pair.second.translation());
+        Eigen::Vector3s sensorAcc
+            = renderScale * pair.second.linear() * virtualAccMap.at(pair.first);
+        virtualAccLine.push_back(pair.second.translation() + sensorAcc);
+        server.createLine(
+            "virtual_acc_" + pair.first,
+            virtualAccLine,
+            imuLayerColor,
+            imuLayerName);
+
+        std::vector<Eigen::Vector3s> realAccLine;
+        realAccLine.push_back(pair.second.translation());
+        Eigen::Vector3s realAcc
+            = renderScale * pair.second.linear() * realAccMap.at(pair.first);
+        realAccLine.push_back(pair.second.translation() + realAcc);
+        server.createLine(
+            "real_acc_" + pair.first,
+            realAccLine,
+            Eigen::Vector4s(0, 0, 1, 1),
+            imuLayerName);
+
+        /*
+        std::vector<Eigen::Vector3s> virtualGyroLine;
+        virtualGyroLine.push_back(pair.second.translation());
+        Eigen::Vector3s sensorGyro
+            = pair.second.linear() * virtualGyroMap.at(pair.first);
+        virtualGyroLine.push_back(pair.second.translation() + sensorGyro);
+        server.createLine(
+            "virtual_gyro_" + pair.first,
+            virtualGyroLine,
+            imuLayerColor,
+            imuLayerName);
+
+        std::vector<Eigen::Vector3s> realGyroLine;
+        realGyroLine.push_back(pair.second.translation());
+        Eigen::Vector3s realGyro
+            = pair.second.linear() * realGyroMap.at(pair.first);
+        realGyroLine.push_back(pair.second.translation() + realGyro);
+        server.createLine(
+            "real_gyro_" + pair.first,
+            realGyroLine,
+            imuLayerColor,
+            imuLayerName);
+        */
       }
     }
 
@@ -3427,11 +3533,279 @@ MarkerInitialization MarkerFitter::smoothOutIK(
 }
 
 //==============================================================================
-/// This sets up a bunch of linear constraints based on the motion of each
-/// body, and attempts to solve all the equations with least-squares.
-void MarkerFitter::initializeMasses(MarkerInitialization& initialization)
+/// This sets the map of IMUs to their locations on body segments
+void MarkerFitter::setImuMap(dynamics::SensorMap imuMap)
 {
-  (void)initialization;
+  mImuMap = imuMap;
+  mImuNames.clear();
+  mImus.clear();
+  for (auto& pair : mImuMap)
+  {
+    mImuNames.push_back(pair.first);
+    mImus.push_back(pair.second);
+  }
+}
+
+//==============================================================================
+/// This calculates the best-fit rotation for the IMUs that were passed in, to
+/// fit the target data.
+void MarkerFitter::rotateIMUs(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<bool>& newClip,
+    MarkerInitialization& initialization,
+    s_t dt)
+{
+  std::vector<std::string> accNameList;
+  std::vector<int> accIndexList;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> accList;
+  std::vector<std::string> gyroNameList;
+  std::vector<int> gyroIndexList;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> gyroList;
+
+  std::vector<Eigen::Matrix3s> imuUnnormalizedRotations;
+
+  for (int imu = 0; imu < mImuNames.size(); imu++)
+  {
+    std::string imuName = mImuNames[imu];
+    if (accObservations[0].count(imuName))
+    {
+      accNameList.push_back(imuName);
+      accList.push_back(mImus[imu]);
+      accIndexList.push_back(imu);
+    }
+    if (gyroObservations[0].count(imuName))
+    {
+      gyroNameList.push_back(imuName);
+      gyroList.push_back(mImus[imu]);
+      gyroIndexList.push_back(imu);
+    }
+
+    imuUnnormalizedRotations.push_back(Eigen::Matrix3s::Identity());
+  }
+
+  for (int t = 0; t < newClip.size(); t++)
+  {
+    if (t > 0 && t < newClip.size() - 1 && !newClip[t] && !newClip[t + 1])
+    {
+      Eigen::VectorXs q = initialization.poses.col(t);
+      Eigen::VectorXs dq
+          = mSkeleton->getPositionDifferences(
+                initialization.poses.col(t), initialization.poses.col(t - 1))
+            / dt;
+      Eigen::VectorXs ddq
+          = (mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t + 1), initialization.poses.col(t))
+             - mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t), initialization.poses.col(t - 1)))
+            / (dt * dt);
+      mSkeleton->setPositions(q);
+      mSkeleton->setVelocities(dq);
+      mSkeleton->setAccelerations(ddq);
+
+      Eigen::VectorXs simulatedAccReadings
+          = mSkeleton->getAccelerometerReadings(accList);
+      for (int i = 0; i < accList.size(); i++)
+      {
+        Eigen::Vector3s acc = accObservations[t].at(accNameList[i]);
+        Eigen::Vector3s simulatedAcc = simulatedAccReadings.segment<3>(3 * i);
+        imuUnnormalizedRotations[accIndexList[i]]
+            += acc * simulatedAcc.transpose();
+      }
+
+      Eigen::VectorXs simulatedGyroReadings
+          = mSkeleton->getGyroReadings(gyroList);
+      for (int i = 0; i < gyroList.size(); i++)
+      {
+        Eigen::Vector3s gyro = gyroObservations[t].at(gyroNameList[i]);
+        Eigen::Vector3s simulatedGyro = simulatedGyroReadings.segment<3>(3 * i);
+        imuUnnormalizedRotations[gyroIndexList[i]]
+            += gyro * simulatedGyro.transpose();
+      }
+    }
+  }
+
+  for (int i = 0; i < mImuNames.size(); i++)
+  {
+    Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+        imuUnnormalizedRotations[i], Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::Matrix3s U = svd.matrixU();
+    Eigen::Matrix3s V = svd.matrixV();
+    Eigen::Matrix3s R = U * V.transpose();
+    if (R.determinant() < 0)
+    {
+      U.col(2) *= -1;
+      R = U * V.transpose();
+    }
+    mImus[i].second.linear() = mImus[i].second.linear() * R.transpose();
+    mImuMap[mImuNames[i]].second = mImus[i].second;
+  }
+}
+
+//==============================================================================
+/// This calculates the RMS of accelerometer data, to see how well the motion
+/// matches the accelerometers.
+s_t MarkerFitter::measureAccelerometerRMS(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<bool>& newClip,
+    MarkerInitialization& initialization,
+    s_t dt)
+{
+  std::vector<std::string> accNameList;
+  std::vector<int> accIndexList;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> accList;
+
+  for (int imu = 0; imu < mImuNames.size(); imu++)
+  {
+    std::string imuName = mImuNames[imu];
+    if (accObservations[0].count(imuName))
+    {
+      accNameList.push_back(imuName);
+      accList.push_back(mImus[imu]);
+      accIndexList.push_back(imu);
+    }
+  }
+
+  s_t error = 0.0;
+  int numFramesCounted = 0;
+
+  for (int t = 0; t < newClip.size(); t++)
+  {
+    if (t > 0 && t < newClip.size() - 1 && !newClip[t] && !newClip[t + 1])
+    {
+      Eigen::VectorXs q = initialization.poses.col(t);
+      Eigen::VectorXs dq
+          = mSkeleton->getPositionDifferences(
+                initialization.poses.col(t), initialization.poses.col(t - 1))
+            / dt;
+      Eigen::VectorXs ddq
+          = (mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t + 1), initialization.poses.col(t))
+             - mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t), initialization.poses.col(t - 1)))
+            / (dt * dt);
+      mSkeleton->setPositions(q);
+      mSkeleton->setVelocities(dq);
+      mSkeleton->setAccelerations(ddq);
+
+      Eigen::VectorXs simulatedAccReadings
+          = mSkeleton->getAccelerometerReadings(accList);
+      for (int i = 0; i < accList.size(); i++)
+      {
+        Eigen::Vector3s acc = accObservations[t].at(accNameList[i]);
+        Eigen::Vector3s simulatedAcc = simulatedAccReadings.segment<3>(3 * i);
+        error += (acc - simulatedAcc).norm();
+      }
+      numFramesCounted++;
+    }
+  }
+
+  return error / (numFramesCounted * accList.size());
+}
+
+//==============================================================================
+/// This calculates the RMS of gyro data, to see how well the motion matches
+/// the gyroscopes.
+s_t MarkerFitter::measureGyroRMS(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<bool>& newClip,
+    MarkerInitialization& initialization,
+    s_t dt)
+{
+  std::vector<std::string> gyroNameList;
+  std::vector<int> gyroIndexList;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> gyroList;
+
+  for (int imu = 0; imu < mImuNames.size(); imu++)
+  {
+    std::string imuName = mImuNames[imu];
+    if (gyroObservations[0].count(imuName))
+    {
+      gyroNameList.push_back(imuName);
+      gyroList.push_back(mImus[imu]);
+      gyroIndexList.push_back(imu);
+    }
+  }
+
+  s_t error = 0.0;
+  int numFramesCounted = 0;
+
+  for (int t = 0; t < newClip.size(); t++)
+  {
+    if (t > 0 && t < newClip.size() - 1 && !newClip[t] && !newClip[t + 1])
+    {
+      Eigen::VectorXs q = initialization.poses.col(t);
+      Eigen::VectorXs dq
+          = mSkeleton->getPositionDifferences(
+                initialization.poses.col(t), initialization.poses.col(t - 1))
+            / dt;
+      Eigen::VectorXs ddq
+          = (mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t + 1), initialization.poses.col(t))
+             - mSkeleton->getPositionDifferences(
+                 initialization.poses.col(t), initialization.poses.col(t - 1)))
+            / (dt * dt);
+      mSkeleton->setPositions(q);
+      mSkeleton->setVelocities(dq);
+      mSkeleton->setAccelerations(ddq);
+
+      Eigen::VectorXs simulatedGyroReadings
+          = mSkeleton->getGyroReadings(gyroList);
+      for (int i = 0; i < gyroList.size(); i++)
+      {
+        Eigen::Vector3s gyro = gyroObservations[t].at(gyroNameList[i]);
+        Eigen::Vector3s simulatedGyro = simulatedGyroReadings.segment<3>(3 * i);
+        error += (gyro - simulatedGyro).norm();
+      }
+      numFramesCounted++;
+    }
+  }
+
+  return error / (numFramesCounted * gyroList.size());
+}
+
+//==============================================================================
+/// This adjusts the joint accelerations to match the IMU data, and offsets the
+/// IMU locations + rotations.
+MarkerInitialization MarkerFitter::fineTuneWithIMU(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<bool>& newClip,
+    MarkerInitialization& initialization,
+    s_t dt)
+{
+  (void)dt;
+  std::vector<std::pair<int, int>> clipBoundaries;
+  int start = 0;
+  for (int i = 1; i < newClip.size(); i++)
+  {
+    if (newClip[i])
+    {
+      clipBoundaries.emplace_back(start, i);
+      start = i;
+    }
+  }
+  if (start < newClip.size() - 1)
+  {
+    clipBoundaries.emplace_back(start, newClip.size() - 1);
+  }
+
+  for (auto& pair : clipBoundaries)
+  {
+    const s_t dt = 0.01;
+    IMUFineTuneProblem problem(
+        this,
+        accObservations,
+        gyroObservations,
+        dt,
+        initialization,
+        pair.first,
+        pair.second);
+    (void)problem;
+    // TODO: run SGD
+  }
+
+  return initialization;
 }
 
 //==============================================================================
@@ -8959,6 +9333,175 @@ bool BilevelFitProblem::intermediate_callback(
   }
 
   return true;
+}
+
+IMUFineTuneProblem::IMUFineTuneProblem(
+    MarkerFitter* fitter,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    s_t dt,
+    MarkerInitialization& initialization,
+    int start,
+    int end)
+  : mFitter(fitter), mTimeStep(dt), mStart(start), mEnd(end)
+{
+  mOriginalPoses = initialization.poses.block(
+      0, start, initialization.poses.rows(), end - start);
+  mPoses = mOriginalPoses;
+  mVels = Eigen::MatrixXs::Zero(mPoses.rows(), mPoses.cols());
+  mAccs = Eigen::MatrixXs::Zero(mPoses.rows(), mPoses.cols());
+  mLength = mEnd - mStart;
+
+  // Use finite differencing to initially fill in columns in mVels and mAccs
+  for (int t = 0; t < mPoses.cols(); t++)
+  {
+    if (t > 0)
+    {
+      mVels.col(t) = mFitter->mSkeleton->getPositionDifferences(
+                         mPoses.col(t), mPoses.col(t - 1))
+                     / mTimeStep;
+    }
+    if (t > 0 && t < mPoses.cols() - 1)
+    {
+      mAccs.col(t) = (mFitter->mSkeleton->getPositionDifferences(
+                          mPoses.col(t + 1), mPoses.col(t))
+                      - mFitter->mSkeleton->getPositionDifferences(
+                          mPoses.col(t), mPoses.col(t - 1)))
+                     / (mTimeStep * mTimeStep);
+    }
+  }
+
+  // Set up our list of observed accelerometers and gyroscopes, in order
+  for (auto& pair : mFitter->mImuMap)
+  {
+    if (accObservations[0].count(pair.first))
+    {
+      mAccelerometerNames.push_back(pair.first);
+      mAccelerometers.push_back(pair.second);
+    }
+    if (gyroObservations[0].count(pair.first))
+    {
+      mGyroNames.push_back(pair.first);
+      mGyros.push_back(pair.second);
+    }
+  }
+
+  // Copy the accelerometer observations into a matrix
+  mAccelerometerObservations
+      = Eigen::MatrixXs::Zero(mAccelerometerNames.size() * 3, mLength);
+  for (int t = 0; t < mLength; t++)
+  {
+    for (int i = 0; i < mAccelerometerNames.size(); i++)
+    {
+      mAccelerometerObservations.block<3, 1>(i * 3, t)
+          = accObservations[mStart + t].at(mAccelerometerNames[i]);
+    }
+  }
+
+  // Copy the gyro observations into a matrix
+  mGyroObservations = Eigen::MatrixXs::Zero(mGyroNames.size() * 3, mLength);
+  for (int t = 0; t < mLength; t++)
+  {
+    for (int i = 0; i < mGyroNames.size(); i++)
+    {
+      mGyroObservations.block<3, 1>(i * 3, t)
+          = gyroObservations[mStart + t].at(mGyroNames[i]);
+    }
+  }
+}
+
+/// Get the size of the x vector for the problem
+int IMUFineTuneProblem::getProblemSize()
+{
+  int dofs = 0;
+
+  dofs += mFitter->mSkeleton->getNumDofs() * (mLength + 2);
+
+  return dofs;
+}
+
+/// Returns the current x vector
+Eigen::VectorXs IMUFineTuneProblem::flatten()
+{
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(getProblemSize());
+  int cursor = 0;
+
+  for (int t = 0; t < mLength; t++)
+  {
+    // The first timestep gets a position, velocity, and acceleration
+    if (t == 0)
+    {
+      x.segment(cursor, mFitter->mSkeleton->getNumDofs()) = mPoses.col(t);
+      cursor += mFitter->mSkeleton->getNumDofs();
+      x.segment(cursor, mFitter->mSkeleton->getNumDofs()) = mVels.col(t);
+      cursor += mFitter->mSkeleton->getNumDofs();
+      x.segment(cursor, mFitter->mSkeleton->getNumDofs()) = mAccs.col(t);
+      cursor += mFitter->mSkeleton->getNumDofs();
+    }
+    // All other timesteps get just an acceleration
+    else
+    {
+      x.segment(cursor, mFitter->mSkeleton->getNumDofs()) = mAccs.col(t);
+      cursor += mFitter->mSkeleton->getNumDofs();
+    }
+  }
+
+  return x;
+}
+
+/// Sets the state of the IMU problem to the given x vector
+void IMUFineTuneProblem::unflatten(Eigen::VectorXs x)
+{
+  Eigen::VectorXs q = x.segment(0, mFitter->mSkeleton->getNumDofs());
+  Eigen::VectorXs dq = x.segment(
+      mFitter->mSkeleton->getNumDofs(), mFitter->mSkeleton->getNumDofs());
+  int cursor = 2 * mFitter->mSkeleton->getNumDofs();
+  for (int t = 0; t < mLength; t++)
+  {
+    Eigen::VectorXs ddq = x.segment(cursor, mFitter->mSkeleton->getNumDofs());
+    mAccs.col(t) = ddq;
+    mVels.col(t) = dq;
+    mPoses.col(t) = q;
+
+    dq += ddq * mTimeStep;
+    q += dq * mTimeStep;
+  }
+}
+
+/// This computes the loss for the passed in x vector
+s_t IMUFineTuneProblem::getLoss(Eigen::VectorXs x)
+{
+  unflatten(x);
+
+  s_t sum = 0.0;
+  for (int t = 0; t < mLength; t++)
+  {
+    mFitter->mSkeleton->setPositions(mPoses.col(t));
+    mFitter->mSkeleton->setVelocities(mVels.col(t));
+    mFitter->mSkeleton->setAccelerations(mAccs.col(t));
+
+    Eigen::VectorXs accError
+        = mAccelerometerObservations.col(t)
+          - mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers);
+    sum += accError.squaredNorm();
+
+    Eigen::VectorXs gyroError = mGyroObservations.col(t)
+                                - mFitter->mSkeleton->getGyroReadings(mGyros);
+    sum += gyroError.squaredNorm();
+  }
+
+  return sum;
+}
+
+/// This computes the gradient for the passed in x vector
+Eigen::VectorXs IMUFineTuneProblem::getGrad(Eigen::VectorXs x)
+{
+  unflatten(x);
+
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
+  assert(false && "Not yet implemented!");
+
+  return grad;
 }
 
 } // namespace biomechanics

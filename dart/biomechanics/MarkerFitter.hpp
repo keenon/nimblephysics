@@ -121,6 +121,9 @@ struct MarkerInitialization
       updatedMarkerMap;
   Eigen::Vector6s staticPoseRoot;
 
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      updatedImuMap;
+
   std::vector<dynamics::Joint*> joints;
   std::vector<std::vector<std::string>> jointsAdjacentMarkers;
   Eigen::VectorXs jointMarkerVariability;
@@ -425,6 +428,10 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerTrajectories,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
       int framesPerSecond,
       std::vector<ForcePlate> forcePlates = std::vector<ForcePlate>(),
       const OpenSimFile* goldSkeleton = nullptr,
@@ -666,13 +673,52 @@ public:
       MarkerInitialization& initialization);
 
   ///////////////////////////////////////////////////////////////////////////
-  // Pipeline step 6: Run through and do a linear initialization of masses based
-  // on link masses.
+  // Pipeline step 6: Integrate IMU information, if we have it, to fine tune
+  // the joint accelerations.
   ///////////////////////////////////////////////////////////////////////////
 
-  /// This sets up a bunch of linear constraints based on the motion of each
-  /// body, and attempts to solve all the equations with least-squares.
-  void initializeMasses(MarkerInitialization& initialization);
+  /// This sets the map of IMUs to their locations on body segments
+  void setImuMap(dynamics::SensorMap imuMap);
+
+  /// This calculates the best-fit rotation for the IMUs that were passed in, to
+  /// fit the target data.
+  void rotateIMUs(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This calculates the RMS of accelerometer data, to see how well the motion
+  /// matches the accelerometers.
+  s_t measureAccelerometerRMS(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This calculates the RMS of gyro data, to see how well the motion matches
+  /// the gyroscopes.
+  s_t measureGyroRMS(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This adjusts the joint accelerations to match the IMU data, and offsets
+  /// the IMU locations + rotations.
+  MarkerInitialization fineTuneWithIMU(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
 
   ///////////////////////////////////////////////////////////////////////////
   // Supporting methods
@@ -982,6 +1028,7 @@ public:
   friend class BilevelFitProblem;
   friend class SphereFitJointCenterProblem;
   friend class CylinderFitJointAxisProblem;
+  friend class IMUFineTuneProblem;
   friend struct MarkerFitterState;
 
 protected:
@@ -993,6 +1040,10 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   dynamics::MarkerMap mMarkerMap;
+
+  dynamics::SensorMap mImuMap;
+  std::vector<std::string> mImuNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mImus;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
@@ -1267,6 +1318,56 @@ protected:
   std::vector<std::vector<int>> mPerThreadIndices;
   std::vector<std::vector<int>> mPerThreadCursor;
   std::vector<std::shared_ptr<dynamics::Skeleton>> mPerThreadSkeletons;
+};
+
+class IMUFineTuneProblem
+{
+public:
+  IMUFineTuneProblem(
+      MarkerFitter* fitter,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      s_t dt,
+      MarkerInitialization& initialization,
+      int start,
+      int end);
+
+  /// Get the size of the x vector for the problem
+  int getProblemSize();
+
+  /// Returns the current x vector
+  Eigen::VectorXs flatten();
+
+  /// Sets the state of the IMU problem to the given x vector
+  void unflatten(Eigen::VectorXs x);
+
+  /// This computes the loss for the passed in x vector
+  s_t getLoss(Eigen::VectorXs x);
+
+  /// This computes the gradient for the passed in x vector
+  Eigen::VectorXs getGrad(Eigen::VectorXs x);
+
+protected:
+  MarkerFitter* mFitter;
+  s_t mTimeStep;
+  int mStart;
+  int mEnd;
+  int mLength;
+  Eigen::MatrixXs mOriginalPoses;
+  Eigen::MatrixXs mAccelerometerObservations;
+  Eigen::MatrixXs mGyroObservations;
+  std::vector<std::string> mAccelerometerNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      mAccelerometers;
+  std::vector<std::string> mGyroNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mGyros;
+
+  // Problem state - currently this only includes poses
+  Eigen::MatrixXs mPoses;
+  Eigen::MatrixXs mVels;
+  Eigen::MatrixXs mAccs;
 };
 
 } // namespace biomechanics
