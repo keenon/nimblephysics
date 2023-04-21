@@ -586,8 +586,8 @@ MarkerFitter::MarkerFitter(
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
-    mJointSphereFitSGDIterations(500),
-    mJointAxisFitSGDIterations(2000),
+    mJointSphereFitSGDIterations(5000),
+    mJointAxisFitSGDIterations(10000),
     mCheckDerivatives(false),
     mUseParallelIKWarps(false),
     mPrintFrequency(1),
@@ -5742,6 +5742,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   SphereFitJointCenterProblem* problem = problemPtr.get();
 
   s_t lr = 1.0;
+  s_t decay = 0.99;
   Eigen::VectorXs x = problem->flatten();
   Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 1.0;
 #ifndef NDEBUG
@@ -5758,7 +5759,8 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   for (int i = 0; i < mJointSphereFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    Eigen::VectorXs newAccum = accum + grad.cwiseProduct(grad);
+    Eigen::VectorXs newAccum
+        = decay * accum + (1.0 - decay) * grad.cwiseProduct(grad);
     Eigen::VectorXs newX = x - grad.cwiseQuotient(newAccum) * lr;
 #ifndef NDEBUG
     if (newX.hasNaN())
@@ -5887,6 +5889,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
 
+  s_t decay = 0.99;
   Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
 
   s_t loss = problem->getLoss();
@@ -5894,7 +5897,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
   for (int i = 0; i < mJointAxisFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    accum += grad.cwiseProduct(grad);
+    accum = decay * accum + (1.0 - decay) * grad.cwiseProduct(grad);
     x = problem->flatten();
     Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
     problem->unflatten(newX);
