@@ -46,6 +46,10 @@ namespace python {
 
 void MarkerFitter(py::module& m)
 {
+  auto markerFitter = ::py::class_<
+      dart::biomechanics::MarkerFitter,
+      std::shared_ptr<dart::biomechanics::MarkerFitter>>(m, "MarkerFitter");
+
   ::py::class_<dart::biomechanics::MarkerFitterState>(m, "MarkerFitterState")
       .def_readwrite(
           "bodyNames", &dart::biomechanics::MarkerFitterState::bodyNames)
@@ -116,6 +120,36 @@ void MarkerFitter(py::module& m)
       .def_readwrite(
           "markerOffsets",
           &dart::biomechanics::MarkerInitialization::markerOffsets);
+
+  ::py::class_<
+      dart::biomechanics::IMUFineTuneProblem,
+      std::shared_ptr<dart::biomechanics::IMUFineTuneProblem>>(
+      m, "IMUFineTuneProblem")
+      .def(
+          "getProblemSize",
+          &dart::biomechanics::IMUFineTuneProblem::getProblemSize)
+      .def(
+          "setWeightGyros",
+          &dart::biomechanics::IMUFineTuneProblem::setWeightGyros,
+          ::py::arg("weight"))
+      .def(
+          "setWeightAccs",
+          &dart::biomechanics::IMUFineTuneProblem::setWeightAccs,
+          ::py::arg("weight"))
+      .def(
+          "setWeightPoses",
+          &dart::biomechanics::IMUFineTuneProblem::setWeightPoses,
+          ::py::arg("weight"))
+      .def("flatten", &dart::biomechanics::IMUFineTuneProblem::flatten)
+      .def(
+          "unflatten",
+          &dart::biomechanics::IMUFineTuneProblem::unflatten,
+          ::py::arg("x"))
+      .def("getLoss", &dart::biomechanics::IMUFineTuneProblem::getLoss)
+      .def("getPoses", &dart::biomechanics::IMUFineTuneProblem::getPoses)
+      .def("getVels", &dart::biomechanics::IMUFineTuneProblem::getVels)
+      .def("getAccs", &dart::biomechanics::IMUFineTuneProblem::getAccs)
+      .def("getGrad", &dart::biomechanics::IMUFineTuneProblem::getGrad);
 
   ::py::class_<dart::biomechanics::InitialMarkerFitParams>(
       m, "InitialMarkerFitParams")
@@ -212,9 +246,7 @@ void MarkerFitter(py::module& m)
           ::py::arg("jointAdjacentMarkers"),
           ::py::arg("jointWeights"));
 
-  ::py::class_<
-      dart::biomechanics::MarkerFitter,
-      std::shared_ptr<dart::biomechanics::MarkerFitter>>(m, "MarkerFitter")
+  markerFitter
       .def(
           ::py::init<
               std::shared_ptr<dynamics::Skeleton>,
@@ -433,6 +465,8 @@ void MarkerFitter(py::module& m)
           ::py::arg("path"),
           ::py::arg("init"),
           ::py::arg("markerObservations"),
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
           ::py::arg("frameRate"),
           ::py::arg("forcePlates") = nullptr,
           ::py::arg("goldOsim") = nullptr,
@@ -462,7 +496,53 @@ void MarkerFitter(py::module& m)
           "autorotateC3D",
           &dart::biomechanics::MarkerFitter::autorotateC3D,
           ::py::arg("c3d"))
-      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
+      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers)
+      .def(
+          "setImuMap",
+          &dart::biomechanics::MarkerFitter::setImuMap,
+          ::py::arg("imuMap"))
+      .def(
+          "rotateIMUs",
+          &dart::biomechanics::MarkerFitter::rotateIMUs,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "measureAccelerometerRMS",
+          &dart::biomechanics::MarkerFitter::measureAccelerometerRMS,
+          ::py::arg("accObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "measureGyroRMS",
+          &dart::biomechanics::MarkerFitter::measureGyroRMS,
+          ::py::arg("gyroObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "getIMUFineTuneProblem",
+          &dart::biomechanics::MarkerFitter::getIMUFineTuneProblem,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("init"),
+          ::py::arg("dt"),
+          ::py::arg("start"),
+          ::py::arg("end"))
+      .def(
+          "fineTuneWithIMU",
+          &dart::biomechanics::MarkerFitter::fineTuneWithIMU,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"),
+          ::py::arg("weightAccs") = 1.0,
+          ::py::arg("weightGyros") = 1.0,
+          ::py::arg("weightPoses") = 1e3);
 }
 
 } // namespace python

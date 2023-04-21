@@ -685,6 +685,189 @@ bool testSolveBilevelFitProblem(
   return true;
 }
 
+bool testIMUGradients(
+    MarkerFitter& fitter,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    s_t dt,
+    MarkerInitialization& initialization,
+    int start,
+    int end)
+{
+  const s_t THRESHOLD = 1e-6;
+
+  IMUFineTuneProblem problem(
+      &fitter,
+      accObservations,
+      gyroObservations,
+      dt,
+      initialization,
+      start,
+      end);
+
+  Eigen::MatrixXs poses = problem.getPoses();
+  Eigen::MatrixXs vels = problem.getVels();
+  Eigen::MatrixXs accs = problem.getAccs();
+  problem.unflatten(problem.flatten());
+  Eigen::MatrixXs recoveredPoses = problem.getPoses();
+  Eigen::MatrixXs recoveredVels = problem.getVels();
+  Eigen::MatrixXs recoveredAccs = problem.getAccs();
+  if (!equals(accs, recoveredAccs, 1e-10))
+  {
+    std::cout << "Accs didn't recover after unflatten(flatten())" << std::endl;
+    return false;
+  }
+  if (!equals(vels, recoveredVels, 1e-10))
+  {
+    std::cout << "Vels didn't recover after unflatten(flatten())" << std::endl;
+    for (int t = 0; t < vels.cols(); t++)
+    {
+      Eigen::VectorXs originalVel = vels.col(t);
+      Eigen::VectorXs recoveredVel = recoveredVels.col(t);
+      if (!equals(originalVel, recoveredVel, 1e-10))
+      {
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(originalVel.size(), 3);
+        compare.col(0) = originalVel;
+        compare.col(1) = recoveredVel;
+        compare.col(2) = originalVel - recoveredVel;
+        std::cout << "Velocity diverged at time t=" << t << ":" << std::endl;
+        std::cout << "Original - Recovered - Diff:" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+  }
+  if (!equals(poses, recoveredPoses, 1e-10))
+  {
+    std::cout << "Poses didn't recover after unflatten(flatten())" << std::endl;
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      Eigen::VectorXs originalPos = poses.col(t);
+      Eigen::VectorXs recoveredPos = recoveredPoses.col(t);
+      if (!equals(originalPos, recoveredPos, 1e-10))
+      {
+        Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(originalPos.size(), 3);
+        compare.col(0) = originalPos;
+        compare.col(1) = recoveredPos;
+        compare.col(2) = originalPos - recoveredPos;
+        std::cout << "Position diverged at time t=" << t << ":" << std::endl;
+        std::cout << "Original - Recovered - Diff:" << std::endl
+                  << compare << std::endl;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  std::vector<neural::WithRespectTo*> wrts;
+  wrts.push_back(neural::WithRespectTo::POSITION);
+  wrts.push_back(neural::WithRespectTo::VELOCITY);
+  wrts.push_back(neural::WithRespectTo::ACCELERATION);
+
+  const int dofs = fitter.getSkeleton()->getNumDofs();
+
+  for (neural::WithRespectTo* wrt : wrts)
+  {
+    Eigen::VectorXs flatGrad = problem.getGradientWrtFlattenedState(wrt);
+    Eigen::VectorXs flatGrad_fd
+        = problem.finiteDifferenceGradientWrtFlattenedState(wrt);
+
+    if (!equals(flatGrad, flatGrad_fd, THRESHOLD))
+    {
+      std::cout << "Error on IMUFineTuneProblem dLoss / dFlat grad wrt flat "
+                << wrt->name() << std::endl;
+      for (int t = 0; t < end - start; t++)
+      {
+        Eigen::VectorXs flatSeg = flatGrad.segment(t * dofs, dofs);
+        Eigen::VectorXs flatSeg_fd = flatGrad_fd.segment(t * dofs, dofs);
+        if (!equals(flatGrad, flatGrad_fd, THRESHOLD))
+        {
+          std::cout << "Error on timestep " << t << ": " << std::endl;
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(flatSeg.size(), 3);
+          compare.col(0) = flatSeg;
+          compare.col(1) = flatSeg_fd;
+          compare.col(2) = flatSeg - flatSeg_fd;
+          std::cout << "Grad - FD - Diff" << std::endl << compare << std::endl;
+        }
+      }
+      return false;
+    }
+
+    Eigen::MatrixXs jac = problem.getJacobianFromXToFlattenedState(wrt);
+    Eigen::MatrixXs jac_fd
+        = problem.finiteDifferenceJacobianFromXToFlattenedState(wrt);
+
+    if (!equals(jac, jac_fd, THRESHOLD))
+    {
+      std::cout << "Error on IMUFineTuneProblem x->flat jac wrt flat "
+                << wrt->name() << std::endl;
+      for (int t = 0; t < end - start; t++)
+      {
+        Eigen::MatrixXs jacWrtPos = jac.block(t * dofs, 0, dofs, dofs);
+        Eigen::MatrixXs jacWrtPos_fd = jac_fd.block(t * dofs, 0, dofs, dofs);
+        if (!equals(jacWrtPos, jacWrtPos_fd, THRESHOLD))
+        {
+          std::cout << "Jac of flat " << wrt->name() << " at time " << t
+                    << " wrt initial POS disagrees!" << std::endl;
+          std::cout << "Analytical: " << std::endl << jacWrtPos << std::endl;
+          std::cout << "FD: " << std::endl << jacWrtPos_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << jacWrtPos - jacWrtPos_fd << std::endl;
+        }
+      }
+
+      for (int t = 0; t < end - start; t++)
+      {
+        Eigen::MatrixXs jacWrtVel = jac.block(t * dofs, dofs, dofs, dofs);
+        Eigen::MatrixXs jacWrtVel_fd = jac_fd.block(t * dofs, dofs, dofs, dofs);
+        if (!equals(jacWrtVel, jacWrtVel_fd, THRESHOLD))
+        {
+          std::cout << "Jac of flat " << wrt->name() << " at time " << t
+                    << " wrt initial VEL disagrees!" << std::endl;
+          std::cout << "Analytical: " << std::endl << jacWrtVel << std::endl;
+          std::cout << "FD: " << std::endl << jacWrtVel_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << jacWrtVel - jacWrtVel_fd << std::endl;
+        }
+      }
+
+      for (int accT = 0; accT < end - start; accT++)
+      {
+        for (int t = 0; t < end - start; t++)
+        {
+          Eigen::MatrixXs jacWrtAcc
+              = jac.block(t * dofs, (2 + accT) * dofs, dofs, dofs);
+          Eigen::MatrixXs jacWrtAcc_fd
+              = jac_fd.block(t * dofs, (2 + accT) * dofs, dofs, dofs);
+          if (!equals(jacWrtAcc, jacWrtAcc_fd, THRESHOLD))
+          {
+            std::cout << "Jac of flat " << wrt->name() << " at time " << t
+                      << " wrt initial ACC " << accT << " disagrees!"
+                      << std::endl;
+            std::cout << "Analytical: " << std::endl << jacWrtAcc << std::endl;
+            std::cout << "FD: " << std::endl << jacWrtAcc_fd << std::endl;
+            std::cout << "Diff: " << std::endl
+                      << jacWrtAcc - jacWrtAcc_fd << std::endl;
+          }
+        }
+      }
+
+      return false;
+    }
+  }
+
+  Eigen::VectorXs grad = problem.getGrad();
+  Eigen::VectorXs grad_fd = problem.finiteDifferenceGrad();
+
+  if (!equals(grad, grad_fd, THRESHOLD))
+  {
+    std::cout << "Error on IMUFineTuneProblem dLoss / dX grad" << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 bool debugIKInitializationToGUI(
     std::shared_ptr<dynamics::Skeleton>& skel,
     Eigen::VectorXs pos,
@@ -7492,6 +7675,71 @@ TEST(MarkerFitter, FULL_KINEMATIC_RAJAGOPAL)
 }
 #endif
 
+#ifdef FUNCTIONAL_TESTS
+TEST(MarkerFitter, FINE_TUNE_ON_IMUS_GRAD)
+{
+  OpenSimFile carmago = OpenSimParser::parseOsim(
+      "dart://sample/grf/CarmagoTest/Models/final.osim");
+  carmago.skeleton->autogroupSymmetricSuffixes();
+  carmago.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  // Get the raw marker trajectory data
+  OpenSimIMUData imuData = OpenSimParser::loadIMUFromCSV(
+      "dart://sample/grf/CarmagoTest/IMU/treadmill_01_01.csv", true);
+
+  OpenSimTRC trc = OpenSimParser::loadTRC(
+      "dart://sample/grf/CarmagoTest/MarkerData/treadmill_01_01.trc");
+
+  OpenSimMot mot = OpenSimParser::loadMot(
+      carmago.skeleton,
+      "dart://sample/grf/CarmagoTest/IK/treadmill_01_01_ik.mot");
+
+  MarkerFitter fitter(carmago.skeleton, carmago.markersMap);
+  fitter.setTrackingMarkers(carmago.trackingMarkers);
+
+  SensorMap imus;
+  // foot, shank, thigh, trunk
+  imus["foot"] = std::make_pair(
+      carmago.skeleton->getBodyNode("calcn_r"), Eigen::Isometry3s::Identity());
+  imus["shank"] = std::make_pair(
+      carmago.skeleton->getBodyNode("tibia_r"), Eigen::Isometry3s::Identity());
+  imus["thigh"] = std::make_pair(
+      carmago.skeleton->getBodyNode("femur_r"), Eigen::Isometry3s::Identity());
+  imus["trunk"] = std::make_pair(
+      carmago.skeleton->getBodyNode("torso"), Eigen::Isometry3s::Identity());
+
+  fitter.setImuMap(imus);
+
+  int limitTimesteps = 10;
+  Eigen::MatrixXs poses
+      = mot.poses.block(0, 0, mot.poses.rows(), limitTimesteps);
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerTimesteps;
+  std::vector<std::map<std::string, Eigen::Vector3s>> accTimesteps;
+  std::vector<std::map<std::string, Eigen::Vector3s>> gyroTimesteps;
+  std::vector<bool> newClip;
+  for (int t = 0; t < limitTimesteps; t++)
+  {
+    markerTimesteps.push_back(trc.markerTimesteps[t]);
+    accTimesteps.push_back(imuData.accReadings[t]);
+    gyroTimesteps.push_back(imuData.gyroReadings[t]);
+    newClip.push_back(t == 0);
+  }
+
+  MarkerInitialization init;
+  AccelerationSmoother smoother(poses.cols(), 1e3, 1e-4, false, false);
+  init.poses = smoother.smooth(poses);
+
+  EXPECT_TRUE(testIMUGradients(
+      fitter,
+      accTimesteps,
+      gyroTimesteps,
+      0.005,
+      init,
+      0,
+      accTimesteps.size()));
+}
+#endif
+
 #ifdef ALL_TESTS
 TEST(MarkerFitter, CARMAGO_FINE_TUNE_ON_IMUS)
 {
@@ -7562,6 +7810,16 @@ TEST(MarkerFitter, CARMAGO_FINE_TUNE_ON_IMUS)
             << fitter.measureGyroRMS(gyroTimesteps, newClip, init, dt)
             << std::endl;
   std::cout << "Resulting acc RMS: "
+            << fitter.measureAccelerometerRMS(accTimesteps, newClip, init, dt)
+            << std::endl;
+
+  fitter.fineTuneWithIMU(
+      accTimesteps, gyroTimesteps, newClip, init, dt, 1.0, 1.0, 1e3);
+
+  std::cout << "After optimization gyro RMS: "
+            << fitter.measureGyroRMS(gyroTimesteps, newClip, init, dt)
+            << std::endl;
+  std::cout << "After optimization acc RMS: "
             << fitter.measureAccelerometerRMS(accTimesteps, newClip, init, dt)
             << std::endl;
 

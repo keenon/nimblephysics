@@ -18,6 +18,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Joint.hpp"
+#include "dart/dynamics/MetaSkeleton.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
@@ -988,6 +989,13 @@ MarkerFitter::MarkerFitter(
 
     return loss;
   };
+}
+
+//==============================================================================
+/// Returns the skeleton pointer we're fitting against
+std::shared_ptr<dynamics::Skeleton> MarkerFitter::getSkeleton()
+{
+  return mSkeleton;
 }
 
 //==============================================================================
@@ -2586,12 +2594,18 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
 
       std::map<std::string, Eigen::Vector3s> virtualAccMap
           = mSkeleton->getAccMapReadings(mImuMap);
-      std::map<std::string, Eigen::Vector3s> realAccMap
-          = accObservations[timestep];
+      std::map<std::string, Eigen::Vector3s> realAccMap;
+      if (accObservations.size() > timestep)
+      {
+        realAccMap = accObservations[timestep];
+      }
       std::map<std::string, Eigen::Vector3s> virtualGyroMap
           = mSkeleton->getGyroMapReadings(mImuMap);
-      std::map<std::string, Eigen::Vector3s> realGyroMap
-          = gyroObservations[timestep];
+      std::map<std::string, Eigen::Vector3s> realGyroMap;
+      if (gyroObservations.size() > timestep)
+      {
+        realGyroMap = gyroObservations[timestep];
+      }
 
       s_t renderScale = 0.2;
       for (auto& pair : sensorWorldTransforms)
@@ -2641,6 +2655,14 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
             imuLayerColor,
             imuLayerName);
         */
+      }
+    }
+    else
+    {
+      for (auto& pair : sensorWorldTransforms)
+      {
+        server.deleteObject("virtual_acc_" + pair.first);
+        server.deleteObject("real_acc_" + pair.first);
       }
     }
 
@@ -3765,6 +3787,22 @@ s_t MarkerFitter::measureGyroRMS(
 }
 
 //==============================================================================
+/// This returns an object that can be used to run an optimization to fine
+/// tune the joint angles to match IMU data.
+std::shared_ptr<biomechanics::IMUFineTuneProblem>
+MarkerFitter::getFineTuneProblem(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    MarkerInitialization& initialization,
+    s_t dt,
+    int start,
+    int end)
+{
+  return std::make_shared<IMUFineTuneProblem>(
+      this, accObservations, gyroObservations, dt, initialization, start, end);
+}
+
+//==============================================================================
 /// This adjusts the joint accelerations to match the IMU data, and offsets the
 /// IMU locations + rotations.
 MarkerInitialization MarkerFitter::fineTuneWithIMU(
@@ -3772,9 +3810,11 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
     const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
     const std::vector<bool>& newClip,
     MarkerInitialization& initialization,
-    s_t dt)
+    s_t dt,
+    s_t weightAccs,
+    s_t weightGyros,
+    s_t weightPoses)
 {
-  (void)dt;
   std::vector<std::pair<int, int>> clipBoundaries;
   int start = 0;
   for (int i = 1; i < newClip.size(); i++)
@@ -3785,14 +3825,10 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
       start = i;
     }
   }
-  if (start < newClip.size() - 1)
-  {
-    clipBoundaries.emplace_back(start, newClip.size() - 1);
-  }
+  clipBoundaries.emplace_back(start, newClip.size());
 
   for (auto& pair : clipBoundaries)
   {
-    const s_t dt = 0.01;
     IMUFineTuneProblem problem(
         this,
         accObservations,
@@ -3801,8 +3837,61 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
         initialization,
         pair.first,
         pair.second);
-    (void)problem;
-    // TODO: run SGD
+    problem.setWeightAccs(weightAccs);
+    problem.setWeightGyros(weightGyros);
+    problem.setWeightPoses(weightPoses);
+
+    // Run SGD
+
+    Eigen::VectorXs x = problem.flatten();
+    s_t decay = 0.95;
+    Eigen::VectorXs adagradSum = Eigen::VectorXs::Ones(x.size());
+    problem.unflatten(x);
+    s_t loss = problem.getLoss();
+    s_t learningRate = 0.5;
+
+    for (int i = 0; i < 100; i++)
+    {
+      Eigen::VectorXs grad = problem.getGrad();
+      adagradSum = (1.0 - decay) * grad.cwiseProduct(grad) + decay * adagradSum;
+
+      while (true)
+      {
+        Eigen::VectorXs adagradRoot = adagradSum.cwiseSqrt();
+        Eigen::VectorXs proposedX
+            = x - grad.cwiseQuotient(adagradRoot) * learningRate;
+        problem.unflatten(proposedX);
+        s_t newLoss = problem.getLoss();
+        std::cout << "Iteration " << i << " [lr=" << learningRate
+                  << "]: " << newLoss << " (prev best=" << loss
+                  << ", diff=" << (newLoss - loss) << ")" << std::endl;
+        if (newLoss < loss)
+        {
+          x = proposedX;
+          loss = newLoss;
+          learningRate *= 1.5;
+          break;
+        }
+        else
+        {
+          learningRate *= 0.5;
+          // If our learning rate has gotten too small, update x and continue
+          // anyways
+          if (learningRate < 1e-12)
+          {
+            x = proposedX;
+            break;
+          }
+        }
+      }
+    }
+
+    // Write the results back to the initialization
+
+    Eigen::MatrixXs& foundPoses = problem.getPoses();
+    initialization.poses.block(
+        0, pair.first, initialization.poses.rows(), pair.second - pair.first)
+        = foundPoses;
   }
 
   return initialization;
@@ -9343,7 +9432,13 @@ IMUFineTuneProblem::IMUFineTuneProblem(
     MarkerInitialization& initialization,
     int start,
     int end)
-  : mFitter(fitter), mTimeStep(dt), mStart(start), mEnd(end)
+  : mFitter(fitter),
+    mTimeStep(dt),
+    mStart(start),
+    mEnd(end),
+    mWeightGyros(1.0),
+    mWeightAccs(1.0),
+    mWeightPoses(1.0)
 {
   mOriginalPoses = initialization.poses.block(
       0, start, initialization.poses.rows(), end - start);
@@ -9370,6 +9465,7 @@ IMUFineTuneProblem::IMUFineTuneProblem(
                      / (mTimeStep * mTimeStep);
     }
   }
+  mVels.col(0) = mVels.col(1);
 
   // Set up our list of observed accelerometers and gyroscopes, in order
   for (auto& pair : mFitter->mImuMap)
@@ -9420,6 +9516,21 @@ int IMUFineTuneProblem::getProblemSize()
   return dofs;
 }
 
+void IMUFineTuneProblem::setWeightGyros(s_t weight)
+{
+  mWeightGyros = weight;
+}
+
+void IMUFineTuneProblem::setWeightAccs(s_t weight)
+{
+  mWeightAccs = weight;
+}
+
+void IMUFineTuneProblem::setWeightPoses(s_t weight)
+{
+  mWeightPoses = weight;
+}
+
 /// Returns the current x vector
 Eigen::VectorXs IMUFineTuneProblem::flatten()
 {
@@ -9449,6 +9560,7 @@ Eigen::VectorXs IMUFineTuneProblem::flatten()
   return x;
 }
 
+//==============================================================================
 /// Sets the state of the IMU problem to the given x vector
 void IMUFineTuneProblem::unflatten(Eigen::VectorXs x)
 {
@@ -9459,6 +9571,8 @@ void IMUFineTuneProblem::unflatten(Eigen::VectorXs x)
   for (int t = 0; t < mLength; t++)
   {
     Eigen::VectorXs ddq = x.segment(cursor, mFitter->mSkeleton->getNumDofs());
+
+    cursor += mFitter->mSkeleton->getNumDofs();
     mAccs.col(t) = ddq;
     mVels.col(t) = dq;
     mPoses.col(t) = q;
@@ -9468,11 +9582,10 @@ void IMUFineTuneProblem::unflatten(Eigen::VectorXs x)
   }
 }
 
+//==============================================================================
 /// This computes the loss for the passed in x vector
-s_t IMUFineTuneProblem::getLoss(Eigen::VectorXs x)
+s_t IMUFineTuneProblem::getLoss()
 {
-  unflatten(x);
-
   s_t sum = 0.0;
   for (int t = 0; t < mLength; t++)
   {
@@ -9483,25 +9596,334 @@ s_t IMUFineTuneProblem::getLoss(Eigen::VectorXs x)
     Eigen::VectorXs accError
         = mAccelerometerObservations.col(t)
           - mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers);
-    sum += accError.squaredNorm();
+    sum += mWeightAccs * accError.squaredNorm();
 
     Eigen::VectorXs gyroError = mGyroObservations.col(t)
                                 - mFitter->mSkeleton->getGyroReadings(mGyros);
-    sum += gyroError.squaredNorm();
+    sum += mWeightGyros * gyroError.squaredNorm();
+
+    Eigen::VectorXs poseError = mPoses.col(t) - mOriginalPoses.col(t);
+    sum += mWeightPoses * poseError.squaredNorm();
   }
 
   return sum;
 }
 
-/// This computes the gradient for the passed in x vector
-Eigen::VectorXs IMUFineTuneProblem::getGrad(Eigen::VectorXs x)
+//==============================================================================
+/// Returns the pose data over time for the current problem state
+Eigen::MatrixXs& IMUFineTuneProblem::getPoses()
 {
-  unflatten(x);
+  return mPoses;
+}
 
+//==============================================================================
+/// Returns the vel data over time for the current problem state
+Eigen::MatrixXs& IMUFineTuneProblem::getVels()
+{
+  return mVels;
+}
+
+//==============================================================================
+/// Returns the acceleration data over time for the current problem state
+Eigen::MatrixXs& IMUFineTuneProblem::getAccs()
+{
+  return mAccs;
+}
+
+//==============================================================================
+/// This computes the gradient for the passed in x vector
+Eigen::VectorXs IMUFineTuneProblem::getGrad()
+{
+  Eigen::VectorXs x = flatten();
   Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
-  assert(false && "Not yet implemented!");
+
+  Eigen::VectorXs posGrad
+      = getGradientWrtFlattenedState(neural::WithRespectTo::POSITION);
+  Eigen::MatrixXs posJac
+      = getJacobianFromXToFlattenedState(neural::WithRespectTo::POSITION);
+  grad += posJac.transpose() * posGrad;
+
+  Eigen::VectorXs velGrad
+      = getGradientWrtFlattenedState(neural::WithRespectTo::VELOCITY);
+  Eigen::MatrixXs velJac
+      = getJacobianFromXToFlattenedState(neural::WithRespectTo::VELOCITY);
+  grad += velJac.transpose() * velGrad;
+
+  Eigen::VectorXs accGrad
+      = getGradientWrtFlattenedState(neural::WithRespectTo::ACCELERATION);
+  Eigen::MatrixXs accJac
+      = getJacobianFromXToFlattenedState(neural::WithRespectTo::ACCELERATION);
+  grad += accJac.transpose() * accGrad;
 
   return grad;
+}
+
+//==============================================================================
+/// This is the brute force version of the getGrad() computation
+Eigen::VectorXs IMUFineTuneProblem::finiteDifferenceGrad()
+{
+  Eigen::VectorXs x = flatten();
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
+
+  math::finiteDifference(
+      [this, &x](
+          /* in*/ s_t eps,
+          /* in*/ int dof,
+
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs tweaked = x;
+        tweaked(dof) += eps;
+        unflatten(tweaked);
+        perturbed = getLoss();
+        return true;
+      },
+      grad,
+      1e-2,
+      true);
+
+  unflatten(x);
+
+  return grad;
+}
+
+//==============================================================================
+/// This computes the gradient with respect to one of the state types.
+Eigen::VectorXs IMUFineTuneProblem::getGradientWrtFlattenedState(
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(mPoses.rows() * mPoses.cols());
+  for (int t = 0; t < mPoses.cols(); t++)
+  {
+    mFitter->mSkeleton->setPositions(mPoses.col(t));
+    mFitter->mSkeleton->setVelocities(mVels.col(t));
+    mFitter->mSkeleton->setAccelerations(mAccs.col(t));
+
+    Eigen::VectorXs accError
+        = mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers)
+          - mAccelerometerObservations.col(t);
+    grad.segment(
+        t * mFitter->mSkeleton->getNumDofs(), mFitter->mSkeleton->getNumDofs())
+        += mWeightAccs * 2
+           * mFitter->mSkeleton
+                 ->getAccelerometerReadingsJacobianWrt(mAccelerometers, wrt)
+                 .transpose()
+           * accError;
+
+    Eigen::VectorXs gyroError = mFitter->mSkeleton->getGyroReadings(mGyros)
+                                - mGyroObservations.col(t);
+    grad.segment(
+        t * mFitter->mSkeleton->getNumDofs(), mFitter->mSkeleton->getNumDofs())
+        += mWeightGyros * 2
+           * mFitter->mSkeleton->getGyroReadingsJacobianWrt(mGyros, wrt)
+                 .transpose()
+           * gyroError;
+
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      Eigen::VectorXs poseError = mPoses.col(t) - mOriginalPoses.col(t);
+      grad.segment(
+          t * mFitter->mSkeleton->getNumDofs(),
+          mFitter->mSkeleton->getNumDofs())
+          += 2 * mWeightPoses * poseError;
+    }
+  }
+
+  return grad;
+}
+
+//==============================================================================
+/// This computes the gradient with respect to one of the state types.
+Eigen::VectorXs IMUFineTuneProblem::finiteDifferenceGradientWrtFlattenedState(
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs grad
+      = Eigen::VectorXs::Zero(mFitter->mSkeleton->getNumDofs() * mLength);
+
+  Eigen::MatrixXs original = mPoses;
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    original = mPoses;
+  }
+  if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    original = mVels;
+  }
+  else if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    original = mAccs;
+  }
+
+  math::finiteDifference(
+      [this, wrt, original](
+          /* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        int row = dof % mFitter->mSkeleton->getNumDofs();
+        int col = (int)floor((s_t)dof / mFitter->mSkeleton->getNumDofs());
+        if (wrt == neural::WithRespectTo::POSITION)
+        {
+          mPoses = original;
+          mPoses(row, col) += eps;
+        }
+        if (wrt == neural::WithRespectTo::VELOCITY)
+        {
+          mVels = original;
+          mVels(row, col) += eps;
+        }
+        else if (wrt == neural::WithRespectTo::ACCELERATION)
+        {
+          mAccs = original;
+          mAccs(row, col) += eps;
+        }
+        perturbed = getLoss();
+        return true;
+      },
+      grad,
+      1e-2,
+      true);
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    mPoses = original;
+  }
+  if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    mVels = original;
+  }
+  else if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    mAccs = original;
+  }
+
+  return grad;
+}
+
+//==============================================================================
+/// This returns the jacobian relating changes in the flattened state vector
+/// to changes in X.
+Eigen::MatrixXs IMUFineTuneProblem::getJacobianFromXToFlattenedState(
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs original = flatten();
+  const int dofs = mFitter->mSkeleton->getNumDofs();
+  Eigen::MatrixXs result
+      = Eigen::MatrixXs::Zero(dofs * mLength, original.size());
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    // Changes to the initial position have an identity effect on all subsequent
+    // positions
+    for (int t = 0; t < mLength; t++)
+    {
+      result.block(t * dofs, 0, dofs, dofs)
+          = Eigen::MatrixXs::Identity(dofs, dofs);
+    }
+    // Changes to the initial velocity have a linear effect on all subsequent
+    // positions
+    for (int t = 0; t < mLength; t++)
+    {
+      result.block(t * dofs, dofs, dofs, dofs)
+          = mTimeStep * t * Eigen::MatrixXs::Identity(dofs, dofs);
+    }
+    // Changes to acceleration have a linear effect on all subsequent positions
+    for (int accT = 0; accT < mLength; accT++)
+    {
+      for (int t = accT; t < mLength; t++)
+      {
+        result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
+            = mTimeStep * mTimeStep * (t - accT)
+              * Eigen::MatrixXs::Identity(dofs, dofs);
+      }
+    }
+  }
+  else if (wrt == neural::WithRespectTo::VELOCITY)
+  {
+    // Changes to the initial velocity have an identity effect on all subsequent
+    // velocities
+    for (int t = 0; t < mLength; t++)
+    {
+      result.block(t * dofs, dofs, dofs, dofs)
+          = Eigen::MatrixXs::Identity(dofs, dofs);
+    }
+    // Changes to acceleration have a linear effect on all subsequent velocities
+    for (int accT = 0; accT < mLength; accT++)
+    {
+      for (int t = accT + 1; t < mLength; t++)
+      {
+        result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
+            = mTimeStep * Eigen::MatrixXs::Identity(dofs, dofs);
+      }
+    }
+  }
+  else if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    // Changes to acceleration have an identity effect on that timestep's
+    // acceleration
+    for (int accT = 0; accT < mLength; accT++)
+    {
+      result.block(accT * dofs, (accT + 2) * dofs, dofs, dofs)
+          = Eigen::MatrixXs::Identity(dofs, dofs);
+    }
+  }
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the jacobian relating changes in the flattened state vector
+/// to changes in X.
+Eigen::MatrixXs
+IMUFineTuneProblem::finiteDifferenceJacobianFromXToFlattenedState(
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs original = flatten();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(
+      mFitter->mSkeleton->getNumDofs() * mLength, original.size());
+
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        unflatten(tweaked);
+
+        perturbed
+            = Eigen::VectorXs::Zero(mFitter->mSkeleton->getNumDofs() * mLength);
+        for (int i = 0; i < mLength; i++)
+        {
+          if (wrt == neural::WithRespectTo::POSITION)
+          {
+            perturbed.segment(
+                i * mFitter->mSkeleton->getNumDofs(),
+                mFitter->mSkeleton->getNumDofs())
+                = mPoses.col(i);
+          }
+          else if (wrt == neural::WithRespectTo::VELOCITY)
+          {
+            perturbed.segment(
+                i * mFitter->mSkeleton->getNumDofs(),
+                mFitter->mSkeleton->getNumDofs())
+                = mVels.col(i);
+          }
+          else if (wrt == neural::WithRespectTo::ACCELERATION)
+          {
+            perturbed.segment(
+                i * mFitter->mSkeleton->getNumDofs(),
+                mFitter->mSkeleton->getNumDofs())
+                = mAccs.col(i);
+          }
+        }
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
 }
 
 } // namespace biomechanics

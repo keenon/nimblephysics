@@ -20,6 +20,7 @@
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
@@ -139,6 +140,102 @@ struct MarkerInitialization
   std::vector<dynamics::Joint*> unobservedJoints;
 
   MarkerInitialization();
+};
+
+class IMUFineTuneProblem
+{
+public:
+  IMUFineTuneProblem(
+      MarkerFitter* fitter,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      s_t dt,
+      MarkerInitialization& initialization,
+      int start,
+      int end);
+
+  /// Get the size of the x vector for the problem
+  int getProblemSize();
+
+  /// Set the optimization weight associated with matching the virtual gyros to
+  /// signals
+  void setWeightGyros(s_t weight);
+
+  /// Set the optimization weight associated with matching the virtual
+  /// accelerometers to signals
+  void setWeightAccs(s_t weight);
+
+  /// Set the optimization weight associated with matching the poses to their
+  /// original poses
+  void setWeightPoses(s_t weight);
+
+  /// Returns the current x vector
+  Eigen::VectorXs flatten();
+
+  /// Sets the state of the IMU problem to the given x vector
+  void unflatten(Eigen::VectorXs x);
+
+  /// This computes the loss for the passed in x vector
+  s_t getLoss();
+
+  /// Returns the pose data over time for the current problem state
+  Eigen::MatrixXs& getPoses();
+
+  /// Returns the vel data over time for the current problem state
+  Eigen::MatrixXs& getVels();
+
+  /// Returns the acceleration data over time for the current problem state
+  Eigen::MatrixXs& getAccs();
+
+  /// This computes the gradient for the passed in x vector
+  Eigen::VectorXs getGrad();
+
+  /// This is the brute force version of the getGrad() computation
+  Eigen::VectorXs finiteDifferenceGrad();
+
+  /// This computes the gradient with respect to one of the state types.
+  Eigen::VectorXs getGradientWrtFlattenedState(neural::WithRespectTo* wrt);
+
+  /// This computes the gradient with respect to either position, velocity, or
+  /// acceleration. It returns a gradient that is a single vector, of all of the
+  /// positions/velocities/accelerations concatenated together.
+  Eigen::VectorXs finiteDifferenceGradientWrtFlattenedState(
+      neural::WithRespectTo* wrt);
+
+  /// This returns the jacobian relating changes in the flattened state vector
+  /// to changes in X.
+  Eigen::MatrixXs getJacobianFromXToFlattenedState(neural::WithRespectTo* wrt);
+
+  /// This returns the jacobian relating changes in the flattened state vector
+  /// to changes in X.
+  Eigen::MatrixXs finiteDifferenceJacobianFromXToFlattenedState(
+      neural::WithRespectTo* wrt);
+
+protected:
+  MarkerFitter* mFitter;
+  s_t mTimeStep;
+  int mStart;
+  int mEnd;
+  int mLength;
+  Eigen::MatrixXs mOriginalPoses;
+  Eigen::MatrixXs mAccelerometerObservations;
+  Eigen::MatrixXs mGyroObservations;
+  std::vector<std::string> mAccelerometerNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      mAccelerometers;
+  std::vector<std::string> mGyroNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mGyros;
+
+  s_t mWeightAccs;
+  s_t mWeightGyros;
+  s_t mWeightPoses;
+
+  // Problem state - currently this only includes poses
+  Eigen::MatrixXs mPoses;
+  Eigen::MatrixXs mVels;
+  Eigen::MatrixXs mAccs;
 };
 
 /**
@@ -343,6 +440,9 @@ public:
       std::shared_ptr<dynamics::Skeleton> skeleton,
       dynamics::MarkerMap markers,
       bool ignoreVirtualJointCenterMarkers = false);
+
+  /// Returns the skeleton pointer we're fitting against
+  std::shared_ptr<dynamics::Skeleton> getSkeleton();
 
   /// This just checks if there are enough markers in the data with the names
   /// expected by the model. Returns true if there are enough, and false
@@ -709,6 +809,18 @@ public:
       MarkerInitialization& initialization,
       s_t dt);
 
+  /// This returns an object that can be used to run an optimization to fine
+  /// tune the joint angles to match IMU data.
+  std::shared_ptr<biomechanics::IMUFineTuneProblem> getFineTuneProblem(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      MarkerInitialization& initialization,
+      s_t dt,
+      int start,
+      int end);
+
   /// This adjusts the joint accelerations to match the IMU data, and offsets
   /// the IMU locations + rotations.
   MarkerInitialization fineTuneWithIMU(
@@ -718,7 +830,10 @@ public:
           gyroObservations,
       const std::vector<bool>& newClip,
       MarkerInitialization& initialization,
-      s_t dt);
+      s_t dt,
+      s_t weightAccs = 1.0,
+      s_t weightGyros = 1.0,
+      s_t weightPoses = 1e3);
 
   ///////////////////////////////////////////////////////////////////////////
   // Supporting methods
@@ -1318,56 +1433,6 @@ protected:
   std::vector<std::vector<int>> mPerThreadIndices;
   std::vector<std::vector<int>> mPerThreadCursor;
   std::vector<std::shared_ptr<dynamics::Skeleton>> mPerThreadSkeletons;
-};
-
-class IMUFineTuneProblem
-{
-public:
-  IMUFineTuneProblem(
-      MarkerFitter* fitter,
-      const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          accObservations,
-      const std::vector<std::map<std::string, Eigen::Vector3s>>&
-          gyroObservations,
-      s_t dt,
-      MarkerInitialization& initialization,
-      int start,
-      int end);
-
-  /// Get the size of the x vector for the problem
-  int getProblemSize();
-
-  /// Returns the current x vector
-  Eigen::VectorXs flatten();
-
-  /// Sets the state of the IMU problem to the given x vector
-  void unflatten(Eigen::VectorXs x);
-
-  /// This computes the loss for the passed in x vector
-  s_t getLoss(Eigen::VectorXs x);
-
-  /// This computes the gradient for the passed in x vector
-  Eigen::VectorXs getGrad(Eigen::VectorXs x);
-
-protected:
-  MarkerFitter* mFitter;
-  s_t mTimeStep;
-  int mStart;
-  int mEnd;
-  int mLength;
-  Eigen::MatrixXs mOriginalPoses;
-  Eigen::MatrixXs mAccelerometerObservations;
-  Eigen::MatrixXs mGyroObservations;
-  std::vector<std::string> mAccelerometerNames;
-  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
-      mAccelerometers;
-  std::vector<std::string> mGyroNames;
-  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mGyros;
-
-  // Problem state - currently this only includes poses
-  Eigen::MatrixXs mPoses;
-  Eigen::MatrixXs mVels;
-  Eigen::MatrixXs mAccs;
 };
 
 } // namespace biomechanics
