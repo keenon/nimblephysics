@@ -811,7 +811,7 @@ public:
 
   /// This returns an object that can be used to run an optimization to fine
   /// tune the joint angles to match IMU data.
-  std::shared_ptr<biomechanics::IMUFineTuneProblem> getFineTuneProblem(
+  std::shared_ptr<biomechanics::IMUFineTuneProblem> getIMUFineTuneProblem(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           accObservations,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
