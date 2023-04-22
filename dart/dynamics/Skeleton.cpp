@@ -2688,6 +2688,17 @@ Eigen::VectorXs Skeleton::finiteDifferenceGradientOfHeightWrtBodyScales(
 }
 
 //==============================================================================
+/// This computes the gradient of the height
+Eigen::VectorXs Skeleton::getGradientOfHeightWrtGroupScales(
+    Eigen::VectorXs pose, Eigen::Vector3s up)
+{
+  Eigen::VectorXs wrtBodyScales = getGradientOfHeightWrtBodyScales(pose, up);
+  Eigen::VectorXs result
+      = convertBodyScalesGradientToGroupScales(wrtBodyScales);
+  return result;
+}
+
+//==============================================================================
 /// This returns a marker set with at least one marker in it, that each
 /// represents the lowest point on the body, measure by the `up` vector, in
 /// the specified position. If there are no ties, this will be of length 1. If

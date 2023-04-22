@@ -782,6 +782,14 @@ public:
   void setAnthropometricPrior(
       std::shared_ptr<biomechanics::Anthropometrics> prior, s_t weight = 0.001);
 
+  /// This sets the height (in meters) that the model should be scaled to, and
+  /// the weight we should use when enforcing that scaling. This is in some
+  /// sense redundant to the anthropometric prior, but it's useful to have a
+  /// separate term for this, because it allows us to weight the height
+  /// constraint more heavily, because it's closer to a "hard constraint" than
+  /// the other anthropometric priors.
+  void setExplicitHeightPrior(s_t height, s_t weight = 0.001);
+
   /// This sets the data from a static trial, which we can use to resolve some
   /// forms of pelvis and foot ambiguity.
   void setStaticTrial(
@@ -1006,6 +1014,11 @@ protected:
   /// add its log-PDF to standard loss
   std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
   s_t mAnthropometricWeight;
+
+  /// This is an optional prior to use when scaling the skeleton, to ensure that
+  /// the height matches what the user expects.
+  s_t mHeightPrior;
+  s_t mHeightPriorWeight;
 
   /// This is an optional prior for a static pose trial, which can be used to
   /// help address ambiguity about feet and pelvis offsets
