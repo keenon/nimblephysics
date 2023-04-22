@@ -263,6 +263,11 @@ void MarkerFitter(py::module& m)
           ::py::arg("prior"),
           ::py::arg("weight") = 0.001)
       .def(
+          "setExplicitHeightPrior",
+          &dart::biomechanics::MarkerFitter::setExplicitHeightPrior,
+          ::py::arg("prior"),
+          ::py::arg("weight") = 1e3)
+      .def(
           "setStaticTrial",
           &dart::biomechanics::MarkerFitter::setStaticTrial,
           ::py::arg("markerObservationsMapAtStaticPose"),
