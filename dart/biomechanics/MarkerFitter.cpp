@@ -3840,7 +3840,8 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
     s_t weightMarkers,
     s_t regularizePoses,
     bool useIPOPT,
-    int iterations)
+    int iterations,
+    int lbfgsMemory)
 {
   std::vector<std::pair<int, int>> clipBoundaries;
   int start = 0;
@@ -3888,7 +3889,8 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
       app->Options()->SetIntegerValue("max_iter", iterations);
 
       // Disable LBFGS history
-      app->Options()->SetIntegerValue("limited_memory_max_history", iterations);
+      app->Options()->SetIntegerValue(
+          "limited_memory_max_history", lbfgsMemory);
 
       // Just for debugging
       if (mCheckDerivatives)
@@ -9949,21 +9951,21 @@ Eigen::VectorXs IMUFineTuneProblem::getGrad()
 
   Eigen::VectorXs posGrad
       = getGradientWrtFlattenedState(neural::WithRespectTo::POSITION);
-  Eigen::MatrixXs posJac
-      = getJacobianFromXToFlattenedState(neural::WithRespectTo::POSITION);
-  grad += posJac.transpose() * posGrad;
+  grad += getJacobianFromXToFlattenedState(neural::WithRespectTo::POSITION)
+              .transpose()
+          * posGrad;
 
   Eigen::VectorXs velGrad
       = getGradientWrtFlattenedState(neural::WithRespectTo::VELOCITY);
-  Eigen::MatrixXs velJac
-      = getJacobianFromXToFlattenedState(neural::WithRespectTo::VELOCITY);
-  grad += velJac.transpose() * velGrad;
+  grad += getJacobianFromXToFlattenedState(neural::WithRespectTo::VELOCITY)
+              .transpose()
+          * velGrad;
 
   Eigen::VectorXs accGrad
       = getGradientWrtFlattenedState(neural::WithRespectTo::ACCELERATION);
-  Eigen::MatrixXs accJac
-      = getJacobianFromXToFlattenedState(neural::WithRespectTo::ACCELERATION);
-  grad += accJac.transpose() * accGrad;
+  grad += getJacobianFromXToFlattenedState(neural::WithRespectTo::ACCELERATION)
+              .transpose()
+          * accGrad;
 
   return grad;
 }
@@ -10225,7 +10227,7 @@ Eigen::VectorXs IMUFineTuneProblem::finiteDifferenceGradientWrtFlattenedState(
 //==============================================================================
 /// This returns the jacobian relating changes in the flattened state vector
 /// to changes in X.
-Eigen::MatrixXs& IMUFineTuneProblem::getJacobianFromXToFlattenedState(
+Eigen::SparseMatrix<s_t>& IMUFineTuneProblem::getJacobianFromXToFlattenedState(
     neural::WithRespectTo* wrt)
 {
   const int dofs = mFitter->mSkeleton->getNumDofs();
@@ -10293,7 +10295,7 @@ Eigen::MatrixXs& IMUFineTuneProblem::getJacobianFromXToFlattenedState(
       }
     }
 
-    mCachedJacobianFromXToFlattenedState[wrt->name()] = result;
+    mCachedJacobianFromXToFlattenedState[wrt->name()] = result.sparseView();
   }
 
   return mCachedJacobianFromXToFlattenedState.at(wrt->name());

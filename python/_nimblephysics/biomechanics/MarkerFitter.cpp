@@ -528,6 +528,7 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::getIMUFineTuneProblem,
           ::py::arg("accObservations"),
           ::py::arg("gyroObservations"),
+          ::py::arg("markerObservations"),
           ::py::arg("init"),
           ::py::arg("dt"),
           ::py::arg("start"),
@@ -537,6 +538,7 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::fineTuneWithIMU,
           ::py::arg("accObservations"),
           ::py::arg("gyroObservations"),
+          ::py::arg("markerObservations"),
           ::py::arg("newClip"),
           ::py::arg("init"),
           ::py::arg("dt"),
@@ -545,7 +547,8 @@ void MarkerFitter(py::module& m)
           ::py::arg("weightMarkers") = 100.0,
           ::py::arg("regularizePoses") = 1.0,
           ::py::arg("useIPOPT") = true,
-          ::py::arg("iterations") = 100);
+          ::py::arg("iterations") = 300,
+          ::py::arg("lbfgsMemory") = 100);
 }
 
 } // namespace python

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
@@ -216,7 +217,8 @@ public:
 
   /// This returns the jacobian relating changes in the flattened state vector
   /// to changes in X.
-  Eigen::MatrixXs& getJacobianFromXToFlattenedState(neural::WithRespectTo* wrt);
+  Eigen::SparseMatrix<s_t>& getJacobianFromXToFlattenedState(
+      neural::WithRespectTo* wrt);
 
   /// This returns the jacobian relating changes in the flattened state vector
   /// to changes in X.
@@ -353,7 +355,8 @@ protected:
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mGyros;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
 
-  std::map<std::string, Eigen::MatrixXs> mCachedJacobianFromXToFlattenedState;
+  std::map<std::string, Eigen::SparseMatrix<s_t>>
+      mCachedJacobianFromXToFlattenedState;
 
   // For recovering the best state from IPOPT
   int mBestObjectiveValueIteration;
@@ -377,7 +380,8 @@ protected:
   s_t mWeightMarkers;
   s_t mRegularizePoses;
 
-  // Problem state - currently this only includes poses
+  // Problem state - currently this only includes kinematics over time (and not
+  // IMU angles or locations on the body, though that would be lovely to add)
   Eigen::MatrixXs mPoses;
   Eigen::MatrixXs mVels;
   Eigen::MatrixXs mAccs;
@@ -985,7 +989,8 @@ public:
       s_t weightMarkers = 1.0,
       s_t regularizePoses = 1.0,
       bool useIPOPT = true,
-      int iterations = 100);
+      int iterations = 100,
+      int lbfgsMemory = 100);
 
   ///////////////////////////////////////////////////////////////////////////
   // Supporting methods
