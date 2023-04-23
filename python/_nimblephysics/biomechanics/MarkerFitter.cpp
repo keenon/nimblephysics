@@ -138,7 +138,7 @@ void MarkerFitter(py::module& m)
           ::py::arg("weight"))
       .def(
           "setWeightPoses",
-          &dart::biomechanics::IMUFineTuneProblem::setWeightPoses,
+          &dart::biomechanics::IMUFineTuneProblem::setRegularizePoses,
           ::py::arg("weight"))
       .def("flatten", &dart::biomechanics::IMUFineTuneProblem::flatten)
       .def(
@@ -542,7 +542,10 @@ void MarkerFitter(py::module& m)
           ::py::arg("dt"),
           ::py::arg("weightAccs") = 1.0,
           ::py::arg("weightGyros") = 1.0,
-          ::py::arg("weightPoses") = 1e3);
+          ::py::arg("weightMarkers") = 100.0,
+          ::py::arg("regularizePoses") = 1.0,
+          ::py::arg("useIPOPT") = true,
+          ::py::arg("iterations") = 100);
 }
 
 } // namespace python

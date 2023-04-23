@@ -3631,6 +3631,15 @@ void MarkerFitter::rotateIMUs(
       {
         Eigen::Vector3s acc = accObservations[t].at(accNameList[i]);
         Eigen::Vector3s simulatedAcc = simulatedAccReadings.segment<3>(3 * i);
+        // The idea here is that we're adding a matrix that measures an input
+        // vector `x` along `simulatedAcc` (by doing `simulatedAcc.dot(x)`) and
+        // then projects that value along `acc`. You can think of this like a
+        // soft rotation from `simulatedAcc` to `acc`. By summing a bunch of
+        // these together, we get an "unnormalized rotation matrix". Then when
+        // we normalize later with SVD, we get the best-fit rotation.
+        //
+        // You can read more about this on the internet if you google the "SVD
+        // method for Wahba's problem".
         imuUnnormalizedRotations[accIndexList[i]]
             += acc * simulatedAcc.transpose();
       }
@@ -3641,6 +3650,7 @@ void MarkerFitter::rotateIMUs(
       {
         Eigen::Vector3s gyro = gyroObservations[t].at(gyroNameList[i]);
         Eigen::Vector3s simulatedGyro = simulatedGyroReadings.segment<3>(3 * i);
+        // See the comment above for the accelerometer case for an explanation.
         imuUnnormalizedRotations[gyroIndexList[i]]
             += gyro * simulatedGyro.transpose();
       }
@@ -3654,6 +3664,9 @@ void MarkerFitter::rotateIMUs(
     Eigen::Matrix3s U = svd.matrixU();
     Eigen::Matrix3s V = svd.matrixV();
     Eigen::Matrix3s R = U * V.transpose();
+    // We want the rotation to be a right-handed (standard) rotation, so if the
+    // determinant is negative that's no good, and we have to flip one of the
+    // axis.
     if (R.determinant() < 0)
     {
       U.col(2) *= -1;
@@ -3793,13 +3806,22 @@ std::shared_ptr<biomechanics::IMUFineTuneProblem>
 MarkerFitter::getIMUFineTuneProblem(
     const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
     MarkerInitialization& initialization,
     s_t dt,
     int start,
     int end)
 {
   return std::make_shared<IMUFineTuneProblem>(
-      this, accObservations, gyroObservations, dt, initialization, start, end);
+      this,
+      accObservations,
+      gyroObservations,
+      markerObservations,
+      dt,
+      initialization,
+      start,
+      end);
 }
 
 //==============================================================================
@@ -3808,12 +3830,17 @@ MarkerFitter::getIMUFineTuneProblem(
 MarkerInitialization MarkerFitter::fineTuneWithIMU(
     const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
     const std::vector<bool>& newClip,
     MarkerInitialization& initialization,
     s_t dt,
     s_t weightAccs,
     s_t weightGyros,
-    s_t weightPoses)
+    s_t weightMarkers,
+    s_t regularizePoses,
+    bool useIPOPT,
+    int iterations)
 {
   std::vector<std::pair<int, int>> clipBoundaries;
   int start = 0;
@@ -3829,69 +3856,187 @@ MarkerInitialization MarkerFitter::fineTuneWithIMU(
 
   for (auto& pair : clipBoundaries)
   {
-    IMUFineTuneProblem problem(
-        this,
-        accObservations,
-        gyroObservations,
-        dt,
-        initialization,
-        pair.first,
-        pair.second);
-    problem.setWeightAccs(weightAccs);
-    problem.setWeightGyros(weightGyros);
-    problem.setWeightPoses(weightPoses);
-
-    // Run SGD
-
-    Eigen::VectorXs x = problem.flatten();
-    s_t decay = 0.95;
-    Eigen::VectorXs adagradSum = Eigen::VectorXs::Ones(x.size());
-    problem.unflatten(x);
-    s_t loss = problem.getLoss();
-    s_t learningRate = 0.5;
-
-    for (int i = 0; i < 100; i++)
+    if (useIPOPT)
     {
-      Eigen::VectorXs grad = problem.getGrad();
-      adagradSum = (1.0 - decay) * grad.cwiseProduct(grad) + decay * adagradSum;
+      // Before using Eigen in a multi-threaded environment, we need to
+      // explicitly call this (at least prior to Eigen 3.3)
+      Eigen::initParallel();
 
-      while (true)
+      // Create an instance of the IpoptApplication
+      //
+      // We are using the factory, since this allows us to compile this
+      // example with an Ipopt Windows DLL
+      SmartPtr<Ipopt::IpoptApplication> app = IpoptApplicationFactory();
+
+      // Change some options
+      // Note: The following choices are only examples, they might not be
+      //       suitable for your optimization problem.
+      app->Options()->SetNumericValue("tol", static_cast<double>(mTolerance));
+      app->Options()->SetStringValue(
+          "linear_solver",
+          "mumps"); // ma27, ma55, ma77, ma86, ma97, parsido, wsmp, mumps,
+                    // custom
+
+      app->Options()->SetStringValue(
+          "hessian_approximation", "limited-memory"); // limited-memory, exacty
+
+      /*
+      app->Options()->SetStringValue(
+          "scaling_method", "none"); // none, gradient-based
+      */
+
+      app->Options()->SetIntegerValue("max_iter", iterations);
+
+      // Disable LBFGS history
+      app->Options()->SetIntegerValue("limited_memory_max_history", iterations);
+
+      // Just for debugging
+      if (mCheckDerivatives)
       {
-        Eigen::VectorXs adagradRoot = adagradSum.cwiseSqrt();
-        Eigen::VectorXs proposedX
-            = x - grad.cwiseQuotient(adagradRoot) * learningRate;
-        problem.unflatten(proposedX);
-        s_t newLoss = problem.getLoss();
-        std::cout << "Iteration " << i << " [lr=" << learningRate
-                  << "]: " << newLoss << " (prev best=" << loss
-                  << ", diff=" << (newLoss - loss) << ")" << std::endl;
-        if (newLoss < loss)
+        app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
+        app->Options()->SetStringValue("derivative_test", "first-order");
+        app->Options()->SetNumericValue("derivative_test_perturbation", 1e-6);
+      }
+
+      if (mPrintFrequency > 0)
+      {
+        app->Options()->SetIntegerValue(
+            "print_frequency_iter", mPrintFrequency);
+      }
+      else
+      {
+        app->Options()->SetIntegerValue(
+            "print_frequency_iter", std::numeric_limits<int>::infinity());
+      }
+      if (mSilenceOutput)
+      {
+        app->Options()->SetIntegerValue("print_level", 0);
+      }
+      if (mDisableLinesearch)
+      {
+        app->Options()->SetIntegerValue("max_soc", 0);
+        app->Options()->SetStringValue("accept_every_trial_step", "yes");
+      }
+      app->Options()->SetIntegerValue("watchdog_shortened_iter_trigger", 0);
+
+      // Initialize the IpoptApplication and process the options
+      Ipopt::ApplicationReturnStatus status;
+      status = app->Initialize();
+      if (status != Solve_Succeeded)
+      {
+        std::cout << std::endl
+                  << std::endl
+                  << "*** Error during initialization!" << std::endl;
+      }
+      else
+      {
+        // This will automatically free the problem object when finished,
+        // through `problemPtr`. `problem` NEEDS TO BE ON THE HEAP or it will
+        // crash. If you try to leave `problem` on the stack, you'll get invalid
+        // free exceptions when IPOpt attempts to free it.
+        IMUFineTuneProblem* problem = new IMUFineTuneProblem(
+            this,
+            accObservations,
+            gyroObservations,
+            markerObservations,
+            dt,
+            initialization,
+            pair.first,
+            pair.second);
+        problem->setWeightAccs(weightAccs);
+        problem->setWeightGyros(weightGyros);
+        problem->setWeightMarkers(weightMarkers);
+        problem->setRegularizePoses(regularizePoses);
+
+        SmartPtr<IMUFineTuneProblem> problemPtr(problem);
+        status = app->OptimizeTNLP(problemPtr);
+
+        if (status == Solve_Succeeded)
         {
-          x = proposedX;
-          loss = newLoss;
-          learningRate *= 1.5;
-          break;
-        }
-        else
-        {
-          learningRate *= 0.5;
-          // If our learning rate has gotten too small, update x and continue
-          // anyways
-          if (learningRate < 1e-12)
-          {
-            x = proposedX;
-            break;
-          }
+          // Retrieve some statistics about the solve
+          Index iter_count = app->Statistics()->IterationCount();
+          std::cout << std::endl
+                    << std::endl
+                    << "*** The problem solved in " << iter_count
+                    << " iterations!" << std::endl;
+
+          Number final_obj = app->Statistics()->FinalObjective();
+          std::cout << std::endl
+                    << std::endl
+                    << "*** The final value of the objective function is "
+                    << final_obj << '.' << std::endl;
         }
       }
     }
+    else
+    {
+      IMUFineTuneProblem problem(
+          this,
+          accObservations,
+          gyroObservations,
+          markerObservations,
+          dt,
+          initialization,
+          pair.first,
+          pair.second);
+      problem.setWeightAccs(weightAccs);
+      problem.setWeightGyros(weightGyros);
+      problem.setWeightMarkers(weightMarkers);
+      problem.setRegularizePoses(regularizePoses);
 
-    // Write the results back to the initialization
+      // Run SGD
 
-    Eigen::MatrixXs& foundPoses = problem.getPoses();
-    initialization.poses.block(
-        0, pair.first, initialization.poses.rows(), pair.second - pair.first)
-        = foundPoses;
+      Eigen::VectorXs x = problem.flatten();
+      s_t decay = 0.95;
+      Eigen::VectorXs adagradSum = Eigen::VectorXs::Ones(x.size());
+      problem.unflatten(x);
+      s_t loss = problem.getLoss();
+      s_t learningRate = 0.5;
+
+      for (int i = 0; i < iterations; i++)
+      {
+        Eigen::VectorXs grad = problem.getGrad();
+        adagradSum
+            = (1.0 - decay) * grad.cwiseProduct(grad) + decay * adagradSum;
+
+        while (true)
+        {
+          Eigen::VectorXs adagradRoot = adagradSum.cwiseSqrt();
+          Eigen::VectorXs proposedX
+              = x - grad.cwiseQuotient(adagradRoot) * learningRate;
+          problem.unflatten(proposedX);
+          s_t newLoss = problem.getLoss();
+          std::cout << "Iteration " << i << " [lr=" << learningRate
+                    << "]: " << newLoss << " (prev best=" << loss
+                    << ", diff=" << (newLoss - loss) << ")" << std::endl;
+          if (newLoss < loss)
+          {
+            x = proposedX;
+            loss = newLoss;
+            learningRate *= 1.5;
+            break;
+          }
+          else
+          {
+            learningRate *= 0.5;
+            // If our learning rate has gotten too small, update x and continue
+            // anyways
+            if (learningRate < 1e-12)
+            {
+              x = proposedX;
+              break;
+            }
+          }
+        }
+      }
+
+      // Write the results back to the initialization
+
+      Eigen::MatrixXs& foundPoses = problem.getPoses();
+      initialization.poses.block(
+          0, pair.first, initialization.poses.rows(), pair.second - pair.first)
+          = foundPoses;
+    }
   }
 
   return initialization;
@@ -9428,17 +9573,25 @@ IMUFineTuneProblem::IMUFineTuneProblem(
     MarkerFitter* fitter,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
     s_t dt,
     MarkerInitialization& initialization,
     int start,
     int end)
   : mFitter(fitter),
+    mInitialization(initialization),
     mTimeStep(dt),
     mStart(start),
     mEnd(end),
     mWeightGyros(1.0),
     mWeightAccs(1.0),
-    mWeightPoses(1.0)
+    mWeightMarkers(100.0),
+    mRegularizePoses(1.0),
+    mMarkerObservations(markerObservations),
+    mBestObjectiveValueIteration(-1),
+    mBestObjectiveValue(std::numeric_limits<s_t>::infinity()),
+    mUseMultiThreading(true)
 {
   mOriginalPoses = initialization.poses.block(
       0, start, initialization.poses.rows(), end - start);
@@ -9504,6 +9657,64 @@ IMUFineTuneProblem::IMUFineTuneProblem(
           = gyroObservations[mStart + t].at(mGyroNames[i]);
     }
   }
+
+  // Establish copies of everything that we will need for our threading
+  mNumThreads = std::thread::hardware_concurrency();
+  int cursor = 0;
+  int chunkSize = mLength / mNumThreads;
+
+  for (int t = 0; t < mNumThreads; t++)
+  {
+    std::shared_ptr<dynamics::Skeleton> threadSkel
+        = mFitter->mSkeleton->clone();
+    mThreadSkeletons.push_back(threadSkel);
+
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> threadMarkers;
+    for (auto& pair : mFitter->mMarkers)
+    {
+      dynamics::BodyNode* threadBody
+          = threadSkel->getBodyNode(pair.first->getName());
+      assert(threadBody != nullptr);
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      threadMarkers.push_back(std::make_pair(threadBody, pair.second));
+    }
+    mThreadMarkers.push_back(threadMarkers);
+
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+        threadAccelerometers;
+    for (auto& pair : mAccelerometers)
+    {
+      dynamics::BodyNode* threadBody
+          = threadSkel->getBodyNode(pair.first->getName());
+      assert(threadBody != nullptr);
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      threadAccelerometers.push_back(std::make_pair(threadBody, pair.second));
+    }
+    mThreadAccelerometers.push_back(threadAccelerometers);
+
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> threadGyros;
+    for (auto& pair : mGyros)
+    {
+      dynamics::BodyNode* threadBody
+          = threadSkel->getBodyNode(pair.first->getName());
+      assert(threadBody != nullptr);
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      threadGyros.push_back(std::make_pair(threadBody, pair.second));
+    }
+    mThreadGyros.push_back(threadGyros);
+
+    if (t == mNumThreads - 1)
+      mThreadRanges.emplace_back(cursor, mLength);
+    else
+      mThreadRanges.emplace_back(cursor, cursor + chunkSize);
+    cursor += chunkSize;
+  }
 }
 
 /// Get the size of the x vector for the problem
@@ -9526,9 +9737,19 @@ void IMUFineTuneProblem::setWeightAccs(s_t weight)
   mWeightAccs = weight;
 }
 
-void IMUFineTuneProblem::setWeightPoses(s_t weight)
+void IMUFineTuneProblem::setWeightMarkers(s_t weight)
 {
-  mWeightPoses = weight;
+  mWeightMarkers = weight;
+}
+
+void IMUFineTuneProblem::setRegularizePoses(s_t weight)
+{
+  mRegularizePoses = weight;
+}
+
+void IMUFineTuneProblem::setUseMultithreading(bool useMultithreading)
+{
+  mUseMultiThreading = useMultithreading;
 }
 
 /// Returns the current x vector
@@ -9587,23 +9808,112 @@ void IMUFineTuneProblem::unflatten(Eigen::VectorXs x)
 s_t IMUFineTuneProblem::getLoss()
 {
   s_t sum = 0.0;
-  for (int t = 0; t < mLength; t++)
+  if (mUseMultiThreading)
   {
-    mFitter->mSkeleton->setPositions(mPoses.col(t));
-    mFitter->mSkeleton->setVelocities(mVels.col(t));
-    mFitter->mSkeleton->setAccelerations(mAccs.col(t));
+    std::vector<std::future<s_t>> futures;
+    for (int threadIdx = 0; threadIdx < mNumThreads; threadIdx++)
+    {
+      futures.push_back(std::async([&, threadIdx]() {
+        s_t threadSum = 0.0;
+        std::shared_ptr<dynamics::Skeleton>& skel = mThreadSkeletons[threadIdx];
+        for (int t = mThreadRanges[threadIdx].first;
+             t < mThreadRanges[threadIdx].second;
+             t++)
+        {
+          skel->setPositions(mPoses.col(t));
+          skel->setVelocities(mVels.col(t));
+          skel->setAccelerations(mAccs.col(t));
 
-    Eigen::VectorXs accError
-        = mAccelerometerObservations.col(t)
-          - mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers);
-    sum += mWeightAccs * accError.squaredNorm();
+          Eigen::VectorXs accError = mAccelerometerObservations.col(t)
+                                     - skel->getAccelerometerReadings(
+                                         mThreadAccelerometers[threadIdx]);
+          threadSum += mWeightAccs * accError.squaredNorm();
 
-    Eigen::VectorXs gyroError = mGyroObservations.col(t)
-                                - mFitter->mSkeleton->getGyroReadings(mGyros);
-    sum += mWeightGyros * gyroError.squaredNorm();
+          Eigen::VectorXs gyroError
+              = mGyroObservations.col(t)
+                - skel->getGyroReadings(mThreadGyros[threadIdx]);
+          threadSum += mWeightGyros * gyroError.squaredNorm();
 
-    Eigen::VectorXs poseError = mPoses.col(t) - mOriginalPoses.col(t);
-    sum += mWeightPoses * poseError.squaredNorm();
+          std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+          for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+          {
+            if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+            {
+              markers.push_back(mThreadMarkers[threadIdx][i]);
+            }
+          }
+          Eigen::VectorXs markerPositions
+              = Eigen::VectorXs::Zero(markers.size() * 3);
+          int cursor = 0;
+          for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+          {
+            if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+            {
+              markerPositions.segment<3>(cursor)
+                  = mMarkerObservations[t].at(mFitter->mMarkerNames[i]);
+              cursor += 3;
+            }
+          }
+          Eigen::VectorXs markerError
+              = skel->getMarkerWorldPositions(markers) - markerPositions;
+          threadSum += mWeightMarkers * markerError.squaredNorm();
+
+          Eigen::VectorXs poseChange = mPoses.col(t) - mOriginalPoses.col(t);
+          threadSum += mRegularizePoses * poseChange.squaredNorm();
+        }
+        return threadSum;
+      }));
+    }
+    for (int threadIdx = 0; threadIdx < mNumThreads; threadIdx++)
+    {
+      sum += futures[threadIdx].get();
+    }
+  }
+  else
+  {
+    for (int t = 0; t < mLength; t++)
+    {
+      mFitter->mSkeleton->setPositions(mPoses.col(t));
+      mFitter->mSkeleton->setVelocities(mVels.col(t));
+      mFitter->mSkeleton->setAccelerations(mAccs.col(t));
+
+      Eigen::VectorXs accError
+          = mAccelerometerObservations.col(t)
+            - mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers);
+      sum += mWeightAccs * accError.squaredNorm();
+
+      Eigen::VectorXs gyroError = mGyroObservations.col(t)
+                                  - mFitter->mSkeleton->getGyroReadings(mGyros);
+      sum += mWeightGyros * gyroError.squaredNorm();
+
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+      for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+      {
+        if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+        {
+          markers.push_back(mFitter->mMarkers[i]);
+        }
+      }
+      Eigen::VectorXs markerPositions
+          = Eigen::VectorXs::Zero(markers.size() * 3);
+      int cursor = 0;
+      for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+      {
+        if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+        {
+          markerPositions.segment<3>(cursor)
+              = mMarkerObservations[t].at(mFitter->mMarkerNames[i]);
+          cursor += 3;
+        }
+      }
+      Eigen::VectorXs markerError
+          = mFitter->mSkeleton->getMarkerWorldPositions(markers)
+            - markerPositions;
+      sum += mWeightMarkers * markerError.squaredNorm();
+
+      Eigen::VectorXs poseChange = mPoses.col(t) - mOriginalPoses.col(t);
+      sum += mRegularizePoses * poseChange.squaredNorm();
+    }
   }
 
   return sum;
@@ -9692,39 +10002,153 @@ Eigen::VectorXs IMUFineTuneProblem::getGradientWrtFlattenedState(
     neural::WithRespectTo* wrt)
 {
   Eigen::VectorXs grad = Eigen::VectorXs::Zero(mPoses.rows() * mPoses.cols());
-  for (int t = 0; t < mPoses.cols(); t++)
+  if (mUseMultiThreading)
   {
-    mFitter->mSkeleton->setPositions(mPoses.col(t));
-    mFitter->mSkeleton->setVelocities(mVels.col(t));
-    mFitter->mSkeleton->setAccelerations(mAccs.col(t));
-
-    Eigen::VectorXs accError
-        = mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers)
-          - mAccelerometerObservations.col(t);
-    grad.segment(
-        t * mFitter->mSkeleton->getNumDofs(), mFitter->mSkeleton->getNumDofs())
-        += mWeightAccs * 2
-           * mFitter->mSkeleton
-                 ->getAccelerometerReadingsJacobianWrt(mAccelerometers, wrt)
-                 .transpose()
-           * accError;
-
-    Eigen::VectorXs gyroError = mFitter->mSkeleton->getGyroReadings(mGyros)
-                                - mGyroObservations.col(t);
-    grad.segment(
-        t * mFitter->mSkeleton->getNumDofs(), mFitter->mSkeleton->getNumDofs())
-        += mWeightGyros * 2
-           * mFitter->mSkeleton->getGyroReadingsJacobianWrt(mGyros, wrt)
-                 .transpose()
-           * gyroError;
-
-    if (wrt == neural::WithRespectTo::POSITION)
+    std::vector<std::future<void>> futures;
+    for (int threadIdx = 0; threadIdx < mNumThreads; threadIdx++)
     {
-      Eigen::VectorXs poseError = mPoses.col(t) - mOriginalPoses.col(t);
+      futures.push_back(std::async([&, threadIdx]() {
+        std::shared_ptr<dynamics::Skeleton>& skel = mThreadSkeletons[threadIdx];
+        for (int t = mThreadRanges[threadIdx].first;
+             t < mThreadRanges[threadIdx].second;
+             t++)
+        {
+          skel->setPositions(mPoses.col(t));
+          skel->setVelocities(mVels.col(t));
+          skel->setAccelerations(mAccs.col(t));
+
+          Eigen::VectorXs accError
+              = skel->getAccelerometerReadings(mThreadAccelerometers[threadIdx])
+                - mAccelerometerObservations.col(t);
+          grad.segment(t * skel->getNumDofs(), skel->getNumDofs())
+              += mWeightAccs * 2
+                 * skel->getAccelerometerReadingsJacobianWrt(
+                           mThreadAccelerometers[threadIdx], wrt)
+                       .transpose()
+                 * accError;
+
+          Eigen::VectorXs gyroError
+              = skel->getGyroReadings(mThreadGyros[threadIdx])
+                - mGyroObservations.col(t);
+          grad.segment(t * skel->getNumDofs(), skel->getNumDofs())
+              += mWeightGyros * 2
+                 * skel->getGyroReadingsJacobianWrt(
+                           mThreadGyros[threadIdx], wrt)
+                       .transpose()
+                 * gyroError;
+
+          if (wrt == neural::WithRespectTo::POSITION)
+          {
+            std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+                markers;
+            for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+            {
+              if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+              {
+                markers.push_back(mThreadMarkers[threadIdx][i]);
+              }
+            }
+            Eigen::VectorXs markerPositions
+                = Eigen::VectorXs::Zero(markers.size() * 3);
+            int cursor = 0;
+            for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+            {
+              if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+              {
+                markerPositions.segment<3>(cursor)
+                    = mMarkerObservations[t].at(mFitter->mMarkerNames[i]);
+                cursor += 3;
+              }
+            }
+            Eigen::VectorXs markerError
+                = skel->getMarkerWorldPositions(markers) - markerPositions;
+            Eigen::MatrixXs markerJac
+                = skel->getMarkerWorldPositionsJacobianWrtJointPositions(
+                    markers);
+            grad.segment(t * skel->getNumDofs(), skel->getNumDofs())
+                += 2 * mWeightMarkers * markerJac.transpose() * markerError;
+
+            Eigen::VectorXs poseChange = mPoses.col(t) - mOriginalPoses.col(t);
+            grad.segment(t * skel->getNumDofs(), skel->getNumDofs())
+                += 2 * mRegularizePoses * poseChange;
+          }
+        }
+      }));
+    }
+    for (int threadIdx = 0; threadIdx < mNumThreads; threadIdx++)
+    {
+      futures[threadIdx].get();
+    }
+  }
+  else
+  {
+    for (int t = 0; t < mPoses.cols(); t++)
+    {
+      mFitter->mSkeleton->setPositions(mPoses.col(t));
+      mFitter->mSkeleton->setVelocities(mVels.col(t));
+      mFitter->mSkeleton->setAccelerations(mAccs.col(t));
+
+      Eigen::VectorXs accError
+          = mFitter->mSkeleton->getAccelerometerReadings(mAccelerometers)
+            - mAccelerometerObservations.col(t);
       grad.segment(
           t * mFitter->mSkeleton->getNumDofs(),
           mFitter->mSkeleton->getNumDofs())
-          += 2 * mWeightPoses * poseError;
+          += mWeightAccs * 2
+             * mFitter->mSkeleton
+                   ->getAccelerometerReadingsJacobianWrt(mAccelerometers, wrt)
+                   .transpose()
+             * accError;
+
+      Eigen::VectorXs gyroError = mFitter->mSkeleton->getGyroReadings(mGyros)
+                                  - mGyroObservations.col(t);
+      grad.segment(
+          t * mFitter->mSkeleton->getNumDofs(),
+          mFitter->mSkeleton->getNumDofs())
+          += mWeightGyros * 2
+             * mFitter->mSkeleton->getGyroReadingsJacobianWrt(mGyros, wrt)
+                   .transpose()
+             * gyroError;
+
+      if (wrt == neural::WithRespectTo::POSITION)
+      {
+        std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+        for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+        {
+          if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+          {
+            markers.push_back(mFitter->mMarkers[i]);
+          }
+        }
+        Eigen::VectorXs markerPositions
+            = Eigen::VectorXs::Zero(markers.size() * 3);
+        int cursor = 0;
+        for (int i = 0; i < mFitter->mMarkerNames.size(); i++)
+        {
+          if (mMarkerObservations[t].count(mFitter->mMarkerNames[i]))
+          {
+            markerPositions.segment<3>(cursor)
+                = mMarkerObservations[t].at(mFitter->mMarkerNames[i]);
+            cursor += 3;
+          }
+        }
+        Eigen::VectorXs markerError
+            = mFitter->mSkeleton->getMarkerWorldPositions(markers)
+              - markerPositions;
+        Eigen::MatrixXs markerJac
+            = mFitter->mSkeleton
+                  ->getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+        grad.segment(
+            t * mFitter->mSkeleton->getNumDofs(),
+            mFitter->mSkeleton->getNumDofs())
+            += 2 * mWeightMarkers * markerJac.transpose() * markerError;
+
+        Eigen::VectorXs poseChange = mPoses.col(t) - mOriginalPoses.col(t);
+        grad.segment(
+            t * mFitter->mSkeleton->getNumDofs(),
+            mFitter->mSkeleton->getNumDofs())
+            += 2 * mRegularizePoses * poseChange;
+      }
     }
   }
 
@@ -9801,72 +10225,78 @@ Eigen::VectorXs IMUFineTuneProblem::finiteDifferenceGradientWrtFlattenedState(
 //==============================================================================
 /// This returns the jacobian relating changes in the flattened state vector
 /// to changes in X.
-Eigen::MatrixXs IMUFineTuneProblem::getJacobianFromXToFlattenedState(
+Eigen::MatrixXs& IMUFineTuneProblem::getJacobianFromXToFlattenedState(
     neural::WithRespectTo* wrt)
 {
-  Eigen::VectorXs original = flatten();
   const int dofs = mFitter->mSkeleton->getNumDofs();
-  Eigen::MatrixXs result
-      = Eigen::MatrixXs::Zero(dofs * mLength, original.size());
-
-  if (wrt == neural::WithRespectTo::POSITION)
+  if (!mCachedJacobianFromXToFlattenedState.count(wrt->name()))
   {
-    // Changes to the initial position have an identity effect on all subsequent
-    // positions
-    for (int t = 0; t < mLength; t++)
+    Eigen::MatrixXs result
+        = Eigen::MatrixXs::Zero(dofs * mLength, getProblemSize());
+
+    if (wrt == neural::WithRespectTo::POSITION)
     {
-      result.block(t * dofs, 0, dofs, dofs)
-          = Eigen::MatrixXs::Identity(dofs, dofs);
-    }
-    // Changes to the initial velocity have a linear effect on all subsequent
-    // positions
-    for (int t = 0; t < mLength; t++)
-    {
-      result.block(t * dofs, dofs, dofs, dofs)
-          = mTimeStep * t * Eigen::MatrixXs::Identity(dofs, dofs);
-    }
-    // Changes to acceleration have a linear effect on all subsequent positions
-    for (int accT = 0; accT < mLength; accT++)
-    {
-      for (int t = accT; t < mLength; t++)
+      // Changes to the initial position have an identity effect on all
+      // subsequent positions
+      for (int t = 0; t < mLength; t++)
       {
-        result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
-            = mTimeStep * mTimeStep * (t - accT)
-              * Eigen::MatrixXs::Identity(dofs, dofs);
+        result.block(t * dofs, 0, dofs, dofs)
+            = Eigen::MatrixXs::Identity(dofs, dofs);
+      }
+      // Changes to the initial velocity have a linear effect on all subsequent
+      // positions
+      for (int t = 0; t < mLength; t++)
+      {
+        result.block(t * dofs, dofs, dofs, dofs)
+            = mTimeStep * t * Eigen::MatrixXs::Identity(dofs, dofs);
+      }
+      // Changes to acceleration have a linear effect on all subsequent
+      // positions
+      for (int accT = 0; accT < mLength; accT++)
+      {
+        for (int t = accT; t < mLength; t++)
+        {
+          result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
+              = mTimeStep * mTimeStep * (t - accT)
+                * Eigen::MatrixXs::Identity(dofs, dofs);
+        }
       }
     }
-  }
-  else if (wrt == neural::WithRespectTo::VELOCITY)
-  {
-    // Changes to the initial velocity have an identity effect on all subsequent
-    // velocities
-    for (int t = 0; t < mLength; t++)
+    else if (wrt == neural::WithRespectTo::VELOCITY)
     {
-      result.block(t * dofs, dofs, dofs, dofs)
-          = Eigen::MatrixXs::Identity(dofs, dofs);
-    }
-    // Changes to acceleration have a linear effect on all subsequent velocities
-    for (int accT = 0; accT < mLength; accT++)
-    {
-      for (int t = accT + 1; t < mLength; t++)
+      // Changes to the initial velocity have an identity effect on all
+      // subsequent velocities
+      for (int t = 0; t < mLength; t++)
       {
-        result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
-            = mTimeStep * Eigen::MatrixXs::Identity(dofs, dofs);
+        result.block(t * dofs, dofs, dofs, dofs)
+            = Eigen::MatrixXs::Identity(dofs, dofs);
+      }
+      // Changes to acceleration have a linear effect on all subsequent
+      // velocities
+      for (int accT = 0; accT < mLength; accT++)
+      {
+        for (int t = accT + 1; t < mLength; t++)
+        {
+          result.block(t * dofs, (accT + 2) * dofs, dofs, dofs)
+              = mTimeStep * Eigen::MatrixXs::Identity(dofs, dofs);
+        }
       }
     }
-  }
-  else if (wrt == neural::WithRespectTo::ACCELERATION)
-  {
-    // Changes to acceleration have an identity effect on that timestep's
-    // acceleration
-    for (int accT = 0; accT < mLength; accT++)
+    else if (wrt == neural::WithRespectTo::ACCELERATION)
     {
-      result.block(accT * dofs, (accT + 2) * dofs, dofs, dofs)
-          = Eigen::MatrixXs::Identity(dofs, dofs);
+      // Changes to acceleration have an identity effect on that timestep's
+      // acceleration
+      for (int accT = 0; accT < mLength; accT++)
+      {
+        result.block(accT * dofs, (accT + 2) * dofs, dofs, dofs)
+            = Eigen::MatrixXs::Identity(dofs, dofs);
+      }
     }
+
+    mCachedJacobianFromXToFlattenedState[wrt->name()] = result;
   }
 
-  return result;
+  return mCachedJacobianFromXToFlattenedState.at(wrt->name());
 }
 
 //==============================================================================
@@ -9924,6 +10354,282 @@ IMUFineTuneProblem::finiteDifferenceJacobianFromXToFlattenedState(
       useRidders);
 
   return result;
+}
+
+//------------------------- Ipopt::TNLP --------------------------------------
+//==============================================================================
+/// \brief Method to return some info about the nlp
+bool IMUFineTuneProblem::get_nlp_info(
+    Ipopt::Index& n,
+    Ipopt::Index& m,
+    Ipopt::Index& nnz_jac_g,
+    Ipopt::Index& nnz_h_lag,
+    Ipopt::TNLP::IndexStyleEnum& index_style)
+{
+  n = getProblemSize();
+  m = 0;
+  nnz_jac_g = 0;
+  nnz_h_lag = 0;
+  (void)index_style;
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the bounds for my problem
+bool IMUFineTuneProblem::get_bounds_info(
+    Ipopt::Index n,
+    Ipopt::Number* x_l,
+    Ipopt::Number* x_u,
+    Ipopt::Index m,
+    Ipopt::Number* g_l,
+    Ipopt::Number* g_u)
+{
+  (void)n;
+  assert(n == getProblemSize());
+
+  // We default bounds to a large finite value, rather than infinity, to prevent
+  // NaNs from creeping into computations where they're not wanted.
+  s_t LARGE_FINITE_VALUE = 10000000;
+  // Lower and upper bounds on X
+  Eigen::Map<Eigen::VectorXd> upperBounds(x_u, n);
+  upperBounds.setConstant(LARGE_FINITE_VALUE);
+  Eigen::Map<Eigen::VectorXd> lowerBounds(x_l, n);
+  lowerBounds.setConstant(-LARGE_FINITE_VALUE);
+
+  (void)m;
+  assert(m == 0);
+  (void)g_l;
+  (void)g_u;
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the starting point for the algorithm
+bool IMUFineTuneProblem::get_starting_point(
+    Ipopt::Index n,
+    bool init_x,
+    Ipopt::Number* _x,
+    bool init_z,
+    Ipopt::Number* z_L,
+    Ipopt::Number* z_U,
+    Ipopt::Index m,
+    bool init_lambda,
+    Ipopt::Number* lambda)
+{
+  // Here, we assume we only have starting values for x
+  (void)init_x;
+  assert(init_x == true);
+  (void)init_z;
+  assert(init_z == false);
+  (void)init_lambda;
+  assert(init_lambda == false);
+  // We don't set the lagrange multipliers
+  (void)z_L;
+  (void)z_U;
+  (void)m;
+  (void)lambda;
+
+  if (init_x)
+  {
+    Eigen::Map<Eigen::VectorXd> x(_x, n);
+    x = flatten().cast<double>();
+  }
+
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the objective value
+bool IMUFineTuneProblem::eval_f(
+    Ipopt::Index n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number& _obj_value)
+{
+  if (_new_x)
+  {
+    Eigen::Map<const Eigen::VectorXd> x(_x, n);
+    unflatten(x.cast<s_t>());
+  }
+  _obj_value = getLoss();
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the gradient of the objective
+bool IMUFineTuneProblem::eval_grad_f(
+    Ipopt::Index n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number* _grad_f)
+{
+  if (_new_x)
+  {
+    Eigen::Map<const Eigen::VectorXd> x(_x, n);
+    unflatten(x.cast<s_t>());
+  }
+  Eigen::Map<Eigen::VectorXd> grad(_grad_f, n);
+  grad = getGrad().cast<s_t>();
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return the constraint residuals
+bool IMUFineTuneProblem::eval_g(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Index _m,
+    Ipopt::Number* _g)
+{
+  (void)_n;
+  (void)_x;
+  (void)_new_x;
+  (void)_m;
+  (void)_g;
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return:
+///        1) The structure of the jacobian (if "values" is nullptr)
+///        2) The values of the jacobian (if "values" is not nullptr)
+bool IMUFineTuneProblem::eval_jac_g(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Index _m,
+    Ipopt::Index _nele_jac,
+    Ipopt::Index* _iRow,
+    Ipopt::Index* _jCol,
+    Ipopt::Number* _values)
+{
+  (void)_n;
+  (void)_x;
+  (void)_new_x;
+  (void)_m;
+  (void)_nele_jac;
+  (void)_iRow;
+  (void)_jCol;
+  (void)_values;
+  return true;
+}
+
+//==============================================================================
+/// \brief Method to return:
+///        1) The structure of the hessian of the lagrangian (if "values" is
+///           nullptr)
+///        2) The values of the hessian of the lagrangian (if "values" is not
+///           nullptr)
+bool IMUFineTuneProblem::eval_h(
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    bool _new_x,
+    Ipopt::Number _obj_factor,
+    Ipopt::Index _m,
+    const Ipopt::Number* _lambda,
+    bool _new_lambda,
+    Ipopt::Index _nele_hess,
+    Ipopt::Index* _iRow,
+    Ipopt::Index* _jCol,
+    Ipopt::Number* _values)
+{
+  (void)_n;
+  (void)_x;
+  (void)_new_x;
+  (void)_obj_factor;
+  (void)_m;
+  (void)_lambda;
+  (void)_new_lambda;
+  (void)_nele_hess;
+  (void)_iRow;
+  (void)_jCol;
+  (void)_values;
+  return true;
+}
+
+//==============================================================================
+/// \brief This method is called when the algorithm is complete so the TNLP
+///        can store/write the solution
+void IMUFineTuneProblem::finalize_solution(
+    Ipopt::SolverReturn _status,
+    Ipopt::Index _n,
+    const Ipopt::Number* _x,
+    const Ipopt::Number* _z_L,
+    const Ipopt::Number* _z_U,
+    Ipopt::Index _m,
+    const Ipopt::Number* _g,
+    const Ipopt::Number* _lambda,
+    Ipopt::Number _obj_value,
+    const Ipopt::IpoptData* _ip_data,
+    Ipopt::IpoptCalculatedQuantities* _ip_cq)
+{
+  (void)_status;
+  (void)_n;
+  (void)_z_L;
+  (void)_z_U;
+  (void)_m;
+  (void)_g;
+  (void)_lambda;
+  (void)_obj_value;
+  (void)_ip_data;
+  (void)_ip_cq;
+  if (mBestObjectiveValueIteration != -1)
+  {
+    std::cout << "Recovering iteration " << mBestObjectiveValueIteration
+              << " with value " << mBestObjectiveValue << std::endl;
+    unflatten(mBestObjectiveValueState);
+  }
+  else
+  {
+    Eigen::Map<const Eigen::VectorXd> x(_x, _n);
+    unflatten(x.cast<s_t>());
+  }
+  // Write the results back to the initialization
+  mInitialization.poses.block(0, mStart, mInitialization.poses.rows(), mLength)
+      = mPoses;
+}
+
+//==============================================================================
+bool IMUFineTuneProblem::intermediate_callback(
+    Ipopt::AlgorithmMode mode,
+    Ipopt::Index iter,
+    Ipopt::Number obj_value,
+    Ipopt::Number inf_pr,
+    Ipopt::Number inf_du,
+    Ipopt::Number mu,
+    Ipopt::Number d_norm,
+    Ipopt::Number regularization_size,
+    Ipopt::Number alpha_du,
+    Ipopt::Number alpha_pr,
+    Ipopt::Index ls_trials,
+    const Ipopt::IpoptData* ip_data,
+    Ipopt::IpoptCalculatedQuantities* ip_cq)
+{
+  (void)mode;
+  (void)iter;
+  (void)obj_value;
+  (void)inf_pr;
+  (void)inf_du;
+  (void)mu;
+  (void)d_norm;
+  (void)regularization_size;
+  (void)alpha_du;
+  (void)alpha_pr;
+  (void)ls_trials;
+  (void)ip_data;
+  (void)ip_cq;
+
+  if (obj_value < mBestObjectiveValue && abs(inf_pr) < 1.0)
+  {
+    mBestObjectiveValueIteration = iter;
+    mBestObjectiveValue = obj_value;
+    mBestObjectiveValueState = flatten();
+  }
+
+  return true;
 }
 
 } // namespace biomechanics

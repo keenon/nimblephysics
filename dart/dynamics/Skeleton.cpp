@@ -8096,10 +8096,10 @@ Eigen::VectorXs Skeleton::getAccelerometerReadings(
     offset = offset.cwiseProduct(accs[i].first->getScale());
 
     // Explicit formulation
-    Eigen::Vector6s velInBodyFrame
-        = bodyVels.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
-    Eigen::Vector6s accInBodyFrame
-        = bodyAccs.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    int bodyIndex = accs[i].first->getIndexInSkeleton();
+    assert(bodyIndex >= 0 && bodyIndex < getNumBodyNodes());
+    Eigen::Vector6s velInBodyFrame = bodyVels.segment<6>(bodyIndex * 6);
+    Eigen::Vector6s accInBodyFrame = bodyAccs.segment<6>(bodyIndex * 6);
     Eigen::Vector6s velInAccFrame = velInBodyFrame;
     velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
     Eigen::Vector6s accInAccFrame = accInBodyFrame;
@@ -8108,9 +8108,10 @@ Eigen::VectorXs Skeleton::getAccelerometerReadings(
     Eigen::Vector3s contributionFromVel
         = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
     Eigen::Vector3s worldGravity = getGravity();
-    Eigen::Vector3s localGravity
-        = accs[i].first->getWorldTransform().linear().transpose()
-          * worldGravity;
+    Eigen::Isometry3s T_wb = accs[i].first->getWorldTransform();
+    Eigen::Matrix3s R_wb = T_wb.linear();
+    Eigen::Matrix3s R_bw = R_wb.transpose();
+    Eigen::Vector3s localGravity = R_bw * worldGravity;
     Eigen::Vector3s acc = accTail + contributionFromVel - localGravity;
     acc = T_ba.linear().transpose() * acc;
 

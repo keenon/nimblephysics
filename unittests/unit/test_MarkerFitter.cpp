@@ -689,6 +689,8 @@ bool testIMUGradients(
     MarkerFitter& fitter,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& accObservations,
     const std::vector<std::map<std::string, Eigen::Vector3s>>& gyroObservations,
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations,
     s_t dt,
     MarkerInitialization& initialization,
     int start,
@@ -700,6 +702,7 @@ bool testIMUGradients(
       &fitter,
       accObservations,
       gyroObservations,
+      markerObservations,
       dt,
       initialization,
       start,
@@ -7733,6 +7736,7 @@ TEST(MarkerFitter, FINE_TUNE_ON_IMUS_GRAD)
       fitter,
       accTimesteps,
       gyroTimesteps,
+      markerTimesteps,
       0.005,
       init,
       0,
@@ -7814,7 +7818,18 @@ TEST(MarkerFitter, CARMAGO_FINE_TUNE_ON_IMUS)
             << std::endl;
 
   fitter.fineTuneWithIMU(
-      accTimesteps, gyroTimesteps, newClip, init, dt, 1.0, 1.0, 1e3);
+      accTimesteps,
+      gyroTimesteps,
+      markerTimesteps,
+      newClip,
+      init,
+      dt,
+      1.0,
+      1.0,
+      100.0,
+      1.0,
+      true,
+      300);
 
   std::cout << "After optimization gyro RMS: "
             << fitter.measureGyroRMS(gyroTimesteps, newClip, init, dt)
