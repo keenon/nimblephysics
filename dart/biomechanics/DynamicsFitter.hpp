@@ -1331,7 +1331,9 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel, s_t slack = 0.1);
 
   // 0. Smooth the accelerations.
-  void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init);
+  void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init,
+                           s_t smoothingWeight = 1e1,
+                           s_t regularizationWeight = 1e-3);
 
   // 0. Estimate which timesteps probably have unmeasured external forces
   // present. By passing a number smaller than 1.0 to scaleThresholds, we can
