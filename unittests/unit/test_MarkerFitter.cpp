@@ -1671,7 +1671,6 @@ std::vector<MarkerInitialization> runEngine(
       2);
 
   Eigen::VectorXs pose = Eigen::VectorXs::Zero(standard.skeleton->getNumDofs());
-  pose(4) = 0.94;
   s_t gotHeight = standard.skeleton->getHeight(pose);
   std::cout << "Target height: " << heightM << "m" << std::endl;
   std::cout << "Final height: " << gotHeight << "m" << std::endl;
