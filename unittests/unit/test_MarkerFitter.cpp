@@ -1670,6 +1670,9 @@ std::vector<MarkerInitialization> runEngine(
 
   fitter.setStaticTrialWeight(0.1);
 
+  // Try regularizing the pelvis joints
+  fitter.setRegularizePelvisJointsWithVirtualSpring(0.1);
+
   // fitter.setDebugLoss(true);
 
   // Create Anthropometric prior

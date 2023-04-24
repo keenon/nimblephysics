@@ -863,6 +863,16 @@ public:
   /// IK, if nothing marker-specific gets assigned.
   void setTrackingMarkerDefaultWeight(s_t weight);
 
+  /// This allows us to encourage the pelvis to align in a way that minimizes
+  /// the total joint angles for the hips and the lower back, which are
+  /// otherwise very ambiguous. This is presented as a general API in case we
+  /// want to apply the same logic to other joints.
+  void setRegularizeJointWithVirtualSpring(std::string jointName, s_t weight);
+
+  /// This will heuristically detect the pelvis, and attached joints, and mark
+  /// them all as needing to be regularized with a virtual spring during IK.
+  void setRegularizePelvisJointsWithVirtualSpring(s_t weight);
+
   /// This returns a score summarizing how much the markers attached to this
   /// joint move relative to one another.
   s_t computeJointVariability(
@@ -1342,6 +1352,10 @@ protected:
   /// the height matches what the user expects.
   s_t mHeightPrior;
   s_t mHeightPriorWeight;
+
+  /// This is an optional prior to enforce on joints, to try to encourage them
+  /// to center their motion around a neutral angle.
+  std::map<std::string, s_t> mJointVirtualSpringRegularizerWeight;
 
   /// This is an optional prior for a static pose trial, which can be used to
   /// help address ambiguity about feet and pelvis offsets
