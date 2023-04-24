@@ -113,31 +113,6 @@ Note that these are specified in the local body frame, acting on the body at its
         This is for doing ML and large-scale data analysis. This is a single frame of data, returned in a list by :code:`SubjectOnDisk.readFrames()`, which contains everything needed to reconstruct all the dynamics of a snapshot in time.
       )doc";
 
-  py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
-      .value(
-          "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
-      .value(
-          "measuredGrfZeroWhenAccelerationNonZero",
-          dart::biomechanics::MissingGRFReason::
-              measuredGrfZeroWhenAccelerationNonZero)
-      .value(
-          "unmeasuredExternalForceDetected",
-          dart::biomechanics::MissingGRFReason::unmeasuredExternalForceDetected)
-      .value(
-          "torqueDiscrepancy",
-          dart::biomechanics::MissingGRFReason::torqueDiscrepancy)
-      .value(
-          "forceDiscrepancy",
-          dart::biomechanics::MissingGRFReason::forceDiscrepancy)
-      .value(
-          "notOverForcePlate",
-          dart::biomechanics::MissingGRFReason::notOverForcePlate)
-      .value(
-          "missingImpact", dart::biomechanics::MissingGRFReason::missingImpact)
-      .value("missingBlip", dart::biomechanics::MissingGRFReason::missingBlip)
-      .value("shiftGRF", dart::biomechanics::MissingGRFReason::shiftGRF)
-      .export_values();
-
   auto subjectOnDisk
       = ::py::class_<
             dart::biomechanics::SubjectOnDisk,

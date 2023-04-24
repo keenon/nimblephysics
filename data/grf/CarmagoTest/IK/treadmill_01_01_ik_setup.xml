@@ -1,0 +1,125 @@
+<OpenSimDocument Version="40000">
+    <InverseKinematicsTool name="treadmill_01_01">
+        <model_file>../Models/optimized_scale_and_markers.osim</model_file>
+        <IKTaskSet name="IK_tasks">
+            <objects>
+                <IKMarkerTask name="L_ASIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Ankle_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Heel">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Knee_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_PSIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Shank_Front">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Shank_Rear">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Shank_Upper">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Thigh_Front">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Thigh_Rear">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Thigh_Upper">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Toe_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Toe_Med">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="L_Toe_Tip">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_ASIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Ankle_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Heel">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Knee_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_PSIS">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Shank_Front">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Shank_Rear">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Shank_Upper">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Thigh_Front">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Thigh_Rear">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Thigh_Upper">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Toe_Lat">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Toe_Med">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+                <IKMarkerTask name="R_Toe_Tip">
+                    <weight>1.0</weight>
+                    <apply>true</apply>
+                </IKMarkerTask>
+            </objects>
+        </IKTaskSet>
+        <marker_file>../MarkerData/treadmill_01_01.trc</marker_file>
+        <output_motion_file>treadmill_01_01_ik_by_opensim.mot</output_motion_file>
+        <accuracy>1e-5</accuracy>
+        <report_errors>true</report_errors>
+    </InverseKinematicsTool>
+</OpenSimDocument>

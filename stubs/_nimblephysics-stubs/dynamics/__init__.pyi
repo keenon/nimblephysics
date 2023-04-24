@@ -4634,7 +4634,7 @@ class Skeleton(MetaSkeleton):
         are mounted on the body
             
         """
-    def getGyroReadings(self, gyros: typing.Dict[str, typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+    def getGyroReadings(self, gyros: typing.List[typing.Tuple[BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
         """
         These are a set of bodies, and offsets in local body space where gyros are mounted on the body.
             
