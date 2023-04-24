@@ -18,6 +18,7 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Joint.hpp"
+#include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
@@ -807,6 +808,26 @@ MarkerFitter::MarkerFitter(
     }
     loss += jointBoundsRegularization;
 
+    s_t virtualJointSpringRegularization = 0.0;
+    for (auto& pair : this->mJointVirtualSpringRegularizerWeight)
+    {
+      auto* joint = this->mSkeleton->getJoint(pair.first);
+      if (joint != nullptr)
+      {
+        for (int i = 0; i < joint->getNumDofs(); i++)
+        {
+          s_t weight = pair.second;
+          int dof = joint->getDof(i)->getIndexInSkeleton();
+          Eigen::VectorXs poses = state->posesAtTimesteps.row(dof);
+          virtualJointSpringRegularization
+              += poses.squaredNorm() * weight / poses.size();
+          state->posesAtTimestepsGrad.row(dof)
+              += (2 * weight / poses.size()) * poses;
+        }
+      }
+    }
+    loss += virtualJointSpringRegularization;
+
     // avg = (sum)/K
     // d/dx = (K-1)*2 / (K^2) * (K*x - sum)
     // d/dx = (K-1)*2 / (K) * (x - avg)
@@ -1007,6 +1028,7 @@ MarkerFitter::MarkerFitter(
                 << ",bodyEvenR=" << bodyEvenRegularization
                 << ",bodyR=" << bodyScaleReg
                 << ",boundsR=" << jointBoundsRegularization
+                << ",jointSpringR=" << virtualJointSpringRegularization
                 << ",staticR=" << staticPoseRegularization
                 << ",jointForceField=" << jointForceFieldLoss << "]"
                 << std::endl;
@@ -4361,7 +4383,25 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     outputNames.push_back(jointPrefix + " Y");
     outputNames.push_back(jointPrefix + " Z");
   }
-  outputNames.push_back("Sigmoid of log(anthropometric prior)");
+
+  // 1.3. Get ready to enforce virtual joint springs that will try to drive
+  // "virtual spring joints" to zero
+  std::vector<int> virtualSpringDofs;
+  std::vector<s_t> virtualSpringWeights;
+  for (auto* joint : skeletonBallJoints->getJoints())
+  {
+    if (fitter->mJointVirtualSpringRegularizerWeight.count(joint->getName()))
+    {
+      for (int i = 0; i < joint->getNumDofs(); i++)
+      {
+        virtualSpringDofs.push_back(joint->getDof(i)->getIndexInSkeleton());
+        virtualSpringWeights.push_back(
+            fitter->mJointVirtualSpringRegularizerWeight.at(joint->getName()));
+        outputNames.push_back("Spring dof " + joint->getDof(i)->getName());
+      }
+    }
+  }
+
   std::vector<std::string> inputNames;
   for (int i = 0; i < skeletonBallJoints->getNumDofs(); i++)
   {
@@ -4409,7 +4449,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         initialPos,
         skeletonBallJoints->getPositionUpperLimits(),
         skeletonBallJoints->getPositionLowerLimits(),
-        (markerObservations.size() * 3) + (joints.size() * 3),
+        (markerObservations.size() * 3) + (joints.size() * 3)
+            + virtualSpringDofs.size(),
         // Set positions
         [skeletonBallJoints,
          skeleton,
@@ -4493,7 +4534,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          jointCenters,
          jointWeights,
          jointAxis,
-         axisWeights](
+         axisWeights,
+         virtualSpringDofs,
+         virtualSpringWeights](
             /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
             /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           diff.segment(0, markerPoses.size())
@@ -4543,6 +4586,17 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               jointWeights,
               jointAxis,
               axisWeights);
+          for (int i = 0; i < virtualSpringDofs.size(); i++)
+          {
+            diff(markerPoses.size() + jointPoses.size() + i)
+                = skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * virtualSpringWeights[i];
+            jac(markerPoses.size() + jointPoses.size() + i,
+                virtualSpringDofs[i])
+                = 2 * skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * virtualSpringWeights[i];
+          }
         },
         // Generate a random restart position
         [&skeleton, &observedJoints, markerPoses](
@@ -4648,14 +4702,17 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     }
 
     // The extra dimension is for the anthropometric penalty term
-    int outputDim = (markerObservations.size() * 3) + (joints.size() * 3);
+    int outputDim = (markerObservations.size() * 3) + (joints.size() * 3)
+                    + virtualSpringDofs.size();
     if (fitter->mAnthropometrics != nullptr)
     {
       outputDim += 1;
+      outputNames.push_back("Sigmoid of log(anthropometric prior)");
     }
     if (fitter->mHeightPriorWeight > 0)
     {
       outputDim += 1;
+      outputNames.push_back("Height prior");
     }
 
     const bool ignoreJointLimits = fitter->mIgnoreJointLimits;
@@ -4816,7 +4873,9 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          jointWeights,
          jointAxis,
          axisWeights,
-         outputDim](
+         outputDim,
+         virtualSpringDofs,
+         virtualSpringWeights](
             /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
             /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           /// Compute the output diff (error)
@@ -4835,7 +4894,27 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               jointAxis,
               axisWeights);
 
+          assert(
+              jac.cols()
+              == skeletonBallJoints->getNumDofs()
+                     + skeletonBallJoints->getGroupScaleDim());
+          (void)outputDim;
+          assert(jac.rows() == outputDim);
+
+          jac.setZero();
+
           int outputCursor = markerPoses.size() + jointCenters.size();
+          for (int i = 0; i < virtualSpringDofs.size(); i++)
+          {
+            diff(outputCursor)
+                = skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * virtualSpringWeights[i];
+            jac(outputCursor, virtualSpringDofs[i])
+                = 2 * skeletonBallJoints->getPosition(virtualSpringDofs[i])
+                  * virtualSpringWeights[i];
+            outputCursor++;
+          }
 
           s_t alphaScale = 0.0;
           s_t expNegLogPdf = 0.0;
@@ -4862,14 +4941,6 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             outputCursor++;
           }
 
-          assert(
-              jac.cols()
-              == skeletonBallJoints->getNumDofs()
-                     + skeletonBallJoints->getGroupScaleDim());
-          (void)outputDim;
-          assert(jac.rows() == outputDim);
-
-          jac.setZero();
           jac.block(
               0, 0, markerVector.size() * 3, skeletonBallJoints->getNumDofs())
               = skeletonBallJoints
@@ -4926,7 +4997,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 
           // Add group scales grad
           int outputRowCursor = (markerVector.size() * 3)
-                                + (jointsForSkeletonBallJoints.size() * 3);
+                                + (jointsForSkeletonBallJoints.size() * 3)
+                                + virtualSpringDofs.size();
           if (fitter->mAnthropometrics != nullptr)
           {
             Eigen::VectorXs expNegLogPdfGradient
@@ -6223,6 +6295,80 @@ void MarkerFitter::setAnatomicalMarkerDefaultWeight(s_t weight)
 void MarkerFitter::setTrackingMarkerDefaultWeight(s_t weight)
 {
   mTrackingMarkerDefaultWeight = weight;
+}
+
+//==============================================================================
+/// This allows us to encourage the pelvis to align in a way that minimizes
+/// the total joint angles for the hips and the lower back, which are
+/// otherwise very ambiguous. This is presented as a general API in case we
+/// want to apply the same logic to other joints.
+void MarkerFitter::setRegularizeJointWithVirtualSpring(
+    std::string jointName, s_t weight)
+{
+  mJointVirtualSpringRegularizerWeight[jointName] = weight;
+}
+
+//==============================================================================
+/// This will heuristically detect the pelvis, and attached joints, and mark
+/// them all as needing to be regularized with a virtual spring during IK.
+void MarkerFitter::setRegularizePelvisJointsWithVirtualSpring(s_t weight)
+{
+  std::vector<std::string> namesToLookFor;
+  namesToLookFor.push_back("pelvis");
+
+  for (auto* body : mSkeleton->getBodyNodes())
+  {
+    // 1. Check if the body name contains the name we're looking for
+    bool isMatch = false;
+    for (std::string nameToLookFor : namesToLookFor)
+    {
+      if (body->getName().find(nameToLookFor) != std::string::npos)
+      {
+        isMatch = true;
+        break;
+      }
+    }
+
+    // 2. Check if the attached mesh names contains the name we're looking for
+    for (auto* shapeNode : body->getShapeNodes())
+    {
+      dynamics::ShapePtr shape = shapeNode->getShape();
+      if (shape->getType() == dynamics::MeshShape::getStaticType())
+      {
+        auto mesh = std::static_pointer_cast<dynamics::MeshShape>(shape);
+
+        for (std::string nameToLookFor : namesToLookFor)
+        {
+          if (mesh->getMeshPath().find(nameToLookFor) != std::string::npos)
+          {
+            isMatch = true;
+            break;
+          }
+        }
+      }
+      if (isMatch)
+      {
+        break;
+      }
+    }
+
+    // 3. If we think we've found the pelvis...
+    if (isMatch)
+    {
+      // 4. ... then we add all the joints attached to it to the list of joints
+      // we want to regularize with a virtual spring
+      if (body->getParentJoint() != mSkeleton->getRootJoint())
+      {
+        setRegularizeJointWithVirtualSpring(
+            body->getParentJoint()->getName(), weight);
+      }
+      for (int i = 0; i < body->getNumChildJoints(); i++)
+      {
+        setRegularizeJointWithVirtualSpring(
+            body->getChildJoint(i)->getName(), weight);
+      }
+    }
+  }
 }
 
 //==============================================================================

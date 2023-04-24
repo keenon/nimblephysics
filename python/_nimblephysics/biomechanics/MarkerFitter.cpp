@@ -416,6 +416,17 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setTrackingMarkerDefaultWeight,
           ::py::arg("weight"))
       .def(
+          "setRegularizeJointWithVirtualSpring",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizeJointWithVirtualSpring,
+          ::py::arg("jointName"),
+          ::py::arg("weight"))
+      .def(
+          "setRegularizePelvisJointsWithVirtualSpring",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizePelvisJointsWithVirtualSpring,
+          ::py::arg("weight"))
+      .def(
           "setJointSphereFitSGDIterations",
           &dart::biomechanics::MarkerFitter::setJointSphereFitSGDIterations,
           ::py::arg("iters"))
