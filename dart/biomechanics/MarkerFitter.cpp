@@ -565,6 +565,8 @@ MarkerFitter::MarkerFitter(
   : mSkeleton(skeleton),
     mAnthropometrics(nullptr),
     mAnthropometricWeight(0.001),
+    mHeightPrior(1.68),
+    mHeightPriorWeight(0.0),
     mInitialIKSatisfactoryLoss(0.003),
     mInitialIKMaxRestarts(100),
     mDebugLoss(false),
@@ -586,8 +588,8 @@ MarkerFitter::MarkerFitter(
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
-    mJointSphereFitSGDIterations(500),
-    mJointAxisFitSGDIterations(2000),
+    mJointSphereFitSGDIterations(5000),
+    mJointAxisFitSGDIterations(10000),
     mCheckDerivatives(false),
     mUseParallelIKWarps(false),
     mPrintFrequency(1),
@@ -688,6 +690,8 @@ MarkerFitter::MarkerFitter(
     }
     loss += markerRegularization;
 
+    state->bodyScalesGrad.setZero();
+
     // 3. If we've got an anthropometrics prior, use it
     s_t anthroRegularization = 0.0;
     if (this->mAnthropometrics)
@@ -710,16 +714,36 @@ MarkerFitter::MarkerFitter(
             * (-1 * this->mAnthropometricWeight);
       for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
       {
-        state->bodyScalesGrad.col(i) = bodyScalesGradVector.segment<3>(i * 3);
+        state->bodyScalesGrad.col(i) += bodyScalesGradVector.segment<3>(i * 3);
       }
       // 3.4. Reset
       this->mSkeleton->setBodyScales(oldBodyScales);
     }
-    else
-    {
-      state->bodyScalesGrad.setZero();
-    }
     loss += anthroRegularization;
+
+    // 4. Regularize the height of the body, if we've got a height prior
+    s_t heightRegularization = 0.0;
+    if (mHeightPriorWeight > 0.0)
+    {
+      Eigen::VectorXs pose
+          = Eigen::VectorXs::Zero(this->mSkeleton->getNumDofs());
+      s_t height = this->mSkeleton->getHeight(pose);
+      Eigen::VectorXs heightGrad
+          = this->mSkeleton->getGradientOfHeightWrtBodyScales(pose);
+
+      s_t diff = height - mHeightPrior;
+      heightRegularization = mHeightPriorWeight * diff * diff;
+
+      // 4.1. Translate gradients from vector back to matrix form for the state
+      // object
+      Eigen::VectorXs bodyScalesGradVector
+          = 2 * mHeightPriorWeight * diff * heightGrad;
+      for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
+      {
+        state->bodyScalesGrad.col(i) += bodyScalesGradVector.segment<3>(i * 3);
+      }
+    }
+    loss += heightRegularization;
 
     // 4. Regularize the body sizes to try to be even in every direction
     s_t bodyEvenRegularization = 0.0;
@@ -978,6 +1002,7 @@ MarkerFitter::MarkerFitter(
       std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
                 << ",axs=" << axisErrors << ",mkrR=" << markerRegularization
                 << ",anthR=" << anthroRegularization
+                << ",heightR=" << heightRegularization
                 << ",bodyEvenR=" << bodyEvenRegularization
                 << ",bodyR=" << bodyScaleReg
                 << ",boundsR=" << jointBoundsRegularization
@@ -3702,6 +3727,7 @@ MarkerInitialization MarkerFitter::getInitialization(
         params.jointWeights,
         jointAxisBlocks[i][0],
         params.axisWeights,
+        result.observedJoints,
         params.dontRescaleBodies,
         i,
         true,
@@ -4518,9 +4544,20 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               axisWeights);
         },
         // Generate a random restart position
-        [&skeleton, &observedJoints](Eigen::Ref<Eigen::VectorXs> val) {
+        [&skeleton, &observedJoints, markerPoses](
+            Eigen::Ref<Eigen::VectorXs> val) {
           val = skeleton->convertPositionsToBallSpace(
               skeleton->getRandomPoseForJoints(observedJoints));
+
+          // Set the root translation to within a fairly narrow range of the
+          // average marker cloud
+          Eigen::Vector3s avgMarkerPos = Eigen::Vector3s::Zero();
+          for (int i = 0; i < markerPoses.size() / 3; i++)
+          {
+            avgMarkerPos += markerPoses.segment<3>(i * 3);
+          }
+          avgMarkerPos /= (s_t)(markerPoses.size() / 3);
+          val.segment<3>(3) = avgMarkerPos + (Eigen::Vector3s::Random() * 0.2);
         },
         math::IKConfig()
             .setMaxStepCount(150)
@@ -4559,6 +4596,12 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         inputNames.push_back(prefix + " Z");
       }
     }
+
+    // Get the neutral pose of the skeleton where we'll measure the height
+    Eigen::VectorXs skeletonHeightMeasurementPose
+        = Eigen::VectorXs::Zero(skeleton->getNumDofs());
+    Eigen::VectorXs skeletonBallJointsHeightMeasurementPose
+        = skeleton->convertPositionsToBallSpace(skeletonHeightMeasurementPose);
 
     // 1.4. Set our initial guess for IK to whatever the current pose of the
     // skeleton is
@@ -4605,6 +4648,10 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     // The extra dimension is for the anthropometric penalty term
     int outputDim = (markerObservations.size() * 3) + (joints.size() * 3);
     if (fitter->mAnthropometrics != nullptr)
+    {
+      outputDim += 1;
+    }
+    if (fitter->mHeightPriorWeight > 0)
     {
       outputDim += 1;
     }
@@ -4762,6 +4809,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          markerVector,
          markerWeightsVector,
          jointsForSkeletonBallJoints,
+         skeletonBallJointsHeightMeasurementPose,
          jointCenters,
          jointWeights,
          jointAxis,
@@ -4785,6 +4833,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               jointAxis,
               axisWeights);
 
+          int outputCursor = markerPoses.size() + jointCenters.size();
+
           s_t alphaScale = 0.0;
           s_t expNegLogPdf = 0.0;
           if (fitter->mAnthropometrics != nullptr)
@@ -4797,7 +4847,17 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             // this penalty will fall to zero.
             alphaScale = 0.01;
             expNegLogPdf = exp(-alphaScale * logPdf);
-            diff(markerPoses.size() + jointCenters.size()) = expNegLogPdf;
+            diff(outputCursor) = expNegLogPdf;
+            outputCursor++;
+          }
+
+          if (fitter->mHeightPriorWeight > 0)
+          {
+            s_t height = skeletonBallJoints->getHeight(
+                skeletonBallJointsHeightMeasurementPose);
+            s_t heightDiff = height - fitter->mHeightPrior;
+            diff(outputCursor) = 10 * heightDiff * heightDiff;
+            outputCursor++;
           }
 
           assert(
@@ -4863,6 +4923,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               axisWeights);
 
           // Add group scales grad
+          int outputRowCursor = (markerVector.size() * 3)
+                                + (jointsForSkeletonBallJoints.size() * 3);
           if (fitter->mAnthropometrics != nullptr)
           {
             Eigen::VectorXs expNegLogPdfGradient
@@ -4873,22 +4935,58 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             assert(groupScaleDim == expNegLogPdfGradient.size());
             assert(
                 jac.cols() == skeletonBallJoints->getNumDofs() + groupScaleDim);
+            assert(outputRowCursor < jac.rows());
             jac.block(
-                (markerVector.size() * 3)
-                    + (jointsForSkeletonBallJoints.size() * 3),
+                outputRowCursor,
                 skeletonBallJoints->getNumDofs(),
                 1,
                 groupScaleDim)
                 = expNegLogPdfGradient.transpose();
+            outputRowCursor++;
+          }
+          if (fitter->mHeightPriorWeight > 0.0)
+          {
+            s_t height = skeletonBallJoints->getHeight(
+                skeletonBallJointsHeightMeasurementPose);
+            s_t heightDiff = height - fitter->mHeightPrior;
+            int groupScaleDim = skeletonBallJoints->getGroupScaleDim();
+            (void)groupScaleDim;
+            assert(outputRowCursor < jac.rows());
+            assert(
+                jac.cols() == skeletonBallJoints->getNumDofs() + groupScaleDim);
+            Eigen::VectorXs gradientOfHeightWrtGroupScales
+                = 2 * heightDiff * 10
+                  * skeletonBallJoints->getGradientOfHeightWrtGroupScales(
+                      skeletonBallJointsHeightMeasurementPose);
+            jac.block(
+                outputRowCursor,
+                skeletonBallJoints->getNumDofs(),
+                1,
+                skeletonBallJoints->getGroupScaleDim())
+                = gradientOfHeightWrtGroupScales.transpose();
+            outputRowCursor++;
           }
           assert(jac.rows() == outputDim);
         },
         // Generate a random restart position
-        [&skeletonBallJoints, &skeleton, &observedJoints](
+        [&skeletonBallJoints, &skeleton, &observedJoints, markerPoses](
             Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skeletonBallJoints->getNumDofs())
-              = skeleton->convertPositionsToBallSpace(
-                  skeleton->getRandomPoseForJoints(observedJoints));
+              = skeleton
+                    ->convertPositionsToBallSpace(
+                        skeleton->getRandomPoseForJoints(observedJoints))
+                    .segment(0, skeletonBallJoints->getNumDofs());
+
+          // Set the root translation to within a fairly narrow range of the
+          // average marker cloud
+          Eigen::Vector3s avgMarkerPos = Eigen::Vector3s::Zero();
+          for (int i = 0; i < markerPoses.size() / 3; i++)
+          {
+            avgMarkerPos += markerPoses.segment<3>(i * 3);
+          }
+          avgMarkerPos /= (s_t)(markerPoses.size() / 3);
+          val.segment<3>(3) = avgMarkerPos + (Eigen::Vector3s::Random() * 0.2);
+
           val.segment(
                  skeletonBallJoints->getNumDofs(),
                  skeletonBallJoints->getGroupScaleDim())
@@ -5742,6 +5840,7 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   SphereFitJointCenterProblem* problem = problemPtr.get();
 
   s_t lr = 1.0;
+  s_t decay = 0.99;
   Eigen::VectorXs x = problem->flatten();
   Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 1.0;
 #ifndef NDEBUG
@@ -5758,7 +5857,12 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   for (int i = 0; i < mJointSphereFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    Eigen::VectorXs newAccum = accum + grad.cwiseProduct(grad);
+    // The use of `decay` here is AdaDelta, to solve the normal problem in
+    // Adagrad of the unbounded accumulation of a Hessian approximation, which
+    // ends up eventually driving your gradients to 0 and terminating
+    // optimization, even if you're not at the optimum.
+    Eigen::VectorXs newAccum
+        = decay * accum + (1.0 - decay) * grad.cwiseProduct(grad);
     Eigen::VectorXs newX = x - grad.cwiseQuotient(newAccum) * lr;
 #ifndef NDEBUG
     if (newX.hasNaN())
@@ -5887,6 +5991,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
   s_t lr = 1.0;
   Eigen::VectorXs x = problem->flatten();
 
+  s_t decay = 0.99;
   Eigen::VectorXs accum = Eigen::VectorXs::Ones(x.size()) * 0.001;
 
   s_t loss = problem->getLoss();
@@ -5894,7 +5999,7 @@ std::shared_ptr<CylinderFitJointAxisProblem> MarkerFitter::findJointAxis(
   for (int i = 0; i < mJointAxisFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
-    accum += grad.cwiseProduct(grad);
+    accum = decay * accum + (1.0 - decay) * grad.cwiseProduct(grad);
     x = problem->flatten();
     Eigen::VectorXs newX = x - grad.cwiseQuotient(accum) * lr;
     problem->unflatten(newX);
@@ -6479,6 +6584,19 @@ void MarkerFitter::setAnthropometricPrior(
 {
   mAnthropometrics = prior;
   mAnthropometricWeight = weight;
+}
+
+//==============================================================================
+/// This sets the height (in meters) that the model should be scaled to, and
+/// the weight we should use when enforcing that scaling. This is in some
+/// sense redundant to the anthropometric prior, but it's useful to have a
+/// separate term for this, because it allows us to weight the height
+/// constraint more heavily, because it's closer to a "hard constraint" than
+/// the other anthropometric priors.
+void MarkerFitter::setExplicitHeightPrior(s_t height, s_t weight)
+{
+  mHeightPrior = height;
+  mHeightPriorWeight = weight;
 }
 
 //==============================================================================

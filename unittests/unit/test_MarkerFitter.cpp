@@ -1502,6 +1502,8 @@ std::vector<MarkerInitialization> runEngine(
   anthropometrics->setDistribution(gauss);
   fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
+  fitter.setExplicitHeightPrior(heightM, 1e3);
+
   (void)staticPoseMarkers;
   (void)staticPose;
   if (staticPoseMarkers.size() > 0)
@@ -1667,6 +1669,11 @@ std::vector<MarkerInitialization> runEngine(
       "./_id_setup.xml",
       0,
       2);
+
+  Eigen::VectorXs pose = Eigen::VectorXs::Zero(standard.skeleton->getNumDofs());
+  s_t gotHeight = standard.skeleton->getHeight(pose);
+  std::cout << "Target height: " << heightM << "m" << std::endl;
+  std::cout << "Final height: " << gotHeight << "m" << std::endl;
 
   if (saveGUI)
   {
@@ -5715,6 +5722,42 @@ TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
       59,
       1.72,
       "female");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, SAM_DATA)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run500/grf.mot");
+
+  runEngine(
+      "dart://sample/grf/Hamner_subject17/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      68.45,
+      1.68,
+      "male",
+      true);
 }
 #endif
 
