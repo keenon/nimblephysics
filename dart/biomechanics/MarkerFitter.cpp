@@ -727,7 +727,6 @@ MarkerFitter::MarkerFitter(
     {
       Eigen::VectorXs pose
           = Eigen::VectorXs::Zero(this->mSkeleton->getNumDofs());
-      pose(4) = 0.94;
       s_t height = this->mSkeleton->getHeight(pose);
       Eigen::VectorXs heightGrad
           = this->mSkeleton->getGradientOfHeightWrtBodyScales(pose);
@@ -735,7 +734,7 @@ MarkerFitter::MarkerFitter(
       s_t diff = height - mHeightPrior;
       heightRegularization = mHeightPriorWeight * diff * diff;
 
-      // 3.3. Translate gradients from vector back to matrix form for the state
+      // 4.1. Translate gradients from vector back to matrix form for the state
       // object
       Eigen::VectorXs bodyScalesGradVector
           = 2 * mHeightPriorWeight * diff * heightGrad;
@@ -4601,7 +4600,6 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
     // Get the neutral pose of the skeleton where we'll measure the height
     Eigen::VectorXs skeletonHeightMeasurementPose
         = Eigen::VectorXs::Zero(skeleton->getNumDofs());
-    skeletonHeightMeasurementPose(5) = 0.94;
     Eigen::VectorXs skeletonBallJointsHeightMeasurementPose
         = skeleton->convertPositionsToBallSpace(skeletonHeightMeasurementPose);
 
@@ -5859,6 +5857,10 @@ std::shared_ptr<SphereFitJointCenterProblem> MarkerFitter::findJointCenter(
   for (int i = 0; i < mJointSphereFitSGDIterations; i++)
   {
     Eigen::VectorXs grad = problem->getGradient();
+    // The use of `decay` here is AdaDelta, to solve the normal problem in
+    // Adagrad of the unbounded accumulation of a Hessian approximation, which
+    // ends up eventually driving your gradients to 0 and terminating
+    // optimization, even if you're not at the optimum.
     Eigen::VectorXs newAccum
         = decay * accum + (1.0 - decay) * grad.cwiseProduct(grad);
     Eigen::VectorXs newX = x - grad.cwiseQuotient(newAccum) * lr;
