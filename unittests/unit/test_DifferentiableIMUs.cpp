@@ -35,7 +35,9 @@ using namespace biomechanics;
 #define ALL_TESTS
 
 bool verifyIMUJacobians(
-    std::shared_ptr<dynamics::Skeleton> skel, neural::WithRespectTo* wrt)
+    std::shared_ptr<dynamics::Skeleton> skel,
+    neural::WithRespectTo* wrt,
+    bool isComplexSkeleton = false)
 {
   srand(42);
 
@@ -90,6 +92,17 @@ bool verifyIMUJacobians(
       }
       return false;
     }
+    if (isComplexSkeleton
+        && (wrt == neural::WithRespectTo::VELOCITY
+            || wrt == neural::WithRespectTo::GROUP_SCALES
+            || wrt == neural::WithRespectTo::POSITION))
+    {
+      if (velJ.isZero())
+      {
+        std::cout << "Vel wrt " << wrt->name() << " is zero!" << std::endl;
+        return false;
+      }
+    }
 
     Eigen::MatrixXs localAccJ = skel->getBodyLocalAccelerationsJacobian(wrt);
     Eigen::MatrixXs localAccJ_fd
@@ -102,6 +115,40 @@ bool verifyIMUJacobians(
       std::cout << "Diff: " << std::endl
                 << localAccJ - localAccJ_fd << std::endl;
       return false;
+    }
+    if (isComplexSkeleton
+        && (wrt == neural::WithRespectTo::VELOCITY
+            || wrt == neural::WithRespectTo::GROUP_SCALES
+            || wrt == neural::WithRespectTo::POSITION))
+    {
+      if (localAccJ.isZero())
+      {
+        std::cout << "Local acc wrt " << wrt->name() << " is zero!"
+                  << std::endl;
+        return false;
+      }
+    }
+
+    Eigen::MatrixXs localGravJ = skel->getBodyLocalGravityVectorsJacobian(wrt);
+    Eigen::MatrixXs localGravJ_fd
+        = skel->finiteDifferenceBodyLocalGravityVectorsJacobian(wrt);
+    if (!equals(localGravJ, localGravJ_fd, 1e-8))
+    {
+      std::cout << "Grav wrt " << wrt->name() << " error!" << std::endl;
+      std::cout << "Analytical: " << std::endl << localGravJ << std::endl;
+      std::cout << "FD: " << std::endl << localGravJ_fd << std::endl;
+      std::cout << "Diff: " << std::endl
+                << localGravJ - localGravJ_fd << std::endl;
+      return false;
+    }
+    if (isComplexSkeleton && (wrt == neural::WithRespectTo::POSITION))
+    {
+      if (localGravJ.isZero())
+      {
+        std::cout << "Local grav wrt " << wrt->name() << " is zero!"
+                  << std::endl;
+        return false;
+      }
     }
 
     Eigen::MatrixXs gyroJ = skel->getGyroReadingsJacobianWrt(sensors, wrt);
@@ -173,29 +220,35 @@ bool verifyIMUJacobians(
   return true;
 }
 
-bool verifySpatialJacobians(std::shared_ptr<dynamics::Skeleton> skel)
+bool verifySpatialJacobians(
+    std::shared_ptr<dynamics::Skeleton> skel, bool isComplexSkeleton = false)
 {
-  if (!verifyIMUJacobians(skel, neural::WithRespectTo::VELOCITY))
+  if (!verifyIMUJacobians(
+          skel, neural::WithRespectTo::VELOCITY, isComplexSkeleton))
   {
     return false;
   }
   std::cout << "Passed VELOCITY" << std::endl;
-  if (!verifyIMUJacobians(skel, neural::WithRespectTo::GROUP_SCALES))
+  if (!verifyIMUJacobians(
+          skel, neural::WithRespectTo::GROUP_SCALES, isComplexSkeleton))
   {
     return false;
   }
   std::cout << "Passed GROUP_SCALES" << std::endl;
-  if (!verifyIMUJacobians(skel, neural::WithRespectTo::POSITION))
+  if (!verifyIMUJacobians(
+          skel, neural::WithRespectTo::POSITION, isComplexSkeleton))
   {
     return false;
   }
   std::cout << "Passed POSITION" << std::endl;
-  if (!verifyIMUJacobians(skel, neural::WithRespectTo::ACCELERATION))
+  if (!verifyIMUJacobians(
+          skel, neural::WithRespectTo::ACCELERATION, isComplexSkeleton))
   {
     return false;
   }
   std::cout << "Passed ACCELERATION" << std::endl;
-  if (!verifyIMUJacobians(skel, neural::WithRespectTo::GROUP_COMS))
+  if (!verifyIMUJacobians(
+          skel, neural::WithRespectTo::GROUP_COMS, isComplexSkeleton))
   {
     return false;
   }
@@ -266,7 +319,7 @@ TEST(BODY_SPATIAL_TRANSLATION, THREE_LINK)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(BODY_SPATIAL_TRANSLATION, EULER_FREE_JOINT)
 {
   std::shared_ptr<dynamics::Skeleton> skel = dynamics::Skeleton::create();
@@ -292,7 +345,7 @@ TEST(BODY_SPATIAL_TRANSLATION, EULER_FREE_JOINT)
 
   EXPECT_TRUE(verifySpatialJacobians(skel));
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(BODY_SPATIAL_TRANSLATION, RAJAGOPAL)
@@ -302,6 +355,6 @@ TEST(BODY_SPATIAL_TRANSLATION, RAJAGOPAL)
   std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
   skel->autogroupSymmetricSuffixes();
 
-  EXPECT_TRUE(verifySpatialJacobians(skel));
+  EXPECT_TRUE(verifySpatialJacobians(skel, true));
 }
 #endif

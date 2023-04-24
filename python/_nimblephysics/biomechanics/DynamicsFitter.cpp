@@ -17,6 +17,31 @@ namespace python {
 
 void DynamicsFitter(py::module& m)
 {
+  py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
+      .value(
+          "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
+      .value(
+          "measuredGrfZeroWhenAccelerationNonZero",
+          dart::biomechanics::MissingGRFReason::
+              measuredGrfZeroWhenAccelerationNonZero)
+      .value(
+          "unmeasuredExternalForceDetected",
+          dart::biomechanics::MissingGRFReason::unmeasuredExternalForceDetected)
+      .value(
+          "torqueDiscrepancy",
+          dart::biomechanics::MissingGRFReason::torqueDiscrepancy)
+      .value(
+          "forceDiscrepancy",
+          dart::biomechanics::MissingGRFReason::forceDiscrepancy)
+      .value(
+          "notOverForcePlate",
+          dart::biomechanics::MissingGRFReason::notOverForcePlate)
+      .value(
+          "missingImpact", dart::biomechanics::MissingGRFReason::missingImpact)
+      .value("missingBlip", dart::biomechanics::MissingGRFReason::missingBlip)
+      .value("shiftGRF", dart::biomechanics::MissingGRFReason::shiftGRF)
+      .export_values();
+
   ::py::class_<dart::biomechanics::ResidualForceHelper>(
       m, "ResidualForceHelper")
       .def(
@@ -340,8 +365,7 @@ protected:
           ::py::arg("bodyWeights"))
       .def(
           "setRegularizeJointAcc",
-          &dart::biomechanics::DynamicsFitProblemConfig::
-              setRegularizeJointAcc,
+          &dart::biomechanics::DynamicsFitProblemConfig::setRegularizeJointAcc,
           ::py::arg("value"))
       .def(
           "setResidualTorqueMultiple",

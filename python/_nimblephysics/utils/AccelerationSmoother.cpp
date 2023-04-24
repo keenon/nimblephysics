@@ -54,6 +54,10 @@ void AccelerationSmoother(py::module& m)
           &dart::utils::AccelerationSmoother::smooth,
           ::py::arg("series"))
       .def(
+          "setIterations",
+          &dart::utils::AccelerationSmoother::setIterations,
+          ::py::arg("iterations"))
+      .def(
           "debugTimeSeries",
           &dart::utils::AccelerationSmoother::debugTimeSeries,
           ::py::arg("series"));

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpTNLP.hpp>
 
@@ -20,6 +21,7 @@
 #include "dart/dynamics/Shape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 
 namespace dart {
@@ -121,6 +123,9 @@ struct MarkerInitialization
       updatedMarkerMap;
   Eigen::Vector6s staticPoseRoot;
 
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      updatedImuMap;
+
   std::vector<dynamics::Joint*> joints;
   std::vector<std::vector<std::string>> jointsAdjacentMarkers;
   Eigen::VectorXs jointMarkerVariability;
@@ -136,6 +141,250 @@ struct MarkerInitialization
   std::vector<dynamics::Joint*> unobservedJoints;
 
   MarkerInitialization();
+};
+
+class IMUFineTuneProblem : public Ipopt::TNLP
+{
+public:
+  IMUFineTuneProblem(
+      MarkerFitter* fitter,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      s_t dt,
+      MarkerInitialization& initialization,
+      int start,
+      int end);
+
+  /// Get the size of the x vector for the problem
+  int getProblemSize();
+
+  /// Set the optimization weight associated with matching the virtual gyros to
+  /// signals
+  void setWeightGyros(s_t weight);
+
+  /// Set the optimization weight associated with matching the virtual
+  /// accelerometers to signals
+  void setWeightAccs(s_t weight);
+
+  /// Set the optimization weight associated with matching the virtual
+  /// markers to observed markers
+  void setWeightMarkers(s_t weight);
+
+  /// Set the optimization weight associated with matching the poses to their
+  /// original poses
+  void setRegularizePoses(s_t weight);
+
+  /// When enabled, we use multiple threads to compute the loss and gradient in
+  /// parallel over timesteps. Enabled by default.
+  void setUseMultithreading(bool useMultithreading);
+
+  /// Returns the current x vector
+  Eigen::VectorXs flatten();
+
+  /// Sets the state of the IMU problem to the given x vector
+  void unflatten(Eigen::VectorXs x);
+
+  /// This computes the loss for the passed in x vector
+  s_t getLoss();
+
+  /// Returns the pose data over time for the current problem state
+  Eigen::MatrixXs& getPoses();
+
+  /// Returns the vel data over time for the current problem state
+  Eigen::MatrixXs& getVels();
+
+  /// Returns the acceleration data over time for the current problem state
+  Eigen::MatrixXs& getAccs();
+
+  /// This computes the gradient for the passed in x vector
+  Eigen::VectorXs getGrad();
+
+  /// This is the brute force version of the getGrad() computation
+  Eigen::VectorXs finiteDifferenceGrad();
+
+  /// This computes the gradient with respect to one of the state types.
+  Eigen::VectorXs getGradientWrtFlattenedState(neural::WithRespectTo* wrt);
+
+  /// This computes the gradient with respect to either position, velocity, or
+  /// acceleration. It returns a gradient that is a single vector, of all of the
+  /// positions/velocities/accelerations concatenated together.
+  Eigen::VectorXs finiteDifferenceGradientWrtFlattenedState(
+      neural::WithRespectTo* wrt);
+
+  /// This returns the jacobian relating changes in the flattened state vector
+  /// to changes in X.
+  Eigen::SparseMatrix<s_t>& getJacobianFromXToFlattenedState(
+      neural::WithRespectTo* wrt);
+
+  /// This returns the jacobian relating changes in the flattened state vector
+  /// to changes in X.
+  Eigen::MatrixXs finiteDifferenceJacobianFromXToFlattenedState(
+      neural::WithRespectTo* wrt);
+
+  //------------------------- Ipopt::TNLP --------------------------------------
+  /// \brief Method to return some info about the nlp
+  bool get_nlp_info(
+      Ipopt::Index& n,
+      Ipopt::Index& m,
+      Ipopt::Index& nnz_jac_g,
+      Ipopt::Index& nnz_h_lag,
+      Ipopt::TNLP::IndexStyleEnum& index_style) override;
+
+  /// \brief Method to return the bounds for my problem
+  bool get_bounds_info(
+      Ipopt::Index n,
+      Ipopt::Number* x_l,
+      Ipopt::Number* x_u,
+      Ipopt::Index m,
+      Ipopt::Number* g_l,
+      Ipopt::Number* g_u) override;
+
+  /// \brief Method to return the starting point for the algorithm
+  bool get_starting_point(
+      Ipopt::Index n,
+      bool init_x,
+      Ipopt::Number* x,
+      bool init_z,
+      Ipopt::Number* z_L,
+      Ipopt::Number* z_U,
+      Ipopt::Index m,
+      bool init_lambda,
+      Ipopt::Number* lambda) override;
+
+  /// \brief Method to return the objective value
+  bool eval_f(
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      bool _new_x,
+      Ipopt::Number& _obj_value) override;
+
+  /// \brief Method to return the gradient of the objective
+  bool eval_grad_f(
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      bool _new_x,
+      Ipopt::Number* _grad_f) override;
+
+  /// \brief Method to return the constraint residuals
+  bool eval_g(
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      bool _new_x,
+      Ipopt::Index _m,
+      Ipopt::Number* _g) override;
+
+  /// \brief Method to return:
+  ///        1) The structure of the jacobian (if "values" is nullptr)
+  ///        2) The values of the jacobian (if "values" is not nullptr)
+  bool eval_jac_g(
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      bool _new_x,
+      Ipopt::Index _m,
+      Ipopt::Index _nele_jac,
+      Ipopt::Index* _iRow,
+      Ipopt::Index* _jCol,
+      Ipopt::Number* _values) override;
+
+  /// \brief Method to return:
+  ///        1) The structure of the hessian of the lagrangian (if "values" is
+  ///           nullptr)
+  ///        2) The values of the hessian of the lagrangian (if "values" is not
+  ///           nullptr)
+  bool eval_h(
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      bool _new_x,
+      Ipopt::Number _obj_factor,
+      Ipopt::Index _m,
+      const Ipopt::Number* _lambda,
+      bool _new_lambda,
+      Ipopt::Index _nele_hess,
+      Ipopt::Index* _iRow,
+      Ipopt::Index* _jCol,
+      Ipopt::Number* _values) override;
+
+  /// \brief This method is called when the algorithm is complete so the TNLP
+  ///        can store/write the solution
+  void finalize_solution(
+      Ipopt::SolverReturn _status,
+      Ipopt::Index _n,
+      const Ipopt::Number* _x,
+      const Ipopt::Number* _z_L,
+      const Ipopt::Number* _z_U,
+      Ipopt::Index _m,
+      const Ipopt::Number* _g,
+      const Ipopt::Number* _lambda,
+      Ipopt::Number _obj_value,
+      const Ipopt::IpoptData* _ip_data,
+      Ipopt::IpoptCalculatedQuantities* _ip_cq) override;
+
+  bool intermediate_callback(
+      Ipopt::AlgorithmMode mode,
+      Ipopt::Index iter,
+      Ipopt::Number obj_value,
+      Ipopt::Number inf_pr,
+      Ipopt::Number inf_du,
+      Ipopt::Number mu,
+      Ipopt::Number d_norm,
+      Ipopt::Number regularization_size,
+      Ipopt::Number alpha_du,
+      Ipopt::Number alpha_pr,
+      Ipopt::Index ls_trials,
+      const Ipopt::IpoptData* ip_data,
+      Ipopt::IpoptCalculatedQuantities* ip_cq) override;
+
+protected:
+  MarkerFitter* mFitter;
+  MarkerInitialization& mInitialization;
+  s_t mTimeStep;
+  int mStart;
+  int mEnd;
+  int mLength;
+  Eigen::MatrixXs mOriginalPoses;
+  Eigen::MatrixXs mAccelerometerObservations;
+  Eigen::MatrixXs mGyroObservations;
+  std::vector<std::string> mAccelerometerNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      mAccelerometers;
+  std::vector<std::string> mGyroNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mGyros;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+
+  std::map<std::string, Eigen::SparseMatrix<s_t>>
+      mCachedJacobianFromXToFlattenedState;
+
+  // For recovering the best state from IPOPT
+  int mBestObjectiveValueIteration;
+  s_t mBestObjectiveValue;
+  Eigen::VectorXs mBestObjectiveValueState;
+
+  // For multithreading
+  bool mUseMultiThreading;
+  int mNumThreads;
+  std::vector<std::shared_ptr<dynamics::Skeleton>> mThreadSkeletons;
+  std::vector<std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>
+      mThreadMarkers;
+  std::vector<std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>>
+      mThreadAccelerometers;
+  std::vector<std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>>
+      mThreadGyros;
+  std::vector<std::pair<int, int>> mThreadRanges;
+
+  s_t mWeightAccs;
+  s_t mWeightGyros;
+  s_t mWeightMarkers;
+  s_t mRegularizePoses;
+
+  // Problem state - currently this only includes kinematics over time (and not
+  // IMU angles or locations on the body, though that would be lovely to add)
+  Eigen::MatrixXs mPoses;
+  Eigen::MatrixXs mVels;
+  Eigen::MatrixXs mAccs;
 };
 
 /**
@@ -341,6 +590,9 @@ public:
       dynamics::MarkerMap markers,
       bool ignoreVirtualJointCenterMarkers = false);
 
+  /// Returns the skeleton pointer we're fitting against
+  std::shared_ptr<dynamics::Skeleton> getSkeleton();
+
   /// This just checks if there are enough markers in the data with the names
   /// expected by the model. Returns true if there are enough, and false
   /// otherwise.
@@ -425,6 +677,10 @@ public:
       MarkerInitialization init,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerTrajectories,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
       int framesPerSecond,
       std::vector<ForcePlate> forcePlates = std::vector<ForcePlate>(),
       const OpenSimFile* goldSkeleton = nullptr,
@@ -676,13 +932,75 @@ public:
       MarkerInitialization& initialization);
 
   ///////////////////////////////////////////////////////////////////////////
-  // Pipeline step 6: Run through and do a linear initialization of masses based
-  // on link masses.
+  // Pipeline step 6: Integrate IMU information, if we have it, to fine tune
+  // the joint accelerations.
   ///////////////////////////////////////////////////////////////////////////
 
-  /// This sets up a bunch of linear constraints based on the motion of each
-  /// body, and attempts to solve all the equations with least-squares.
-  void initializeMasses(MarkerInitialization& initialization);
+  /// This sets the map of IMUs to their locations on body segments
+  void setImuMap(dynamics::SensorMap imuMap);
+
+  /// This calculates the best-fit rotation for the IMUs that were passed in, to
+  /// fit the target data.
+  void rotateIMUs(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This calculates the RMS of accelerometer data, to see how well the motion
+  /// matches the accelerometers.
+  s_t measureAccelerometerRMS(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This calculates the RMS of gyro data, to see how well the motion matches
+  /// the gyroscopes.
+  s_t measureGyroRMS(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt);
+
+  /// This returns an object that can be used to run an optimization to fine
+  /// tune the joint angles to match IMU data.
+  std::shared_ptr<biomechanics::IMUFineTuneProblem> getIMUFineTuneProblem(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      MarkerInitialization& initialization,
+      s_t dt,
+      int start,
+      int end);
+
+  /// This adjusts the joint accelerations to match the IMU data, and offsets
+  /// the IMU locations + rotations.
+  MarkerInitialization fineTuneWithIMU(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          accObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          gyroObservations,
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations,
+      const std::vector<bool>& newClip,
+      MarkerInitialization& initialization,
+      s_t dt,
+      s_t weightAccs = 1.0,
+      s_t weightGyros = 1.0,
+      s_t weightMarkers = 1.0,
+      s_t regularizePoses = 1.0,
+      bool useIPOPT = true,
+      int iterations = 100,
+      int lbfgsMemory = 100);
 
   ///////////////////////////////////////////////////////////////////////////
   // Supporting methods
@@ -1000,6 +1318,7 @@ public:
   friend class BilevelFitProblem;
   friend class SphereFitJointCenterProblem;
   friend class CylinderFitJointAxisProblem;
+  friend class IMUFineTuneProblem;
   friend struct MarkerFitterState;
 
 protected:
@@ -1011,6 +1330,10 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   dynamics::MarkerMap mMarkerMap;
+
+  dynamics::SensorMap mImuMap;
+  std::vector<std::string> mImuNames;
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> mImus;
 
   std::shared_ptr<dynamics::Skeleton> mSkeletonBallJoints;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
