@@ -14,6 +14,7 @@ namespace biomechanics {
 struct ForcePlate
 {
   Eigen::Vector3s worldOrigin;
+  std::vector<s_t> timestamps;
   std::vector<Eigen::Vector3s> corners;
   std::vector<Eigen::Vector3s> centersOfPressure;
   std::vector<Eigen::Vector3s> moments;

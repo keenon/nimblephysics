@@ -53,6 +53,7 @@ void ForcePlate(py::module& m)
   ::py::class_<dart::biomechanics::ForcePlate>(m, "ForcePlate")
       .def_readwrite(
           "worldOrigin", &dart::biomechanics::ForcePlate::worldOrigin)
+      .def_readwrite("timestamps", &dart::biomechanics::ForcePlate::timestamps)
       .def_readwrite("corners", &dart::biomechanics::ForcePlate::corners)
       .def_readwrite(
           "centersOfPressure",
