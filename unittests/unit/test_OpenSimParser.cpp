@@ -885,3 +885,48 @@ TEST(OpenSimParser, COMPLEX_KNEE)
   */
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_IMU_RAJAGOPAL2015)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/IMUs/Rajagopal2015_opensense_calibrated.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+
+  EXPECT_TRUE(file.imuMap.size() > 0);
+  for (auto pair : file.imuMap)
+  {
+    EXPECT_TRUE(skel->getBodyNode(pair.second.first) != nullptr);
+  }
+
+  EXPECT_EQ("torso", file.imuMap["torso_imu"].first);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_IMU_CARMAGO)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/grf/CarmagoTest/Models/final_with_imu.osim");
+  std::shared_ptr<dynamics::Skeleton> skel = file.skeleton;
+  EXPECT_TRUE(skel->getNumDofs() > 0);
+
+  EXPECT_TRUE(file.imuMap.size() > 0);
+  for (auto pair : file.imuMap)
+  {
+    EXPECT_TRUE(skel->getBodyNode(pair.second.first) != nullptr);
+  }
+
+  EXPECT_EQ("torso", file.imuMap["trunk"].first);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_IMU_DATA)
+{
+  OpenSimIMUData data = OpenSimParser::loadIMUFromCSV(
+      "dart://sample/grf/CarmagoTest/IMU/treadmill_01_01.csv");
+  EXPECT_TRUE(data.timestamps.size() > 0);
+}
+#endif

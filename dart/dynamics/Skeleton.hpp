@@ -773,6 +773,10 @@ public:
   Eigen::VectorXs finiteDifferenceGradientOfHeightWrtBodyScales(
       Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
 
+  /// This computes the gradient of the height
+  Eigen::VectorXs getGradientOfHeightWrtGroupScales(
+      Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
   /// This returns a marker set with at least one marker in it, that each
   /// represents the lowest point on the body, measure by the `up` vector, in
   /// the specified position. If there are no ties, this will be of length 1. If
@@ -1674,6 +1678,10 @@ public:
   std::map<std::string, Eigen::Vector3s> getAccMapReadings(
       const SensorMap& accs);
 
+  /// This returns the world positions and orientations of the sensors
+  std::map<std::string, Eigen::Isometry3s> getSensorWorldPositions(
+      const SensorMap& sensors);
+
   /// This converts markers from a source skeleton to the current, doing a
   /// simple mapping based on body node names. Any markers that don't find a
   /// body node in the current skeleton with the same name are dropped.
@@ -1777,6 +1785,10 @@ public:
   /// local body space, concatenated
   Eigen::VectorXs getBodyLocalAccelerations();
 
+  /// This returns the linear accelerations due to gravity (3 vecs) of the
+  /// bodies in each in local body space, concatenated
+  Eigen::VectorXs getBodyLocalGravityVectors();
+
   /// This computes the jacobian of the local velocities for each body with
   /// respect to `wrt`
   Eigen::MatrixXs getBodyLocalVelocitiesJacobian(neural::WithRespectTo* wrt);
@@ -1791,6 +1803,15 @@ public:
 
   /// This brute forces our local accelerations jacobian
   Eigen::MatrixXs finiteDifferenceBodyLocalAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the local gravity vectors for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalGravityVectorsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This brute forces our local gravity vectors jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalGravityVectorsJacobian(
       neural::WithRespectTo* wrt);
 
   /// This returns the spatial velocities (6 vecs) of the bodies in world space,

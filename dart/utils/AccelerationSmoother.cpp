@@ -29,7 +29,8 @@ AccelerationSmoother::AccelerationSmoother(
     mSmoothingWeight(smoothingWeight),
     mRegularizationWeight(regularizationWeight),
     mUseSparse(useSparse),
-    mUseIterativeSolver(useIterativeSolver)
+    mUseIterativeSolver(useIterativeSolver),
+    mIterations(10000)
 {
   Eigen::Vector4s stamp;
   stamp << -1, 3, -3, 1;
@@ -101,8 +102,10 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
 
   for (int row = 0; row < series.rows(); row++)
   {
-    // If all the values in this row are identical, it's probably a locked joint, and we can't smooth it.
-    if (series.row(row).maxCoeff() == series.row(row).minCoeff()) {
+    // If all the values in this row are identical, it's probably a locked
+    // joint, and we can't smooth it.
+    if (series.row(row).maxCoeff() == series.row(row).minCoeff())
+    {
       smoothed.row(row) = series.row(row);
       continue;
     }
@@ -116,7 +119,7 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
         Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<s_t>> solver;
         solver.compute(mB_sparse);
         solver.setTolerance(1e-12);
-        solver.setMaxIterations(10000);
+        solver.setMaxIterations(mIterations);
         smoothed.row(row) = solver.solveWithGuess(c, series.row(row))
                             * (1.0 / mRegularizationWeight);
       }
@@ -125,7 +128,7 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
         Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> cg;
         cg.compute(mB);
         cg.setTolerance(1e-12);
-        cg.setMaxIterations(10000);
+        cg.setMaxIterations(mIterations);
         smoothed.row(row) = cg.solveWithGuess(c, series.row(row))
                             * (1.0 / mRegularizationWeight);
       }
@@ -148,6 +151,18 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
 
   return smoothed;
 };
+
+/**
+ * If we're using an iterative solver, this sets the number of iterations that
+ * the iterative solver will use to find the least squares minimum-jerk
+ * solution. For particularly stiff problems (where the ratio between
+ * smoothingWeight and regularizationWeight is greater than 1e6 or so) we'll
+ * want to increase this number to something like 100,000.
+ */
+void AccelerationSmoother::setIterations(int iterations)
+{
+  mIterations = iterations;
+}
 
 /**
  * This computes the squared loss for this smoother, given a time series and a
