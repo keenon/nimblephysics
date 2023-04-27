@@ -518,6 +518,15 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setImuMap,
           ::py::arg("imuMap"))
       .def(
+          "getImuMap",
+          &dart::biomechanics::MarkerFitter::getImuMap)
+      .def(
+          "getImuList",
+          &dart::biomechanics::MarkerFitter::getImuList)
+      .def(
+          "getImuNames",
+          &dart::biomechanics::MarkerFitter::getImuNames)
+      .def(
           "rotateIMUs",
           &dart::biomechanics::MarkerFitter::rotateIMUs,
           ::py::arg("accObservations"),

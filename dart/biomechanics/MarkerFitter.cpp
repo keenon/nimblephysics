@@ -3615,6 +3615,26 @@ void MarkerFitter::setImuMap(dynamics::SensorMap imuMap)
 }
 
 //==============================================================================
+dynamics::SensorMap MarkerFitter::getImuMap()
+{
+  return mImuMap;
+}
+
+//==============================================================================
+/// This returns (a copy of) the list of IMUs to their locations on body segments
+std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> MarkerFitter::getImuList()
+{
+  return mImus;
+}
+
+//==============================================================================
+/// This returns (a copy of) the list of IMU names, corresponding to the getImuList() IMUs
+std::vector<std::string> MarkerFitter::getImuNames()
+{
+  return mImuNames;
+}
+
+//==============================================================================
 /// This calculates the best-fit rotation for the IMUs that were passed in, to
 /// fit the target data.
 void MarkerFitter::rotateIMUs(
