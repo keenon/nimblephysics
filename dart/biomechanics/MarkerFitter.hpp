@@ -939,6 +939,15 @@ public:
   /// This sets the map of IMUs to their locations on body segments
   void setImuMap(dynamics::SensorMap imuMap);
 
+  /// This returns (a copy of) the map of IMUs to their locations on body segments
+  dynamics::SensorMap getImuMap();
+
+  /// This returns (a copy of) the list of IMUs to their locations on body segments
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> getImuList();
+
+  /// This returns (a copy of) the list of IMU names, corresponding to the getImuList() IMUs
+  std::vector<std::string> getImuNames();
+
   /// This calculates the best-fit rotation for the IMUs that were passed in, to
   /// fit the target data.
   void rotateIMUs(
