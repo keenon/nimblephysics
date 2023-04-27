@@ -10001,7 +10001,8 @@ void DynamicsFitter::addJointBoundSlack(
 //==============================================================================
 // 0. Smooth the accelerations.
 void DynamicsFitter::smoothAccelerations(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init,
+    s_t smoothingWeight, s_t regularizationWeight)
 {
   const Eigen::VectorXs posUpperBound = mSkeleton->getPositionUpperLimits();
   const Eigen::VectorXs posLowerBound = mSkeleton->getPositionLowerLimits();
@@ -10028,9 +10029,9 @@ void DynamicsFitter::smoothAccelerations(
         }
       }
     }
-
-    // 0.05
-    AccelerationSmoother smoother(init->poseTrials[trial].cols(), 1, 0.02);
+    AccelerationSmoother smoother(init->poseTrials[trial].cols(),
+                                  smoothingWeight, regularizationWeight,
+                                  false, false);
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 

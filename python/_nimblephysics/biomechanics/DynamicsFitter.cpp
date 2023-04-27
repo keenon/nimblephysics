@@ -563,7 +563,9 @@ protected:
       .def(
           "smoothAccelerations",
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("smoothingWeight") = 1e1,
+          ::py::arg("regularizationWeight") = 1e-3)
       .def(
           "optimizeMarkerOffsets",
           &dart::biomechanics::DynamicsFitter::optimizeMarkerOffsets,
