@@ -1254,6 +1254,10 @@ public:
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
           markerObservationTrials,
+      /// This argument takes a list over trials, where each trial is a list of
+      /// integers, one-per-force-plate, where each integer is the index of the
+      /// GRF node to assign that force plate to, or -1 to just rely on the
+      /// automated assignment algorithm
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
       = std::vector<std::vector<int>>());
 
@@ -1267,6 +1271,10 @@ public:
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
           markerObservationTrials,
+      /// This argument takes a list over trials, where each trial is a list of
+      /// integers, one-per-force-plate, where each integer is the index of the
+      /// GRF node to assign that force plate to, or -1 to just rely on the
+      /// automated assignment algorithm
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
       = std::vector<std::vector<int>>());
 

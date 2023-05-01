@@ -13246,7 +13246,7 @@ void DynamicsFitter::recomputeGRFs(
         int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
         if (closestFoot != -1)
         {
-          // If closestFoot is already in the list, add it to the list
+          // If closestFoot is not already in the list, add it to the list
           if (std::find(
                   assignedToFeet.begin(), assignedToFeet.end(), closestFoot)
               == assignedToFeet.end())
@@ -13320,20 +13320,23 @@ void DynamicsFitter::recomputeGRFs(
       // This is a map of [trial][forcePlate][timestep]
       int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
 
-      Eigen::Vector3s force = forcePlates[i].forces[t];
-      Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
-      Eigen::Vector3s moments = forcePlates[i].moments[t];
+      if (closestFoot != -1)
+      {
+        Eigen::Vector3s force = forcePlates[i].forces[t];
+        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+        Eigen::Vector3s moments = forcePlates[i].moments[t];
 
-      Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
-      wrench.head<3>() = moments;
-      wrench.tail<3>() = force;
-      Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
-      wrenchT.translation() = cop;
-      Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
+        Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
+        wrench.head<3>() = moments;
+        wrench.tail<3>() = force;
+        Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
+        wrenchT.translation() = cop;
+        Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
 
-      // If multiple force plates assign to the same foot, sum up the
-      // forces
-      init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
+        // If multiple force plates assign to the same foot, sum up the
+        // forces
+        init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
+      }
     }
   }
 }
@@ -15977,8 +15980,11 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
       count++;
     }
   }
-  force /= count;
-  torque /= count;
+  if (count > 0)
+  {
+    force /= count;
+    torque /= count;
+  }
 
   mSkeleton->setPositions(originalPoses);
   mSkeleton->setGroupScales(originalScales);
