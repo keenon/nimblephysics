@@ -485,7 +485,9 @@ protected:
               std::vector<Eigen::MatrixXs> poseTrials,
               std::vector<int> framesPerSecond,
               std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-                  markerObservationTrials)
+                  markerObservationTrials,
+              std::vector<std::vector<int>>
+                  overrideForcePlateToGRFNodeAssignment)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
@@ -495,7 +497,8 @@ protected:
                 forcePlateTrials,
                 poseTrials,
                 framesPerSecond,
-                markerObservationTrials);
+                markerObservationTrials,
+                overrideForcePlateToGRFNodeAssignment);
           },
           ::py::arg("skel"),
           ::py::arg("markerMap"),
@@ -504,7 +507,9 @@ protected:
           ::py::arg("forcePlateTrials"),
           ::py::arg("poseTrials"),
           ::py::arg("framesPerSecond"),
-          ::py::arg("markerObservationTrials"))
+          ::py::arg("markerObservationTrials"),
+          ::py::arg("overrideForcePlateToGRFNodeAssignment")
+          = std::vector<std::vector<int>>())
       .def_static(
           "createInitialization",
           +[](std::shared_ptr<dynamics::Skeleton> skel,
@@ -516,7 +521,9 @@ protected:
                   forcePlateTrials,
               std::vector<int> framesPerSecond,
               std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-                  markerObservationTrials)
+                  markerObservationTrials,
+              std::vector<std::vector<int>>
+                  overrideForcePlateToGRFNodeAssignment)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
@@ -525,7 +532,8 @@ protected:
                 grfNodes,
                 forcePlateTrials,
                 framesPerSecond,
-                markerObservationTrials);
+                markerObservationTrials,
+                overrideForcePlateToGRFNodeAssignment);
           },
           ::py::arg("skel"),
           ::py::arg("kinematicInits"),
@@ -533,7 +541,9 @@ protected:
           ::py::arg("grfNodes"),
           ::py::arg("forcePlateTrials"),
           ::py::arg("framesPerSecond"),
-          ::py::arg("markerObservationTrials"))
+          ::py::arg("markerObservationTrials"),
+          ::py::arg("overrideForcePlateToGRFNodeAssignment")
+          = std::vector<std::vector<int>>())
       .def(
           "comPositions",
           &dart::biomechanics::DynamicsFitter::comPositions,
