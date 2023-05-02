@@ -19,6 +19,7 @@
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
+#include <sys/param.h>
 
 #include "dart/biomechanics/C3DForcePlatforms.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
@@ -8767,11 +8768,14 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::vector<Eigen::MatrixXs> poseTrials,
     std::vector<int> framesPerSecond,
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-        markerObservationTrials)
+        markerObservationTrials,
+    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment)
 {
   std::shared_ptr<DynamicsInitialization> init
       = std::make_shared<DynamicsInitialization>();
   init->forcePlateTrials = forcePlateTrials;
+  init->overrideForcePlateToGRFNodeAssignment
+      = overrideForcePlateToGRFNodeAssignment;
 
   bool anyAntiparallel = false;
   for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
@@ -9064,7 +9068,8 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::vector<std::vector<ForcePlate>> forcePlateTrials,
     std::vector<int> framesPerSecond,
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-        markerObservationTrials)
+        markerObservationTrials,
+    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment)
 {
   if (markerObservationTrials.size() != kinematicInit.size())
   {
@@ -9100,7 +9105,8 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       forcePlateTrials,
       poseTrials,
       framesPerSecond,
-      markerObservationTrials);
+      markerObservationTrials,
+      overrideForcePlateToGRFNodeAssignment);
 
   // Copy over the initial body scaling
   init->groupScales = kinematicInit[0].groupScales;
@@ -10002,7 +10008,8 @@ void DynamicsFitter::addJointBoundSlack(
 // 0. Smooth the accelerations.
 void DynamicsFitter::smoothAccelerations(
     std::shared_ptr<DynamicsInitialization> init,
-    s_t smoothingWeight, s_t regularizationWeight)
+    s_t smoothingWeight,
+    s_t regularizationWeight)
 {
   const Eigen::VectorXs posUpperBound = mSkeleton->getPositionUpperLimits();
   const Eigen::VectorXs posLowerBound = mSkeleton->getPositionLowerLimits();
@@ -10029,9 +10036,12 @@ void DynamicsFitter::smoothAccelerations(
         }
       }
     }
-    AccelerationSmoother smoother(init->poseTrials[trial].cols(),
-                                  smoothingWeight, regularizationWeight,
-                                  false, false);
+    AccelerationSmoother smoother(
+        init->poseTrials[trial].cols(),
+        smoothingWeight,
+        regularizationWeight,
+        false,
+        false);
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
@@ -13117,7 +13127,7 @@ void DynamicsFitter::recomputeGRFs(
 
   init->grfTrials[trial].setZero();
 
-  // Precompute the foot locations over time
+  // 1. Precompute the foot locations over time
   std::vector<std::vector<Eigen::Vector3s>> footLocations;
   for (int t = 0; t < poses.cols(); t++)
   {
@@ -13134,95 +13144,187 @@ void DynamicsFitter::recomputeGRFs(
     footLocations.push_back(footLocationsThisTimestep);
   }
 
+  // 2. Assign force plates to feet
   for (int i = 0; i < forcePlates.size(); i++)
   {
-    int lastStartedTrack = -1;
-    Eigen::VectorXs sumSquaredDistances
-        = Eigen::VectorXs::Zero(init->grfBodyNodes.size());
-
-    for (int t = 0; t < poses.cols(); t++)
+    // 2.0. If there is a manual override on force plate assignment, respect
+    // that above all else
+    if (init->overrideForcePlateToGRFNodeAssignment.size() > trial
+        && init->overrideForcePlateToGRFNodeAssignment[trial].size() > i
+        && init->overrideForcePlateToGRFNodeAssignment[trial][i] != -1)
     {
-      Eigen::Vector3s force = forcePlates[i].forces[t];
-      Eigen::Vector3s moments = forcePlates[i].moments[t];
-      Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
-
-      // Timesteps where the force plate has a 0 force (we use 3 newtons
-      // as our threshold), don't need to be assigned to anything
-      if (force.norm() < 3.0 || force.hasNaN() || cop.hasNaN()
-          || moments.hasNaN())
+      for (int t = 0; t < poses.cols(); t++)
       {
-        if (lastStartedTrack > -1)
+        init->forcePlatesAssignedToContactBody[trial][i][t]
+            = init->overrideForcePlateToGRFNodeAssignment[trial][i];
+      }
+    }
+    else
+    {
+      // 2.1. Go through all the timesteps, and assign the force plate to a foot
+      // throughout time.
+      for (int t = 0; t < poses.cols(); t++)
+      {
+        init->forcePlatesAssignedToContactBody[trial][i][t] = -1;
+      }
+      int lastStartedTrack = -1;
+      Eigen::VectorXs sumSquaredDistances
+          = Eigen::VectorXs::Zero(init->grfBodyNodes.size());
+      for (int t = 0; t < poses.cols(); t++)
+      {
+        Eigen::Vector3s force = forcePlates[i].forces[t];
+        Eigen::Vector3s moments = forcePlates[i].moments[t];
+        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+
+        // Timesteps where the force plate has a 0 force (we use 3 newtons
+        // as our threshold), don't need to be assigned to anything at this
+        // stage
+        if (force.norm() < 3.0 || force.hasNaN() || cop.hasNaN()
+            || moments.hasNaN())
         {
-          Eigen::Index closestFoot;
-          sumSquaredDistances.minCoeff(&closestFoot);
-
-          // std::cout << "Force Plate " << i << " time range ["
-          //           << lastStartedTrack << "," << (t - 1)
-          //           << "] Closest foot: " << closestFoot << " with
-          //           distances
-          //           "
-          //           << sumSquaredDistances.transpose() << std::endl;
-
-          // Now assign everything in that track to the foot that was closest
-          // over the whole track
-          for (int assignT = lastStartedTrack; assignT < t; assignT++)
+          if (lastStartedTrack > -1)
           {
-            // This is a map of [trial][forcePlate][timestep]
-            init->forcePlatesAssignedToContactBody[trial][i][assignT]
-                = closestFoot;
+            Eigen::Index closestFoot;
+            sumSquaredDistances.minCoeff(&closestFoot);
 
-            Eigen::Vector3s force = forcePlates[i].forces[assignT];
-            Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
-            Eigen::Vector3s moments = forcePlates[i].moments[assignT];
+            // std::cout << "Force Plate " << i << " time range ["
+            //           << lastStartedTrack << "," << (t - 1)
+            //           << "] Closest foot: " << closestFoot << " with
+            //           distances
+            //           "
+            //           << sumSquaredDistances.transpose() << std::endl;
 
-            Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
-            wrench.head<3>() = moments;
-            wrench.tail<3>() = force;
-            Eigen::Isometry3s wrenchT = Eigen::Isometry3s::Identity();
-            wrenchT.translation() = cop;
-            Eigen::Vector6s worldWrench = math::dAdInvT(wrenchT, wrench);
-
-            // If multiple force plates assign to the same foot, sum up the
-            // forces
-            init->grfTrials[trial].block<6, 1>(closestFoot * 6, assignT)
-                += worldWrench;
+            // Now assign everything in that track to the foot that was closest
+            // over the whole track
+            for (int assignT = lastStartedTrack; assignT < t; assignT++)
+            {
+              // This is a map of [trial][forcePlate][timestep]
+              init->forcePlatesAssignedToContactBody[trial][i][assignT]
+                  = closestFoot;
+            }
           }
+          lastStartedTrack = -1;
+          sumSquaredDistances.setZero();
+          continue;
         }
-        lastStartedTrack = -1;
-        sumSquaredDistances.setZero();
-        continue;
+
+        if (lastStartedTrack == -1)
+          lastStartedTrack = t;
+        for (int b = 0; b < init->grfBodyNodes.size(); b++)
+        {
+          sumSquaredDistances(b) += (footLocations[t][b] - cop).squaredNorm();
+        }
       }
 
-      if (lastStartedTrack == -1)
-        lastStartedTrack = t;
-      for (int b = 0; b < init->grfBodyNodes.size(); b++)
+      // Do one last pass, in case we ended the trajectory with active contact
+      if (lastStartedTrack > -1)
       {
-        sumSquaredDistances(b) += (footLocations[t][b] - cop).squaredNorm();
+        Eigen::Index closestFoot;
+        sumSquaredDistances.minCoeff(&closestFoot);
+
+        // std::cout << "Force Plate " << i << " time range [" <<
+        // lastStartedTrack
+        //           << "," << (poses.cols() - 1)
+        //           << "] Closest foot: " << closestFoot << " with distances "
+        //           << sumSquaredDistances.transpose() << std::endl;
+
+        // Now assign everything in that track to the foot that was closest
+        // over the whole track
+        for (int assignT = lastStartedTrack; assignT < poses.cols(); assignT++)
+        {
+          // This is a map of [trial][forcePlate][timestep]
+          init->forcePlatesAssignedToContactBody[trial][i][assignT]
+              = closestFoot;
+        }
+      }
+
+      // 2.2. Check if this force plate is only ever assigned to a single foot
+      // (which is great) and if so, then assign all timesteps to that foot.
+      std::vector<int> assignedToFeet;
+      for (int t = 0; t < poses.cols(); t++)
+      {
+        int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
+        if (closestFoot != -1)
+        {
+          // If closestFoot is not already in the list, add it to the list
+          if (std::find(
+                  assignedToFeet.begin(), assignedToFeet.end(), closestFoot)
+              == assignedToFeet.end())
+          {
+            assignedToFeet.push_back(closestFoot);
+          }
+        }
+      }
+
+      if (assignedToFeet.size() == 0)
+      {
+        // This force plate is never assigned to a foot, so we can't do anything
+        std::cout << "NOTE: Assigning force plate " << i
+                  << " to no feet during trial " << trial
+                  << ", because there was never sufficient measured force on "
+                     "the plate"
+                  << std::endl;
+      }
+      else if (assignedToFeet.size() == 1)
+      {
+        std::cout << "Assigning force plate " << i << " to foot "
+                  << assignedToFeet[0] << " on trial " << trial << std::endl;
+        // This force plate is only ever assigned to a single foot, so we can
+        // assign all timesteps to that foot
+        for (int t = 0; t < poses.cols(); t++)
+        {
+          // This is a map of [trial][forcePlate][timestep]
+          init->forcePlatesAssignedToContactBody[trial][i][t]
+              = assignedToFeet[0];
+        }
+      }
+      else
+      {
+        std::cout << "NOTE: Assigning force plate " << i
+                  << " to multiple feet during trial " << trial << std::endl;
+        // This force plate is assigned to multiple feet over time. This can
+        // often happen with foot-crossing. We won't issue a warning, but we can
+        // go through and try to fill in the gaps between feet assignments that
+        // are the same.
+        int lastContactIndex = -1;
+        for (int t = 0; t < poses.cols(); t++)
+        {
+          int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
+          if (closestFoot != -1)
+          {
+            // If we find a gap (filled with -1's) where the contact foot on
+            // both ends is the same, then we can fill it in
+            if (lastContactIndex != -1
+                && init->forcePlatesAssignedToContactBody[trial][i]
+                                                         [lastContactIndex]
+                       == closestFoot)
+            {
+              for (int fillT = lastContactIndex + 1; fillT < t; fillT++)
+              {
+                assert(
+                    init->forcePlatesAssignedToContactBody[trial][i][fillT]
+                    == -1);
+                init->forcePlatesAssignedToContactBody[trial][i][fillT]
+                    = closestFoot;
+              }
+            }
+            lastContactIndex = t;
+          }
+        }
       }
     }
 
-    // Do one last pass, in case we ended the trajectory with active contact
-    if (lastStartedTrack > -1)
+    // 2.3. Compute the actual wrenches for the foot assignment(s) we've made
+    for (int t = 0; t < poses.cols(); t++)
     {
-      Eigen::Index closestFoot;
-      sumSquaredDistances.minCoeff(&closestFoot);
+      // This is a map of [trial][forcePlate][timestep]
+      int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
 
-      // std::cout << "Force Plate " << i << " time range [" <<
-      // lastStartedTrack
-      //           << "," << (poses.cols() - 1)
-      //           << "] Closest foot: " << closestFoot << " with distances "
-      //           << sumSquaredDistances.transpose() << std::endl;
-
-      // Now assign everything in that track to the foot that was closest
-      // over the whole track
-      for (int assignT = lastStartedTrack; assignT < poses.cols(); assignT++)
+      if (closestFoot != -1)
       {
-        // This is a map of [trial][forcePlate][timestep]
-        init->forcePlatesAssignedToContactBody[trial][i][assignT] = closestFoot;
-
-        Eigen::Vector3s force = forcePlates[i].forces[assignT];
-        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[assignT];
-        Eigen::Vector3s moments = forcePlates[i].moments[assignT];
+        Eigen::Vector3s force = forcePlates[i].forces[t];
+        Eigen::Vector3s cop = forcePlates[i].centersOfPressure[t];
+        Eigen::Vector3s moments = forcePlates[i].moments[t];
 
         Eigen::Vector6s wrench = Eigen::Vector6s::Zero();
         wrench.head<3>() = moments;
@@ -13233,8 +13335,7 @@ void DynamicsFitter::recomputeGRFs(
 
         // If multiple force plates assign to the same foot, sum up the
         // forces
-        init->grfTrials[trial].block<6, 1>(closestFoot * 6, assignT)
-            += worldWrench;
+        init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
       }
     }
   }
@@ -15879,8 +15980,11 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageResidualForce(
       count++;
     }
   }
-  force /= count;
-  torque /= count;
+  if (count > 0)
+  {
+    force /= count;
+    torque /= count;
+  }
 
   mSkeleton->setPositions(originalPoses);
   mSkeleton->setGroupScales(originalScales);
