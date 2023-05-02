@@ -1256,8 +1256,13 @@ public:
           markerObservationTrials,
       /// This argument takes a list over trials, where each trial is a list of
       /// integers, one-per-force-plate, where each integer is the index of the
-      /// GRF node to assign that force plate to, or -1 to just rely on the
-      /// automated assignment algorithm
+      /// corresponding entry in `grfNodes` to assign that force plate to, or -1
+      /// to just rely on the automated assignment algorithm. For example, if
+      /// `grfNodes` is [left_foot, right_foot], and we have only one trial with
+      /// two force plates, and wish to assign the first force plate to the
+      /// right_foot, and second to the left_foot, we would pass in [[1, 0]].
+      /// For two trials, where the second trial we wish to use automatic
+      /// assignment, we could pass [[1,0], [-1,-1]].
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
       = std::vector<std::vector<int>>());
 
@@ -1273,8 +1278,13 @@ public:
           markerObservationTrials,
       /// This argument takes a list over trials, where each trial is a list of
       /// integers, one-per-force-plate, where each integer is the index of the
-      /// GRF node to assign that force plate to, or -1 to just rely on the
-      /// automated assignment algorithm
+      /// corresponding entry in `grfNodes` to assign that force plate to, or -1
+      /// to just rely on the automated assignment algorithm. For example, if
+      /// `grfNodes` is [left_foot, right_foot], and we have only one trial with
+      /// two force plates, and wish to assign the first force plate to the
+      /// right_foot, and second to the left_foot, we would pass in [[1, 0]].
+      /// For two trials, where the second trial we wish to use automatic
+      /// assignment, we could pass [[1,0], [-1,-1]].
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
       = std::vector<std::vector<int>>());
 
