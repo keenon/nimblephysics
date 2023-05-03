@@ -1708,6 +1708,11 @@ std::vector<MarkerInitialization> runEngine(
   std::map<std::string, s_t> observedValues;
   std::cout << "Anthro before conditioning:" << std::endl;
   gauss->debugToStdout();
+  // Annoyingly, the ANSUR dataset doesn't store the mass data as kg, it stores
+  // it as tenths of kgs, and it stores all distances in millimeters. For
+  // convenience, when we load the data from the CSV, we scale everything down
+  // by 0.001 (to do mm -> m conversion). To get the mass column back to kg, we
+  // need to multiply by 0.01.
   observedValues["weightkg"] = massKg * 0.01;
   observedValues["stature"] = heightM;
   gauss = gauss->condition(observedValues);
