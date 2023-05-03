@@ -583,7 +583,7 @@ MarkerFitter::MarkerFitter(
     mDebugJointVariability(false),
     mRegularizeTrackingMarkerOffsets(0.05),
     mRegularizeAnatomicalMarkerOffsets(10.0),
-    mRegularizeIndividualBodyScales(0.2),
+    mRegularizeIndividualBodyScales(10.0),
     mRegularizeAllBodyScales(0.2),
     mRegularizeJointBounds(0),
     mTolerance(1e-8),
@@ -5399,7 +5399,14 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
       outputDim += 1;
       outputNames.push_back("Sigmoid of log(anthropometric prior)");
     }
-    if (fitter->mHeightPriorWeight > 0)
+    bool useHeightPrior = fitter->mHeightPriorWeight > 0;
+    if (fitter->mSkeleton->getHeight(
+            Eigen::VectorXs::Zero(fitter->mSkeleton->getNumDofs()))
+        == 0.0)
+    {
+      useHeightPrior = false;
+    }
+    if (useHeightPrior)
     {
       outputDim += 1;
       outputNames.push_back("Height prior");
@@ -5576,7 +5583,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          axisWeights,
          outputDim,
          virtualSpringDofs,
-         virtualSpringWeights](
+         virtualSpringWeights,
+         useHeightPrior](
             /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
             /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
           /// Compute the output diff (error)
@@ -5633,7 +5641,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             outputCursor++;
           }
 
-          if (fitter->mHeightPriorWeight > 0)
+          if (useHeightPrior)
           {
             s_t height = skeletonBallJoints->getHeight(
                 skeletonBallJointsHeightMeasurementPose);
@@ -5719,7 +5727,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
                 = expNegLogPdfGradient.transpose();
             outputRowCursor++;
           }
-          if (fitter->mHeightPriorWeight > 0.0)
+          if (useHeightPrior)
           {
             s_t height = skeletonBallJoints->getHeight(
                 skeletonBallJointsHeightMeasurementPose);

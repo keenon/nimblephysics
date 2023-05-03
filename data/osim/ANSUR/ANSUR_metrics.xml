@@ -18,7 +18,7 @@
     <Name>iliocristaleheight</Name>
     <MarkerA>
       <MeshNode>r_pelvis</MeshNode>
-      <Offset>-0.08 0.085 0.08</Offset>
+      <Offset>-0.08 0.06 0.08</Offset>
     </MarkerA>
     <MarkerB>
       <MeshNode>r_foot</MeshNode>
@@ -32,7 +32,7 @@
     <Name>crotchheight</Name>
     <MarkerA>
       <MeshNode>r_pelvis</MeshNode>
-      <Offset>0 -0.12 0.0</Offset>
+      <Offset>0 -0.15 0.0</Offset>
     </MarkerA>
     <MarkerB>
       <MeshNode>r_foot</MeshNode>
@@ -41,7 +41,7 @@
     <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
     <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
   </Metric>
-    <!-- (83) TROCHANTERION HEIGHT -->
+  <!-- (83) TROCHANTERION HEIGHT -->
   <Metric>
     <Name>trochanterionheight</Name>
     <MarkerA>
@@ -60,11 +60,11 @@
     <Name>bicristalbreadth</Name>
     <MarkerA>
       <MeshNode>r_pelvis</MeshNode>
-      <Offset>0.0 0.0 -0.13</Offset>
+      <Offset>0.0 0.0 -0.12</Offset>
     </MarkerA>
     <MarkerB>
       <MeshNode>l_pelvis</MeshNode>
-      <Offset>0.0 0.0 0.13</Offset>
+      <Offset>0.0 0.0 0.12</Offset>
     </MarkerB>
     <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
     <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
@@ -74,11 +74,11 @@
     <Name>waistdepth</Name>
     <MarkerA>
       <MeshNode>r_pelvis</MeshNode>
-      <Offset>0.10 0.08 0</Offset>
+      <Offset>0.09 0.08 0</Offset>
     </MarkerA>
     <MarkerB>
       <MeshNode>r_pelvis</MeshNode>
-      <Offset>-0.12 0.08 0.0</Offset>
+      <Offset>-0.11 0.08 0.0</Offset>
     </MarkerB>
     <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
     <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>

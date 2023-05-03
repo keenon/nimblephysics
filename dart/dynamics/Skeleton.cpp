@@ -2638,6 +2638,12 @@ Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
     }
   }
 
+  if (minBodyNode == nullptr || maxBodyNode == nullptr)
+  {
+    setPositions(originalPose);
+    return Eigen::VectorXs::Zero(getNumBodyNodes() * 3);
+  }
+
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.emplace_back(minBodyNode, minVertex);
   markers.emplace_back(maxBodyNode, maxVertex);
