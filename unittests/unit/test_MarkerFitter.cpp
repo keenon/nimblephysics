@@ -1657,7 +1657,7 @@ std::vector<MarkerInitialization> runEngine(
     fitter.setTriadsToTracking();
   }
   // This is 1.0x the values in the default code
-  fitter.setRegularizeAnatomicalMarkerOffsets(3.0);
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
   // This is 1.0x the default value
   fitter.setRegularizeTrackingMarkerOffsets(0.05);
   // These are 2x the values in the default code
