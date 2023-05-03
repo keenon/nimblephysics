@@ -39,7 +39,7 @@
 
 // #define ALL_TESTS
 
-// #define FUNCTIONAL_TESTS
+#define FUNCTIONAL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -1680,8 +1680,9 @@ std::vector<MarkerInitialization> runEngine(
       = Anthropometrics::loadFromFile(
           "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
   std::vector<std::string> cols = anthropometrics->getMetricNames();
-  cols.push_back("Weightlbs");
-  cols.push_back("Heightin");
+  // cols.push_back("Weightlbs");
+  // cols.push_back("Heightin");
+  cols.push_back("weightkg");
   std::shared_ptr<MultivariateGaussian> gauss;
   if (sex == "male")
   {
@@ -1705,13 +1706,22 @@ std::vector<MarkerInitialization> runEngine(
         0.001); // mm -> m
   }
   std::map<std::string, s_t> observedValues;
-  observedValues["Weightlbs"] = massKg * 2.204 * 0.001;
-  observedValues["Heightin"] = heightM * 39.37 * 0.001;
+  std::cout << "Anthro before conditioning:" << std::endl;
+  gauss->debugToStdout();
+  // Annoyingly, the ANSUR dataset doesn't store the mass data as kg, it stores
+  // it as tenths of kgs, and it stores all distances in millimeters. For
+  // convenience, when we load the data from the CSV, we scale everything down
+  // by 0.001 (to do mm -> m conversion). To get the mass column back to kg, we
+  // need to multiply by 0.01.
+  observedValues["weightkg"] = massKg * 0.01;
+  observedValues["stature"] = heightM;
   gauss = gauss->condition(observedValues);
+  std::cout << "Anthro after conditioning:" << std::endl;
+  gauss->debugToStdout();
   anthropometrics->setDistribution(gauss);
-  fitter.setAnthropometricPrior(anthropometrics, 0.1);
 
-  fitter.setExplicitHeightPrior(heightM, 1e3);
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+  fitter.setExplicitHeightPrior(heightM, 0.1);
 
   (void)staticPoseMarkers;
   (void)staticPose;
@@ -1802,13 +1812,17 @@ std::vector<MarkerInitialization> runEngine(
   std::cout << "Final kinematic fit report:" << std::endl;
   finalKinematicsReport.printReport(5);
 
-  std::cout << "Final marker locations: " << std::endl;
-  for (auto& pair : results[0].updatedMarkerMap)
-  {
-    Eigen::Vector3s offset = pair.second.second;
-    std::cout << pair.first << ": " << pair.second.first->getName() << ", "
-              << offset(0) << " " << offset(1) << " " << offset(2) << std::endl;
-  }
+  std::cout << "Final anthro: " << std::endl;
+  anthropometrics->debugValues(standard.skeleton);
+
+  // std::cout << "Final marker locations: " << std::endl;
+  // for (auto& pair : results[0].updatedMarkerMap)
+  // {
+  //   Eigen::Vector3s offset = pair.second.second;
+  //   std::cout << pair.first << ": " << pair.second.first->getName() << ", "
+  //             << offset(0) << " " << offset(1) << " " << offset(2) <<
+  //             std::endl;
+  // }
 
   std::cout << "Saving marker error report" << std::endl;
   finalKinematicsReport.saveCSVMarkerErrorReport(
@@ -6026,6 +6040,32 @@ TEST(MarkerFitter, SAM_DATA)
       imuFiles,
       68.45,
       1.68,
+      "male",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, SYNTHETIC_SUBJECT_18)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
+  trcFiles.push_back(
+      "dart://sample/grf/subject18_synthetic/trials/walk2/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/subject18_synthetic/trials/walk2/grf.mot");
+
+  runEngine(
+      "dart://sample/grf/subject18_synthetic/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      imuFiles,
+      64.09,
+      1.775,
       "male",
       true);
 }

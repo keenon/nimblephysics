@@ -274,6 +274,21 @@ void Anthropometrics::debugToGUI(
 }
 
 //==============================================================================
+/// This prints a summary of each metric, and its relationship to its mean and
+/// variance, to the console
+void Anthropometrics::debugValues(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  std::map<std::string, s_t> metrics = measure(skel);
+  std::cout << "Anthropometrics:" << std::endl;
+  for (auto& pair : metrics)
+  {
+    std::cout << "  " << pair.first << ": " << pair.second << " ~ N("
+              << mDist->getMean(pair.first) << ","
+              << mDist->getVariance(pair.first) << ")" << std::endl;
+  }
+}
+
+//==============================================================================
 void Anthropometrics::addMetric(
     std::string name,
     Eigen::VectorXs bodyPose,

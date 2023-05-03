@@ -2638,6 +2638,15 @@ Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
     }
   }
 
+  // This can happen if the skeleton has no mesh shapes, in which case it will
+  // not have a "highest mesh vertex" and "lowest mesh vertex", because there
+  // are no vertices and no meshes.
+  if (minBodyNode == nullptr || maxBodyNode == nullptr)
+  {
+    setPositions(originalPose);
+    return Eigen::VectorXs::Zero(getNumBodyNodes() * 3);
+  }
+
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   markers.emplace_back(minBodyNode, minVertex);
   markers.emplace_back(maxBodyNode, maxVertex);
