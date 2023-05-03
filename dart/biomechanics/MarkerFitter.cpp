@@ -602,8 +602,12 @@ MarkerFitter::MarkerFitter(
     mJointForceFieldThresholdDistance(0.0),
     mJointForceFieldSoftness(0.2),
     // mJointForceFieldSoftness(20.0),
-    mStaticTrialEnabled(false)
+    mStaticTrialEnabled(false),
+    mPostprocessTrackingMarkerOffsets(true),
+    mPostprocessAnatomicalMarkerOffsets(false)
 {
+  mImuMap = std::
+      map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>();
   mSkeletonBallJoints = mSkeleton->convertSkeletonToBallJoints();
 
   // Pre-filter the markers to get rid of artificial joint centers
@@ -2645,6 +2649,10 @@ void MarkerFitter::saveTrajectoryAndMarkersToGUI(
       {
         realAccMap = accObservations[timestep];
       }
+      else
+      {
+        realAccMap = std::map<std::string, Eigen::Vector3s>();
+      }
       std::map<std::string, Eigen::Vector3s> virtualGyroMap
           = mSkeleton->getGyroMapReadings(mImuMap);
       std::map<std::string, Eigen::Vector3s> realGyroMap;
@@ -3239,8 +3247,22 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   for (int i = 0; i < mMarkerNames.size(); i++)
   {
     std::string name = mMarkerNames[i];
+    if (mMarkerIsTracking[i] && !mPostprocessTrackingMarkerOffsets)
+    {
+      std::cout << "Skipping adjusting marker " << name
+                << " because we are not adjusting tracking markers after the "
+                   "main optimization"
+                << std::endl;
+    }
+    else if (!mMarkerIsTracking[i] && !mPostprocessAnatomicalMarkerOffsets)
+    {
+      std::cout << "Skipping adjusting marker " << name
+                << " because we are not adjusting anatomical markers after the "
+                   "main optimization"
+                << std::endl;
+    }
     // Avoid divide-by-zero edge case
-    if (markerNumObservations[name] > 0)
+    else if (markerNumObservations[name] > 0)
     {
       result.markerOffsets[name]
           = markerObservationsSum[name] / markerNumObservations[name];
@@ -3621,14 +3643,17 @@ dynamics::SensorMap MarkerFitter::getImuMap()
 }
 
 //==============================================================================
-/// This returns (a copy of) the list of IMUs to their locations on body segments
-std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> MarkerFitter::getImuList()
+/// This returns (a copy of) the list of IMUs to their locations on body
+/// segments
+std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+MarkerFitter::getImuList()
 {
   return mImus;
 }
 
 //==============================================================================
-/// This returns (a copy of) the list of IMU names, corresponding to the getImuList() IMUs
+/// This returns (a copy of) the list of IMU names, corresponding to the
+/// getImuList() IMUs
 std::vector<std::string> MarkerFitter::getImuNames()
 {
   return mImuNames;
@@ -4936,6 +4961,28 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
   }
   skeleton->setPositions(firstGuessPose);
 
+  // Restrict the scale bounds more when we have less information. Don't allow
+  // scaling that's too far beyond the default height for any individual body
+  // when we have no joint center information to help constrain the problem
+  // (e.g. during our first initialization pass).
+  bool useMoreRestrictiveScaleBounds = joints.size() == 0;
+  std::vector<bool> originalUniformScaling;
+  if (useMoreRestrictiveScaleBounds)
+  {
+    for (auto& group : skeleton->getBodyScaleGroups())
+    {
+      originalUniformScaling.push_back(group.uniformScaling);
+      skeleton->setScaleGroupUniformScaling(group.nodes[0], true);
+    }
+    skeleton->setGroupScales(
+        Eigen::VectorXs::Ones(skeleton->getGroupScaleDim()));
+  }
+  s_t defaultHeight
+      = skeleton->getHeight(Eigen::VectorXs::Zero(skeleton->getNumDofs()));
+  s_t defaultScale = fitter->mHeightPrior / defaultHeight;
+  s_t defaultScaleLowerBound = defaultScale * 0.9;
+  s_t defaultScaleUpperBound = defaultScale * 1.1;
+
   // 0.1. Translate over the observedJoints array to the cloned skeleton
   std::vector<dynamics::Joint*> observedJoints;
   for (auto joint : initObservedJoints)
@@ -5243,7 +5290,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           val.segment<3>(3) = avgMarkerPos + (Eigen::Vector3s::Random() * 0.2);
         },
         math::IKConfig()
-            .setMaxStepCount(150)
+            .setMaxStepCount(350)
             .setConvergenceThreshold(1e-10)
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
@@ -5302,14 +5349,30 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
         skeletonBallJoints->getNumDofs(),
         skeletonBallJoints->getGroupScaleDim())
         = skeletonBallJoints->getGroupScales();
-    lowerBound.segment(
-        skeletonBallJoints->getNumDofs(),
-        skeletonBallJoints->getGroupScaleDim())
-        = skeletonBallJoints->getGroupScalesLowerBound();
-    upperBound.segment(
-        skeletonBallJoints->getNumDofs(),
-        skeletonBallJoints->getGroupScaleDim())
-        = skeletonBallJoints->getGroupScalesUpperBound();
+    if (useMoreRestrictiveScaleBounds)
+    {
+      lowerBound
+          .segment(
+              skeletonBallJoints->getNumDofs(),
+              skeletonBallJoints->getGroupScaleDim())
+          .setConstant(defaultScaleLowerBound);
+      upperBound
+          .segment(
+              skeletonBallJoints->getNumDofs(),
+              skeletonBallJoints->getGroupScaleDim())
+          .setConstant(defaultScaleUpperBound);
+    }
+    else
+    {
+      lowerBound.segment(
+          skeletonBallJoints->getNumDofs(),
+          skeletonBallJoints->getGroupScaleDim())
+          = skeletonBallJoints->getGroupScalesLowerBound();
+      upperBound.segment(
+          skeletonBallJoints->getNumDofs(),
+          skeletonBallJoints->getGroupScaleDim())
+          = skeletonBallJoints->getGroupScalesUpperBound();
+    }
 
     if (debug)
     {
@@ -5356,9 +5419,13 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
          &server,
          markerPoses,
          markerVector,
+         markerWeightsVector,
          jointsForSkeletonBallJoints,
          jointCenters,
          jointAxis,
+         useMoreRestrictiveScaleBounds,
+         defaultScaleLowerBound,
+         defaultScaleUpperBound,
          ignoreJointLimits](
             /* in*/ const Eigen::VectorXs pos, bool clamp) {
           skeletonBallJoints->setPositions(
@@ -5430,6 +5497,11 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
               = skeletonBallJoints->getGroupScalesUpperBound();
           Eigen::VectorXs scalesLowerBound
               = skeletonBallJoints->getGroupScalesLowerBound();
+          if (useMoreRestrictiveScaleBounds)
+          {
+            scalesLowerBound.setConstant(defaultScaleLowerBound);
+            scalesUpperBound.setConstant(defaultScaleUpperBound);
+          }
           newScales = newScales.cwiseMax(scalesLowerBound);
           newScales = newScales.cwiseMin(scalesUpperBound);
           skeleton->setGroupScales(newScales);
@@ -5444,12 +5516,14 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
             for (int i = 0; i < markerVector.size(); i++)
             {
               std::vector<Eigen::Vector3s> points;
+              s_t markerWeightPercentage
+                  = markerWeightsVector(i) / markerWeightsVector.maxCoeff();
               points.push_back(currentMarkerPoses.segment<3>(i * 3));
               points.push_back(markerPoses.segment<3>(i * 3));
               server.createLine(
                   "marker_" + std::to_string(i),
                   points,
-                  Eigen::Vector4s(1, 0, 0, 1));
+                  Eigen::Vector4s(1, 0, 0, markerWeightPercentage));
             }
             Eigen::VectorXs currentJointPoses
                 = skeletonBallJoints->getJointWorldPositions(
@@ -5670,8 +5744,11 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           assert(jac.rows() == outputDim);
         },
         // Generate a random restart position
-        [&skeletonBallJoints, &skeleton, &observedJoints, markerPoses](
-            Eigen::Ref<Eigen::VectorXs> val) {
+        [&skeletonBallJoints,
+         &skeleton,
+         &observedJoints,
+         markerPoses,
+         defaultScale](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, skeletonBallJoints->getNumDofs())
               = skeleton
                     ->convertPositionsToBallSpace(
@@ -5691,10 +5768,10 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           val.segment(
                  skeletonBallJoints->getNumDofs(),
                  skeletonBallJoints->getGroupScaleDim())
-              .setConstant(1.0);
+              .setConstant(defaultScale);
         },
         math::IKConfig()
-            .setMaxStepCount(150)
+            .setMaxStepCount(350)
             .setConvergenceThreshold(1e-10)
             // .setLossLowerBound(1e-8)
             .setLossLowerBound(fitter->mInitialIKSatisfactoryLoss)
@@ -5706,6 +5783,16 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 
   // 3. Return the result from the best fit we had
   result.pose = skeleton->getPositions();
+  // If we used a more restrictive "uniform scaling for all the bodies" reset
+  // that here, so that the dimensions of getGroupScales() below is correct.
+  if (useMoreRestrictiveScaleBounds)
+  {
+    for (int i = 0; i < skeleton->getNumScaleGroups(); i++)
+    {
+      skeleton->setScaleGroupUniformScaling(
+          skeleton->getBodyScaleGroup(i).nodes[0], originalUniformScaling[i]);
+    }
+  }
   result.scale = skeleton->getGroupScales();
   std::cout << "Best result: " << result.score << std::endl;
 
@@ -7426,6 +7513,26 @@ void MarkerFitter::setJointForceFieldThresholdDistance(s_t minDistance)
 void MarkerFitter::setJointForceFieldSoftness(s_t softness)
 {
   mJointForceFieldSoftness = softness;
+}
+
+//==============================================================================
+/// If we set this to true, then after the main optimization completes we will
+/// do a final step to "center" the error of the anatomical markers. This
+/// minimizes marker RMSE, but does NOT respect the weights about how far
+/// markers should be allowed to move.
+void MarkerFitter::setPostprocessAnatomicalMarkerOffsets(bool postprocess)
+{
+  mPostprocessAnatomicalMarkerOffsets = postprocess;
+}
+
+//==============================================================================
+/// If we set this to true, then after the main optimization completes we will
+/// do a final step to "center" the error of the tracking markers. This
+/// minimizes marker RMSE, but does NOT respect the weights about how far
+/// markers should be allowed to move.
+void MarkerFitter::setPostprocessTrackingMarkerOffsets(bool postprocess)
+{
+  mPostprocessTrackingMarkerOffsets = postprocess;
 }
 
 //==============================================================================
@@ -9533,7 +9640,8 @@ bool BilevelFitProblem::get_bounds_info(
 
   assert(
       n
-      == scaleGroupDim + markerOffsetDim + (mMarkerObservations.size() * dofs));
+      == scaleGroupDim + markerOffsetDim + (mMarkerObservations.size() * dofs)
+             + 6);
 
   upperBounds.segment(0, scaleGroupDim)
       = mFitter->mSkeleton->getGroupScalesUpperBound().cast<double>();

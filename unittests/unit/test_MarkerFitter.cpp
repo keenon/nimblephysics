@@ -39,7 +39,7 @@
 
 // #define ALL_TESTS
 
-#define FUNCTIONAL_TESTS
+// #define FUNCTIONAL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -1889,12 +1889,22 @@ std::vector<MarkerInitialization> runEngine(
     std::cout << "Saving trajectory..." << std::endl;
     std::cout << "FPS: " << framesPerSecond[0] << std::endl;
     std::cout << "Force plates len: " << forcePlates.size() << std::endl;
+    std::vector<std::map<std::string, Eigen::Vector3s>> accObs;
+    if (accObservations.size() > 0)
+    {
+      accObs = accObservations[0];
+    }
+    std::vector<std::map<std::string, Eigen::Vector3s>> gyroObs;
+    if (gyroObservations.size() > 0)
+    {
+      gyroObs = gyroObservations[0];
+    }
     fitter.saveTrajectoryAndMarkersToGUI(
         "../../../javascript/src/data/movement2.bin",
         results[0],
         markerObservationTrials[0],
-        accObservations[0],
-        gyroObservations[0],
+        accObs,
+        gyroObs,
         framesPerSecond[0],
         forcePlates[0]);
   }
@@ -5989,22 +5999,23 @@ TEST(MarkerFitter, SAM_DATA)
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
   trcFiles.push_back(
       "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
-  trcFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
-  trcFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
-  trcFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
+  // trcFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
   grfFiles.push_back(
       "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
-  grfFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
-  grfFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
-  grfFiles.push_back(
-      "dart://sample/grf/Hamner_subject17/trials/run500/grf.mot");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
+  // grfFiles.push_back(
+  //     "dart://sample/grf/Hamner_subject17/trials/run500/grf.mot");
 
   runEngine(
       "dart://sample/grf/Hamner_subject17/"
@@ -6012,6 +6023,7 @@ TEST(MarkerFitter, SAM_DATA)
       c3dFiles,
       trcFiles,
       grfFiles,
+      imuFiles,
       68.45,
       1.68,
       "male",

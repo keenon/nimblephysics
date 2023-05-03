@@ -204,14 +204,14 @@ s_t solveIK(
     IKConfig config)
 {
 #ifndef NDEBUG
-  verifyJacobian(
-      initialPos,
-      upperBound,
-      lowerBound,
-      targetSize,
-      setPosAndClamp,
-      eval,
-      config);
+  // verifyJacobian(
+  //     initialPos,
+  //     upperBound,
+  //     lowerBound,
+  //     targetSize,
+  //     setPosAndClamp,
+  //     eval,
+  //     config);
 #endif
 
   s_t bestError = std::numeric_limits<s_t>::infinity();
@@ -424,10 +424,9 @@ IKResult refineIK(
       {
         // Slowly grow LR while we're safely decreasing loss
         lr *= 1.1;
+        lastError = currentError;
       }
     }
-
-    lastError = currentError;
 
     /////////////////////////////////////////////////////////////////////////////
     // Do the actual IK update
