@@ -10,6 +10,7 @@ enum MissingGRFReason { notMissingGRF,
                         torqueDiscrepancy,
                         forceDiscrepancy,
                         notOverForcePlate,
+                        footContactButNoGRF,
                         missingImpact,
                         missingBlip,
                         shiftGRF};

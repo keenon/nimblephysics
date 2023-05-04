@@ -37,6 +37,9 @@ void DynamicsFitter(py::module& m)
           "notOverForcePlate",
           dart::biomechanics::MissingGRFReason::notOverForcePlate)
       .value(
+          "footContactButNoGRF",
+          dart::biomechanics::MissingGRFReason::footContactButNoGRF)
+      .value(
           "missingImpact", dart::biomechanics::MissingGRFReason::missingImpact)
       .value("missingBlip", dart::biomechanics::MissingGRFReason::missingBlip)
       .value("shiftGRF", dart::biomechanics::MissingGRFReason::shiftGRF)
@@ -654,7 +657,8 @@ protected:
           ::py::arg("detectUnmeasuredTorque") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15,
-          ::py::arg("reoptimizeMarkerOffsets") = true)
+          ::py::arg("reoptimizeMarkerOffsets") = true,
+          ::py::arg("trimMissingGRFs") = false)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::

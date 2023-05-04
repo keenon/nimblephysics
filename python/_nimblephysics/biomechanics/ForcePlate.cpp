@@ -59,7 +59,14 @@ void ForcePlate(py::module& m)
           "centersOfPressure",
           &dart::biomechanics::ForcePlate::centersOfPressure)
       .def_readwrite("moments", &dart::biomechanics::ForcePlate::moments)
-      .def_readwrite("forces", &dart::biomechanics::ForcePlate::forces);
+      .def_readwrite("forces", &dart::biomechanics::ForcePlate::forces)
+      .def("trim",
+          &dart::biomechanics::ForcePlate::trim,
+          ::py::arg("newStartTime"),
+          ::py::arg("newEndTime"))
+      .def_static("copyForcePlate",
+          &dart::biomechanics::ForcePlate::copyForcePlate,
+          ::py::arg("plate"));
 }
 
 } // namespace python

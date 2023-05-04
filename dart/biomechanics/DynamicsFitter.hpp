@@ -869,6 +869,117 @@ struct DynamicsInitialization
   Eigen::VectorXs regularizeGroupInertiasTo;
   Eigen::VectorXs regularizeGroupScalesTo;
   std::map<std::string, Eigen::Vector3s> regularizeMarkerOffsetsTo;
+
+  ///////////////////////////////////////////
+  // Convenience function to trim a vector to a new start and end index.
+  template<typename T>
+  static void trimVector(std::vector<T>& vec, const int startIdx,
+                         const int endIdx) {
+    vec.erase(vec.begin(), vec.begin() + startIdx);
+    vec.erase(vec.begin() + (endIdx - startIdx) + 1, vec.end());
+  }
+
+  // Trim columns of matrix `mat` to start and end index.
+  static Eigen::MatrixXs trimColumns(const Eigen::MatrixXs& mat, int startIdx,
+                                     int endIdx) {
+      int numRows = (int)mat.rows();
+      int numCols = endIdx - startIdx + 1;
+      return mat.block(0, startIdx, numRows, numCols);
+  }
+
+  // Convenience function to trim time points from the start and end of the
+  // trials corresponding to missing GRF data.
+  std::vector<std::pair<int,int>> trimMissingGRFsAtEndpoints() {
+    // Loop through all the trials.
+    int numTrials = (int)probablyMissingGRF.size();
+    std::vector<std::pair<int,int>> newIndicesTrials;
+    for (int itrial = 0; itrial < numTrials; itrial++) {
+      const auto& trialMissingGRF = probablyMissingGRF[itrial];
+      int newStartIndex = 0;
+      int newEndIndex = trialMissingGRF.size() - 1;
+      std::cout << "DEBUG Original start index: " << newStartIndex << std::endl;
+      std::cout << "DEBUG Original end index: " << newEndIndex << std::endl;
+      std::cout << "DEBUG original size: " << trialMissingGRF.size() << std::endl;
+
+      // Find the first index that's not missing GRF.
+      for (int i = 0; i < trialMissingGRF.size(); i++) {
+        if (!trialMissingGRF[i]) {
+          newStartIndex = i;
+          break;
+        }
+      }
+      // Working backwards from the end of the trial, find the first index
+      // that's not missing GRF.
+      for (int i = trialMissingGRF.size() - 1; i >= 0; i--) {
+        if (!trialMissingGRF[i]) {
+          newEndIndex = i;
+          break;
+        }
+      }
+
+      std::cout << "DEBUG newStartIndex: " << newStartIndex << std::endl;
+      std::cout << "DEBUG newEndIndex: " << newEndIndex << std::endl;
+      std::cout << "DEBUG new size: " << (newEndIndex - newStartIndex + 1) << std::endl;
+
+      // Trim all the data structures.
+      // -----------------------------
+      // Pose information.
+      std::cout << "Trimming poses..." << std::endl;
+      originalPoses[itrial] = trimColumns(originalPoses[itrial],
+                                          newStartIndex, newEndIndex);
+      std::cout << "Pose trials size pre-trim: [" << poseTrials[itrial].rows()
+                << ", " << poseTrials[itrial].cols() << "]" << std::endl;
+      poseTrials[itrial] = trimColumns(poseTrials[itrial],
+                                        newStartIndex, newEndIndex);
+      std::cout << "Pose trials size post-trim: [" << poseTrials[itrial].rows()
+                << ", " << poseTrials[itrial].cols() << "]" << std::endl;
+      regularizePosesTo[itrial] = trimColumns(regularizePosesTo[itrial],
+                                                newStartIndex, newEndIndex);
+
+      // Marker observations.
+      std::cout << "Trimming markers..." << std::endl;
+      std::cout << "Marker size pre-trim: " << markerObservationTrials[itrial].size() << std::endl;
+      trimVector(markerObservationTrials[itrial], newStartIndex, newEndIndex);
+      std::cout << "Marker size post-trim: " << markerObservationTrials[itrial].size() << std::endl;
+
+      // Reaction wheels.
+      if (reactionWheels[itrial].size() > 0) {
+        std::cout << "Trimming reaction wheels..." << std::endl;
+        reactionWheels[itrial] = trimColumns(reactionWheels[itrial],
+                                              newStartIndex, newEndIndex);
+      }
+
+      // Force plate information.
+      std::cout << "Trimming force plates..." << std::endl;
+      for (int ifp = 0; ifp < forcePlateTrials[itrial].size(); ifp++) {
+        std::cout << "Trimming force plates 1..." << std::endl;
+        forcePlateTrials[itrial][ifp].trimToIndices(newStartIndex, newEndIndex);
+//        if (!perfectForcePlateTrials[itrial][ifp].timestamps.empty()) {
+//          perfectForcePlateTrials[itrial][ifp].trimToIndices(newStartIndex,
+//                                                             newEndIndex);
+//        }
+        std::cout << "Trimming force plates 2..." << std::endl;
+        trimVector(forcePlatesAssignedToContactBody[itrial][ifp], newStartIndex,
+                   newEndIndex);
+        std::cout << "Trimming force plates 3..." << std::endl;
+//        trimVector(grfBodyContactSphereRadius[itrial][ifp], newStartIndex,
+//                   newEndIndex);
+        std::cout << "Trimming force plates 4..." << std::endl;
+        trimVector(grfBodyForceActive[itrial][ifp], newStartIndex, newEndIndex);
+        std::cout << "Trimming force plates 5..." << std::endl;
+        trimVector(grfBodySphereInContact[itrial][ifp], newStartIndex,
+                   newEndIndex);
+        std::cout << "Trimming force plates 6..." << std::endl;
+        trimVector(grfBodyOffForcePlate[itrial][ifp], newStartIndex, newEndIndex);
+        std::cout << "Trimming force plates 7..." << std::endl;
+        trimVector(probablyMissingGRF[itrial], newStartIndex, newEndIndex);
+        std::cout << "Trimming force plates 8..." << std::endl;
+        trimVector(missingGRFReason[itrial], newStartIndex, newEndIndex);
+      }
+      newIndicesTrials.push_back(std::make_pair(newStartIndex, newEndIndex));
+    }
+    return newIndicesTrials;
+  }
 };
 
 class DynamicsFitProblemConfig
@@ -1437,7 +1548,8 @@ public:
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
       s_t avgAngularChangeThreshold = 0.15,
-      bool reoptimizeMarkerOffsets = true);
+      bool reoptimizeMarkerOffsets = true,
+      bool trimMissingGRFs = true);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external

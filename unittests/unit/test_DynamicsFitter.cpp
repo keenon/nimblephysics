@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+//#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -6499,6 +6499,40 @@ TEST(DynamicsFitter, HamnerMultipleTrials)
       maxTrialsToSolveMassOver);
 }
 #endif
+
+//#ifdef ALL_TESTS
+TEST(DynamicsFitter, RAJAGOPAL_TRIM_GRFS)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  std::string prefix = "dart://sample/grf/Rajagopal2015/";
+  trcFiles.push_back(prefix + "walk.trc");
+  grfFiles.push_back(prefix + "walk_grf.mot");
+  motFiles.push_back(prefix + "walk_ik.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  int maxTrialsToSolveMassOver = 1;
+  runEngine(
+      "dart://sample/grf/Rajagopal2015/Rajagopal2015.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      false,
+      false,
+      false,
+      maxTrialsToSolveMassOver);
+}
+//#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)

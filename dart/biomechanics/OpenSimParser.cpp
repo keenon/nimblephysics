@@ -3041,7 +3041,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
           }
           else
           {
-            std::cout << "DEBUG" << std::endl;
             std::cout << "Reading new GRF column prefixSuffix: " << prefixSuffix
                       << std::endl;
             plate = prefixSuffixNumbers.size();
