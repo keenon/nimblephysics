@@ -9792,7 +9792,7 @@ void DynamicsFitter::estimateFootGroundContacts(
         bool contactIsSus = false;
         if (inContact && !footActive)
         {
-          // G. Even if we're ignoring force plate geometry, we still want
+          // 4.3.1. Even if we're ignoring force plate geometry, we still want
           // to flag this time point since we're detecting that the foot is on
           // the ground, but there's no measured external force.
           if (ignoreFootNotOverForcePlate) {

@@ -928,7 +928,7 @@ struct DynamicsInitialization
 
       // Reaction wheels.
       if (reactionWheels[itrial].size() > 0) {
-        trimVector(reactionWheels[itrial], newStartIndex, newEndIndex);
+        trimColumns(reactionWheels[itrial], newStartIndex, newEndIndex);
       }
 
       // Force plate information.
