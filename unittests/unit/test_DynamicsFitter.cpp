@@ -2717,8 +2717,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   DynamicsFitter fitter(skel, init->grfBodyNodes, init->trackingMarkers);
   fitter.addJointBoundSlack(skel, 0.1);
-  fitter.boundPush(init);
+  // fitter.boundPush(init);
   fitter.smoothAccelerations(init);
+
   // fitter.markMissingImpacts(init, 3, true);
 
   /*
@@ -2926,8 +2927,8 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // //         .setIncludeMarkerOffsets(true)
   // //         .setIncludePoses(true));
 
-  /*
-  fitter.setLBFGSHistoryLength(250);
+  fitter.setLBFGSHistoryLength(20);
+  fitter.setIterationLimit(200);
   fitter.runIPOPTOptimization(
       init,
       DynamicsFitProblemConfig(skel)
@@ -2946,14 +2947,16 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   for (int i = 0; i < init->poseTrials.size(); i++)
   {
-    fitter.runIPOPTOptimization(
-        init,
-        DynamicsFitProblemConfig(skel)
-            .setDefaults(true)
-            .setOnlyOneTrial(i)
-            .setIncludePoses(true));
+    if (init->includeTrialsInDynamicsFit[i])
+    {
+      fitter.runIPOPTOptimization(
+          init,
+          DynamicsFitProblemConfig(skel)
+              .setDefaults(true)
+              .setOnlyOneTrial(i)
+              .setIncludePoses(true));
+    }
   }
-  */
 
   // // Do a final polishing pass on the marker offsets
   // fitter.optimizeMarkerOffsets(init);
@@ -3411,6 +3414,12 @@ std::shared_ptr<DynamicsInitialization> runEngine(
   // TODO: limit COM for the centerline bodies
 
   standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  // TODO: enable this if you need a specific starting mass for your subject for a test
+  // s_t mass = standard.skeleton->getLinkMasses().sum();
+  // s_t scaleBy = 78.5 / mass;
+  // standard.skeleton->setLinkMasses(
+  //     standard.skeleton->getLinkMasses() * scaleBy);
 
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
       standard.skeleton,
@@ -6652,6 +6661,100 @@ TEST(DynamicsFitter, CARMAGO_TEST)
   runEngine(
       "dart://sample/grf/CarmagoTest/Models/"
       "optimized_scale_and_markers.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      false,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, KIRSTEN_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DLS01");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/kirsten_bug/MarkerData/" + name + ".trc");
+    motFiles.push_back("dart://sample/grf/kirsten_bug/IK/" + name + "_ik.mot");
+    grfFiles.push_back("dart://sample/grf/kirsten_bug/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/kirsten_bug/Models/"
+      "final.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      false,
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, OPENCAP_SCALE_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DJ1");
+  trialNames.push_back("DJ2");
+  trialNames.push_back("DJ3");
+  trialNames.push_back("DJAsym1");
+  trialNames.push_back("DJAsym4");
+  trialNames.push_back("DJAsym5");
+  trialNames.push_back("squats1");
+  trialNames.push_back("squatsAsym1");
+  trialNames.push_back("static1");
+  trialNames.push_back("STS1");
+  trialNames.push_back("STSweakLegs1");
+  trialNames.push_back("walking1");
+  trialNames.push_back("walking2");
+  trialNames.push_back("walking3");
+  trialNames.push_back("walkingTS1");
+  trialNames.push_back("walkingTS2");
+  trialNames.push_back("walkingTS4");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/opencap_large/MarkerData/" + name + ".trc");
+    motFiles.push_back(
+        "dart://sample/grf/opencap_large/IK/" + name + "_ik.mot");
+    grfFiles.push_back(
+        "dart://sample/grf/opencap_large/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/opencap_large/Models/"
+      "final.osim",
       footNames,
       motFiles,
       c3dFiles,
