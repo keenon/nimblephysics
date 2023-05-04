@@ -9792,7 +9792,7 @@ void DynamicsFitter::estimateFootGroundContacts(
         bool contactIsSus = false;
         if (inContact && !footActive)
         {
-          // 4.3.1. Even if we're ignoring force plate geometry, we still want
+          // G. Even if we're ignoring force plate geometry, we still want
           // to flag this time point since we're detecting that the foot is on
           // the ground, but there's no measured external force.
           if (ignoreFootNotOverForcePlate) {
@@ -12106,7 +12106,6 @@ bool DynamicsFitter::timeSyncTrialGRF(
     // Now score the trial
     s_t score = 0;
     atLeastOneShiftSucceeded = true;
-    std::cout << "Scoring trial..." << std::endl;
     if (useReactionWheels)
     {
       score = computeAverageReactionWheelRMSE(init, trial);
@@ -12141,7 +12140,6 @@ bool DynamicsFitter::timeSyncTrialGRF(
   init->grfTrials[trial] = bestShiftGRFTrial;
   init->poseTrials[trial] = bestShiftPoseTrial;
 
-  std::cout << "Updating force plates trial..." << std::endl;
   // update force plates to reflect shift
   for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
   {
@@ -12367,7 +12365,6 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     return false;
   }
 
-  std::cout << "Adjusting regularization target..." << std::endl;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     // Adjust the regularization target to match our newly solved trajectory,
@@ -12997,15 +12994,11 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
 void DynamicsFitter::recalibrateForcePlatesOffset(
     std::shared_ptr<DynamicsInitialization> init, int trial, s_t maxMovement)
 {
-  std::cout << "Recalibrating force plates offset..." << std::endl;
   Eigen::Vector3s avgMarkerOffset = Eigen::Vector3s::Zero();
   int numSamples = 0;
   Eigen::MatrixXs poses = init->poseTrials[trial];
-  std::cout << "DEBUG num marker obs: " << init->markerObservationTrials[trial].size() << std::endl;
   for (int t = 0; t < poses.cols(); t++)
   {
-    std::cout << "Recalibrating force plates offset at timestep " << t << "/"
-              << poses.cols() << std::endl;
     mSkeleton->setPositions(poses.col(t));
     auto markerMap
         = mSkeleton->getMarkerMapWorldPositions(init->updatedMarkerMap);
@@ -13026,7 +13019,6 @@ void DynamicsFitter::recalibrateForcePlatesOffset(
     }
   }
 
-  std::cout << "DEBUG numSamples: " << numSamples << std::endl;
   if (numSamples == 0)
     return;
   avgMarkerOffset /= numSamples;
@@ -13044,7 +13036,6 @@ void DynamicsFitter::recalibrateForcePlatesOffset(
 
   // Now we have to go through and shift everything related to
   // the forces over by "shift"
-  std::cout << "Shifting force plates..." << std::endl;
   for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
   {
     ForcePlate& plate = init->forcePlateTrials[trial][i];
@@ -15827,7 +15818,6 @@ s_t DynamicsFitter::computeAverageMarkerRMSE(
 s_t DynamicsFitter::computeAverageTrialMarkerRMSE(
     std::shared_ptr<DynamicsInitialization> init, int trial)
 {
-  std::cout << "Computing average trial marker RMSE..." << std::endl;
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
   Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
   mSkeleton->setGroupScales(init->groupScales);
