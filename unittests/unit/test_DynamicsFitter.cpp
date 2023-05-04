@@ -6535,6 +6535,40 @@ TEST(DynamicsFitter, RAJAGOPAL_TRIM_GRFS)
 //#endif
 
 #ifdef ALL_TESTS
+TEST(DynamicsFitter, GRFBlipTest)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  std::string prefix = "dart://sample/grf/GRFBlipTest1/";
+  trcFiles.push_back(prefix + "MarkerData/markers.trc");
+  grfFiles.push_back(prefix + "ID/markers_grf.mot");
+  motFiles.push_back(prefix + "IK/markers_ik.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  int maxTrialsToSolveMassOver = 1;
+  runEngine(
+      "dart://sample/grf/GRFBlipTest1/Models/final.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      false,
+      false,
+      false,
+      maxTrialsToSolveMassOver);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_OPENCAP)
 {
   std::string subjectName = "Subject4";

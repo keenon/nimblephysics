@@ -71,6 +71,16 @@ s_t MultivariateGaussian::getMean(std::string variable)
   return 0.0;
 }
 
+s_t MultivariateGaussian::getVariance(std::string variable)
+{
+  for (int i = 0; i < mVars.size(); i++)
+  {
+    if (mVars[i] == variable)
+      return sqrt(mCov(i, i));
+  }
+  return 0.0;
+}
+
 Eigen::VectorXs MultivariateGaussian::convertFromMap(
     const std::map<std::string, s_t>& values)
 {
@@ -199,6 +209,8 @@ std::shared_ptr<MultivariateGaussian> MultivariateGaussian::condition(
   }
   Eigen::VectorXs subMu = mu_1 + cov_12 * cov_22_Inv * (observedVector - mu_2);
   Eigen::MatrixXs subCov = cov_11 - cov_12 * cov_22_Inv * cov_21;
+  assert(!subMu.hasNaN());
+  assert(!subCov.hasNaN());
 
   return std::make_shared<MultivariateGaussian>(subNames, subMu, subCov);
 }

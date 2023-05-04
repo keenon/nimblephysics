@@ -55,6 +55,10 @@ public:
       std::shared_ptr<server::GUIWebsocketServer> server,
       std::shared_ptr<dynamics::Skeleton> skel);
 
+  /// This prints a summary of each metric, and its relationship to its mean and
+  /// variance, to the console
+  void debugValues(std::shared_ptr<dynamics::Skeleton> skel);
+
   void addMetric(
       std::string name,
       Eigen::VectorXs bodyPose,

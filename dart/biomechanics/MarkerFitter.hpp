@@ -939,6 +939,18 @@ public:
   /// This sets the map of IMUs to their locations on body segments
   void setImuMap(dynamics::SensorMap imuMap);
 
+  /// This returns (a copy of) the map of IMUs to their locations on body
+  /// segments
+  dynamics::SensorMap getImuMap();
+
+  /// This returns (a copy of) the list of IMUs to their locations on body
+  /// segments
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>> getImuList();
+
+  /// This returns (a copy of) the list of IMU names, corresponding to the
+  /// getImuList() IMUs
+  std::vector<std::string> getImuNames();
+
   /// This calculates the best-fit rotation for the IMUs that were passed in, to
   /// fit the target data.
   void rotateIMUs(
@@ -1138,6 +1150,18 @@ public:
   /// penality for going below the threshold distance. That would be hard to
   /// optimize, so don't make it too small.
   void setJointForceFieldSoftness(s_t softness);
+
+  /// If we set this to true, then after the main optimization completes we will
+  /// do a final step to "center" the error of the anatomical markers. This
+  /// minimizes marker RMSE, but does NOT respect the weights about how far
+  /// markers should be allowed to move.
+  void setPostprocessAnatomicalMarkerOffsets(bool postprocess);
+
+  /// If we set this to true, then after the main optimization completes we will
+  /// do a final step to "center" the error of the tracking markers. This
+  /// minimizes marker RMSE, but does NOT respect the weights about how far
+  /// markers should be allowed to move.
+  void setPostprocessTrackingMarkerOffsets(bool postprocess);
 
   /// Sets the loss and gradient function
   void setCustomLossAndGrad(
@@ -1388,6 +1412,11 @@ protected:
   s_t mStaticTrialWeight;
   s_t mJointForceFieldThresholdDistance;
   s_t mJointForceFieldSoftness;
+
+  // These flags control which markers get adjusted to "center" their errors
+  // after the main optimization is complete
+  bool mPostprocessAnatomicalMarkerOffsets;
+  bool mPostprocessTrackingMarkerOffsets;
 
   // These are IPOPT settings
   double mTolerance;

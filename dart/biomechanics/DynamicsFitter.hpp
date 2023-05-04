@@ -771,8 +771,6 @@ protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
 };
 
-
-
 /**
  * We create a single initialization object, and pass it around to optimization
  * problems to re-use, because it's not super cheap to construct.
@@ -782,6 +780,7 @@ struct DynamicsInitialization
   ///////////////////////////////////////////
   // Inputs from files
   std::vector<std::vector<ForcePlate>> forcePlateTrials;
+  std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment;
   std::vector<Eigen::MatrixXs> originalPoses;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
@@ -1365,7 +1364,18 @@ public:
       std::vector<Eigen::MatrixXs> poseTrials,
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-          markerObservationTrials);
+          markerObservationTrials,
+      /// This argument takes a list over trials, where each trial is a list of
+      /// integers, one-per-force-plate, where each integer is the index of the
+      /// corresponding entry in `grfNodes` to assign that force plate to, or -1
+      /// to just rely on the automated assignment algorithm. For example, if
+      /// `grfNodes` is [left_foot, right_foot], and we have only one trial with
+      /// two force plates, and wish to assign the first force plate to the
+      /// right_foot, and second to the left_foot, we would pass in [[1, 0]].
+      /// For two trials, where the second trial we wish to use automatic
+      /// assignment, we could pass [[1,0], [-1,-1]].
+      std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
+      = std::vector<std::vector<int>>());
 
   // This creates an optimization problem from a kinematics initialization
   static std::shared_ptr<DynamicsInitialization> createInitialization(
@@ -1376,7 +1386,18 @@ public:
       std::vector<std::vector<ForcePlate>> forcePlateTrials,
       std::vector<int> framesPerSecond,
       std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-          markerObservationTrials);
+          markerObservationTrials,
+      /// This argument takes a list over trials, where each trial is a list of
+      /// integers, one-per-force-plate, where each integer is the index of the
+      /// corresponding entry in `grfNodes` to assign that force plate to, or -1
+      /// to just rely on the automated assignment algorithm. For example, if
+      /// `grfNodes` is [left_foot, right_foot], and we have only one trial with
+      /// two force plates, and wish to assign the first force plate to the
+      /// right_foot, and second to the left_foot, we would pass in [[1, 0]].
+      /// For two trials, where the second trial we wish to use automatic
+      /// assignment, we could pass [[1,0], [-1,-1]].
+      std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
+      = std::vector<std::vector<int>>());
 
   // This retargets a dynamics initialization to another skeleton
   static std::shared_ptr<DynamicsInitialization> retargetInitialization(
@@ -1413,8 +1434,9 @@ public:
   // 0. Estimate when each foot is in contact with the ground, which we can use
   // to infer when we're missing GRF data on certain timesteps, so we don't let
   // it mess with our optimization.
-  void estimateFootGroundContacts(std::shared_ptr<DynamicsInitialization> init,
-                                  bool ignoreFootNotOverForcePlate = false);
+  void estimateFootGroundContacts(
+      std::shared_ptr<DynamicsInitialization> init,
+      bool ignoreFootNotOverForcePlate = false);
 
   // 0. This goes through and marks any "impact" GRF timesteps (defined as
   // `windowLen` steps after the first non-zero step after a flight phase with
@@ -1442,9 +1464,10 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel, s_t slack = 0.1);
 
   // 0. Smooth the accelerations.
-  void smoothAccelerations(std::shared_ptr<DynamicsInitialization> init,
-                           s_t smoothingWeight = 1e1,
-                           s_t regularizationWeight = 1e-3);
+  void smoothAccelerations(
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t smoothingWeight = 1e1,
+      s_t regularizationWeight = 1e-3);
 
   // 0. Estimate which timesteps probably have unmeasured external forces
   // present. By passing a number smaller than 1.0 to scaleThresholds, we can

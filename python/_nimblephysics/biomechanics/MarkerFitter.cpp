@@ -329,6 +329,28 @@ void MarkerFitter(py::module& m)
   optimize, so don't make it too small.
           )pydoc")
       .def(
+          "setPostprocessAnatomicalMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setPostprocessAnatomicalMarkerOffsets,
+          ::py::arg("postprocess"),
+          R"pydoc(
+  If we set this to true, then after the main optimization completes we will
+  do a final step to "center" the error of the anatomical markers. This
+  minimizes marker RMSE, but does NOT respect the weights about how far
+  markers should be allowed to move.
+          )pydoc")
+      .def(
+          "setPostprocessTrackingMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setPostprocessTrackingMarkerOffsets,
+          ::py::arg("postprocess"),
+          R"pydoc(
+  If we set this to true, then after the main optimization completes we will
+  do a final step to "center" the error of the tracking markers. This
+  minimizes marker RMSE, but does NOT respect the weights about how far
+  markers should be allowed to move.
+          )pydoc")
+      .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
           ::py::arg("loss"))
@@ -517,6 +539,9 @@ void MarkerFitter(py::module& m)
           "setImuMap",
           &dart::biomechanics::MarkerFitter::setImuMap,
           ::py::arg("imuMap"))
+      .def("getImuMap", &dart::biomechanics::MarkerFitter::getImuMap)
+      .def("getImuList", &dart::biomechanics::MarkerFitter::getImuList)
+      .def("getImuNames", &dart::biomechanics::MarkerFitter::getImuNames)
       .def(
           "rotateIMUs",
           &dart::biomechanics::MarkerFitter::rotateIMUs,
