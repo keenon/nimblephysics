@@ -6072,6 +6072,39 @@ TEST(MarkerFitter, SYNTHETIC_SUBJECT_18)
 #endif
 
 #ifdef ALL_TESTS
+TEST(DynamicsFitter, KIRSTEN_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("DLS01");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/kirsten_bug/MarkerData/" + name + ".trc");
+    grfFiles.push_back("dart://sample/grf/kirsten_bug/ID/" + name + "_grf.mot");
+  }
+
+  runEngine(
+      "dart://sample/grf/kirsten_bug/Models/"
+      "unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      imuFiles,
+      68.5,
+      1.65,
+      "unknown",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, BUG1)
 {
   // TODO: this still causes some kind of bug/crash

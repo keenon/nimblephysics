@@ -102,7 +102,7 @@ Inertia::Inertia(
   // Default bounds
   mCenterOfMassLowerBound << -5, -5, -5;
   mCenterOfMassUpperBound << 5, 5, 5;
-  mMassLowerBound = 0.01;
+  mMassLowerBound = 0.0001;
   mMassUpperBound = 100;
   mMomentLowerBound << 1e-7, 1e-7, 1e-7, -1e3, -1e3, -1e3;
   mMomentUpperBound << 1e3, 1e3, 1e3, 1e3, 1e3, 1e3;

@@ -4682,12 +4682,24 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
   int onlyOneTrial = config.mOnlyOneTrial;
   int maxBlocksPerTrial = config.mMaxNumBlocksPerTrial;
 
+  int includedTrials = 0;
+
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    if (maxNumTrials > -1 && trial >= maxNumTrials)
-      continue;
     if (onlyOneTrial > -1 && trial != onlyOneTrial)
       continue;
+    if (onlyOneTrial == -1)
+    {
+      if (maxNumTrials > -1 && includedTrials >= maxNumTrials)
+      {
+        continue;
+      }
+      if (!init->includeTrialsInDynamicsFit[trial])
+      {
+        continue;
+      }
+      includedTrials++;
+    }
 
     int cursor = 0;
     int blockIndex = 0;
@@ -4722,6 +4734,14 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
       blockIndex++;
     }
   }
+
+  std::cout << "Created " << blocks.size() << " blocks: [" << std::endl;
+  for (auto& block : blocks)
+  {
+    std::cout << "  trial[" << block.trial << "] steps [" << block.start
+              << " to " << block.start + block.len << "]" << std::endl;
+  }
+  std::cout << "]" << std::endl;
 
   return blocks;
 }
@@ -8780,6 +8800,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   bool anyAntiparallel = false;
   for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
   {
+    init->includeTrialsInDynamicsFit.push_back(true);
     init->reactionWheels.push_back(Eigen::MatrixXs::Zero(0, 0));
     for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
     {
@@ -8966,7 +8987,6 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   {
     init->markerOffsets[pair.first] = pair.second.second;
   }
-  init->bodyMasses = skel->getLinkMasses();
   init->groupMasses = skel->getGroupMasses();
   init->groupScales = skel->getGroupScales();
   init->bodyCom.resize(3, skel->getNumBodyNodes());
@@ -8989,6 +9009,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
         == skel->getBodyNode(i)->getMass());
     init->bodyMasses(i) = skel->getBodyNode(i)->getInertia().getMass();
   }
+  assert(skel->getLinkMasses() == init->bodyMasses);
 
   // Initially smooth the accelerations just a little bit
 
@@ -9925,6 +9946,33 @@ void DynamicsFitter::fillInMissingGRFBlips(
       }
     }
   }
+  excludeTrialsWithTooManyMissingGRFs(init);
+}
+
+//==============================================================================
+// This will mark trials that have too many frames of missing GRF data, and
+// attempt to drop them from subsequent optimization steps that tune model
+// parameters.
+void DynamicsFitter::excludeTrialsWithTooManyMissingGRFs(
+    std::shared_ptr<DynamicsInitialization> init, int threshold)
+{
+  for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
+  {
+    int count = 0;
+    for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+    {
+      if (init->probablyMissingGRF[trial][t])
+      {
+        count++;
+      }
+    }
+    if (count >= threshold && init->includeTrialsInDynamicsFit[trial])
+    {
+      std::cout << "DROPPING TRIAL " << trial << " FROM DYNAMICS FIT!"
+                << std::endl;
+      init->includeTrialsInDynamicsFit[trial] = false;
+    }
+  }
 }
 
 //==============================================================================
@@ -9954,26 +10002,10 @@ void DynamicsFitter::boundPush(
     }
   }
 
-  const Eigen::VectorXs massLowerBound = mSkeleton->getGroupMassesLowerBound();
-  const Eigen::VectorXs massUpperBound = mSkeleton->getGroupMassesUpperBound();
-  Eigen::VectorXs mass = mSkeleton->getGroupMasses();
-  for (int i = 0; i < mass.size(); i++)
-  {
-    if (mass(i) < massLowerBound(i) + boundPush)
-    {
-      mass(i) = massLowerBound(i) + boundPush;
-    }
-    if (mass(i) > massUpperBound(i) - boundPush)
-    {
-      mass(i) = massUpperBound(i) - boundPush;
-    }
-  }
-  mSkeleton->setGroupMasses(mass);
-
   const Eigen::VectorXs scaleLowerBound = mSkeleton->getGroupScalesLowerBound();
   const Eigen::VectorXs scaleUpperBound = mSkeleton->getGroupScalesUpperBound();
   Eigen::VectorXs scale = mSkeleton->getGroupScales();
-  for (int i = 0; i < mass.size(); i++)
+  for (int i = 0; i < scale.size(); i++)
   {
     if (scale(i) < scaleLowerBound(i) + boundPush)
     {
@@ -9986,7 +10018,8 @@ void DynamicsFitter::boundPush(
   }
   mSkeleton->setGroupScales(scale);
 
-  std::cout << "All jitter in joint accelerations smoothed!" << std::endl;
+  std::cout << "Positions, masses, and scales have been pushed at least "
+            << boundPush << " away from their bounds." << std::endl;
 }
 
 //==============================================================================
@@ -10036,12 +10069,13 @@ void DynamicsFitter::smoothAccelerations(
         }
       }
     }
+    int timesteps = init->poseTrials[trial].cols();
     AccelerationSmoother smoother(
         init->poseTrials[trial].cols(),
         smoothingWeight,
         regularizationWeight,
-        false,
-        false);
+        timesteps > 1000,
+        true);
 
     init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
@@ -10285,7 +10319,6 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
               = MissingGRFReason::torqueDiscrepancy;
         }
       }
-      std::cout << "Ang badness " << t << ": " << badness << std::endl;
     }
   }
   if (filteredTimesteps.size() > 0)
@@ -10306,6 +10339,7 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
               << trial << std::endl;
   }
   // fillInMissingGRFBlips(init);
+  excludeTrialsWithTooManyMissingGRFs(init);
   return filteredTimesteps.size();
 }
 
@@ -10332,7 +10366,7 @@ void DynamicsFitter::moveComsToMinimizeAngularResiduals(
 // 1. Adjust the total mass of the body, and change the initial positions and
 // velocities of the body to achieve a least-squares closest COM trajectory to
 // the current kinematic fit.
-void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
+bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::shared_ptr<DynamicsInitialization> init,
     int maxTrialsToSolveMassOver,
     bool detectExternalForce,
@@ -10352,7 +10386,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         << mSkeleton->getRootJoint()->getType()
         << ". Ignoring call, and leaving DynamicsInitialization unchanged."
         << std::endl;
-    return;
+    return false;
   }
 
 #ifndef NDEBUG
@@ -10360,9 +10394,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 #endif
 
   int numTrials = init->poseTrials.size();
-  int numTrialsToSolveMassOver = numTrials < maxTrialsToSolveMassOver
-                                     ? numTrials
-                                     : maxTrialsToSolveMassOver;
 
   std::vector<std::vector<Eigen::Vector3s>> trialGRFs;
   std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
@@ -10413,8 +10444,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     trialOriginalAccOffsets.push_back(accOffset);
   }
 
-  // for (s_t threshold = 1.0; threshold > 1e-6; threshold *= 0.5)
-  for (s_t threshold = 1.0; threshold > 0.4; threshold *= 0.5)
+  for (s_t threshold = 1.0; threshold > 1e-4; threshold *= 0.5)
   {
     const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeForcePlateRotations = 10.0;
@@ -10426,9 +10456,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     std::vector<Eigen::MatrixXs> trialLinearMaps;
     std::vector<Eigen::VectorXs> trialOriginalPositions;
     std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
-
-    int totalSampledColsWithoutMass = 0;
-    int totalSampledRows = 0;
 
     std::cout << "Zeroing linear residuals in the COM trajectory" << std::endl;
 
@@ -10483,11 +10510,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       Eigen::MatrixXs trialLinearMapToPositions = Eigen::MatrixXs::Zero(
           numTimesteps * 3 + (numForcePlates * 3) + (numMissingSteps * 3) + 1,
           6 + (numForcePlates * 3) + (numMissingSteps * 3) + 2);
-      if (i < maxTrialsToSolveMassOver)
-      {
-        totalSampledColsWithoutMass += trialLinearMapToPositions.cols() - 1;
-        totalSampledRows += trialLinearMapToPositions.rows();
-      }
 
       // This is a vector with the original positions of our COM over time,
       // which we will use to find good values for the position, velocity, and
@@ -10677,8 +10699,34 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       trialOriginalGravityOffsets.push_back(comGravityOffset);
     }
 
+    int totalSampledColsWithoutMass = 0;
+    int totalSampledRows = 0;
+    std::vector<int> sampledTrials;
+    for (int trial = 0; trial < numTrials; trial++)
+    {
+      if (init->includeTrialsInDynamicsFit[trial])
+      {
+        totalSampledColsWithoutMass += trialLinearMaps[trial].cols() - 1;
+        totalSampledRows += trialLinearMaps[trial].rows();
+        sampledTrials.push_back(trial);
+        if (sampledTrials.size() >= maxTrialsToSolveMassOver)
+        {
+          break;
+        }
+      }
+    }
+    if (sampledTrials.size() == 0)
+    {
+      std::cout << "We have excluded all our trials from the dynamics fit to "
+                   "find subject mass, "
+                   "quitting early!"
+                << std::endl;
+      return false;
+    }
+
     std::cout << "Assembling the unified linear COM trajectory map across "
-              << numTrials << " trials" << std::endl;
+              << sampledTrials.size() << " included trials (of " << numTrials
+              << " total)" << std::endl;
 
     // Build one big unified matrix, so we can hold mass fixed across all the
     // trials. This keeps all the starting (position,velocity) pairs for each
@@ -10694,8 +10742,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     int rowCursor = 0;
     int colCursor = 0;
     int massCol = unifiedLinearMap.cols() - 1;
-    for (int trial = 0; trial < numTrials && trial < maxTrialsToSolveMassOver;
-         trial++)
+    for (int trial : sampledTrials)
     {
       int trialTimestepRows = trialOriginalPositions[trial].size();
       int trialRows = trialLinearMaps[trial].rows();
@@ -10727,7 +10774,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(200 * numTrialsToSolveMassOver);
+    solver.setMaxIterations(200 * sampledTrials.size());
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -10735,8 +10782,6 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         = (unifiedLinearMap * tentativeResult) + unifiedGravityOffset;
 
     std::cout << "Solved!" << std::endl;
-    std::cout << "Solution vector: " << std::endl
-              << tentativeResult << std::endl;
 
     // The linear map is in terms of "inverse mass", so we need to invert to
     // recover original mass.
@@ -10744,14 +10789,14 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
     // If our mass has dropped below an acceptable threshold in this solve,
     // then we need to run again but hold mass fixed.
-    if (foundMass < 0.1 * originalMass)
+    if (foundMass < 0.7 * originalMass || foundMass > 1.3 * originalMass)
     {
       if (detectExternalForce)
       {
         std::cout << "Reducing the threshold for detecting external forces and "
                      "trying "
-                     "again, because we got an unrealistically small mass ("
-                  << foundMass
+                     "again, because we got an out-of-bounds mass ("
+                  << foundMass << "kg vs user specified " << originalMass
                   << "kg) for "
                      "the subject."
                   << std::endl;
@@ -10763,12 +10808,10 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       else
       {
         std::cout << "Failed to solve for COM trajectory, because we got an "
-                     "unrealistically small mass ("
-                  << foundMass
-                  << "kg) for "
-                     "the subject, and detectExternalForces was false."
+                     "unrealistic adjustments to the body ("
+                  << foundMass << "kg) and detectExternalForces was false."
                   << std::endl;
-        return;
+        return false;
       }
     }
 
@@ -10792,7 +10835,8 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     rowCursor = 0;
     for (int trial = 0; trial < numTrials; trial++)
     {
-      if (trial < maxTrialsToSolveMassOver)
+      if (std::find(sampledTrials.begin(), sampledTrials.end(), trial)
+          != sampledTrials.end())
       {
         int trialCols = trialLinearMaps[trial].cols();
         int trialRows = trialLinearMaps[trial].rows();
@@ -11073,7 +11117,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       std::cout << "Trial " << trial << " moved COM by an average of "
                 << (totalChange / originalCOMs.size())
                 << "m to achieve linear physical consistency." << std::endl;
-      if ((totalChange / originalCOMs.size()) > 0.06)
+      if ((totalChange / originalCOMs.size()) > 0.045)
       {
         std::cout << "Trial " << trial << " changed too much!" << std::endl;
         anyTrialChangedTooMuch = true;
@@ -11091,7 +11135,7 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
 
       std::cout << "Detecting external forces, with thresholds at "
                 << (threshold * 100) << " percent of normal." << std::endl;
-      estimateUnmeasuredExternalForces(init, threshold);
+      estimateUnmeasuredExternalForces(init, threshold, trialsChangedTooMuch);
 
       continue;
     }
@@ -11119,8 +11163,13 @@ void DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     }
 
     std::cout << "Finished zeroing linear residuals." << std::endl;
-    break;
+    return true;
   }
+
+  std::cout << "Threshold for detecting unmeasured external forces fell too "
+               "low without reaching a satisfactory solution."
+            << std::endl;
+  return false;
 }
 
 //==============================================================================
@@ -11144,13 +11193,26 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 
   const int massPercentageCols = mSkeleton->getNumScaleGroups();
   const int massCols = 1 + massPercentageCols;
-  const int numTrials = init->poseTrials.size();
+
+  std::vector<int> solveOverTrials;
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    if (init->includeTrialsInDynamicsFit[trial])
+    {
+      solveOverTrials.push_back(trial);
+      if (solveOverTrials.size() >= maxTrialsToSolveMassOver)
+      {
+        break;
+      }
+    }
+  }
+  const int numTrials = solveOverTrials.size();
 
   const int maxBucketSize = 150;
   int totalMissingSteps = 0;
   int totalTimesteps = 0;
   std::vector<int> trialMissingTimesteps;
-  for (int trial = 0; trial < numTrials; trial++)
+  for (int trial : solveOverTrials)
   {
     totalTimesteps += init->poseTrials[trial].cols();
     int trialNumMissing = 0;
@@ -11187,7 +11249,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
   int rowCursor = 0;
   int colCursor = 0;
   int regularizationCursor = totalTimesteps * 3;
-  for (int trial = 0; trial < numTrials; trial++)
+  for (int trial : solveOverTrials)
   {
     s_t dt = init->trialTimesteps[trial];
     mSkeleton->setTimeStep(dt);
@@ -11490,7 +11552,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 
     int outputTimestep = 0;
     s_t diff = 0.0;
-    for (int trial = 0; trial < numTrials; trial++)
+    for (int trial : solveOverTrials)
     {
       for (int t = 0; t < init->poseTrials[trial].cols(); t++)
       {
@@ -11820,48 +11882,52 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     totalAngOffset /= init->poseTrials[trial].cols();
 
     if ((totalPosOffset > avgPositionChangeThreshold
-         || totalAngOffset > avgAngularChangeThreshold)
-        && detectUnmeasuredTorque)
+         || totalAngOffset > avgAngularChangeThreshold))
     {
       std::cout << "Trial pos/angle changed too much! (pos change="
-                << totalPosOffset << ", angle change=" << totalAngOffset << ")"
+                << totalPosOffset
+                << " [threshold = " << avgPositionChangeThreshold
+                << "], angle change=" << totalAngOffset
+                << " [threshold = " << avgAngularChangeThreshold << "])"
                 << std::endl;
-      std::cout << "Estimating unmeasured external torques with threshold at "
-                << (threshold * 100) << " percent of nominal" << std::endl;
-      if (estimateUnmeasuredExternalTorques(init, trial, threshold) > 0
-          || threshold > 0.0005)
+      if (detectUnmeasuredTorque)
       {
-        int numTimestepsAngularDetected = 0;
-        for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
+        std::cout << "Estimating unmeasured external torques with threshold at "
+                  << (threshold * 100) << " percent of nominal" << std::endl;
+        if (estimateUnmeasuredExternalTorques(init, trial, threshold) > 0
+            || threshold > 0.0005)
         {
-          for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+          int numTimestepsAngularDetected = 0;
+          for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
           {
-            if (init->probablyMissingGRF[trial][t])
+            for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
             {
-              if (init->missingGRFReason[trial][t]
-                  == MissingGRFReason::torqueDiscrepancy)
+              if (init->probablyMissingGRF[trial][t])
               {
-                numTimestepsAngularDetected++;
+                if (init->missingGRFReason[trial][t]
+                    == MissingGRFReason::torqueDiscrepancy)
+                {
+                  numTimestepsAngularDetected++;
+                }
               }
             }
           }
-        }
-        std::cout << "Missing torques detected on frames: "
-                  << numTimestepsAngularDetected << std::endl;
-        const int maxTimestepsAngularDetected = 150;
-        if (numTimestepsAngularDetected > maxTimestepsAngularDetected)
-        {
-          std::cout << "Detected too many timesteps where we were experiencing "
-                       "unmeasured external torques ("
-                    << numTimestepsAngularDetected << " > "
-                    << maxTimestepsAngularDetected
-                    << "). Failing angular minimization, and resetting those "
-                       "missing GRF labels."
-                    << std::endl;
-
-          // Reset the missing GRF flags to false for angular discrepancies.
-          for (int trial = 0; trial < init->probablyMissingGRF.size(); trial++)
+          std::cout << "Missing torques detected on frames: "
+                    << numTimestepsAngularDetected << std::endl;
+          const int maxTimestepsAngularDetected = 150;
+          if (numTimestepsAngularDetected > maxTimestepsAngularDetected)
           {
+            std::cout
+                << "In trial " << trial
+                << " detected too many timesteps where we were experiencing "
+                   "unmeasured external torques ("
+                << numTimestepsAngularDetected << " > "
+                << maxTimestepsAngularDetected
+                << "). Failing angular minimization, and resetting those "
+                   "missing GRF labels."
+                << std::endl;
+
+            // Reset the missing GRF flags to false for angular discrepancies.
             for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
             {
               if (init->probablyMissingGRF[trial][t])
@@ -11873,25 +11939,48 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                 }
               }
             }
+            return {false, totalResidual};
           }
-          return {false, totalResidual};
+          else
+          {
+            // As long as we're below the threshold, keep going
+            std::cout << "Trying again now that we've marked these additional "
+                         "frames as probably missing GRF data."
+                      << std::endl;
+            continue;
+          }
         }
         else
         {
-          // As long as we're below the threshold, keep going
-          continue;
+          std::cout << "Found no additional frames with suspicious torques "
+                       "even after "
+                       "reducing the threshold to "
+                    << (threshold * 100)
+                    << " percent of nominal, exiting the optimization early "
+                    << std::endl;
+          return {false, totalResidual};
         }
       }
       else
       {
-        std::cout << "Found no additional frames with suspicious torques "
-                     "even after "
-                     "reducing the threshold to "
-                  << (threshold * 100)
-                  << " percent of nominal, exiting the optimization early "
-                  << std::endl;
+        std::cout
+            << "Failing minimize angular residuals step for trial " << trial
+            << ". Marking as excluded from determining subject parameters "
+               "(mass, scale, etc) for the rest of the pipeline."
+            << std::endl;
+        init->includeTrialsInDynamicsFit[trial] = false;
         return {false, totalResidual};
       }
+    }
+    else
+    {
+      std::cout << "Trial pos/angle changed by acceptable amount (pos change="
+                << totalPosOffset
+                << " [threshold = " << avgPositionChangeThreshold
+                << "], angle change=" << totalAngOffset
+                << " [threshold = " << avgAngularChangeThreshold
+                << "], detect torques = " << detectUnmeasuredTorque << ")"
+                << std::endl;
     }
 
     if (numBlurCoefficients > 0)
@@ -12208,7 +12297,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     bool detectUnmeasuredTorque,
     s_t avgPositionChangeThreshold,
     s_t avgAngularChangeThreshold,
-    bool reoptimizeMarkerOffsets)
+    bool reoptimizeAnatomicalMarkers,
+    bool reoptimizeTrackingMarkers)
 {
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   for (int i = 0; i < init->poseTrials.size(); i++)
@@ -12216,7 +12306,14 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     originalPoseTrials.push_back(init->poseTrials[i]);
   }
   // First detect external force
-  zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  bool success
+      = zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  if (!success)
+  {
+    return false;
+  }
+  std::cout << "Done with initial zeroLinearResidualsOnCOMTrajectory()"
+            << std::endl;
 
   // Now reset positions and re-run with multi-mass
   for (int i = 0; i < init->poseTrials.size(); i++)
@@ -12236,15 +12333,15 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
       if (!timeSyncSuccess)
         return false;
     }
+    // Reset the pose trials now that we've found the GRF data, and start again
+    for (int trial = 0; trial < init->poseTrials.size(); trial++)
+    {
+      init->poseTrials[trial] = originalPoseTrials[trial];
+    }
+    // Re-find the link masses, with updated GRF offsets
+    multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
   }
 
-  // Reset the pose trials now that we've found the GRF data, and start again
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
-  {
-    init->poseTrials[trial] = originalPoseTrials[trial];
-  }
-  // Re-find the link masses, with updated GRF offsets
-  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
   init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
 
   // If we're using reaction wheels, we're accepting that you can't get this
@@ -12268,17 +12365,27 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   auto originalMissingGRFReason = init->missingGRFReason;
 
   // Get rid of the rest of the angular residuals
-  bool residualMinimizationSuccess = true;
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    int iterations = useReactionWheels ? 1 : 50;
+    bool useReactionWheelsThisTrial = useReactionWheels;
+    if (!init->includeTrialsInDynamicsFit[trial])
+    {
+      std::cout << "Starting trial " << trial
+                << " with reaction wheels because it was marked as not "
+                   "included in the dynamics fit."
+                << std::endl;
+      useReactionWheelsThisTrial = true;
+    }
+    int iterations = useReactionWheelsThisTrial ? 1 : 50;
     s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
+    bool residualMinimizationSuccess = true;
     for (int i = 0; i < iterations; i++)
     {
       std::cout << "Running zeroLinearResidualsAndOptimizeAngular() iteration "
                 << i << " of " << iterations << " for trial " << trial << " of "
                 << init->poseTrials.size()
-                << " with useReactionWheels=" << useReactionWheels << std::endl;
+                << " with useReactionWheels=" << useReactionWheelsThisTrial
+                << std::endl;
       // this holds the mass constant, and re-jigs the trajectory to try to
       // make angular ACC's match more closely what was actually observed
       bool commitDriftCompensation = i == iterations - 1;
@@ -12289,7 +12396,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
           originalPoseTrials[trial],
           previousTotalResidual,
           i,
-          useReactionWheels,
+          useReactionWheelsThisTrial,
           weightLinear,
           weightAngular,
           regularizeLinearResiduals,
@@ -12306,10 +12413,13 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
       {
         std::cout << "zeroLinearResidualsAndOptimizeAngular() failed. "
                      "useReactionWheels="
-                  << useReactionWheels << std::endl;
-        if (!useReactionWheels)
+                  << useReactionWheelsThisTrial << std::endl;
+        if (!useReactionWheelsThisTrial)
         {
-          useReactionWheels = true;
+          std::cout << "Trying again, but using virtual reaction wheels "
+                       "instead of exact angular residual elimination."
+                    << std::endl;
+          useReactionWheelsThisTrial = true;
           detectUnmeasuredTorque = false;
           i = -1;
           iterations = 1;
@@ -12317,46 +12427,45 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
         }
         else
         {
+          std::cout << "Quitting zeroLinearResidualsAndOptimizeAngular() with "
+                       "failure to optimize."
+                    << std::endl;
           residualMinimizationSuccess = false;
           break;
         }
       }
     }
-    if (!residualMinimizationSuccess)
-      break;
-  }
 
-  // If ANY trial failed, restore original values for ALL trials.
-  // TODO make trial-specific.
-  if (!residualMinimizationSuccess)
-  {
-    std::cout << "Residual moment minimization failed. Restoring results to "
-              << "linear center-of-mass trajectory fit." << std::endl;
-    init->reactionWheels = originalReactionWheels;
-    init->forcePlateTrials = originalForcePlateTrials;
-    init->poseTrials = originalPoseTrials;
-    init->regularizePosesTo = originalRegularizePosesTo;
-    init->grfTrials = originalGRFTrials;
-    init->forcePlatesAssignedToContactBody
-        = originalForcePlatesAssignedToContactBody;
-    init->probablyMissingGRF = originalProbablyMissingGRF;
-    init->missingGRFReason = originalMissingGRFReason;
-    return false;
-  }
-
-  for (int trial = 0; trial < init->poseTrials.size(); trial++)
-  {
-    // Adjust the regularization target to match our newly solved trajectory,
-    // so we're not trying to pull the root away from the solved trajectory
-    init->regularizePosesTo[trial] = init->poseTrials[trial];
-    recalibrateForcePlatesOffset(init, trial);
+    if (residualMinimizationSuccess)
+    {
+      // Adjust the regularization target to match our newly solved trajectory,
+      // so we're not trying to pull the root away from the solved trajectory
+      init->regularizePosesTo[trial] = init->poseTrials[trial];
+      recalibrateForcePlatesOffset(init, trial);
+    }
+    else
+    {
+      // If this trial failed, restore original values.
+      std::cout
+          << "Residual moment minimization failed. Restoring results for trial "
+          << trial << " to "
+          << "linear center-of-mass trajectory fit." << std::endl;
+      init->reactionWheels[trial] = originalReactionWheels[trial];
+      init->forcePlateTrials[trial] = originalForcePlateTrials[trial];
+      init->poseTrials[trial] = originalPoseTrials[trial];
+      init->regularizePosesTo[trial] = originalRegularizePosesTo[trial];
+      init->grfTrials[trial] = originalGRFTrials[trial];
+      init->forcePlatesAssignedToContactBody[trial]
+          = originalForcePlatesAssignedToContactBody[trial];
+      init->probablyMissingGRF[trial] = originalProbablyMissingGRF[trial];
+      init->missingGRFReason[trial] = originalMissingGRFReason[trial];
+    }
   }
 
   // Recompute the marker offsets to minimize error
-  if (reoptimizeMarkerOffsets)
-  {
-    optimizeMarkerOffsets(init);
-  }
+  optimizeMarkerOffsets(
+      init, reoptimizeAnatomicalMarkers, reoptimizeTrackingMarkers);
+
   return true;
 }
 
@@ -13050,7 +13159,9 @@ void DynamicsFitter::recalibrateForcePlatesOffset(
 //==============================================================================
 // This analytically re-centers each marker to minimize marker errors.
 void DynamicsFitter::optimizeMarkerOffsets(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init,
+    bool reoptimizeAnatomicalMarkers,
+    bool reoptimizeTrackingMarkers)
 {
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
 
@@ -13101,8 +13212,14 @@ void DynamicsFitter::optimizeMarkerOffsets(
   for (auto& pair : markerNumObservations)
   {
     std::string name = pair.first;
+    bool markerIsTracking
+        = std::find(
+              init->trackingMarkers.begin(), init->trackingMarkers.end(), name)
+          != init->trackingMarkers.end();
     // Avoid divide-by-zero edge case
-    if (markerNumObservations[name] > 0)
+    if (markerNumObservations[name] > 0
+        && ((markerIsTracking && reoptimizeTrackingMarkers)
+            || (!markerIsTracking && reoptimizeAnatomicalMarkers)))
     {
       init->markerOffsets[name]
           += markerObservationsSum[name] / markerNumObservations[name];
@@ -14307,6 +14424,14 @@ void DynamicsFitter::runIPOPTOptimization(
                  "Please enable some variables, for example with "
                  "config.setIncludePoses(true)"
               << std::endl;
+    return;
+  }
+  if (problem->mBlocks.size() == 0) {
+    delete problem;
+    std::cout << "WARNING: Optimization problem had no timesteps to optimize over! "
+                 "This usually means all of your trials were marked as having GRF "
+                 "data that was sufficiently hard to match with the markers that "
+                 "we couldn't find a solution." << std::endl;
     return;
   }
 
