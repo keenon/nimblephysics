@@ -786,6 +786,10 @@ struct DynamicsInitialization
       markerObservationTrials;
   std::vector<s_t> trialTimesteps;
 
+  // This vector has a single boolean per trial, and allows the pipeline to mark
+  // whole trials as "excluded" during processing.
+  std::vector<bool> includeTrialsInDynamicsFit;
+
   ///////////////////////////////////////////
   // Assigning GRFs to specific feet
   std::vector<Eigen::MatrixXs> grfTrials;
@@ -1428,6 +1432,12 @@ public:
   void fillInMissingGRFBlips(
       std::shared_ptr<DynamicsInitialization> init, int blipFilterLen = 20);
 
+  // This will mark trials that have too many frames of missing GRF data, and
+  // attempt to drop them from subsequent optimization steps that tune model
+  // parameters.
+  void excludeTrialsWithTooManyMissingGRFs(
+      std::shared_ptr<DynamicsInitialization> init, int threshold = 75);
+
   // 0. Push the initialization away from hard bounds
   void boundPush(
       std::shared_ptr<DynamicsInitialization> init, s_t boundPush = 0.02);
@@ -1468,7 +1478,7 @@ public:
   // 1. Adjust the total mass of the body, and change the initial positions and
   // velocities of the body to achieve a least-squares closest COM trajectory to
   // the current kinematic fit.
-  void zeroLinearResidualsOnCOMTrajectory(
+  bool zeroLinearResidualsOnCOMTrajectory(
       std::shared_ptr<DynamicsInitialization> init,
       int maxTrialsToSolveMassOver = 4,
       bool detectExternalForce = true,
@@ -1545,7 +1555,8 @@ public:
       bool detectUnmeasuredTorque = true,
       s_t avgPositionChangeThreshold = 0.08,
       s_t avgAngularChangeThreshold = 0.15,
-      bool reoptimizeMarkerOffsets = true,
+      bool reoptimizeAnatomicalMarkers = false,
+      bool reoptimizeTrackingMarkers = true,
       bool trimMissingGRFs = true);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
@@ -1574,7 +1585,10 @@ public:
       s_t maxMovement = 0.03);
 
   // This analytically re-centers each marker to minimize marker errors.
-  void optimizeMarkerOffsets(std::shared_ptr<DynamicsInitialization> init);
+  void optimizeMarkerOffsets(
+      std::shared_ptr<DynamicsInitialization> init,
+      bool reoptimizeAnatomicalMarkers = false,
+      bool reoptimizeTrackingMarkers = true);
 
   // This utility recomputes the GRF world wrenches, in case we changed the data
   static void recomputeGRFs(

@@ -3559,6 +3559,7 @@ void Skeleton::setLinkMasses(Eigen::VectorXs masses)
   {
     getBodyNode(i)->setMass(masses(i));
   }
+  updateTotalMass();
 }
 
 //==============================================================================

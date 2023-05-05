@@ -102,6 +102,10 @@ void DynamicsFitter(py::module& m)
           "trialTimesteps",
           &dart::biomechanics::DynamicsInitialization::trialTimesteps)
       .def_readwrite(
+          "includeTrialsInDynamicsFit",
+          &dart::biomechanics::DynamicsInitialization::
+              includeTrialsInDynamicsFit)
+      .def_readwrite(
           "grfTrials", &dart::biomechanics::DynamicsInitialization::grfTrials)
       .def_readwrite(
           "grfBodyIndices",
@@ -582,7 +586,9 @@ protected:
       .def(
           "optimizeMarkerOffsets",
           &dart::biomechanics::DynamicsFitter::optimizeMarkerOffsets,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("reoptimizeAnatomicalMarkers") = false,
+          ::py::arg("reoptimizeTrackingMarkers") = true)
       .def(
           "applyInitToSkeleton",
           &dart::biomechanics::DynamicsFitter::applyInitToSkeleton,
@@ -667,7 +673,8 @@ protected:
           ::py::arg("detectUnmeasuredTorque") = true,
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15,
-          ::py::arg("reoptimizeMarkerOffsets") = true,
+          ::py::arg("reoptimizeAnatomicalMarkers") = false,
+          ::py::arg("reoptimizeTrackingMarkers") = true,
           ::py::arg("trimMissingGRFs") = false)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
