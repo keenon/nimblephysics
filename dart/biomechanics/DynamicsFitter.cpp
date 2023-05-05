@@ -8770,9 +8770,7 @@ DynamicsFitter::DynamicsFitter(
     mSilenceOutput(false),
     mDisableLinesearch(false)
 {
-  std::cout << "Initial mass: " << mSkeleton->getMass() << std::endl;
   mSkeleton->setGroupMasses(mSkeleton->getGroupMasses());
-  std::cout << "Reset mass: " << mSkeleton->getMass() << std::endl;
   mSkeleton->setGroupCOMs(mSkeleton->getGroupCOMs());
   mSkeleton->setGroupInertias(mSkeleton->getGroupInertias());
   mSkeleton->setGroupScales(mSkeleton->getGroupScales());
@@ -10004,24 +10002,6 @@ void DynamicsFitter::boundPush(
     }
   }
 
-  // const Eigen::VectorXs massLowerBound =
-  // mSkeleton->getGroupMassesLowerBound(); const Eigen::VectorXs massUpperBound
-  // = mSkeleton->getGroupMassesUpperBound(); Eigen::VectorXs mass =
-  // mSkeleton->getGroupMasses(); for (int i = 0; i < mass.size(); i++)
-  // {
-  //   if (mass(i) < massLowerBound(i) + boundPush)
-  //   {
-  //     mass(i) = massLowerBound(i) + boundPush;
-  //   }
-  //   if (mass(i) > massUpperBound(i) - boundPush)
-  //   {
-  //     mass(i) = massUpperBound(i) - boundPush;
-  //   }
-  // }
-  // mSkeleton->setGroupMasses(mass);
-  // std::cout << "New mass after bound push: " << mSkeleton->getMass()
-  //           << std::endl;
-
   const Eigen::VectorXs scaleLowerBound = mSkeleton->getGroupScalesLowerBound();
   const Eigen::VectorXs scaleUpperBound = mSkeleton->getGroupScalesUpperBound();
   Eigen::VectorXs scale = mSkeleton->getGroupScales();
@@ -10073,7 +10053,7 @@ void DynamicsFitter::smoothAccelerations(
 
     // Round all the Euler joints to their nearest previous value, to avoid
     // jumping around on wrapping.
-    for (int t = 1; t < false; t++)
+    for (int t = 1; t < init->poseTrials[trial].cols(); t++)
     {
       Eigen::VectorXs pos = init->poseTrials[trial].col(t);
       for (int j = 0; j < mSkeleton->getNumJoints(); j++)
