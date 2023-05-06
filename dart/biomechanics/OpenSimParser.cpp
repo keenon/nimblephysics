@@ -321,6 +321,7 @@ OpenSimFile OpenSimParser::parseOsim(
   //--------------------------------------------------------------------------
   tinyxml2::XMLElement* docElement
       = osimFile.FirstChildElement("OpenSimDocument");
+
   if (docElement == nullptr)
   {
     dterr << "OpenSim file[" << fileNameForErrorDisplay
@@ -338,17 +339,18 @@ OpenSimFile OpenSimParser::parseOsim(
   tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
 
   OpenSimFile result;
+
   if (jointSet != nullptr)
   {
-    // This is the older format, where JointSet specifies the joints separately
+    // This is the newer format, where JointSet specifies the joints separately
     // from the body hierarchy
-    result = readOsim30(
+    result = readOsim40(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
   else
   {
-    // This is the newer format, where Joints are specified as childen of Bodies
-    result = readOsim40(
+    // This is the older format, where Joints are specified as childen of Bodies
+    result = readOsim30(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
 
@@ -4596,7 +4598,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
 }
 
 //==============================================================================
-OpenSimFile OpenSimParser::readOsim40(
+OpenSimFile OpenSimParser::readOsim30(
     tinyxml2::XMLElement* docElement,
     const std::string fileNameForErrorDisplay,
     const std::string geometryFolder,
@@ -4843,12 +4845,15 @@ OpenSimFile OpenSimParser::readOsim40(
         if (body != nullptr)
         {
           file.markersMap[name] = std::make_pair(body, offset);
+          std::cout << "Adding anatomical marker " << name << std::endl;
           if (fixed)
           {
+            std::cout << "Adding anatomical marker " << name << std::endl;
             file.anatomicalMarkers.push_back(name);
           }
           else
           {
+            std::cout << "Adding tracking marker " << name << std::endl;
             file.trackingMarkers.push_back(name);
           }
         }
@@ -5008,7 +5013,7 @@ void recursiveCreateJoint(
 }
 
 //==============================================================================
-OpenSimFile OpenSimParser::readOsim30(
+OpenSimFile OpenSimParser::readOsim40(
     tinyxml2::XMLElement* docElement,
     const std::string fileNameForErrorDisplay,
     const std::string geometryFolder,
@@ -5431,10 +5436,14 @@ OpenSimFile OpenSimParser::readOsim30(
               = std::make_pair(skel->getBodyNode(bodyName), offset);
           if (fixed)
           {
+            std::cout << "Adding anatomical marker " << name << " to body "
+                      << bodyName << std::endl;
             file.anatomicalMarkers.push_back(name);
           }
           else
           {
+            std::cout << "Adding tracking marker " << name << " to body "
+                      << bodyName << std::endl;
             file.trackingMarkers.push_back(name);
           }
         }
