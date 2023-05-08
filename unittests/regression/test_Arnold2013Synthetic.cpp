@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
-#include <tinyxml2.h>
 
 #include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/ForcePlate.hpp"
@@ -27,7 +26,7 @@ using namespace biomechanics;
 using namespace math;
 
 //==============================================================================
-std::vector<MarkerInitialization> runMarkerFitter(
+std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
     std::string modelPath,
     std::vector<std::string> trcFiles,
     std::vector<std::string> grfFiles,
@@ -163,7 +162,7 @@ std::vector<MarkerInitialization> runMarkerFitter(
 
   // Run the MarkerFitter.
   // ---------------------
-  std::vector<MarkerInitialization> results
+  std::vector<MarkerInitialization> markerInit
       = fitter.runMultiTrialKinematicsPipeline(
           markerObservationTrials,
           InitialMarkerFitParams()
@@ -176,8 +175,8 @@ std::vector<MarkerInitialization> runMarkerFitter(
   // -----------------------------------
   IKErrorReport finalKinematicsReport(
       standard.skeleton,
-      results[0].updatedMarkerMap,
-      results[0].poses,
+      markerInit[0].updatedMarkerMap,
+      markerInit[0].poses,
       markerObservationTrials[0],
       anthropometrics);
 
@@ -187,27 +186,23 @@ std::vector<MarkerInitialization> runMarkerFitter(
   std::cout << "Final anthropometric values: " << std::endl;
   anthropometrics->debugValues(standard.skeleton);
 
-  std::cout << "Saving marker error report..." << std::endl;
-  finalKinematicsReport.saveCSVMarkerErrorReport(
-      "./ik_marker_errors.csv");
-
   // Save all the results to files.
   // -----------------------------
   std::vector<std::vector<s_t>> timestamps;
-  for (int i = 0; i < (int)results.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++) {
     timestamps.emplace_back();
-    for (int t = 0; t < results[i].poses.cols(); t++) {
+    for (int t = 0; t < markerInit[i].poses.cols(); t++) {
       timestamps[i].push_back((s_t)t * (1.0 / framesPerSecond[i]));
     }
   }
 
-  for (int i = 0; i < (int)results.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++) {
     std::cout << "Saving IK Mot " << i << std::endl;
     OpenSimParser::saveMot(
         standard.skeleton,
         "./_ik" + std::to_string(i) + ".mot",
         timestamps[i],
-        results[i].poses);
+        markerInit[i].poses);
     std::cout << "Saving GRF Mot " << i << std::endl;
     OpenSimParser::saveRawGRFMot(
         "./_grf" + std::to_string(i) + ".mot", timestamps[i], forcePlates[i]);
@@ -234,12 +229,12 @@ std::vector<MarkerInitialization> runMarkerFitter(
       "_ik_by_opensim.mot",
       "./_ik_setup.xml");
   // TODO: remove me
-  for (int i = 0; i < (int)results.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++) {
     std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
     OpenSimParser::saveOsimInverseDynamicsRawForcesXMLFile(
         "test_name",
         standard.skeleton,
-        results[i].poses,
+        markerInit[i].poses,
         forcePlates[i],
         "name_grf.mot",
         "./_external_forces.xml");
@@ -270,7 +265,7 @@ std::vector<MarkerInitialization> runMarkerFitter(
     std::vector<std::map<std::string, Eigen::Vector3s>> gyroObs;
     fitter.saveTrajectoryAndMarkersToGUI(
         "../../../javascript/src/data/movement2.bin",
-        results[0],
+        markerInit[0],
         markerObservationTrials[0],
         accObs,
         gyroObs,
@@ -278,54 +273,97 @@ std::vector<MarkerInitialization> runMarkerFitter(
         forcePlates[0]);
   }
 
+  auto results = std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile>(
+      markerInit[0], finalKinematicsReport, standard);
   return results;
 }
 
-//==============================================================================
-TEST(Arnold2013Synthetic, JointCenters) {
+void testSubject(const std::string& subject, const s_t& height,
+                 const s_t& mass) {
 
+  std::cout << "Testing " << subject << "..." << std::endl;
+
+  // Run MarkerFitter.
+  // -----------------
   std::string prefix = "dart://sample/regression/Arnold2013Synthetic/";
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
-  trcFiles.push_back(prefix + "subject01/trials/walk2/markers.trc");
-  grfFiles.push_back(prefix + "subject01/trials/walk2/grf.mot");
-
-  auto results = runMarkerFitter(
+  trcFiles.push_back(prefix + subject + "/trials/walk2/markers.trc");
+  grfFiles.push_back(prefix + subject + "/trials/walk2/grf.mot");
+  const auto [markerInit, finalKinematicsReport, osimFile] = runMarkerFitter(
       prefix + "unscaled_generic.osim",
       trcFiles,
       grfFiles,
-      72.84,
-      1.808,
+      mass,
+      height,
       "male",
       true);
-
-  MarkerInitialization result = results[0];
-  auto poses = result.poses;
-  std::cout << "Final poses size: [" << poses.rows() << ", " << poses.cols()
-            << "]" << std::endl;
 
   // Load ground-truth results.
   // --------------------------
   auto goldOsim = OpenSimParser::parseOsim(
-      prefix + "subject01/subject01.osim");
+      prefix + subject + "/subject01.osim");
   auto goldIK = OpenSimParser::loadMot(
-      goldOsim.skeleton, prefix + "subject01/coordinates.sto");
-  auto goldPoses = goldIK.poses;
-  std::cout << "Gold poses size: [" << goldPoses.rows() << ", "
-            << goldPoses.cols() << "]" << std::endl;
+      goldOsim.skeleton, prefix + subject + "/coordinates.sto");
 
-  // Compute the RMS difference between the columns in poses and goldPoses
-  // (which are the same size)
+  // Compare poses.
+  // --------------
+  auto poses = markerInit.poses;
+  auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  for (int i = 0; i < poses.cols(); i++)
-  {
+  for (int i = 0; i < poses.cols(); i++) {
     Eigen::VectorXs diff = poses.col(i) - goldPoses.col(i);
     totalError += diff.squaredNorm();
   }
-  s_t rmsError = std::sqrt(totalError / poses.cols());
-  std::cout << "RMS Error: " << rmsError << std::endl;
-  EXPECT_TRUE(rmsError < 0.01);
+  s_t averagePoseError = std::sqrt(totalError / (s_t)poses.cols());
+  EXPECT_TRUE(averagePoseError < 0.01);
 
+  // Marker errors.
+  // --------------
+  EXPECT_TRUE(finalKinematicsReport.averageRootMeanSquaredError < 0.01);
+  EXPECT_TRUE(finalKinematicsReport.averageMaxError < 0.02);
+
+  // Joint centers.
+  // --------------
+  auto skeleton = osimFile.skeleton;
+  auto joints = skeleton->getJoints();
+  auto goldSkeleton = goldOsim.skeleton;
+  auto goldJoints = goldSkeleton->getJoints();
+  Eigen::VectorXs jointErrors = Eigen::VectorXs::Zero(poses.cols());
+  for (int i = 0; i < poses.cols(); i++) {
+    skeleton->setPositions(poses.col(i));
+    goldSkeleton->setPositions(goldPoses.col(i));
+    Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
+    Eigen::VectorXs goldJointPoses = goldSkeleton->getJointWorldPositions(
+        goldJoints);
+    jointErrors[i] = (jointPoses - goldJointPoses).norm();
+  }
+  s_t averageJointPoseError = jointErrors.mean();
+  EXPECT_TRUE(averageJointPoseError < 0.01);
+
+  // Body scales.
+  // ------------
+  auto bodies = skeleton->getBodyNodes();
+  auto goldBodies = goldSkeleton->getBodyNodes();
+  Eigen::VectorXs bodyScaleErrors = Eigen::VectorXs::Zero((int)bodies.size());
+  for (int i = 0; i < (int)bodies.size(); i++) {
+    Eigen::Vector3s bodyScale = bodies[i]->getScale();
+    Eigen::Vector3s goldBodyScale = goldBodies[i]->getScale();
+    bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
+  }
+  s_t averageBodyScaleError = bodyScaleErrors.mean();
+  EXPECT_TRUE(averageBodyScaleError < 0.01);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, RegressionTests) {
+  std::vector<string> subjects = {"subject01", "subject02", "subject04",
+                                  "subject18", "subject19"};
+  std::vector<s_t> heights = {1.808, 1.853, 1.801, 1.775, 1.79};
+  std::vector<s_t> masses = {72.84, 76.48, 80.3, 64.09, 68.5};
+  for (int i = 0; i < (int)subjects.size(); i++) {
+    testSubject(subjects[i], heights[i], masses[i]);
+  }
 }
 
 //==============================================================================
