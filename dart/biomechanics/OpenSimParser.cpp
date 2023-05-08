@@ -4845,15 +4845,12 @@ OpenSimFile OpenSimParser::readOsim30(
         if (body != nullptr)
         {
           file.markersMap[name] = std::make_pair(body, offset);
-          std::cout << "Adding anatomical marker " << name << std::endl;
           if (fixed)
           {
-            std::cout << "Adding anatomical marker " << name << std::endl;
             file.anatomicalMarkers.push_back(name);
           }
           else
           {
-            std::cout << "Adding tracking marker " << name << std::endl;
             file.trackingMarkers.push_back(name);
           }
         }
@@ -5436,14 +5433,10 @@ OpenSimFile OpenSimParser::readOsim40(
               = std::make_pair(skel->getBodyNode(bodyName), offset);
           if (fixed)
           {
-            std::cout << "Adding anatomical marker " << name << " to body "
-                      << bodyName << std::endl;
             file.anatomicalMarkers.push_back(name);
           }
           else
           {
-            std::cout << "Adding tracking marker " << name << " to body "
-                      << bodyName << std::endl;
             file.trackingMarkers.push_back(name);
           }
         }

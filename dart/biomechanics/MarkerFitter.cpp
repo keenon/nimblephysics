@@ -242,12 +242,6 @@ Eigen::VectorXs MarkerFitterState::flattenState()
   Eigen::VectorXs originalScales = skeleton->getGroupScales();
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
-    // Set a break point if a body scale is inf
-    if (bodyScales.col(i).hasNaN())
-    {
-      std::cout << "Body scale is NaN!" << std::endl;
-    }
-
     skeleton->getBodyNode(i)->setScale(bodyScales.col(i));
   }
   flat.segment(0, groupScaleDim) = skeleton->getGroupScales();
@@ -335,11 +329,6 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
 
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
-    // Set a break point if a body scale is inf
-    if (bodyScales.col(i).hasNaN())
-    {
-      std::cout << "Body scale is NaN!" << std::endl;
-    }
     skeleton->getBodyNode(i)->setScale(bodyScales.col(i));
   }
   Eigen::VectorXs groupScales = skeleton->getGroupScales();
@@ -718,11 +707,6 @@ MarkerFitter::MarkerFitter(
       // on the state object
       for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
       {
-        // Set a break point if a body scale is inf
-        if (state->bodyScales.col(i).hasNaN())
-        {
-          std::cout << "Body scale is NaN!" << std::endl;
-        }
         this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
       }
       // 3.2. Actually compute the loss
@@ -893,11 +877,6 @@ MarkerFitter::MarkerFitter(
       // problem.
       for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
       {
-        // Set a break point if a body scale is inf
-        if (state->bodyScales.col(i).hasNaN())
-        {
-          std::cout << "Body scale is NaN!" << std::endl;
-        }
         this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
       }
       Eigen::VectorXs staticPose = mStaticTrialPose;
@@ -1002,11 +981,6 @@ MarkerFitter::MarkerFitter(
       // 8.1. Set the skeleton to the current scales in the problem.
       for (int i = 0; i < this->mSkeleton->getNumBodyNodes(); i++)
       {
-        // Set a break point if a body scale is inf
-        if (state->bodyScales.col(i).hasNaN())
-        {
-          std::cout << "Body scale is NaN!" << std::endl;
-        }
         this->mSkeleton->getBodyNode(i)->setScale(state->bodyScales.col(i));
       }
 
@@ -10103,9 +10077,9 @@ IMUFineTuneProblem::IMUFineTuneProblem(
       dynamics::BodyNode* threadBody
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
-//      assert(
-//          threadBody->getIndexInSkeleton() >= 0
-//          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadMarkers.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadMarkers.push_back(threadMarkers);
@@ -10117,9 +10091,9 @@ IMUFineTuneProblem::IMUFineTuneProblem(
       dynamics::BodyNode* threadBody
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
-//      assert(
-//          threadBody->getIndexInSkeleton() >= 0
-//          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadAccelerometers.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadAccelerometers.push_back(threadAccelerometers);
@@ -10130,9 +10104,9 @@ IMUFineTuneProblem::IMUFineTuneProblem(
       dynamics::BodyNode* threadBody
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
-//      assert(
-//          threadBody->getIndexInSkeleton() >= 0
-//          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+      assert(
+          threadBody->getIndexInSkeleton() >= 0
+          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadGyros.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadGyros.push_back(threadGyros);
