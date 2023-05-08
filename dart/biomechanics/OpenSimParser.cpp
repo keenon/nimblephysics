@@ -321,7 +321,6 @@ OpenSimFile OpenSimParser::parseOsim(
   //--------------------------------------------------------------------------
   tinyxml2::XMLElement* docElement
       = osimFile.FirstChildElement("OpenSimDocument");
-
   if (docElement == nullptr)
   {
     dterr << "OpenSim file[" << fileNameForErrorDisplay
@@ -339,7 +338,6 @@ OpenSimFile OpenSimParser::parseOsim(
   tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
 
   OpenSimFile result;
-
   if (jointSet != nullptr)
   {
     // This is the newer format, where JointSet specifies the joints separately

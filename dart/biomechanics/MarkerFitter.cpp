@@ -326,7 +326,6 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
   Eigen::VectorXs originalPos = skeleton->getPositions();
   Eigen::VectorXs originalScales = skeleton->getGroupScales();
 
-
   for (int i = 0; i < skeleton->getNumBodyNodes(); i++)
   {
     skeleton->getBodyNode(i)->setScale(bodyScales.col(i));
