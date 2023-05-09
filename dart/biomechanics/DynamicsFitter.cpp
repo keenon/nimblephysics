@@ -9477,9 +9477,9 @@ void DynamicsFitter::estimateFootGroundContacts(
 {
   Eigen::VectorXs originalPose = mSkeleton->getPositions();
 
-  const s_t offForcePlateHeightSafetyMargin = 0.05;
+  //const s_t offForcePlateHeightSafetyMargin = 0.05;
 
-  // 0. Expand the set of grf bodies to include any childen that are not
+  // 0. Expand the set of grf bodies to include any children that are not
   // already themselves grf bodies
   //
   // Result goes in std::vector<std::vector<dynamics::BodyNode*>>
@@ -9581,46 +9581,81 @@ void DynamicsFitter::estimateFootGroundContacts(
       }
     }
 
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
-    {
+    // Find the minimum distance between the ground and any contact point on
+    // the body, and use that as the radius of the contact spheres.
+    s_t radius = std::numeric_limits<s_t>::infinity();
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++) {
       mSkeleton->setPositions(init->poseTrials[trial].col(t));
-
-      for (int b = 0; b < init->grfBodyNodes.size(); b++)
-      {
-        bool footActive
-            = (init->grfTrials[trial].col(t).segment<6>(b * 6).squaredNorm()
-               > 1e-3);
-
-        // If this foot is active on this timestep, then we have to resize our
-        // contact spheres to ensure that they show contact on this frame. We
-        // do this by ensuring that the closest sphere is at least large
-        // enough to hit contact.
-        if (footActive)
-        {
-          // Check which of the contact bodies is closest to the ground
-          s_t minDist = std::numeric_limits<s_t>::infinity();
-          int closestBody = -1;
-          for (int c = 0; c < init->contactBodies[b].size(); c++)
-          {
-            auto* body = init->contactBodies[b][c];
-            Eigen::Vector3s worldPos = body->getWorldTransform().translation();
-            s_t dist = worldPos(1) - groundHeight;
-            if (dist < minDist)
-            {
-              minDist = dist;
-              closestBody = c;
-            }
-          }
-
-          // If our closest sphere needs to expand to hit the ground, then
-          // expand it
-          if (minDist > grfContactSphereSizes[b][closestBody])
-          {
-            grfContactSphereSizes[b][closestBody] = minDist;
+      for (int b = 0; b < init->grfBodyNodes.size(); b++) {
+        for (int c = 0; c < init->contactBodies[b].size(); c++) {
+          auto* body = init->contactBodies[b][c];
+          Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+          s_t dist = worldPos(1) - groundHeight;
+          if (dist < radius) {
+            radius = dist;
           }
         }
       }
     }
+    for (int b = 0; b < init->grfBodyNodes.size(); b++) {
+      for (int c = 0; c < init->contactBodies[b].size(); c++) {
+        grfContactSphereSizes[b][c] = 1.1*radius;
+      }
+    }
+
+//    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+//    {
+//      mSkeleton->setPositions(init->poseTrials[trial].col(t));
+//
+//      for (int b = 0; b < init->grfBodyNodes.size(); b++)
+//      {
+//        bool footActive
+//            = (init->grfTrials[trial].col(t).segment<6>(b * 6).squaredNorm()
+//               > 1e-3);
+//
+//        // If this foot is active on this timestep, then we have to resize our
+//        // contact spheres to ensure that they show contact on this frame. We
+//        // do this by ensuring that the closest sphere is at least large
+//        // enough to hit contact.
+//        if (footActive)
+//        {
+//          // Check which of the contact bodies is closest to the ground
+//          s_t minDist = std::numeric_limits<s_t>::infinity();
+//          int closestBody = -1;
+//          for (int c = 0; c < init->contactBodies[b].size(); c++)
+//          {
+//            auto* body = init->contactBodies[b][c];
+//            Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+//            s_t dist = worldPos(1) - groundHeight;
+//            if (dist < minDist)
+//            {
+//              minDist = dist;
+//              closestBody = c;
+//            }
+//          }
+//
+//          // If our closest sphere needs to expand to hit the ground, then
+//          // expand it
+//          if (minDist > grfContactSphereSizes[b][closestBody])
+//          {
+//            grfContactSphereSizes[b][closestBody] = minDist;
+//          }
+//        }
+//      }
+//    }
+
+    // Set contact body radii to the minimum radii for this grf body
+//    for (int b = 0; b < init->contactBodies.size(); b++) {
+//      s_t minRadius = std::numeric_limits<s_t>::infinity();
+//      for (s_t r : grfContactSphereSizes[b]) {
+//        if (r < minRadius) {
+//          minRadius = r;
+//        }
+//      }
+//      for (int c = 0; c < init->contactBodies[b].size(); c++) {
+//        grfContactSphereSizes[b][c] = minRadius;
+//      }
+//    }
 
     for (int b = 0; b < init->contactBodies.size(); b++)
     {
@@ -9726,8 +9761,10 @@ void DynamicsFitter::estimateFootGroundContacts(
     std::vector<std::vector<bool>> trialOffForcePlate;
     std::vector<bool> trialAnyOffForcePlate;
     std::vector<MissingGRFReason> trialMissingGRFReason;
+    std::cout << "Checking foot-ground contact..." << std::endl;
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
     {
+      std::cout << "Time: " << t << std::endl;
       mSkeleton->setPositions(init->poseTrials[trial].col(t));
 
       std::vector<bool> forceActive;
@@ -9737,6 +9774,7 @@ void DynamicsFitter::estimateFootGroundContacts(
       MissingGRFReason reason = MissingGRFReason::notMissingGRF;
       for (int b = 0; b < init->grfBodyNodes.size(); b++)
       {
+        std::cout << "Body: " << init->grfBodyNodes[b]->getName() << std::endl;
         // 4.1. Check the GRF to see if we are measured as being in contact
         bool footActive
             = (init->grfTrials[trial].col(t).segment<6>(b * 6).squaredNorm()
@@ -9751,6 +9789,7 @@ void DynamicsFitter::estimateFootGroundContacts(
         {
           auto* body = init->contactBodies[b][c];
           Eigen::Vector3s worldPos = body->getWorldTransform().translation();
+          //Eigen::Vector3s worldVel = body->getLinearVelocity();
 
           // Check if this body is over a force plate
           bool overPlate = false;
@@ -9789,15 +9828,21 @@ void DynamicsFitter::estimateFootGroundContacts(
           }
 
           s_t dist = worldPos(1) - groundHeight;
-          if (!overPlate)
-          {
-            // If we're not over a force plate, use a more generous margin to
-            // detect foot-ground contact, since we almost certainly are
-            // missing data here, and we want to prioritize recall on those
-            // timesteps.
-            dist -= offForcePlateHeightSafetyMargin;
-          }
+          std::cout << "Foot-ground distance: " << dist << std::endl;
+//          if (!overPlate)
+//          {
+//            // If we're not over a force plate, use a more generous margin to
+//            // detect foot-ground contact, since we almost certainly are
+//            // missing data here, and we want to prioritize recall on those
+//            // timesteps.
+//            dist -= offForcePlateHeightSafetyMargin;
+//          }
 
+          // We only want to mark a foot as in contact if it's moving slow enough
+          // to be reasonably in contact. In other words, we want to filter out
+          // time points when the foot is skimming barely above the ground during
+          // swing.
+//          bool slowEnoughToBeInContact = worldVel.norm() < 0.1; // m/s
           if (dist < grfContactSphereSizes[b][c])
           {
             inContact = true;
@@ -9811,6 +9856,8 @@ void DynamicsFitter::estimateFootGroundContacts(
         // which would mean that our inverse dynamics should ignore these
         // frames.
         bool contactIsSus = false;
+        std::cout << "Foot active: " << footActive << std::endl;
+        std::cout << "In contact: " << inContact << std::endl;
         if (inContact && !footActive)
         {
           // 4.3.1. Even if we're ignoring force plate geometry, we still want
@@ -9819,6 +9866,7 @@ void DynamicsFitter::estimateFootGroundContacts(
           if (ignoreFootNotOverForcePlate) {
             contactIsSus = true;
             anyContactIsSus = true;
+            std::cout << "Foot contact but no GRF!" << std::endl;
             reason = MissingGRFReason::footContactButNoGRF;
           } else {
             // 4.3.2. If we're not ignoring foot not over force plate, then we
@@ -12313,7 +12361,20 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
   {
     originalPoseTrials.push_back(init->poseTrials[i]);
   }
-  // First detect external force
+
+  if (trimMissingGRFs) {
+    std::cout << "Trimming timestamps with missing GRFs..." << std::endl;
+    std::vector<std::pair<int,int>> newIndicesTrials =
+        init->trimMissingGRFsAtEndpoints();
+    // Trim the "original" pose trials data to match the new trial lengths.
+    for (int i = 0; i < init->poseTrials.size(); i++){
+      std::pair<int,int> newIndices = newIndicesTrials[i];
+      originalPoseTrials[i] = DynamicsInitialization::trimColumns(
+          originalPoseTrials[i], newIndices.first, newIndices.second);
+    }
+    //zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+  }
+
   bool success
       = zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
   if (!success)
@@ -12329,19 +12390,6 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     init->poseTrials[i] = originalPoseTrials[i];
   }
   multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
-
-  if (trimMissingGRFs) {
-    std::cout << "Triming timestamps with missing GRFs..." << std::endl;
-    std::vector<std::pair<int,int>> newIndicesTrials =
-        init->trimMissingGRFsAtEndpoints();
-    // Trim the "original" pose trials data to match the new trial lengths.
-    for (int i = 0; i < init->poseTrials.size(); i++){
-      std::pair<int,int> newIndices = newIndicesTrials[i];
-      originalPoseTrials[i] = DynamicsInitialization::trimColumns(
-          originalPoseTrials[i], newIndices.first, newIndices.second);
-    }
-    zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
-  }
 
   // Attempt to time sync the GRFs relative to the coordinate data.
   if (shiftGRF)

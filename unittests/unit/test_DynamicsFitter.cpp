@@ -6537,7 +6537,7 @@ TEST(DynamicsFitter, RAJAGOPAL_TRIM_GRFS)
       -1,
       0,
       false,
-      false,
+      true,
       false,
       maxTrialsToSolveMassOver);
 }

@@ -899,7 +899,7 @@ struct DynamicsInitialization
     for (int itrial = 0; itrial < numTrials; itrial++) {
       const auto& trialMissingGRF = probablyMissingGRF[itrial];
       int newStartIndex = 0;
-      int newEndIndex = trialMissingGRF.size() - 1;
+      int newEndIndex = (int)trialMissingGRF.size() - 1;
 
       // Find the first index that's not missing GRF.
       for (int i = 0; i < trialMissingGRF.size(); i++) {
@@ -910,7 +910,7 @@ struct DynamicsInitialization
       }
       // Working backwards from the end of the trial, find the first index
       // that's not missing GRF.
-      for (int i = trialMissingGRF.size() - 1; i >= 0; i--) {
+      for (int i = (int)trialMissingGRF.size() - 1; i >= 0; i--) {
         if (!trialMissingGRF[i]) {
           newEndIndex = i;
           break;
@@ -938,21 +938,19 @@ struct DynamicsInitialization
       // Force plate information.
       for (int ifp = 0; ifp < forcePlateTrials[itrial].size(); ifp++) {
         forcePlateTrials[itrial][ifp].trimToIndices(newStartIndex, newEndIndex);
-//        if (!perfectForcePlateTrials[itrial][ifp].timestamps.empty()) {
-//          perfectForcePlateTrials[itrial][ifp].trimToIndices(newStartIndex,
-//                                                             newEndIndex);
-//        }
         trimVector(forcePlatesAssignedToContactBody[itrial][ifp], newStartIndex,
                    newEndIndex);
-//        trimVector(grfBodyContactSphereRadius[itrial][ifp], newStartIndex,
-//                   newEndIndex);
         trimVector(grfBodyForceActive[itrial][ifp], newStartIndex, newEndIndex);
         trimVector(grfBodySphereInContact[itrial][ifp], newStartIndex,
                    newEndIndex);
         trimVector(grfBodyOffForcePlate[itrial][ifp], newStartIndex, newEndIndex);
-        trimVector(probablyMissingGRF[itrial], newStartIndex, newEndIndex);
-        trimVector(missingGRFReason[itrial], newStartIndex, newEndIndex);
       }
+
+      // Trim the vectors identifying missing GRF data.
+      trimVector(probablyMissingGRF[itrial], newStartIndex, newEndIndex);
+      trimVector(missingGRFReason[itrial], newStartIndex, newEndIndex);
+
+      // Store the new start and end indices for this trial.
       newIndicesTrials.push_back(std::make_pair(newStartIndex, newEndIndex));
     }
     return newIndicesTrials;
@@ -1414,7 +1412,7 @@ public:
   // it mess with our optimization.
   void estimateFootGroundContacts(
       std::shared_ptr<DynamicsInitialization> init,
-      bool ignoreFootNotOverForcePlate = false);
+      bool ignoreFootNotOverForcePlate = true);
 
   // 0. This goes through and marks any "impact" GRF timesteps (defined as
   // `windowLen` steps after the first non-zero step after a flight phase with
@@ -1436,7 +1434,7 @@ public:
   // attempt to drop them from subsequent optimization steps that tune model
   // parameters.
   void excludeTrialsWithTooManyMissingGRFs(
-      std::shared_ptr<DynamicsInitialization> init, int threshold = 75);
+      std::shared_ptr<DynamicsInitialization> init, int threshold = 1000);
 
   // 0. Push the initialization away from hard bounds
   void boundPush(
