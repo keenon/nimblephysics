@@ -40,6 +40,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
 
+  dart_add_test("unit" test_IKInitializer)
+  target_link_libraries(test_IKInitializer dart-utils)
+
   dart_add_test("unit" test_CompositeResourceRetriever)
   target_link_libraries(test_CompositeResourceRetriever dart-utils)
 
