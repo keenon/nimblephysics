@@ -34,6 +34,9 @@ void DynamicsFitter(py::module& m)
           "forceDiscrepancy",
           dart::biomechanics::MissingGRFReason::forceDiscrepancy)
       .value(
+          "footContactButNoGRF",
+          dart::biomechanics::MissingGRFReason::footContactButNoGRF)
+      .value(
           "notOverForcePlate",
           dart::biomechanics::MissingGRFReason::notOverForcePlate)
       .value(

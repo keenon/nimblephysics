@@ -9813,13 +9813,21 @@ void DynamicsFitter::estimateFootGroundContacts(
         bool contactIsSus = false;
         if (inContact && !footActive)
         {
-          // 4.3.2. If we're NOT over a plate, then register this frame as
-          // suspicious
-          if (!anyInPlate && !ignoreFootNotOverForcePlate)
-          {
+          // 4.3.1. Even if we're ignoring force plate geometry, we still want
+          // to flag this time point since we're detecting that the foot is on
+          // the ground, but there's no measured external force.
+          if (ignoreFootNotOverForcePlate) {
             contactIsSus = true;
             anyContactIsSus = true;
-            reason = MissingGRFReason::notOverForcePlate;
+            reason = MissingGRFReason::footContactButNoGRF;
+          } else {
+            // 4.3.2. If we're not ignoring foot not over force plate, then we
+            // also want to check if the foot is over the force plate.
+            if (!anyInPlate) {
+              contactIsSus = true;
+              anyContactIsSus = true;
+              reason = MissingGRFReason::notOverForcePlate;
+            }
           }
         }
 
