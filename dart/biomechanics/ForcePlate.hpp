@@ -20,24 +20,6 @@ struct ForcePlate
   std::vector<Eigen::Vector3s> moments;
   std::vector<Eigen::Vector3s> forces;
 
-  void trimToIndices(int newStartIndex, int newEndIndex) {
-    // Erase the data up until the new start index.
-    timestamps.erase(timestamps.begin(), timestamps.begin() + newStartIndex);
-    centersOfPressure.erase(centersOfPressure.begin(),
-                            centersOfPressure.begin() + newStartIndex);
-    moments.erase(moments.begin(), moments.begin() + newStartIndex);
-    forces.erase(forces.begin(), forces.begin() + newStartIndex);
-
-    // Erase the data from the new end index to the end. We have to adjust the
-    // end index to be relative to the new start index.
-    int adjustedEndIndex = newEndIndex - newStartIndex + 1;
-    timestamps.erase(timestamps.begin() + adjustedEndIndex, timestamps.end());
-    centersOfPressure.erase(centersOfPressure.begin() + adjustedEndIndex,
-                            centersOfPressure.end());
-    moments.erase(moments.begin() + adjustedEndIndex, moments.end());
-    forces.erase(forces.begin() + adjustedEndIndex, forces.end());
-  }
-
   void trim(s_t newStartTime, s_t newEndTime) {
     assert(newStartTime >= timestamps[0]);
     assert(newEndTime <= timestamps[timestamps.size()-1]);
@@ -45,12 +27,25 @@ struct ForcePlate
     auto lower = std::lower_bound(timestamps.begin(), timestamps.end(),
                                   newStartTime);
     int newStartIndex = (int)std::distance(timestamps.begin(), lower);
+    // Erase the data up until the new start index.
+    timestamps.erase(timestamps.begin(), timestamps.begin() + newStartIndex);
+    centersOfPressure.erase(centersOfPressure.begin(),
+                            centersOfPressure.begin() + newStartIndex);
+    moments.erase(moments.begin(), moments.begin() + newStartIndex);
+    forces.erase(forces.begin(), forces.begin() + newStartIndex);
+
     // Find new end index.
     auto upper = std::upper_bound(timestamps.begin(), timestamps.end(),
                                   newEndTime);
     int newEndIndex = (int)std::distance(timestamps.begin(), upper);
-    // Trim the data.
-    trimToIndices(newStartIndex, newEndIndex);
+    // Erase the data from the new end index to the end. We have to adjust the
+    // end index to be relative to the new start index.
+    int adjustedEndIndex = newEndIndex - newStartIndex;
+    timestamps.erase(timestamps.begin() + adjustedEndIndex, timestamps.end());
+    centersOfPressure.erase(centersOfPressure.begin() + adjustedEndIndex,
+                            centersOfPressure.end());
+    moments.erase(moments.begin() + adjustedEndIndex, moments.end());
+    forces.erase(forces.begin() + adjustedEndIndex, forces.end());
   }
 
   static ForcePlate copyForcePlate(const ForcePlate& plate) {
