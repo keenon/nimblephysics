@@ -40,12 +40,11 @@ struct ForcePlate
     int newEndIndex = (int)std::distance(timestamps.begin(), upper);
     // Erase the data from the new end index to the end. We have to adjust the
     // end index to be relative to the new start index.
-    int adjustedEndIndex = newEndIndex - newStartIndex;
-    timestamps.erase(timestamps.begin() + adjustedEndIndex, timestamps.end());
-    centersOfPressure.erase(centersOfPressure.begin() + adjustedEndIndex,
+    timestamps.erase(timestamps.begin() + newEndIndex, timestamps.end());
+    centersOfPressure.erase(centersOfPressure.begin() + newEndIndex,
                             centersOfPressure.end());
-    moments.erase(moments.begin() + adjustedEndIndex, moments.end());
-    forces.erase(forces.begin() + adjustedEndIndex, forces.end());
+    moments.erase(moments.begin() + newEndIndex, moments.end());
+    forces.erase(forces.begin() + newEndIndex, forces.end());
   }
 
   static ForcePlate copyForcePlate(const ForcePlate& plate) {
