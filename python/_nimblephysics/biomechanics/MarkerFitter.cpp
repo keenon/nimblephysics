@@ -364,6 +364,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::removeZeroConstraint,
           ::py::arg("name"))
       .def(
+          "writeCSVData",
+          &dart::biomechanics::MarkerFitter::writeCSVData,
+          ::py::arg("path"),
+          ::py::arg("init"),
+          ::py::arg("rmsMarkerErrors"),
+          ::py::arg("maxMarkerErrors"),
+          ::py::arg("timestamps"))
+      .def(
           "getInitialization",
           &dart::biomechanics::MarkerFitter::getInitialization,
           ::py::arg("markerObservations"),

@@ -7570,13 +7570,14 @@ void MarkerFitter::removeZeroConstraint(std::string name)
 }
 
 //==============================================================================
-/// This writes a unified CSV with columns describing the results for a
-/// selected trial.
+/// This writes a unified CSV with columns describing the results for the trial
+  /// associated with this MarkerInitialization.
 void MarkerFitter::writeCSVData(
     std::string path,
     std::shared_ptr<MarkerInitialization> init,
-    const IKErrorReport& reportIK,
-    std::vector<double> timestamps)
+    const std::vector<s_t>& rmsMarkerErrors,
+    const std::vector<s_t>& maxMarkerErrors,
+    const std::vector<s_t>& timestamps)
 {
   // Convenience function.
   auto writeVectorToCSV = [](std::ofstream& csvFile, Eigen::VectorXs& vec) {
@@ -7606,8 +7607,6 @@ void MarkerFitter::writeCSVData(
   (void)init;
   int nrows = init->poses.cols();
   s_t dt = timestamps[1] - timestamps[0];
-  const auto& rmsMarkerError = reportIK.rootMeanSquaredError;
-  const auto& maxMarkerError = reportIK.maxError;
   assert(rmsMarkerError.size() == nrows);
   assert(maxMarkerError.size() == nrows);
   for (int t = 0; t < nrows; t++)
@@ -7629,7 +7628,7 @@ void MarkerFitter::writeCSVData(
     writeVectorToCSV(csvFile, ddq);
 
     // Marker errors.
-    csvFile << "," << rmsMarkerError[t] << "," << maxMarkerError[t];
+    csvFile << "," << rmsMarkerErrors[t] << "," << maxMarkerErrors[t];
   }
 
   csvFile.close();

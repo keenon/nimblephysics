@@ -1177,13 +1177,14 @@ public:
   /// This removes an equality constraint by name
   void removeZeroConstraint(std::string name);
 
-  /// This writes a unified CSV with columns describing the results for a
-  /// selected trial.
+  /// This writes a unified CSV with columns describing the results for the trial
+  /// associated with this MarkerInitialization.
   void writeCSVData(
       std::string path,
       std::shared_ptr<MarkerInitialization> init,
-      const IKErrorReport& reportIK,
-      std::vector<double> timestamps);
+      const std::vector<s_t>& rmsMarkerErrors,
+      const std::vector<s_t>& maxMarkerErrors,
+      const std::vector<s_t>& timestamps);
 
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
