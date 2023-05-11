@@ -92,9 +92,17 @@ void runOnRealOsim(
   }
 }
 
-bool runOnSyntheticOsim(std::string openSimPath, bool saveToGUI = false)
+bool verifyReconstructionOnSyntheticRandomPosesOsim(
+    std::string openSimPath, bool saveToGUI = false)
 {
   auto osim = OpenSimParser::parseOsim(openSimPath);
+  s_t targetHeight = 1.8;
+  s_t currentHeight = osim.skeleton->getHeight(
+      Eigen::VectorXs::Zero(osim.skeleton->getNumDofs()));
+  osim.skeleton->setBodyScales(
+      Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3)
+      * (targetHeight / currentHeight));
+
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::vector<Eigen::VectorXs> poses;
   std::vector<Eigen::VectorXs> jointCenters;
@@ -122,21 +130,32 @@ bool runOnSyntheticOsim(std::string openSimPath, bool saveToGUI = false)
     }
   }
 
+  // Reset to neutral scale
+  osim.skeleton->setBodyScales(
+      Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3));
+
   server::GUIRecording server;
   server.setFramesPerSecond(10);
   server.renderSkeleton(osim.skeleton);
   std::shared_ptr<dynamics::Skeleton> recoveredSkel
       = osim.skeleton->cloneSkeleton();
 
-  IKInitializer initializer(osim.skeleton, osim.markersMap, markerObservations);
+  IKInitializer initializer(
+      osim.skeleton, osim.markersMap, markerObservations, targetHeight);
 
-  s_t markerError = initializer.closedFormJointCenterSolver();
-  s_t markerErrorFromIK = initializer.estimatePosesAndGroupScalesInClosedForm();
-  (void)markerErrorFromIK;
-  for (int t = 0; t < markerObservations.size(); t++)
-  {
-    initializer.completeIKIteratively(t, osim.skeleton);
-  }
+  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
+  std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
+
+  s_t markerError = 0.0;
+  // initializer.reestimateDistancesFromJointCenters();
+  // s_t markerError = initializer.closedFormMDSJointCenterSolver();
+  // s_t markerErrorFromIK =
+  // initializer.estimatePosesAndGroupScalesInClosedForm();
+  // (void)markerErrorFromIK;
+  // for (int t = 0; t < markerObservations.size(); t++)
+  // {
+  //   initializer.completeIKIteratively(t, osim.skeleton);
+  // }
 
   std::vector<Eigen::VectorXs> recoveredPoses = initializer.mPoses;
   Eigen::VectorXs groupScales = initializer.mGroupScales;
@@ -453,7 +472,7 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
 #ifdef ALL_TESTS
 TEST(IKInitializer, SYNTHETIC_OSIM)
 {
-  EXPECT_TRUE(runOnSyntheticOsim(
+  EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(
       "dart://sample/grf/subject18_synthetic/"
       "unscaled_generic.osim",
       true));
@@ -475,8 +494,8 @@ TEST(IKInitializer, MARKER_RECONSTRUCTION)
 }
 #endif
 
-#ifdef ALL_TESTS
-TEST(IKInitializer, EVAL_PERFORMANCE)
+/*
+TEST(IKInitializer, VISUALIZE_RESULTS)
 {
   std::vector<std::string> trcFiles;
   trcFiles.push_back(
@@ -489,4 +508,4 @@ TEST(IKInitializer, EVAL_PERFORMANCE)
       1.775,
       true);
 }
-#endif
+*/

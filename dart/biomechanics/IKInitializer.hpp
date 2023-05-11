@@ -51,7 +51,14 @@ public:
   /// algorithm to triangulate the joint center location from the known marker
   /// locations of the markers attached to the joint's two body segments, and
   /// then known distance from the joint center to each marker.
-  s_t closedFormJointCenterSolver(bool logOutput = false);
+  s_t closedFormMDSJointCenterSolver(bool logOutput = false);
+
+  /// This first finds an approximate rigid body trajectory for each body
+  /// that has at least 3 markers on it, and then sets up and solves a linear
+  /// system of equations for each joint to find the pair of offsets in the
+  /// adjacent body nodes that results in the least offset between the joint
+  /// centers.
+  s_t closedFormPivotFindingJointCenterSolver(bool logOutput = false);
 
   /// This uses the current guesses for the joint centers to re-estimate the
   /// bone sizes (based on distance between joint centers) and then use that to

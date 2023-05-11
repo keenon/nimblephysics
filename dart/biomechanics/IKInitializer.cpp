@@ -214,9 +214,6 @@ IKInitializer::IKInitializer(
   {
     dynamics::Joint* joint = mSkel->getJoint(i);
 
-    // if (joint->isFixed())
-    //   continue;
-
     Eigen::Vector3s jointWorldCenter = jointWorldPositions.segment<3>(i * 3);
 
     std::map<std::string, s_t> jointToMarkerSquaredDistances;
@@ -281,44 +278,6 @@ IKInitializer::IKInitializer(
             = joint1ToJoint2SquaredDistance;
         mJointToJointSquaredDistances[joint2->getName()][joint1->getName()]
             = joint1ToJoint2SquaredDistance;
-
-        // 3.2. We also want to record the sequence of connecting body nodes,
-        // for the later scaling and positioning steps.
-        std::vector<dynamics::BodyNode*> bodyNodePath;
-        // If Joint2 is a parent of Joint1
-        if (joint1->getParentBodyNode() != nullptr
-            && isDynamicChildOfJoint(
-                joint1->getParentBodyNode()->getName(), joint2))
-        {
-          dynamics::BodyNode* current = joint1->getParentBodyNode();
-          while (current != nullptr)
-          {
-            bodyNodePath.push_back(current);
-            if (current->getParentJoint() == joint2)
-            {
-              break;
-            }
-            current = current->getParentBodyNode();
-          }
-        }
-        // Then Joint1 is a parent of Joint2
-        else
-        {
-          dynamics::BodyNode* current = joint2->getParentBodyNode();
-          while (current != nullptr)
-          {
-            bodyNodePath.push_back(current);
-            if (current->getParentJoint() == joint1)
-            {
-              break;
-            }
-            current = current->getParentBodyNode();
-          }
-        }
-        mJointToJointBodyNodesPath[joint1->getName()][joint2->getName()]
-            = bodyNodePath;
-        mJointToJointBodyNodesPath[joint2->getName()][joint1->getName()]
-            = bodyNodePath;
       }
     }
   }
@@ -332,11 +291,14 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
-  for (int i = 0; i < 10; i++)
-  {
-    closedFormJointCenterSolver(logOutput);
-    reestimateDistancesFromJointCenters();
-  }
+  // Use the pivot finding, where there is the huge wealth of marker information
+  // (3+ markers on adjacent body segments) to make it possible
+  closedFormPivotFindingJointCenterSolver();
+  reestimateDistancesFromJointCenters();
+  // Use the MDS solver, where there is less information (only 1-2 markers on
+  // adjacent body segments) to make it possible
+  closedFormMDSJointCenterSolver(logOutput);
+  // Fill in the parts of the body scales and poses that we can in closed form
   estimatePosesAndGroupScalesInClosedForm();
 
   for (int t = 0; t < mMarkerObservations.size(); t++)
@@ -356,7 +318,7 @@ void IKInitializer::runFullPipeline(bool logOutput)
 /// algorithm to triangulate the joint center location from the known marker
 /// locations of the markers attached to the joint's two body segments, and
 /// then known distance from the joint center to each marker.
-s_t IKInitializer::closedFormJointCenterSolver(bool logOutput)
+s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
 {
   // 0. Save the default pose and scale's version of the joint centers and
   // marker locations, so that we can use it to detect and resolve coplanar
@@ -516,6 +478,229 @@ s_t IKInitializer::closedFormJointCenterSolver(bool logOutput)
     mJointCenters.push_back(lastSolvedJointCenters);
   }
   return totalMarkerError / count;
+}
+
+//==============================================================================
+/// This first finds an approximate rigid body trajectory for each body
+/// that has at least 3 markers on it, and then sets up and solves a linear
+/// system of equations for each joint to find the pair of offsets in the
+/// adjacent body nodes that results in the least offset between the joint
+/// centers.
+s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
+{
+  // 1. Find all the bodies with at least 3 markers on them
+  std::map<std::string, int> bodyMarkerCounts;
+  for (auto& marker : mMarkers)
+  {
+    if (bodyMarkerCounts.count(marker.first->getName()) == 0)
+      bodyMarkerCounts[marker.first->getName()] = 0;
+    bodyMarkerCounts[marker.first->getName()]++;
+  }
+
+  // 2. Find all the joints with bodies on both sides that have 3 markers on
+  // them, and keep track of all adjacent bodies.
+  std::vector<dynamics::Joint*> jointsToSolve;
+  std::vector<std::string> bodiesAdjacentToJoints;
+  for (int i = 0; i < mSkel->getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = mSkel->getJoint(i);
+    if (joint->getParentBodyNode() == nullptr)
+      continue;
+    if (bodyMarkerCounts[joint->getParentBodyNode()->getName()] >= 3
+        && bodyMarkerCounts[joint->getChildBodyNode()->getName()] >= 3)
+    {
+      jointsToSolve.push_back(joint);
+      // Keep track of adjacent bodies, so we can solve for their positions
+      if (std::find(
+              bodiesAdjacentToJoints.begin(),
+              bodiesAdjacentToJoints.end(),
+              joint->getParentBodyNode()->getName())
+          == bodiesAdjacentToJoints.end())
+      {
+        bodiesAdjacentToJoints.push_back(joint->getParentBodyNode()->getName());
+      }
+      if (std::find(
+              bodiesAdjacentToJoints.begin(),
+              bodiesAdjacentToJoints.end(),
+              joint->getChildBodyNode()->getName())
+          == bodiesAdjacentToJoints.end())
+      {
+        bodiesAdjacentToJoints.push_back(joint->getChildBodyNode()->getName());
+      }
+    }
+  }
+
+  (void)logOutput;
+  // 3. Find the approximate rigid body trajectory for each body. The original
+  // transform doesn't matter, since we're just looking for the relative
+  // transform between the two bodies. So, arbitrarily, we choose the first
+  // timestep where 3 markers are observed as the identity transform.
+  std::map<std::string, std::map<int, Eigen::Isometry3s>> bodyTrajectories;
+  for (std::string bodyName : bodiesAdjacentToJoints)
+  {
+    // 3.1. Collect the names of the markers we're attached to
+    std::vector<std::string> attachedMarkers;
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      auto marker = mMarkers[i];
+      if (marker.first->getName() == bodyName)
+      {
+        attachedMarkers.push_back(mMarkerNames[i]);
+      }
+    }
+    // Go through all the timesteps, solving for relative transforms on the
+    // timesteps that we can.
+    std::map<int, Eigen::Isometry3s> bodyTrajectory;
+    std::vector<std::string> visibleMarkersCloud;
+    std::vector<Eigen::Vector3s> visibleMarkerCloudIdentityTransform;
+    bool foundFirstFrame = false;
+    for (int t = 0; t < mMarkerObservations.size(); t++)
+    {
+      // 3.2. We first search through all the frames to find the first frame
+      // where there are at least 3 markers visible on the body. Call this the
+      // identity transform.
+      if (!foundFirstFrame)
+      {
+        visibleMarkersCloud.clear();
+        visibleMarkerCloudIdentityTransform.clear();
+        for (std::string marker : attachedMarkers)
+        {
+          if (mMarkerObservations[t].count(marker))
+          {
+            visibleMarkersCloud.push_back(marker);
+            visibleMarkerCloudIdentityTransform.push_back(
+                mMarkerObservations[t][marker]);
+          }
+        }
+        if (visibleMarkersCloud.size() >= 3)
+        {
+          foundFirstFrame = true;
+          bodyTrajectory[t] = Eigen::Isometry3s::Identity();
+        }
+      }
+      // 3.3. Once we have the identity transform, we can solve for the relative
+      // transform of subsequent frames, if enough markers are visible.
+      else
+      {
+        std::vector<Eigen::Vector3s> identityMarkerCloud;
+        std::vector<Eigen::Vector3s> currentMarkerCloud;
+        std::vector<s_t> weights;
+        for (int i = 0; i < visibleMarkersCloud.size(); i++)
+        {
+          std::string marker = visibleMarkersCloud[i];
+          if (mMarkerObservations[t].count(marker))
+          {
+            identityMarkerCloud.push_back(
+                visibleMarkerCloudIdentityTransform[i]);
+            currentMarkerCloud.push_back(mMarkerObservations[t][marker]);
+            weights.push_back(1.0);
+          }
+        }
+
+        // 3.4. If we have enough markers, we can solve for the relative
+        // transform at this frame
+        if (identityMarkerCloud.size() >= 3)
+        {
+          bodyTrajectory[t] = getPointCloudToPointCloudTransform(
+              identityMarkerCloud, currentMarkerCloud, weights);
+        }
+      }
+    }
+    bodyTrajectories[bodyName] = bodyTrajectory;
+  }
+
+  // 4. Now we can solve for the relative transforms of each joint, by setting
+  // up a linear system of equations where the unknowns are the relative
+  // transforms from each body to the joint center, and the constraints are that
+  // those map to the same location in world space on each timestep.
+  s_t avgJointCenterError = 0.0;
+  for (dynamics::Joint* joint : jointsToSolve)
+  {
+    // At this point, the parent body node shouldn't be null
+    assert(joint->getParentBodyNode() != nullptr);
+    std::string parentBodyName = joint->getParentBodyNode()->getName();
+    std::string childBodyName = joint->getChildBodyNode()->getName();
+
+    // 4.1. Collect all the usable timesteps where transforms of parent and
+    // child are both known
+    std::vector<int> usableTimesteps;
+    for (int t = 0; t < mMarkerObservations.size(); t++)
+    {
+      if (bodyTrajectories[parentBodyName].count(t)
+          && bodyTrajectories[childBodyName].count(t))
+      {
+        usableTimesteps.push_back(t);
+      }
+    }
+
+    // 4.2. Subsample timesteps if necessary to keep problem size reasonable
+    const int maxSamples = 500;
+    if (usableTimesteps.size() > maxSamples)
+    {
+      std::vector<int> sampledIndices
+          = math::evenlySpacedTimesteps(usableTimesteps.size(), maxSamples);
+      std::vector<int> sampledTimesteps;
+      for (int index : sampledIndices)
+      {
+        sampledTimesteps.push_back(usableTimesteps[index]);
+      }
+      usableTimesteps = sampledTimesteps;
+    }
+
+    // 4.3. Setup the linear system of equations
+    int cols = 6;
+    int rows = usableTimesteps.size() * 3;
+
+    Eigen::MatrixXs A = Eigen::MatrixXs::Zero(rows, cols);
+    Eigen::VectorXs b = Eigen::VectorXs::Zero(rows);
+    for (int i = 0; i < usableTimesteps.size(); i++)
+    {
+      Eigen::Isometry3s parentTransform
+          = bodyTrajectories[parentBodyName][usableTimesteps[i]];
+      Eigen::Isometry3s childTransform
+          = bodyTrajectories[childBodyName][usableTimesteps[i]];
+      A.block<3, 3>(i * 3, 0) = parentTransform.linear();
+      A.block<3, 3>(i * 3, 3) = -1 * childTransform.linear();
+      b.segment<3>(i * 3)
+          = parentTransform.translation() - childTransform.translation();
+    }
+
+    Eigen::VectorXs target = Eigen::VectorXs::Zero(rows);
+    Eigen::VectorXs offsets = A.householderQr().solve(target - b);
+    assert(offsets.size() == 6);
+
+    // 4.4. Decode the results of our solution into average values
+    Eigen::Vector3s parentOffset = offsets.segment<3>(0);
+    Eigen::Vector3s childOffset = offsets.segment<3>(3);
+
+    // Ensure that we've got enough space in our joint centers vector
+    while (mJointCenters.size() < mMarkerObservations.size())
+    {
+      mJointCenters.push_back(std::map<std::string, Eigen::Vector3s>());
+    }
+
+    s_t error = 0.0;
+    for (int i = 0; i < usableTimesteps.size(); i++)
+    {
+      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][i];
+      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][i];
+      Eigen::Vector3s parentWorldCenter = parentTransform * parentOffset;
+      Eigen::Vector3s childWorldCenter = childTransform * childOffset;
+      Eigen::Vector3s jointCenter
+          = (parentWorldCenter + childWorldCenter) / 2.0;
+      error += (parentWorldCenter - jointCenter).norm();
+      error += (childWorldCenter - jointCenter).norm();
+
+      // 4.4.1. Record the result
+      mJointCenters[usableTimesteps[i]][joint->getName()] = jointCenter;
+    }
+
+    error /= usableTimesteps.size() * 2;
+    avgJointCenterError += error;
+  }
+  avgJointCenterError /= jointsToSolve.size();
+
+  return avgJointCenterError;
 }
 
 //==============================================================================
@@ -702,7 +887,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
   // 1.3. Scale any remaining bodies to a default scale based on the height, if
   // known
   Eigen::Vector3s defaultScales = Eigen::Vector3s::Ones();
-  Eigen::Vector3s defaultScaleWeights = Eigen::Vector3s::Zero();
+  Eigen::Vector3s defaultScaleWeights = Eigen::Vector3s::Ones() * 0.01;
 
   if (mModelHeightM > 0)
   {
@@ -712,16 +897,15 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
     {
       s_t ratio = mModelHeightM / defaultHeight;
       defaultScales = Eigen::Vector3s(ratio, ratio, ratio);
-      defaultScaleWeights = Eigen::Vector3s::Ones() * 0.01;
+    }
+  }
 
-      for (dynamics::BodyNode* bodyNode : mSkel->getBodyNodes())
-      {
-        if (bodyScales.count(bodyNode->getName()) == 0)
-        {
-          bodyScales[bodyNode->getName()] = defaultScales;
-          bodyScaleWeights[bodyNode->getName()] = defaultScaleWeights;
-        }
-      }
+  for (dynamics::BodyNode* bodyNode : mSkel->getBodyNodes())
+  {
+    if (bodyScales.count(bodyNode->getName()) == 0)
+    {
+      bodyScales[bodyNode->getName()] = defaultScales;
+      bodyScaleWeights[bodyNode->getName()] = defaultScaleWeights;
     }
   }
   // 1.4. Apply all the scalings to bodies, taking weighted averages over scale

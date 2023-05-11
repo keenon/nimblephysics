@@ -17,7 +17,6 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/MathTypes.hpp"
 
-
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
@@ -33,7 +32,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
     s_t massKg,
     s_t heightM,
     std::string sex,
-    bool saveGUI = false) {
+    bool saveGUI = false)
+{
 
   // Initialize data structures.
   // ---------------------------
@@ -45,7 +45,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   // Fill marker and GRF data structures.
   // ------------------------------------
   assert(trcFiles.size() == grfFiles.size());
-  for (int itrial = 0; itrial < (int)trcFiles.size(); itrial++) {
+  for (int itrial = 0; itrial < (int)trcFiles.size(); itrial++)
+  {
     // Markers.
     OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[itrial]);
     framesPerSecond.push_back(trc.framesPerSecond);
@@ -61,7 +62,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
-  if (standard.skeleton->getBodyNode("hand_r") != nullptr) {
+  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  {
     standard.skeleton->setScaleGroupUniformScaling(
         standard.skeleton->getBodyNode("hand_r"));
   }
@@ -76,19 +78,23 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   // Populate the markers list.
   // --------------------------
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerList;
-  for (auto& pair : standard.markersMap) {
+  for (auto& pair : standard.markersMap)
+  {
     markerList.push_back(pair.second);
   }
 
-  for (auto marker : standard.anatomicalMarkers) {
+  for (auto marker : standard.anatomicalMarkers)
+  {
     std::cout << "Anatomical marker: " << marker << std::endl;
   }
 
-  for (auto marker : standard.trackingMarkers) {
+  for (auto marker : standard.trackingMarkers)
+  {
     std::cout << "Tracking marker: " << marker << std::endl;
   }
 
-  for (auto marker : standard.markersMap) {
+  for (auto marker : standard.markersMap)
+  {
     std::cout << "Marker: " << marker.first << std::endl;
     std::cout << "  Body: " << marker.second.first->getName() << std::endl;
     std::cout << "  Offset: " << marker.second.second.transpose() << std::endl;
@@ -116,17 +122,22 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   std::vector<std::string> cols = anthropometrics->getMetricNames();
   cols.push_back("weightkg");
   std::shared_ptr<MultivariateGaussian> gauss;
-  if (sex == "male") {
+  if (sex == "male")
+  {
     gauss = MultivariateGaussian::loadFromCSV(
         "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
         cols,
         0.001); // mm -> m
-  } else if (sex == "female") {
+  }
+  else if (sex == "female")
+  {
     gauss = MultivariateGaussian::loadFromCSV(
         "dart://sample/osim/ANSUR/ANSUR_II_FEMALE_Public.csv",
         cols,
         0.001); // mm -> m
-  } else {
+  }
+  else
+  {
     gauss = MultivariateGaussian::loadFromCSV(
         "dart://sample/osim/ANSUR/ANSUR_II_BOTH_Public.csv",
         cols,
@@ -149,11 +160,13 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   // Create the error reports.
   // -------------------------
   std::vector<std::shared_ptr<MarkersErrorReport>> reports;
-  for (int i = 0; i < (int)markerObservationTrials.size(); i++) {
+  for (int i = 0; i < (int)markerObservationTrials.size(); i++)
+  {
     std::shared_ptr<MarkersErrorReport> report
         = fitter.generateDataErrorsReport(
             markerObservationTrials[i], 1.0 / (s_t)framesPerSecond[i]);
-    for (std::string& warning : report->warnings) {
+    for (std::string& warning : report->warnings)
+    {
       std::cout << "DATA WARNING: " << warning << std::endl;
     }
     markerObservationTrials[i] = report->markerObservationsAttemptedFixed;
@@ -169,7 +182,6 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
               .setMaxTrialsToUseForMultiTrialScaling(5)
               .setMaxTimestepsToUseForMultiTrialScaling(4000),
           150);
-
 
   // Create the final kinematics report.
   // -----------------------------------
@@ -189,14 +201,17 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   // Save all the results to files.
   // -----------------------------
   std::vector<std::vector<s_t>> timestamps;
-  for (int i = 0; i < (int)markerInit.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++)
+  {
     timestamps.emplace_back();
-    for (int t = 0; t < markerInit[i].poses.cols(); t++) {
+    for (int t = 0; t < markerInit[i].poses.cols(); t++)
+    {
       timestamps[i].push_back((s_t)t * (1.0 / framesPerSecond[i]));
     }
   }
 
-  for (int i = 0; i < (int)markerInit.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++)
+  {
     std::cout << "Saving IK Mot " << i << std::endl;
     OpenSimParser::saveMot(
         standard.skeleton,
@@ -217,7 +232,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   }
 
   std::vector<std::string> markerNames;
-  for (auto& pair : standard.markersMap) {
+  for (auto& pair : standard.markersMap)
+  {
     markerNames.push_back(pair.first);
   }
   std::cout << "Saving OpenSim IK XML" << std::endl;
@@ -229,7 +245,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
       "_ik_by_opensim.mot",
       "./_ik_setup.xml");
   // TODO: remove me
-  for (int i = 0; i < (int)markerInit.size(); i++) {
+  for (int i = 0; i < (int)markerInit.size(); i++)
+  {
     std::cout << "Saving OpenSim ID Forces " << i << " XML" << std::endl;
     OpenSimParser::saveOsimInverseDynamicsRawForcesXMLFile(
         "test_name",
@@ -278,8 +295,8 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
   return results;
 }
 
-void testSubject(const std::string& subject, const s_t& height,
-                 const s_t& mass) {
+void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
+{
 
   std::cout << "Testing " << subject << "..." << std::endl;
 
@@ -290,7 +307,7 @@ void testSubject(const std::string& subject, const s_t& height,
   std::vector<std::string> grfFiles;
   trcFiles.push_back(prefix + subject + "/trials/walk2/markers.trc");
   grfFiles.push_back(prefix + subject + "/trials/walk2/grf.mot");
-  const auto [markerInit, finalKinematicsReport, osimFile] = runMarkerFitter(
+  const auto tuple = runMarkerFitter(
       prefix + "unscaled_generic.osim",
       trcFiles,
       grfFiles,
@@ -298,11 +315,14 @@ void testSubject(const std::string& subject, const s_t& height,
       height,
       "male",
       true);
+  const auto markerInit = std::get<0>(tuple);
+  const auto finalKinematicsReport = std::get<1>(tuple);
+  const auto osimFile = std::get<2>(tuple);
 
   // Load ground-truth results.
   // --------------------------
-  auto goldOsim = OpenSimParser::parseOsim(
-      prefix + subject + "/subject01.osim");
+  auto goldOsim
+      = OpenSimParser::parseOsim(prefix + subject + "/subject01.osim");
   auto goldIK = OpenSimParser::loadMot(
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
 
@@ -311,17 +331,18 @@ void testSubject(const std::string& subject, const s_t& height,
   auto poses = markerInit.poses;
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  for (int i = 0; i < poses.cols(); i++) {
+  for (int i = 0; i < poses.cols(); i++)
+  {
     Eigen::VectorXs diff = poses.col(i) - goldPoses.col(i);
     totalError += diff.squaredNorm();
   }
   s_t averagePoseError = std::sqrt(totalError / (s_t)poses.cols());
-  EXPECT_TRUE(averagePoseError < 0.01);
+  EXPECT_LT(averagePoseError, 0.01);
 
   // Marker errors.
   // --------------
-  EXPECT_TRUE(finalKinematicsReport.averageRootMeanSquaredError < 0.01);
-  EXPECT_TRUE(finalKinematicsReport.averageMaxError < 0.02);
+  EXPECT_LT(finalKinematicsReport.averageRootMeanSquaredError, 0.01);
+  EXPECT_LT(finalKinematicsReport.averageMaxError, 0.02);
 
   // Joint centers.
   // --------------
@@ -330,45 +351,51 @@ void testSubject(const std::string& subject, const s_t& height,
   auto goldSkeleton = goldOsim.skeleton;
   auto goldJoints = goldSkeleton->getJoints();
   Eigen::VectorXs jointErrors = Eigen::VectorXs::Zero(poses.cols());
-  for (int i = 0; i < poses.cols(); i++) {
+  for (int i = 0; i < poses.cols(); i++)
+  {
     skeleton->setPositions(poses.col(i));
     goldSkeleton->setPositions(goldPoses.col(i));
     Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
-    Eigen::VectorXs goldJointPoses = goldSkeleton->getJointWorldPositions(
-        goldJoints);
+    Eigen::VectorXs goldJointPoses
+        = goldSkeleton->getJointWorldPositions(goldJoints);
     jointErrors[i] = (jointPoses - goldJointPoses).norm();
   }
   s_t averageJointPoseError = jointErrors.mean();
-  EXPECT_TRUE(averageJointPoseError < 0.01);
+  EXPECT_LT(averageJointPoseError, 0.01);
 
   // Body scales.
   // ------------
   auto bodies = skeleton->getBodyNodes();
   auto goldBodies = goldSkeleton->getBodyNodes();
   Eigen::VectorXs bodyScaleErrors = Eigen::VectorXs::Zero((int)bodies.size());
-  for (int i = 0; i < (int)bodies.size(); i++) {
+  for (int i = 0; i < (int)bodies.size(); i++)
+  {
     Eigen::Vector3s bodyScale = bodies[i]->getScale();
     Eigen::Vector3s goldBodyScale = goldBodies[i]->getScale();
     bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
   }
   s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_TRUE(averageBodyScaleError < 0.01);
+  EXPECT_LT(averageBodyScaleError, 0.01);
 }
 
 //==============================================================================
-TEST(Arnold2013Synthetic, RegressionTests) {
-  std::vector<string> subjects = {"subject01", "subject02", "subject04",
-                                  "subject18", "subject19"};
+TEST(Arnold2013Synthetic, RegressionTests)
+{
+  std::vector<string> subjects
+      = {"subject01", "subject02", "subject04", "subject18", "subject19"};
   std::vector<s_t> heights = {1.808, 1.853, 1.801, 1.775, 1.79};
   std::vector<s_t> masses = {72.84, 76.48, 80.3, 64.09, 68.5};
-  for (int i = 0; i < (int)subjects.size(); i++) {
+  for (int i = 0; i < (int)subjects.size(); i++)
+  {
     testSubject(subjects[i], heights[i], masses[i]);
   }
 }
 
+/*
 //==============================================================================
 int main(int argc, char* argv[])
 {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+*/
