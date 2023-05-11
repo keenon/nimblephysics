@@ -23,6 +23,40 @@
 namespace dart {
 namespace biomechanics {
 
+/// Several bookkeeping things need to happen in order to handle edge cases in
+/// arbitrary uploaded OpenSim files elegantly.
+///
+/// 1. Joints that are stacked on top of each other with negligible offsets
+/// between them (effectively using many low-DOF joints to represent one
+/// high-DOF joint) must be somehow merged and treated as a unit, so that we can
+/// use as many adjacent markers as possible and solve for a single shared joint
+/// center across all the "stacked" joints.
+///
+/// 2. Welded joints must be collapsed, and the bodies they connect must be
+/// treated as a single body.
+///
+/// What we ultimately want is to be able to rewrite the IK algorithms in terms
+/// of this SimplifiedSkeleton.
+///
+/// Really, this means that we're forming a new topology out of lists of bodies
+/// and lists of joints.
+struct StackedJoint;
+struct StackedBody;
+struct StackedJoint
+{
+  std::string name;
+  std::vector<dynamics::Joint*> joints;
+  std::shared_ptr<struct StackedBody> parentBody;
+  std::shared_ptr<struct StackedBody> childBody;
+};
+struct StackedBody
+{
+  std::string name;
+  std::vector<dynamics::BodyNode*> bodies;
+  std::shared_ptr<struct StackedJoint> parentJoint;
+  std::vector<std::shared_ptr<struct StackedJoint>> childJoints;
+};
+
 /**
  * This class implements a closed-form optimization problem for initializing the
  * joint center locations in world space over time, and then using that to
@@ -98,7 +132,7 @@ public:
 
   /// This gets the subset of joints that are attached to markers that are
   /// visible at a given timestep
-  std::vector<dynamics::Joint*> getVisibleJoints(int t);
+  std::vector<std::shared_ptr<struct StackedJoint>> getVisibleJoints(int t);
 
   /// This gets the world center estimates for joints that are attached to
   /// markers that are visible at this timestep.
@@ -142,17 +176,19 @@ protected:
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
 
-  std::vector<dynamics::Joint*> mJoints;
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointCenters;
 
   std::map<std::string, std::map<std::string, s_t>>
       mJointToMarkerSquaredDistances;
   std::map<std::string, std::map<std::string, s_t>>
       mJointToJointSquaredDistances;
-  std::map<std::string, std::map<std::string, std::vector<dynamics::BodyNode*>>>
-      mJointToJointBodyNodesPath;
 
 public:
+  // This holds the simplified skeleton, which is a list of (possibly stacked)
+  // bodies and joints. This is public to faccilitate unit testing.
+  std::vector<std::shared_ptr<struct StackedBody>> mStackedBodies;
+  std::vector<std::shared_ptr<struct StackedJoint>> mStackedJoints;
+
   // Results from the IK solver
   std::vector<std::map<std::string, Eigen::Isometry3s>> mBodyTransforms;
   Eigen::VectorXs mGroupScales;

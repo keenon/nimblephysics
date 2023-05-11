@@ -102,6 +102,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   osim.skeleton->setBodyScales(
       Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3)
       * (targetHeight / currentHeight));
+  Eigen::VectorXs goldGroupScales = osim.skeleton->getGroupScales();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::vector<Eigen::VectorXs> poses;
@@ -115,19 +116,6 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         osim.skeleton->getMarkerMapWorldPositions(osim.markersMap));
     jointCenters.push_back(
         osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints()));
-  }
-  std::map<std::string, std::map<std::string, s_t>>
-      originalJointToJointDistances;
-  for (auto* joint1 : osim.skeleton->getJoints())
-  {
-    for (auto* joint2 : osim.skeleton->getJoints())
-    {
-      originalJointToJointDistances[joint1->getName()][joint2->getName()]
-          = (jointCenters[0].segment<3>(joint1->getJointIndexInSkeleton() * 3)
-             - jointCenters[0].segment<3>(
-                 joint2->getJointIndexInSkeleton() * 3))
-                .norm();
-    }
   }
 
   // Reset to neutral scale
@@ -143,14 +131,44 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   IKInitializer initializer(
       osim.skeleton, osim.markersMap, markerObservations, targetHeight);
 
-  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
-  std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
+  std::map<std::string, std::map<std::string, s_t>>
+      originalJointToJointDistances;
+  std::map<std::string, int> jointStackSize;
+  for (auto& joint1 : initializer.mStackedJoints)
+  {
+    Eigen::Vector3s joint1Center = Eigen::Vector3s::Zero();
+    for (auto* j : joint1->joints)
+    {
+      joint1Center
+          += jointCenters[0].segment<3>(j->getJointIndexInSkeleton() * 3);
+    }
+    joint1Center /= joint1->joints.size();
+
+    jointStackSize[joint1->name] = joint1->joints.size();
+
+    for (auto& joint2 : initializer.mStackedJoints)
+    {
+      Eigen::Vector3s joint2Center = Eigen::Vector3s::Zero();
+      for (auto* j : joint2->joints)
+      {
+        joint2Center
+            += jointCenters[0].segment<3>(j->getJointIndexInSkeleton() * 3);
+      }
+      joint2Center /= joint2->joints.size();
+
+      originalJointToJointDistances[joint1->name][joint2->name]
+          = (joint1Center - joint2Center).norm();
+    }
+  }
+
+  // s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
+  // std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
 
   s_t markerError = 0.0;
   // initializer.reestimateDistancesFromJointCenters();
-  // s_t markerError = initializer.closedFormMDSJointCenterSolver();
+  markerError = initializer.closedFormMDSJointCenterSolver();
   // s_t markerErrorFromIK =
-  // initializer.estimatePosesAndGroupScalesInClosedForm();
+  initializer.estimatePosesAndGroupScalesInClosedForm();
   // (void)markerErrorFromIK;
   // for (int t = 0; t < markerObservations.size(); t++)
   // {
@@ -177,15 +195,23 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
                 << pair2.first << ": estimated " << estimatedDist
                 << ", original: " << originalDist
                 << ", error: " << (originalDist - estimatedDist) << std::endl;
-      if (std::abs(originalDist - estimatedDist) > 1e-8
-          && pair1.first.find("walker_knee") == std::string::npos
-          && pair2.first.find("walker_knee") == std::string::npos)
+      s_t threshold = 1e-8;
+      // If the joint isn't a perfectly rotational joint (either because it's
+      // actually a compound joint, or because it's a knee), we have much looser
+      // bounds on correctness, because the algorithms' core assumptions don't
+      // hold.
+      if (jointStackSize[pair1.first] > 1 || jointStackSize[pair2.first] > 1
+          || pair1.first.find("walker_knee") != std::string::npos
+          || pair2.first.find("walker_knee") != std::string::npos)
+      {
+        threshold = 0.02;
+      }
+      if (std::abs(originalDist - estimatedDist) > threshold)
       {
         std::cout << "Failed to reconstruct joint to joint distance between "
                   << pair1.first << " and " << pair2.first
-                  << "! Error should be less than 1e-8, unless a "
-                     "\"walker_knee\" joint is involved."
-                  << std::endl;
+                  << "! Error should be less than " << threshold << ", got "
+                  << std::abs(originalDist - estimatedDist) << std::endl;
         return false;
       }
     }
@@ -195,6 +221,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   {
     recoveredSkel->setGroupScales(groupScales);
   }
+  osim.skeleton->setGroupScales(goldGroupScales);
 
   s_t avgJointCenterEstimateError = 0.0;
   int numJointsCenterEstimatesCounted = 0;
