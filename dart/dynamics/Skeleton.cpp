@@ -2574,12 +2574,25 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
 
   setPositions(originalPose);
 
+  s_t height = 0;
   if (isfinite(maxUp) && isfinite(minUp))
   {
-    return maxUp - minUp;
+    height = maxUp - minUp;
   }
-  // Fallback
-  return 0.0;
+
+  // Check that we computed a valid height.
+  if (height == 0) {
+    std::cout << "ERROR: getHeight() computed a height of 0. Exiting..."
+              << std::endl;
+    exit(1);
+  } else if (height < 0) {
+    std::cout << "WARNING: getHeight() computed a negative height of "
+              << height << ". Exiting..." << std::endl;
+    exit(1);
+  } else {
+    return height;
+  }
+
 }
 
 //==============================================================================
