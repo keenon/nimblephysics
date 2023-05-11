@@ -13,6 +13,7 @@
 #include <coin/IpSolveStatistics.hpp>
 #include <coin/IpTNLP.hpp>
 
+#include "dart/biomechanics/IKInitializer.hpp"
 #include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"

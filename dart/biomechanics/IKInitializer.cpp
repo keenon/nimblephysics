@@ -1,25 +1,182 @@
 #include "dart/biomechanics/IKInitializer.hpp"
 
+#include <iostream>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include <Eigen/Eigenvalues>
 #include <Eigen/SVD>
 
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace biomechanics {
 
+//==============================================================================
+/// This is a helper struct that is used to simplify the code in
+/// estimatePosesAndGroupScales()
+typedef struct IKWeldedBodyGroup
+{
+  std::vector<dynamics::BodyNode*> bodies;
+  std::vector<Eigen::Isometry3s> relativeTransforms;
+  std::vector<std::string> adjacentJoints;
+  std::vector<Eigen::Vector3s> adjacentJointCenters;
+  std::vector<std::string> adjacentMarkers;
+  std::vector<Eigen::Vector3s> adjacentMarkerCenters;
+} IKWeldedBodyGroup;
+
+//==============================================================================
+/// This returns true if the given body is the parent of the joint OR if
+/// there's a hierarchy of fixed joints that connect it to the parent
+bool isDynamicParentOfJoint(std::string bodyName, dynamics::Joint* joint)
+{
+  while (true)
+  {
+    if (joint->getParentBodyNode() == nullptr)
+      return false;
+    if (bodyName == joint->getParentBodyNode()->getName())
+    {
+      return true;
+    }
+    // Recurse up the chain, as long as we're traversing only fixed joints
+    if (joint->getParentBodyNode()->getParentJoint() != nullptr
+        && joint->getParentBodyNode()->getParentJoint()->isFixed())
+    {
+      joint = joint->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+//==============================================================================
+/// This returns true if the given body is the child of the joint OR if
+/// there's a hierarchy of fixed joints that connect it to the child
+bool isDynamicChildOfJoint(std::string bodyName, dynamics::Joint* joint)
+{
+  while (true)
+  {
+    if (joint->getChildBodyNode() == nullptr)
+      return false;
+    if (bodyName == joint->getChildBodyNode()->getName())
+    {
+      return true;
+    }
+    // Recurse down the chain, as long as we're traversing only fixed joints
+    if (joint->getChildBodyNode()->getNumChildJoints() == 1
+        && joint->getChildBodyNode()->getChildJoint(0)->isFixed())
+    {
+      joint = joint->getChildBodyNode()->getChildJoint(0);
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+//==============================================================================
+bool isCoplanar(const std::vector<Eigen::Vector3s>& points)
+{
+  // Ensure there are at least 4 points
+  if (points.size() < 4)
+  {
+    return true;
+  }
+
+  // Choose the first three points and form two vectors
+  const Eigen::Vector3s& p1 = points[0];
+  const Eigen::Vector3s& p2 = points[1];
+  const Eigen::Vector3s& p3 = points[2];
+  const Eigen::Vector3s v1 = p2 - p1;
+  const Eigen::Vector3s v2 = p3 - p1;
+
+  // Calculate the cross-product of the two vectors to get a normal vector
+  const Eigen::Vector3s normal = v1.cross(v2).normalized();
+
+  // Check if all remaining points are coplanar with the first three points
+  for (size_t i = 3; i < points.size(); ++i)
+  {
+    // Form a vector from one of the original three points to the current point
+    const Eigen::Vector3s& point = points[i];
+    const Eigen::Vector3s v = point - p1;
+
+    // Calculate the dot product of the vector with the normal vector
+    const double dot_product = v.dot(normal);
+
+    // Check if the dot product is greater zero, and if so we have found a
+    // non-coplanar point
+    const s_t threshold = 1e-3;
+    if (std::abs(dot_product) > threshold)
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+//==============================================================================
+Eigen::Vector3s ensureOnSameSideOfPlane(
+    const std::vector<Eigen::Vector3s>& neutralPoints,
+    Eigen::Vector3s neutralGoal,
+    std::vector<Eigen::Vector3s> actualPoints,
+    Eigen::Vector3s ambiguousReconstructionFromActualPoints)
+{
+  if (neutralPoints.size() < 3 || actualPoints.size() < 3)
+  {
+    return ambiguousReconstructionFromActualPoints;
+  }
+
+  // Choose the first three points and form two vectors
+  const Eigen::Vector3s neutralNormal
+      = ((neutralPoints[1] - neutralPoints[0])
+             .cross(neutralPoints[2] - neutralPoints[0]))
+            .normalized();
+  s_t neutralGoalDistanceFromNormal
+      = (neutralGoal - neutralPoints[0]).dot(neutralNormal);
+
+  const Eigen::Vector3s actualNormal
+      = ((actualPoints[1] - actualPoints[0])
+             .cross(actualPoints[2] - actualPoints[0]))
+            .normalized();
+  s_t ambiguousReconstructionDistanceFromNormal
+      = (ambiguousReconstructionFromActualPoints - actualPoints[0])
+            .dot(actualNormal);
+
+  if (neutralGoalDistanceFromNormal * ambiguousReconstructionDistanceFromNormal
+      < 0)
+  {
+    // If they're on opposite sides of the plane, flip the `actualGoal` to be on
+    // the same side of the plane as the `neutralGoal`.
+    return ambiguousReconstructionFromActualPoints
+           - 2 * ambiguousReconstructionDistanceFromNormal * actualNormal;
+  }
+  else
+  {
+    // If they're already on the same side of the plane, don't worry
+    return ambiguousReconstructionFromActualPoints;
+  }
+}
+
+//==============================================================================
 IKInitializer::IKInitializer(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         markers,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
     s_t modelHeightM)
-  : mSkel(skel), mMarkerObservations(markerObservations)
+  : mSkel(skel),
+    mMarkerObservations(markerObservations),
+    mModelHeightM(modelHeightM)
 {
   // 1. Convert the marker map to an ordered list
   for (auto& pair : markers)
@@ -42,11 +199,12 @@ IKInitializer::IKInitializer(
       mSkel->setBodyScales(mSkel->getBodyScales() * ratio);
       s_t newHeight
           = mSkel->getHeight(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+      (void)newHeight;
       assert(abs(newHeight - modelHeightM) < 1e-6);
     }
   }
 
-  // 2. Find all the joints that are connected to at least one marker, and
+  // 2. Find all the joints that are connected to at least three markers and
   // measure the distances between that joint center and the adjacent markers
   Eigen::VectorXs jointWorldPositions
       = mSkel->getJointWorldPositions(mSkel->getJoints());
@@ -55,13 +213,17 @@ IKInitializer::IKInitializer(
   for (int i = 0; i < mSkel->getNumJoints(); i++)
   {
     dynamics::Joint* joint = mSkel->getJoint(i);
+
+    // if (joint->isFixed())
+    //   continue;
+
     Eigen::Vector3s jointWorldCenter = jointWorldPositions.segment<3>(i * 3);
 
     std::map<std::string, s_t> jointToMarkerSquaredDistances;
     for (int j = 0; j < mMarkers.size(); j++)
     {
-      if (mMarkers[j].first->getParentJoint() == joint
-          || joint->getParentBodyNode() == mMarkers[j].first)
+      if (isDynamicChildOfJoint(mMarkers[j].first->getName(), joint)
+          || isDynamicParentOfJoint(mMarkers[j].first->getName(), joint))
       {
         Eigen::Vector3s markerWorldCenter
             = markerWorldPositions.segment<3>(j * 3);
@@ -75,7 +237,7 @@ IKInitializer::IKInitializer(
       }
     }
 
-    if (jointToMarkerSquaredDistances.size() > 0)
+    if (jointToMarkerSquaredDistances.size() >= 3)
     {
       mJoints.push_back(mSkel->getJoint(i));
       mJointToMarkerSquaredDistances[joint->getName()]
@@ -102,10 +264,14 @@ IKInitializer::IKInitializer(
       }
       Eigen::Vector3s joint2WorldCenter = jointWorldPositions.segment<3>(j * 3);
 
+      // 3.1. If the joints are connected by a body (or a series of bodies
+      // connected with fixed joints), then record them
       if ((joint1->getParentBodyNode() != nullptr
-           && joint1->getParentBodyNode()->getParentJoint() == joint2)
+           && isDynamicChildOfJoint(
+               joint1->getParentBodyNode()->getName(), joint2))
           || (joint2->getParentBodyNode() != nullptr
-              && joint2->getParentBodyNode()->getParentJoint() == joint1))
+              && isDynamicChildOfJoint(
+                  joint2->getParentBodyNode()->getName(), joint1)))
       {
         Eigen::Vector3s joint1ToJoint2 = joint2WorldCenter - joint1WorldCenter;
         s_t joint1ToJoint2SquaredDistance = joint1ToJoint2.squaredNorm();
@@ -115,6 +281,44 @@ IKInitializer::IKInitializer(
             = joint1ToJoint2SquaredDistance;
         mJointToJointSquaredDistances[joint2->getName()][joint1->getName()]
             = joint1ToJoint2SquaredDistance;
+
+        // 3.2. We also want to record the sequence of connecting body nodes,
+        // for the later scaling and positioning steps.
+        std::vector<dynamics::BodyNode*> bodyNodePath;
+        // If Joint2 is a parent of Joint1
+        if (joint1->getParentBodyNode() != nullptr
+            && isDynamicChildOfJoint(
+                joint1->getParentBodyNode()->getName(), joint2))
+        {
+          dynamics::BodyNode* current = joint1->getParentBodyNode();
+          while (current != nullptr)
+          {
+            bodyNodePath.push_back(current);
+            if (current->getParentJoint() == joint2)
+            {
+              break;
+            }
+            current = current->getParentBodyNode();
+          }
+        }
+        // Then Joint1 is a parent of Joint2
+        else
+        {
+          dynamics::BodyNode* current = joint2->getParentBodyNode();
+          while (current != nullptr)
+          {
+            bodyNodePath.push_back(current);
+            if (current->getParentJoint() == joint1)
+            {
+              break;
+            }
+            current = current->getParentBodyNode();
+          }
+        }
+        mJointToJointBodyNodesPath[joint1->getName()][joint2->getName()]
+            = bodyNodePath;
+        mJointToJointBodyNodesPath[joint2->getName()][joint1->getName()]
+            = bodyNodePath;
       }
     }
   }
@@ -123,12 +327,62 @@ IKInitializer::IKInitializer(
   mSkel->setBodyScales(oldScales);
 }
 
+//==============================================================================
+/// This runs the full IK initialization algorithm, and leaves the answers in
+/// the public fields of this class
+void IKInitializer::runFullPipeline(bool logOutput)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    closedFormJointCenterSolver(logOutput);
+    reestimateDistancesFromJointCenters();
+  }
+  estimatePosesAndGroupScalesInClosedForm();
+
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    if (logOutput || t % 20 == 0)
+    {
+      std::cout << "Completing IK for " << t << "/"
+                << mMarkerObservations.size() << " timesteps" << std::endl;
+    }
+    completeIKIteratively(t, mSkel);
+    fineTuneIKIteratively(t, mSkel);
+  }
+}
+
+//==============================================================================
 /// For each timestep, and then for each joint, this sets up and runs an MDS
 /// algorithm to triangulate the joint center location from the known marker
 /// locations of the markers attached to the joint's two body segments, and
 /// then known distance from the joint center to each marker.
-s_t IKInitializer::islandJointCenterSolver()
+s_t IKInitializer::closedFormJointCenterSolver(bool logOutput)
 {
+  // 0. Save the default pose and scale's version of the joint centers and
+  // marker locations, so that we can use it to detect and resolve coplanar
+  // ambiguity in subsequent steps.
+  Eigen::VectorXs oldPositions = mSkel->getPositions();
+  Eigen::VectorXs oldScales = mSkel->getBodyScales();
+  Eigen::VectorXs neutralSkelJointWorldPositions
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+  Eigen::VectorXs neutralSkelMarkerWorldPositions
+      = mSkel->getMarkerWorldPositions(mMarkers);
+  mSkel->setPositions(oldPositions);
+  mSkel->setBodyScales(oldScales);
+  std::map<std::string, Eigen::Vector3s>
+      neutralSkelJointCenterWorldPositionsMap;
+  for (int i = 0; i < mSkel->getNumJoints(); i++)
+  {
+    neutralSkelJointCenterWorldPositionsMap[mSkel->getJoint(i)->getName()]
+        = neutralSkelJointWorldPositions.segment<3>(i * 3);
+  }
+  std::map<std::string, Eigen::Vector3s> neutralSkelMarkerWorldPositionsMap;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    neutralSkelMarkerWorldPositionsMap[mMarkerNames[i]]
+        = neutralSkelMarkerWorldPositions.segment<3>(i * 3);
+  }
+
   s_t totalMarkerError = 0.0;
   int count = 0;
   mJointCenters.clear();
@@ -142,11 +396,15 @@ s_t IKInitializer::islandJointCenterSolver()
       for (dynamics::Joint* joint : joints)
       {
         // If we already solved this joint, no need to go again
-        // if (lastSolvedJointCenters.count(joint->getName()))
-        //   continue;
+        if (lastSolvedJointCenters.count(joint->getName()))
+          continue;
 
         std::vector<Eigen::Vector3s> adjacentPointLocations;
         std::vector<s_t> adjacentPointSquaredDistances;
+        // These are the locations of each of the adjacent points, but on the
+        // unscaled skeleton in the neutral pose, which we use to detect and
+        // resolve coplanar ambiguity during reconstruction.
+        std::vector<Eigen::Vector3s> adjacentPointLocationsInNeutralSkel;
 
         // 1. Find the markers that are adjacent to this joint and visible on
         // this frame
@@ -157,6 +415,8 @@ s_t IKInitializer::islandJointCenterSolver()
             adjacentPointLocations.push_back(
                 mMarkerObservations[t][pair.first]);
             adjacentPointSquaredDistances.push_back(pair.second);
+            adjacentPointLocationsInNeutralSkel.push_back(
+                neutralSkelMarkerWorldPositionsMap[pair.first]);
           }
         }
 
@@ -167,6 +427,8 @@ s_t IKInitializer::islandJointCenterSolver()
             adjacentPointLocations.push_back(
                 lastSolvedJointCenters[pair.first]);
             adjacentPointSquaredDistances.push_back(pair.second);
+            adjacentPointLocationsInNeutralSkel.push_back(
+                neutralSkelJointCenterWorldPositionsMap[pair.first]);
           }
         }
 
@@ -206,11 +468,45 @@ s_t IKInitializer::islandJointCenterSolver()
               += (adjacentPointLocations[j] - transformed.col(j)).norm();
         }
         pointCloudError /= adjacentPointLocations.size();
+        if (logOutput)
+        {
+          std::cout << "Joint center " << joint->getName()
+                    << " point cloud reconstruction error: " << pointCloudError
+                    << "m" << std::endl;
+        }
         totalMarkerError += pointCloudError;
         count++;
 
-        // 5. Record the newly found joint center
+        // 5. If the point cloud is co-planar (or very close to it), then
+        // there's ambiguity about which side of the plane to place the joint
+        // center. We'll check co-planarity on the neutral skeleton also, to
+        // avoid having noise in the real marker data fool us into thinking
+        // there isn't a coplanar ambiguity. Then we can also use the neutral
+        // skeleton to resolve which side of the plane to place the joint
+        // center.
         Eigen::Vector3s jointCenter = transformed.col(dim - 1);
+        if (isCoplanar(adjacentPointLocationsInNeutralSkel)
+            || isCoplanar(adjacentPointLocations))
+        {
+          if (logOutput)
+          {
+            std::cout << "Joint " << joint->getName()
+                      << " has coplanar support, and is therefore ambiguous! "
+                         "Resolving ambiguity."
+                      << std::endl;
+          }
+          // If the point cloud is coplanar, then we need to resolve the
+          // ambiguity about which side of the plane to place the joint center.
+          // We do this by checking which side of the plane the joint center is
+          // on in the neutral pose, and ensuring that the joint center is on
+          // the same side of the plane in the reconstructed pose.
+          jointCenter = ensureOnSameSideOfPlane(
+              adjacentPointLocationsInNeutralSkel,
+              neutralSkelJointCenterWorldPositionsMap[joint->getName()],
+              adjacentPointLocations,
+              jointCenter);
+        }
+
         solvedJointCenters[joint->getName()] = jointCenter;
       }
       if (solvedJointCenters.size() == lastSolvedJointCenters.size())
@@ -220,6 +516,786 @@ s_t IKInitializer::islandJointCenterSolver()
     mJointCenters.push_back(lastSolvedJointCenters);
   }
   return totalMarkerError / count;
+}
+
+//==============================================================================
+/// This uses the current guesses for the joint centers to re-estimate the
+/// bone sizes (based on distance between joint centers) and then use that to
+/// get the group scale vector. This also uses the joint centers to estimate
+/// the body positions.
+s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
+{
+  Eigen::VectorXs originalPose = mSkel->getPositions();
+  Eigen::VectorXs originalBodyScales = mSkel->getBodyScales();
+  mSkel->setBodyScales(Eigen::VectorXs::Ones(mSkel->getNumBodyNodes() * 3));
+  mSkel->setPositions(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+
+  Eigen::VectorXs jointWorldPositions
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+
+  // 1. Estimate the bone sizes from the joint centers
+
+  // 1.1. Get estimated joint to joint distances from our current joint center
+  // guesses
+  std::map<std::string, std::map<std::string, s_t>>
+      estimatedJointToJointDistances = estimateJointToJointDistances();
+  // 1.2. Find a scale for all the bodies that we can
+  std::map<std::string, Eigen::Vector3s> bodyScales;
+  std::map<std::string, Eigen::Vector3s> bodyScaleWeights;
+  for (dynamics::BodyNode* bodyNode : mSkel->getBodyNodes())
+  {
+    // 1.2.1. Collect joints adjacent to this body that we can potentially use
+    // to help scale
+    std::vector<dynamics::Joint*> adjacentJoints;
+    adjacentJoints.push_back(bodyNode->getParentJoint());
+    for (int i = 0; i < bodyNode->getNumChildJoints(); i++)
+    {
+      adjacentJoints.push_back(bodyNode->getChildJoint(i));
+    }
+
+    // 1.2.2. Find which pairs of joints (expressed as locations in the local
+    // frame of the body), if any, have estimated distances between them
+    std::vector<std::tuple<std::string, std::string, s_t>> jointPairs;
+    std::map<std::string, Eigen::Vector3s> jointsInLocalSpace;
+    for (int i = 0; i < adjacentJoints.size(); i++)
+    {
+      for (int j = i + 1; j < adjacentJoints.size(); j++)
+      {
+        dynamics::Joint* joint1 = adjacentJoints[i];
+        dynamics::Joint* joint2 = adjacentJoints[j];
+        if (estimatedJointToJointDistances.count(joint1->getName()) > 0
+            && estimatedJointToJointDistances[joint1->getName()].count(
+                   joint2->getName())
+                   > 0)
+        {
+          s_t dist = estimatedJointToJointDistances[joint1->getName()]
+                                                   [joint2->getName()];
+          Eigen::Vector3s joint1WorldPos = jointWorldPositions.segment<3>(
+              joint1->getJointIndexInSkeleton() * 3);
+          Eigen::Vector3s joint2WorldPos = jointWorldPositions.segment<3>(
+              joint2->getJointIndexInSkeleton() * 3);
+          Eigen::Vector3s joint1LocalPos
+              = bodyNode->getWorldTransform().inverse() * joint1WorldPos;
+          jointsInLocalSpace[joint1->getName()] = joint1LocalPos;
+          Eigen::Vector3s joint2LocalPos
+              = bodyNode->getWorldTransform().inverse() * joint2WorldPos;
+          jointsInLocalSpace[joint2->getName()] = joint2LocalPos;
+          jointPairs.emplace_back(joint1->getName(), joint2->getName(), dist);
+        }
+      }
+    }
+
+    // 1.2.3. If we have a single joint pair, then we can use that to scale the
+    // body
+    if (jointPairs.size() == 1)
+    {
+      std::string joint1Name = std::get<0>(jointPairs[0]);
+      std::string joint2Name = std::get<1>(jointPairs[0]);
+      s_t desiredDist = std::get<2>(jointPairs[0]);
+      s_t currentDist
+          = (jointsInLocalSpace[joint1Name] - jointsInLocalSpace[joint2Name])
+                .norm();
+      s_t scale = desiredDist / currentDist;
+      if (log)
+      {
+        std::cout << "Scaling " << bodyNode->getName() << " by " << scale
+                  << " based on " << joint1Name << " and " << joint2Name
+                  << std::endl;
+      }
+      bodyScales[bodyNode->getName()] = Eigen::Vector3s(scale, scale, scale);
+      bodyScaleWeights[bodyNode->getName()]
+          = Eigen::Vector3s::Ones() * currentDist * currentDist;
+    }
+    // 1.2.4. If we have multiple joint pairs, then we can use those to scale
+    // along multiple axis at once.
+    else if (jointPairs.size() > 1)
+    {
+      assert(jointsInLocalSpace.size() > 0);
+      std::map<std::string, int> jointToIndex;
+      std::vector<Eigen::Vector3s> jointsInLocalSpaceVector;
+      for (auto& pair : jointsInLocalSpace)
+      {
+        jointToIndex[pair.first] = jointToIndex.size();
+        jointsInLocalSpaceVector.push_back(pair.second);
+      }
+      assert(jointsInLocalSpaceVector.size() > 0);
+
+      // Default the square distances to the current distances, in case we're
+      // missing some pairs
+      Eigen::MatrixXs squaredDistances = Eigen::MatrixXs::Zero(
+          jointsInLocalSpace.size(), jointsInLocalSpace.size());
+      for (auto& pair1 : jointsInLocalSpace)
+      {
+        for (auto& pair2 : jointsInLocalSpace)
+        {
+          squaredDistances(jointToIndex[pair1.first], jointToIndex[pair2.first])
+              = (pair1.second - pair2.second).squaredNorm();
+        }
+      }
+
+      // Now overwrite the distances we have with the estimated distances
+      for (auto& pair : jointPairs)
+      {
+        std::string joint1Name = std::get<0>(pair);
+        std::string joint2Name = std::get<1>(pair);
+        s_t desiredDist = std::get<2>(pair);
+        squaredDistances(jointToIndex[joint1Name], jointToIndex[joint2Name])
+            = desiredDist * desiredDist;
+        squaredDistances(jointToIndex[joint2Name], jointToIndex[joint1Name])
+            = desiredDist * desiredDist;
+      }
+
+      // Now we can run MDS to get the point cloud
+      Eigen::MatrixXs rawPointCloud
+          = getPointCloudFromDistanceMatrix(squaredDistances);
+
+      // Now we can map the point cloud back to the original locations
+      Eigen::MatrixXs pointCloud
+          = mapPointCloudToData(rawPointCloud, jointsInLocalSpaceVector);
+
+      // Compute axis scales as the average ratio of the columns of `pointCloud`
+      // to `jointsInLocalSpaceVector`
+      Eigen::Vector3s axisScales = Eigen::Vector3s::Zero();
+      Eigen::Vector3s axisLengthSum = Eigen::Vector3s::Zero();
+      for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
+      {
+        axisLengthSum += jointsInLocalSpaceVector[i].cwiseProduct(
+            jointsInLocalSpaceVector[i]);
+        for (int axis = 0; axis < 3; axis++)
+        {
+          if (jointsInLocalSpaceVector[i](axis) > 0)
+          {
+            axisScales(axis)
+                += pointCloud(axis, i) / jointsInLocalSpaceVector[i](axis);
+          }
+          else
+          {
+            // We have info about this axis, so assume the scale is perfectly
+            // fine
+            axisScales(axis) += 1.0;
+          }
+        }
+      }
+      axisScales /= jointsInLocalSpaceVector.size();
+
+      if (log)
+      {
+        std::cout << "Scaling " << bodyNode->getName() << " by "
+                  << axisScales.transpose() << " based on " << jointPairs.size()
+                  << " pairs of joints" << std::endl;
+        for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
+        {
+          Eigen::Vector3s target = pointCloud.col(i);
+          Eigen::Vector3s scaled
+              = jointsInLocalSpaceVector[i].cwiseProduct(axisScales);
+          std::cout << "  " << i
+                    << " reconstruction error = " << (target - scaled).norm()
+                    << ": target " << target.transpose() << " vs scaled "
+                    << scaled.transpose() << std::endl;
+        }
+      }
+
+      bodyScales[bodyNode->getName()] = axisScales;
+      bodyScaleWeights[bodyNode->getName()] = axisLengthSum;
+    }
+  }
+  // 1.3. Scale any remaining bodies to a default scale based on the height, if
+  // known
+  Eigen::Vector3s defaultScales = Eigen::Vector3s::Ones();
+  Eigen::Vector3s defaultScaleWeights = Eigen::Vector3s::Zero();
+
+  if (mModelHeightM > 0)
+  {
+    s_t defaultHeight
+        = mSkel->getHeight(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+    if (defaultHeight > 0)
+    {
+      s_t ratio = mModelHeightM / defaultHeight;
+      defaultScales = Eigen::Vector3s(ratio, ratio, ratio);
+      defaultScaleWeights = Eigen::Vector3s::Ones() * 0.01;
+
+      for (dynamics::BodyNode* bodyNode : mSkel->getBodyNodes())
+      {
+        if (bodyScales.count(bodyNode->getName()) == 0)
+        {
+          bodyScales[bodyNode->getName()] = defaultScales;
+          bodyScaleWeights[bodyNode->getName()] = defaultScaleWeights;
+        }
+      }
+    }
+  }
+  // 1.4. Apply all the scalings to bodies, taking weighted averages over scale
+  // groups
+  for (auto& group : mSkel->getBodyScaleGroups())
+  {
+    Eigen::Vector3s scaleAvg = defaultScales.cwiseProduct(defaultScaleWeights);
+    Eigen::Vector3s weightsSum = defaultScaleWeights;
+
+    std::cout << "Scaling group:" << std::endl;
+    for (auto* body : group.nodes)
+    {
+      // Prevent divide-by-zero errors
+      Eigen::Vector3s weight = bodyScaleWeights[body->getName()];
+      for (int axis = 0; axis < 3; axis++)
+      {
+        if (weight(axis) <= 0)
+          weight(axis) = 1e-5;
+      }
+
+      std::cout << "  " << body->getName() << " = "
+                << bodyScales[body->getName()].transpose() << " with weight "
+                << weight.transpose() << std::endl;
+      scaleAvg += bodyScales[body->getName()].cwiseProduct(weight);
+      weightsSum += weight;
+    }
+    scaleAvg = scaleAvg.cwiseQuotient(weightsSum);
+    std::cout << "  -> weighted avg = " << scaleAvg.transpose() << std::endl;
+    for (auto* body : group.nodes)
+    {
+      body->setScale(scaleAvg);
+    }
+  }
+  // 1.5. Ensure that the scaling is symmetric across groups, by condensing into
+  // the group scales vector and then re-setting the body scales from that
+  // vector.
+  mGroupScales = mSkel->getGroupScales();
+  mSkel->setGroupScales(mGroupScales);
+  // Recompute the joint world positions
+  jointWorldPositions = mSkel->getJointWorldPositions(mSkel->getJoints());
+
+  // 2. We'll need to go by groups of bodies connected by weld joints in the
+  // subsequent code, so compute and store those outside of the time loop.
+  std::vector<IKWeldedBodyGroup> weldedGroups;
+  for (auto* body : mSkel->getBodyNodes())
+  {
+    weldedGroups.emplace_back();
+    weldedGroups[weldedGroups.size() - 1].bodies.push_back(body);
+  }
+  for (auto* joint : mSkel->getJoints())
+  {
+    if (joint->getNumDofs() == 0 && joint->getParentBodyNode() != nullptr)
+    {
+      int parentGroupIndex = -1;
+      int childGroupIndex = -1;
+      for (int i = 0; i < weldedGroups.size(); i++)
+      {
+        if (std::find(
+                weldedGroups[i].bodies.begin(),
+                weldedGroups[i].bodies.end(),
+                joint->getParentBodyNode())
+            != weldedGroups[i].bodies.end())
+        {
+          parentGroupIndex = i;
+        }
+        if (std::find(
+                weldedGroups[i].bodies.begin(),
+                weldedGroups[i].bodies.end(),
+                joint->getChildBodyNode())
+            != weldedGroups[i].bodies.end())
+        {
+          childGroupIndex = i;
+        }
+      }
+      assert(parentGroupIndex != -1);
+      assert(childGroupIndex != -1);
+      if (parentGroupIndex != childGroupIndex)
+      {
+        weldedGroups[parentGroupIndex].bodies.insert(
+            weldedGroups[parentGroupIndex].bodies.end(),
+            weldedGroups[childGroupIndex].bodies.begin(),
+            weldedGroups[childGroupIndex].bodies.end());
+        weldedGroups.erase(weldedGroups.begin() + childGroupIndex);
+      }
+    }
+  }
+  // 2.1. Compute all the related information for each welded group, everything
+  // in the frame of the first (root) body in the welded group. We compute the
+  // transforms of any other bodies, the joint centers, and the marker centers.
+
+  // 2.1.1. Compute body relative transforms
+  for (int i = 0; i < weldedGroups.size(); i++)
+  {
+    for (int j = 0; j < weldedGroups[i].bodies.size(); j++)
+    {
+      weldedGroups[i].relativeTransforms.push_back(
+          weldedGroups[i].bodies[0]->getWorldTransform().inverse()
+          * weldedGroups[i].bodies[j]->getWorldTransform());
+    }
+  }
+  // 2.1.2. Compute adjacent joints and their relative transforms
+  for (auto* joint : mSkel->getJoints())
+  {
+    for (auto& weldedGroup : weldedGroups)
+    {
+      if (std::find(
+              weldedGroup.bodies.begin(),
+              weldedGroup.bodies.end(),
+              joint->getParentBodyNode())
+              != weldedGroup.bodies.end()
+          || std::find(
+                 weldedGroup.bodies.begin(),
+                 weldedGroup.bodies.end(),
+                 joint->getChildBodyNode())
+                 != weldedGroup.bodies.end())
+      {
+        weldedGroup.adjacentJoints.push_back(joint->getName());
+        Eigen::Vector3s jointCenter = jointWorldPositions.segment<3>(
+            joint->getJointIndexInSkeleton() * 3);
+        weldedGroup.adjacentJointCenters.push_back(
+            weldedGroup.bodies[0]->getWorldTransform().inverse() * jointCenter);
+      }
+    }
+  }
+  // 2.1.3. Compute adjacent markers and their relative transforms
+  Eigen::VectorXs markerWorldPositions
+      = mSkel->getMarkerWorldPositions(mMarkers);
+  for (int i = 0; i < mMarkers.size(); i++)
+  {
+    auto& marker = mMarkers[i];
+    for (auto& weldedGroup : weldedGroups)
+    {
+      if (std::find(
+              weldedGroup.bodies.begin(),
+              weldedGroup.bodies.end(),
+              marker.first)
+          != weldedGroup.bodies.end())
+      {
+        weldedGroup.adjacentMarkers.push_back(mMarkerNames[i]);
+        Eigen::Vector3s markerCenter = markerWorldPositions.segment<3>(i * 3);
+        weldedGroup.adjacentMarkerCenters.push_back(
+            weldedGroup.bodies[0]->getWorldTransform().inverse()
+            * markerCenter);
+      }
+    }
+  }
+
+  // 3. Now we can go through each timestep and do "closed form IK", by first
+  // estimating the body positions and then estimating the joint angles to
+  // achieve those body positions.
+  mPoses.clear();
+  mBodyTransforms.clear();
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    // 3.1. Estimate the body positions in world space of each welded group from
+    // the joint estimates and marker estimates, when they're available.
+    std::map<std::string, Eigen::Isometry3s> estimatedBodyWorldTransforms;
+    for (auto& weldGroup : weldedGroups)
+    {
+      // 3.1.1. Collect all the visible points in world space that we can use to
+      // estimate the body transform
+      std::vector<Eigen::Vector3s> visibleAdjacentPointsInWorldSpace;
+      std::vector<std::string> visibleAdjacentPointNames;
+      std::vector<Eigen::Vector3s> visibleAdjacentPointsInLocalSpace;
+      std::vector<s_t> visibleAdjacentPointWeights;
+      for (int j = 0; j < weldGroup.adjacentJoints.size(); j++)
+      {
+        if (mJointCenters[t].count(weldGroup.adjacentJoints[j]) > 0)
+        {
+          visibleAdjacentPointsInWorldSpace.push_back(
+              mJointCenters[t][weldGroup.adjacentJoints[j]]);
+          visibleAdjacentPointsInLocalSpace.push_back(
+              weldGroup.adjacentJointCenters[j]);
+          visibleAdjacentPointNames.push_back(
+              "Joint " + weldGroup.adjacentJoints[j]);
+          visibleAdjacentPointWeights.push_back(1.0);
+        }
+      }
+      for (int j = 0; j < weldGroup.adjacentMarkers.size(); j++)
+      {
+        if (mMarkerObservations[t].count(weldGroup.adjacentMarkers[j]) > 0)
+        {
+          visibleAdjacentPointsInWorldSpace.push_back(
+              mMarkerObservations[t][weldGroup.adjacentMarkers[j]]);
+          visibleAdjacentPointsInLocalSpace.push_back(
+              weldGroup.adjacentMarkerCenters[j]);
+          visibleAdjacentPointNames.push_back(
+              "Marker " + weldGroup.adjacentMarkers[j]);
+          visibleAdjacentPointWeights.push_back(1.0);
+        }
+      }
+      assert(
+          visibleAdjacentPointsInLocalSpace.size()
+          == visibleAdjacentPointsInWorldSpace.size());
+
+      if (visibleAdjacentPointsInLocalSpace.size() >= 4)
+      {
+        // 3.1.2. Compute the root body transform from the visible points, and
+        // then use that to compute the other body transforms
+        Eigen::Isometry3s rootBodyWorldTransform
+            = getPointCloudToPointCloudTransform(
+                visibleAdjacentPointsInLocalSpace,
+                visibleAdjacentPointsInWorldSpace,
+                visibleAdjacentPointWeights);
+        for (int j = 0; j < weldGroup.bodies.size(); j++)
+        {
+          estimatedBodyWorldTransforms[weldGroup.bodies[j]->getName()]
+              = rootBodyWorldTransform * weldGroup.relativeTransforms[j];
+        }
+
+        s_t error = 0.0;
+        for (int j = 0; j < visibleAdjacentPointsInLocalSpace.size(); j++)
+        {
+          Eigen::Vector3s reconstructedPoint
+              = rootBodyWorldTransform * visibleAdjacentPointsInLocalSpace[j];
+          error += (visibleAdjacentPointsInWorldSpace[j] - reconstructedPoint)
+                       .norm();
+        }
+        error /= visibleAdjacentPointsInLocalSpace.size();
+
+        if (log)
+        {
+          std::cout << "Estimated bodies ";
+          for (int j = 0; j < weldGroup.bodies.size(); j++)
+          {
+            std::cout << "\"" << weldGroup.bodies[j]->getName() << "\" ";
+          }
+          std::cout << " at time " << t << " with error " << error << "m from "
+                    << visibleAdjacentPointsInLocalSpace.size()
+                    << " points: " << std::endl;
+          for (int j = 0; j < visibleAdjacentPointsInLocalSpace.size(); j++)
+          {
+            std::cout << "  " << visibleAdjacentPointNames[j] << ": "
+                      << visibleAdjacentPointsInWorldSpace[j].transpose()
+                      << " reconstructed as "
+                      << (rootBodyWorldTransform
+                          * visibleAdjacentPointsInLocalSpace[j])
+                             .transpose()
+                      << std::endl;
+          }
+        }
+      }
+    }
+    mBodyTransforms.push_back(estimatedBodyWorldTransforms);
+
+    // 3.2. Now that we have the estimated body positions, we can estimate the
+    // joint angles.
+    Eigen::VectorXs jointAngles = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+    Eigen::VectorXi jointAnglesClosedFormEstimate
+        = Eigen::VectorXi::Zero(mSkel->getNumDofs());
+    for (auto* joint : mSkel->getJoints())
+    {
+      // Only estimate joint angles for joints connecting two bodies that we
+      // have estimated locations for
+      if ((joint->getParentBodyNode() == nullptr
+           || estimatedBodyWorldTransforms.count(
+               joint->getParentBodyNode()->getName()))
+          && estimatedBodyWorldTransforms.count(
+              joint->getChildBodyNode()->getName()))
+      {
+        // 3.2.1. Get the relative transformation we estimate is taking place
+        // over the joint
+        Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
+        if (joint->getParentBodyNode() != nullptr)
+        {
+          parentTransform
+              = estimatedBodyWorldTransforms[joint->getParentBodyNode()
+                                                 ->getName()];
+        }
+        Eigen::Isometry3s childTransform
+            = estimatedBodyWorldTransforms[joint->getChildBodyNode()
+                                               ->getName()];
+        Eigen::Isometry3s jointTransform
+            = parentTransform.inverse() * childTransform;
+
+        // 3.2.2. Convert that estimated tranformation into joint coordinates
+        Eigen::VectorXs pos = joint->getNearestPositionToDesiredRotation(
+            jointTransform.linear());
+        joint->setPositions(pos);
+        Eigen::Isometry3s recoveredJointTransform
+            = joint->getRelativeTransform();
+        if (joint->getType() == dynamics::FreeJoint::getStaticType()
+            || joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+        {
+          Eigen::Vector3s translationOffset
+              = (recoveredJointTransform.translation()
+                 - jointTransform.translation());
+          pos.tail<3>() -= translationOffset;
+          joint->setPositions(pos);
+          recoveredJointTransform = joint->getRelativeTransform();
+        }
+
+        if (log)
+        {
+          s_t translationError = (jointTransform.translation()
+                                  - recoveredJointTransform.translation())
+                                     .norm();
+          s_t rotationError
+              = (jointTransform.linear() - recoveredJointTransform.linear())
+                    .norm();
+          std::cout << "Estimating joint " << joint->getName()
+                    << " from adjacent body transforms with error "
+                    << translationError << "m and " << rotationError
+                    << " on rotation" << std::endl;
+        }
+
+        // 3.2.3. Save our estimate back to our joint angles
+        jointAngles.segment(joint->getIndexInSkeleton(0), joint->getNumDofs())
+            = pos;
+        jointAnglesClosedFormEstimate
+            .segment(joint->getIndexInSkeleton(0), joint->getNumDofs())
+            .setConstant(1.0);
+      }
+    }
+    mPoses.push_back(jointAngles);
+    mPosesClosedFormEstimateAvailable.push_back(jointAnglesClosedFormEstimate);
+  }
+
+  mSkel->setBodyScales(originalBodyScales);
+  mSkel->setPositions(originalPose);
+
+  // TODO: compute marker reconstruction error and return that
+  return 0.0;
+}
+
+/// This solves the remaining DOFs that couldn't be found in closed form using
+/// an iterative IK solver. This portion of the solver is the only non-convex
+/// portion. It uses random-restarts, and so is not as unit-testable as the
+/// other portions of the algorithm, so it should hopefully only impact less
+/// important joints.
+s_t IKInitializer::completeIKIteratively(
+    int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel)
+{
+  Eigen::VectorXs analyticalPose = mPoses[timestep];
+  Eigen::VectorXi analyticalPoseClosedFormEstimate
+      = mPosesClosedFormEstimateAvailable[timestep];
+
+  int numClosedForm = 0;
+  for (int i = 0; i < analyticalPoseClosedFormEstimate.size(); i++)
+  {
+    if (analyticalPoseClosedFormEstimate(i) == 1)
+    {
+      numClosedForm++;
+    }
+  }
+  int numDofsToSolve = analyticalPose.size() - numClosedForm;
+  if (numDofsToSolve == 0)
+    return 0.0;
+
+  Eigen::VectorXs initialGuess = Eigen::VectorXs::Zero(numDofsToSolve);
+  Eigen::VectorXs upperLimit = Eigen::VectorXs::Zero(numDofsToSolve);
+  Eigen::VectorXs lowerLimit = Eigen::VectorXs::Zero(numDofsToSolve);
+  int cursor = 0;
+  for (int i = 0; i < analyticalPose.size(); i++)
+  {
+    if (analyticalPoseClosedFormEstimate(i) == 0)
+    {
+      upperLimit(cursor) = threadsafeSkel->getDof(i)->getPositionUpperLimit();
+      lowerLimit(cursor) = threadsafeSkel->getDof(i)->getPositionLowerLimit();
+      cursor++;
+    }
+  }
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers
+      = getVisibleMarkers(timestep);
+  std::vector<std::string> markerNames = getVisibleMarkerNames(timestep);
+  std::vector<dynamics::Joint*> otherSkelJoints = getVisibleJoints(timestep);
+  std::vector<dynamics::Joint*> joints;
+  for (auto* j : otherSkelJoints)
+  {
+    joints.push_back(threadsafeSkel->getJoint(j->getName()));
+  }
+
+  Eigen::VectorXs goal
+      = Eigen::VectorXs::Zero(markers.size() * 3 + joints.size() * 3);
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    goal.segment<3>(i * 3) = mMarkerObservations[timestep][markerNames[i]];
+  }
+  for (int i = 0; i < joints.size(); i++)
+  {
+    goal.segment<3>(markerNames.size() * 3 + i * 3)
+        = mJointCenters[timestep][joints[i]->getName()];
+  }
+
+  math::solveIK(
+      initialGuess,
+      upperLimit,
+      lowerLimit,
+      goal.size(),
+      // Set positions
+      [threadsafeSkel, analyticalPose, analyticalPoseClosedFormEstimate](
+          /* in*/ const Eigen::VectorXs pos, bool clamp) {
+        (void)clamp;
+        // Complete the root position to the rest of the skeleton
+        Eigen::VectorXs fullPos = analyticalPose;
+        int cursor = 0;
+        for (int i = 0; i < analyticalPoseClosedFormEstimate.size(); i++)
+        {
+          if (analyticalPoseClosedFormEstimate(i) == 0)
+          {
+            fullPos(i) = pos(cursor);
+            cursor++;
+          }
+        }
+        threadsafeSkel->setPositions(fullPos);
+
+        // Return the root position
+        return pos;
+      },
+      // Compute the Jacobian
+      [threadsafeSkel,
+       analyticalPose,
+       analyticalPoseClosedFormEstimate,
+       goal,
+       markers,
+       joints,
+       numDofsToSolve](
+          /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+          /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+        diff.segment(0, markers.size() * 3)
+            = threadsafeSkel->getMarkerWorldPositions(markers)
+              - goal.segment(0, markers.size() * 3);
+        diff.segment(markers.size() * 3, joints.size() * 3)
+            = threadsafeSkel->getJointWorldPositions(joints)
+              - goal.segment(markers.size() * 3, joints.size() * 3);
+
+        (void)numDofsToSolve;
+        assert(jac.cols() == numDofsToSolve);
+        assert(jac.rows() == goal.size());
+        jac.setZero();
+
+        Eigen::MatrixXs markerJac
+            = threadsafeSkel->getMarkerWorldPositionsJacobianWrtJointPositions(
+                markers);
+        Eigen::MatrixXs jointJac
+            = threadsafeSkel->getJointWorldPositionsJacobianWrtJointPositions(
+                joints);
+
+        int cursor = 0;
+        for (int i = 0; i < analyticalPoseClosedFormEstimate.size(); i++)
+        {
+          if (analyticalPoseClosedFormEstimate(i) == 0)
+          {
+            jac.block(0, cursor, markerJac.rows(), 1)
+                = markerJac.block(0, i, markerJac.rows(), 1);
+            jac.block(markerJac.rows(), cursor, jointJac.rows(), 1)
+                = jointJac.block(0, i, jointJac.rows(), 1);
+            cursor++;
+          }
+        }
+      },
+      // Generate a random restart position
+      [threadsafeSkel, analyticalPoseClosedFormEstimate, numDofsToSolve](
+          Eigen::Ref<Eigen::VectorXs> val) {
+        Eigen::VectorXs fullRandom = threadsafeSkel->getRandomPose();
+
+        Eigen::VectorXs random = Eigen::VectorXs::Zero(numDofsToSolve);
+        int cursor = 0;
+        for (int i = 0; i < analyticalPoseClosedFormEstimate.size(); i++)
+        {
+          if (analyticalPoseClosedFormEstimate(i) == 0)
+          {
+            random(cursor) = fullRandom(i);
+            cursor++;
+          }
+        }
+        val = random;
+      },
+      math::IKConfig()
+          .setMaxStepCount(150)
+          .setConvergenceThreshold(1e-10)
+          .setMaxRestarts(3)
+          .setLogOutput(false));
+
+  mPoses[timestep] = threadsafeSkel->getPositions();
+  return 0.0;
+}
+
+/// This solves ALL the DOFs, including the ones that were found in closed
+/// form, to fine tune loss.
+s_t IKInitializer::fineTuneIKIteratively(
+    int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel)
+{
+  Eigen::VectorXs analyticalPose = mPoses[timestep];
+
+  Eigen::VectorXs initialGuess
+      = Eigen::VectorXs::Zero(threadsafeSkel->getNumDofs());
+  Eigen::VectorXs upperLimit
+      = Eigen::VectorXs::Zero(threadsafeSkel->getNumDofs());
+  Eigen::VectorXs lowerLimit
+      = Eigen::VectorXs::Zero(threadsafeSkel->getNumDofs());
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers
+      = getVisibleMarkers(timestep);
+  std::vector<std::string> markerNames = getVisibleMarkerNames(timestep);
+  std::vector<dynamics::Joint*> otherSkelJoints = getVisibleJoints(timestep);
+  std::vector<dynamics::Joint*> joints;
+  for (auto* j : otherSkelJoints)
+  {
+    joints.push_back(threadsafeSkel->getJoint(j->getName()));
+  }
+
+  Eigen::VectorXs goal
+      = Eigen::VectorXs::Zero(markers.size() * 3 + joints.size() * 3);
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    goal.segment<3>(i * 3) = mMarkerObservations[timestep][markerNames[i]];
+  }
+  for (int i = 0; i < joints.size(); i++)
+  {
+    goal.segment<3>(markerNames.size() * 3 + i * 3)
+        = mJointCenters[timestep][joints[i]->getName()];
+  }
+
+  math::solveIK(
+      initialGuess,
+      threadsafeSkel->getPositionUpperLimits(),
+      threadsafeSkel->getPositionLowerLimits(),
+      goal.size(),
+      // Set positions
+      [threadsafeSkel, analyticalPose](
+          /* in*/ const Eigen::VectorXs pos, bool clamp) {
+        Eigen::VectorXs clampedPos = pos;
+        if (clamp)
+        {
+          clampedPos
+              = clampedPos.cwiseMax(threadsafeSkel->getPositionLowerLimits());
+          clampedPos
+              = clampedPos.cwiseMin(threadsafeSkel->getPositionUpperLimits());
+        }
+        // Complete the root position to the rest of the skeleton
+        threadsafeSkel->setPositions(clampedPos);
+        // Return the root position
+        return pos;
+      },
+      // Compute the Jacobian
+      [threadsafeSkel, analyticalPose, goal, markers, joints](
+          /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+          /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+        diff.segment(0, markers.size() * 3)
+            = threadsafeSkel->getMarkerWorldPositions(markers)
+              - goal.segment(0, markers.size() * 3);
+        diff.segment(markers.size() * 3, joints.size() * 3)
+            = threadsafeSkel->getJointWorldPositions(joints)
+              - goal.segment(markers.size() * 3, joints.size() * 3);
+
+        assert(jac.cols() == threadsafeSkel->getNumDofs());
+        assert(jac.rows() == goal.size());
+        jac.setZero();
+
+        Eigen::MatrixXs markerJac
+            = threadsafeSkel->getMarkerWorldPositionsJacobianWrtJointPositions(
+                markers);
+        Eigen::MatrixXs jointJac
+            = threadsafeSkel->getJointWorldPositionsJacobianWrtJointPositions(
+                joints);
+        jac.block(0, 0, markerJac.rows(), markerJac.cols()) = markerJac;
+        jac.block(markerJac.rows(), 0, jointJac.rows(), jointJac.cols())
+            = jointJac;
+      },
+      // Generate a random restart position
+      [threadsafeSkel](Eigen::Ref<Eigen::VectorXs> val) {
+        Eigen::VectorXs fullRandom = threadsafeSkel->getRandomPose();
+        val = fullRandom;
+      },
+      math::IKConfig()
+          .setMaxStepCount(150)
+          .setConvergenceThreshold(1e-10)
+          .setMaxRestarts(1)
+          .setLogOutput(false));
+
+  mPoses[timestep] = threadsafeSkel->getPositions();
+  return 0.0;
 }
 
 /// This uses the current guesses for the joint centers to re-estimate the
@@ -330,6 +1406,64 @@ void IKInitializer::reestimateDistancesFromJointCenters()
   }
 }
 
+//==============================================================================
+/// This gets the average distance between adjacent joint centers in our
+/// current joint center estimates.
+std::map<std::string, std::map<std::string, s_t>>
+IKInitializer::estimateJointToJointDistances()
+{
+  // 1. Recompute the joint to joint squared distances
+
+  std::map<std::string, std::map<std::string, s_t>> jointToJointAvgDistances;
+  std::map<std::string, std::map<std::string, int>>
+      jointToJointAvgDistancesCount;
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    for (auto& pair : mJointToJointSquaredDistances)
+    {
+      std::string joint1Name = pair.first;
+      for (auto& pair2 : pair.second)
+      {
+        std::string joint2Name = pair2.first;
+        if (joint1Name == joint2Name)
+        {
+          continue;
+        }
+        if (mJointCenters[t].count(joint1Name) == 0)
+        {
+          continue;
+        }
+        if (mJointCenters[t].count(joint2Name) == 0)
+        {
+          continue;
+        }
+        Eigen::Vector3s joint1Center = mJointCenters[t][joint1Name];
+        Eigen::Vector3s joint2Center = mJointCenters[t][joint2Name];
+        s_t distance = (joint1Center - joint2Center).norm();
+        if (jointToJointAvgDistances[joint1Name].count(joint2Name) == 0)
+        {
+          jointToJointAvgDistances[joint1Name][joint2Name] = 0;
+          jointToJointAvgDistancesCount[joint1Name][joint2Name] = 0;
+        }
+        jointToJointAvgDistances[joint1Name][joint2Name] += distance;
+        jointToJointAvgDistancesCount[joint1Name][joint2Name]++;
+      }
+    }
+  }
+  for (auto& pair : jointToJointAvgDistances)
+  {
+    std::string joint1Name = pair.first;
+    for (auto& pair2 : pair.second)
+    {
+      std::string joint2Name = pair2.first;
+      jointToJointAvgDistances[joint1Name][joint2Name]
+          /= jointToJointAvgDistancesCount[joint1Name][joint2Name];
+    }
+  }
+  return jointToJointAvgDistances;
+}
+
+//==============================================================================
 /// This gets the subset of markers that are visible at a given timestep
 std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
 IKInitializer::getVisibleMarkers(int t)
@@ -345,6 +1479,7 @@ IKInitializer::getVisibleMarkers(int t)
   return markers;
 }
 
+//==============================================================================
 /// This gets the subset of markers that are visible at a given timestep
 std::vector<std::string> IKInitializer::getVisibleMarkerNames(int t)
 {
@@ -359,6 +1494,7 @@ std::vector<std::string> IKInitializer::getVisibleMarkerNames(int t)
   return markerNames;
 }
 
+//==============================================================================
 /// This gets the subset of joints that are attached to markers that are
 /// visible at a given timestep
 std::vector<dynamics::Joint*> IKInitializer::getVisibleJoints(int t)
@@ -383,6 +1519,7 @@ std::vector<dynamics::Joint*> IKInitializer::getVisibleJoints(int t)
   return joints;
 }
 
+//==============================================================================
 /// This gets the world center estimates for joints that are attached to
 /// markers that are visible at this timestep.
 std::map<std::string, Eigen::Vector3s> IKInitializer::getVisibleJointCenters(
@@ -391,6 +1528,7 @@ std::map<std::string, Eigen::Vector3s> IKInitializer::getVisibleJointCenters(
   return mJointCenters[t];
 }
 
+//==============================================================================
 /// This gets the squared distance between a joint and a marker on an adjacent
 /// body segment.
 std::map<std::string, s_t> IKInitializer::getJointToMarkerSquaredDistances(
@@ -399,6 +1537,7 @@ std::map<std::string, s_t> IKInitializer::getJointToMarkerSquaredDistances(
   return mJointToMarkerSquaredDistances[jointName];
 }
 
+//==============================================================================
 /// This does a rank-N completion of the distance matrix, which provides some
 /// guarantees about reconstruction quality. See "Distance Matrix
 /// Reconstruction from Incomplete Distance Information for Sensor Network
@@ -421,6 +1560,7 @@ Eigen::MatrixXs IKInitializer::rankNDistanceMatrix(
   return rank_five_approximation;
 }
 
+//==============================================================================
 /// This will reconstruct a centered Euclidean point cloud from a distance
 /// matrix.
 Eigen::MatrixXs IKInitializer::getPointCloudFromDistanceMatrix(
@@ -450,6 +1590,7 @@ Eigen::MatrixXs IKInitializer::getPointCloudFromDistanceMatrix(
   return k_eigenvalues.asDiagonal() * k_eigenvectors.transpose();
 }
 
+//==============================================================================
 /// This will rotate and translate a point cloud to match the first N points
 /// as closely as possible to the passed in matrix
 Eigen::MatrixXs IKInitializer::mapPointCloudToData(
@@ -525,21 +1666,80 @@ Eigen::MatrixXs IKInitializer::mapPointCloudToData(
   // we're only doing right-handed rotations. HOWEVER, because we're using a
   // point cloud, we may actually have to flip the data along an axis to get it
   // to match up, so we skip the determinant check.
-  Eigen::Vector3s trans = targetCentroid;
-
-  // Compute the transformation as an Isometry3s
-  Eigen::Isometry3s transformation = Eigen::Isometry3s::Identity();
-  transformation.linear() = R;
-  transformation.translation() = trans;
 
   // Transform the source point cloud to the target point cloud
   Eigen::MatrixXs transformed = Eigen::MatrixXs::Zero(3, pointCloud.cols());
   for (int i = 0; i < pointCloud.cols(); i++)
   {
     transformed.col(i)
-        = transformation * (pointCloud.col(i).head<3>() - sourceCentroid);
+        = R * (pointCloud.col(i).head<3>() - sourceCentroid) + targetCentroid;
   }
   return transformed;
+}
+
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible.
+Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    std::vector<s_t> weights)
+{
+  assert(localPoints.size() > 0);
+  assert(worldPoints.size() > 0);
+  assert(localPoints.size() == worldPoints.size());
+
+  // Compute the centroids of the local and world points
+  Eigen::Vector3s localCentroid = Eigen::Vector3s::Zero();
+  for (Eigen::Vector3s& point : localPoints)
+  {
+    localCentroid += point;
+  }
+  localCentroid /= localPoints.size();
+  Eigen::Vector3s worldCentroid = Eigen::Vector3s::Zero();
+  for (Eigen::Vector3s& point : worldPoints)
+  {
+    worldCentroid += point;
+  }
+  worldCentroid /= worldPoints.size();
+
+  // Compute the centered local and world points
+  std::vector<Eigen::Vector3s> centeredLocalPoints;
+  std::vector<Eigen::Vector3s> centeredWorldPoints;
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    centeredLocalPoints.push_back(localPoints[i] - localCentroid);
+    centeredWorldPoints.push_back(worldPoints[i] - worldCentroid);
+  }
+
+  // Compute the covariance matrix
+  Eigen::Matrix3s covarianceMatrix = Eigen::Matrix3s::Zero();
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    covarianceMatrix += weights[i] * centeredWorldPoints[i]
+                        * centeredLocalPoints[i].transpose();
+  }
+
+  // Compute the singular value decomposition of the covariance matrix
+  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix3s U = svd.matrixU();
+  Eigen::Matrix3s V = svd.matrixV();
+
+  // Compute the rotation matrix and translation vector
+  Eigen::Matrix3s R = U * V.transpose();
+  if (R.determinant() < 0)
+  {
+    Eigen::Matrix3s scales = Eigen::Matrix3s::Identity();
+    scales(2, 2) = -1;
+    R = U * scales * V.transpose();
+  }
+  Eigen::Vector3s translation = worldCentroid - R * localCentroid;
+
+  Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+  transform.linear() = R;
+  transform.translation() = translation;
+  return transform;
 }
 
 } // namespace biomechanics

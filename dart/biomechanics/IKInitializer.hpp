@@ -29,6 +29,9 @@ namespace biomechanics {
  * compute the body scales and positions. The core idea is that we assume that
  * the distances between optical markers and joint centers are known and fixed
  * quantities.
+ *
+ * There are several iterative "polishing" steps that can also be done to
+ * improve the closed form solution in the presence of noise.
  */
 class IKInitializer
 {
@@ -40,16 +43,44 @@ public:
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       s_t modelHeightM = -1.0);
 
+  /// This runs the full IK initialization algorithm, and leaves the answers in
+  /// the public fields of this class
+  void runFullPipeline(bool logOutput = false);
+
   /// For each timestep, and then for each joint, this sets up and runs an MDS
   /// algorithm to triangulate the joint center location from the known marker
   /// locations of the markers attached to the joint's two body segments, and
   /// then known distance from the joint center to each marker.
-  s_t islandJointCenterSolver();
+  s_t closedFormJointCenterSolver(bool logOutput = false);
+
+  /// This uses the current guesses for the joint centers to re-estimate the
+  /// bone sizes (based on distance between joint centers) and then use that to
+  /// get the group scale vector. This also uses the joint centers to estimate
+  /// the body positions.
+  s_t estimatePosesAndGroupScalesInClosedForm(bool logOutput = false);
+
+  /// This solves the remaining DOFs that couldn't be found in closed form using
+  /// an iterative IK solver. This portion of the solver is the only requirement
+  /// that is a non-convex portion. It uses random-restarts, and so is not as
+  /// unit-testable as the other portions of the algorithm, so it should
+  /// hopefully only impact less important joints.
+  s_t completeIKIteratively(
+      int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel);
+
+  /// This solves ALL the DOFs, including the ones that were found in closed
+  /// form, to fine tune loss.
+  s_t fineTuneIKIteratively(
+      int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel);
 
   /// This uses the current guesses for the joint centers to re-estimate the
   /// distances between the markers and the joint centers, and the distances
   /// between the adjacent joints.
   void reestimateDistancesFromJointCenters();
+
+  /// This gets the average distance between adjacent joint centers in our
+  /// current joint center estimates.
+  std::map<std::string, std::map<std::string, s_t>>
+  estimateJointToJointDistances();
 
   /// This gets the subset of markers that are visible at a given timestep
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
@@ -89,8 +120,17 @@ public:
       const Eigen::MatrixXs& pointCloud,
       std::vector<Eigen::Vector3s> firstNPoints);
 
+  /// This will give the world transform necessary to apply to the local points
+  /// (worldT * p[i] for all localPoints) to get the local points to match the
+  /// world points as closely as possible.
+  static Eigen::Isometry3s getPointCloudToPointCloudTransform(
+      std::vector<Eigen::Vector3s> localPoints,
+      std::vector<Eigen::Vector3s> worldPoints,
+      std::vector<s_t> weights);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
+  s_t mModelHeightM;
   std::vector<std::string> mMarkerNames;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
@@ -102,6 +142,18 @@ protected:
       mJointToMarkerSquaredDistances;
   std::map<std::string, std::map<std::string, s_t>>
       mJointToJointSquaredDistances;
+  std::map<std::string, std::map<std::string, std::vector<dynamics::BodyNode*>>>
+      mJointToJointBodyNodesPath;
+
+public:
+  // Results from the IK solver
+  std::vector<std::map<std::string, Eigen::Isometry3s>> mBodyTransforms;
+  Eigen::VectorXs mGroupScales;
+  std::vector<Eigen::VectorXs> mPoses;
+  // These are vectors of integers (as booleans), where a 1 in index i means
+  // that DOF [i] was found with a closed form estimate, and a 0 means that it
+  // wasn't.
+  std::vector<Eigen::VectorXi> mPosesClosedFormEstimateAvailable;
 };
 
 } // namespace biomechanics
