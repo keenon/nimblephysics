@@ -107,7 +107,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::vector<Eigen::VectorXs> poses;
   std::vector<Eigen::VectorXs> jointCenters;
-  for (int t = 0; t < 10; t++)
+  for (int t = 0; t < 5; t++)
   {
     Eigen::VectorXs pose = osim.skeleton->getRandomPose();
     poses.push_back(pose);
@@ -161,19 +161,19 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
     }
   }
 
-  // s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
-  // std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
-
   s_t markerError = 0.0;
-  // initializer.reestimateDistancesFromJointCenters();
-  markerError = initializer.closedFormMDSJointCenterSolver();
-  // s_t markerErrorFromIK =
-  initializer.estimatePosesAndGroupScalesInClosedForm();
-  // (void)markerErrorFromIK;
-  // for (int t = 0; t < markerObservations.size(); t++)
-  // {
-  //   initializer.completeIKIteratively(t, osim.skeleton);
-  // }
+  markerError = initializer.closedFormMDSJointCenterSolver(true);
+  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
+  std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
+  initializer.reestimateDistancesFromJointCenters();
+  markerError = initializer.closedFormMDSJointCenterSolver(true);
+  s_t markerErrorFromIK
+      = initializer.estimatePosesAndGroupScalesInClosedForm(true);
+  (void)markerErrorFromIK;
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    initializer.completeIKIteratively(t, osim.skeleton);
+  }
 
   std::vector<Eigen::VectorXs> recoveredPoses = initializer.mPoses;
   Eigen::VectorXs groupScales = initializer.mGroupScales;

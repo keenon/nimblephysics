@@ -436,9 +436,10 @@ IKInitializer::IKInitializer(
           = getStackedJointCenterFromJointCentersVector(
               joint2, jointWorldPositions);
 
-      // 3.1. If the joints are connected by a stacked body, then record them
+      // 3.1. If the joints are connected to the same body, then record them
       if (joint1->parentBody == joint2->childBody
-          || joint2->parentBody == joint1->childBody)
+          || joint2->parentBody == joint1->childBody
+          || joint1->parentBody == joint2->parentBody)
       {
         Eigen::Vector3s joint1ToJoint2 = joint2WorldCenter - joint1WorldCenter;
         s_t joint1ToJoint2SquaredDistance = joint1ToJoint2.squaredNorm();
@@ -461,6 +462,10 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
+  // Use the MDS solver to initialize all the joint centers. The point is just
+  // to provide a solution to center the pivot finding algo around, so we could
+  // save some time by only running it on those joints, so TODO.
+  closedFormMDSJointCenterSolver(logOutput);
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
   closedFormPivotFindingJointCenterSolver();
@@ -799,6 +804,7 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
   // transforms from each body to the joint center, and the constraints are that
   // those map to the same location in world space on each timestep.
   s_t avgJointCenterError = 0.0;
+  int solvedJoints = 0;
   for (std::shared_ptr<struct StackedJoint> joint : jointsToSolve)
   {
     // At this point, the parent body node shouldn't be null
@@ -817,8 +823,36 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
         usableTimesteps.push_back(t);
       }
     }
+    if (usableTimesteps.size() < 5)
+    {
+      // Insufficient sample to solve for joint center
+      continue;
+    }
 
-    // 4.2. Subsample timesteps if necessary to keep problem size reasonable
+    // 4.2. Compute the average offset of the joint in the parent and child
+    // frames, if we've already done some sort of solve to estimate the joint
+    // center. We'll center our solution around that previous estimate.
+    Eigen::Vector3s parentAvgOffset = Eigen::Vector3s::Zero();
+    Eigen::Vector3s childAvgOffset = Eigen::Vector3s::Zero();
+    int observationCount = 0;
+    for (int t : usableTimesteps)
+    {
+      if (mJointCenters[t].count(joint->name))
+      {
+        parentAvgOffset += bodyTrajectories[parentBodyName][t].inverse()
+                           * mJointCenters[t][joint->name];
+        childAvgOffset += bodyTrajectories[childBodyName][t].inverse()
+                          * mJointCenters[t][joint->name];
+        observationCount++;
+      }
+    }
+    if (observationCount > 0)
+    {
+      parentAvgOffset /= observationCount;
+      childAvgOffset /= observationCount;
+    }
+
+    // 4.3. Subsample timesteps if necessary to keep problem size reasonable
     const int maxSamples = 500;
     if (usableTimesteps.size() > maxSamples)
     {
@@ -832,7 +866,7 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       usableTimesteps = sampledTimesteps;
     }
 
-    // 4.3. Setup the linear system of equations
+    // 4.4. Setup the linear system of equations
     int cols = 6;
     int rows = usableTimesteps.size() * 3;
 
@@ -850,8 +884,14 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
           = parentTransform.translation() - childTransform.translation();
     }
 
+    Eigen::VectorXs centerAnswerOn = Eigen::VectorXs::Zero(6);
+    centerAnswerOn.head<3>() = parentAvgOffset;
+    centerAnswerOn.tail<3>() = childAvgOffset;
+
     Eigen::VectorXs target = Eigen::VectorXs::Zero(rows);
-    Eigen::VectorXs offsets = A.householderQr().solve(target - b);
+    Eigen::VectorXs offsets
+        = A.householderQr().solve(target - b - A * centerAnswerOn)
+          + centerAnswerOn;
     assert(offsets.size() == 6);
 
     // 4.4. Decode the results of our solution into average values
@@ -882,8 +922,9 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
 
     error /= usableTimesteps.size() * 2;
     avgJointCenterError += error;
+    solvedJoints++;
   }
-  avgJointCenterError /= jointsToSolve.size();
+  avgJointCenterError /= solvedJoints;
 
   return avgJointCenterError;
 }
@@ -970,8 +1011,8 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       s_t scale = desiredDist / currentDist;
       if (log)
       {
-        std::cout << "Scaling " << bodyNode->name << " by " << scale
-                  << " based on " << joint1Name << " and " << joint2Name
+        std::cout << "Scaling " << bodyNode->name << " by (" << scale
+                  << ") based on " << joint1Name << " and " << joint2Name
                   << std::endl;
       }
       for (auto* body : bodyNode->bodies)
@@ -988,9 +1029,11 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       assert(jointsInLocalSpace.size() > 0);
       std::map<std::string, int> jointToIndex;
       std::vector<Eigen::Vector3s> jointsInLocalSpaceVector;
+      std::vector<std::string> jointNames;
       for (auto& pair : jointsInLocalSpace)
       {
         jointToIndex[pair.first] = jointToIndex.size();
+        jointNames.push_back(pair.first);
         jointsInLocalSpaceVector.push_back(pair.second);
       }
       assert(jointsInLocalSpaceVector.size() > 0);
@@ -1028,9 +1071,30 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       Eigen::MatrixXs pointCloud
           = mapPointCloudToData(rawPointCloud, jointsInLocalSpaceVector);
 
+      // If any of the joints are at the origin in our local body coordinates,
+      // we want to re-center the target point cloud so that the same point is
+      // at its origin, or else scaling won't work.
+      int vectorAtOrigin = -1;
+      for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
+      {
+        if (jointsInLocalSpaceVector[i].isZero())
+        {
+          vectorAtOrigin = i;
+        }
+      }
+      if (vectorAtOrigin != -1)
+      {
+        Eigen::Vector3s origin = pointCloud.col(vectorAtOrigin);
+        for (int i = 0; i < pointCloud.cols(); i++)
+        {
+          pointCloud.col(i) -= origin;
+        }
+      }
+
       // Compute axis scales as the average ratio of the columns of `pointCloud`
       // to `jointsInLocalSpaceVector`
       Eigen::Vector3s axisScales = Eigen::Vector3s::Zero();
+      Eigen::Vector3s axisCounts = Eigen::Vector3s::Zero();
       Eigen::Vector3s axisLengthSum = Eigen::Vector3s::Zero();
       for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
       {
@@ -1038,32 +1102,68 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
             jointsInLocalSpaceVector[i]);
         for (int axis = 0; axis < 3; axis++)
         {
-          if (jointsInLocalSpaceVector[i](axis) > 0)
+          if (std::abs(jointsInLocalSpaceVector[i](axis)) > 0)
           {
             axisScales(axis)
                 += pointCloud(axis, i) / jointsInLocalSpaceVector[i](axis);
-          }
-          else
-          {
-            // We have info about this axis, so assume the scale is perfectly
-            // fine
-            axisScales(axis) += 1.0;
+            axisCounts(axis) += 1;
           }
         }
       }
-      axisScales /= jointsInLocalSpaceVector.size();
+      int observedAnyAxis = -1;
+      for (int axis = 0; axis < 3; axis++)
+      {
+        if (axisCounts(axis) > 0)
+        {
+          axisScales(axis) /= axisCounts(axis);
+          observedAnyAxis = axis;
+        }
+      }
+      if (observedAnyAxis != -1)
+      {
+        for (int axis = 0; axis < 3; axis++)
+        {
+          if (axisCounts(axis) == 0)
+          {
+            // We have no info about this axis, so assume the scale is whatever
+            // the observed scales were
+            axisScales(axis) = axisScales(observedAnyAxis);
+            if (log)
+            {
+              std::cout
+                  << "Body " << bodyNode->name
+                  << " has no observations with non-zero-length along axis="
+                  << axis << std::endl;
+            }
+          }
+        }
+      }
+      else
+      {
+        std::cout << "Body " << bodyNode->name
+                  << " has no observations with non-zero-length along any "
+                     "axis! This is probably a bug."
+                  << std::endl;
+        axisScales.setConstant(1.0);
+      }
 
       if (log)
       {
-        std::cout << "Scaling " << bodyNode->name << " by "
-                  << axisScales.transpose() << " based on " << jointPairs.size()
-                  << " pairs of joints" << std::endl;
+        std::cout << "Scaling " << bodyNode->name << " by ("
+                  << axisScales.transpose() << ") based on "
+                  << jointPairs.size() << " pairs of joints" << std::endl;
+        for (auto& pair : jointPairs)
+        {
+          std::cout << "  Pair " << std::get<0>(pair) << " and "
+                    << std::get<1>(pair) << " with distance "
+                    << std::get<2>(pair) << std::endl;
+        }
         for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
         {
           Eigen::Vector3s target = pointCloud.col(i);
           Eigen::Vector3s scaled
               = jointsInLocalSpaceVector[i].cwiseProduct(axisScales);
-          std::cout << "  " << i
+          std::cout << "  Joint " << jointNames[i]
                     << " reconstruction error = " << (target - scaled).norm()
                     << ": target " << target.transpose() << " vs scaled "
                     << scaled.transpose() << std::endl;
@@ -1105,8 +1205,8 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
   // groups
   for (auto& group : mSkel->getBodyScaleGroups())
   {
-    Eigen::Vector3s scaleAvg = defaultScales.cwiseProduct(defaultScaleWeights);
-    Eigen::Vector3s weightsSum = defaultScaleWeights;
+    Eigen::Vector3s scaleAvg = Eigen::Vector3s::Zero();
+    Eigen::Vector3s weightsSum = Eigen::Vector3s::Zero();
 
     std::cout << "Scaling group:" << std::endl;
     for (auto* body : group.nodes)
@@ -1438,9 +1538,12 @@ s_t IKInitializer::completeIKIteratively(
   std::vector<dynamics::Joint*> joints;
   for (auto& j : otherSkelJoints)
   {
-    for (auto* joint : j->joints)
+    if (j->joints.size() == 1)
     {
-      joints.push_back(threadsafeSkel->getJoint(joint->getName()));
+      for (auto* joint : j->joints)
+      {
+        joints.push_back(threadsafeSkel->getJoint(joint->getName()));
+      }
     }
   }
 
@@ -1572,9 +1675,12 @@ s_t IKInitializer::fineTuneIKIteratively(
   std::vector<dynamics::Joint*> joints;
   for (auto& j : otherSkelJoints)
   {
-    for (auto* joint : j->joints)
+    if (j->joints.size() == 1)
     {
-      joints.push_back(threadsafeSkel->getJoint(joint->getName()));
+      for (auto* joint : j->joints)
+      {
+        joints.push_back(threadsafeSkel->getJoint(joint->getName()));
+      }
     }
   }
 
