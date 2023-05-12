@@ -1181,7 +1181,7 @@ public:
   /// associated with this MarkerInitialization.
   void writeCSVData(
       std::string path,
-      std::shared_ptr<MarkerInitialization> init,
+      const MarkerInitialization& init,
       const std::vector<s_t>& rmsMarkerErrors,
       const std::vector<s_t>& maxMarkerErrors,
       const std::vector<s_t>& timestamps);

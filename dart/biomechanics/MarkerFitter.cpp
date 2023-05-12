@@ -7574,7 +7574,7 @@ void MarkerFitter::removeZeroConstraint(std::string name)
   /// associated with this MarkerInitialization.
 void MarkerFitter::writeCSVData(
     std::string path,
-    std::shared_ptr<MarkerInitialization> init,
+    const MarkerInitialization& init,
     const std::vector<s_t>& rmsMarkerErrors,
     const std::vector<s_t>& maxMarkerErrors,
     const std::vector<s_t>& timestamps)
@@ -7605,7 +7605,7 @@ void MarkerFitter::writeCSVData(
   csvFile << ",marker_error_rms,marker_error_max";
 
   (void)init;
-  int nrows = init->poses.cols();
+  int nrows = init.poses.cols();
   s_t dt = timestamps[1] - timestamps[0];
   assert(rmsMarkerError.size() == nrows);
   assert(maxMarkerError.size() == nrows);
@@ -7613,14 +7613,14 @@ void MarkerFitter::writeCSVData(
   {
     csvFile << std::endl;
     csvFile << timestamps[t];
-    Eigen::VectorXs q = init->poses.col(t);
+    Eigen::VectorXs q = init.poses.col(t);
     Eigen::VectorXs dq = Eigen::VectorXs::Zero(q.size());
     Eigen::VectorXs ddq = Eigen::VectorXs::Zero(q.size());
     if (t > 0 && t < nrows - 1)
     {
-      dq = (init->poses.col(t) - init->poses.col(t - 1)) / dt;
-      ddq = (init->poses.col(t + 1) - 2 * init->poses.col(t)
-             + init->poses.col(t - 1)) / (dt * dt);
+      dq = (init.poses.col(t) - init.poses.col(t - 1)) / dt;
+      ddq = (init.poses.col(t + 1) - 2 * init.poses.col(t)
+             + init.poses.col(t - 1)) / (dt * dt);
     }
 
     writeVectorToCSV(csvFile, q);
