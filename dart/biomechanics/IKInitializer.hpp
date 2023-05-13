@@ -94,6 +94,15 @@ public:
   /// centers.
   s_t closedFormPivotFindingJointCenterSolver(bool logOutput = false);
 
+  /// This finds the joint centers for any joints that have one side attached to
+  /// a body with at least 3 markers on it, but the other side with fewer
+  /// markers. This uses the method introduced in "Hiniduma Udugama Gamage,
+  /// S.S., & Lasenby, J. (2002). New least squares solutions for estimating the
+  /// average center of rotation and the axis of rotation. J. Biomechanics 35,
+  /// 87-93." Described in detail on
+  /// http://www.kwon3d.com/theory/jkinem/jcent.html
+  s_t closedFormGamageAndLasenby2002JointCenterSolver(bool logOutput = false);
+
   /// This uses the current guesses for the joint centers to re-estimate the
   /// bone sizes (based on distance between joint centers) and then use that to
   /// get the group scale vector. This also uses the joint centers to estimate
@@ -168,6 +177,39 @@ public:
       std::vector<Eigen::Vector3s> localPoints,
       std::vector<Eigen::Vector3s> worldPoints,
       std::vector<s_t> weights);
+
+  /// This implements the method in "Constrained least-squares optimization for
+  /// robust estimation of center of rotation" by Chang and Pollard, 2006. This
+  /// is the simpler version, that only supports a single marker.
+  ///
+  /// This assumes we're operating in a frame where the joint center is fixed in
+  /// place, and `markerTrace` is a list of marker positions over time in that
+  /// frame. So `markerTrace[t]` is the location of the marker on its t'th
+  /// observation. This method will return the joint center in that frame.
+  ///
+  /// The benefit of using this instead of the
+  /// `closedFormPivotFindingJointCenterSolver` is that we can run it on pairs
+  /// of bodies where only one side of the pair has 3 markers on it (commonly,
+  /// the ankle).
+  ///
+  /// IMPORTANT NOTE: This method assumes there are no markers that are
+  /// literally coincident with the joint center. It has a singularity in that
+  /// case, and will produce garbage. However, the only reason we would have a
+  /// marker on top of the joint center is if someone actually gave us marker
+  /// data with virtual joint centers already computed, in which case maybe we
+  /// just respect their wishes?
+  static Eigen::Vector3s getChangPollard2006JointCenterSingleMarker(
+      std::vector<Eigen::Vector3s> markerTrace, bool log = false);
+
+  /// This implements a simple least-squares problem to find the center of a
+  /// sphere of unknown radius, with samples along the hull given by `points`.
+  /// This tolerates noise less well than the ChangPollard2006 method, because
+  /// it biases the radius of the sphere towards zero in the presence of
+  /// ambiguity, because it is part of the least-squares terms. However, this
+  /// method will work even on data with zero noise, whereas ChangPollard2006
+  /// will fail when there is zero noise (for example, on synthetic datasets).
+  static Eigen::Vector3s leastSquaresSphereFit(
+      std::vector<Eigen::Vector3s> points);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;

@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
@@ -46,7 +47,7 @@ void runOnRealOsim(
 
   IKInitializer initializer(
       osim.skeleton, osim.markersMap, markerObservations, heightM);
-  initializer.runFullPipeline();
+  initializer.runFullPipeline(true);
 
   if (saveToGUI)
   {
@@ -497,6 +498,145 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
 #endif
 
 #ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
+{
+  for (int i = 0; i < 5; i++)
+  {
+    Eigen::Vector3s point = Eigen::Vector3s::Random();
+    Eigen::Vector3s center = Eigen::Vector3s::Random();
+    s_t radius = 1.0 + ((s_t)rand() / RAND_MAX);
+
+    s_t cost = (point - center).squaredNorm() - (radius * radius);
+
+    s_t a = 2.0;
+
+    Eigen::Vector5s basis = Eigen::Vector5s(
+        point.squaredNorm(), point(0), point(1), point(2), 1.0);
+    Eigen::Vector5s u = Eigen::Vector5s(
+        a,
+        -2 * a * center(0),
+        -2 * a * center(1),
+        -2 * a * center(2),
+        (center.squaredNorm() - radius * radius) * a);
+    s_t recoveredCost = basis.dot(u) / a;
+
+    Eigen::Vector3s recoveredCenter = u.segment<3>(1) / (-2.0 * a);
+    EXPECT_TRUE(recoveredCenter.isApprox(center, 1e-8));
+    if (!recoveredCenter.isApprox(center, 1e-8))
+    {
+      return;
+    }
+    s_t recoveredRadiusSquared = abs(u(4) / a - recoveredCenter.squaredNorm());
+    EXPECT_NEAR(recoveredRadiusSquared, radius * radius, 1e-8);
+
+    EXPECT_NEAR(cost, recoveredCost, 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
+{
+  for (int i = 0; i < 5; i++)
+  {
+    Eigen::Vector3s point = Eigen::Vector3s::Random();
+
+    Eigen::Vector5s u = Eigen::Vector5s::Random();
+
+    Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * u(0));
+    s_t radiusSquared = abs((u(4) / u(0) - center.squaredNorm()));
+    s_t recoveredCost = (point - center).squaredNorm() - radiusSquared;
+
+    Eigen::Vector5s recoveredU = Eigen::Vector5s(
+        1.0,
+        -2 * center(0),
+        -2 * center(1),
+        -2 * center(2),
+        center.squaredNorm() - radiusSquared);
+    recoveredU *= u(0);
+    EXPECT_TRUE(recoveredU.segment<3>(1).isApprox(u.segment<3>(1), 1e-8));
+    EXPECT_NEAR(recoveredU(4), u(4), 1e-8);
+
+    Eigen::Vector5s basis = Eigen::Vector5s(
+        point.squaredNorm(), point(0), point(1), point(2), 1.0);
+    s_t cost = basis.dot(u) / u(0);
+
+    EXPECT_NEAR(cost, recoveredCost, 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, SPHERE_FIT_LEAST_SQUARES)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<Eigen::Vector3s> markerObservations;
+  s_t radius = 2.0;
+  markerObservations.push_back(center + Eigen::Vector3s::UnitX() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitX() * radius);
+  markerObservations.push_back(center + Eigen::Vector3s::UnitY() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitY() * radius);
+  markerObservations.push_back(center + Eigen::Vector3s::UnitZ() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitZ() * radius);
+
+  Eigen::Vector3s center_raw
+      = IKInitializer::leastSquaresSphereFit(markerObservations);
+  s_t error_raw = (center_raw - center).norm();
+  EXPECT_NEAR(error_raw, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_JOINT_TEST_NO_NOISE)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<Eigen::Vector3s> markerObservations;
+  s_t radius = 2.0;
+  markerObservations.push_back(center + Eigen::Vector3s::UnitX() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitX() * radius);
+  markerObservations.push_back(center + Eigen::Vector3s::UnitY() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitY() * radius);
+  markerObservations.push_back(center + Eigen::Vector3s::UnitZ() * radius);
+  markerObservations.push_back(center - Eigen::Vector3s::UnitZ() * radius);
+
+  Eigen::Vector3s center_recovered
+      = IKInitializer::getChangPollard2006JointCenterSingleMarker(
+          markerObservations);
+
+  s_t error = (center_recovered - center).norm();
+  EXPECT_NEAR(error, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_JOINT_TEST_WITH_NOISE)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<Eigen::Vector3s> markerObservations;
+  s_t radius = 2.0;
+  for (int i = 0; i < 500; i++)
+  {
+    Eigen::Matrix3s R = math::expMapRot(Eigen::Vector3s::Random());
+    markerObservations.push_back(
+        center + (R * Eigen::Vector3s::UnitX() * radius));
+  }
+
+  s_t noise = 0.01;
+  for (int i = 0; i < markerObservations[i].size(); i++)
+  {
+    markerObservations[i] += Eigen::Vector3s::Random() * noise;
+  }
+
+  Eigen::Vector3s center_recovered
+      = IKInitializer::getChangPollard2006JointCenterSingleMarker(
+          markerObservations);
+
+  s_t error = (center_recovered - center).norm();
+  EXPECT_NEAR(error, 0.0, 1e-4);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(IKInitializer, SYNTHETIC_OSIM)
 {
   EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(
@@ -532,7 +672,8 @@ TEST(IKInitializer, VISUALIZE_RESULTS)
       "dart://sample/grf/subject18_synthetic/"
       "unscaled_generic.osim",
       trcFiles,
-      1.775,
+      1.68,
+      // 1.775,
       true);
 }
 */

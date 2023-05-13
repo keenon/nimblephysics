@@ -1,9 +1,12 @@
 #include "dart/biomechanics/IKInitializer.hpp"
 
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -138,6 +141,34 @@ bool isCoplanar(const std::vector<Eigen::Vector3s>& points)
   }
 
   return true;
+}
+
+//==============================================================================
+bool isPositiveDefinite(const Eigen::MatrixXd& A)
+{
+  if (A.rows() != A.cols())
+    return false;
+
+  // Check symmetry
+  if (!A.isApprox(A.transpose()))
+    return false;
+
+  // Compute eigenvalues
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(A);
+
+  // Check for success
+  if (solver.info() != Eigen::Success)
+    return false;
+
+  // Check if all eigenvalues are positive
+  if ((solver.eigenvalues().array() > 0).all())
+    return true;
+  else
+  {
+    std::cout << "Got non-positive eigenvalues: " << solver.eigenvalues()
+              << std::endl;
+    return false;
+  }
 }
 
 //==============================================================================
@@ -474,7 +505,7 @@ void IKInitializer::runFullPipeline(bool logOutput)
   // adjacent body segments) to make it possible
   closedFormMDSJointCenterSolver(logOutput);
   // Fill in the parts of the body scales and poses that we can in closed form
-  estimatePosesAndGroupScalesInClosedForm();
+  estimatePosesAndGroupScalesInClosedForm(logOutput);
 
   for (int t = 0; t < mMarkerObservations.size(); t++)
   {
@@ -2137,6 +2168,7 @@ Eigen::MatrixXs IKInitializer::mapPointCloudToData(
   return transformed;
 }
 
+//==============================================================================
 /// This will give the world transform necessary to apply to the local points
 /// (worldT * p[i] for all localPoints) to get the local points to match the
 /// world points as closely as possible.
@@ -2200,6 +2232,245 @@ Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
   transform.linear() = R;
   transform.translation() = translation;
   return transform;
+}
+
+//==============================================================================
+/// This implements the method in "Constrained least-squares optimization for
+/// robust estimation of center of rotation" by Chang and Pollard, 2006. This
+/// is the simpler version, that only supports a single marker.
+///
+/// This assumes we're operating in a frame where the joint center is fixed in
+/// place, and `markerTrace` is a list of marker positions over time in that
+/// frame. So `markerTrace[t]` is the location of the marker on its t'th
+/// observation. This method will return the joint center in that frame.
+///
+/// The benefit of using this instead of the
+/// `closedFormPivotFindingJointCenterSolver` is that we can run it on pairs
+/// of bodies where only one side of the pair has 3 markers on it (commonly,
+/// the ankle).
+///
+/// IMPORTANT NOTE: This method assumes there are no markers that are
+/// literally coincident with the joint center. It has a singularity in that
+/// case, and will produce garbage. However, the only reason we would have a
+/// marker on top of the joint center is if someone actually gave us marker
+/// data with virtual joint centers already computed, in which case maybe we
+/// just respect their wishes?
+Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterSingleMarker(
+    std::vector<Eigen::Vector3s> markerTrace, bool log)
+{
+  // Construct the matrix D, described in Equation 12 in the paper
+  Eigen::MatrixXs D = Eigen::MatrixXs::Zero(markerTrace.size(), 5);
+  for (int i = 0; i < markerTrace.size(); i++)
+  {
+    D(i, 0) = markerTrace[i].squaredNorm();
+    D(i, 1) = markerTrace[i](0);
+    D(i, 2) = markerTrace[i](1);
+    D(i, 3) = markerTrace[i](2);
+    D(i, 4) = 1.0;
+  }
+  if (log)
+  {
+    std::cout << "The data matrix D: " << std::endl << D << std::endl;
+  }
+
+  // Construct the matrix S, described in Equation 13 in the paper
+  Eigen::MatrixXs S = D.transpose() * D;
+  if (log)
+  {
+    std::cout << "The objective matrix S: " << std::endl << S << std::endl;
+  }
+
+  // Construct the constraint matrix C, described in Equation 14 in the paper
+  Eigen::MatrixXs C = Eigen::MatrixXs::Zero(5, 5);
+  // C(0, 0) = 1;
+  C(4, 0) = -2;
+  C(0, 4) = -2;
+  C(1, 1) = 1;
+  C(2, 2) = 1;
+  C(3, 3) = 1;
+  if (log)
+  {
+    std::cout << "Constraint matrix C: " << std::endl << C << std::endl;
+  }
+
+  // Create a GeneralizedEigenSolver object
+  Eigen::GeneralizedEigenSolver<Eigen::MatrixXs> solver;
+
+  // Compute the generalized eigenvalues and eigenvectors
+  solver.compute(S, C);
+
+  auto result = solver.info();
+  if (result == Eigen::NumericalIssue)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::NumericalIssue"
+              << std::endl;
+  }
+  else if (result == Eigen::NoConvergence)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::NoConvergence"
+              << std::endl;
+  }
+  else if (result == Eigen::InvalidInput)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::InvalidInput"
+              << std::endl;
+  }
+  assert(result == Eigen::Success);
+
+  // Print the generalized eigenvalues - we use the opposite sign convention for
+  // the eigenvalues as the solver
+  Eigen::VectorXcd complexEigenvalues
+      = solver.alphas().cwiseQuotient(solver.betas()).transpose();
+  if (log)
+  {
+    std::cout << "The generalized eigenvalues of S and C are:\n"
+              << complexEigenvalues << std::endl;
+  }
+
+  // Print the generalized eigenvectors
+  Eigen::MatrixXcd complexEigenvectors = solver.eigenvectors();
+  if (log)
+  {
+    std::cout << "A matrix whose columns are eigenvectors corresponding to"
+              << "\nthe generalized eigenvalues of S and C are:\n"
+              << complexEigenvectors << std::endl;
+  }
+
+  // Reconstruct the solution from the eigenvectors, described after equation 17
+  // in the paper. To quote: "The best-fit solution is the generalized
+  // eigenvector u with non-negative eigenvalue l which has the least cost
+  // according to Eq. (13) and subject to Eq. (14)"
+  s_t bestCost = std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s reconstructedCenter = Eigen::Vector3s::Zero();
+  for (int i = 0; i < complexEigenvalues.size(); i++)
+  {
+    if (complexEigenvalues(i).imag() != 0
+        || complexEigenvalues(i).real() <= 1e-12)
+      continue;
+    s_t eigenvalue = complexEigenvalues(i).real();
+    Eigen::VectorXs eigenvector = complexEigenvectors.col(i).real();
+
+    // Normalized by constraint according to Equation 14 in the paper
+    s_t constraint = eigenvector.dot(C * eigenvector);
+    s_t scaleBy = sqrt(1.0 / constraint);
+    if (!isfinite(scaleBy))
+      continue;
+    Eigen::VectorXs u = eigenvector * scaleBy;
+    if (u.hasNaN())
+      continue;
+    s_t a = u(0);
+    // This means we're in a numerically unstable fit, due to extremely low
+    // marker noise (in practice this pretty much only happens on synthetic
+    // data)
+    if (std::abs(u(0)) < 1e-8)
+    {
+      continue;
+    }
+
+    if (log)
+    {
+      std::cout << "Un-Normalized result [" << i << "]: " << std::endl
+                << eigenvector << std::endl;
+      std::cout << "Constraint [" << i
+                << "] (will be normalized to 1.0): " << constraint << std::endl;
+      std::cout << "Normalized result [" << i << "]: " << std::endl
+                << u << std::endl;
+    }
+
+#ifndef NDEBUG
+    // Double check that the rescaled eigenvector still satisfies the equation
+    // (it must, cause everything is linear)
+    assert(((S * u) - (eigenvalue * C * u)).norm() < 1e-8);
+#endif
+
+#ifndef NDEBUG
+    if (log)
+      std::cout << "Normalized Constraint [" << i << "]: " << u.dot(C * u)
+                << std::endl;
+    assert(abs(u.dot(C * u) - 1.0) < 1e-6);
+#endif
+
+    // Cost according to Equation 13 in the paper
+    s_t cost = u.dot(S * u);
+    cost /= a * a;
+    if (log)
+      std::cout << "Cost[" << i << "]: " << cost << std::endl;
+    Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * a);
+    if (log)
+      std::cout << "Center[" << i << "]: " << std::endl << center << std::endl;
+
+#ifndef NDEBUG
+    s_t radiusSquared = abs(u(4) / a - center.squaredNorm());
+    s_t reconstructedCost = 0.0;
+    for (int i = 0; i < markerTrace.size(); i++)
+    {
+      s_t distance = (markerTrace[i] - center).squaredNorm() - radiusSquared;
+      reconstructedCost += distance * distance;
+    }
+    if (log)
+    {
+      std::cout << "Reconstructed Cost[" << i << "]: " << reconstructedCost
+                << std::endl;
+    }
+    // Don't run this test if these numbers are near a singularity
+    if ((abs(cost) + abs(reconstructedCost)) < 1e8)
+    {
+      assert(
+          abs(cost - reconstructedCost) / (abs(cost) + abs(reconstructedCost))
+          < 1e-6);
+    }
+#endif
+    if (log)
+    {
+      std::cout << "Radius[" << i << "]: " << sqrt(radiusSquared) << std::endl;
+    }
+
+    if (cost < bestCost)
+    {
+      bestCost = cost;
+      reconstructedCenter = center;
+    }
+  }
+
+  if (!std::isfinite(bestCost))
+  {
+    // We fall back to a least-squares fit when there's no valid solution, which
+    // generally means that there was no noise (and therefore no radius
+    // variability) in the marker data.
+    reconstructedCenter = leastSquaresSphereFit(markerTrace);
+  }
+
+  return reconstructedCenter;
+}
+
+/// This implements a simple least-squares problem to find the center of a
+/// sphere of unknown radius, with samples along the hull given by `points`.
+/// This tolerates noise less well than the ChangPollard2006 method, because
+/// it biases the radius of the sphere towards zero in the presence of
+/// ambiguity, because it is part of the least-squares terms. However, this
+/// method will work even on data with zero noise, whereas ChangPollard2006
+/// will fail when there is zero noise (for example, on synthetic datasets).
+Eigen::Vector3s IKInitializer::leastSquaresSphereFit(
+    std::vector<Eigen::Vector3s> points)
+{
+  // Method copied from https://jekel.me/2015/Least-Squares-Sphere-Fit/
+  Eigen::VectorXs f = Eigen::VectorXs::Zero(points.size());
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(points.size(), 4);
+
+  for (int i = 0; i < points.size(); i++)
+  {
+    Eigen::Vector3s p = points[i];
+    f(i) = p.squaredNorm();
+
+    A(i, 0) = 2 * p(0);
+    A(i, 1) = 2 * p(1);
+    A(i, 2) = 2 * p(2);
+    A(i, 3) = 1;
+  }
+
+  Eigen::VectorXs c = A.completeOrthogonalDecomposition().solve(f);
+  Eigen::Vector3s center = c.head<3>();
+  return center;
 }
 
 } // namespace biomechanics
