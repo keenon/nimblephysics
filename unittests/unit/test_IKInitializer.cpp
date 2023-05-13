@@ -637,6 +637,102 @@ TEST(IKInitializer, CHANG_POLLARD_JOINT_TEST_WITH_NOISE)
 #endif
 
 #ifdef ALL_TESTS
+TEST(IKInitializer, SPHERE_FIT_MULTI_JOINT_LEAST_SQUARES)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<Eigen::Vector3s> markerObservations1;
+  s_t radius1 = 2.0;
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitZ() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitZ() * radius1);
+  std::vector<Eigen::Vector3s> markerObservations2;
+  s_t radius2 = 3.0;
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitX() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitX() * radius2);
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitY() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitY() * radius2);
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitZ() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitZ() * radius2);
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  markerTraces.push_back(markerObservations1);
+  markerTraces.push_back(markerObservations2);
+
+  Eigen::Vector3s center_raw
+      = IKInitializer::leastSquaresConcentricSphereFit(markerTraces);
+  s_t error_raw = (center_raw - center).norm();
+  EXPECT_NEAR(error_raw, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_MULTI_MARKER_NO_NOISE)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<Eigen::Vector3s> markerObservations1;
+  s_t radius1 = 2.0;
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitZ() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitZ() * radius1);
+  std::vector<Eigen::Vector3s> markerObservations2;
+  s_t radius2 = 3.0;
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitX() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitX() * radius2);
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitY() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitY() * radius2);
+  markerObservations2.push_back(center + Eigen::Vector3s::UnitZ() * radius2);
+  markerObservations2.push_back(center - Eigen::Vector3s::UnitZ() * radius2);
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  markerTraces.push_back(markerObservations1);
+  markerTraces.push_back(markerObservations2);
+
+  Eigen::Vector3s center_raw
+      = IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
+  s_t error_raw = (center_raw - center).norm();
+  EXPECT_NEAR(error_raw, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_MULTI_MARKER_TEST_WITH_NOISE)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  for (int i = 0; i < 2; i++)
+  {
+    std::vector<Eigen::Vector3s> markerObservations;
+    s_t radius = 1.0 * i;
+    for (int i = 0; i < 500; i++)
+    {
+      Eigen::Matrix3s R = math::expMapRot(Eigen::Vector3s::Random());
+      markerObservations.push_back(
+          center + (R * Eigen::Vector3s::UnitX() * radius));
+    }
+
+    s_t noise = 0.01;
+    for (int i = 0; i < markerObservations[i].size(); i++)
+    {
+      markerObservations[i] += Eigen::Vector3s::Random() * noise;
+    }
+    markerTraces.push_back(markerObservations);
+  }
+
+  Eigen::Vector3s center_recovered
+      = IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
+
+  s_t error = (center_recovered - center).norm();
+  EXPECT_NEAR(error, 0.0, 2e-4);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(IKInitializer, SYNTHETIC_OSIM)
 {
   EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(

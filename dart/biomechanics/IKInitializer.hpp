@@ -201,6 +201,11 @@ public:
   static Eigen::Vector3s getChangPollard2006JointCenterSingleMarker(
       std::vector<Eigen::Vector3s> markerTrace, bool log = false);
 
+  /// This implements the variant of ChangPollard2006 that supports multiple
+  /// markers.
+  static Eigen::Vector3s getChangPollard2006JointCenterMultiMarker(
+      std::vector<std::vector<Eigen::Vector3s>> markerTrace, bool log = false);
+
   /// This implements a simple least-squares problem to find the center of a
   /// sphere of unknown radius, with samples along the hull given by `points`.
   /// This tolerates noise less well than the ChangPollard2006 method, because
@@ -210,6 +215,12 @@ public:
   /// will fail when there is zero noise (for example, on synthetic datasets).
   static Eigen::Vector3s leastSquaresSphereFit(
       std::vector<Eigen::Vector3s> points);
+
+  /// This is just like a leastSquaresSphereFit(), but it allows for multiple
+  /// radii, and finds the best fit for the center of a spheres with the same
+  /// center.
+  static Eigen::Vector3s leastSquaresConcentricSphereFit(
+      std::vector<std::vector<Eigen::Vector3s>> traces);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;

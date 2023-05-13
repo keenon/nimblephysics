@@ -2443,6 +2443,195 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterSingleMarker(
   return reconstructedCenter;
 }
 
+/// This implements the variant of ChangPollard2006 that supports multiple
+/// markers.
+Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
+    std::vector<std::vector<Eigen::Vector3s>> markerTraces, bool log)
+{
+  int numMarkers = markerTraces.size();
+  int uDim = 4 + numMarkers;
+
+  std::vector<Eigen::MatrixXs> Ds;
+  int sumRows = 0;
+  for (auto& markerTrace : markerTraces)
+  {
+    // Construct the matrix D, described in Equation 12 in the paper
+    Eigen::MatrixXs D = Eigen::MatrixXs::Zero(markerTrace.size(), 4);
+    for (int i = 0; i < markerTrace.size(); i++)
+    {
+      D(i, 0) = markerTrace[i].squaredNorm();
+      D(i, 1) = markerTrace[i](0);
+      D(i, 2) = markerTrace[i](1);
+      D(i, 3) = markerTrace[i](2);
+    }
+    if (log)
+    {
+      std::cout << "The data matrix D[" << Ds.size() << "]: " << std::endl
+                << D << std::endl;
+    }
+    Ds.push_back(D);
+    sumRows += D.rows();
+  }
+  Eigen::MatrixXs D = Eigen::MatrixXs::Zero(sumRows, uDim);
+  int rowCursor = 0;
+  for (int i = 0; i < Ds.size(); i++)
+  {
+    D.block(rowCursor, 0, Ds[i].rows(), Ds[i].cols()) = Ds[i];
+    D.block(rowCursor, 4 + i, Ds[i].rows(), 1).setConstant(1.0);
+    rowCursor += Ds[i].rows();
+  }
+  if (log)
+  {
+    std::cout << "The assembled data matrix D: " << std::endl << D << std::endl;
+  }
+
+  // Construct the matrix S, described in Equation 13 in the paper
+  Eigen::MatrixXs S = D.transpose() * D;
+  if (log)
+  {
+    std::cout << "The objective matrix S: " << std::endl << S << std::endl;
+  }
+
+  // Construct the constraint matrix C, described in Equation 14 in the paper
+  Eigen::MatrixXs C = Eigen::MatrixXs::Zero(uDim, uDim);
+  // C(0, 0) = 1;
+  C(1, 1) = numMarkers;
+  C(2, 2) = numMarkers;
+  C(3, 3) = numMarkers;
+  for (int i = 4; i < uDim; i++)
+  {
+    C(i, 0) = -2;
+    C(0, i) = -2;
+  }
+  if (log)
+  {
+    std::cout << "Constraint matrix C: " << std::endl << C << std::endl;
+  }
+
+  // Create a GeneralizedEigenSolver object
+  Eigen::GeneralizedEigenSolver<Eigen::MatrixXs> solver;
+
+  // Compute the generalized eigenvalues and eigenvectors
+  solver.compute(S, C);
+
+  auto result = solver.info();
+  if (result == Eigen::NumericalIssue)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::NumericalIssue"
+              << std::endl;
+  }
+  else if (result == Eigen::NoConvergence)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::NoConvergence"
+              << std::endl;
+  }
+  else if (result == Eigen::InvalidInput)
+  {
+    std::cout << "GeneralizedEigenSolver failed with Eigen::InvalidInput"
+              << std::endl;
+  }
+  assert(result == Eigen::Success);
+
+  // Print the generalized eigenvalues - we use the opposite sign convention for
+  // the eigenvalues as the solver
+  Eigen::VectorXcd complexEigenvalues
+      = solver.alphas().cwiseQuotient(solver.betas()).transpose();
+  if (log)
+  {
+    std::cout << "The generalized eigenvalues of S and C are:\n"
+              << complexEigenvalues << std::endl;
+  }
+
+  // Print the generalized eigenvectors
+  Eigen::MatrixXcd complexEigenvectors = solver.eigenvectors();
+  if (log)
+  {
+    std::cout << "A matrix whose columns are eigenvectors corresponding to"
+              << "\nthe generalized eigenvalues of S and C are:\n"
+              << complexEigenvectors << std::endl;
+  }
+
+  // Reconstruct the solution from the eigenvectors, described after equation 17
+  // in the paper. To quote: "The best-fit solution is the generalized
+  // eigenvector u with non-negative eigenvalue l which has the least cost
+  // according to Eq. (13) and subject to Eq. (14)"
+  s_t bestCost = std::numeric_limits<s_t>::infinity();
+  Eigen::Vector3s reconstructedCenter = Eigen::Vector3s::Zero();
+  for (int i = 0; i < complexEigenvalues.size(); i++)
+  {
+    if (complexEigenvalues(i).imag() != 0
+        || complexEigenvalues(i).real() <= 1e-12)
+      continue;
+    s_t eigenvalue = complexEigenvalues(i).real();
+    Eigen::VectorXs eigenvector = complexEigenvectors.col(i).real();
+
+    // Normalized by constraint according to Equation 14 in the paper
+    s_t constraint = eigenvector.dot(C * eigenvector);
+    s_t scaleBy = sqrt(1.0 / constraint);
+    if (!isfinite(scaleBy))
+      continue;
+    Eigen::VectorXs u = eigenvector * scaleBy;
+    if (u.hasNaN())
+      continue;
+    s_t a = u(0);
+    // This means we're in a numerically unstable fit, due to extremely low
+    // marker noise (in practice this pretty much only happens on synthetic
+    // data)
+    if (std::abs(u(0)) < 1e-8)
+    {
+      continue;
+    }
+
+    if (log)
+    {
+      std::cout << "Un-Normalized result [" << i << "]: " << std::endl
+                << eigenvector << std::endl;
+      std::cout << "Constraint [" << i
+                << "] (will be normalized to 1.0): " << constraint << std::endl;
+      std::cout << "Normalized result [" << i << "]: " << std::endl
+                << u << std::endl;
+    }
+
+#ifndef NDEBUG
+    // Double check that the rescaled eigenvector still satisfies the equation
+    // (it must, cause everything is linear)
+    assert(((S * u) - (eigenvalue * C * u)).norm() < 1e-8);
+#endif
+
+#ifndef NDEBUG
+    if (log)
+      std::cout << "Normalized Constraint [" << i << "]: " << u.dot(C * u)
+                << std::endl;
+    assert(abs(u.dot(C * u) - 1.0) < 1e-6);
+#endif
+
+    // Cost according to Equation 13 in the paper
+    s_t cost = u.dot(S * u);
+    cost /= a * a;
+    if (log)
+      std::cout << "Cost[" << i << "]: " << cost << std::endl;
+    Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * a);
+    if (log)
+      std::cout << "Center[" << i << "]: " << std::endl << center << std::endl;
+
+    if (cost < bestCost)
+    {
+      bestCost = cost;
+      reconstructedCenter = center;
+    }
+  }
+
+  if (!std::isfinite(bestCost))
+  {
+    // We fall back to a least-squares fit when there's no valid solution, which
+    // generally means that there was no noise (and therefore no radius
+    // variability) in the marker data.
+    reconstructedCenter = leastSquaresConcentricSphereFit(markerTraces);
+  }
+
+  return reconstructedCenter;
+}
+
 /// This implements a simple least-squares problem to find the center of a
 /// sphere of unknown radius, with samples along the hull given by `points`.
 /// This tolerates noise less well than the ChangPollard2006 method, because
@@ -2468,6 +2657,40 @@ Eigen::Vector3s IKInitializer::leastSquaresSphereFit(
     A(i, 3) = 1;
   }
 
+  Eigen::VectorXs c = A.completeOrthogonalDecomposition().solve(f);
+  Eigen::Vector3s center = c.head<3>();
+  return center;
+}
+
+/// This is just like a leastSquaresSphereFit(), but it allows for multiple
+/// radii, and finds the best fit for the center of a spheres with the same
+/// center.
+Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
+    std::vector<std::vector<Eigen::Vector3s>> traces)
+{
+  int dim = 0;
+  for (auto& trace : traces)
+    dim += trace.size();
+
+  Eigen::VectorXs f = Eigen::VectorXs::Zero(dim);
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(dim, 3 + traces.size());
+  int rowCursor = 0;
+  int colCursor = 3;
+  for (auto& trace : traces)
+  {
+    for (Eigen::Vector3s& p : trace)
+    {
+      f(rowCursor) = p.squaredNorm();
+
+      A(rowCursor, 0) = 2 * p(0);
+      A(rowCursor, 1) = 2 * p(1);
+      A(rowCursor, 2) = 2 * p(2);
+      A(rowCursor, colCursor) = 1;
+
+      rowCursor++;
+    }
+    colCursor++;
+  }
   Eigen::VectorXs c = A.completeOrthogonalDecomposition().solve(f);
   Eigen::Vector3s center = c.head<3>();
   return center;
