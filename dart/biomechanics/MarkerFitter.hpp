@@ -16,6 +16,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
+#include "dart/biomechanics/IKErrorReport.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Shape.hpp"
@@ -1175,6 +1176,15 @@ public:
 
   /// This removes an equality constraint by name
   void removeZeroConstraint(std::string name);
+
+  /// This writes a unified CSV with columns describing the results for the trial
+  /// associated with this MarkerInitialization.
+  void writeCSVData(
+      std::string path,
+      const MarkerInitialization& init,
+      const std::vector<s_t>& rmsMarkerErrors,
+      const std::vector<s_t>& maxMarkerErrors,
+      const std::vector<s_t>& timestamps);
 
   //////////////////////////////////////////////////////////////////////////
   // First order gradients
