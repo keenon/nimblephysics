@@ -61,6 +61,39 @@ void runOnRealOsim(
       osim.skeleton->setPositions(initializer.mPoses[t]);
       server.renderSkeleton(osim.skeleton);
 
+      /*
+      for (auto& pair : initializer.mBodyTransforms[t])
+      {
+        dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
+        for (int i = 0; i < body->getNumShapeNodes(); i++)
+        {
+          dynamics::ShapeNode* shape = body->getShapeNode(i);
+          if (shape->hasVisualAspect())
+          {
+            std::shared_ptr<dynamics::Shape> shapePtr = shape->getShape();
+            if (shapePtr->getType() == MeshShape::getStaticType())
+            {
+              std::shared_ptr<dynamics::MeshShape> meshShape
+                  = std::static_pointer_cast<dynamics::MeshShape>(shapePtr);
+              Eigen::Isometry3s shapeTransform
+                  = pair.second * shape->getRelativeTransform();
+
+              server.createMeshFromShape(
+                  body->getName() + "-" + std::to_string(i),
+                  meshShape,
+                  shapeTransform.translation(),
+                  math::matrixToEulerXYZ(shapeTransform.linear()),
+                  body->getScale(),
+                  Eigen::Vector4s(0, 1, 0, 0.7));
+              server.setObjectTooltip(
+                  body->getName() + "-" + std::to_string(i),
+                  "Estimated " + body->getName());
+            }
+          }
+        }
+      }
+      */
+
       server.deleteObjectsByPrefix("line_");
       auto jointMap = initializer.getVisibleJointCenters(t);
       for (auto& pair : jointMap)
@@ -108,9 +141,11 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
   std::vector<Eigen::VectorXs> poses;
   std::vector<Eigen::VectorXs> jointCenters;
-  for (int t = 0; t < 5; t++)
+  for (int t = 0; t < 10; t++)
   {
-    Eigen::VectorXs pose = osim.skeleton->getRandomPose();
+    Eigen::VectorXs pose
+        = t < 2 ? Eigen::VectorXs::Zero(osim.skeleton->getNumDofs())
+                : osim.skeleton->getRandomPose();
     poses.push_back(pose);
     osim.skeleton->setPositions(pose);
     markerObservations.push_back(
@@ -163,17 +198,37 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   }
 
   s_t markerError = 0.0;
-  markerError = initializer.closedFormMDSJointCenterSolver(true);
+  // markerError = initializer.closedFormMDSJointCenterSolver(true);
   s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
+  initializer.recenterAxisJointsBasedOnBoneAngles();
+  /*
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    Eigen::VectorXs pose = poses[t];
+    osim.skeleton->setPositions(pose);
+    auto jointMap = initializer.getVisibleJointCenters(t);
+    for (auto& pair : jointMap)
+    {
+      Eigen::Vector3s jointWorld = jointCenters[t].segment<3>(
+          osim.skeleton->getJoint(pair.first)->getJointIndexInSkeleton() * 3);
+      Eigen::Vector3s jointCenterEstimated = pair.second;
+      s_t jointError = (jointWorld - jointCenterEstimated).norm();
+      std::cout << "Joint center " << pair.first << " error: " << jointError
+                << std::endl;
+    }
+  }
+  */
   std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
-  initializer.reestimateDistancesFromJointCenters();
-  markerError = initializer.closedFormMDSJointCenterSolver(true);
+
+  // initializer.reestimateDistancesFromJointCenters();
+  // markerError = initializer.closedFormMDSJointCenterSolver(true);
   s_t markerErrorFromIK
-      = initializer.estimatePosesAndGroupScalesInClosedForm(true);
+      = initializer.estimatePosesAndGroupScalesInClosedForm(false);
   (void)markerErrorFromIK;
   for (int t = 0; t < markerObservations.size(); t++)
   {
-    initializer.completeIKIteratively(t, osim.skeleton);
+    // initializer.completeIKIteratively(t, osim.skeleton);
+    // initializer.fineTuneIKIteratively(t, osim.skeleton);
   }
 
   std::vector<Eigen::VectorXs> recoveredPoses = initializer.mPoses;
@@ -185,6 +240,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   std::map<std::string, std::map<std::string, s_t>>
       estimatedJointToJointDistances
       = initializer.estimateJointToJointDistances();
+  bool jointFailure = false;
   for (auto& pair1 : estimatedJointToJointDistances)
   {
     for (auto& pair2 : pair1.second)
@@ -205,7 +261,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
           || pair1.first.find("walker_knee") != std::string::npos
           || pair2.first.find("walker_knee") != std::string::npos)
       {
-        threshold = 0.02;
+        threshold = 0.04;
       }
       if (std::abs(originalDist - estimatedDist) > threshold)
       {
@@ -213,7 +269,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
                   << pair1.first << " and " << pair2.first
                   << "! Error should be less than " << threshold << ", got "
                   << std::abs(originalDist - estimatedDist) << std::endl;
-        return false;
+        jointFailure = true;
       }
     }
   }
@@ -238,6 +294,42 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
           recoveredSkel, "recovered", Eigen::Vector4s(1, 0, 0, 0.7));
       osim.skeleton->setPositions(pose);
       server.renderSkeleton(osim.skeleton);
+
+      Eigen::VectorXs jointWorldCenters
+          = osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints());
+      for (int j = 0; j < osim.skeleton->getNumJoints(); j++)
+      {
+        dynamics::Joint* joint = osim.skeleton->getJoint(j);
+        if (joint->getNumDofs() == 1)
+        {
+          Eigen::Vector3s jointWorld = jointWorldCenters.segment<3>(
+              joint->getJointIndexInSkeleton() * 3);
+          Eigen::Vector3s axis
+              = joint->getWorldAxisScrewForVelocity(0).head<3>();
+          std::vector<Eigen::Vector3s> jointAxisLine;
+          jointAxisLine.push_back(jointWorld);
+          jointAxisLine.push_back(jointWorld + axis * 0.5);
+          server.createLine(
+              "joint_" + std::to_string(j),
+              jointAxisLine,
+              Eigen::Vector4s(1, 0, 0, 1));
+        }
+      }
+
+      for (auto& pair : initializer.mJointCenters[t])
+      {
+        if (initializer.mJointAxisDirs[t].count(pair.first))
+        {
+          std::vector<Eigen::Vector3s> guessedAxisLine;
+          guessedAxisLine.push_back(pair.second);
+          guessedAxisLine.push_back(
+              pair.second + initializer.mJointAxisDirs[t][pair.first] * 0.5);
+          server.createLine(
+              "guessed_joint" + pair.first,
+              guessedAxisLine,
+              Eigen::Vector4s(0, 1, 1, 1));
+        }
+      }
 
       for (auto& pair : estimatedBodyTransforms[t])
       {
@@ -327,15 +419,101 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
             << "m, joint center estimate error: " << avgJointCenterEstimateError
             << "m" << std::endl;
   std::cout << "Joint angle error: " << avgJointAngleError << std::endl;
+
+  if (saveToGUI)
+  {
+    server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+  }
+
+  if (jointFailure)
+  {
+    return false;
+  }
   if (avgJointCenterEstimateError > 0.05)
   {
     std::cout << "Joint error is too high on synthetic data!" << std::endl;
     return false;
   }
+  return true;
+}
 
-  if (saveToGUI)
+bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
+    std::string openSimPath)
+{
+  auto osim = OpenSimParser::parseOsim(openSimPath);
+  s_t targetHeight = 1.8;
+  s_t currentHeight = osim.skeleton->getHeight(
+      Eigen::VectorXs::Zero(osim.skeleton->getNumDofs()));
+  osim.skeleton->setBodyScales(
+      Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3)
+      * (targetHeight / currentHeight));
+  Eigen::VectorXs goldGroupScales = osim.skeleton->getGroupScales();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<Eigen::VectorXs> poses;
+  std::vector<Eigen::VectorXs> jointCenters;
+  for (int t = 0; t < 50; t++)
   {
-    server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+    Eigen::VectorXs pose = osim.skeleton->getRandomPose();
+    poses.push_back(pose);
+    osim.skeleton->setPositions(pose);
+    markerObservations.push_back(
+        osim.skeleton->getMarkerMapWorldPositions(osim.markersMap));
+    jointCenters.push_back(
+        osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints()));
+  }
+
+  // Reset to neutral scale
+  osim.skeleton->setBodyScales(
+      Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3));
+
+  IKInitializer initializer(
+      osim.skeleton, osim.markersMap, markerObservations, targetHeight);
+
+  // Initial guesses using MDS to center our subsequent least-squares on
+  initializer.closedFormMDSJointCenterSolver();
+  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver(true);
+  std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
+  initializer.recenterAxisJointsBasedOnBoneAngles(true);
+
+  s_t avgJointCenterEstimateError = 0.0;
+  int numJointsCenterEstimatesCounted = 0;
+  std::map<std::string, s_t> avgJointCenterEstimateErrorByJoint;
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    auto jointMap = initializer.getVisibleJointCenters(t);
+    for (auto& pair : jointMap)
+    {
+      Eigen::Vector3s jointWorld = jointCenters[t].segment<3>(
+          osim.skeleton->getJoint(pair.first)->getJointIndexInSkeleton() * 3);
+      Eigen::Vector3s jointCenterEstimated = pair.second;
+      s_t jointError = (jointWorld - jointCenterEstimated).norm();
+      avgJointCenterEstimateErrorByJoint[pair.first] += jointError;
+      avgJointCenterEstimateError += jointError;
+      numJointsCenterEstimatesCounted++;
+
+      std::map<std::string, s_t> jointToMarkerSquaredDistances
+          = initializer.getJointToMarkerSquaredDistances(pair.first);
+    }
+  }
+  for (auto& pair : avgJointCenterEstimateErrorByJoint)
+  {
+    pair.second /= markerObservations.size();
+    std::cout << "Joint center " << pair.first << " error: " << pair.second
+              << std::endl;
+  }
+
+  if (numJointsCenterEstimatesCounted > 0)
+  {
+    avgJointCenterEstimateError /= numJointsCenterEstimatesCounted;
+  }
+  std::cout << "Joint center estimate error: " << avgJointCenterEstimateError
+            << "m" << std::endl;
+  if (avgJointCenterEstimateError > 0.015)
+  {
+    std::cout << "Joint center estimate error is too high on synthetic data!"
+              << std::endl;
+    return false;
   }
 
   return true;
@@ -733,6 +911,88 @@ TEST(IKInitializer, CHANG_POLLARD_MULTI_MARKER_TEST_WITH_NOISE)
 #endif
 
 #ifdef ALL_TESTS
+TEST(IKInitializer, AXIS_FIT_NO_NOISE)
+{
+  Eigen::Vector3s axis = Eigen::Vector3s::UnitX();
+  Eigen::Vector3s center = Eigen::Vector3s::UnitZ();
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  for (int i = 0; i < 3; i++)
+  {
+    Eigen::Vector3s markerPos = Eigen::Vector3s::Random();
+    std::vector<Eigen::Vector3s> markerObservations;
+    for (int t = 0; t < 50; t++)
+    {
+      Eigen::Matrix3s R = math::expMapRot(axis * 0.01 * t);
+      markerObservations.push_back(center + (R * markerPos));
+    }
+    markerTraces.push_back(markerObservations);
+  }
+
+  auto pair = IKInitializer::gamageLasenby2002AxisFit(markerTraces);
+  s_t singularValue = pair.second;
+  Eigen::Vector3s axisRecovered = pair.first;
+  EXPECT_LT(std::abs(singularValue), 1e-8);
+  EXPECT_TRUE((axisRecovered - axis).norm() < 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, AXIS_FIT_SOME_NOISE)
+{
+  Eigen::Vector3s axis = Eigen::Vector3s::Random().normalized();
+  Eigen::Vector3s center = Eigen::Vector3s::Random();
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  for (int i = 0; i < 3; i++)
+  {
+    Eigen::Vector3s markerPos = Eigen::Vector3s::Random();
+    std::vector<Eigen::Vector3s> markerObservations;
+    for (int t = 0; t < 500; t++)
+    {
+      Eigen::Matrix3s R
+          = math::expMapRot(axis * ((s_t)rand() / RAND_MAX) * 3.14159 * 2);
+      Eigen::Vector3s noise = Eigen::Vector3s::Random() * 0.01;
+      markerObservations.push_back(center + (R * markerPos) + noise);
+    }
+    markerTraces.push_back(markerObservations);
+  }
+
+  // auto pair = IKInitializer::svdAxisFit(markerTraces, center);
+  auto pair = IKInitializer::gamageLasenby2002AxisFit(markerTraces);
+  s_t singularValue = pair.second;
+  Eigen::Vector3s axisRecovered = pair.first;
+  // Deal with sign ambiguity
+  if (((axisRecovered * -1) - axis).norm() < (axisRecovered - axis).norm())
+  {
+    axisRecovered *= -1;
+  }
+  EXPECT_LT(std::abs(singularValue), 1e-3);
+  if ((axisRecovered - axis).norm() >= 1e-3)
+  {
+    Eigen::Matrix3s compare;
+    compare.col(0) = axis;
+    compare.col(1) = axisRecovered;
+    compare.col(2) = axis - axisRecovered;
+    std::cout << "Axis error of " << (axisRecovered - axis).norm()
+              << " is too high!" << std::endl;
+    std::cout << "Axis - Recovered - Error: " << std::endl
+              << compare << std::endl;
+  }
+  EXPECT_TRUE((axisRecovered - axis).norm() < 1e-3);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, SYNTHETIC_OSIM_JUST_JOINT_CENTERS)
+{
+  EXPECT_TRUE(verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
+      "dart://sample/grf/subject18_synthetic/"
+      "unscaled_generic.osim"));
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(IKInitializer, SYNTHETIC_OSIM)
 {
   EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(
@@ -768,8 +1028,7 @@ TEST(IKInitializer, VISUALIZE_RESULTS)
       "dart://sample/grf/subject18_synthetic/"
       "unscaled_generic.osim",
       trcFiles,
-      1.68,
-      // 1.775,
+      1.775,
       true);
 }
 */

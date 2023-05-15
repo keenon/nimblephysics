@@ -94,14 +94,12 @@ public:
   /// centers.
   s_t closedFormPivotFindingJointCenterSolver(bool logOutput = false);
 
-  /// This finds the joint centers for any joints that have one side attached to
-  /// a body with at least 3 markers on it, but the other side with fewer
-  /// markers. This uses the method introduced in "Hiniduma Udugama Gamage,
-  /// S.S., & Lasenby, J. (2002). New least squares solutions for estimating the
-  /// average center of rotation and the axis of rotation. J. Biomechanics 35,
-  /// 87-93." Described in detail on
-  /// http://www.kwon3d.com/theory/jkinem/jcent.html
-  s_t closedFormGamageAndLasenby2002JointCenterSolver(bool logOutput = false);
+  /// For joints where we believe they're floating along an axis, and we have at
+  /// least one of either the parent or child joint has a known joint center
+  /// WITHOUT the axis amiguity, we can slide the joint center along the axis
+  /// until the angle formed by the axis and the known adjacent joint matches
+  /// what is in the skeleton.
+  s_t recenterAxisJointsBasedOnBoneAngles(bool logOutput = false);
 
   /// This uses the current guesses for the joint centers to re-estimate the
   /// bone sizes (based on distance between joint centers) and then use that to
@@ -222,6 +220,21 @@ public:
   static Eigen::Vector3s leastSquaresConcentricSphereFit(
       std::vector<std::vector<Eigen::Vector3s>> traces);
 
+  /// This will attempt to fit an axis to a set of traces, after we've already
+  /// found the center of rotation, by running an SVD on a matrix composed of
+  /// the traces and looking at the near-zero singular value, if there is one.
+  /// This returns the axis fit, along with the corresponding singular value (if
+  /// that number is too high, the axis should be disregarded).
+  static std::pair<Eigen::Vector3s, s_t> svdAxisFit(
+      std::vector<std::vector<Eigen::Vector3s>> traces,
+      Eigen::Vector3s jointCenter);
+
+  /// This implements the least-squares method in Gamage and Lasenby 2002, "New
+  /// least squares solutions for estimating the average centre of rotation and
+  /// the axis of rotation"
+  static std::pair<Eigen::Vector3s, s_t> gamageLasenby2002AxisFit(
+      std::vector<std::vector<Eigen::Vector3s>> traces);
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   s_t mModelHeightM;
@@ -229,7 +242,9 @@ protected:
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
 
+public:
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointCenters;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mJointAxisDirs;
 
   std::map<std::string, std::map<std::string, s_t>>
       mJointToMarkerSquaredDistances;
@@ -250,6 +265,11 @@ public:
   // that DOF [i] was found with a closed form estimate, and a 0 means that it
   // wasn't.
   std::vector<Eigen::VectorXi> mPosesClosedFormEstimateAvailable;
+
+  // If we have synthetic joint centers with zero error, we can store them here
+  // so that we can compare our estimates to them with asserts mid-function
+  std::vector<std::map<std::string, Eigen::Vector3s>>
+      mDebugKnownSyntheticJointCenters;
 };
 
 } // namespace biomechanics

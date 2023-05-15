@@ -13,10 +13,14 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/SVD>
 
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
+#include "dart/dynamics/RevoluteJoint.hpp"
+#include "dart/dynamics/UniversalJoint.hpp"
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
@@ -282,9 +286,6 @@ IKInitializer::IKInitializer(
       mStackedBodies[i]->childJoints.push_back(
           mStackedJoints[body->getChildJoint(j)->getJointIndexInSkeleton()]);
     }
-    std::cout << "Body " << mStackedBodies[i]->name << " has "
-              << mStackedBodies[i]->childJoints.size() << " children"
-              << std::endl;
   }
   for (int i = 0; i < mSkel->getNumJoints(); i++)
   {
@@ -387,7 +388,68 @@ IKInitializer::IKInitializer(
   // 2.3. Collapse the stacked bodies that are connected by a fixed joint, and
   // simply remove the fixed joint.
 
-  // TODO
+  while (true)
+  {
+    std::shared_ptr<struct StackedJoint> toCollapse = nullptr;
+
+    for (int i = 0; i < mStackedJoints.size(); i++)
+    {
+      bool allFixed = true;
+      for (auto* joint : mStackedJoints[i]->joints)
+      {
+        if (!joint->isFixed())
+        {
+          allFixed = false;
+          break;
+        }
+      }
+      if (allFixed)
+      {
+        toCollapse = mStackedJoints[i];
+      }
+    }
+
+    if (toCollapse != nullptr)
+    {
+      // 2.3.1. Merge the connected bodies
+      std::shared_ptr<struct StackedBody> parentBody = toCollapse->parentBody;
+      std::shared_ptr<struct StackedBody> childBody = toCollapse->childBody;
+      std::cout << "Discovered locked joint \"" << toCollapse->name << "\""
+                << std::endl;
+      std::cout << " -> As a result merging bodies \"" << childBody->name
+                << "\" into \"" << parentBody->name << "\"" << std::endl;
+      parentBody->bodies.insert(
+          parentBody->bodies.end(),
+          childBody->bodies.begin(),
+          childBody->bodies.end());
+      // Re-attach all the child joints to the parent body
+      for (auto& childJoint : childBody->childJoints)
+      {
+        childJoint->parentBody = parentBody;
+        parentBody->childJoints.push_back(childJoint);
+      }
+
+      // 2.3.2. Remove the joint and body from the lists
+      auto jointToDeleteIterator
+          = std::find(mStackedJoints.begin(), mStackedJoints.end(), toCollapse);
+      assert(jointToDeleteIterator != mStackedJoints.end());
+      mStackedJoints.erase(jointToDeleteIterator);
+      auto bodyToDeleteIterator
+          = std::find(mStackedBodies.begin(), mStackedBodies.end(), childBody);
+      assert(bodyToDeleteIterator != mStackedBodies.end());
+      mStackedBodies.erase(bodyToDeleteIterator);
+      auto childJointToDeletIterator = std::find(
+          parentBody->childJoints.begin(),
+          parentBody->childJoints.end(),
+          toCollapse);
+      assert(jointToDeleteIterator != parentBody->childJoints.end());
+      parentBody->childJoints.erase(childJointToDeletIterator);
+    }
+    else
+    {
+      break;
+    }
+  }
 
   // 3. Filter to just the stacked joints that are connected to at least three
   // markers, since none of our closed-form algorithms will work with less than
@@ -493,30 +555,17 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
-  // Use the MDS solver to initialize all the joint centers. The point is just
-  // to provide a solution to center the pivot finding algo around, so we could
-  // save some time by only running it on those joints, so TODO.
-  closedFormMDSJointCenterSolver(logOutput);
+  // Use MDS, despite its many flaws, to arrive at decent initial guesses for
+  // joint centers that we can use to center the subsequent least-squares fits
+  // if a joint doesn't move very much during a trial (like if your arms are at
+  // your side during a whole trial).
+  closedFormMDSJointCenterSolver();
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
-  closedFormPivotFindingJointCenterSolver();
-  reestimateDistancesFromJointCenters();
-  // Use the MDS solver, where there is less information (only 1-2 markers on
-  // adjacent body segments) to make it possible
-  closedFormMDSJointCenterSolver(logOutput);
+  closedFormPivotFindingJointCenterSolver(logOutput);
+  recenterAxisJointsBasedOnBoneAngles();
   // Fill in the parts of the body scales and poses that we can in closed form
-  estimatePosesAndGroupScalesInClosedForm(logOutput);
-
-  for (int t = 0; t < mMarkerObservations.size(); t++)
-  {
-    if (logOutput || t % 20 == 0)
-    {
-      std::cout << "Completing IK for " << t << "/"
-                << mMarkerObservations.size() << " timesteps" << std::endl;
-    }
-    completeIKIteratively(t, mSkel);
-    fineTuneIKIteratively(t, mSkel);
-  }
+  estimatePosesAndGroupScalesInClosedForm();
 }
 
 //==============================================================================
@@ -531,6 +580,8 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   // ambiguity in subsequent steps.
   Eigen::VectorXs oldPositions = mSkel->getPositions();
   Eigen::VectorXs oldScales = mSkel->getBodyScales();
+  mSkel->setPositions(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+  mSkel->setBodyScales(Eigen::VectorXs::Ones(mSkel->getNumBodyNodes() * 3));
   Eigen::VectorXs neutralSkelJointWorldPositions
       = mSkel->getJointWorldPositions(mSkel->getJoints());
   Eigen::VectorXs neutralSkelMarkerWorldPositions
@@ -566,8 +617,8 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
       for (std::shared_ptr<struct StackedJoint> joint : joints)
       {
         // If we already solved this joint, no need to go again
-        if (lastSolvedJointCenters.count(joint->name))
-          continue;
+        // if (lastSolvedJointCenters.count(joint->name))
+        //   continue;
 
         std::vector<Eigen::Vector3s> adjacentPointLocations;
         std::vector<s_t> adjacentPointSquaredDistances;
@@ -696,6 +747,16 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
 /// centers.
 s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
 {
+  // 0. Ensure that we've got enough space in our joint centers vector
+  while (mJointCenters.size() < mMarkerObservations.size())
+  {
+    mJointCenters.push_back(std::map<std::string, Eigen::Vector3s>());
+  }
+  while (mJointAxisDirs.size() < mMarkerObservations.size())
+  {
+    mJointAxisDirs.push_back(std::map<std::string, Eigen::Vector3s>());
+  }
+
   // 1. Find all the bodies with at least 3 markers on them
   std::map<std::string, int> bodyMarkerCounts;
   for (auto& marker : mMarkers)
@@ -718,8 +779,10 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
 
   // 2. Find all the joints with bodies on both sides that have 3 markers on
   // them, and keep track of all adjacent bodies.
-  std::vector<std::shared_ptr<struct StackedJoint>> jointsToSolve;
-  std::vector<std::shared_ptr<struct StackedBody>> bodiesAdjacentToJoints;
+  std::vector<std::shared_ptr<struct StackedJoint>> jointsToSolveWithPivots;
+  std::vector<std::shared_ptr<struct StackedJoint>>
+      jointsToSolveWithChangPollard;
+  std::vector<std::shared_ptr<struct StackedBody>> bodiesToFindTransformsFor;
   for (int i = 0; i < mStackedJoints.size(); i++)
   {
     std::shared_ptr<struct StackedJoint> joint = mStackedJoints[i];
@@ -729,23 +792,38 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     if (bodyMarkerCounts[joint->parentBody->name] >= 3
         && bodyMarkerCounts[joint->childBody->name] >= 3)
     {
-      jointsToSolve.push_back(joint);
-      // Keep track of adjacent bodies, so we can solve for their positions
+      jointsToSolveWithPivots.push_back(joint);
+    }
+    else if (
+        (bodyMarkerCounts[joint->parentBody->name] >= 3
+         || bodyMarkerCounts[joint->childBody->name] >= 3)
+        && (bodyMarkerCounts[joint->parentBody->name] > 0
+            && bodyMarkerCounts[joint->childBody->name] > 0))
+    {
+      jointsToSolveWithChangPollard.push_back(joint);
+    }
+    // Keep track of bodies with enough markers, so we can solve for their
+    // transforms over time
+    if (bodyMarkerCounts[joint->parentBody->name] >= 3)
+    {
       if (std::find(
-              bodiesAdjacentToJoints.begin(),
-              bodiesAdjacentToJoints.end(),
+              bodiesToFindTransformsFor.begin(),
+              bodiesToFindTransformsFor.end(),
               joint->parentBody)
-          == bodiesAdjacentToJoints.end())
+          == bodiesToFindTransformsFor.end())
       {
-        bodiesAdjacentToJoints.push_back(joint->parentBody);
+        bodiesToFindTransformsFor.push_back(joint->parentBody);
       }
+    }
+    if (bodyMarkerCounts[joint->childBody->name] >= 3)
+    {
       if (std::find(
-              bodiesAdjacentToJoints.begin(),
-              bodiesAdjacentToJoints.end(),
+              bodiesToFindTransformsFor.begin(),
+              bodiesToFindTransformsFor.end(),
               joint->childBody)
-          == bodiesAdjacentToJoints.end())
+          == bodiesToFindTransformsFor.end())
       {
-        bodiesAdjacentToJoints.push_back(joint->childBody);
+        bodiesToFindTransformsFor.push_back(joint->childBody);
       }
     }
   }
@@ -756,7 +834,7 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
   // transform between the two bodies. So, arbitrarily, we choose the first
   // timestep where 3 markers are observed as the identity transform.
   std::map<std::string, std::map<int, Eigen::Isometry3s>> bodyTrajectories;
-  for (std::shared_ptr<struct StackedBody> body : bodiesAdjacentToJoints)
+  for (std::shared_ptr<struct StackedBody> body : bodiesToFindTransformsFor)
   {
     // 3.1. Collect the names of the markers we're attached to
     std::vector<std::string> attachedMarkers;
@@ -830,13 +908,14 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     bodyTrajectories[body->name] = bodyTrajectory;
   }
 
-  // 4. Now we can solve for the relative transforms of each joint, by setting
-  // up a linear system of equations where the unknowns are the relative
-  // transforms from each body to the joint center, and the constraints are that
-  // those map to the same location in world space on each timestep.
+  // 4. Now we can solve for the relative transforms of each joint with 3+
+  // markers on BOTH SIDES using pivots, by setting up a linear system of
+  // equations where the unknowns are the relative transforms from each body to
+  // the joint center, and the constraints are that those map to the same
+  // location in world space on each timestep.
   s_t avgJointCenterError = 0.0;
   int solvedJoints = 0;
-  for (std::shared_ptr<struct StackedJoint> joint : jointsToSolve)
+  for (std::shared_ptr<struct StackedJoint> joint : jointsToSolveWithPivots)
   {
     // At this point, the parent body node shouldn't be null
     assert(joint->parentBody != nullptr);
@@ -920,20 +999,14 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     centerAnswerOn.tail<3>() = childAvgOffset;
 
     Eigen::VectorXs target = Eigen::VectorXs::Zero(rows);
+    auto svd = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
     Eigen::VectorXs offsets
-        = A.householderQr().solve(target - b - A * centerAnswerOn)
-          + centerAnswerOn;
+        = svd.solve(target - b - A * centerAnswerOn) + centerAnswerOn;
     assert(offsets.size() == 6);
 
     // 4.4. Decode the results of our solution into average values
     Eigen::Vector3s parentOffset = offsets.segment<3>(0);
     Eigen::Vector3s childOffset = offsets.segment<3>(3);
-
-    // Ensure that we've got enough space in our joint centers vector
-    while (mJointCenters.size() < mMarkerObservations.size())
-    {
-      mJointCenters.push_back(std::map<std::string, Eigen::Vector3s>());
-    }
 
     s_t error = 0.0;
     for (int i = 0; i < usableTimesteps.size(); i++)
@@ -951,13 +1024,612 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       mJointCenters[usableTimesteps[i]][joint->name] = jointCenter;
     }
 
+    // 4.5. Check if we're on an axis, which will show up if there's a 0
+    // singular value.
+    Eigen::VectorXs singularValues = svd.singularValues();
+    Eigen::MatrixXs V = svd.matrixV();
+#ifndef NDEBUG
+    Eigen::MatrixXs A_reconstructed
+        = svd.matrixU() * singularValues.asDiagonal() * V.transpose();
+    assert((A - A_reconstructed).norm() < 1e-8);
+#endif
+    // We normalize the singular values to be agnostic to the size of the data
+    // we're dealing with in the original matrix.
+    Eigen::VectorXs normalizedSingularValues = singularValues.normalized();
+    if (logOutput)
+    {
+      std::cout << "Joint \"" << joint->name
+                << "\" smallest normalized singular value is "
+                << normalizedSingularValues(5) << std::endl;
+    }
+    if (std::abs(normalizedSingularValues(5)) < 1e-2)
+    {
+      if (logOutput)
+      {
+        std::cout << "Joint \"" << joint->name << "\" is an axis joint!"
+                  << std::endl;
+      }
+      // 4.5.1. We found an axis! Record it.
+      Eigen::Vector6s nullSpace = V.col(5);
+      Eigen::Vector3s parentLocalAxis = nullSpace.segment<3>(0).normalized();
+      Eigen::Vector3s childLocalAxis = nullSpace.segment<3>(3).normalized();
+
+      // 4.5.2. Transform the axis direction back to world space
+      for (int i = 0; i < usableTimesteps.size(); i++)
+      {
+        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][i];
+        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][i];
+        Eigen::Vector3s parentWorldAxis
+            = parentTransform.linear() * parentLocalAxis;
+        Eigen::Vector3s childWorldAxis
+            = childTransform.linear() * childLocalAxis;
+        Eigen::Vector3s jointAxis = (parentWorldAxis + childWorldAxis) / 2.0;
+        // 4.5.3. Record the result
+        mJointAxisDirs[usableTimesteps[i]][joint->name]
+            = jointAxis.normalized();
+      }
+    }
+
+    if (logOutput)
+    {
+      std::cout << "Solved for joint \"" << joint->name
+                << "\" with a linear system on body transforms with "
+                << usableTimesteps.size() << " samples, error: " << error << "m"
+                << std::endl;
+    }
+
     error /= usableTimesteps.size() * 2;
     avgJointCenterError += error;
     solvedJoints++;
   }
-  avgJointCenterError /= solvedJoints;
 
+  // 5. Now we can solve for the relative transforms of each joint with 3+
+  // markers on just ONE SIDE, and 1-2 markers on the other using
+  // ChangPollard2006 (which does a better job handling small ranges of motion
+  // than vanilla least-squares)
+  for (std::shared_ptr<struct StackedJoint> joint :
+       jointsToSolveWithChangPollard)
+  {
+    // 5.1. Figure out which body is going to be the reference frame, and which
+    // body has only a few markers to solve with
+    std::shared_ptr<struct StackedBody> anchorBody = nullptr;
+    std::shared_ptr<struct StackedBody> otherBody = nullptr;
+    if (bodyMarkerCounts[joint->parentBody->name] >= 3)
+    {
+      assert(bodyMarkerCounts[joint->childBody->name] < 3);
+      assert(bodyMarkerCounts[joint->childBody->name] > 0);
+      anchorBody = joint->parentBody;
+      otherBody = joint->childBody;
+    }
+    else
+    {
+      assert(bodyMarkerCounts[joint->parentBody->name] < 3);
+      assert(bodyMarkerCounts[joint->parentBody->name] > 0);
+      assert(bodyMarkerCounts[joint->childBody->name] >= 3);
+      anchorBody = joint->childBody;
+      otherBody = joint->parentBody;
+    }
+
+    // 5.2. Work out which markers will be moving around on the other body
+    std::vector<std::string> movingMarkers;
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      if (std::find(
+              otherBody->bodies.begin(),
+              otherBody->bodies.end(),
+              mMarkers[i].first)
+          != otherBody->bodies.end())
+      {
+        movingMarkers.push_back(mMarkerNames[i]);
+      }
+    }
+
+    // 5.3. Go through and transform all the markers into the anchor body's
+    // frame.
+    std::map<std::string, std::vector<Eigen::Vector3s>> anchorBodyMarkerClouds;
+    for (auto& pair : bodyTrajectories[anchorBody->name])
+    {
+      int t = pair.first;
+      Eigen::Isometry3s anchorTransform = pair.second;
+      for (std::string movingMarker : movingMarkers)
+      {
+        if (mMarkerObservations[t].count(movingMarker))
+        {
+          if (anchorBodyMarkerClouds.count(movingMarker) == 0)
+          {
+            anchorBodyMarkerClouds[movingMarker]
+                = std::vector<Eigen::Vector3s>();
+          }
+          anchorBodyMarkerClouds[movingMarker].push_back(
+              anchorTransform.inverse() * mMarkerObservations[t][movingMarker]);
+        }
+      }
+    }
+    std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+    for (auto& pair : anchorBodyMarkerClouds)
+    {
+      markerTraces.push_back(pair.second);
+    }
+
+    // 5.4. Get the local joint center in the anchor body
+    Eigen::Vector3s jointCenter
+        = getChangPollard2006JointCenterMultiMarker(markerTraces);
+
+    // 5.5. Transform the result back into world space, and record them
+    for (auto& pair : bodyTrajectories[anchorBody->name])
+    {
+      int t = pair.first;
+      Eigen::Isometry3s anchorTransform = pair.second;
+      Eigen::Vector3s jointWorldCenter = anchorTransform * jointCenter;
+      mJointCenters[t][joint->name] = jointWorldCenter;
+    }
+
+    // 5.6. Get the axis direction in the anchor body, along with the
+    // corresponding singular value
+    std::pair<Eigen::Vector3s, s_t> axisDirAndSingularValue
+        = gamageLasenby2002AxisFit(markerTraces);
+    Eigen::Vector3s jointAxisDir = axisDirAndSingularValue.first;
+    s_t singularValue = axisDirAndSingularValue.second;
+    if (std::abs(singularValue) < 1e-2)
+    {
+      // 5.6.1. We found an axis! Record it.
+      if (logOutput)
+      {
+        std::cout << "Joint \"" << joint->name
+                  << "\" found a near-zero singular value (" << singularValue
+                  << ") in its linear system, so it's an axis joint."
+                  << std::endl;
+      }
+      // 5.6.2. Transform the axis direction back to world space
+      for (auto& pair : bodyTrajectories[anchorBody->name])
+      {
+        int t = pair.first;
+        Eigen::Isometry3s anchorTransform = pair.second;
+        Eigen::Vector3s jointWorldAxis
+            = anchorTransform.linear() * jointAxisDir;
+        mJointAxisDirs[t][joint->name] = jointWorldAxis.normalized();
+      }
+    }
+
+    if (logOutput)
+    {
+      std::cout << "Solved for joint \"" << joint->name
+                << "\" with Chang Pollard 2006" << std::endl;
+    }
+  }
+
+  avgJointCenterError /= solvedJoints;
   return avgJointCenterError;
+}
+
+//==============================================================================
+/// For joints where we believe they're floating along an axis, and we have at
+/// least one of either the parent or child joint has a known joint center
+/// WITHOUT the axis amiguity, we can slide the joint center along the axis
+/// until the angle formed by the axis and the known adjacent joint matches
+/// what is in the skeleton.
+s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
+{
+  // 0. Save the default pose and scale's version of the joint centers and
+  // marker locations, so that we can use it to detect and resolve coplanar
+  // ambiguity in subsequent steps.
+  Eigen::VectorXs oldPositions = mSkel->getPositions();
+  Eigen::VectorXs oldScales = mSkel->getBodyScales();
+  mSkel->setPositions(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+  mSkel->setBodyScales(Eigen::VectorXs::Ones(mSkel->getNumBodyNodes() * 3));
+  Eigen::VectorXs neutralSkelJointWorldPositions
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+  Eigen::VectorXs neutralSkelMarkerWorldPositions
+      = mSkel->getMarkerWorldPositions(mMarkers);
+  std::map<std::string, Eigen::Vector3s> neutralSkelMarkerWorldPositionsMap;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    neutralSkelMarkerWorldPositionsMap[mMarkerNames[i]]
+        = neutralSkelMarkerWorldPositions.segment<3>(i * 3);
+  }
+  std::map<std::string, Eigen::Vector3s>
+      neutralSkelJointCenterWorldPositionsMap;
+  std::map<std::string, Eigen::Vector3s> neutralSkelJointAxisWorldDirectionsMap;
+  for (int i = 0; i < mStackedJoints.size(); i++)
+  {
+    neutralSkelJointCenterWorldPositionsMap[mStackedJoints[i]->name]
+        = getStackedJointCenterFromJointCentersVector(
+            mStackedJoints[i], neutralSkelJointWorldPositions);
+    neutralSkelJointAxisWorldDirectionsMap[mStackedJoints[i]->name]
+        = mStackedJoints[i]
+              ->joints[0]
+              ->getWorldAxisScrewForPosition(0)
+              .head<3>()
+              .normalized();
+    std::string jointType = mStackedJoints[i]->joints[0]->getType();
+    bool isPureRevolute
+        = jointType == dynamics::RevoluteJoint::getStaticType()
+          || jointType == dynamics::EulerJoint::getStaticType()
+          || jointType == dynamics::BallJoint::getStaticType()
+          || jointType == dynamics::UniversalJoint::getStaticType();
+
+    // If we're not a pure revolute joint (for example, a CustomJoint driven by
+    // evil splines) we need to do some extra work to estimate a useful joint
+    // axis in the neutral pose.
+    if (!isPureRevolute)
+    {
+      if (logOutput)
+      {
+        std::cout << "Joint \"" << mStackedJoints[i]->name
+                  << "\" is not a pure revolute joint, so we're going to "
+                     "estimate a joint axis based on a sweep of virtual "
+                     "markers, and then a Gamage Lasenby axis fit."
+                  << std::endl;
+      }
+      dynamics::Joint* revoluteJoint = mStackedJoints[i]->joints[0];
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+      for (int i = 0; i < 3; i++)
+      {
+        markers.push_back(std::make_pair(
+            revoluteJoint->getChildBodyNode(), Eigen::Vector3s::Unit(i)));
+      }
+
+      s_t min = revoluteJoint->getDof(0)->getPositionLowerLimit();
+      s_t max = revoluteJoint->getDof(0)->getPositionUpperLimit();
+      int steps = 2000;
+      s_t stepSize = (max - min) / (s_t)steps;
+
+      std::vector<std::vector<Eigen::Vector3s>> markerObservationsOverSweep;
+      for (int i = 0; i < markers.size(); i++)
+      {
+        markerObservationsOverSweep.push_back(std::vector<Eigen::Vector3s>());
+      }
+      for (int i = 0; i < steps; i++)
+      {
+        s_t pos = min + stepSize * i;
+        revoluteJoint->setPosition(0, pos);
+        Eigen::VectorXs markerWorldPos
+            = mSkel->getMarkerWorldPositions(markers);
+        for (int j = 0; j < markers.size(); j++)
+        {
+          markerObservationsOverSweep[j].push_back(
+              markerWorldPos.segment<3>(j * 3));
+        }
+      }
+      // Reset to the neutral pose when we're done
+      revoluteJoint->setPosition(0, 0.0);
+
+      Eigen::Vector3s axis
+          = gamageLasenby2002AxisFit(markerObservationsOverSweep).first;
+      if (logOutput)
+      {
+        std::cout << "Joint \"" << mStackedJoints[i]->name
+                  << "\" found Gamage Lasenby axis in neutral pos: "
+                  << axis.transpose() << std::endl;
+      }
+      neutralSkelJointAxisWorldDirectionsMap[mStackedJoints[i]->name] = axis;
+    }
+  }
+  mSkel->setPositions(oldPositions);
+  mSkel->setBodyScales(oldScales);
+
+  // 1. Sort the joints into two categories: "axis joints", where the solver
+  // found an axis along which the joint center is ambiguous, and "center
+  // joints", where the solver believes it knows the joint center without
+  // ambiguity.
+  std::vector<std::shared_ptr<struct StackedJoint>> axisJoints;
+  std::vector<std::shared_ptr<struct StackedJoint>> centerJoints;
+  std::map<std::string, bool> isJointAxis;
+
+  for (std::shared_ptr<struct StackedJoint> joint : mStackedJoints)
+  {
+    int numCentersObserved = 0;
+    int numAxisObserved = 0;
+    for (int t = 0; t < mMarkerObservations.size(); t++)
+    {
+      if (mJointCenters[t].count(joint->name))
+      {
+        numCentersObserved++;
+      }
+      if (mJointAxisDirs[t].count(joint->name))
+      {
+        numAxisObserved++;
+      }
+    }
+    if (numCentersObserved > 0 && numAxisObserved > 0)
+    {
+      isJointAxis[joint->name] = true;
+      if (logOutput)
+      {
+        std::cout
+            << "Joint \"" << joint->name
+            << "\" has found axis, we're going to attempt to re-center it."
+            << std::endl;
+      }
+      axisJoints.push_back(joint);
+    }
+    else if (numCentersObserved > 0)
+    {
+      isJointAxis[joint->name] = false;
+      centerJoints.push_back(joint);
+    }
+  }
+
+  // 2. We're going to repeatedly look for an axis joint that meets our criteria
+  // for "solvability", in order to work out how far along the axis the joint
+  // center lies relative to adjacent "center joints". Once we've solved an
+  // "axis joint", and adjusted its center location, we'll move it to be a
+  // "center joint" and repeat the process until we can't find any more joints
+  // to improve.
+  (void)logOutput;
+  while (true)
+  {
+    bool anyChanged = false;
+
+    for (int i = 0; i < axisJoints.size(); i++)
+    {
+      std::shared_ptr<struct StackedJoint> joint = axisJoints[i];
+
+      // 2.1. Find the joints that are not axis joints, that are adjacent to
+      // this joint. This includes both parent and as many children as fit the
+      // criteria.
+      std::vector<std::shared_ptr<struct StackedJoint>> adjacentPointJoints;
+      if (joint->parentBody != nullptr
+          && !isJointAxis[joint->parentBody->parentJoint->name])
+      {
+        adjacentPointJoints.push_back(joint->parentBody->parentJoint);
+      }
+      for (auto& childJoint : joint->childBody->childJoints)
+      {
+        if (!isJointAxis[childJoint->name])
+        {
+          adjacentPointJoints.push_back(childJoint);
+        }
+      }
+
+      // 2.2. On joints where at least one adjacent point has a known joint
+      // center, we're going to attempt to go through and solve for the correct
+      // spot to put the joint center along the axis.
+      //
+      // We're going to solve by reference to the ratio of of the triangle's
+      // sides formed between the axis and the adjacent joint center(s),
+      // measured along the joint axis and perpendicular to it.
+      //
+      // For example:
+      //
+      //          adjacent joint
+      //           /    |
+      //          /     |
+      //         /      |
+      //        /       | (perpendicular dist)
+      //       /        |
+      //      /         |
+      //   joint ----- axis
+      //   (parallel dist)
+      //
+      // The angle between the axis and the adjacent joint is given by the ratio
+      // of the parallel and perpendicular distances. Given an unambiguous
+      // perpendicular distance from our solver, and an unambiguous joint axis,
+      // we can solve for the distance along the axis by solving for the ratio
+      // of the parallel distance to the perpendicular distance.
+      if (adjacentPointJoints.size() > 0)
+      {
+        // 2.2.1. Collect the joint centers and axis direction on the neutral
+        // skeleton, so we can determine our ratio of parallel to perpendicular
+        // distances in the neutral pose
+        const Eigen::Vector3s neutralAxis
+            = neutralSkelJointAxisWorldDirectionsMap[joint->name];
+        const Eigen::Vector3s neutralJointCenter
+            = neutralSkelJointCenterWorldPositionsMap[joint->name];
+
+        for (std::shared_ptr<struct StackedJoint> pointJoint :
+             adjacentPointJoints)
+        {
+          Eigen::Vector3s adjacentNeutralJointCenter
+              = neutralSkelJointCenterWorldPositionsMap[pointJoint->name];
+
+          // 2.2.2. Find the joint center distance to the adjacent joint both
+          // along the axis, and perpindicular to the axis
+          Eigen::Vector3s neutralOffset
+              = adjacentNeutralJointCenter - neutralJointCenter;
+          s_t neutralDistAlongAxis = neutralOffset.dot(neutralAxis);
+          Eigen::Vector3s neutralOffsetParallel
+              = neutralDistAlongAxis * neutralAxis;
+          Eigen::Vector3s neutralOffsetPerp
+              = (neutralOffset - neutralOffsetParallel);
+          assert(
+              (neutralOffsetParallel + neutralOffsetPerp - neutralOffset).norm()
+              < 1e-15);
+          assert(
+              (neutralJointCenter + neutralOffsetParallel + neutralOffsetPerp
+               - adjacentNeutralJointCenter)
+                  .norm()
+              < 1e-15);
+          s_t neutralRatio = neutralDistAlongAxis / neutralOffsetPerp.norm();
+
+          // 2.2.3. Find the intervening body between us and the pin joint, and
+          // record it for later disambiguation.
+          std::shared_ptr<struct StackedBody> interveningBody = nullptr;
+          if (pointJoint->parentBody != nullptr
+              && pointJoint->parentBody->parentJoint == joint)
+          {
+            interveningBody = pointJoint->parentBody;
+          }
+          else
+          {
+            assert(joint->parentBody != nullptr);
+            assert(joint->parentBody->parentJoint == pointJoint);
+            interveningBody = joint->parentBody;
+          }
+          assert(interveningBody != nullptr);
+
+          if (logOutput)
+          {
+            std::cout << "Shifting joint \"" << joint->name
+                      << "\" along axis with help of joint \""
+                      << pointJoint->name << "\" with neutral ratio "
+                      << neutralRatio << std::endl;
+            std::cout << "  -> Joint neutral center: "
+                      << neutralJointCenter.transpose() << std::endl;
+            std::cout << "  -> Joint neutral axis: " << neutralAxis.transpose()
+                      << std::endl;
+            std::cout << "  -> Adjacent neutral center: "
+                      << adjacentNeutralJointCenter.transpose() << std::endl;
+          }
+
+          // 2.2.4. Now we're going to go through all the timesteps and grab the
+          // ratio in practice, and then use that to solve for the two joint
+          // center offsets possible along the axis.
+          for (int t = 0; t < mMarkerObservations.size(); t++)
+          {
+            if (mJointCenters[t].count(joint->name)
+                && mJointAxisDirs[t].count(joint->name)
+                && mJointCenters[t].count(pointJoint->name))
+            {
+              // Get the joint center and axis direction in world space
+              Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
+              Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+
+              // Get the adjacent joint center in world space
+              Eigen::Vector3s adjacentJointCenter
+                  = mJointCenters[t][pointJoint->name];
+
+              // 2.2.5. We're going to make sure that our axis is pointed in the
+              // correct direction, by aligning the point cloud of visible
+              // markers on the interveningBody with the neutral pose, and
+              // checking the direction of the neutral axis under the resulting
+              // transformation.
+              std::vector<Eigen::Vector3s> neutralMarkerLocations;
+              std::vector<Eigen::Vector3s> worldMarkerLocations;
+              std::vector<s_t> weights;
+              for (int j = 0; j < mMarkers.size(); j++)
+              {
+                if (std::find(
+                        interveningBody->bodies.begin(),
+                        interveningBody->bodies.end(),
+                        mMarkers[j].first)
+                    != interveningBody->bodies.end())
+                {
+                  if (mMarkerObservations[t].count(mMarkerNames[j]))
+                  {
+                    neutralMarkerLocations.push_back(
+                        neutralSkelMarkerWorldPositionsMap[mMarkerNames[j]]);
+                    worldMarkerLocations.push_back(
+                        mMarkerObservations[t][mMarkerNames[j]]);
+                    weights.push_back(1.0);
+                  }
+                }
+              }
+              Eigen::Isometry3s neutralToWorldTransform
+                  = getPointCloudToPointCloudTransform(
+                      neutralMarkerLocations, worldMarkerLocations, weights);
+              Eigen::Vector3s neutralAxisInWorld
+                  = neutralToWorldTransform.linear() * neutralAxis;
+              // Ensure that the joint axis is pointed in the same direction as
+              // the neutral axis
+              if (neutralAxisInWorld.dot(jointAxis) < 0)
+              {
+                jointAxis *= -1;
+              }
+              s_t recoveredAxisSimilarity = neutralAxisInWorld.dot(jointAxis);
+              if (logOutput)
+              {
+                std::cout
+                    << "Recovered world axis similarity (after flipping): "
+                    << recoveredAxisSimilarity << std::endl;
+              }
+
+              // 2.2.6. Now that we've corrected the axis direction, the joint
+              // center can be found unambiguously
+              // Project `other_point` onto the line.
+              // Eigen::Vector3d projection = jointCenter +
+              // (jointAxis.dot(adjacentJointCenter - jointCenter) /
+              // jointAxis.dot(jointAxis)) * jointAxis;
+              Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
+              s_t distAlongAxis = offset.dot(jointAxis);
+              Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
+              Eigen::Vector3s offsetPerp = (offset - offsetParallel);
+
+              Eigen::Vector3s closestPointOnAxis = jointCenter + offsetParallel;
+              assert(
+                  (closestPointOnAxis + offsetPerp - adjacentJointCenter).norm()
+                  < 1e-15);
+              s_t orthogonalError
+                  = (closestPointOnAxis - adjacentJointCenter).dot(jointAxis);
+              (void)orthogonalError;
+              assert(orthogonalError < 1e-15);
+
+              Eigen::Vector3s correctedJointCenter
+                  = closestPointOnAxis
+                    - jointAxis * offsetPerp.norm() * neutralRatio;
+
+#ifndef NDEBUG
+              // Check that the ratio is now preserved
+              Eigen::Vector3s recoveredOffset
+                  = adjacentJointCenter - correctedJointCenter;
+              s_t recoveredDistAlongAxis = recoveredOffset.dot(jointAxis);
+              Eigen::Vector3s recoveredOffsetParallel
+                  = recoveredDistAlongAxis * jointAxis;
+              Eigen::Vector3s recoveredOffsetPerp
+                  = (recoveredOffset - recoveredOffsetParallel);
+              assert(
+                  (recoveredOffsetParallel + recoveredOffsetPerp
+                   - recoveredOffset)
+                      .norm()
+                  < 1e-15);
+              assert(
+                  (correctedJointCenter + recoveredOffsetParallel
+                   + recoveredOffsetPerp - adjacentJointCenter)
+                      .norm()
+                  < 1e-15);
+              s_t recoveredRatio
+                  = recoveredDistAlongAxis / recoveredOffsetPerp.norm();
+              assert(abs(recoveredRatio - neutralRatio) < 1e-8);
+#endif
+
+              s_t movedDist
+                  = (correctedJointCenter - mJointCenters[t][joint->name])
+                        .norm();
+              if (movedDist < 0.10)
+              {
+                if (logOutput)
+                {
+                  std::cout << "Axis aligned joint center for joint \""
+                            << joint->name << " by shifting " << movedDist
+                            << "m: [" << correctedJointCenter.transpose()
+                            << "] from ["
+                            << mJointCenters[t][joint->name].transpose() << "]"
+                            << std::endl;
+                }
+                mJointCenters[t][joint->name] = correctedJointCenter;
+              }
+              else
+              {
+                if (logOutput)
+                {
+                  std::cout << "Axis aligned joint center for joint \""
+                            << joint->name << " wants to shift " << movedDist
+                            << "m which is suspiciously large, and so we're "
+                               "ignoring it."
+                            << std::endl;
+                }
+              }
+            }
+          }
+        }
+
+        // 2.2.6. Now we can mark this joint as having a reliable joint center,
+        // so we can use it as support in the next iteration of the algorithm.
+        centerJoints.push_back(joint);
+        axisJoints.erase(axisJoints.begin() + i);
+        isJointAxis[joint->name] = false;
+        anyChanged = true;
+        break;
+      }
+    }
+
+    if (!anyChanged)
+    {
+      break;
+    }
+  }
+
+  return 0.0;
 }
 
 //==============================================================================
@@ -1376,7 +2048,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
               annotatedGroup.adjacentMarkerCenters[j]);
           visibleAdjacentPointNames.push_back(
               "Marker " + annotatedGroup.adjacentMarkers[j]);
-          visibleAdjacentPointWeights.push_back(1.0);
+          visibleAdjacentPointWeights.push_back(0.01);
         }
       }
       assert(
@@ -1569,6 +2241,7 @@ s_t IKInitializer::completeIKIteratively(
   std::vector<dynamics::Joint*> joints;
   for (auto& j : otherSkelJoints)
   {
+    // TODO: merge joints together
     if (j->joints.size() == 1)
     {
       for (auto* joint : j->joints)
@@ -2183,17 +2856,21 @@ Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
 
   // Compute the centroids of the local and world points
   Eigen::Vector3s localCentroid = Eigen::Vector3s::Zero();
-  for (Eigen::Vector3s& point : localPoints)
+  s_t sumWeights = 0.0;
+  for (int i = 0; i < localPoints.size(); i++)
   {
-    localCentroid += point;
+    Eigen::Vector3s& point = localPoints[i];
+    sumWeights += weights[i];
+    localCentroid += point * weights[i];
   }
-  localCentroid /= localPoints.size();
+  localCentroid /= sumWeights;
   Eigen::Vector3s worldCentroid = Eigen::Vector3s::Zero();
-  for (Eigen::Vector3s& point : worldPoints)
+  for (int i = 0; i < worldPoints.size(); i++)
   {
-    worldCentroid += point;
+    Eigen::Vector3s& point = worldPoints[i];
+    worldCentroid += point * weights[i];
   }
-  worldCentroid /= worldPoints.size();
+  worldCentroid /= sumWeights;
 
   // Compute the centered local and world points
   std::vector<Eigen::Vector3s> centeredLocalPoints;
@@ -2347,7 +3024,6 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterSingleMarker(
     if (complexEigenvalues(i).imag() != 0
         || complexEigenvalues(i).real() <= 1e-12)
       continue;
-    s_t eigenvalue = complexEigenvalues(i).real();
     Eigen::VectorXs eigenvector = complexEigenvectors.col(i).real();
 
     // Normalized by constraint according to Equation 14 in the paper
@@ -2378,6 +3054,7 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterSingleMarker(
     }
 
 #ifndef NDEBUG
+    s_t eigenvalue = complexEigenvalues(i).real();
     // Double check that the rescaled eigenvector still satisfies the equation
     // (it must, cause everything is linear)
     assert(((S * u) - (eigenvalue * C * u)).norm() < 1e-8);
@@ -2419,11 +3096,11 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterSingleMarker(
           abs(cost - reconstructedCost) / (abs(cost) + abs(reconstructedCost))
           < 1e-6);
     }
-#endif
     if (log)
     {
       std::cout << "Radius[" << i << "]: " << sqrt(radiusSquared) << std::endl;
     }
+#endif
 
     if (cost < bestCost)
     {
@@ -2562,7 +3239,6 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     if (complexEigenvalues(i).imag() != 0
         || complexEigenvalues(i).real() <= 1e-12)
       continue;
-    s_t eigenvalue = complexEigenvalues(i).real();
     Eigen::VectorXs eigenvector = complexEigenvectors.col(i).real();
 
     // Normalized by constraint according to Equation 14 in the paper
@@ -2593,6 +3269,7 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     }
 
 #ifndef NDEBUG
+    s_t eigenvalue = complexEigenvalues(i).real();
     // Double check that the rescaled eigenvector still satisfies the equation
     // (it must, cause everything is linear)
     assert(((S * u) - (eigenvalue * C * u)).norm() < 1e-8);
@@ -2694,6 +3371,74 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   Eigen::VectorXs c = A.completeOrthogonalDecomposition().solve(f);
   Eigen::Vector3s center = c.head<3>();
   return center;
+}
+
+/// This will attempt to fit an axis to a set of traces, after we've already
+/// found the center of rotation, by running an SVD on a matrix composed of
+/// the traces and looking at the near-zero singular value, if there is one.
+/// This returns the axis fit, along with the corresponding singular value (if
+/// that number is too high, the axis should be disregarded).
+std::pair<Eigen::Vector3s, s_t> IKInitializer::svdAxisFit(
+    std::vector<std::vector<Eigen::Vector3s>> traces,
+    Eigen::Vector3s jointCenter)
+{
+  std::vector<Eigen::Vector3s> traceAvg;
+  int totalPoints = 0;
+  for (auto& trace : traces)
+  {
+    Eigen::Vector3s avg = Eigen::Vector3s::Zero();
+    for (auto& point : trace)
+    {
+      avg += (point - jointCenter);
+    }
+    avg /= trace.size();
+    traceAvg.push_back(avg);
+    totalPoints += trace.size();
+  }
+  Eigen::MatrixXs points = Eigen::MatrixXs::Zero(totalPoints, 3);
+  int rowCursor = 0;
+  for (int i = 0; i < traces.size(); i++)
+  {
+    for (int j = 0; j < traces[i].size(); j++)
+    {
+      points.row(rowCursor) = (traces[i][j] - jointCenter) - traceAvg[i];
+      rowCursor++;
+    }
+  }
+  Eigen::BDCSVD<Eigen::MatrixXs> svd(
+      points, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::Vector3s axis = svd.matrixV().col(2);
+  s_t singularValue = svd.singularValues()(2);
+  return std::make_pair(axis, singularValue);
+}
+
+/// This implements the least-squares method in Gamage and Lasenby 2002, "New
+/// least squares solutions for estimating the average centre of rotation and
+/// the axis of rotation"
+std::pair<Eigen::Vector3s, s_t> IKInitializer::gamageLasenby2002AxisFit(
+    std::vector<std::vector<Eigen::Vector3s>> traces)
+{
+  Eigen::MatrixXs A = Eigen::Matrix3s::Zero();
+  for (std::vector<Eigen::Vector3s> trace : traces)
+  {
+    Eigen::Vector3s mean = Eigen::Vector3s::Zero();
+    Eigen::Matrix3s meanOuterProduct = Eigen::Matrix3s::Zero();
+    for (Eigen::Vector3s& point : trace)
+    {
+      mean += point;
+      meanOuterProduct += point * point.transpose();
+    }
+    mean /= trace.size();
+    meanOuterProduct /= trace.size();
+
+    A += meanOuterProduct - (mean * mean.transpose());
+  }
+
+  Eigen::JacobiSVD<Eigen::MatrixXs> svd(
+      A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Vector3s axis = svd.matrixV().col(2);
+  s_t singularValue = svd.singularValues()(2);
+  return std::make_pair(axis, singularValue);
 }
 
 } // namespace biomechanics
