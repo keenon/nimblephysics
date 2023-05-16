@@ -688,14 +688,11 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
 
     s_t a = 2.0;
 
-    Eigen::Vector5s basis = Eigen::Vector5s(
-        point.squaredNorm(), point(0), point(1), point(2), 1.0);
-    Eigen::Vector5s u = Eigen::Vector5s(
-        a,
-        -2 * a * center(0),
-        -2 * a * center(1),
-        -2 * a * center(2),
-        (center.squaredNorm() - radius * radius) * a);
+    Eigen::Vector5s basis;
+    basis << point.squaredNorm(), point(0), point(1), point(2), 1.0;
+    Eigen::Vector5s u;
+    u << a, -2 * a * center(0), -2 * a * center(1), -2 * a * center(2),
+        (center.squaredNorm() - radius * radius) * a;
     s_t recoveredCost = basis.dot(u) / a;
 
     Eigen::Vector3s recoveredCenter = u.segment<3>(1) / (-2.0 * a);
@@ -725,18 +722,15 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
     s_t radiusSquared = abs((u(4) / u(0) - center.squaredNorm()));
     s_t recoveredCost = (point - center).squaredNorm() - radiusSquared;
 
-    Eigen::Vector5s recoveredU = Eigen::Vector5s(
-        1.0,
-        -2 * center(0),
-        -2 * center(1),
-        -2 * center(2),
-        center.squaredNorm() - radiusSquared);
+    Eigen::Vector5s recoveredU;
+    recoveredU << 1.0, -2 * center(0), -2 * center(1), -2 * center(2),
+        center.squaredNorm() - radiusSquared;
     recoveredU *= u(0);
     EXPECT_TRUE(recoveredU.segment<3>(1).isApprox(u.segment<3>(1), 1e-8));
     EXPECT_NEAR(recoveredU(4), u(4), 1e-8);
 
-    Eigen::Vector5s basis = Eigen::Vector5s(
-        point.squaredNorm(), point(0), point(1), point(2), 1.0);
+    Eigen::Vector5s basis;
+    basis << point.squaredNorm(), point(0), point(1), point(2), 1.0;
     s_t cost = basis.dot(u) / u(0);
 
     EXPECT_NEAR(cost, recoveredCost, 1e-8);
