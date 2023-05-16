@@ -75,7 +75,8 @@ public:
       std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
           markers,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-      s_t modelHeightM = -1.0);
+      s_t modelHeightM = -1.0,
+      bool dontMergeNearbyJoints = false);
 
   //////////////////////////////////////////////////////////////////////////////
   // Core entrypoint
@@ -218,6 +219,20 @@ public:
   /// the axis of rotation"
   static std::pair<Eigen::Vector3s, s_t> gamageLasenby2002AxisFit(
       std::vector<std::vector<Eigen::Vector3s>> traces);
+
+  /// This uses Cardano's method to solve a cubic equation in closed form. It
+  /// return a list of roots, real and complex.
+  static std::vector<double> findCubicRealRoots(
+      double a, double b, double c, double d);
+
+  /// This method will find the best point on the line given by f(x) = (c + a*x)
+  /// that minimizes: Sum_i weights[i] * (f(x) -
+  /// pointsAndRadii[i].first).squaredNorm() - pointsAndRadii[i].second^2)^2
+  static Eigen::Vector3s centerPointOnAxis(
+      Eigen::Vector3s c,
+      Eigen::Vector3s a,
+      std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii,
+      std::vector<s_t> weights = std::vector<s_t>());
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;

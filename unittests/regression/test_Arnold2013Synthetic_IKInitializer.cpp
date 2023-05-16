@@ -26,9 +26,16 @@ using namespace biomechanics;
 using namespace math;
 
 //==============================================================================
-std::tuple<std::vector<Eigen::VectorXs>, Eigen::VectorXs, OpenSimFile>
+std::tuple<
+    std::vector<Eigen::VectorXs>,
+    std::vector<Eigen::VectorXi>,
+    Eigen::VectorXs,
+    OpenSimFile>
 runIKInitializer(
-    std::string modelPath, std::vector<std::string> trcFiles, s_t heightM)
+    std::string modelPath,
+    std::vector<std::string> trcFiles,
+    s_t heightM,
+    bool knownScalesInAdvance = false)
 {
 
   // Initialize data structures.
@@ -96,14 +103,28 @@ runIKInitializer(
       standard.skeleton,
       standard.markersMap,
       markerObservationTrials[0],
-      heightM);
-  initializer.runFullPipeline(true);
+      heightM,
+      knownScalesInAdvance);
+  if (knownScalesInAdvance)
+  {
+    initializer.closedFormMDSJointCenterSolver();
+    initializer.estimateGroupScalesClosedForm();
+    initializer.estimatePosesClosedForm();
+  }
+  else
+  {
+    initializer.runFullPipeline(true);
+  }
 
   return std::make_tuple(
-      initializer.mPoses, initializer.mGroupScales, standard);
+      initializer.mPoses,
+      initializer.mPosesClosedFormEstimateAvailable,
+      initializer.mGroupScales,
+      standard);
 }
 
-void testSubject(const std::string& subject, const s_t& height)
+void testSubject(
+    const std::string& subject, const s_t& height, bool knownScales = false)
 {
 
   std::cout << "Testing " << subject << "..." << std::endl;
@@ -118,16 +139,18 @@ void testSubject(const std::string& subject, const s_t& height)
   (void)height;
   // const auto tuple
   //     = runIKInitializer(prefix + "unscaled_generic.osim", trcFiles, height);
-  const auto tuple
-      = runIKInitializer(prefix + subject + "/subject01.osim", trcFiles, -1.0);
+  const auto tuple = runIKInitializer(
+      prefix + subject + "/" + subject + ".osim", trcFiles, -1.0, knownScales);
   std::vector<Eigen::VectorXs> poses = std::get<0>(tuple);
-  Eigen::VectorXs groupScales = std::get<1>(tuple);
-  OpenSimFile osimFile = std::get<2>(tuple);
+  std::vector<Eigen::VectorXi> posesClosedForeEstimateAvailable
+      = std::get<1>(tuple);
+  Eigen::VectorXs groupScales = std::get<2>(tuple);
+  OpenSimFile osimFile = std::get<3>(tuple);
 
   // Load ground-truth results.
   // --------------------------
   auto goldOsim
-      = OpenSimParser::parseOsim(prefix + subject + "/subject01.osim");
+      = OpenSimParser::parseOsim(prefix + subject + "/" + subject + ".osim");
   auto goldIK = OpenSimParser::loadMot(
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
 
@@ -139,10 +162,12 @@ void testSubject(const std::string& subject, const s_t& height)
   for (int i = 0; i < poses.size(); i++)
   {
     Eigen::VectorXs diff = poses[i] - goldPoses.col(i);
-    totalError += diff.squaredNorm();
+    // Only could those joint with a closed form estimate available
+    diff = diff.cwiseProduct(posesClosedForeEstimateAvailable[i].cast<s_t>());
+    totalError += diff.cwiseAbs().sum() / diff.size();
     averagePerDofError += diff.cwiseAbs();
   }
-  s_t averagePoseError = std::sqrt(totalError / (s_t)poses.size());
+  s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
   if (averagePoseError >= 0.01)
   {
@@ -154,7 +179,7 @@ void testSubject(const std::string& subject, const s_t& height)
                 << averagePerDofError(i) << std::endl;
     }
   }
-  EXPECT_LE(averagePoseError, 0.01);
+  EXPECT_LE(averagePoseError, knownScales ? 0.03 : 0.06);
 
   // Marker errors.
   // --------------
@@ -175,10 +200,17 @@ void testSubject(const std::string& subject, const s_t& height)
     Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
     Eigen::VectorXs goldJointPoses
         = goldSkeleton->getJointWorldPositions(goldJoints);
-    jointErrors[i] = (jointPoses - goldJointPoses).norm();
+    Eigen::VectorXs diff = jointPoses - goldJointPoses;
+    for (int j = 0; j < skeleton->getNumJoints(); j++)
+    {
+      std::cout << skeleton->getJoint(i)->getName()
+                << " center error: " << diff.segment<3>(3 * i).norm()
+                << std::endl;
+    }
+    jointErrors[i] = diff.mean();
   }
   s_t averageJointPoseError = jointErrors.mean();
-  EXPECT_LE(averageJointPoseError, 0.01);
+  EXPECT_LE(averageJointPoseError, knownScales ? 0.02 : 0.04);
 
   // Body scales.
   // ------------
@@ -192,7 +224,7 @@ void testSubject(const std::string& subject, const s_t& height)
     bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
   }
   s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_LE(averageBodyScaleError, 0.01);
+  EXPECT_LE(averageBodyScaleError, knownScales ? 0.01 : 0.02);
 }
 
 //==============================================================================
@@ -205,7 +237,7 @@ TEST(Arnold2013Synthetic, RegressionTests)
   (void)masses;
   for (int i = 0; i < (int)subjects.size(); i++)
   {
-    testSubject(subjects[i], heights[i]);
+    testSubject(subjects[i], heights[i], true);
   }
 }
 

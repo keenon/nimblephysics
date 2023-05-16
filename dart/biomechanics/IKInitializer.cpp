@@ -176,6 +176,32 @@ bool isPositiveDefinite(const Eigen::MatrixXd& A)
 }
 
 //==============================================================================
+// This method will find the roots of a polynomial given by a*x^2 + b*x + c = 0
+std::vector<double> findRealRoots(double a, double b, double c)
+{
+  std::vector<double> roots;
+  double discriminant = b * b - 4 * a * c;
+
+  if (discriminant < 0)
+  {
+    // No real roots
+  }
+  else if (discriminant == 0)
+  {
+    roots.push_back(-b / (2 * a));
+  }
+  else
+  {
+    double root1 = (-b + std::sqrt(discriminant)) / (2 * a);
+    double root2 = (-b - std::sqrt(discriminant)) / (2 * a);
+    roots.push_back(root1);
+    roots.push_back(root2);
+  }
+
+  return roots;
+}
+
+//==============================================================================
 Eigen::Vector3s ensureOnSameSideOfPlane(
     const std::vector<Eigen::Vector3s>& neutralPoints,
     Eigen::Vector3s neutralGoal,
@@ -224,7 +250,8 @@ IKInitializer::IKInitializer(
     std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         markers,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-    s_t modelHeightM)
+    s_t modelHeightM,
+    bool dontMergeNearbyJoints)
   : mSkel(skel),
     mMarkerObservations(markerObservations),
     mModelHeightM(modelHeightM)
@@ -334,7 +361,7 @@ IKInitializer::IKInitializer(
         Eigen::Vector3s joint1ToJoint2 = joint2WorldCenter - joint1WorldCenter;
         s_t joint1ToJoint2Distance = joint1ToJoint2.norm();
 
-        if (joint1ToJoint2Distance < 0.07)
+        if (joint1ToJoint2Distance < 0.07 && !dontMergeNearbyJoints)
         {
           anyToMerge = true;
           toMerge = std::make_pair(mStackedJoints[i], childJoint);
@@ -1383,34 +1410,13 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
         }
       }
 
-      // 2.2. On joints where at least one adjacent point has a known joint
-      // center, we're going to attempt to go through and solve for the correct
-      // spot to put the joint center along the axis.
-      //
-      // We're going to solve by reference to the ratio of of the triangle's
-      // sides formed between the axis and the adjacent joint center(s),
-      // measured along the joint axis and perpendicular to it.
-      //
-      // For example:
-      //
-      //          adjacent joint
-      //           /    |
-      //          /     |
-      //         /      |
-      //        /       | (perpendicular dist)
-      //       /        |
-      //      /         |
-      //   joint ----- axis
-      //   (parallel dist)
-      //
-      // The angle between the axis and the adjacent joint is given by the ratio
-      // of the parallel and perpendicular distances. Given an unambiguous
-      // perpendicular distance from our solver, and an unambiguous joint axis,
-      // we can solve for the distance along the axis by solving for the ratio
-      // of the parallel distance to the perpendicular distance.
+      // We'll hold off solving joints until at least one adjacent joint has
+      // been solved, so that we can work our way out/in from unambiguous joint
+      // centers, since those provide so much useful info on joint center
+      // location.
       if (adjacentPointJoints.size() > 0)
       {
-        // 2.2.1. Collect the joint centers and axis direction on the neutral
+        // 2.2. Collect the joint centers and axis direction on the neutral
         // skeleton, so we can determine our ratio of parallel to perpendicular
         // distances in the neutral pose
         const Eigen::Vector3s neutralAxis
@@ -1418,212 +1424,141 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
         const Eigen::Vector3s neutralJointCenter
             = neutralSkelJointCenterWorldPositionsMap[joint->name];
 
-        for (std::shared_ptr<struct StackedJoint> pointJoint :
-             adjacentPointJoints)
+        s_t averageOffset = 0.0;
+        int numTimestepsCounted = 0;
+        std::vector<s_t> recordedOffsets;
+
+        // 2.3. Now we're going to run through every timestep and solve each
+        // one, and then collect an average offset to apply
+        for (int t = 0; t < mMarkerObservations.size(); t++)
         {
-          Eigen::Vector3s adjacentNeutralJointCenter
-              = neutralSkelJointCenterWorldPositionsMap[pointJoint->name];
-
-          // 2.2.2. Find the joint center distance to the adjacent joint both
-          // along the axis, and perpindicular to the axis
-          Eigen::Vector3s neutralOffset
-              = adjacentNeutralJointCenter - neutralJointCenter;
-          s_t neutralDistAlongAxis = neutralOffset.dot(neutralAxis);
-          Eigen::Vector3s neutralOffsetParallel
-              = neutralDistAlongAxis * neutralAxis;
-          Eigen::Vector3s neutralOffsetPerp
-              = (neutralOffset - neutralOffsetParallel);
-          assert(
-              (neutralOffsetParallel + neutralOffsetPerp - neutralOffset).norm()
-              < 1e-15);
-          assert(
-              (neutralJointCenter + neutralOffsetParallel + neutralOffsetPerp
-               - adjacentNeutralJointCenter)
-                  .norm()
-              < 1e-15);
-          s_t neutralRatio = neutralDistAlongAxis / neutralOffsetPerp.norm();
-
-          // 2.2.3. Find the intervening body between us and the pin joint, and
-          // record it for later disambiguation.
-          std::shared_ptr<struct StackedBody> interveningBody = nullptr;
-          if (pointJoint->parentBody != nullptr
-              && pointJoint->parentBody->parentJoint == joint)
+          if (mJointCenters[t].count(joint->name) == 0
+              || mJointAxisDirs[t].count(joint->name) == 0)
           {
-            interveningBody = pointJoint->parentBody;
-          }
-          else
-          {
-            assert(joint->parentBody != nullptr);
-            assert(joint->parentBody->parentJoint == pointJoint);
-            interveningBody = joint->parentBody;
-          }
-          assert(interveningBody != nullptr);
-
-          if (logOutput)
-          {
-            std::cout << "Shifting joint \"" << joint->name
-                      << "\" along axis with help of joint \""
-                      << pointJoint->name << "\" with neutral ratio "
-                      << neutralRatio << std::endl;
-            std::cout << "  -> Joint neutral center: "
-                      << neutralJointCenter.transpose() << std::endl;
-            std::cout << "  -> Joint neutral axis: " << neutralAxis.transpose()
-                      << std::endl;
-            std::cout << "  -> Adjacent neutral center: "
-                      << adjacentNeutralJointCenter.transpose() << std::endl;
+            continue;
           }
 
-          // 2.2.4. Now we're going to go through all the timesteps and grab the
-          // ratio in practice, and then use that to solve for the two joint
-          // center offsets possible along the axis.
-          for (int t = 0; t < mMarkerObservations.size(); t++)
+          std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii;
+          std::vector<s_t> weights;
+
+          // 2.3.1. Collect the points and radii for the adjacent joint(s) that
+          // have unambiguous joint centers
+          for (std::shared_ptr<struct StackedJoint> pointJoint :
+               adjacentPointJoints)
           {
-            if (mJointCenters[t].count(joint->name)
-                && mJointAxisDirs[t].count(joint->name)
-                && mJointCenters[t].count(pointJoint->name))
-            {
-              // Get the joint center and axis direction in world space
-              Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
-              Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+            if (mJointCenters[t].count(pointJoint->name) == 0)
+              continue;
 
-              // Get the adjacent joint center in world space
-              Eigen::Vector3s adjacentJointCenter
-                  = mJointCenters[t][pointJoint->name];
+            Eigen::Vector3s adjacentNeutralJointCenter
+                = neutralSkelJointCenterWorldPositionsMap[pointJoint->name];
 
-              // 2.2.5. We're going to make sure that our axis is pointed in the
-              // correct direction, by aligning the point cloud of visible
-              // markers on the interveningBody with the neutral pose, and
-              // checking the direction of the neutral axis under the resulting
-              // transformation.
-              std::vector<Eigen::Vector3s> neutralMarkerLocations;
-              std::vector<Eigen::Vector3s> worldMarkerLocations;
-              std::vector<s_t> weights;
-              for (int j = 0; j < mMarkers.size(); j++)
-              {
-                if (std::find(
-                        interveningBody->bodies.begin(),
-                        interveningBody->bodies.end(),
-                        mMarkers[j].first)
-                    != interveningBody->bodies.end())
-                {
-                  if (mMarkerObservations[t].count(mMarkerNames[j]))
-                  {
-                    neutralMarkerLocations.push_back(
-                        neutralSkelMarkerWorldPositionsMap[mMarkerNames[j]]);
-                    worldMarkerLocations.push_back(
-                        mMarkerObservations[t][mMarkerNames[j]]);
-                    weights.push_back(1.0);
-                  }
-                }
-              }
-              Eigen::Isometry3s neutralToWorldTransform
-                  = getPointCloudToPointCloudTransform(
-                      neutralMarkerLocations, worldMarkerLocations, weights);
-              Eigen::Vector3s neutralAxisInWorld
-                  = neutralToWorldTransform.linear() * neutralAxis;
-              // Ensure that the joint axis is pointed in the same direction as
-              // the neutral axis
-              if (neutralAxisInWorld.dot(jointAxis) < 0)
-              {
-                jointAxis *= -1;
-              }
-              s_t recoveredAxisSimilarity = neutralAxisInWorld.dot(jointAxis);
-              if (logOutput)
-              {
-                std::cout
-                    << "Recovered world axis similarity (after flipping): "
-                    << recoveredAxisSimilarity << std::endl;
-              }
+            // 2.3.1.1. Find the ratio on the neutral skeleton for these two
+            // joints between (distance) / (distance perpendicular to axis)
+            Eigen::Vector3s neutralOffset
+                = adjacentNeutralJointCenter - neutralJointCenter;
+            s_t neutralDistAlongAxis = neutralOffset.dot(neutralAxis);
+            Eigen::Vector3s neutralOffsetParallel
+                = neutralDistAlongAxis * neutralAxis;
+            Eigen::Vector3s neutralOffsetPerp
+                = (neutralOffset - neutralOffsetParallel);
+            assert(
+                (neutralOffsetParallel + neutralOffsetPerp - neutralOffset)
+                    .norm()
+                < 1e-15);
+            assert(
+                (neutralJointCenter + neutralOffsetParallel + neutralOffsetPerp
+                 - adjacentNeutralJointCenter)
+                    .norm()
+                < 1e-15);
+            s_t neutralRatio = neutralOffset.norm() / neutralOffsetPerp.norm();
 
-              // 2.2.6. Now that we've corrected the axis direction, the joint
-              // center can be found unambiguously
-              // Project `other_point` onto the line.
-              // Eigen::Vector3d projection = jointCenter +
-              // (jointAxis.dot(adjacentJointCenter - jointCenter) /
-              // jointAxis.dot(jointAxis)) * jointAxis;
-              Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
-              s_t distAlongAxis = offset.dot(jointAxis);
-              Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
-              Eigen::Vector3s offsetPerp = (offset - offsetParallel);
+            // 2.3.1.2. Find the ratio on the current skeleton for these two
+            // joints between (distance) / (distance perpendicular to axis)
+            Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
+            Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+            Eigen::Vector3s adjacentJointCenter
+                = mJointCenters[t][pointJoint->name];
+            Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
+            s_t distAlongAxis = offset.dot(jointAxis);
+            Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
+            Eigen::Vector3s offsetPerp = (offset - offsetParallel);
 
-              Eigen::Vector3s closestPointOnAxis = jointCenter + offsetParallel;
-              assert(
-                  (closestPointOnAxis + offsetPerp - adjacentJointCenter).norm()
-                  < 1e-15);
-              s_t orthogonalError
-                  = (closestPointOnAxis - adjacentJointCenter).dot(jointAxis);
-              (void)orthogonalError;
-              assert(orthogonalError < 1e-15);
+            s_t impliedDistance = offsetPerp.norm() * neutralRatio;
 
-              Eigen::Vector3s correctedJointCenter
-                  = closestPointOnAxis
-                    - jointAxis * offsetPerp.norm() * neutralRatio;
-
-#ifndef NDEBUG
-              // Check that the ratio is now preserved
-              Eigen::Vector3s recoveredOffset
-                  = adjacentJointCenter - correctedJointCenter;
-              s_t recoveredDistAlongAxis = recoveredOffset.dot(jointAxis);
-              Eigen::Vector3s recoveredOffsetParallel
-                  = recoveredDistAlongAxis * jointAxis;
-              Eigen::Vector3s recoveredOffsetPerp
-                  = (recoveredOffset - recoveredOffsetParallel);
-              assert(
-                  (recoveredOffsetParallel + recoveredOffsetPerp
-                   - recoveredOffset)
-                      .norm()
-                  < 1e-15);
-              assert(
-                  (correctedJointCenter + recoveredOffsetParallel
-                   + recoveredOffsetPerp - adjacentJointCenter)
-                      .norm()
-                  < 1e-15);
-              s_t recoveredRatio
-                  = recoveredDistAlongAxis / recoveredOffsetPerp.norm();
-              assert(abs(recoveredRatio - neutralRatio) < 1e-8);
-#endif
-
-              s_t movedDist
-                  = (correctedJointCenter - mJointCenters[t][joint->name])
-                        .norm();
-              if (movedDist < 0.10)
-              {
-                if (logOutput)
-                {
-                  std::cout << "Axis aligned joint center for joint \""
-                            << joint->name << " by shifting " << movedDist
-                            << "m: [" << correctedJointCenter.transpose()
-                            << "] from ["
-                            << mJointCenters[t][joint->name].transpose() << "]"
-                            << std::endl;
-                }
-                mJointCenters[t][joint->name] = correctedJointCenter;
-              }
-              else
-              {
-                if (logOutput)
-                {
-                  std::cout << "Axis aligned joint center for joint \""
-                            << joint->name << " wants to shift " << movedDist
-                            << "m which is suspiciously large, and so we're "
-                               "ignoring it."
-                            << std::endl;
-                }
-              }
-            }
+            // 2.3.1.3. Record the implied distance to our objective set
+            pointsAndRadii.emplace_back(
+                mJointCenters[t][pointJoint->name], impliedDistance);
+            weights.push_back(1.0);
           }
+
+          // 2.4. Now we're going to record all the available marker distances
+          // as well, since those provide useful disambiguating signal, and can
+          // help compensate for otherwise large errors caused by small changes
+          // in joint axis.
+
+          for (auto& pair : mJointToMarkerSquaredDistances[joint->name])
+          {
+            std::string markerName = pair.first;
+            s_t squaredDistance = pair.second;
+            if (mMarkerObservations[t].count(markerName) == 0)
+              continue;
+            Eigen::Vector3s markerWorldPos = mMarkerObservations[t][markerName];
+            pointsAndRadii.emplace_back(markerWorldPos, sqrt(squaredDistance));
+            weights.push_back(0.5);
+          }
+
+          Eigen::Vector3s newCenter = centerPointOnAxis(
+              mJointCenters[t][joint->name],
+              mJointAxisDirs[t][joint->name],
+              pointsAndRadii,
+              weights);
+          s_t distAlongAxis = (newCenter - mJointCenters[t][joint->name])
+                                  .dot(mJointAxisDirs[t][joint->name]);
+          averageOffset += distAlongAxis;
+          numTimestepsCounted++;
+          recordedOffsets.push_back(distAlongAxis);
         }
 
-        // 2.2.6. Now we can mark this joint as having a reliable joint center,
-        // so we can use it as support in the next iteration of the algorithm.
-        centerJoints.push_back(joint);
-        axisJoints.erase(axisJoints.begin() + i);
-        isJointAxis[joint->name] = false;
-        anyChanged = true;
-        break;
-      }
-    }
+        averageOffset /= numTimestepsCounted;
 
+        s_t offsetVariance = 0.0;
+        for (int i = 0; i < recordedOffsets.size(); i++)
+        {
+          offsetVariance += (recordedOffsets[i] - averageOffset)
+                            * (recordedOffsets[i] - averageOffset);
+        }
+        offsetVariance /= recordedOffsets.size();
+
+        if (logOutput)
+        {
+          std::cout << "Joint \"" << joint->name
+                    << "\" average offset along axis: " << averageOffset
+                    << "m with variance " << offsetVariance << "m^2"
+                    << std::endl;
+        }
+
+        // 2.5. Now we're going to go through and apply the average offset we
+        // just found to the joint centers
+        for (int t = 0; t < mMarkerObservations.size(); t++)
+        {
+          if (mJointCenters[t].count(joint->name) == 0
+              || mJointAxisDirs[t].count(joint->name) == 0)
+            continue;
+          Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
+          Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+          Eigen::Vector3s newCenter = jointCenter + averageOffset * jointAxis;
+          mJointCenters[t][joint->name] = newCenter;
+        }
+      }
+
+      // 2.6. Now we can mark this joint as having a reliable joint center,
+      // so we can use it as support in the next iteration of the algorithm.
+      centerJoints.push_back(joint);
+      axisJoints.erase(axisJoints.begin() + i);
+      isJointAxis[joint->name] = false;
+      anyChanged = true;
+      break;
+    }
     if (!anyChanged)
     {
       break;
@@ -3074,6 +3009,194 @@ std::pair<Eigen::Vector3s, s_t> IKInitializer::gamageLasenby2002AxisFit(
   Eigen::Vector3s axis = svd.matrixV().col(2);
   s_t singularValue = svd.singularValues()(2);
   return std::make_pair(axis, singularValue);
+}
+
+std::vector<double> IKInitializer::findCubicRealRoots(
+    double a, double b, double c, double d)
+{
+  std::vector<std::complex<double>> roots;
+
+  // If a == 0, it's not a cubic equation. Check if it's quadratic or linear and
+  // solve accordingly.
+  if (std::abs(a) < 1e-10)
+  {
+    if (std::abs(b) < 1e-10)
+    {
+      // It's a linear equation: c*x + d = 0
+      if (std::abs(c) > 1e-10)
+      {
+        roots.push_back(-d / c);
+      }
+    }
+    else
+    {
+      // It's a quadratic equation: b*x^2 + c*x + d = 0
+      double discr = c * c - 4 * b * d;
+      if (discr >= 0)
+      {
+        roots.push_back((-c + std::sqrt(discr)) / (2 * b));
+        roots.push_back((-c - std::sqrt(discr)) / (2 * b));
+      }
+      else
+      {
+        roots.push_back(
+            std::complex<double>(-c / (2 * b), std::sqrt(-discr) / (2 * b)));
+        roots.push_back(
+            std::complex<double>(-c / (2 * b), -std::sqrt(-discr) / (2 * b)));
+      }
+    }
+
+    std::vector<double> realRoots;
+    for (int i = 0; i < roots.size(); i++)
+    {
+      if (std::abs(roots[i].imag()) < 1e-10)
+      {
+        realRoots.push_back(roots[i].real());
+      }
+    }
+    return realRoots;
+  }
+
+  // Change to monic equation t^3 + Pt + Q = 0, t = x - b / (3a)
+  double P = c / a - b * b / (3 * a * a);
+  double Q = 2 * b * b * b / (27 * a * a * a) - b * c / (3 * a * a) + d / a;
+
+  std::complex<double> discriminant = Q * Q / 4 + P * P * P / 27;
+
+  if (std::abs(discriminant) < 1e-10)
+  {
+    // The equation has a multiple root
+    double u = -std::cbrt(Q / 2);
+    roots.push_back(2 * u - b / (3 * a));
+    roots.push_back(-u - b / (3 * a));
+    std::vector<double> realRoots;
+    for (int i = 0; i < roots.size(); i++)
+    {
+      if (std::abs(roots[i].imag()) < 1e-10)
+      {
+        realRoots.push_back(roots[i].real());
+      }
+    }
+    return realRoots;
+  }
+
+  // Calculate square roots of discriminant
+  std::complex<double> sqrt_discriminant = std::sqrt(discriminant);
+
+  // Calculate u and v
+  std::complex<double> u = std::pow(-Q / 2 + sqrt_discriminant, 1.0 / 3.0);
+  std::complex<double> v = std::pow(-Q / 2 - sqrt_discriminant, 1.0 / 3.0);
+
+  // Three roots in total
+  roots.push_back(u + v - b / (3 * a));
+  roots.push_back(
+      u * std::exp(std::complex<double>(0, 2 * M_PI / 3))
+      + v * std::exp(std::complex<double>(0, -2 * M_PI / 3)) - b / (3 * a));
+  roots.push_back(
+      u * std::exp(std::complex<double>(0, -2 * M_PI / 3))
+      + v * std::exp(std::complex<double>(0, 2 * M_PI / 3)) - b / (3 * a));
+
+  // Post-processing: convert roots with very small imaginary parts to real
+  // numbers
+  std::vector<double> realRoots;
+  for (int i = 0; i < roots.size(); i++)
+  {
+    if (std::abs(roots[i].imag()) < 1e-10)
+    {
+      realRoots.push_back(roots[i].real());
+    }
+  }
+  return realRoots;
+}
+
+/// This method will find the best point on the line given by f(x) = (c + a*x)
+/// that minimizes: Sum_i weights[i] * (f(x) -
+/// pointsAndRadii[i].first).squaredNorm() - pointsAndRadii[i].second^2)^2
+Eigen::Vector3s IKInitializer::centerPointOnAxis(
+    Eigen::Vector3s center,
+    Eigen::Vector3s axis,
+    std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii,
+    std::vector<s_t> weights)
+{
+  s_t a = 0.0;
+  s_t b = 0.0;
+  s_t c = 0.0;
+  s_t d = 0.0;
+
+  const s_t e = axis.squaredNorm();
+  for (int i = 0; i < pointsAndRadii.size(); i++)
+  {
+    const s_t weight = weights.size() > i ? weights[i] : 1.0;
+    const s_t f = (center - pointsAndRadii[i].first).dot(axis);
+    const s_t g = (center - pointsAndRadii[i].first).squaredNorm()
+                  - pointsAndRadii[i].second * pointsAndRadii[i].second;
+
+    a += weight * 4.0 * e * e;
+    b += weight * 12.0 * e * f;
+    c += weight * (4.0 * e * g + 8.0 * f * f);
+    d += weight * 4.0 * f * g;
+  }
+
+  std::vector<s_t> roots = findCubicRealRoots(a, b, c, d);
+  if (roots.size() == 0)
+  {
+    std::cout << "Failed to solve cubic in centerPointOnAxis() for polynomial "
+              << a << " * x^3 + " << b << " * x^2 + " << c << " * x + " << d
+              << ", returning original center point" << std::endl;
+    return center;
+  }
+
+  s_t bestRoot = roots[0];
+  s_t bestLoss = std::numeric_limits<double>::infinity();
+  for (s_t root : roots)
+  {
+    s_t loss = 0.0;
+    const Eigen::Vector3s resultingCenter = center + root * axis;
+
+#ifndef NDEBUG
+    s_t polynomialLoss = 0.0;
+#endif
+
+    for (int i = 0; i < pointsAndRadii.size(); i++)
+    {
+      const s_t weight = weights.size() > i ? weights[i] : 1.0;
+
+      // Compute the loss according to the original definition, which is the
+      // square of the error between the squared desired radius and the squared
+      // distance from the center.
+      const s_t linearErrorOnSquaredDistances
+          = ((pointsAndRadii[i].first - resultingCenter).squaredNorm()
+             - pointsAndRadii[i].second * pointsAndRadii[i].second);
+      loss += weight * linearErrorOnSquaredDistances
+              * linearErrorOnSquaredDistances;
+
+#ifndef NDEBUG
+      // If we're in debug mode, we also compute the loss using the polynomial,
+      // just to check that everything is equivalent. This is to verify that we
+      // didn't make an algebra mistake in our polynomial expansion, and so
+      // we're likely to trust the optimal value.
+      const s_t f = (center - pointsAndRadii[i].first).dot(axis);
+      const s_t g = (center - pointsAndRadii[i].first).squaredNorm()
+                    - pointsAndRadii[i].second * pointsAndRadii[i].second;
+      polynomialLoss
+          += weight
+             * (e * e * root * root * root * root
+                + 4 * e * f * root * root * root + 2 * e * g * root * root
+                + 4 * f * f * root * root + 4 * f * g * root + g * g);
+#endif
+    }
+
+#ifndef NDEBUG
+    assert(std::abs(polynomialLoss - loss) < 1e-8);
+#endif
+    if (loss < bestLoss)
+    {
+      bestLoss = loss;
+      bestRoot = root;
+    }
+  }
+
+  return center + bestRoot * axis;
 }
 
 } // namespace biomechanics

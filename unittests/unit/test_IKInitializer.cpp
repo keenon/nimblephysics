@@ -127,7 +127,9 @@ void runOnRealOsim(
 }
 
 bool verifyReconstructionOnSyntheticRandomPosesOsim(
-    std::string openSimPath, bool saveToGUI = false)
+    std::string openSimPath,
+    bool saveToGUI = false,
+    bool givePerfectScaleInfoToInitializer = false)
 {
   auto osim = OpenSimParser::parseOsim(openSimPath);
   s_t targetHeight = 1.8;
@@ -154,9 +156,13 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints()));
   }
 
-  // Reset to neutral scale
-  osim.skeleton->setBodyScales(
-      Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3));
+  // Reset to neutral scale, unless we're testing the IKInitializer with perfect
+  // scaling information already given.
+  if (!givePerfectScaleInfoToInitializer)
+  {
+    osim.skeleton->setBodyScales(
+        Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3));
+  }
 
   server::GUIRecording server;
   server.setFramesPerSecond(10);
@@ -165,7 +171,11 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
       = osim.skeleton->cloneSkeleton();
 
   IKInitializer initializer(
-      osim.skeleton, osim.markersMap, markerObservations, targetHeight);
+      osim.skeleton,
+      osim.markersMap,
+      markerObservations,
+      targetHeight,
+      givePerfectScaleInfoToInitializer);
 
   std::map<std::string, std::map<std::string, s_t>>
       originalJointToJointDistances;
@@ -201,23 +211,6 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   markerError = initializer.closedFormMDSJointCenterSolver(true);
   s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
   initializer.recenterAxisJointsBasedOnBoneAngles();
-  /*
-  for (int t = 0; t < markerObservations.size(); t++)
-  {
-    Eigen::VectorXs pose = poses[t];
-    osim.skeleton->setPositions(pose);
-    auto jointMap = initializer.getVisibleJointCenters(t);
-    for (auto& pair : jointMap)
-    {
-      Eigen::Vector3s jointWorld = jointCenters[t].segment<3>(
-          osim.skeleton->getJoint(pair.first)->getJointIndexInSkeleton() * 3);
-      Eigen::Vector3s jointCenterEstimated = pair.second;
-      s_t jointError = (jointWorld - jointCenterEstimated).norm();
-      std::cout << "Joint center " << pair.first << " error: " << jointError
-                << std::endl;
-    }
-  }
-  */
   std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
 
   // initializer.reestimateDistancesFromJointCenters();
@@ -316,18 +309,21 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         }
       }
 
-      for (auto& pair : initializer.mJointCenters[t])
+      if (initializer.mJointAxisDirs.size() > t)
       {
-        if (initializer.mJointAxisDirs[t].count(pair.first))
+        for (auto& pair : initializer.mJointAxisDirs[t])
         {
-          std::vector<Eigen::Vector3s> guessedAxisLine;
-          guessedAxisLine.push_back(pair.second);
-          guessedAxisLine.push_back(
-              pair.second + initializer.mJointAxisDirs[t][pair.first] * 0.5);
-          server.createLine(
-              "guessed_joint" + pair.first,
-              guessedAxisLine,
-              Eigen::Vector4s(0, 1, 1, 1));
+          if (initializer.mJointAxisDirs[t].count(pair.first))
+          {
+            std::vector<Eigen::Vector3s> guessedAxisLine;
+            guessedAxisLine.push_back(pair.second);
+            guessedAxisLine.push_back(
+                pair.second + initializer.mJointAxisDirs[t][pair.first] * 0.5);
+            server.createLine(
+                "guessed_joint" + pair.first,
+                guessedAxisLine,
+                Eigen::Vector4s(0, 1, 1, 1));
+          }
         }
       }
 
@@ -906,6 +902,137 @@ TEST(IKInitializer, AXIS_FIT_SOME_NOISE)
 #endif
 
 #ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_REAL_ROOTS)
+{
+  std::vector<double> roots = IKInitializer::findCubicRealRoots(1, -6, 11, -6);
+  std::vector<double> expected = {1, 2, 3};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_COMPLEX_ROOTS)
+{
+  std::vector<double> roots = IKInitializer::findCubicRealRoots(1, -3, 3, -1);
+  std::vector<double> expected = {1, 1};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_CONJUGATE_ROOT_PAIR)
+{
+  std::vector<double> roots = IKInitializer::findCubicRealRoots(1, 0, 1, 0);
+  std::vector<double> expected = {0};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CENTER_POINT_ON_AXIS_ONE_SUPPORT_POINT)
+{
+  std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii;
+  pointsAndRadii.emplace_back(Eigen::Vector3s(1, 1, 0), 1.0);
+
+  Eigen::Vector3s center = Eigen::Vector3s::Zero();
+  Eigen::Vector3s axis = Eigen::Vector3s::UnitX();
+
+  Eigen::Vector3s expectedCenter = Eigen::Vector3s::UnitX();
+  Eigen::Vector3s recoveredCenter
+      = IKInitializer::centerPointOnAxis(center, axis, pointsAndRadii);
+
+  EXPECT_TRUE((recoveredCenter - expectedCenter).norm() < 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CENTER_POINT_ON_AXIS_TWO_SYMMETRIC_SUPPORT_POINTS)
+{
+  std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii;
+  pointsAndRadii.emplace_back(Eigen::Vector3s(-1.5, 1, 0), 1.0);
+  pointsAndRadii.emplace_back(Eigen::Vector3s(-0.5, 1, 0), 1.0);
+
+  Eigen::Vector3s center = Eigen::Vector3s::Zero();
+  Eigen::Vector3s axis = Eigen::Vector3s::UnitX();
+
+  Eigen::Vector3s expectedCenter = -Eigen::Vector3s::UnitX();
+  Eigen::Vector3s recoveredCenter
+      = IKInitializer::centerPointOnAxis(center, axis, pointsAndRadii);
+
+  EXPECT_TRUE((recoveredCenter - expectedCenter).norm() < 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CENTER_POINT_ON_AXIS_RANDOM_POINTS)
+{
+  srand(42);
+
+  // Generate a random problem definition
+  std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii;
+  for (int i = 0; i < 10; i++)
+  {
+    pointsAndRadii.emplace_back(
+        Eigen::Vector3s::Random(), ((s_t)rand() / RAND_MAX) * 3.0 + 0.01);
+  }
+  Eigen::Vector3s center = Eigen::Vector3s::Zero();
+  Eigen::Vector3s axis = Eigen::Vector3s::Random().normalized();
+
+  // Solve it
+  Eigen::Vector3s optimalCenter
+      = IKInitializer::centerPointOnAxis(center, axis, pointsAndRadii);
+
+  // Test a bunch of random points to see if we can guess a better value
+  for (int i = 0; i < 1000; i++)
+  {
+    s_t randomDistance = ((s_t)rand() / RAND_MAX) * 3.0 - 1.5;
+    Eigen::Vector3s trialPoint = center + (axis * randomDistance);
+
+    s_t optimalLoss = 0.0;
+    s_t trialPointLoss = 0.0;
+    for (int t = 0; t < pointsAndRadii.size(); t++)
+    {
+      const s_t optimalLinearErrorOnSquaredDistances
+          = ((pointsAndRadii[t].first - optimalCenter).squaredNorm()
+             - pointsAndRadii[t].second * pointsAndRadii[t].second);
+      optimalLoss += optimalLinearErrorOnSquaredDistances
+                     * optimalLinearErrorOnSquaredDistances;
+
+      const s_t trialLinearErrorOnSquaredDistances
+          = ((pointsAndRadii[t].first - trialPoint).squaredNorm()
+             - pointsAndRadii[t].second * pointsAndRadii[t].second);
+      trialPointLoss += trialLinearErrorOnSquaredDistances
+                        * trialLinearErrorOnSquaredDistances;
+    }
+    EXPECT_LE(optimalLoss, trialPointLoss);
+    if (optimalLoss > trialPointLoss)
+    {
+      return;
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(IKInitializer, SYNTHETIC_OSIM_JUST_JOINT_CENTERS)
 {
   EXPECT_TRUE(verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
@@ -920,6 +1047,17 @@ TEST(IKInitializer, SYNTHETIC_OSIM)
   EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(
       "dart://sample/grf/subject18_synthetic/"
       "unscaled_generic.osim",
+      true));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, SYNTHETIC_OSIM_SCALES_GIVEN)
+{
+  EXPECT_TRUE(verifyReconstructionOnSyntheticRandomPosesOsim(
+      "dart://sample/grf/subject18_synthetic/"
+      "unscaled_generic.osim",
+      true,
       true));
 }
 #endif
