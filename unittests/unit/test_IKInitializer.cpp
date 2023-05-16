@@ -551,14 +551,13 @@ bool verifyMarkerReconstructionOnOsim(
                       .squaredNorm();
       }
     }
-    Eigen::MatrixXs D_rank5 = IKInitializer::rankNDistanceMatrix(D, 5);
     Eigen::MatrixXs P = IKInitializer::getPointCloudFromDistanceMatrix(D);
     for (int i = 0; i < markerNames.size(); i++)
     {
       for (int j = 0; j < markerNames.size(); j++)
       {
         s_t recoveredDist = (P.col(i) - P.col(j)).squaredNorm();
-        s_t originalDist = D_rank5(i, j);
+        s_t originalDist = D(i, j);
         if (std::abs(recoveredDist - originalDist) > 1e-6)
         {
           std::cout << "Failed to reconstruct distance in P between "
@@ -606,8 +605,7 @@ TEST(IKInitializer, RECONSTRUCT_EXAMPLE_CLOUD)
       D(i, j) = (points[i] - points[j]).squaredNorm();
     }
   }
-  Eigen::MatrixXs D_rank5 = IKInitializer::rankNDistanceMatrix(D, 5);
-  Eigen::MatrixXs P = IKInitializer::getPointCloudFromDistanceMatrix(D_rank5);
+  Eigen::MatrixXs P = IKInitializer::getPointCloudFromDistanceMatrix(D);
 
   for (int i = 0; i < points.size(); i++)
   {
@@ -735,76 +733,6 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 
     EXPECT_NEAR(cost, recoveredCost, 1e-8);
   }
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(IKInitializer, SPHERE_FIT_LEAST_SQUARES)
-{
-  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
-  std::vector<Eigen::Vector3s> markerObservations;
-  s_t radius = 2.0;
-  markerObservations.push_back(center + Eigen::Vector3s::UnitX() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitX() * radius);
-  markerObservations.push_back(center + Eigen::Vector3s::UnitY() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitY() * radius);
-  markerObservations.push_back(center + Eigen::Vector3s::UnitZ() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitZ() * radius);
-
-  Eigen::Vector3s center_raw
-      = IKInitializer::leastSquaresSphereFit(markerObservations);
-  s_t error_raw = (center_raw - center).norm();
-  EXPECT_NEAR(error_raw, 0.0, 1e-8);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(IKInitializer, CHANG_POLLARD_JOINT_TEST_NO_NOISE)
-{
-  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
-  std::vector<Eigen::Vector3s> markerObservations;
-  s_t radius = 2.0;
-  markerObservations.push_back(center + Eigen::Vector3s::UnitX() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitX() * radius);
-  markerObservations.push_back(center + Eigen::Vector3s::UnitY() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitY() * radius);
-  markerObservations.push_back(center + Eigen::Vector3s::UnitZ() * radius);
-  markerObservations.push_back(center - Eigen::Vector3s::UnitZ() * radius);
-
-  Eigen::Vector3s center_recovered
-      = IKInitializer::getChangPollard2006JointCenterSingleMarker(
-          markerObservations);
-
-  s_t error = (center_recovered - center).norm();
-  EXPECT_NEAR(error, 0.0, 1e-8);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(IKInitializer, CHANG_POLLARD_JOINT_TEST_WITH_NOISE)
-{
-  Eigen::Vector3s center = Eigen::Vector3s::UnitX();
-  std::vector<Eigen::Vector3s> markerObservations;
-  s_t radius = 2.0;
-  for (int i = 0; i < 500; i++)
-  {
-    Eigen::Matrix3s R = math::expMapRot(Eigen::Vector3s::Random());
-    markerObservations.push_back(
-        center + (R * Eigen::Vector3s::UnitX() * radius));
-  }
-
-  s_t noise = 0.01;
-  for (int i = 0; i < markerObservations[i].size(); i++)
-  {
-    markerObservations[i] += Eigen::Vector3s::Random() * noise;
-  }
-
-  Eigen::Vector3s center_recovered
-      = IKInitializer::getChangPollard2006JointCenterSingleMarker(
-          markerObservations);
-
-  s_t error = (center_recovered - center).norm();
-  EXPECT_NEAR(error, 0.0, 1e-4);
 }
 #endif
 

@@ -77,9 +77,31 @@ public:
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       s_t modelHeightM = -1.0);
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Core entrypoint
+  //////////////////////////////////////////////////////////////////////////////
+
   /// This runs the full IK initialization algorithm, and leaves the answers in
-  /// the public fields of this class
+  /// the public fields of this class.
+  ///
+  /// The key results are
+  /// - mGroupScales: call skeleton->setGroupScales(mGroupScales) to apply
+  /// - mPoses: each column of mPoses represents one timestep
+  ///
+  /// The other fields that may be of use are the values for joint locations,
+  /// which can be used for loss terms:
+  /// - mJointCenters: each entry of mJointCenters is a map of joint_name ->
+  /// joint_location, if available
+  /// - mJointAxisDirs: each entry of mJointAxisDirs is a map of joint_name ->
+  /// joint_axis_dir, if available
+  /// - mStackedJoints: each entry of mStackedJoints is a StackedJoint, which
+  /// contains a list of joints whose average center is the joint center that
+  /// the other entries are talking about
   void runFullPipeline(bool logOutput = false);
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Steps of the pipeline
+  //////////////////////////////////////////////////////////////////////////////
 
   /// For each timestep, and then for each joint, this sets up and runs an MDS
   /// algorithm to triangulate the joint center location from the known marker
@@ -110,23 +132,9 @@ public:
   /// This uses the joint centers to estimate the body positions.
   s_t estimatePosesClosedForm(bool logOutput = false);
 
-  /// This solves the remaining DOFs that couldn't be found in closed form using
-  /// an iterative IK solver. This portion of the solver is the only requirement
-  /// that is a non-convex portion. It uses random-restarts, and so is not as
-  /// unit-testable as the other portions of the algorithm, so it should
-  /// hopefully only impact less important joints.
-  s_t completeIKIteratively(
-      int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel);
-
-  /// This solves ALL the DOFs, including the ones that were found in closed
-  /// form, to fine tune loss.
-  s_t fineTuneIKIteratively(
-      int timestep, std::shared_ptr<dynamics::Skeleton> threadsafeSkel);
-
-  /// This uses the current guesses for the joint centers to re-estimate the
-  /// distances between the markers and the joint centers, and the distances
-  /// between the adjacent joints.
-  void reestimateDistancesFromJointCenters();
+  //////////////////////////////////////////////////////////////////////////////
+  // Utilities
+  //////////////////////////////////////////////////////////////////////////////
 
   /// This gets the average distance between adjacent joint centers in our
   /// current joint center estimates.
@@ -152,13 +160,6 @@ public:
   /// body segment.
   std::map<std::string, s_t> getJointToMarkerSquaredDistances(
       std::string jointName);
-
-  /// This does a rank-N completion of the distance matrix, which provides some
-  /// guarantees about reconstruction quality. See "Distance Matrix
-  /// Reconstruction from Incomplete Distance Information for Sensor Network
-  /// Localization"
-  static Eigen::MatrixXs rankNDistanceMatrix(
-      const Eigen::MatrixXs& distances, int n = 3);
 
   /// This will reconstruct a centered Euclidean point cloud from a distance
   /// matrix.
@@ -199,11 +200,6 @@ public:
   /// marker on top of the joint center is if someone actually gave us marker
   /// data with virtual joint centers already computed, in which case maybe we
   /// just respect their wishes?
-  static Eigen::Vector3s getChangPollard2006JointCenterSingleMarker(
-      std::vector<Eigen::Vector3s> markerTrace, bool log = false);
-
-  /// This implements the variant of ChangPollard2006 that supports multiple
-  /// markers.
   static Eigen::Vector3s getChangPollard2006JointCenterMultiMarker(
       std::vector<std::vector<Eigen::Vector3s>> markerTrace, bool log = false);
 
@@ -214,23 +210,8 @@ public:
   /// ambiguity, because it is part of the least-squares terms. However, this
   /// method will work even on data with zero noise, whereas ChangPollard2006
   /// will fail when there is zero noise (for example, on synthetic datasets).
-  static Eigen::Vector3s leastSquaresSphereFit(
-      std::vector<Eigen::Vector3s> points);
-
-  /// This is just like a leastSquaresSphereFit(), but it allows for multiple
-  /// radii, and finds the best fit for the center of a spheres with the same
-  /// center.
   static Eigen::Vector3s leastSquaresConcentricSphereFit(
       std::vector<std::vector<Eigen::Vector3s>> traces);
-
-  /// This will attempt to fit an axis to a set of traces, after we've already
-  /// found the center of rotation, by running an SVD on a matrix composed of
-  /// the traces and looking at the near-zero singular value, if there is one.
-  /// This returns the axis fit, along with the corresponding singular value (if
-  /// that number is too high, the axis should be disregarded).
-  static std::pair<Eigen::Vector3s, s_t> svdAxisFit(
-      std::vector<std::vector<Eigen::Vector3s>> traces,
-      Eigen::Vector3s jointCenter);
 
   /// This implements the least-squares method in Gamage and Lasenby 2002, "New
   /// least squares solutions for estimating the average centre of rotation and
