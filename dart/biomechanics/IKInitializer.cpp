@@ -28,12 +28,12 @@ namespace biomechanics {
 
 //==============================================================================
 /// This is a helper struct that is used to simplify the code in
-/// estimatePosesAndGroupScales()
+/// estimatePosesClosedForm()
 typedef struct AnnotatedStackedBody
 {
   std::shared_ptr<struct StackedBody> stackedBody;
   std::vector<Eigen::Isometry3s> relativeTransforms;
-  std::vector<std::string> adjacentJoints;
+  std::vector<std::shared_ptr<struct StackedJoint>> adjacentJoints;
   std::vector<Eigen::Vector3s> adjacentJointCenters;
   std::vector<std::string> adjacentMarkers;
   std::vector<Eigen::Vector3s> adjacentMarkerCenters;
@@ -565,7 +565,8 @@ void IKInitializer::runFullPipeline(bool logOutput)
   closedFormPivotFindingJointCenterSolver(logOutput);
   recenterAxisJointsBasedOnBoneAngles();
   // Fill in the parts of the body scales and poses that we can in closed form
-  estimatePosesAndGroupScalesInClosedForm();
+  estimateGroupScalesClosedForm();
+  estimatePosesClosedForm();
 }
 
 //==============================================================================
@@ -1637,7 +1638,7 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
 /// bone sizes (based on distance between joint centers) and then use that to
 /// get the group scale vector. This also uses the joint centers to estimate
 /// the body positions.
-s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
+void IKInitializer::estimateGroupScalesClosedForm(bool log)
 {
   Eigen::VectorXs originalPose = mSkel->getPositions();
   Eigen::VectorXs originalBodyScales = mSkel->getBodyScales();
@@ -1940,10 +1941,24 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
   // vector.
   mGroupScales = mSkel->getGroupScales();
   mSkel->setGroupScales(mGroupScales);
-  // Recompute the joint world positions
-  jointWorldPositions = mSkel->getJointWorldPositions(mSkel->getJoints());
 
-  // 2. We'll want to use annotations on top of our stacked bodies, so construct
+  mSkel->setBodyScales(originalBodyScales);
+  mSkel->setPositions(originalPose);
+}
+
+//==============================================================================
+/// WARNING: You must have already called estimateGroupScalesClosedForm()!
+/// This uses the joint centers to estimate the body positions.
+s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
+{
+  Eigen::VectorXs originalPose = mSkel->getPositions();
+  mSkel->setPositions(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+
+  // Compute the joint world positions
+  Eigen::VectorXs jointWorldPositions
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+
+  // 1. We'll want to use annotations on top of our stacked bodies, so construct
   // structs to make that easier.
   std::vector<AnnotatedStackedBody> annotatedGroups;
   for (int i = 0; i < mStackedBodies.size(); i++)
@@ -1952,7 +1967,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
     group.stackedBody = mStackedBodies[i];
     annotatedGroups.push_back(group);
   }
-  // 2.1.1. Compute body relative transforms
+  // 1.1.1. Compute body relative transforms
   for (int i = 0; i < annotatedGroups.size(); i++)
   {
     for (int j = 0; j < annotatedGroups[i].stackedBody->bodies.size(); j++)
@@ -1965,7 +1980,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
           * annotatedGroups[i].stackedBody->bodies[j]->getWorldTransform());
     }
   }
-  // 2.1.2. Compute adjacent (stacked) joints and their relative transforms
+  // 1.1.2. Compute adjacent (stacked) joints and their relative transforms
   for (int i = 0; i < mStackedJoints.size(); i++)
   {
     std::shared_ptr<struct StackedJoint> joint = mStackedJoints[i];
@@ -1977,14 +1992,14 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       if (joint->childBody == annotatedGroup.stackedBody
           || joint->parentBody == annotatedGroup.stackedBody)
       {
-        annotatedGroup.adjacentJoints.push_back(joint->name);
+        annotatedGroup.adjacentJoints.push_back(joint);
         annotatedGroup.adjacentJointCenters.push_back(
             annotatedGroup.stackedBody->bodies[0]->getWorldTransform().inverse()
             * jointCenter);
       }
     }
   }
-  // 2.1.3. Compute adjacent markers and their relative transforms
+  // 1.1.3. Compute adjacent markers and their relative transforms
   Eigen::VectorXs markerWorldPositions
       = mSkel->getMarkerWorldPositions(mMarkers);
   for (int i = 0; i < mMarkers.size(); i++)
@@ -2006,20 +2021,47 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       }
     }
   }
+  const Eigen::MatrixXi& isJointParentOf = mSkel->getJointParentMap();
+  Eigen::MatrixXi isStackedJointParentOfBody
+      = Eigen::MatrixXi::Zero(mStackedJoints.size(), mStackedBodies.size());
+  for (int i = 0; i < mStackedJoints.size(); i++)
+  {
+    for (int j = 0; j < mStackedBodies.size(); j++)
+    {
+      for (auto* potentialParent : mStackedJoints[i]->joints)
+      {
+        for (auto* potentialChildBody : mStackedBodies[j]->bodies)
+        {
+          if ((potentialParent == potentialChildBody->getParentJoint())
+              || (isJointParentOf(
+                      potentialParent->getJointIndexInSkeleton(),
+                      potentialChildBody->getParentJoint()
+                          ->getJointIndexInSkeleton())
+                  > 0))
+          {
+            isStackedJointParentOfBody(i, j) = 1;
+            break;
+          }
+        }
+        if (isStackedJointParentOfBody(i, j))
+          break;
+      }
+    }
+  }
 
-  // 3. Now we can go through each timestep and do "closed form IK", by first
+  // 2. Now we can go through each timestep and do "closed form IK", by first
   // estimating the body positions and then estimating the joint angles to
   // achieve those body positions.
   mPoses.clear();
   mBodyTransforms.clear();
   for (int t = 0; t < mMarkerObservations.size(); t++)
   {
-    // 3.1. Estimate the body positions in world space of each welded group from
+    // 2.1. Estimate the body positions in world space of each welded group from
     // the joint estimates and marker estimates, when they're available.
     std::map<std::string, Eigen::Isometry3s> estimatedBodyWorldTransforms;
     for (auto& annotatedGroup : annotatedGroups)
     {
-      // 3.1.1. Collect all the visible points in world space that we can use to
+      // 2.1.1. Collect all the visible points in world space that we can use to
       // estimate the body transform
       std::vector<Eigen::Vector3s> visibleAdjacentPointsInWorldSpace;
       std::vector<std::string> visibleAdjacentPointNames;
@@ -2027,14 +2069,14 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
       std::vector<s_t> visibleAdjacentPointWeights;
       for (int j = 0; j < annotatedGroup.adjacentJoints.size(); j++)
       {
-        if (mJointCenters[t].count(annotatedGroup.adjacentJoints[j]) > 0)
+        if (mJointCenters[t].count(annotatedGroup.adjacentJoints[j]->name) > 0)
         {
           visibleAdjacentPointsInWorldSpace.push_back(
-              mJointCenters[t][annotatedGroup.adjacentJoints[j]]);
+              mJointCenters[t][annotatedGroup.adjacentJoints[j]->name]);
           visibleAdjacentPointsInLocalSpace.push_back(
               annotatedGroup.adjacentJointCenters[j]);
           visibleAdjacentPointNames.push_back(
-              "Joint " + annotatedGroup.adjacentJoints[j]);
+              "Joint " + annotatedGroup.adjacentJoints[j]->name);
           visibleAdjacentPointWeights.push_back(1.0);
         }
       }
@@ -2055,7 +2097,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
           visibleAdjacentPointsInLocalSpace.size()
           == visibleAdjacentPointsInWorldSpace.size());
 
-      if (visibleAdjacentPointsInLocalSpace.size() >= 4)
+      if (visibleAdjacentPointsInLocalSpace.size() >= 3)
       {
         // 3.1.2. Compute the root body transform from the visible points, and
         // then use that to compute the other body transforms
@@ -2081,7 +2123,7 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
         }
         error /= visibleAdjacentPointsInLocalSpace.size();
 
-        if (log)
+        if (logOutput)
         {
           std::cout << "Estimated bodies ";
           for (int j = 0; j < annotatedGroup.stackedBody->bodies.size(); j++)
@@ -2108,87 +2150,332 @@ s_t IKInitializer::estimatePosesAndGroupScalesInClosedForm(bool log)
     }
     mBodyTransforms.push_back(estimatedBodyWorldTransforms);
 
-    // 3.2. Now that we have the estimated body positions, we can estimate the
+    // 2.2. Now that we have the estimated body positions, we can estimate the
     // joint angles.
     Eigen::VectorXs jointAngles = Eigen::VectorXs::Zero(mSkel->getNumDofs());
     Eigen::VectorXi jointAnglesClosedFormEstimate
         = Eigen::VectorXi::Zero(mSkel->getNumDofs());
-    for (auto& joint : mStackedJoints)
+
+    int NUM_PASSES = 1;
+    for (int pass = 0; pass < NUM_PASSES; pass++)
     {
-      // Only estimate joint angles for joints connecting two bodies that we
-      // have estimated locations for
-      if ((joint->parentBody == nullptr
-           || estimatedBodyWorldTransforms.count(joint->parentBody->name))
-          && estimatedBodyWorldTransforms.count(joint->childBody->name))
+      std::map<std::string, bool> solvedJoints;
+      std::map<std::string, Eigen::Isometry3s> jointChildTransform;
+      if (logOutput)
       {
-        // 3.2.1. Get the relative transformation we estimate is taking place
-        // over the joint
-        Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
-        if (joint->parentBody != nullptr)
+        std::cout << "Running IK Pass " << pass << "/" << NUM_PASSES
+                  << " upward" << std::endl;
+      }
+      while (true)
+      {
+        bool foundJointToSolve = false;
+        // We want to accumulate snowballs of joints as we roll up the kinematic
+        // tree, from the leaves inwards. We want to solve the leaves using just
+        // the world transform we already have computed, but then for higher
+        // level joints we want to also include the solved children in the point
+        // cloud fit.
+        for (int i = 0; i < mStackedJoints.size(); i++)
         {
-          parentTransform
-              = estimatedBodyWorldTransforms[joint->parentBody->name];
-        }
-        Eigen::Isometry3s childTransform
-            = estimatedBodyWorldTransforms[joint->childBody->name];
-        Eigen::Isometry3s totalJointTransform
-            = parentTransform.inverse() * childTransform;
+          auto& joint = mStackedJoints[i];
+          if (solvedJoints.count(joint->name))
+            continue;
+          // Only estimate joint angles for joints connecting two bodies that we
+          // have estimated locations for
+          if (!(joint->parentBody == nullptr
+                || estimatedBodyWorldTransforms.count(joint->parentBody->name))
+              || estimatedBodyWorldTransforms.count(joint->childBody->name)
+                     == 0)
+            continue;
 
-        Eigen::Isometry3s remainingJointTransform = totalJointTransform;
-        for (int j = 0; j < joint->joints.size(); j++)
-        {
-          dynamics::Joint* subJoint = joint->joints[j];
-
-          // 3.2.2. Convert the remaining estimated tranformation into joint
-          // coordinates on this joint
-          Eigen::VectorXs pos = subJoint->getNearestPositionToDesiredRotation(
-              remainingJointTransform.linear());
-          subJoint->setPositions(pos);
-          Eigen::Isometry3s recoveredJointTransform
-              = subJoint->getRelativeTransform();
-          if (subJoint->getType() == dynamics::FreeJoint::getStaticType()
-              || subJoint->getType()
-                     == dynamics::EulerFreeJoint::getStaticType())
+          bool solvedAllChildren = true;
+          for (int i = 0; i < joint->childBody->childJoints.size(); i++)
           {
-            Eigen::Vector3s translationOffset
-                = (recoveredJointTransform.translation()
-                   - totalJointTransform.translation());
-            pos.tail<3>() -= translationOffset;
+            if (solvedJoints.count(joint->childBody->childJoints[i]->name) == 0)
+            {
+              solvedAllChildren = false;
+              break;
+            }
+          }
+
+          if (!solvedAllChildren)
+            continue;
+
+          // 2.2.1. Get the relative transformation we estimate is taking place
+          // over the joint
+          Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
+          if (joint->parentBody != nullptr)
+          {
+            parentTransform
+                = estimatedBodyWorldTransforms[joint->parentBody->name];
+          }
+          Eigen::Isometry3s childTransform
+              = estimatedBodyWorldTransforms[joint->childBody->name];
+
+          if (joint->childBody->childJoints.size() == 0)
+          {
+            // 2.2.1. If this is a leaf node, read the transform off of the body
+            // transforms already computed
+          }
+          else
+          {
+            // 2.2.2. If we've got children, we want to include their joint
+            // angles in the point cloud fit. This is somewhat more involved.
+            // First step is to set the skeleton into the position we've
+            // estimated so far.
+            mSkel->setPositions(jointAngles);
+            Eigen::VectorXs jointWorldPositions
+                = mSkel->getJointWorldPositions(mSkel->getJoints());
+            Eigen::VectorXs markerWorldPositions
+                = mSkel->getMarkerWorldPositions(mMarkers);
+            Eigen::Isometry3s rootBodyWorldTransform
+                = joint->childBody->bodies[0]->getWorldTransform();
+
+            // 2.2.3. Now we need to go through the children and get a point
+            // cloud in the coordinates of the root child body
+            std::vector<Eigen::Vector3s> visibleAdjacentPointsInWorldSpace;
+            std::vector<Eigen::Vector3s> visibleAdjacentPointsInLocalSpace;
+            std::vector<s_t> visibleAdjacentPointWeights;
+
+            for (int j = 0; j < annotatedGroups.size(); j++)
+            {
+              if (isStackedJointParentOfBody(i, j))
+              {
+                auto& annotatedGroup = annotatedGroups[j];
+                for (int j = 0; j < annotatedGroup.adjacentJoints.size(); j++)
+                {
+                  if (mJointCenters[t].count(
+                          annotatedGroup.adjacentJoints[j]->name)
+                      > 0)
+                  {
+                    visibleAdjacentPointsInWorldSpace.push_back(
+                        mJointCenters[t]
+                                     [annotatedGroup.adjacentJoints[j]->name]);
+                    visibleAdjacentPointsInLocalSpace.push_back(
+                        rootBodyWorldTransform.inverse()
+                        * getStackedJointCenterFromJointCentersVector(
+                            annotatedGroup.adjacentJoints[j],
+                            jointWorldPositions));
+                    visibleAdjacentPointWeights.push_back(1.0);
+                  }
+                }
+                for (int j = 0; j < annotatedGroup.adjacentMarkers.size(); j++)
+                {
+                  if (mMarkerObservations[t].count(
+                          annotatedGroup.adjacentMarkers[j])
+                      > 0)
+                  {
+                    visibleAdjacentPointsInWorldSpace.push_back(
+                        mMarkerObservations[t]
+                                           [annotatedGroup.adjacentMarkers[j]]);
+                    int markerIndex = std::find(
+                                          mMarkerNames.begin(),
+                                          mMarkerNames.end(),
+                                          annotatedGroup.adjacentMarkers[j])
+                                      - mMarkerNames.begin();
+                    visibleAdjacentPointsInLocalSpace.push_back(
+                        rootBodyWorldTransform.inverse()
+                        * markerWorldPositions.segment<3>(markerIndex * 3));
+                    visibleAdjacentPointWeights.push_back(0.01);
+                  }
+                }
+              }
+            }
+            assert(
+                visibleAdjacentPointsInLocalSpace.size()
+                == visibleAdjacentPointsInWorldSpace.size());
+
+            // 3.1.2. Compute the root body transform from the visible points,
+            // and then use that to compute the other body transforms
+            childTransform = getPointCloudToPointCloudTransform(
+                visibleAdjacentPointsInLocalSpace,
+                visibleAdjacentPointsInWorldSpace,
+                visibleAdjacentPointWeights);
+
+            if (NUM_PASSES > 1)
+            {
+              // Update the estimated body transform for next iteration
+              estimatedBodyWorldTransforms[joint->childBody->name]
+                  = childTransform;
+            }
+          }
+          jointChildTransform[joint->name] = childTransform;
+
+          Eigen::Isometry3s totalJointTransform
+              = parentTransform.inverse() * childTransform;
+
+          Eigen::Isometry3s remainingJointTransform = totalJointTransform;
+          for (int j = 0; j < joint->joints.size(); j++)
+          {
+            dynamics::Joint* subJoint = joint->joints[j];
+
+            // 2.2.2. Convert the remaining estimated tranformation into joint
+            // coordinates on this joint
+            Eigen::VectorXs pos = subJoint->getNearestPositionToDesiredRotation(
+                remainingJointTransform.linear());
             subJoint->setPositions(pos);
-            recoveredJointTransform = subJoint->getRelativeTransform();
-          }
-          remainingJointTransform
-              = recoveredJointTransform.inverse() * remainingJointTransform;
+            Eigen::Isometry3s recoveredJointTransform
+                = subJoint->getRelativeTransform();
+            if (subJoint->getType() == dynamics::FreeJoint::getStaticType()
+                || subJoint->getType()
+                       == dynamics::EulerFreeJoint::getStaticType())
+            {
+              Eigen::Vector3s translationOffset
+                  = (recoveredJointTransform.translation()
+                     - totalJointTransform.translation());
+              pos.tail<3>() -= translationOffset;
+              subJoint->setPositions(pos);
+              recoveredJointTransform = subJoint->getRelativeTransform();
+            }
+            remainingJointTransform
+                = recoveredJointTransform.inverse() * remainingJointTransform;
 
-          if (log)
-          {
-            s_t translationError = (totalJointTransform.translation()
-                                    - recoveredJointTransform.translation())
-                                       .norm();
-            s_t rotationError = (totalJointTransform.linear()
-                                 - recoveredJointTransform.linear())
-                                    .norm();
-            std::cout << "Estimating joint " << subJoint->getName()
-                      << " from adjacent body transforms with error "
-                      << translationError << "m and " << rotationError
-                      << " on rotation" << std::endl;
+            if (logOutput)
+            {
+              s_t translationError = (totalJointTransform.translation()
+                                      - recoveredJointTransform.translation())
+                                         .norm();
+              s_t rotationError = (totalJointTransform.linear()
+                                   - recoveredJointTransform.linear())
+                                      .norm();
+              std::cout << "Estimating joint " << subJoint->getName()
+                        << " from adjacent body transforms with error "
+                        << translationError << "m and " << rotationError
+                        << " on rotation" << std::endl;
+            }
+
+            // 2.2.3. Save our estimate back to our joint angles
+            jointAngles.segment(
+                subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
+                = pos;
+            jointAnglesClosedFormEstimate
+                .segment(
+                    subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
+                .setConstant(1.0);
           }
 
-          // 3.2.3. Save our estimate back to our joint angles
-          jointAngles.segment(
-              subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
-              = pos;
-          jointAnglesClosedFormEstimate
-              .segment(subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
-              .setConstant(1.0);
+          solvedJoints[joint->name] = true;
+          foundJointToSolve = true;
         }
+
+        if (!foundJointToSolve)
+          break;
+      }
+
+      // Now we want to do one more pass, this time going from the root back out
+      // to the leaves, where we can re-estimate the joint angles now that the
+      // parent body may have changed its location.
+
+      if (logOutput)
+      {
+        std::cout << "Running IK Pass " << pass << "/" << NUM_PASSES
+                  << " downward" << std::endl;
+      }
+      std::map<std::string, bool> solvedParents;
+      while (true)
+      {
+        bool foundJointToSolve = false;
+        // We want to accumulate snowballs of joints as we roll up the kinematic
+        // tree, from the leaves inwards. We want to solve the leaves using just
+        // the world transform we already have computed, but then for higher
+        // level joints we want to also include the solved children in the point
+        // cloud fit.
+        for (int i = 0; i < mStackedJoints.size(); i++)
+        {
+          // No need to solve twice
+          if (solvedParents.count(mStackedJoints[i]->name))
+            continue;
+
+          // If we haven't solved the parent joint yet, continue
+          if (mStackedJoints[i]->parentBody != nullptr
+              && solvedParents.count(
+                     mStackedJoints[i]->parentBody->parentJoint->name)
+                     == 0)
+            continue;
+
+          std::shared_ptr<struct StackedJoint> joint = mStackedJoints[i];
+
+          Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
+          if (joint->parentBody != nullptr)
+          {
+            mSkel->setPositions(jointAngles);
+            parentTransform = joint->parentBody->bodies[0]->getWorldTransform();
+            if (NUM_PASSES > 1)
+            {
+              // Update the estimated body transform for next iteration
+              estimatedBodyWorldTransforms[joint->parentBody->name]
+                  = parentTransform;
+            }
+          }
+          Eigen::Isometry3s childTransform = jointChildTransform[joint->name];
+
+          Eigen::Isometry3s totalJointTransform
+              = parentTransform.inverse() * childTransform;
+
+          Eigen::Isometry3s remainingJointTransform = totalJointTransform;
+          for (int j = 0; j < joint->joints.size(); j++)
+          {
+            dynamics::Joint* subJoint = joint->joints[j];
+
+            // 2.2.2. Convert the remaining estimated tranformation into joint
+            // coordinates on this joint
+            Eigen::VectorXs pos = subJoint->getNearestPositionToDesiredRotation(
+                remainingJointTransform.linear());
+            subJoint->setPositions(pos);
+            Eigen::Isometry3s recoveredJointTransform
+                = subJoint->getRelativeTransform();
+            if (subJoint->getType() == dynamics::FreeJoint::getStaticType()
+                || subJoint->getType()
+                       == dynamics::EulerFreeJoint::getStaticType())
+            {
+              Eigen::Vector3s translationOffset
+                  = (recoveredJointTransform.translation()
+                     - totalJointTransform.translation());
+              pos.tail<3>() -= translationOffset;
+              subJoint->setPositions(pos);
+              recoveredJointTransform = subJoint->getRelativeTransform();
+            }
+            remainingJointTransform
+                = recoveredJointTransform.inverse() * remainingJointTransform;
+
+            if (logOutput)
+            {
+              s_t translationError = (totalJointTransform.translation()
+                                      - recoveredJointTransform.translation())
+                                         .norm();
+              s_t rotationError = (totalJointTransform.linear()
+                                   - recoveredJointTransform.linear())
+                                      .norm();
+              std::cout
+                  << "Re-estimating (this time with a known parent) joint "
+                  << subJoint->getName()
+                  << " from adjacent body transforms with error "
+                  << translationError << "m and " << rotationError
+                  << " on rotation" << std::endl;
+            }
+
+            // 2.2.3. Save our estimate back to our joint angles
+            jointAngles.segment(
+                subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
+                = pos;
+            jointAnglesClosedFormEstimate
+                .segment(
+                    subJoint->getIndexInSkeleton(0), subJoint->getNumDofs())
+                .setConstant(1.0);
+          }
+
+          solvedParents[mStackedJoints[i]->name] = true;
+          foundJointToSolve = true;
+          break;
+        }
+        if (!foundJointToSolve)
+          break;
       }
     }
+
     mPoses.push_back(jointAngles);
     mPosesClosedFormEstimateAvailable.push_back(jointAnglesClosedFormEstimate);
   }
 
-  mSkel->setBodyScales(originalBodyScales);
   mSkel->setPositions(originalPose);
 
   // TODO: compute marker reconstruction error and return that

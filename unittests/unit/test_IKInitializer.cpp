@@ -198,7 +198,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   }
 
   s_t markerError = 0.0;
-  // markerError = initializer.closedFormMDSJointCenterSolver(true);
+  markerError = initializer.closedFormMDSJointCenterSolver(true);
   s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
   initializer.recenterAxisJointsBasedOnBoneAngles();
   /*
@@ -222,8 +222,8 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
 
   // initializer.reestimateDistancesFromJointCenters();
   // markerError = initializer.closedFormMDSJointCenterSolver(true);
-  s_t markerErrorFromIK
-      = initializer.estimatePosesAndGroupScalesInClosedForm(false);
+  initializer.estimateGroupScalesClosedForm(false);
+  s_t markerErrorFromIK = initializer.estimatePosesClosedForm(false);
   (void)markerErrorFromIK;
   for (int t = 0; t < markerObservations.size(); t++)
   {

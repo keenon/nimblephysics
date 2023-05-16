@@ -103,9 +103,12 @@ public:
 
   /// This uses the current guesses for the joint centers to re-estimate the
   /// bone sizes (based on distance between joint centers) and then use that to
-  /// get the group scale vector. This also uses the joint centers to estimate
-  /// the body positions.
-  s_t estimatePosesAndGroupScalesInClosedForm(bool logOutput = false);
+  /// get the group scale vector.
+  void estimateGroupScalesClosedForm(bool logOutput = false);
+
+  /// WARNING: You must have already called estimateGroupScalesClosedForm()!
+  /// This uses the joint centers to estimate the body positions.
+  s_t estimatePosesClosedForm(bool logOutput = false);
 
   /// This solves the remaining DOFs that couldn't be found in closed form using
   /// an iterative IK solver. This portion of the solver is the only requirement
