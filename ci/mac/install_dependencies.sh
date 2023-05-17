@@ -280,32 +280,32 @@ sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libas
 # brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="71"
-ICU4C_FULL_VERSION="71.1"
-if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
-      pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
-else
-      pushd /opt/homebrew/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
-fi
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicutu.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicutu.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuuc.${ICU4C_FULL_VERSION}.dylib 
-sudo codesign -f -s - libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicuuc.${ICU4C_FULL_VERSION}.dylib
-popd
+#ICU4C_MAJOR_VERSION="71"
+#ICU4C_FULL_VERSION="71.1"
+#if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
+#      pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+#else
+#      pushd /opt/homebrew/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+#fi
+#sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicutu.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicutu.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
+#sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuuc.${ICU4C_FULL_VERSION}.dylib
+#sudo codesign -f -s - libicui18n.${ICU4C_FULL_VERSION}.dylib
+#sudo codesign -f -s - libicuio.${ICU4C_FULL_VERSION}.dylib
+#sudo codesign -f -s - libicutest.${ICU4C_FULL_VERSION}.dylib
+#sudo codesign -f -s - libicutu.${ICU4C_FULL_VERSION}.dylib
+#sudo codesign -f -s - libicuuc.${ICU4C_FULL_VERSION}.dylib
+#popd
 
 # Get ready to bundle the links
 if [ -f "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib" ]; then
