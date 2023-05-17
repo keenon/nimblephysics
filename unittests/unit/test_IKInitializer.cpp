@@ -209,8 +209,8 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
 
   s_t markerError = 0.0;
   markerError = initializer.closedFormMDSJointCenterSolver(true);
-  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver();
-  initializer.recenterAxisJointsBasedOnBoneAngles();
+  s_t pivotError = initializer.closedFormPivotFindingJointCenterSolver(true);
+  initializer.recenterAxisJointsBasedOnBoneAngles(true);
   std::cout << "Pivot error avg: " << pivotError << "m" << std::endl;
 
   // initializer.reestimateDistancesFromJointCenters();
@@ -379,6 +379,14 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
 
       if (saveToGUI)
       {
+        server.createSphere(
+            "joint_" + pair.first,
+            0.01,
+            jointCenterEstimated,
+            Eigen::Vector4s(0.5, 0.5, 0, 1));
+        server.setObjectTooltip(
+            "joint_" + pair.first, pair.first + " Estimated");
+
         std::vector<Eigen::Vector3s> points;
         points.push_back(jointWorld);
         points.push_back(jointCenterEstimated);
@@ -765,6 +773,71 @@ TEST(IKInitializer, SPHERE_FIT_MULTI_JOINT_LEAST_SQUARES)
 #endif
 
 #ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_SINGLE_MARKER_NO_NOISE)
+{
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX() * 3;
+  std::vector<Eigen::Vector3s> markerObservations1;
+  s_t radius1 = 2.0;
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitX() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitY() * radius1);
+  markerObservations1.push_back(center + Eigen::Vector3s::UnitZ() * radius1);
+  markerObservations1.push_back(center - Eigen::Vector3s::UnitZ() * radius1);
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  markerTraces.push_back(markerObservations1);
+
+  Eigen::Vector3s center_raw
+      = IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
+  s_t error_raw = (center_raw - center).norm();
+  EXPECT_NEAR(error_raw, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_REGRESSION_1)
+{
+  std::vector<Eigen::Vector3s> markerObservations;
+  markerObservations.push_back(Eigen::Vector3s(-0.0910221, 0.179806, 0.172988));
+  markerObservations.push_back(Eigen::Vector3s(-0.0701303, 0.178589, 0.191935));
+  markerObservations.push_back(Eigen::Vector3s(-0.0691176, 0.178504, 0.206454));
+  markerObservations.push_back(Eigen::Vector3s(-0.0723091, 0.178722, 0.187018));
+  markerObservations.push_back(Eigen::Vector3s(-0.0712103, 0.178656, 0.189191));
+  markerObservations.push_back(Eigen::Vector3s(-0.0704132, 0.178607, 0.191132));
+  markerObservations.push_back(Eigen::Vector3s(-0.0717303, 0.178687, 0.188106));
+  markerObservations.push_back(Eigen::Vector3s(-0.0707039, 0.178625, 0.190376));
+  markerObservations.push_back(Eigen::Vector3s(-0.0686261, 0.178486, 0.201041));
+
+  std::vector<std::vector<Eigen::Vector3s>> markerTraces;
+  markerTraces.push_back(markerObservations);
+
+  // Eigen::Vector3s center_raw
+  //     =
+  //     IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
+  Eigen::Vector3s center_raw
+      = IKInitializer::leastSquaresConcentricSphereFit(markerTraces);
+
+  std::vector<s_t> radii;
+  s_t avgRadius = 0.0;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    s_t radius = (markerObservations[i] - center_raw).norm();
+    radii.push_back(radius);
+    avgRadius += radius;
+  }
+  avgRadius /= markerObservations.size();
+
+  s_t radiusVariance = 0.0;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    radiusVariance += (radii[i] - avgRadius) * (radii[i] - avgRadius);
+  }
+  EXPECT_LE(radiusVariance, 1e-12);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(IKInitializer, CHANG_POLLARD_MULTI_MARKER_NO_NOISE)
 {
   Eigen::Vector3s center = Eigen::Vector3s::UnitX();
@@ -848,9 +921,9 @@ TEST(IKInitializer, AXIS_FIT_NO_NOISE)
   }
 
   auto pair = IKInitializer::gamageLasenby2002AxisFit(markerTraces);
-  s_t singularValue = pair.second;
+  s_t conditionNumber = pair.second;
   Eigen::Vector3s axisRecovered = pair.first;
-  EXPECT_LT(std::abs(singularValue), 1e-8);
+  EXPECT_GT(std::abs(conditionNumber), 1e5);
   EXPECT_TRUE((axisRecovered - axis).norm() < 1e-8);
 }
 #endif
@@ -878,14 +951,14 @@ TEST(IKInitializer, AXIS_FIT_SOME_NOISE)
 
   // auto pair = IKInitializer::svdAxisFit(markerTraces, center);
   auto pair = IKInitializer::gamageLasenby2002AxisFit(markerTraces);
-  s_t singularValue = pair.second;
+  s_t conditionNumber = pair.second;
   Eigen::Vector3s axisRecovered = pair.first;
   // Deal with sign ambiguity
   if (((axisRecovered * -1) - axis).norm() < (axisRecovered - axis).norm())
   {
     axisRecovered *= -1;
   }
-  EXPECT_LT(std::abs(singularValue), 1e-3);
+  EXPECT_GT(std::abs(conditionNumber), 1e3);
   if ((axisRecovered - axis).norm() >= 1e-3)
   {
     Eigen::Matrix3s compare;
@@ -921,13 +994,61 @@ TEST(SolveCubicTest, CUBIC_REAL_ROOTS)
 TEST(SolveCubicTest, CUBIC_COMPLEX_ROOTS)
 {
   std::vector<double> roots = IKInitializer::findCubicRealRoots(1, -3, 3, -1);
-  std::vector<double> expected = {1, 1};
+  std::vector<double> expected = {1};
   std::sort(roots.begin(), roots.end());
   std::sort(expected.begin(), expected.end());
   ASSERT_EQ(roots.size(), expected.size());
   for (int i = 0; i < roots.size(); ++i)
   {
     EXPECT_NEAR(roots[i], expected[i], 1e-8);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_ROOT_REGRESSION_1)
+{
+  std::vector<double> roots
+      = IKInitializer::findCubicRealRoots(28, -3.36611, 0.220185, -0.00323973);
+  std::vector<double> expected = {0.0196532};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-6);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_ROOT_REGRESSION_2)
+{
+  std::vector<double> roots
+      = IKInitializer::findCubicRealRoots(24, 1.3544, 0.17324, 0.00158158);
+  std::vector<double> expected = {-0.00974348};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-6);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SolveCubicTest, CUBIC_ROOT_REGRESSION_3)
+{
+  std::vector<double> roots = IKInitializer::findCubicRealRoots(
+      18, 0.374666, 0.00595641, 6.77338e-07);
+  std::vector<double> expected = {-0.000114536};
+  std::sort(roots.begin(), roots.end());
+  std::sort(expected.begin(), expected.end());
+  ASSERT_EQ(roots.size(), expected.size());
+  for (int i = 0; i < roots.size(); ++i)
+  {
+    EXPECT_NEAR(roots[i], expected[i], 1e-6);
   }
 }
 #endif
@@ -960,6 +1081,16 @@ TEST(SolveCubicTest, CENTER_POINT_ON_AXIS_ONE_SUPPORT_POINT)
   Eigen::Vector3s recoveredCenter
       = IKInitializer::centerPointOnAxis(center, axis, pointsAndRadii);
 
+  if ((recoveredCenter - expectedCenter).norm() >= 1e-8)
+  {
+    std::cout << "Axis centering failed." << std::endl;
+    Eigen::Matrix3s compare;
+    compare.col(0) = recoveredCenter;
+    compare.col(1) = expectedCenter;
+    compare.col(2) = recoveredCenter - expectedCenter;
+    std::cout << "Recovered - expected - diff:" << std::endl
+              << compare << std::endl;
+  }
   EXPECT_TRUE((recoveredCenter - expectedCenter).norm() < 1e-8);
 }
 #endif

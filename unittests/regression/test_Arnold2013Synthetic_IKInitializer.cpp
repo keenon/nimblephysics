@@ -137,10 +137,12 @@ void testSubject(
   trcFiles.push_back(prefix + subject + "/trials/walk2/markers.trc");
   grfFiles.push_back(prefix + subject + "/trials/walk2/grf.mot");
   (void)height;
-  // const auto tuple
-  //     = runIKInitializer(prefix + "unscaled_generic.osim", trcFiles, height);
   const auto tuple = runIKInitializer(
-      prefix + subject + "/" + subject + ".osim", trcFiles, -1.0, knownScales);
+      knownScales ? (prefix + subject + "/" + subject + ".osim")
+                  : (prefix + "unscaled_generic.osim"),
+      trcFiles,
+      knownScales ? -1.0 : height,
+      knownScales);
   std::vector<Eigen::VectorXs> poses = std::get<0>(tuple);
   std::vector<Eigen::VectorXi> posesClosedForeEstimateAvailable
       = std::get<1>(tuple);
@@ -169,7 +171,8 @@ void testSubject(
   }
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  if (averagePoseError >= 0.01)
+  s_t threshold = knownScales ? 0.03 : 0.15;
+  if (averagePoseError >= threshold)
   {
     std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
               << std::endl;
@@ -179,7 +182,7 @@ void testSubject(
                 << averagePerDofError(i) << std::endl;
     }
   }
-  EXPECT_LE(averagePoseError, knownScales ? 0.03 : 0.06);
+  EXPECT_LE(averagePoseError, threshold);
 
   // Marker errors.
   // --------------
@@ -192,7 +195,8 @@ void testSubject(
   auto joints = skeleton->getJoints();
   auto goldSkeleton = goldOsim.skeleton;
   auto goldJoints = goldSkeleton->getJoints();
-  Eigen::VectorXs jointErrors = Eigen::VectorXs::Zero(poses.size());
+  Eigen::VectorXs avgJointError
+      = Eigen::VectorXs::Zero(skeleton->getNumJoints());
   for (int i = 0; i < poses.size(); i++)
   {
     skeleton->setPositions(poses[i]);
@@ -201,16 +205,22 @@ void testSubject(
     Eigen::VectorXs goldJointPoses
         = goldSkeleton->getJointWorldPositions(goldJoints);
     Eigen::VectorXs diff = jointPoses - goldJointPoses;
+
     for (int j = 0; j < skeleton->getNumJoints(); j++)
     {
-      std::cout << skeleton->getJoint(i)->getName()
-                << " center error: " << diff.segment<3>(3 * i).norm()
-                << std::endl;
+      s_t jointDist = diff.segment<3>(3 * j).norm();
+      avgJointError(j) += jointDist;
     }
-    jointErrors[i] = diff.mean();
   }
-  s_t averageJointPoseError = jointErrors.mean();
-  EXPECT_LE(averageJointPoseError, knownScales ? 0.02 : 0.04);
+  avgJointError /= poses.size();
+  for (int j = 0; j < skeleton->getNumJoints(); j++)
+  {
+    std::cout << "Joint " << skeleton->getJoint(j)->getName()
+              << " average center-estimate error: " << avgJointError(j) << "m"
+              << std::endl;
+  }
+  s_t averageJointCenterError = avgJointError.mean();
+  EXPECT_LE(averageJointCenterError, knownScales ? 0.02 : 0.06);
 
   // Body scales.
   // ------------
@@ -228,24 +238,61 @@ void testSubject(
 }
 
 //==============================================================================
-TEST(Arnold2013Synthetic, RegressionTests)
+TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_01)
 {
-  std::vector<string> subjects
-      = {"subject01", "subject02", "subject04", "subject18", "subject19"};
-  std::vector<s_t> heights = {1.808, 1.853, 1.801, 1.775, 1.79};
-  std::vector<s_t> masses = {72.84, 76.48, 80.3, 64.09, 68.5};
-  (void)masses;
-  for (int i = 0; i < (int)subjects.size(); i++)
-  {
-    testSubject(subjects[i], heights[i], true);
-  }
+  testSubject("subject01", 1.808, true);
 }
 
-/*
 //==============================================================================
-int main(int argc, char* argv[])
+TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_02)
 {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  testSubject("subject02", 1.853, true);
 }
-*/
+
+//==============================================================================
+TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_04)
+{
+  testSubject("subject04", 1.801, true);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_18)
+{
+  testSubject("subject18", 1.775, true);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_19)
+{
+  testSubject("subject19", 1.79, true);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, UNKNOWN_SCALES_IN_ADVANCE_SUBJECT_01)
+{
+  testSubject("subject01", 1.808, false);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, UNKNOWN_SCALES_IN_ADVANCE_SUBJECT_02)
+{
+  testSubject("subject02", 1.853, false);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, UNKNOWN_SCALES_IN_ADVANCE_SUBJECT_04)
+{
+  testSubject("subject04", 1.801, false);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, UNKNOWN_SCALES_IN_ADVANCE_SUBJECT_18)
+{
+  testSubject("subject18", 1.775, false);
+}
+
+//==============================================================================
+TEST(Arnold2013Synthetic, UNKNOWN_SCALES_IN_ADVANCE_SUBJECT_19)
+{
+  testSubject("subject19", 1.79, false);
+}

@@ -212,7 +212,7 @@ public:
   /// method will work even on data with zero noise, whereas ChangPollard2006
   /// will fail when there is zero noise (for example, on synthetic datasets).
   static Eigen::Vector3s leastSquaresConcentricSphereFit(
-      std::vector<std::vector<Eigen::Vector3s>> traces);
+      std::vector<std::vector<Eigen::Vector3s>> traces, bool logOutput = false);
 
   /// This implements the least-squares method in Gamage and Lasenby 2002, "New
   /// least squares solutions for estimating the average centre of rotation and

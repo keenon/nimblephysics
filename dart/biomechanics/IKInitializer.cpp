@@ -12,6 +12,7 @@
 
 #include <Eigen/Eigenvalues>
 #include <Eigen/SVD>
+#include <unsupported/Eigen/Polynomials>
 
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -175,30 +176,100 @@ bool isPositiveDefinite(const Eigen::MatrixXd& A)
   }
 }
 
-//==============================================================================
-// This method will find the roots of a polynomial given by a*x^2 + b*x + c = 0
-std::vector<double> findRealRoots(double a, double b, double c)
-{
-  std::vector<double> roots;
-  double discriminant = b * b - 4 * a * c;
+// solve cubic equation x^3 + a*x^2 + b*x + c = 0
+#define TwoPi 6.28318530717958648
 
-  if (discriminant < 0)
+static double _root3(double x)
+{
+  double s = 1.;
+  while (x < 1.)
   {
-    // No real roots
+    x *= 8.;
+    s *= 0.5;
   }
-  else if (discriminant == 0)
+  while (x > 8.)
   {
-    roots.push_back(-b / (2 * a));
+    x *= 0.125;
+    s *= 2.;
+  }
+  double r = 1.5;
+  r -= 1. / 3. * (r - x / (r * r));
+  r -= 1. / 3. * (r - x / (r * r));
+  r -= 1. / 3. * (r - x / (r * r));
+  r -= 1. / 3. * (r - x / (r * r));
+  r -= 1. / 3. * (r - x / (r * r));
+  r -= 1. / 3. * (r - x / (r * r));
+  return r * s;
+}
+
+double root3(double x)
+{
+  if (x > 0)
+    return _root3(x);
+  else if (x < 0)
+    return -_root3(-x);
+  else
+    return 0.;
+}
+
+int SolveP3(double* x, double a, double b, double c)
+{
+  const double eps = 1e-14;
+  double a2 = a * a;
+  double q = (a2 - 3 * b) / 9;
+  double r = (a * (2 * a2 - 9 * b) + 27 * c) / 54;
+  // equation y^3 - 3q*y + r/2 = 0 where x = y-a/3
+  if (fabs(q) < eps)
+  { // y^3 =-r/2	!!! Thanks to John Fairman <jfairman1066@gmail.com>
+    if (fabs(r) < eps)
+    { // three identical roots
+      x[0] = x[1] = x[2] = -a / 3;
+      return (1);
+    }
+    // y^3 =-r/2
+    x[0] = root3(-r / 2);
+    x[1] = x[0] * 0.5;
+    x[2] = x[0] * sqrt(3.) / 2;
+    return (1);
+  }
+  // now favs(q)>eps
+  double r2 = r * r;
+  double q3 = q * q * q;
+  double A, B;
+  if (r2 <= (q3 + eps))
+  { //<<-- FIXED!
+    double t = r / sqrt(q3);
+    if (t < -1)
+      t = -1;
+    if (t > 1)
+      t = 1;
+    t = acos(t);
+    a /= 3;
+    q = -2 * sqrt(q);
+    x[0] = q * cos(t / 3) - a;
+    x[1] = q * cos((t + TwoPi) / 3) - a;
+    x[2] = q * cos((t - TwoPi) / 3) - a;
+    return (3);
   }
   else
   {
-    double root1 = (-b + std::sqrt(discriminant)) / (2 * a);
-    double root2 = (-b - std::sqrt(discriminant)) / (2 * a);
-    roots.push_back(root1);
-    roots.push_back(root2);
-  }
+    // A =-pow(fabs(r)+sqrt(r2-q3),1./3);
+    A = -root3(fabs(r) + sqrt(r2 - q3));
+    if (r < 0)
+      A = -A;
+    B = (A == 0 ? 0 : B = q / A);
 
-  return roots;
+    a /= 3;
+    x[0] = (A + B) - a;
+    x[1] = -0.5 * (A + B) - a;
+    x[2] = 0.5 * sqrt(3.) * (A - B);
+    if (fabs(x[2]) < eps)
+    {
+      x[2] = x[1];
+      return (1);
+    }
+    return (1);
+  }
 }
 
 //==============================================================================
@@ -590,7 +661,8 @@ void IKInitializer::runFullPipeline(bool logOutput)
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
   closedFormPivotFindingJointCenterSolver(logOutput);
-  recenterAxisJointsBasedOnBoneAngles();
+  recenterAxisJointsBasedOnBoneAngles(logOutput);
+
   // Fill in the parts of the body scales and poses that we can in closed form
   estimateGroupScalesClosedForm();
   estimatePosesClosedForm();
@@ -817,6 +889,15 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     if (joint->parentBody == nullptr)
       continue;
 
+    if (logOutput)
+    {
+      std::cout << "Joint " << joint->name << " has "
+                << bodyMarkerCounts[joint->parentBody->name]
+                << " markers on parent body, and "
+                << bodyMarkerCounts[joint->childBody->name]
+                << " markers on child body" << std::endl;
+    }
+
     if (bodyMarkerCounts[joint->parentBody->name] >= 3
         && bodyMarkerCounts[joint->childBody->name] >= 3)
     {
@@ -881,6 +962,8 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     std::vector<std::string> visibleMarkersCloud;
     std::vector<Eigen::Vector3s> visibleMarkerCloudIdentityTransform;
     bool foundFirstFrame = false;
+    s_t averagePointReconstructionError = 0.0;
+    int countedTimesteps = 0;
     for (int t = 0; t < mMarkerObservations.size(); t++)
     {
       // 3.2. We first search through all the frames to find the first frame
@@ -928,12 +1011,35 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
         // transform at this frame
         if (identityMarkerCloud.size() >= 3)
         {
-          bodyTrajectory[t] = getPointCloudToPointCloudTransform(
+          Eigen::Isometry3s worldTransform = getPointCloudToPointCloudTransform(
               identityMarkerCloud, currentMarkerCloud, weights);
+          if (logOutput)
+          {
+            s_t error = 0.0;
+            for (int i = 0; i < identityMarkerCloud.size(); i++)
+            {
+              error += (currentMarkerCloud[i]
+                        - worldTransform * identityMarkerCloud[i])
+                           .norm();
+            }
+            error /= identityMarkerCloud.size();
+            averagePointReconstructionError += error;
+            countedTimesteps++;
+          }
+          bodyTrajectory[t] = worldTransform;
         }
       }
     }
     bodyTrajectories[body->name] = bodyTrajectory;
+
+    if (logOutput)
+    {
+      std::cout << "Body transforms for \"" << body->name
+                << "\" reconstructed over " << countedTimesteps
+                << " timesteps with average error "
+                << averagePointReconstructionError / countedTimesteps << "m"
+                << std::endl;
+    }
   }
 
   // 4. Now we can solve for the relative transforms of each joint with 3+
@@ -1063,14 +1169,13 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
 #endif
     // We normalize the singular values to be agnostic to the size of the data
     // we're dealing with in the original matrix.
-    Eigen::VectorXs normalizedSingularValues = singularValues.normalized();
+    s_t conditionNumber = singularValues(0) / singularValues(5);
     if (logOutput)
     {
-      std::cout << "Joint \"" << joint->name
-                << "\" smallest normalized singular value is "
-                << normalizedSingularValues(5) << std::endl;
+      std::cout << "Joint \"" << joint->name << "\" condition number is "
+                << conditionNumber << std::endl;
     }
-    if (std::abs(normalizedSingularValues(5)) < 1e-2)
+    if (std::abs(conditionNumber) > 50)
     {
       if (logOutput)
       {
@@ -1137,6 +1242,12 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       anchorBody = joint->childBody;
       otherBody = joint->parentBody;
     }
+    if (logOutput)
+    {
+      std::cout << "Joint \"" << joint->name << "\" has anchor body \""
+                << anchorBody->name << "\" and other body \"" << otherBody->name
+                << "\"" << std::endl;
+    }
 
     // 5.2. Work out which markers will be moving around on the other body
     std::vector<std::string> movingMarkers;
@@ -1151,10 +1262,24 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
         movingMarkers.push_back(mMarkerNames[i]);
       }
     }
+    if (logOutput)
+    {
+      std::cout << "Joint \"" << joint->name << "\" has "
+                << movingMarkers.size() << " markers attached to \""
+                << otherBody->name
+                << "\", and we will find their relative joint center in the "
+                   "frame of \""
+                << anchorBody->name << "\":" << std::endl;
+      for (std::string marker : movingMarkers)
+      {
+        std::cout << "  " << marker << std::endl;
+      }
+    }
 
     // 5.3. Go through and transform all the markers into the anchor body's
     // frame.
     std::map<std::string, std::vector<Eigen::Vector3s>> anchorBodyMarkerClouds;
+    int uniqueMarkerObservationsFound = 0;
     for (auto& pair : bodyTrajectories[anchorBody->name])
     {
       int t = pair.first;
@@ -1168,11 +1293,38 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
             anchorBodyMarkerClouds[movingMarker]
                 = std::vector<Eigen::Vector3s>();
           }
-          anchorBodyMarkerClouds[movingMarker].push_back(
-              anchorTransform.inverse() * mMarkerObservations[t][movingMarker]);
+          Eigen::Vector3s observation = anchorTransform.inverse()
+                                        * mMarkerObservations[t][movingMarker];
+          bool foundDuplicate = false;
+          for (Eigen::Vector3s existingObservation :
+               anchorBodyMarkerClouds[movingMarker])
+          {
+            if ((existingObservation - observation).norm() < 1e-10)
+            {
+              foundDuplicate = true;
+              break;
+            }
+          }
+          if (!foundDuplicate)
+          {
+            anchorBodyMarkerClouds[movingMarker].push_back(observation);
+            uniqueMarkerObservationsFound++;
+          }
         }
       }
     }
+
+    if (uniqueMarkerObservationsFound < 3)
+    {
+      if (logOutput)
+      {
+        std::cout << "Got insufficient unique marker observations ("
+                  << uniqueMarkerObservationsFound << ") to solve joint \""
+                  << joint->name << "\" with Chang Pollard 2006" << std::endl;
+      }
+      continue;
+    }
+
     std::vector<std::vector<Eigen::Vector3s>> markerTraces;
     for (auto& pair : anchorBodyMarkerClouds)
     {
@@ -1180,8 +1332,15 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     }
 
     // 5.4. Get the local joint center in the anchor body
+    if (logOutput)
+    {
+      std::cout << "Solving for joint \"" << joint->name
+                << "\" with Chang Pollard 2006" << std::endl;
+    }
+    // Eigen::Vector3s jointCenter
+    //     = getChangPollard2006JointCenterMultiMarker(markerTraces, logOutput);
     Eigen::Vector3s jointCenter
-        = getChangPollard2006JointCenterMultiMarker(markerTraces);
+        = leastSquaresConcentricSphereFit(markerTraces, logOutput);
 
     // 5.5. Transform the result back into world space, and record them
     for (auto& pair : bodyTrajectories[anchorBody->name])
@@ -1194,17 +1353,17 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
 
     // 5.6. Get the axis direction in the anchor body, along with the
     // corresponding singular value
-    std::pair<Eigen::Vector3s, s_t> axisDirAndSingularValue
+    std::pair<Eigen::Vector3s, s_t> axisDirAndConditionNumber
         = gamageLasenby2002AxisFit(markerTraces);
-    Eigen::Vector3s jointAxisDir = axisDirAndSingularValue.first;
-    s_t singularValue = axisDirAndSingularValue.second;
-    if (std::abs(singularValue) < 1e-2)
+    Eigen::Vector3s jointAxisDir = axisDirAndConditionNumber.first;
+    s_t conditionNumber = axisDirAndConditionNumber.second;
+    if (std::abs(conditionNumber) > 50)
     {
       // 5.6.1. We found an axis! Record it.
       if (logOutput)
       {
         std::cout << "Joint \"" << joint->name
-                  << "\" found a near-zero singular value (" << singularValue
+                  << "\" found a large condition value (" << conditionNumber
                   << ") in its linear system, so it's an axis joint."
                   << std::endl;
       }
@@ -1270,7 +1429,8 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
               .head<3>()
               .normalized();
     std::string jointType = mStackedJoints[i]->joints[0]->getType();
-    bool isPureRevolute
+
+    bool hasNoInternalTranslation
         = jointType == dynamics::RevoluteJoint::getStaticType()
           || jointType == dynamics::EulerJoint::getStaticType()
           || jointType == dynamics::BallJoint::getStaticType()
@@ -1279,7 +1439,7 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
     // If we're not a pure revolute joint (for example, a CustomJoint driven by
     // evil splines) we need to do some extra work to estimate a useful joint
     // axis in the neutral pose.
-    if (!isPureRevolute)
+    if (!hasNoInternalTranslation)
     {
       if (logOutput)
       {
@@ -1392,6 +1552,7 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
     for (int i = 0; i < axisJoints.size(); i++)
     {
       std::shared_ptr<struct StackedJoint> joint = axisJoints[i];
+      bool isBallJoint = joint->joints[0]->getNumDofs() > 1;
 
       // 2.1. Find the joints that are not axis joints, that are adjacent to
       // this joint. This includes both parent and as many children as fit the
@@ -1414,11 +1575,20 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
       // been solved, so that we can work our way out/in from unambiguous joint
       // centers, since those provide so much useful info on joint center
       // location.
-      if (adjacentPointJoints.size() > 0)
+      if (adjacentPointJoints.size() > 0 || isBallJoint)
       {
-        // 2.2. Collect the joint centers and axis direction on the neutral
-        // skeleton, so we can determine our ratio of parallel to perpendicular
-        // distances in the neutral pose
+        if (logOutput && isBallJoint)
+        {
+          std::cout << "Classifying " << joint->name
+                    << " as a ball joint for the purposes of recentering along "
+                       "the axis, so we'll ignore offset information to the "
+                       "parent along the axis."
+                    << std::endl;
+        }
+
+        // 2.2. For non-ball joints: collect the joint centers and axis
+        // direction on the neutral skeleton, so we can determine our ratio of
+        // parallel to perpendicular distances in the neutral pose
         const Eigen::Vector3s neutralAxis
             = neutralSkelJointAxisWorldDirectionsMap[joint->name];
         const Eigen::Vector3s neutralJointCenter
@@ -1442,53 +1612,59 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
           std::vector<s_t> weights;
 
           // 2.3.1. Collect the points and radii for the adjacent joint(s) that
-          // have unambiguous joint centers
-          for (std::shared_ptr<struct StackedJoint> pointJoint :
-               adjacentPointJoints)
+          // have unambiguous joint centers, if we're not a ball joint and so
+          // can rely on consistent geometry between the axis and the adjacent
+          // joint centers with known locations.
+          if (!isBallJoint)
           {
-            if (mJointCenters[t].count(pointJoint->name) == 0)
-              continue;
+            for (std::shared_ptr<struct StackedJoint> pointJoint :
+                 adjacentPointJoints)
+            {
+              if (mJointCenters[t].count(pointJoint->name) == 0)
+                continue;
 
-            Eigen::Vector3s adjacentNeutralJointCenter
-                = neutralSkelJointCenterWorldPositionsMap[pointJoint->name];
+              Eigen::Vector3s adjacentNeutralJointCenter
+                  = neutralSkelJointCenterWorldPositionsMap[pointJoint->name];
 
-            // 2.3.1.1. Find the ratio on the neutral skeleton for these two
-            // joints between (distance) / (distance perpendicular to axis)
-            Eigen::Vector3s neutralOffset
-                = adjacentNeutralJointCenter - neutralJointCenter;
-            s_t neutralDistAlongAxis = neutralOffset.dot(neutralAxis);
-            Eigen::Vector3s neutralOffsetParallel
-                = neutralDistAlongAxis * neutralAxis;
-            Eigen::Vector3s neutralOffsetPerp
-                = (neutralOffset - neutralOffsetParallel);
-            assert(
-                (neutralOffsetParallel + neutralOffsetPerp - neutralOffset)
-                    .norm()
-                < 1e-15);
-            assert(
-                (neutralJointCenter + neutralOffsetParallel + neutralOffsetPerp
-                 - adjacentNeutralJointCenter)
-                    .norm()
-                < 1e-15);
-            s_t neutralRatio = neutralOffset.norm() / neutralOffsetPerp.norm();
+              // 2.3.1.1. Find the ratio on the neutral skeleton for these two
+              // joints between (distance) / (distance perpendicular to axis)
+              Eigen::Vector3s neutralOffset
+                  = adjacentNeutralJointCenter - neutralJointCenter;
+              s_t neutralDistAlongAxis = neutralOffset.dot(neutralAxis);
+              Eigen::Vector3s neutralOffsetParallel
+                  = neutralDistAlongAxis * neutralAxis;
+              Eigen::Vector3s neutralOffsetPerp
+                  = (neutralOffset - neutralOffsetParallel);
+              assert(
+                  (neutralOffsetParallel + neutralOffsetPerp - neutralOffset)
+                      .norm()
+                  < 1e-15);
+              assert(
+                  (neutralJointCenter + neutralOffsetParallel
+                   + neutralOffsetPerp - adjacentNeutralJointCenter)
+                      .norm()
+                  < 1e-15);
+              s_t neutralRatio
+                  = neutralOffset.norm() / neutralOffsetPerp.norm();
 
-            // 2.3.1.2. Find the ratio on the current skeleton for these two
-            // joints between (distance) / (distance perpendicular to axis)
-            Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
-            Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
-            Eigen::Vector3s adjacentJointCenter
-                = mJointCenters[t][pointJoint->name];
-            Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
-            s_t distAlongAxis = offset.dot(jointAxis);
-            Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
-            Eigen::Vector3s offsetPerp = (offset - offsetParallel);
+              // 2.3.1.2. Find the ratio on the current skeleton for these two
+              // joints between (distance) / (distance perpendicular to axis)
+              Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
+              Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+              Eigen::Vector3s adjacentJointCenter
+                  = mJointCenters[t][pointJoint->name];
+              Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
+              s_t distAlongAxis = offset.dot(jointAxis);
+              Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
+              Eigen::Vector3s offsetPerp = (offset - offsetParallel);
 
-            s_t impliedDistance = offsetPerp.norm() * neutralRatio;
+              s_t impliedDistance = offsetPerp.norm() * neutralRatio;
 
-            // 2.3.1.3. Record the implied distance to our objective set
-            pointsAndRadii.emplace_back(
-                mJointCenters[t][pointJoint->name], impliedDistance);
-            weights.push_back(1.0);
+              // 2.3.1.3. Record the implied distance to our objective set
+              pointsAndRadii.emplace_back(
+                  mJointCenters[t][pointJoint->name], impliedDistance);
+              weights.push_back(1.0);
+            }
           }
 
           // 2.4. Now we're going to record all the available marker distances
@@ -1504,7 +1680,7 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
               continue;
             Eigen::Vector3s markerWorldPos = mMarkerObservations[t][markerName];
             pointsAndRadii.emplace_back(markerWorldPos, sqrt(squaredDistance));
-            weights.push_back(0.5);
+            weights.push_back(0.01);
           }
 
           Eigen::Vector3s newCenter = centerPointOnAxis(
@@ -2938,7 +3114,16 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     // We fall back to a least-squares fit when there's no valid solution, which
     // generally means that there was no noise (and therefore no radius
     // variability) in the marker data.
-    reconstructedCenter = leastSquaresConcentricSphereFit(markerTraces);
+    if (log)
+    {
+      std::cout << "Didn't get any valid solutions (perhaps because there was "
+                   "no noise in the data and this joint only had a single "
+                   "marker attached, which often happens with synthetic "
+                   "data, or because there was a marker for the joint center). "
+                   "Falling back to least-squares fit"
+                << std::endl;
+    }
+    reconstructedCenter = leastSquaresConcentricSphereFit(markerTraces, log);
   }
 
   return reconstructedCenter;
@@ -2952,7 +3137,7 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
 /// method will work even on data with zero noise, whereas ChangPollard2006
 /// will fail when there is zero noise (for example, on synthetic datasets).
 Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
-    std::vector<std::vector<Eigen::Vector3s>> traces)
+    std::vector<std::vector<Eigen::Vector3s>> traces, bool logOutput)
 {
   int dim = 0;
   for (auto& trace : traces)
@@ -2979,6 +3164,14 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   }
   Eigen::VectorXs c = A.completeOrthogonalDecomposition().solve(f);
   Eigen::Vector3s center = c.head<3>();
+  if (logOutput)
+  {
+    std::cout << "Least-squares joint center fit:" << std::endl;
+    std::cout << "Matrix A:" << std::endl << A << std::endl;
+    std::cout << "Vector f:" << std::endl << f << std::endl;
+    std::cout << "Vector c = A.solve(f):" << std::endl << c << std::endl;
+    std::cout << "Resulting center:" << std::endl << center << std::endl;
+  }
   return center;
 }
 
@@ -3007,106 +3200,42 @@ std::pair<Eigen::Vector3s, s_t> IKInitializer::gamageLasenby2002AxisFit(
   Eigen::JacobiSVD<Eigen::MatrixXs> svd(
       A, Eigen::ComputeFullU | Eigen::ComputeFullV);
   Eigen::Vector3s axis = svd.matrixV().col(2);
-  s_t singularValue = svd.singularValues()(2);
-  return std::make_pair(axis, singularValue);
+  s_t conditionNumber = svd.singularValues()(0) / svd.singularValues()(2);
+  return std::make_pair(axis, conditionNumber);
 }
 
 std::vector<double> IKInitializer::findCubicRealRoots(
     double a, double b, double c, double d)
 {
-  std::vector<std::complex<double>> roots;
-
-  // If a == 0, it's not a cubic equation. Check if it's quadratic or linear and
-  // solve accordingly.
-  if (std::abs(a) < 1e-10)
+  double results[3];
+  int numRoots = SolveP3(results, b / a, c / a, d / a);
+  std::vector<double> roots;
+  for (int i = 0; i < numRoots; i++)
   {
-    if (std::abs(b) < 1e-10)
-    {
-      // It's a linear equation: c*x + d = 0
-      if (std::abs(c) > 1e-10)
-      {
-        roots.push_back(-d / c);
-      }
-    }
-    else
-    {
-      // It's a quadratic equation: b*x^2 + c*x + d = 0
-      double discr = c * c - 4 * b * d;
-      if (discr >= 0)
-      {
-        roots.push_back((-c + std::sqrt(discr)) / (2 * b));
-        roots.push_back((-c - std::sqrt(discr)) / (2 * b));
-      }
-      else
-      {
-        roots.push_back(
-            std::complex<double>(-c / (2 * b), std::sqrt(-discr) / (2 * b)));
-        roots.push_back(
-            std::complex<double>(-c / (2 * b), -std::sqrt(-discr) / (2 * b)));
-      }
-    }
+    roots.push_back(results[i]);
+  }
+  return roots;
 
-    std::vector<double> realRoots;
-    for (int i = 0; i < roots.size(); i++)
+  /*
+  Eigen::Vector4d coeffs;
+  coeffs << d, c, b, a; // The coefficients of the cubic polynomial.
+
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> solver(coeffs);
+
+  Eigen::PolynomialSolver<double, Eigen::Dynamic>::RootsType eigenRoots;
+  eigenRoots = solver.roots();
+
+  std::vector<double> roots;
+  for (int i = 0; i < eigenRoots.size(); i++)
+  {
+    if (std::abs(eigenRoots(i).imag()) < 1e-10)
     {
-      if (std::abs(roots[i].imag()) < 1e-10)
-      {
-        realRoots.push_back(roots[i].real());
-      }
+      roots.push_back(eigenRoots(i).real());
     }
-    return realRoots;
   }
 
-  // Change to monic equation t^3 + Pt + Q = 0, t = x - b / (3a)
-  double P = c / a - b * b / (3 * a * a);
-  double Q = 2 * b * b * b / (27 * a * a * a) - b * c / (3 * a * a) + d / a;
-
-  std::complex<double> discriminant = Q * Q / 4 + P * P * P / 27;
-
-  if (std::abs(discriminant) < 1e-10)
-  {
-    // The equation has a multiple root
-    double u = -std::cbrt(Q / 2);
-    roots.push_back(2 * u - b / (3 * a));
-    roots.push_back(-u - b / (3 * a));
-    std::vector<double> realRoots;
-    for (int i = 0; i < roots.size(); i++)
-    {
-      if (std::abs(roots[i].imag()) < 1e-10)
-      {
-        realRoots.push_back(roots[i].real());
-      }
-    }
-    return realRoots;
-  }
-
-  // Calculate square roots of discriminant
-  std::complex<double> sqrt_discriminant = std::sqrt(discriminant);
-
-  // Calculate u and v
-  std::complex<double> u = std::pow(-Q / 2 + sqrt_discriminant, 1.0 / 3.0);
-  std::complex<double> v = std::pow(-Q / 2 - sqrt_discriminant, 1.0 / 3.0);
-
-  // Three roots in total
-  roots.push_back(u + v - b / (3 * a));
-  roots.push_back(
-      u * std::exp(std::complex<double>(0, 2 * M_PI / 3))
-      + v * std::exp(std::complex<double>(0, -2 * M_PI / 3)) - b / (3 * a));
-  roots.push_back(
-      u * std::exp(std::complex<double>(0, -2 * M_PI / 3))
-      + v * std::exp(std::complex<double>(0, 2 * M_PI / 3)) - b / (3 * a));
-
-  // Post-processing: convert roots with very small imaginary parts to real
-  // numbers
-  std::vector<double> realRoots;
-  for (int i = 0; i < roots.size(); i++)
-  {
-    if (std::abs(roots[i].imag()) < 1e-10)
-    {
-      realRoots.push_back(roots[i].real());
-    }
-  }
-  return realRoots;
+  return roots;
+  */
 }
 
 /// This method will find the best point on the line given by f(x) = (c + a*x)
@@ -3162,8 +3291,8 @@ Eigen::Vector3s IKInitializer::centerPointOnAxis(
       const s_t weight = weights.size() > i ? weights[i] : 1.0;
 
       // Compute the loss according to the original definition, which is the
-      // square of the error between the squared desired radius and the squared
-      // distance from the center.
+      // square of the error between the squared desired radius and the
+      // squared distance from the center.
       const s_t linearErrorOnSquaredDistances
           = ((pointsAndRadii[i].first - resultingCenter).squaredNorm()
              - pointsAndRadii[i].second * pointsAndRadii[i].second);
@@ -3171,10 +3300,10 @@ Eigen::Vector3s IKInitializer::centerPointOnAxis(
               * linearErrorOnSquaredDistances;
 
 #ifndef NDEBUG
-      // If we're in debug mode, we also compute the loss using the polynomial,
-      // just to check that everything is equivalent. This is to verify that we
-      // didn't make an algebra mistake in our polynomial expansion, and so
-      // we're likely to trust the optimal value.
+      // If we're in debug mode, we also compute the loss using the
+      // polynomial, just to check that everything is equivalent. This is to
+      // verify that we didn't make an algebra mistake in our polynomial
+      // expansion, and so we're likely to trust the optimal value.
       const s_t f = (center - pointsAndRadii[i].first).dot(axis);
       const s_t g = (center - pointsAndRadii[i].first).squaredNorm()
                     - pointsAndRadii[i].second * pointsAndRadii[i].second;
@@ -3187,7 +3316,18 @@ Eigen::Vector3s IKInitializer::centerPointOnAxis(
     }
 
 #ifndef NDEBUG
-    assert(std::abs(polynomialLoss - loss) < 1e-8);
+    s_t error = std::abs(polynomialLoss - loss);
+    if (std::abs(polynomialLoss) > 1.0)
+    {
+      error /= std::abs(polynomialLoss);
+    }
+    if (error > 1e-8)
+    {
+      std::cout << "Polynomial loss (" << polynomialLoss
+                << ") differs from standard loss (" << loss << ") by "
+                << std::abs(polynomialLoss - loss) << std::endl;
+    }
+    assert(error < 1e-8);
 #endif
     if (loss < bestLoss)
     {
