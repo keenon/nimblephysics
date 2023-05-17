@@ -13,7 +13,7 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="10.9"
+export MACOSX_DEPLOYMENT_TARGET="12.0"
 
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
@@ -30,241 +30,241 @@ echo "Python3=${PYTHON3}"
 # popd
 # rm -rf PerfUtils
 
-brew install boost # @1.73
-brew install eigen
-
-brew install openssl@1.1
-if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
-      # x86 Macs
-      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
-else
-      # ARM64 Macs
-      # TODO: unsudo this command
-      sudo mkdir -p /usr/local/lib/pkgconfig
-      sudo cp /opt/homebrew/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
-fi
-
-# Install CCD
-git clone https://github.com/danfis/libccd.git
-pushd libccd
-git checkout v2.1
-mkdir build
-pushd build
-cmake .. -DENABLE_DOUBLE_PRECISION=ON
-sudo make install -j
-popd
-popd
-rm -rf libccd
-
-# Install ASSIMP
-git clone https://github.com/assimp/assimp.git
-pushd assimp
-git checkout v5.0.1
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-rm -rf assimp
-
-# Install LAPACK
-brew install lapack
-
-# Install MUMPS
-git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
-pushd ThirdParty-Mumps
-./get.Mumps
-./configure
-# make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
-sudo make install
-popd
-sudo rm -rf ThirdParty-Mumps
-
-# NOTE: on local arm64 M1 mac, I've had to do the following when I get linker errors during "delocate"
-# ln -s /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.1.dylib /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.dylib 
-
-# Install IPOPT
-git clone https://github.com/coin-or/Ipopt.git
-pushd Ipopt
-./configure --with-mumps --disable-java
-sudo make install -j
-popd
-sudo rm -rf Ipopt
-sudo ln -s /usr/local/include/coin-or /usr/local/include/coin
-
-# Install pybind11
-git clone https://github.com/pybind/pybind11.git
-pushd pybind11
-git checkout v2.7.0
-mkdir build
-pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
-sudo make install -j
-popd
-popd
-sudo rm -rf pybind11
-
-# Install FCL
-# Key note: this needs to happen before octomap
-# git clone https://github.com/flexible-collision-library/fcl.git
-# pushd fcl
-# git checkout 0.3.4
-# mkdir build
-# pushd build
-# cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
-# make install -j
-# popd
-# popd
-# rm -rf fcl
-
-# Install octomap
-# git clone https://github.com/OctoMap/octomap.git
-# pushd octomap
-# git checkout v1.8.1
-# mkdir build
-# pushd build
-# cmake ..
-# make install -j
-# popd
-# popd
-# rm -rf octomap
-
-# Install tinyxml2
-git clone https://github.com/leethomason/tinyxml2.git
-pushd tinyxml2
-git checkout 8.0.0
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-sudo rm -rf tinyxml2
-
-# Install freeglut
-# brew cask install xquartz
-# brew install freeglut
-
-# Install Open Scene Graph
-# brew install open-scene-graph
-
-# Install pytest
-pip3 install pytest
-
-
-# Install tinyxml1
-git clone https://github.com/robotology-dependencies/tinyxml.git
-pushd tinyxml
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-sudo rm -rf tinyxml
-
-# Install urdfdom_headers
-git clone https://github.com/ros/urdfdom_headers.git
-pushd urdfdom_headers
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-sudo rm -rf urdfdom_headers
-
-# Install console_bridge
-git clone https://github.com/ros/console_bridge.git
-pushd console_bridge
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-sudo rm -rf console_bridge
-
-# Install urdfdom
-git clone https://github.com/ros/urdfdom.git
-pushd urdfdom
-mkdir build
-pushd build
-cmake ..
-sudo make install -j
-popd
-popd
-sudo rm -rf urdfdom
-
-# Install protobuf
-PROTOBUF_VERSION="3.14.0"
-# wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# pushd protobuf-${PROTOBUF_VERSION}
-# CXX_FLAGS="-fvisibility=hidden" ./configure
-# make -j
-# make install
-# popd
-# rm -rf protobuf-${PROTOBUF_VERSION}
-
-# brew install zlib
-# brew install xz zlib bzip2
-
-# Install grpc
-git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
-pushd grpc
-pushd third_party/protobuf
-git checkout v${PROTOBUF_VERSION}
-popd
-mkdir -p cmake/build
-pushd cmake/build
-cmake -DgRPC_INSTALL=ON \
-      -DgRPC_BUILD_TESTS=OFF \
-      -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
-      ../..
-sudo make install -j
-popd
-popd
-sudo rm -rf grpc
-
-# Install Google benchmark
-git clone https://github.com/google/benchmark.git
-git clone https://github.com/google/googletest.git benchmark/googletest
-pushd benchmark
-mkdir build
-pushd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-sudo make install
-popd
-popd
-sudo rm -rf benchmark
-
-# Install ezc3d
-git clone https://github.com/pyomeca/ezc3d.git
-pushd ezc3d
-git checkout Release_1.4.7
-mkdir build
-pushd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
-sudo make install
-popd
-popd
-sudo rm -rf ezc3d
-
-# Reset the IDs for our libraries to absolute paths
-sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/liburdfdom_model.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
-sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
-sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
-# install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
-# install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
-sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
-# install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
-sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
+#brew install boost # @1.73
+#brew install eigen
+#
+#brew install openssl@1.1
+#if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
+#      # x86 Macs
+#      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+#else
+#      # ARM64 Macs
+#      # TODO: unsudo this command
+#      sudo mkdir -p /usr/local/lib/pkgconfig
+#      sudo cp /opt/homebrew/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+#fi
+#
+## Install CCD
+#git clone https://github.com/danfis/libccd.git
+#pushd libccd
+#git checkout v2.1
+#mkdir build
+#pushd build
+#cmake .. -DENABLE_DOUBLE_PRECISION=ON
+#sudo make install -j
+#popd
+#popd
+#rm -rf libccd
+#
+## Install ASSIMP
+#git clone https://github.com/assimp/assimp.git
+#pushd assimp
+#git checkout v5.0.1
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#rm -rf assimp
+#
+## Install LAPACK
+#brew install lapack
+#
+## Install MUMPS
+#git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
+#pushd ThirdParty-Mumps
+#./get.Mumps
+#./configure
+## make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
+#sudo make install
+#popd
+#sudo rm -rf ThirdParty-Mumps
+#
+## NOTE: on local arm64 M1 mac, I've had to do the following when I get linker errors during "delocate"
+## ln -s /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.1.dylib /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.dylib
+#
+## Install IPOPT
+#git clone https://github.com/coin-or/Ipopt.git
+#pushd Ipopt
+#./configure --with-mumps --disable-java
+#sudo make install -j
+#popd
+#sudo rm -rf Ipopt
+#sudo ln -s /usr/local/include/coin-or /usr/local/include/coin
+#
+## Install pybind11
+#git clone https://github.com/pybind/pybind11.git
+#pushd pybind11
+#git checkout v2.7.0
+#mkdir build
+#pushd build
+#cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf pybind11
+#
+## Install FCL
+## Key note: this needs to happen before octomap
+## git clone https://github.com/flexible-collision-library/fcl.git
+## pushd fcl
+## git checkout 0.3.4
+## mkdir build
+## pushd build
+## cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
+## make install -j
+## popd
+## popd
+## rm -rf fcl
+#
+## Install octomap
+## git clone https://github.com/OctoMap/octomap.git
+## pushd octomap
+## git checkout v1.8.1
+## mkdir build
+## pushd build
+## cmake ..
+## make install -j
+## popd
+## popd
+## rm -rf octomap
+#
+## Install tinyxml2
+#git clone https://github.com/leethomason/tinyxml2.git
+#pushd tinyxml2
+#git checkout 8.0.0
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf tinyxml2
+#
+## Install freeglut
+## brew cask install xquartz
+## brew install freeglut
+#
+## Install Open Scene Graph
+## brew install open-scene-graph
+#
+## Install pytest
+#pip3 install pytest
+#
+#
+## Install tinyxml1
+#git clone https://github.com/robotology-dependencies/tinyxml.git
+#pushd tinyxml
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf tinyxml
+#
+## Install urdfdom_headers
+#git clone https://github.com/ros/urdfdom_headers.git
+#pushd urdfdom_headers
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf urdfdom_headers
+#
+## Install console_bridge
+#git clone https://github.com/ros/console_bridge.git
+#pushd console_bridge
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf console_bridge
+#
+## Install urdfdom
+#git clone https://github.com/ros/urdfdom.git
+#pushd urdfdom
+#mkdir build
+#pushd build
+#cmake ..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf urdfdom
+#
+## Install protobuf
+#PROTOBUF_VERSION="3.14.0"
+## wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
+## tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
+## rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
+## pushd protobuf-${PROTOBUF_VERSION}
+## CXX_FLAGS="-fvisibility=hidden" ./configure
+## make -j
+## make install
+## popd
+## rm -rf protobuf-${PROTOBUF_VERSION}
+#
+## brew install zlib
+## brew install xz zlib bzip2
+#
+## Install grpc
+#git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+#pushd grpc
+#pushd third_party/protobuf
+#git checkout v${PROTOBUF_VERSION}
+#popd
+#mkdir -p cmake/build
+#pushd cmake/build
+#cmake -DgRPC_INSTALL=ON \
+#      -DgRPC_BUILD_TESTS=OFF \
+#      -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
+#      ../..
+#sudo make install -j
+#popd
+#popd
+#sudo rm -rf grpc
+#
+## Install Google benchmark
+#git clone https://github.com/google/benchmark.git
+#git clone https://github.com/google/googletest.git benchmark/googletest
+#pushd benchmark
+#mkdir build
+#pushd build
+#cmake -DCMAKE_BUILD_TYPE=Release ..
+#sudo make install
+#popd
+#popd
+#sudo rm -rf benchmark
+#
+## Install ezc3d
+#git clone https://github.com/pyomeca/ezc3d.git
+#pushd ezc3d
+#git checkout Release_1.4.7
+#mkdir build
+#pushd build
+#cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
+#sudo make install
+#popd
+#popd
+#sudo rm -rf ezc3d
+#
+## Reset the IDs for our libraries to absolute paths
+#sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
+#sudo install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
+#sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/liburdfdom_model.dylib
+#sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
+#sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
+#sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
+## install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
+## install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
+#sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
+## install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
+#sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
 # We're not installing Open Scene Graph, so these aren't necessary
 # install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
 # install_name_tool -id /usr/local/lib/libosgViewer.161.dylib /usr/local/lib/libosgViewer.161.dylib
