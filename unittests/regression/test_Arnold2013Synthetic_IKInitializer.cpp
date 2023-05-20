@@ -117,9 +117,9 @@ runIKInitializer(
   }
 
   return std::make_tuple(
-      initializer.mPoses,
-      initializer.mPosesClosedFormEstimateAvailable,
-      initializer.mGroupScales,
+      initializer.getPoses(),
+      initializer.getPosesClosedFormEstimateAvailable(),
+      initializer.getGroupScales(),
       standard);
 }
 
@@ -171,7 +171,7 @@ void testSubject(
   }
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  s_t threshold = knownScales ? 0.03 : 0.15;
+  s_t threshold = knownScales ? 0.03 : 0.14;
   if (averagePoseError >= threshold)
   {
     std::cout << "Average pose error norm " << averagePoseError << " > 0.01"

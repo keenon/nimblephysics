@@ -144,18 +144,20 @@ public:
 
   /// This gets the subset of markers that are visible at a given timestep
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-  getVisibleMarkers(int t);
+  getObservedMarkers(int t);
 
   /// This gets the subset of markers that are visible at a given timestep
-  std::vector<std::string> getVisibleMarkerNames(int t);
+  std::vector<std::string> getObservedMarkerNames(int t);
 
   /// This gets the subset of joints that are attached to markers that are
   /// visible at a given timestep
-  std::vector<std::shared_ptr<struct StackedJoint>> getVisibleJoints(int t);
+  std::vector<std::shared_ptr<struct StackedJoint>>
+  getJointsAttachedToObservedMarkers(int t);
 
   /// This gets the world center estimates for joints that are attached to
   /// markers that are visible at this timestep.
-  std::map<std::string, Eigen::Vector3s> getVisibleJointCenters(int t);
+  std::map<std::string, Eigen::Vector3s>
+  getJointsAttachedToObservedMarkersCenters(int t);
 
   /// This gets the squared distance between a joint and a marker on an adjacent
   /// body segment.
@@ -195,12 +197,10 @@ public:
   /// of bodies where only one side of the pair has 3 markers on it (commonly,
   /// the ankle).
   ///
-  /// IMPORTANT NOTE: This method assumes there are no markers that are
-  /// literally coincident with the joint center. It has a singularity in that
-  /// case, and will produce garbage. However, the only reason we would have a
-  /// marker on top of the joint center is if someone actually gave us marker
-  /// data with virtual joint centers already computed, in which case maybe we
-  /// just respect their wishes?
+  /// This method has various singularities, such as if there is a marker that
+  /// is zero noise in the marker data (because it's synthetic), or if the
+  /// marker is exactly on the joint center. In these cases, the method will
+  /// fall back to the leastSquaresConcentricSphereFit() below.
   static Eigen::Vector3s getChangPollard2006JointCenterMultiMarker(
       std::vector<std::vector<Eigen::Vector3s>> markerTrace, bool log = false);
 
@@ -234,6 +234,33 @@ public:
       std::vector<std::pair<Eigen::Vector3s, s_t>> pointsAndRadii,
       std::vector<s_t> weights = std::vector<s_t>());
 
+  /// Here's a bunch of simple getters:
+
+  std::vector<std::map<std::string, Eigen::Vector3s>>& getJointCenters();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>>& getJointAxisDirs();
+
+  std::map<std::string, std::map<std::string, s_t>>&
+  getJointToMarkerSquaredDistances();
+
+  std::map<std::string, std::map<std::string, s_t>>&
+  getJointToJointSquaredDistances();
+
+  std::vector<std::shared_ptr<struct StackedBody>>& getStackedBodies();
+
+  std::vector<std::shared_ptr<struct StackedJoint>>& getStackedJoints();
+
+  std::vector<std::map<std::string, Eigen::Isometry3s>>& getBodyTransforms();
+
+  Eigen::VectorXs getGroupScales();
+
+  std::vector<Eigen::VectorXs> getPoses();
+
+  std::vector<Eigen::VectorXi> getPosesClosedFormEstimateAvailable();
+
+  std::vector<std::map<std::string, Eigen::Vector3s>>&
+  getDebugKnownSyntheticJointCenters();
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   s_t mModelHeightM;
@@ -241,7 +268,6 @@ protected:
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
 
-public:
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointCenters;
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointAxisDirs;
 
@@ -250,7 +276,6 @@ public:
   std::map<std::string, std::map<std::string, s_t>>
       mJointToJointSquaredDistances;
 
-public:
   // This holds the simplified skeleton, which is a list of (possibly stacked)
   // bodies and joints. This is public to faccilitate unit testing.
   std::vector<std::shared_ptr<struct StackedBody>> mStackedBodies;

@@ -51,14 +51,14 @@ void runOnRealOsim(
 
   if (saveToGUI)
   {
-    osim.skeleton->setGroupScales(initializer.mGroupScales);
+    osim.skeleton->setGroupScales(initializer.getGroupScales());
 
     server::GUIRecording server;
     server.setFramesPerSecond(30);
     server.renderSkeleton(osim.skeleton);
     for (int t = 0; t < markerObservations.size(); t++)
     {
-      osim.skeleton->setPositions(initializer.mPoses[t]);
+      osim.skeleton->setPositions(initializer.getPoses()[t]);
       server.renderSkeleton(osim.skeleton);
 
       /*
@@ -95,13 +95,13 @@ void runOnRealOsim(
       */
 
       server.deleteObjectsByPrefix("line_");
-      auto jointMap = initializer.getVisibleJointCenters(t);
+      auto jointMap = initializer.getJointsAttachedToObservedMarkersCenters(t);
       for (auto& pair : jointMap)
       {
         Eigen::Vector3s jointCenterEstimated = pair.second;
         std::map<std::string, s_t> jointToMarkerSquaredDistances
             = initializer.getJointToMarkerSquaredDistances(pair.first);
-        for (std::string& markerName : initializer.getVisibleMarkerNames(t))
+        for (std::string& markerName : initializer.getObservedMarkerNames(t))
         {
           Eigen::Vector3s markerWorld = markerObservations[t][markerName];
           Eigen::Vector4s color(0.5, 0.5, 0.5, 1.0);
@@ -131,6 +131,8 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
     bool saveToGUI = false,
     bool givePerfectScaleInfoToInitializer = false)
 {
+  srand(42);
+
   auto osim = OpenSimParser::parseOsim(openSimPath);
   s_t targetHeight = 1.8;
   s_t currentHeight = osim.skeleton->getHeight(
@@ -180,7 +182,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   std::map<std::string, std::map<std::string, s_t>>
       originalJointToJointDistances;
   std::map<std::string, int> jointStackSize;
-  for (auto& joint1 : initializer.mStackedJoints)
+  for (auto& joint1 : initializer.getStackedJoints())
   {
     Eigen::Vector3s joint1Center = Eigen::Vector3s::Zero();
     for (auto* j : joint1->joints)
@@ -192,7 +194,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
 
     jointStackSize[joint1->name] = joint1->joints.size();
 
-    for (auto& joint2 : initializer.mStackedJoints)
+    for (auto& joint2 : initializer.getStackedJoints())
     {
       Eigen::Vector3s joint2Center = Eigen::Vector3s::Zero();
       for (auto* j : joint2->joints)
@@ -224,10 +226,10 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
     // initializer.fineTuneIKIteratively(t, osim.skeleton);
   }
 
-  std::vector<Eigen::VectorXs> recoveredPoses = initializer.mPoses;
-  Eigen::VectorXs groupScales = initializer.mGroupScales;
+  std::vector<Eigen::VectorXs> recoveredPoses = initializer.getPoses();
+  Eigen::VectorXs groupScales = initializer.getGroupScales();
   std::vector<std::map<std::string, Eigen::Isometry3s>> estimatedBodyTransforms
-      = initializer.mBodyTransforms;
+      = initializer.getBodyTransforms();
 
   // Check the quality of joint to joint distances
   std::map<std::string, std::map<std::string, s_t>>
@@ -309,16 +311,17 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         }
       }
 
-      if (initializer.mJointAxisDirs.size() > t)
+      if (initializer.getJointAxisDirs().size() > t)
       {
-        for (auto& pair : initializer.mJointAxisDirs[t])
+        for (auto& pair : initializer.getJointAxisDirs()[t])
         {
-          if (initializer.mJointAxisDirs[t].count(pair.first))
+          if (initializer.getJointAxisDirs()[t].count(pair.first))
           {
             std::vector<Eigen::Vector3s> guessedAxisLine;
             guessedAxisLine.push_back(pair.second);
             guessedAxisLine.push_back(
-                pair.second + initializer.mJointAxisDirs[t][pair.first] * 0.5);
+                pair.second
+                + initializer.getJointAxisDirs()[t][pair.first] * 0.5);
             server.createLine(
                 "guessed_joint" + pair.first,
                 guessedAxisLine,
@@ -365,7 +368,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
       }
       avgJointAngleError += (pose - recoveredPose).norm();
     }
-    auto jointMap = initializer.getVisibleJointCenters(t);
+    auto jointMap = initializer.getJointsAttachedToObservedMarkersCenters(t);
     for (auto& pair : jointMap)
     {
       Eigen::Vector3s jointWorld = jointCenters[t].segment<3>(
@@ -395,7 +398,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
 
       std::map<std::string, s_t> jointToMarkerSquaredDistances
           = initializer.getJointToMarkerSquaredDistances(pair.first);
-      for (std::string& markerName : initializer.getVisibleMarkerNames(t))
+      for (std::string& markerName : initializer.getObservedMarkerNames(t))
       {
         Eigen::Vector3s markerWorld = markerObservations[t][markerName];
         Eigen::Vector4s color(0.5, 0.5, 0.5, 1.0);
@@ -485,7 +488,7 @@ bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
   std::map<std::string, s_t> avgJointCenterEstimateErrorByJoint;
   for (int t = 0; t < markerObservations.size(); t++)
   {
-    auto jointMap = initializer.getVisibleJointCenters(t);
+    auto jointMap = initializer.getJointsAttachedToObservedMarkersCenters(t);
     for (auto& pair : jointMap)
     {
       Eigen::Vector3s jointWorld = jointCenters[t].segment<3>(
@@ -543,7 +546,8 @@ bool verifyMarkerReconstructionOnOsim(
       osim.skeleton, osim.markersMap, markerObservations, heightM);
   for (int t = 0; t < markerObservations.size(); t++)
   {
-    std::vector<std::string> markerNames = initializer.getVisibleMarkerNames(t);
+    std::vector<std::string> markerNames
+        = initializer.getObservedMarkerNames(t);
     Eigen::MatrixXs D
         = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
     for (int i = 0; i < markerNames.size(); i++)
@@ -678,6 +682,10 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
 #endif
 
 #ifdef ALL_TESTS
+/// This test is just for exploring the math in the Chang Pollard paper. This
+/// doesn't actually test anything in IKInitializer, it's just validating that
+/// the formula I'm using for mapping into/out-of the 5-dim polynomial basis
+/// functions they use is correct.
 TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
 {
   for (int i = 0; i < 5; i++)
@@ -712,6 +720,10 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
 #endif
 
 #ifdef ALL_TESTS
+/// This test is just for exploring the math in the Chang Pollard paper. This
+/// doesn't actually test anything in IKInitializer, it's just validating that
+/// the formula I'm using for mapping into/out-of the 5-dim polynomial basis
+/// functions they use is correct.
 TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 {
   for (int i = 0; i < 5; i++)
@@ -737,6 +749,96 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 
     EXPECT_NEAR(cost, recoveredCost, 1e-8);
   }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_POLYNOMIAL_REGRESSION_1)
+{
+  srand(42);
+
+  Eigen::Vector3s dataPoint = Eigen::Vector3s(-0.0910221, 0.179806, 0.172988);
+
+  Eigen::Vector5s polynomial = Eigen::Vector5s::Zero();
+  polynomial(0) = dataPoint.squaredNorm();
+  polynomial(1) = dataPoint(0);
+  polynomial(2) = dataPoint(1);
+  polynomial(3) = dataPoint(2);
+  polynomial(4) = 1.0;
+
+  // Now we'll evaluate the cost in two different formats on the forward version
+  for (int i = 0; i < 1000; i++)
+  {
+    // First generate a random point to evaluate
+    s_t radius = 0.1 + ((s_t)rand() / RAND_MAX) * 0.9;
+    Eigen::Vector3s center = Eigen::Vector3s::Random();
+
+    // Now we'll evaluate the cost in the original definition
+    s_t originalLoss = (dataPoint - center).squaredNorm() - radius * radius;
+
+    // Next, we'll construct the algebraic version of the loss
+    // From the original formula, we have:
+    // (dataPoint(0) - center(0))^2 + (dataPoint(1) - center(1))^2 +
+    // (dataPoint(2) - center(2))^2 - radius * radius
+    // We can expand this out to:
+    // dataPoint(0)^2 - 2 * dataPoint(0) * center(0) + center(0)^2 +
+    // dataPoint(1)^2 - 2 * dataPoint(1) * center(1) + center(1)^2 +
+    // dataPoint(2)^2 - 2 * dataPoint(2) * center(2) + center(2)^2 -
+    // radius * radius
+    // We can then reorganize the terms, and we get:
+    // (dataPoint.squaredNorm())*(1.0)
+    // (dataPoint(0))*(-2 * center(0))
+    // (dataPoint(1))*(-2 * center(1))
+    // (dataPoint(2))*(-2 * center(2))
+    // (1.0)*(center.squaredNorm() - radius * radius)
+
+    Eigen::Vector5s u = Eigen::Vector5s::Zero();
+    u(0) = 1.0;
+    u(1) = -2 * center(0);
+    u(2) = -2 * center(1);
+    u(3) = -2 * center(2);
+    u(4) = center.squaredNorm() - radius * radius;
+
+    s_t algebraicLoss = polynomial.dot(u);
+
+    EXPECT_NEAR(originalLoss, algebraicLoss, 1e-10);
+  }
+
+  Eigen::Matrix5s C = Eigen::Matrix5s::Zero();
+  C(1, 1) = 1.0;
+  C(2, 2) = 1.0;
+  C(3, 3) = 1.0;
+  C(4, 0) = -2.0;
+  C(0, 4) = -2.0;
+
+  // Now evaluate the cost in two different formats on the backward version
+  for (int i = 0; i < 1000; i++)
+  {
+    Eigen::Vector5s u = Eigen::Vector5s::Random();
+    s_t rawConstraint = u.dot(C * u);
+    if (rawConstraint < 0)
+    {
+      continue;
+    }
+    u /= sqrt(rawConstraint);
+
+    // First evaluate the algebraic loss
+    s_t algebraicLoss = polynomial.dot(u) / u(0);
+
+    // Now we need to recover the center point and the radius
+    u /= u(0);
+    Eigen::Vector3s center = u.segment<3>(1) / -2.0;
+    s_t radiusSquared = (center.squaredNorm() - u(4));
+    // u(4) = center.squaredNorm() - radiusSquared;
+    // u(4) - center.squaredNorm() = - radiusSquared;
+    // center.squaredNorm() - u(4) = radiusSquared;
+
+    s_t originalLoss = (dataPoint - center).squaredNorm() - radiusSquared;
+
+    EXPECT_NEAR(originalLoss, algebraicLoss, 1e-9);
+  }
+
+  // Problem U: -13.0184   -1.356  4.62209  5.64295 -1.03786
 }
 #endif
 
@@ -775,11 +877,13 @@ TEST(IKInitializer, SPHERE_FIT_MULTI_JOINT_LEAST_SQUARES)
 #ifdef ALL_TESTS
 TEST(IKInitializer, CHANG_POLLARD_SINGLE_MARKER_NO_NOISE)
 {
-  Eigen::Vector3s center = Eigen::Vector3s::UnitX() * 3;
+  Eigen::Vector3s center = Eigen::Vector3s::UnitX() * 0;
   std::vector<Eigen::Vector3s> markerObservations1;
-  s_t radius1 = 2.0;
-  markerObservations1.push_back(center + Eigen::Vector3s::UnitX() * radius1);
-  markerObservations1.push_back(center - Eigen::Vector3s::UnitX() * radius1);
+  s_t radius1 = 1.0;
+  markerObservations1.push_back(
+      center + Eigen::Vector3s::UnitX() * (radius1 + 0.01));
+  markerObservations1.push_back(
+      center - Eigen::Vector3s::UnitX() * (radius1 + 0.01));
   markerObservations1.push_back(center + Eigen::Vector3s::UnitY() * radius1);
   markerObservations1.push_back(center - Eigen::Vector3s::UnitY() * radius1);
   markerObservations1.push_back(center + Eigen::Vector3s::UnitZ() * radius1);
@@ -789,7 +893,8 @@ TEST(IKInitializer, CHANG_POLLARD_SINGLE_MARKER_NO_NOISE)
   markerTraces.push_back(markerObservations1);
 
   Eigen::Vector3s center_raw
-      = IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
+      = IKInitializer::getChangPollard2006JointCenterMultiMarker(
+          markerTraces, true);
   s_t error_raw = (center_raw - center).norm();
   EXPECT_NEAR(error_raw, 0.0, 1e-8);
 }
@@ -812,28 +917,47 @@ TEST(IKInitializer, CHANG_POLLARD_REGRESSION_1)
   std::vector<std::vector<Eigen::Vector3s>> markerTraces;
   markerTraces.push_back(markerObservations);
 
-  // Eigen::Vector3s center_raw
-  //     =
-  //     IKInitializer::getChangPollard2006JointCenterMultiMarker(markerTraces);
-  Eigen::Vector3s center_raw
+  Eigen::Vector3s least_squares_center
       = IKInitializer::leastSquaresConcentricSphereFit(markerTraces);
+  std::cout << "Least squares center: " << std::endl
+            << least_squares_center << std::endl;
+
+  Eigen::Vector3s center_raw
+      = IKInitializer::getChangPollard2006JointCenterMultiMarker(
+          markerTraces, true);
 
   std::vector<s_t> radii;
+  std::vector<s_t> radiiLS;
   s_t avgRadius = 0.0;
+  s_t avgRadiusLS = 0.0;
   for (int i = 0; i < markerObservations.size(); i++)
   {
+    // Do chang-pollard
     s_t radius = (markerObservations[i] - center_raw).norm();
     radii.push_back(radius);
     avgRadius += radius;
+
+    // Do least squares
+    s_t radiusLS = (markerObservations[i] - least_squares_center).norm();
+    radiiLS.push_back(radiusLS);
+    avgRadiusLS += radiusLS;
   }
   avgRadius /= markerObservations.size();
+  avgRadiusLS /= markerObservations.size();
 
   s_t radiusVariance = 0.0;
+  s_t radiusVarianceLS = 0.0;
   for (int i = 0; i < markerObservations.size(); i++)
   {
     radiusVariance += (radii[i] - avgRadius) * (radii[i] - avgRadius);
+    radiusVarianceLS += (radiiLS[i] - avgRadiusLS) * (radiiLS[i] - avgRadiusLS);
   }
+  std::cout << "Radius variance (Chang Pollard): " << radiusVariance
+            << std::endl;
+  std::cout << "Radius variance (Least Squares): " << radiusVarianceLS
+            << std::endl;
   EXPECT_LE(radiusVariance, 1e-12);
+  EXPECT_LE(radiusVarianceLS, 1e-12);
 }
 #endif
 
@@ -1220,6 +1344,57 @@ TEST(IKInitializer, VISUALIZE_RESULTS)
       "unscaled_generic.osim",
       trcFiles,
       1.775,
+      true);
+}
+*/
+
+/*
+TEST(IKInitializer, VISUALIZE_RESULTS_REGRESSION_SUBJECT02)
+{
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/regression/Arnold2013Synthetic/subject02/trials/walk2/"
+      "markers.trc");
+
+  runOnRealOsim(
+      "dart://sample/regression/Arnold2013Synthetic/"
+      "unscaled_generic.osim",
+      trcFiles,
+      1.853,
+      true);
+}
+*/
+
+/*
+TEST(IKInitializer, VISUALIZE_RESULTS_REGRESSION_SUBJECT18)
+{
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/regression/Arnold2013Synthetic/subject18/trials/walk2/"
+      "markers.trc");
+
+  runOnRealOsim(
+      "dart://sample/regression/Arnold2013Synthetic/"
+      "unscaled_generic.osim",
+      trcFiles,
+      1.775,
+      true);
+}
+*/
+
+/*
+TEST(IKInitializer, VISUALIZE_RESULTS_REGRESSION_SUBJECT19)
+{
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/regression/Arnold2013Synthetic/subject19/trials/walk2/"
+      "markers.trc");
+
+  runOnRealOsim(
+      "dart://sample/regression/Arnold2013Synthetic/"
+      "unscaled_generic.osim",
+      trcFiles,
+      1.79,
       true);
 }
 */

@@ -660,11 +660,11 @@ void IKInitializer::runFullPipeline(bool logOutput)
   closedFormMDSJointCenterSolver();
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
-  closedFormPivotFindingJointCenterSolver(logOutput);
-  recenterAxisJointsBasedOnBoneAngles(logOutput);
+  closedFormPivotFindingJointCenterSolver();
+  recenterAxisJointsBasedOnBoneAngles();
 
   // Fill in the parts of the body scales and poses that we can in closed form
-  estimateGroupScalesClosedForm();
+  estimateGroupScalesClosedForm(logOutput);
   estimatePosesClosedForm();
 }
 
@@ -709,7 +709,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   for (int t = 0; t < mMarkerObservations.size(); t++)
   {
     std::vector<std::shared_ptr<struct StackedJoint>> joints
-        = getVisibleJoints(t);
+        = getJointsAttachedToObservedMarkers(t);
     std::map<std::string, Eigen::Vector3s> lastSolvedJointCenters;
     std::map<std::string, Eigen::Vector3s> solvedJointCenters;
     while (true)
@@ -1325,6 +1325,29 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       continue;
     }
 
+    bool anyMarkersTooCloseToJoint = false;
+    for (std::string marker : movingMarkers)
+    {
+      if (mJointToMarkerSquaredDistances[joint->name].count(marker) > 0)
+      {
+        if (mJointToMarkerSquaredDistances[joint->name][marker] < 0.01)
+        {
+          if (logOutput)
+          {
+            std::cout << "Joint \"" << joint->name << "\" detected marker \""
+                      << marker
+                      << "\" is too close to the joint (perhaps this is a "
+                         "synthetic joint center marker?), which would cause a "
+                         "singularity on Chang Pollard 2006, so we're going to "
+                         "go straight to least-squares."
+                      << std::endl;
+          }
+          anyMarkersTooCloseToJoint = true;
+          break;
+        }
+      }
+    }
+
     std::vector<std::vector<Eigen::Vector3s>> markerTraces;
     for (auto& pair : anchorBodyMarkerClouds)
     {
@@ -1332,15 +1355,26 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     }
 
     // 5.4. Get the local joint center in the anchor body
-    if (logOutput)
+    Eigen::Vector3s jointCenter;
+    if (anyMarkersTooCloseToJoint)
     {
-      std::cout << "Solving for joint \"" << joint->name
-                << "\" with Chang Pollard 2006" << std::endl;
+      if (logOutput)
+      {
+        std::cout << "Solving for joint \"" << joint->name
+                  << "\" with Least Squares" << std::endl;
+      }
+      jointCenter = leastSquaresConcentricSphereFit(markerTraces, logOutput);
     }
-    // Eigen::Vector3s jointCenter
-    //     = getChangPollard2006JointCenterMultiMarker(markerTraces, logOutput);
-    Eigen::Vector3s jointCenter
-        = leastSquaresConcentricSphereFit(markerTraces, logOutput);
+    else
+    {
+      if (logOutput)
+      {
+        std::cout << "Solving for joint \"" << joint->name
+                  << "\" with Chang Pollard 2006" << std::endl;
+      }
+      jointCenter
+          = getChangPollard2006JointCenterMultiMarker(markerTraces, logOutput);
+    }
 
     // 5.5. Transform the result back into world space, and record them
     for (auto& pair : bodyTrajectories[anchorBody->name])
@@ -2351,6 +2385,8 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
             {
               if (isStackedJointParentOfBody(i, j))
               {
+                s_t selfMultiplier = (i == j) ? 1.0 : 0.1;
+
                 auto& annotatedGroup = annotatedGroups[j];
                 for (int j = 0; j < annotatedGroup.adjacentJoints.size(); j++)
                 {
@@ -2366,7 +2402,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                         * getStackedJointCenterFromJointCentersVector(
                             annotatedGroup.adjacentJoints[j],
                             jointWorldPositions));
-                    visibleAdjacentPointWeights.push_back(1.0);
+                    visibleAdjacentPointWeights.push_back(selfMultiplier * 1.0);
                   }
                 }
                 for (int j = 0; j < annotatedGroup.adjacentMarkers.size(); j++)
@@ -2386,7 +2422,8 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                     visibleAdjacentPointsInLocalSpace.push_back(
                         rootBodyWorldTransform.inverse()
                         * markerWorldPositions.segment<3>(markerIndex * 3));
-                    visibleAdjacentPointWeights.push_back(0.01);
+                    visibleAdjacentPointWeights.push_back(
+                        selfMultiplier * 0.01);
                   }
                 }
               }
@@ -2653,7 +2690,7 @@ IKInitializer::estimateJointToJointDistances()
 //==============================================================================
 /// This gets the subset of markers that are visible at a given timestep
 std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-IKInitializer::getVisibleMarkers(int t)
+IKInitializer::getObservedMarkers(int t)
 {
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
   for (int i = 0; i < mMarkerNames.size(); i++)
@@ -2668,7 +2705,7 @@ IKInitializer::getVisibleMarkers(int t)
 
 //==============================================================================
 /// This gets the subset of markers that are visible at a given timestep
-std::vector<std::string> IKInitializer::getVisibleMarkerNames(int t)
+std::vector<std::string> IKInitializer::getObservedMarkerNames(int t)
 {
   std::vector<std::string> markerNames;
   for (int i = 0; i < mMarkerNames.size(); i++)
@@ -2685,7 +2722,7 @@ std::vector<std::string> IKInitializer::getVisibleMarkerNames(int t)
 /// This gets the subset of joints that are attached to markers that are
 /// visible at a given timestep
 std::vector<std::shared_ptr<struct StackedJoint>>
-IKInitializer::getVisibleJoints(int t)
+IKInitializer::getJointsAttachedToObservedMarkers(int t)
 {
   std::vector<std::shared_ptr<struct StackedJoint>> joints;
   for (int i = 0; i < mStackedJoints.size(); i++)
@@ -2710,8 +2747,8 @@ IKInitializer::getVisibleJoints(int t)
 //==============================================================================
 /// This gets the world center estimates for joints that are attached to
 /// markers that are visible at this timestep.
-std::map<std::string, Eigen::Vector3s> IKInitializer::getVisibleJointCenters(
-    int t)
+std::map<std::string, Eigen::Vector3s>
+IKInitializer::getJointsAttachedToObservedMarkersCenters(int t)
 {
   return mJointCenters[t];
 }
@@ -2936,6 +2973,12 @@ Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
 Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     std::vector<std::vector<Eigen::Vector3s>> markerTraces, bool log)
 {
+  // This algorithm performs really poorly if the joint center is less than 0.1
+  // units away from the markers, which often happens when your distance metric
+  // is in meters. To get around this, we pre-scale all the data up by
+  // SCALE_FACTOR, and scale down the result at the end by the same amount.
+  const s_t SCALE_FACTOR = 50.0;
+
   int numMarkers = markerTraces.size();
   int uDim = 4 + numMarkers;
 
@@ -2947,14 +2990,16 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     Eigen::MatrixXs D = Eigen::MatrixXs::Zero(markerTrace.size(), 4);
     for (int i = 0; i < markerTrace.size(); i++)
     {
-      D(i, 0) = markerTrace[i].squaredNorm();
-      D(i, 1) = markerTrace[i](0);
-      D(i, 2) = markerTrace[i](1);
-      D(i, 3) = markerTrace[i](2);
+      Eigen::Vector3s scaledPoint = SCALE_FACTOR * markerTrace[i];
+      D(i, 0) = scaledPoint.squaredNorm();
+      D(i, 1) = scaledPoint(0);
+      D(i, 2) = scaledPoint(1);
+      D(i, 3) = scaledPoint(2);
     }
     if (log)
     {
-      std::cout << "The data matrix D[" << Ds.size() << "]: " << std::endl
+      std::cout << "The data matrix D[" << Ds.size() << "] (scaled by "
+                << SCALE_FACTOR << "): " << std::endl
                 << D << std::endl;
     }
     Ds.push_back(D);
@@ -2970,14 +3015,18 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
   }
   if (log)
   {
-    std::cout << "The assembled data matrix D: " << std::endl << D << std::endl;
+    std::cout << "The assembled data matrix D (scaled by " << SCALE_FACTOR
+              << "): " << std::endl
+              << D << std::endl;
   }
 
   // Construct the matrix S, described in Equation 13 in the paper
   Eigen::MatrixXs S = D.transpose() * D;
   if (log)
   {
-    std::cout << "The objective matrix S: " << std::endl << S << std::endl;
+    std::cout << "The objective matrix S (scaled by " << SCALE_FACTOR
+              << "^2): " << std::endl
+              << S << std::endl;
   }
 
   // Construct the constraint matrix C, described in Equation 14 in the paper
@@ -3034,8 +3083,7 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
   Eigen::MatrixXcd complexEigenvectors = solver.eigenvectors();
   if (log)
   {
-    std::cout << "A matrix whose columns are eigenvectors corresponding to"
-              << "\nthe generalized eigenvalues of S and C are:\n"
+    std::cout << "The generalized eigenvectors of S and C are:\n"
               << complexEigenvectors << std::endl;
   }
 
@@ -3083,7 +3131,11 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     s_t eigenvalue = complexEigenvalues(i).real();
     // Double check that the rescaled eigenvector still satisfies the equation
     // (it must, cause everything is linear)
-    assert(((S * u) - (eigenvalue * C * u)).norm() < 1e-8);
+    Eigen::VectorXs S_u = S * u;
+    Eigen::VectorXs C_u = C * u;
+    Eigen::VectorXs diff = S_u - eigenvalue * C_u;
+    s_t diffNorm = diff.norm() / max(1.0, S_u.norm());
+    assert(diffNorm < 1e-6);
 #endif
 
 #ifndef NDEBUG
@@ -3100,7 +3152,58 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
       std::cout << "Cost[" << i << "]: " << cost << std::endl;
     Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * a);
     if (log)
-      std::cout << "Center[" << i << "]: " << std::endl << center << std::endl;
+      std::cout << "Center[" << i << "]: " << std::endl
+                << (center / SCALE_FACTOR) << std::endl;
+
+#ifndef NDEBUG
+    if (markerTraces.size() == 1)
+    {
+      // Check that the polynomial loss actually maps back to the original
+      // values
+      s_t radiusSquared = (center.squaredNorm() - u(4) / u(0));
+      s_t radius = sqrt(radiusSquared);
+      for (int i = 0; i < markerTraces.size(); i++)
+      {
+        for (int j = 0; j < markerTraces[i].size(); j++)
+        {
+          Eigen::Vector5s polynomial;
+          polynomial.head<4>() = Ds[i].row(j);
+          polynomial(4) = 1.0;
+
+          s_t algebraicDistance = polynomial.dot(u) / u(0);
+          Eigen::Vector3s scaledPoint = SCALE_FACTOR * markerTraces[i][j];
+          s_t originalDistance
+              = (scaledPoint - center).squaredNorm() - radiusSquared;
+          if (abs(algebraicDistance - originalDistance)
+                  / max(1.0, abs(originalDistance))
+              >= 1e-8)
+          {
+            std::cout << "Data polynomial failed to reconstruct data point ["
+                      << scaledPoint.transpose()
+                      << "] with distance from proposed center "
+                      << (scaledPoint - center).norm()
+                      << " and proposed radius " << radius << std::endl;
+            std::cout << "Polynomial: " << polynomial.transpose() << std::endl;
+            std::cout << "U: " << u.transpose() << std::endl;
+            std::cout << "Algebraic distance: " << algebraicDistance
+                      << std::endl;
+            std::cout << "Reconstructed center: " << center.transpose()
+                      << std::endl;
+            std::cout << "Reconstructed radius: " << radius << std::endl;
+            std::cout << "Original distance: " << originalDistance << std::endl;
+            std::cout << "Normalized Error: "
+                      << abs(algebraicDistance - originalDistance)
+                             / max(1.0, abs(originalDistance))
+                      << std::endl;
+          }
+          assert(
+              abs(algebraicDistance - originalDistance)
+                  / max(1.0, abs(originalDistance))
+              < 1e-8);
+        }
+      }
+    }
+#endif
 
     if (cost < bestCost)
     {
@@ -3125,10 +3228,15 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     }
     reconstructedCenter = leastSquaresConcentricSphereFit(markerTraces, log);
   }
+  else
+  {
+    reconstructedCenter /= SCALE_FACTOR;
+  }
 
   return reconstructedCenter;
 }
 
+//==============================================================================
 /// This implements a simple least-squares problem to find the center of a
 /// sphere of unknown radius, with samples along the hull given by `points`.
 /// This tolerates noise less well than the ChangPollard2006 method, because
@@ -3175,6 +3283,7 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   return center;
 }
 
+//==============================================================================
 /// This implements the least-squares method in Gamage and Lasenby 2002, "New
 /// least squares solutions for estimating the average centre of rotation and
 /// the axis of rotation"
@@ -3238,6 +3347,7 @@ std::vector<double> IKInitializer::findCubicRealRoots(
   */
 }
 
+//==============================================================================
 /// This method will find the best point on the line given by f(x) = (c + a*x)
 /// that minimizes: Sum_i weights[i] * (f(x) -
 /// pointsAndRadii[i].first).squaredNorm() - pointsAndRadii[i].second^2)^2
@@ -3337,6 +3447,81 @@ Eigen::Vector3s IKInitializer::centerPointOnAxis(
   }
 
   return center + bestRoot * axis;
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>&
+IKInitializer::getJointCenters()
+{
+  return mJointCenters;
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>&
+IKInitializer::getJointAxisDirs()
+{
+  return mJointAxisDirs;
+}
+
+//==============================================================================
+std::map<std::string, std::map<std::string, s_t>>&
+IKInitializer::getJointToMarkerSquaredDistances()
+{
+  return mJointToMarkerSquaredDistances;
+}
+
+//==============================================================================
+std::map<std::string, std::map<std::string, s_t>>&
+IKInitializer::getJointToJointSquaredDistances()
+{
+  return mJointToJointSquaredDistances;
+}
+
+//==============================================================================
+std::vector<std::shared_ptr<struct StackedBody>>&
+IKInitializer::getStackedBodies()
+{
+  return mStackedBodies;
+}
+
+//==============================================================================
+std::vector<std::shared_ptr<struct StackedJoint>>&
+IKInitializer::getStackedJoints()
+{
+  return mStackedJoints;
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Isometry3s>>&
+IKInitializer::getBodyTransforms()
+{
+  return mBodyTransforms;
+}
+
+//==============================================================================
+Eigen::VectorXs IKInitializer::getGroupScales()
+{
+  return mGroupScales;
+}
+
+//==============================================================================
+std::vector<Eigen::VectorXs> IKInitializer::getPoses()
+{
+  return mPoses;
+}
+
+//==============================================================================
+std::vector<Eigen::VectorXi>
+IKInitializer::getPosesClosedFormEstimateAvailable()
+{
+  return mPosesClosedFormEstimateAvailable;
+}
+
+//==============================================================================
+std::vector<std::map<std::string, Eigen::Vector3s>>&
+IKInitializer::getDebugKnownSyntheticJointCenters()
+{
+  return mDebugKnownSyntheticJointCenters;
 }
 
 } // namespace biomechanics

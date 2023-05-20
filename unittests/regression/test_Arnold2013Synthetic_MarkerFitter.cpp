@@ -390,12 +390,3 @@ TEST(Arnold2013Synthetic, RegressionTests)
     testSubject(subjects[i], heights[i], masses[i]);
   }
 }
-
-/*
-//==============================================================================
-int main(int argc, char* argv[])
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-*/
