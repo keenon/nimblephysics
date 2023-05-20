@@ -4506,8 +4506,15 @@ s_t getClosestRotationalApproximation(
   // Now the top left corner of R_b is our rotation matrix in 2D, about the
   // `axis` basis
   Eigen::Matrix2s twoDimensionalRotation = R_b.block<2, 2>(0, 0);
-  Eigen::Transform<s_t, 2, Eigen::Affine> t(twoDimensionalRotation);
-  Eigen::Matrix2s normalizedTwoDimensional = t.rotation();
+  Eigen::JacobiSVD<Eigen::Matrix2s> svd(
+      twoDimensionalRotation, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix2s U = svd.matrixU();
+  Eigen::Matrix2s V = svd.matrixV();
+  Eigen::Matrix2s normalizedTwoDimensional = U * V.transpose();
+  if (normalizedTwoDimensional.determinant() < 0)
+  {
+    normalizedTwoDimensional.col(1) *= -1;
+  }
   s_t angle
       = atan2(normalizedTwoDimensional(1, 0), normalizedTwoDimensional(0, 0));
   return angle;

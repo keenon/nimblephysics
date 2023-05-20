@@ -2474,7 +2474,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
               subJoint->setPositions(pos);
               recoveredJointTransform = subJoint->getRelativeTransform();
             }
-            remainingJointTransform
+            Eigen::Isometry3s newRemainingJointTransform
                 = recoveredJointTransform.inverse() * remainingJointTransform;
 
             if (logOutput)
@@ -2490,6 +2490,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                         << translationError << "m and " << rotationError
                         << " on rotation" << std::endl;
             }
+            remainingJointTransform = newRemainingJointTransform;
 
             // 2.2.3. Save our estimate back to our joint angles
             jointAngles.segment(

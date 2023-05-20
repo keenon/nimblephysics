@@ -161,8 +161,9 @@ Eigen::VectorXs RevoluteJoint::getNearestPositionToDesiredRotation(
       = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
         * relativeRotationGlobal
         * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
-  return Eigen::VectorXs::Ones(1)
-         * math::getClosestRotationalApproximation(getAxis(), relativeRotation);
+  s_t angle
+      = math::getClosestRotationalApproximation(getAxis(), relativeRotation);
+  return Eigen::VectorXs::Ones(1) * angle;
 }
 
 //==============================================================================
