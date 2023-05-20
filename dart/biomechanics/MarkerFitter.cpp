@@ -4236,444 +4236,472 @@ MarkerInitialization MarkerFitter::getInitialization(
       result.observedJoints.size() + result.unobservedJoints.size()
       == mSkeleton->getNumJoints());
 
-  // 1. Divide the marker observations into N sequential blocks.
-  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> blocks;
-  std::vector<Eigen::VectorXs> firstGuessPoses;
-  std::vector<std::vector<Eigen::VectorXs>> jointCenterBlocks;
-  std::vector<std::vector<Eigen::VectorXs>> jointAxisBlocks;
-  for (int i = 0; i < markerObservations.size(); i++)
+  if (params.joints.size() == 0)
   {
-    // This means we've just started a new clip, so we need a new block
-    if ((i % blockLen == 0) || newClip[i])
-    {
-      blocks.emplace_back();
-      jointCenterBlocks.emplace_back();
-      jointAxisBlocks.emplace_back();
-      assert(params.initPoses.cols() == 0 || i < params.initPoses.cols());
-      if (i < params.initPoses.cols())
-      {
-        firstGuessPoses.emplace_back(params.initPoses.col(i));
-      }
-      else
-      {
-        firstGuessPoses.emplace_back(mSkeleton->getPositions());
-      }
-    }
-    // Append our state to whatever the current block is
-    int mapIndex = blocks[blocks.size() - 1].size();
-    blocks[blocks.size() - 1].emplace_back();
-    for (std::string& marker : mMarkerNames)
-    {
-      if (markerObservations[i].count(marker) > 0)
-      {
-        assert(markerObservations[i].count(marker));
-        blocks[blocks.size() - 1][mapIndex].emplace(
-            marker, markerObservations[i].at(marker));
-      }
-    }
-    assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
-    if (params.jointCenters.cols() > i)
-    {
-      assert(params.jointCenters.rows() == params.joints.size() * 3);
-      jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
-          params.jointCenters.col(i));
-    }
-    else
-    {
-      assert(params.jointCenters.cols() == 0);
-      jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
-          Eigen::VectorXs::Zero(0));
-    }
-    if (params.jointAxis.cols() > i)
-    {
-      jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
-          params.jointAxis.col(i));
-    }
-    else
-    {
-      jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
-          Eigen::VectorXs::Zero(0));
-    }
-  }
+    // 1. If we don't have any joint center information yet, don't just run
+    // non-convex IK and hope for the best. Instead, run the least-squares IK
+    // initializer.
 
-  assert(blocks.size() >= numBlocks);
-  numBlocks = blocks.size();
+    IKInitializer initializer(
+        mSkeleton, mMarkerMap, markerObservations, mHeightPrior);
+    initializer.runFullPipeline();
 
-  std::vector<int> blockStartIndices;
-  std::vector<int> blockSizeIndices;
-  int cursor = 0;
-  for (int i = 0; i < blocks.size(); i++)
-  {
-    blockStartIndices.push_back(cursor);
-    blockSizeIndices.push_back(blocks[i].size());
-    cursor += blocks[i].size();
-  }
-
-  // Divide everything up into trials, instead of blocks.
-
-  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> trials;
-  std::vector<std::vector<Eigen::VectorXs>> jointCenterTrials;
-  std::vector<std::vector<Eigen::VectorXs>> jointAxisTrials;
-  for (int i = 0; i < markerObservations.size(); i++)
-  {
-    // This means we've just started a new clip, so we need a new block
-    if (newClip[i] || i == 0)
+    // For now, we're just going to use the poses and scales, and then leave the
+    // joint centers to the non-convex optimization pipeline. We could (and
+    // maybe should?) use the joint centers that the least-squares algo finds
+    // directly. That would require some refactoring, since those joint centers
+    // are for "stacked joints" which may be multiple joints in the skeleton at
+    // once.
+    result.poses = Eigen::MatrixXs::Zero(
+        mSkeleton->getNumDofs(), markerObservations.size());
+    result.groupScales = initializer.getGroupScales();
+    for (int i = 0; i < markerObservations.size(); i++)
     {
-      trials.emplace_back();
-      jointCenterTrials.emplace_back();
-      jointAxisTrials.emplace_back();
+      result.poses.col(i) = initializer.getPoses()[i];
     }
-    // Append our state to whatever the current block is
-    int mapIndex = trials[trials.size() - 1].size();
-    trials[trials.size() - 1].emplace_back();
-    for (std::string& marker : mMarkerNames)
-    {
-      if (markerObservations[i].count(marker) > 0)
-      {
-        assert(markerObservations[i].count(marker));
-        trials[trials.size() - 1][mapIndex].emplace(
-            marker, markerObservations[i].at(marker));
-      }
-    }
-    assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
-    if (params.jointCenters.cols() > i)
-    {
-      assert(params.jointCenters.rows() == params.joints.size() * 3);
-      jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
-          params.jointCenters.col(i));
-    }
-    else
-    {
-      assert(params.jointCenters.cols() == 0);
-      jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
-          Eigen::VectorXs::Zero(0));
-    }
-    if (params.jointAxis.cols() > i)
-    {
-      jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
-          params.jointAxis.col(i));
-    }
-    else
-    {
-      jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
-          Eigen::VectorXs::Zero(0));
-    }
-  }
-
-  int numTrials = trials.size();
-
-  std::vector<int> trialStartIndices;
-  std::vector<int> trialSizeIndices;
-  int trialCursor = 0;
-  for (int i = 0; i < trials.size(); i++)
-  {
-    trialStartIndices.push_back(trialCursor);
-    trialSizeIndices.push_back(trials[i].size());
-    trialCursor += trials[i].size();
-  }
-
-  // 2. Find IK+scaling for the beginning of each block independently
-  std::vector<ScaleAndFitResult> posesAndScales;
-  std::vector<std::future<ScaleAndFitResult>> posesAndScalesFutures;
-
-  if (params.groupScales.size() > 0)
-  {
-    mSkeleton->setGroupScales(params.groupScales);
-  }
-  for (int i = 0; i < numBlocks; i++)
-  {
-    if (params.dontRescaleBodies)
-    {
-      std::cout << "Starting initial fit for first timestep of block " << i
-                << "/" << numBlocks << std::endl;
-    }
-    else
-    {
-      std::cout << "Starting initial scale+fit for first timestep of block "
-                << i << "/" << numBlocks << std::endl;
-    }
-    /*
-    posesAndScales.push_back(scaleAndFit(
-        this,
-        blocks[i][0],
-        firstGuessPoses[i],
-        params.markerWeights,
-        params.markerOffsets,
-        params.joints,
-        jointCenterBlocks[i][0],
-        params.jointWeights,
-        jointAxisBlocks[i][0],
-        params.axisWeights,
-        result.observedJoints,
-        params.dontRescaleBodies,
-        i,
-        true,
-        true));
-    exit(1);
-    */
-    posesAndScalesFutures.push_back(std::async(
-        &MarkerFitter::scaleAndFit,
-        this,
-        blocks[i][0],
-        firstGuessPoses[i],
-        params.markerWeights,
-        params.markerOffsets,
-        params.joints,
-        jointCenterBlocks[i][0],
-        params.jointWeights,
-        jointAxisBlocks[i][0],
-        params.axisWeights,
-        result.observedJoints,
-        params.dontRescaleBodies,
-        i,
-        false,
-        false));
-  }
-
-  for (int i = 0; i < numBlocks; i++)
-  {
-    ScaleAndFitResult result = posesAndScalesFutures[i].get();
-
-    // Do some error checking on the results
-    if (!mIgnoreJointLimits)
-    {
-      Eigen::VectorXs posLowerLimits = mSkeleton->getPositionLowerLimits();
-      Eigen::VectorXs posUpperLimits = mSkeleton->getPositionUpperLimits();
-      for (int j = 0; j < mSkeleton->getNumDofs(); j++)
-      {
-        s_t posJ = result.pose(j);
-        if (posJ < posLowerLimits(j))
-        {
-          std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
-                    << ") below lower limit! " << posJ << " < "
-                    << posLowerLimits(j) << std::endl;
-        }
-        if (posJ > posUpperLimits(j))
-        {
-          std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
-                    << ") above upper limit! " << posJ << " > "
-                    << posUpperLimits(j) << std::endl;
-        }
-      }
-    }
-    // End: error checking
-
-    posesAndScales.push_back(result);
-    if (params.dontRescaleBodies)
-    {
-      std::cout << "Finished initial fit for first timestep of block " << i
-                << "/" << numBlocks << std::endl;
-    }
-    else
-    {
-      std::cout << "Finished initial scale+fit for first timestep of block "
-                << i << "/" << numBlocks << std::endl;
-    }
-  }
-
-  // 3. Average the scalings for each block together
-  if (params.dontRescaleBodies && params.groupScales.size() > 0)
-  {
-    result.groupScales = params.groupScales;
-    mSkeleton->setGroupScales(result.groupScales);
   }
   else
   {
-    Eigen::VectorXs averageGroupScales
-        = Eigen::VectorXs::Zero(mSkeleton->getGroupScaleDim());
-    s_t totalWeight = 0.0;
-    for (int i = 0; i < numBlocks; i++)
+    // 1. Divide the marker observations into N sequential blocks.
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> blocks;
+    std::vector<Eigen::VectorXs> firstGuessPoses;
+    std::vector<std::vector<Eigen::VectorXs>> jointCenterBlocks;
+    std::vector<std::vector<Eigen::VectorXs>> jointAxisBlocks;
+    for (int i = 0; i < markerObservations.size(); i++)
     {
-      s_t weight = 1.0 / posesAndScales[i].score;
-      averageGroupScales += weight * posesAndScales[i].scale;
-      totalWeight += weight;
+      // This means we've just started a new clip, so we need a new block
+      if ((i % blockLen == 0) || newClip[i])
+      {
+        blocks.emplace_back();
+        jointCenterBlocks.emplace_back();
+        jointAxisBlocks.emplace_back();
+        assert(params.initPoses.cols() == 0 || i < params.initPoses.cols());
+        if (i < params.initPoses.cols())
+        {
+          firstGuessPoses.emplace_back(params.initPoses.col(i));
+        }
+        else
+        {
+          firstGuessPoses.emplace_back(mSkeleton->getPositions());
+        }
+      }
+      // Append our state to whatever the current block is
+      int mapIndex = blocks[blocks.size() - 1].size();
+      blocks[blocks.size() - 1].emplace_back();
+      for (std::string& marker : mMarkerNames)
+      {
+        if (markerObservations[i].count(marker) > 0)
+        {
+          assert(markerObservations[i].count(marker));
+          blocks[blocks.size() - 1][mapIndex].emplace(
+              marker, markerObservations[i].at(marker));
+        }
+      }
+      assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
+      if (params.jointCenters.cols() > i)
+      {
+        assert(params.jointCenters.rows() == params.joints.size() * 3);
+        jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
+            params.jointCenters.col(i));
+      }
+      else
+      {
+        assert(params.jointCenters.cols() == 0);
+        jointCenterBlocks[jointCenterBlocks.size() - 1].push_back(
+            Eigen::VectorXs::Zero(0));
+      }
+      if (params.jointAxis.cols() > i)
+      {
+        jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
+            params.jointAxis.col(i));
+      }
+      else
+      {
+        jointAxisBlocks[jointAxisBlocks.size() - 1].push_back(
+            Eigen::VectorXs::Zero(0));
+      }
     }
-    averageGroupScales /= totalWeight;
-    result.groupScales = averageGroupScales;
-    mSkeleton->setGroupScales(result.groupScales);
-  }
 
-  // 4. Go through and run IK on each block
-  result.poses = Eigen::MatrixXs::Zero(
-      mSkeleton->getNumDofs(), markerObservations.size());
-  result.poseScores = Eigen::VectorXs::Zero(markerObservations.size());
+    assert(blocks.size() >= numBlocks);
+    numBlocks = blocks.size();
 
-  for (int i = 0; i < numBlocks; i++)
-  {
-    result.poses.col(blockStartIndices[i]) = posesAndScales[i].pose;
-  }
-  std::vector<bool> shouldProcessBlock;
-  std::vector<s_t> lastBlockLoss;
-  for (int i = 0; i < numBlocks; i++)
-  {
-    shouldProcessBlock.push_back(true);
-    lastBlockLoss.push_back(std::numeric_limits<double>::infinity());
-  }
+    std::vector<int> blockStartIndices;
+    std::vector<int> blockSizeIndices;
+    int cursor = 0;
+    for (int i = 0; i < blocks.size(); i++)
+    {
+      blockStartIndices.push_back(cursor);
+      blockSizeIndices.push_back(blocks[i].size());
+      cursor += blocks[i].size();
+    }
 
-  // We re-run parallel processing over all the blocks until convergence, or at
-  // most numBlocks times
-  for (int k = 0; k < params.numIKTries; k++)
-  {
-    std::vector<std::future<void>> blockFitFutures;
+    // Divide everything up into trials, instead of blocks.
+
+    std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>> trials;
+    std::vector<std::vector<Eigen::VectorXs>> jointCenterTrials;
+    std::vector<std::vector<Eigen::VectorXs>> jointAxisTrials;
+    for (int i = 0; i < markerObservations.size(); i++)
+    {
+      // This means we've just started a new clip, so we need a new block
+      if (newClip[i] || i == 0)
+      {
+        trials.emplace_back();
+        jointCenterTrials.emplace_back();
+        jointAxisTrials.emplace_back();
+      }
+      // Append our state to whatever the current block is
+      int mapIndex = trials[trials.size() - 1].size();
+      trials[trials.size() - 1].emplace_back();
+      for (std::string& marker : mMarkerNames)
+      {
+        if (markerObservations[i].count(marker) > 0)
+        {
+          assert(markerObservations[i].count(marker));
+          trials[trials.size() - 1][mapIndex].emplace(
+              marker, markerObservations[i].at(marker));
+        }
+      }
+      assert(params.jointCenters.cols() == 0 || params.jointCenters.cols() > i);
+      if (params.jointCenters.cols() > i)
+      {
+        assert(params.jointCenters.rows() == params.joints.size() * 3);
+        jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
+            params.jointCenters.col(i));
+      }
+      else
+      {
+        assert(params.jointCenters.cols() == 0);
+        jointCenterTrials[jointCenterTrials.size() - 1].emplace_back(
+            Eigen::VectorXs::Zero(0));
+      }
+      if (params.jointAxis.cols() > i)
+      {
+        jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
+            params.jointAxis.col(i));
+      }
+      else
+      {
+        jointAxisTrials[jointAxisTrials.size() - 1].emplace_back(
+            Eigen::VectorXs::Zero(0));
+      }
+    }
+
+    int numTrials = trials.size();
+
+    std::vector<int> trialStartIndices;
+    std::vector<int> trialSizeIndices;
+    int trialCursor = 0;
+    for (int i = 0; i < trials.size(); i++)
+    {
+      trialStartIndices.push_back(trialCursor);
+      trialSizeIndices.push_back(trials[i].size());
+      trialCursor += trials[i].size();
+    }
+
+    // 2. Find IK+scaling for the beginning of each block independently
+    std::vector<ScaleAndFitResult> posesAndScales;
+    std::vector<std::future<ScaleAndFitResult>> posesAndScalesFutures;
+
+    if (params.groupScales.size() > 0)
+    {
+      mSkeleton->setGroupScales(params.groupScales);
+    }
     for (int i = 0; i < numBlocks; i++)
     {
-      std::cout << "Starting fit for whole block " << i << "/" << numBlocks
+      if (params.dontRescaleBodies)
+      {
+        std::cout << "Starting initial fit for first timestep of block " << i
+                  << "/" << numBlocks << std::endl;
+      }
+      else
+      {
+        std::cout << "Starting initial scale+fit for first timestep of block "
+                  << i << "/" << numBlocks << std::endl;
+      }
+      /*
+      posesAndScales.push_back(scaleAndFit(
+          this,
+          blocks[i][0],
+          firstGuessPoses[i],
+          params.markerWeights,
+          params.markerOffsets,
+          params.joints,
+          jointCenterBlocks[i][0],
+          params.jointWeights,
+          jointAxisBlocks[i][0],
+          params.axisWeights,
+          result.observedJoints,
+          params.dontRescaleBodies,
+          i,
+          true,
+          true));
+      exit(1);
+      */
+      posesAndScalesFutures.push_back(std::async(
+          &MarkerFitter::scaleAndFit,
+          this,
+          blocks[i][0],
+          firstGuessPoses[i],
+          params.markerWeights,
+          params.markerOffsets,
+          params.joints,
+          jointCenterBlocks[i][0],
+          params.jointWeights,
+          jointAxisBlocks[i][0],
+          params.axisWeights,
+          result.observedJoints,
+          params.dontRescaleBodies,
+          i,
+          false,
+          false));
+    }
+
+    for (int i = 0; i < numBlocks; i++)
+    {
+      ScaleAndFitResult result = posesAndScalesFutures[i].get();
+
+      // Do some error checking on the results
+      if (!mIgnoreJointLimits)
+      {
+        Eigen::VectorXs posLowerLimits = mSkeleton->getPositionLowerLimits();
+        Eigen::VectorXs posUpperLimits = mSkeleton->getPositionUpperLimits();
+        for (int j = 0; j < mSkeleton->getNumDofs(); j++)
+        {
+          s_t posJ = result.pose(j);
+          if (posJ < posLowerLimits(j))
+          {
+            std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                      << ") below lower limit! " << posJ << " < "
+                      << posLowerLimits(j) << std::endl;
+          }
+          if (posJ > posUpperLimits(j))
+          {
+            std::cout << "DOF " << j << " (" << mSkeleton->getDof(j)->getName()
+                      << ") above upper limit! " << posJ << " > "
+                      << posUpperLimits(j) << std::endl;
+          }
+        }
+      }
+      // End: error checking
+
+      posesAndScales.push_back(result);
+      if (params.dontRescaleBodies)
+      {
+        std::cout << "Finished initial fit for first timestep of block " << i
+                  << "/" << numBlocks << std::endl;
+      }
+      else
+      {
+        std::cout << "Finished initial scale+fit for first timestep of block "
+                  << i << "/" << numBlocks << std::endl;
+      }
+    }
+
+    // 3. Average the scalings for each block together
+    if (params.dontRescaleBodies && params.groupScales.size() > 0)
+    {
+      result.groupScales = params.groupScales;
+      mSkeleton->setGroupScales(result.groupScales);
+    }
+    else
+    {
+      Eigen::VectorXs averageGroupScales
+          = Eigen::VectorXs::Zero(mSkeleton->getGroupScaleDim());
+      s_t totalWeight = 0.0;
+      for (int i = 0; i < numBlocks; i++)
+      {
+        s_t weight = 1.0 / posesAndScales[i].score;
+        averageGroupScales += weight * posesAndScales[i].scale;
+        totalWeight += weight;
+      }
+      averageGroupScales /= totalWeight;
+      result.groupScales = averageGroupScales;
+      mSkeleton->setGroupScales(result.groupScales);
+    }
+
+    // 4. Go through and run IK on each block
+    result.poses = Eigen::MatrixXs::Zero(
+        mSkeleton->getNumDofs(), markerObservations.size());
+    result.poseScores = Eigen::VectorXs::Zero(markerObservations.size());
+
+    for (int i = 0; i < numBlocks; i++)
+    {
+      result.poses.col(blockStartIndices[i]) = posesAndScales[i].pose;
+    }
+    std::vector<bool> shouldProcessBlock;
+    std::vector<s_t> lastBlockLoss;
+    for (int i = 0; i < numBlocks; i++)
+    {
+      shouldProcessBlock.push_back(true);
+      lastBlockLoss.push_back(std::numeric_limits<double>::infinity());
+    }
+
+    // We re-run parallel processing over all the blocks until convergence, or
+    // at most numBlocks times
+    for (int k = 0; k < params.numIKTries; k++)
+    {
+      std::vector<std::future<void>> blockFitFutures;
+      for (int i = 0; i < numBlocks; i++)
+      {
+        std::cout << "Starting fit for whole block " << i << "/" << numBlocks
+                  << std::endl;
+
+        if (shouldProcessBlock[i])
+        {
+          blockFitFutures.push_back(std::async(
+              &MarkerFitter::fitTrajectory,
+              this,
+              result.groupScales,
+              result.poses.col(blockStartIndices[i]),
+              blocks[i],
+              params.markerWeights,
+              params.markerOffsets,
+              params.joints,
+              jointCenterBlocks[i],
+              params.jointWeights,
+              jointAxisBlocks[i],
+              params.axisWeights,
+              result.observedJoints,
+              result.poses.block(
+                  0,
+                  blockStartIndices[i],
+                  mSkeleton->getNumDofs(),
+                  blockSizeIndices[i]),
+              result.poseScores.segment(
+                  blockStartIndices[i], blockSizeIndices[i]),
+              false));
+        }
+        else
+        {
+          blockFitFutures.push_back(std::async([]() {}));
+        }
+      }
+      for (int i = 0; i < numBlocks; i++)
+      {
+        blockFitFutures[i].get();
+        std::cout << "Finished fit for whole block " << i << "/" << numBlocks
+                  << std::endl;
+      }
+
+      bool foundGap = false;
+      for (int i = 1; i < numBlocks; i++)
+      {
+        s_t blockStartLoss = result.poseScores(blockStartIndices[i]);
+        if (blockStartLoss > result.poseScores(blockStartIndices[i] - 1) * 3
+            && blockStartLoss > 0.01 && !newClip[blockStartIndices[i]])
+        {
+          s_t lastBlockStartLoss = lastBlockLoss[i];
+          if (abs(blockStartLoss - lastBlockStartLoss) < 1e-3)
+          {
+            std::cout << "Bad block start at " << i << ": prev block ended at "
+                      << result.poseScores(blockStartIndices[i] - 1)
+                      << ", but this block started at "
+                      << result.poseScores(blockStartIndices[i])
+                      << ". However, no improvement since last iteration, so "
+                         "we're not going to retry this block."
+                      << std::endl;
+          }
+          else
+          {
+            lastBlockLoss[i] = blockStartLoss;
+            shouldProcessBlock[i] = true;
+            std::cout << "Found bad block start at " << i
+                      << ": prev block ended at "
+                      << result.poseScores(blockStartIndices[i] - 1)
+                      << ", but this block started at "
+                      << result.poseScores(blockStartIndices[i]) << std::endl;
+            result.poses(blockStartIndices[i])
+                = result.poses(blockStartIndices[i] - 1);
+            foundGap = true;
+          }
+        }
+        else
+        {
+          shouldProcessBlock[i] = false;
+        }
+      }
+
+      /*
+      Eigen::MatrixXs blockVsScore
+          = Eigen::MatrixXs::Zero(result.poseScores.size(), 2);
+      for (int i = 0; i < numBlocks; i++)
+      {
+        blockVsScore.block(blockStartIndices[i], 0, blockSizeIndices[i], 1)
+            .setConstant(i);
+      }
+      blockVsScore.col(1) = result.poseScores;
+      std::cout << "Block vs score: " << blockVsScore << std::endl;
+      */
+
+      if (!foundGap)
+      {
+        break;
+      }
+    }
+
+    bool shouldResmooth = false;
+    for (int t = 1; t < result.poses.cols(); t++)
+    {
+      if (!newClip[t])
+      {
+        s_t diff = (result.poses.col(t) - result.poses.col(t - 1)).norm();
+        if (diff > 0.1)
+        {
+          shouldResmooth = true;
+          break;
+        }
+      }
+    }
+
+    if (shouldResmooth)
+    {
+      std::cout << "Fixing jitters by running a round of single-threaded IK"
                 << std::endl;
 
-      if (shouldProcessBlock[i])
+      std::vector<std::future<void>> trialFitFutures;
+      for (int i = 0; i < numTrials; i++)
       {
-        blockFitFutures.push_back(std::async(
+        std::cout << "Starting fit for whole trial " << i << "/" << numTrials
+                  << std::endl;
+
+        trialFitFutures.push_back(std::async(
             &MarkerFitter::fitTrajectory,
             this,
             result.groupScales,
-            result.poses.col(blockStartIndices[i]),
-            blocks[i],
+            result.poses.col(trialStartIndices[i]),
+            trials[i],
             params.markerWeights,
             params.markerOffsets,
             params.joints,
-            jointCenterBlocks[i],
+            jointCenterTrials[i],
             params.jointWeights,
-            jointAxisBlocks[i],
+            jointAxisTrials[i],
             params.axisWeights,
             result.observedJoints,
             result.poses.block(
                 0,
-                blockStartIndices[i],
+                trialStartIndices[i],
                 mSkeleton->getNumDofs(),
-                blockSizeIndices[i]),
+                trialSizeIndices[i]),
             result.poseScores.segment(
-                blockStartIndices[i], blockSizeIndices[i]),
+                trialStartIndices[i], trialSizeIndices[i]),
             false));
       }
-      else
+      for (int i = 0; i < numTrials; i++)
       {
-        blockFitFutures.push_back(std::async([]() {}));
-      }
-    }
-    for (int i = 0; i < numBlocks; i++)
-    {
-      blockFitFutures[i].get();
-      std::cout << "Finished fit for whole block " << i << "/" << numBlocks
-                << std::endl;
-    }
-
-    bool foundGap = false;
-    for (int i = 1; i < numBlocks; i++)
-    {
-      s_t blockStartLoss = result.poseScores(blockStartIndices[i]);
-      if (blockStartLoss > result.poseScores(blockStartIndices[i] - 1) * 3
-          && blockStartLoss > 0.01 && !newClip[blockStartIndices[i]])
-      {
-        s_t lastBlockStartLoss = lastBlockLoss[i];
-        if (abs(blockStartLoss - lastBlockStartLoss) < 1e-3)
-        {
-          std::cout << "Bad block start at " << i << ": prev block ended at "
-                    << result.poseScores(blockStartIndices[i] - 1)
-                    << ", but this block started at "
-                    << result.poseScores(blockStartIndices[i])
-                    << ". However, no improvement since last iteration, so "
-                       "we're not going to retry this block."
-                    << std::endl;
-        }
-        else
-        {
-          lastBlockLoss[i] = blockStartLoss;
-          shouldProcessBlock[i] = true;
-          std::cout << "Found bad block start at " << i
-                    << ": prev block ended at "
-                    << result.poseScores(blockStartIndices[i] - 1)
-                    << ", but this block started at "
-                    << result.poseScores(blockStartIndices[i]) << std::endl;
-          result.poses(blockStartIndices[i])
-              = result.poses(blockStartIndices[i] - 1);
-          foundGap = true;
-        }
-      }
-      else
-      {
-        shouldProcessBlock[i] = false;
-      }
-    }
-
-    /*
-    Eigen::MatrixXs blockVsScore
-        = Eigen::MatrixXs::Zero(result.poseScores.size(), 2);
-    for (int i = 0; i < numBlocks; i++)
-    {
-      blockVsScore.block(blockStartIndices[i], 0, blockSizeIndices[i], 1)
-          .setConstant(i);
-    }
-    blockVsScore.col(1) = result.poseScores;
-    std::cout << "Block vs score: " << blockVsScore << std::endl;
-    */
-
-    if (!foundGap)
-    {
-      break;
-    }
-  }
-
-  bool shouldResmooth = false;
-  for (int t = 1; t < result.poses.cols(); t++)
-  {
-    if (!newClip[t])
-    {
-      s_t diff = (result.poses.col(t) - result.poses.col(t - 1)).norm();
-      if (diff > 0.1)
-      {
-        shouldResmooth = true;
-        break;
+        trialFitFutures[i].get();
+        std::cout << "Finished fit for whole trial " << i << "/" << numTrials
+                  << std::endl;
       }
     }
   }
 
-  if (shouldResmooth)
-  {
-    std::cout << "Fixing jitters by running a round of single-threaded IK"
-              << std::endl;
-
-    std::vector<std::future<void>> trialFitFutures;
-    for (int i = 0; i < numTrials; i++)
-    {
-      std::cout << "Starting fit for whole trial " << i << "/" << numTrials
-                << std::endl;
-
-      trialFitFutures.push_back(std::async(
-          &MarkerFitter::fitTrajectory,
-          this,
-          result.groupScales,
-          result.poses.col(trialStartIndices[i]),
-          trials[i],
-          params.markerWeights,
-          params.markerOffsets,
-          params.joints,
-          jointCenterTrials[i],
-          params.jointWeights,
-          jointAxisTrials[i],
-          params.axisWeights,
-          result.observedJoints,
-          result.poses.block(
-              0,
-              trialStartIndices[i],
-              mSkeleton->getNumDofs(),
-              trialSizeIndices[i]),
-          result.poseScores.segment(trialStartIndices[i], trialSizeIndices[i]),
-          false));
-    }
-    for (int i = 0; i < numTrials; i++)
-    {
-      trialFitFutures[i].get();
-      std::cout << "Finished fit for whole trial " << i << "/" << numTrials
-                << std::endl;
-    }
-  }
-
-  // 5. Find the local offsets for the anthropometric markers as a simple
+  // 5. Find the local offsets for the tracking markers as a simple
   // average
 
   if (params.dontMoveMarkers == false)
   {
-    bool offsetAnthropometricMarkersToo = false;
+    bool offsetAnatomicalMarkersToo = false;
 
     // 5.1. Initialize empty maps to accumulate sums into
 
@@ -4681,7 +4709,7 @@ MarkerInitialization MarkerFitter::getInitialization(
     std::map<std::string, int> trackingMarkerNumObservations;
     for (int i = 0; i < mMarkerNames.size(); i++)
     {
-      if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
+      if (mMarkerIsTracking[i] || offsetAnatomicalMarkersToo)
       {
         std::string name = mMarkerNames[i];
         trackingMarkerObservationsSum[name] = Eigen::Vector3s::Zero();
@@ -4701,7 +4729,7 @@ MarkerInitialization MarkerFitter::getInitialization(
       {
         std::string name = pair.first;
         int index = mMarkerIndices[name];
-        if (mMarkerIsTracking[index] || offsetAnthropometricMarkersToo)
+        if (mMarkerIsTracking[index] || offsetAnatomicalMarkersToo)
         {
           std::pair<dynamics::BodyNode*, Eigen::Vector3s> trackingMarker
               = mMarkers[index];
@@ -4738,7 +4766,7 @@ MarkerInitialization MarkerFitter::getInitialization(
       }
       else
       {
-        if (mMarkerIsTracking[i] || offsetAnthropometricMarkersToo)
+        if (mMarkerIsTracking[i] || offsetAnatomicalMarkersToo)
         {
           // Avoid divide-by-zero edge case
           if (trackingMarkerNumObservations[name] == 0)
