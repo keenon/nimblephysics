@@ -339,7 +339,7 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
     averagePerDofError += diff.cwiseAbs();
   }
   s_t averagePoseError = totalError / (s_t)poses.cols();
-  averagePerDofError /= (s_t)poses.rows();
+  averagePerDofError /= (s_t)poses.cols();
   if (averagePoseError >= 0.03)
   {
     std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
