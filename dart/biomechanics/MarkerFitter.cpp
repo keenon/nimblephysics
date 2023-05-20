@@ -10106,8 +10106,7 @@ IMUFineTuneProblem::IMUFineTuneProblem(
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
       assert(
-          threadBody->getIndexInSkeleton() >= 0
-          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+          threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadMarkers.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadMarkers.push_back(threadMarkers);
@@ -10120,8 +10119,7 @@ IMUFineTuneProblem::IMUFineTuneProblem(
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
       assert(
-          threadBody->getIndexInSkeleton() >= 0
-          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+          threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadAccelerometers.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadAccelerometers.push_back(threadAccelerometers);
@@ -10133,8 +10131,7 @@ IMUFineTuneProblem::IMUFineTuneProblem(
           = threadSkel->getBodyNode(pair.first->getName());
       assert(threadBody != nullptr);
       assert(
-          threadBody->getIndexInSkeleton() >= 0
-          && threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
+          threadBody->getIndexInSkeleton() < threadSkel->getNumBodyNodes());
       threadGyros.push_back(std::make_pair(threadBody, pair.second));
     }
     mThreadGyros.push_back(threadGyros);
