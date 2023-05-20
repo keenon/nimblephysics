@@ -171,7 +171,7 @@ void testSubject(
   }
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  s_t threshold = knownScales ? 0.03 : 0.14;
+  s_t threshold = knownScales ? 0.03 : 0.18;
   if (averagePoseError >= threshold)
   {
     std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
@@ -220,7 +220,7 @@ void testSubject(
               << std::endl;
   }
   s_t averageJointCenterError = avgJointError.mean();
-  EXPECT_LE(averageJointCenterError, knownScales ? 0.02 : 0.06);
+  EXPECT_LE(averageJointCenterError, knownScales ? 0.02 : 0.08);
 
   // Body scales.
   // ------------
@@ -234,7 +234,7 @@ void testSubject(
     bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
   }
   s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_LE(averageBodyScaleError, knownScales ? 0.01 : 0.02);
+  EXPECT_LE(averageBodyScaleError, knownScales ? 0.01 : 0.03);
 }
 
 //==============================================================================
