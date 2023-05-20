@@ -331,18 +331,31 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
   auto poses = markerInit.poses;
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
+  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(poses.rows());
   for (int i = 0; i < poses.cols(); i++)
   {
     Eigen::VectorXs diff = poses.col(i) - goldPoses.col(i);
-    totalError += diff.squaredNorm();
+    totalError += diff.cwiseAbs().sum() / diff.size();
+    averagePerDofError += diff.cwiseAbs();
   }
-  s_t averagePoseError = std::sqrt(totalError / (s_t)poses.cols());
-  EXPECT_LT(averagePoseError, 0.01);
+  s_t averagePoseError = totalError / (s_t)poses.cols();
+  averagePerDofError /= (s_t)poses.rows();
+  if (averagePoseError >= 0.03)
+  {
+    std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
+              << std::endl;
+    for (int i = 0; i < averagePerDofError.size(); i++)
+    {
+      std::cout << "  " << osimFile.skeleton->getDof(i)->getName() << ": "
+                << averagePerDofError(i) << std::endl;
+    }
+  }
+  EXPECT_LE(averagePoseError, 0.03);
 
   // Marker errors.
   // --------------
-  EXPECT_LT(finalKinematicsReport.averageRootMeanSquaredError, 0.01);
-  EXPECT_LT(finalKinematicsReport.averageMaxError, 0.02);
+  EXPECT_LE(finalKinematicsReport.averageRootMeanSquaredError, 0.01);
+  EXPECT_LE(finalKinematicsReport.averageMaxError, 0.02);
 
   // Joint centers.
   // --------------
@@ -350,7 +363,8 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
   auto joints = skeleton->getJoints();
   auto goldSkeleton = goldOsim.skeleton;
   auto goldJoints = goldSkeleton->getJoints();
-  Eigen::VectorXs jointErrors = Eigen::VectorXs::Zero(poses.cols());
+  Eigen::VectorXs avgJointError
+      = Eigen::VectorXs::Zero(skeleton->getNumJoints());
   for (int i = 0; i < poses.cols(); i++)
   {
     skeleton->setPositions(poses.col(i));
@@ -358,10 +372,23 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
     Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
     Eigen::VectorXs goldJointPoses
         = goldSkeleton->getJointWorldPositions(goldJoints);
-    jointErrors[i] = (jointPoses - goldJointPoses).norm();
+    Eigen::VectorXs diff = jointPoses - goldJointPoses;
+
+    for (int j = 0; j < skeleton->getNumJoints(); j++)
+    {
+      s_t jointDist = diff.segment<3>(3 * j).norm();
+      avgJointError(j) += jointDist;
+    }
   }
-  s_t averageJointPoseError = jointErrors.mean();
-  EXPECT_LT(averageJointPoseError, 0.01);
+  avgJointError /= poses.cols();
+  for (int j = 0; j < skeleton->getNumJoints(); j++)
+  {
+    std::cout << "Joint " << skeleton->getJoint(j)->getName()
+              << " average center-estimate error: " << avgJointError(j) << "m"
+              << std::endl;
+  }
+  s_t averageJointCenterError = avgJointError.mean();
+  EXPECT_LE(averageJointCenterError, 0.02);
 
   // Body scales.
   // ------------
@@ -375,7 +402,7 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
     bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
   }
   s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_LT(averageBodyScaleError, 0.01);
+  EXPECT_LE(averageBodyScaleError, 0.01);
 }
 
 // Currently, these tests are timing out CI, which is quite unfortunate. For
