@@ -257,7 +257,7 @@ int SolveP3(double* x, double a, double b, double c)
     A = -root3(fabs(r) + sqrt(r2 - q3));
     if (r < 0)
       A = -A;
-    B = (A == 0 ? 0 : B = q / A);
+    B = (A == 0 ? 0 : q / A);
 
     a /= 3;
     x[0] = (A + B) - a;
