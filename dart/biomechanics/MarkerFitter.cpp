@@ -8552,20 +8552,21 @@ Eigen::VectorXs SphereFitJointCenterProblem::finiteDifferenceGradient()
   Eigen::VectorXs x = flatten();
   Eigen::VectorXs grad = Eigen::VectorXs::Zero(x.size());
 
-  const s_t EPS = 1e-7;
-  for (int i = 0; i < x.size(); i++)
-  {
-    Eigen::VectorXs perturbed = x;
-    perturbed(i) += EPS;
-    unflatten(perturbed);
-    s_t plus = getLoss();
-    perturbed = x;
-    perturbed(i) -= EPS;
-    unflatten(perturbed);
-    s_t minus = getLoss();
+  math::finiteDifference(
+      [this, &x](
+          /* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs tweaked = x;
+        tweaked(dof) += eps;
+        unflatten(tweaked);
+        perturbed = getLoss();
+        return true;
+      },
+      grad,
+      1e-2,
+      true);
 
-    grad(i) = (plus - minus) / (2 * EPS);
-  }
   unflatten(x);
 
   return grad;

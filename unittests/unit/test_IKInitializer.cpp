@@ -688,11 +688,12 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
 /// functions they use is correct.
 TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
 {
-  for (int i = 0; i < 5; i++)
+  srand(42);
+  for (int i = 0; i < 5000; i++)
   {
     Eigen::Vector3s point = Eigen::Vector3s::Random();
     Eigen::Vector3s center = Eigen::Vector3s::Random();
-    s_t radius = 1.0 + ((s_t)rand() / RAND_MAX);
+    s_t radius = -5.0 + 10.0 * ((s_t)rand() / RAND_MAX);
 
     s_t cost = (point - center).squaredNorm() - (radius * radius);
 
@@ -726,14 +727,15 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_FORWARD_BASIS)
 /// functions they use is correct.
 TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 {
-  for (int i = 0; i < 5; i++)
+  srand(42);
+  for (int i = 0; i < 5000; i++)
   {
     Eigen::Vector3s point = Eigen::Vector3s::Random();
 
     Eigen::Vector5s u = Eigen::Vector5s::Random();
 
     Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * u(0));
-    s_t radiusSquared = abs((u(4) / u(0) - center.squaredNorm()));
+    s_t radiusSquared = center.squaredNorm() - (u(4) / u(0));
     s_t recoveredCost = (point - center).squaredNorm() - radiusSquared;
 
     Eigen::Vector5s recoveredU;
@@ -749,6 +751,24 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 
     EXPECT_NEAR(cost, recoveredCost, 1e-8);
   }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS_REGRESSION_1)
+{
+  Eigen::Vector5s u
+      = Eigen::Vector5s(0.257748, 0.592256, 0.167432, -0.450467, 0.659196);
+
+  Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * u(0));
+  s_t radiusSquared = center.squaredNorm() - (u(4) / u(0));
+
+  Eigen::Vector5s recoveredU;
+  recoveredU << 1.0, -2 * center(0), -2 * center(1), -2 * center(2),
+      center.squaredNorm() - radiusSquared;
+  recoveredU *= u(0);
+  EXPECT_TRUE(recoveredU.segment<3>(1).isApprox(u.segment<3>(1), 1e-8));
+  EXPECT_NEAR(recoveredU(4), u(4), 1e-8);
 }
 #endif
 
