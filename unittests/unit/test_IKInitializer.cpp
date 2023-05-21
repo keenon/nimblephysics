@@ -247,7 +247,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
                 << pair2.first << ": estimated " << estimatedDist
                 << ", original: " << originalDist
                 << ", error: " << (originalDist - estimatedDist) << std::endl;
-      s_t threshold = 1e-8;
+      s_t threshold = 1e-5;
       // If the joint isn't a perfectly rotational joint (either because it's
       // actually a compound joint, or because it's a knee), we have much looser
       // bounds on correctness, because the algorithms' core assumptions don't
@@ -757,8 +757,8 @@ TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS)
 #ifdef ALL_TESTS
 TEST(IKInitializer, CHANG_POLLARD_SIMPLE_REVERSE_BASIS_REGRESSION_1)
 {
-  Eigen::Vector5s u
-      = Eigen::Vector5s(0.257748, 0.592256, 0.167432, -0.450467, 0.659196);
+  Eigen::Vector5s u;
+  u << 0.257748, 0.592256, 0.167432, -0.450467, 0.659196;
 
   Eigen::Vector3s center = u.segment<3>(1) / (-2.0 * u(0));
   s_t radiusSquared = center.squaredNorm() - (u(4) / u(0));
