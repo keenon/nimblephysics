@@ -4500,6 +4500,11 @@ s_t getClosestRotationalApproximation(
   R_bw.col(1) = y;
   R_bw.col(2) = axis;
 
+  if (R_bw.determinant() < 0)
+  {
+    R_bw.col(2) *= -1;
+  }
+
   // Get our desired rotation in the coordinate space of the `axis` basis
   Eigen::Matrix3s R_b = R_bw.transpose() * desiredRotation * R_bw;
 
@@ -4517,6 +4522,36 @@ s_t getClosestRotationalApproximation(
   }
   s_t angle
       = atan2(normalizedTwoDimensional(1, 0), normalizedTwoDimensional(0, 0));
+
+  // And now, perform gradient descent using a finite-differenced gradient!
+
+  s_t cost = (desiredRotation - math::expMapRot(axis * angle)).norm();
+  const s_t eps = 1e-3;
+  s_t stepSize = 1e-2;
+  for (int iter = 0; iter < 100; iter++)
+  {
+    s_t plusCost
+        = (desiredRotation - math::expMapRot(axis * (angle + eps))).norm();
+    s_t minusCost
+        = (desiredRotation - math::expMapRot(axis * (angle - eps))).norm();
+    s_t grad = (plusCost - minusCost) / (2 * eps);
+
+    while (stepSize > 1e-12)
+    {
+      s_t proposedAngle = angle - grad * stepSize;
+      s_t proposedCost
+          = (desiredRotation - math::expMapRot(axis * proposedAngle)).norm();
+      if (proposedCost < cost)
+      {
+        cost = proposedCost;
+        angle = proposedAngle;
+        stepSize *= 1.2;
+        break;
+      }
+      stepSize *= 0.5;
+    }
+  }
+
   return angle;
 }
 

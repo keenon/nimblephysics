@@ -163,6 +163,14 @@ Eigen::VectorXs RevoluteJoint::getNearestPositionToDesiredRotation(
         * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
   s_t angle
       = math::getClosestRotationalApproximation(getAxis(), relativeRotation);
+  while (angle < getPositionLowerLimit(0))
+  {
+    angle += 2 * dart::math::constantsd::pi();
+  }
+  while (angle > getPositionUpperLimit(0))
+  {
+    angle -= 2 * dart::math::constantsd::pi();
+  }
   return Eigen::VectorXs::Ones(1) * angle;
 }
 

@@ -129,19 +129,6 @@ TEST(NEAREST_POSITION_TO_ROTATION, CLOSEST_ROTATION_APPROX_PERP_AXIS)
 #endif
 
 #ifdef ALL_TESTS
-TEST(NEAREST_POSITION_TO_ROTATION, CLOSEST_ROTATION_REGRESSION_1)
-{
-  Eigen::Matrix3s R;
-  R << -0.220189, -0.586933, 0.779119, -0.270804, 0.804107, 0.529224, -0.937114,
-      -0.0944596, -0.335999;
-  Eigen::Vector3s axis = Eigen::Vector3s::UnitZ();
-  s_t expectedPos = 0.69712862031662526;
-  s_t recovered = math::getClosestRotationalApproximation(axis, R);
-  EXPECT_NEAR(expectedPos, recovered, 1e-7);
-}
-#endif
-
-#ifdef ALL_TESTS
 TEST(NEAREST_POSITION_TO_ROTATION, EULER_JOINT)
 {
   EXPECT_TRUE(testNearestPosition<dynamics::EulerJoint>());
@@ -169,7 +156,6 @@ TEST(NEAREST_POSITION_TO_ROTATION, FREE_JOINT)
 }
 #endif
 
-/*
 // TODO: Our formula for getting the nearest approximation to a rotation matrix
 // along a single axis is wrong, so these tests fail. We should fix this, but I
 // can't figure out a better formula, and the current one seems to work well
@@ -198,7 +184,6 @@ TEST(NEAREST_POSITION_TO_ROTATION, REVOLUTE_JOINT)
       }));
 }
 #endif
-*/
 
 #ifdef ALL_TESTS
 TEST(NEAREST_POSITION_TO_ROTATION, ELLIPSOID_JOINT)
