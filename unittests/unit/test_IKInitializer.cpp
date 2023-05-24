@@ -213,8 +213,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
       osim.markersMap,
       markerIsAnatomical,
       markerObservations,
-      targetHeight,
-      givePerfectScaleInfoToInitializer);
+      targetHeight);
 
   std::map<std::string, std::map<std::string, s_t>>
       originalJointToJointDistances;
