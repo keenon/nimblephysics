@@ -3108,7 +3108,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
     Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
     Eigen::Vector6s wrenchAvg = Eigen::Vector6s::Zero();
     int numAveraged = 0;
-    int cursor = 0;
     for (int t = 0; t < timestamps.size(); t++)
     {
       copAvg += copRows[t][i];
@@ -3122,7 +3121,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
         forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
         forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);
-        cursor++;
 
         numAveraged = 0;
         copAvg.setZero();

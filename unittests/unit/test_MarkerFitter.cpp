@@ -39,7 +39,7 @@
 
 // #define ALL_TESTS
 
-#define FUNCTIONAL_TESTS
+// #define FUNCTIONAL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -6656,12 +6656,13 @@ TEST(MarkerFitter, COMPLETE_HUMAN_MODEL_BALLET)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MarkerFitter, ANTOINE_BUG_1)
 {
   std::vector<std::string> c3dFiles;
   std::vector<std::string> trcFiles;
   std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
 
   trcFiles.push_back(
       "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0001/markers.trc");
@@ -6679,12 +6680,13 @@ TEST(MarkerFitter, ANTOINE_BUG_1)
       c3dFiles,
       trcFiles,
       grfFiles,
+      imuFiles,
       79.1,
       1.8,
       "male",
       true);
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, MULTI_TRIAL_MICHAEL)

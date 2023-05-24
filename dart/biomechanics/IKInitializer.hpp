@@ -5,9 +5,6 @@
 #include <tuple>
 #include <vector>
 
-#include <coin/IpIpoptApplication.hpp>
-#include <coin/IpTNLP.hpp>
-
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/enums.hpp"
@@ -57,6 +54,13 @@ struct StackedBody
   std::vector<std::shared_ptr<struct StackedJoint>> childJoints;
 };
 
+enum JointCenterEstimateSource
+{
+  MDS = 0,
+  LEAST_SQUARES_EXACT = 1,
+  LEAST_SQUARES_AXIS = 2,
+};
+
 /**
  * This class implements a closed-form optimization problem for initializing the
  * joint center locations in world space over time, and then using that to
@@ -74,6 +78,7 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel,
       std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
           markers,
+      std::map<std::string, bool> markerIsAnatomical,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       s_t modelHeightM = -1.0,
       bool dontMergeNearbyJoints = false);
@@ -103,6 +108,14 @@ public:
   //////////////////////////////////////////////////////////////////////////////
   // Steps of the pipeline
   //////////////////////////////////////////////////////////////////////////////
+
+  /// This takes advantage of the fact that we assume anatomical markers have
+  /// pretty much known locations on their body segment. That means that two or
+  /// more anatomical markers on the same body segment can tell you about the
+  /// body segment scaling, which can then help inform the distances between
+  /// those markers and the joints, which helps all the subsequent steps in the
+  /// pipeline be more accurate.
+  s_t prescaleBasedOnAnatomicalMarkers(bool logOutput = false);
 
   /// For each timestep, and then for each joint, this sets up and runs an MDS
   /// algorithm to triangulate the joint center location from the known marker
@@ -182,6 +195,15 @@ public:
       std::vector<Eigen::Vector3s> localPoints,
       std::vector<Eigen::Vector3s> worldPoints,
       std::vector<s_t> weights);
+
+  /// This tries to solve the least-squares problem to get the local scales for
+  /// a body, such that the distances between the local points match the input
+  /// distances as closely as possible, with a weighted preference.
+  static Eigen::Vector3s getLocalScale(
+      std::vector<Eigen::Vector3s> localPoints,
+      std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights,
+      s_t defaultAxisScale = 1.0,
+      bool logOutput = false);
 
   /// This implements the method in "Constrained least-squares optimization for
   /// robust estimation of center of rotation" by Chang and Pollard, 2006. This
@@ -267,8 +289,12 @@ protected:
   std::vector<std::string> mMarkerNames;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  std::vector<bool> mMarkerIsAnatomical;
+  std::map<std::string, int> mMarkerNameToIndex;
 
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointCenters;
+  std::vector<std::map<std::string, JointCenterEstimateSource>>
+      mJointCentersEstimateSource;
   std::vector<std::map<std::string, Eigen::Vector3s>> mJointAxisDirs;
 
   std::map<std::string, std::map<std::string, s_t>>

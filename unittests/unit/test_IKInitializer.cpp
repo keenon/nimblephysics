@@ -39,14 +39,29 @@ void runOnRealOsim(
   {
     auto trc = OpenSimParser::loadTRC(trcFile);
     // Add the marker observations to our list
-    for (auto& obs : trc.markerTimesteps)
+    for (int i = 0; i < trc.markerTimesteps.size(); i++)
     {
+      auto& obs = trc.markerTimesteps[i];
       markerObservations.push_back(obs);
     }
   }
 
+  std::map<std::string, bool> markerIsAnatomical;
+  for (auto& pair : osim.markersMap)
+  {
+    markerIsAnatomical[pair.first] = false;
+  }
+  for (std::string& marker : osim.anatomicalMarkers)
+  {
+    markerIsAnatomical[marker] = true;
+  }
+
   IKInitializer initializer(
-      osim.skeleton, osim.markersMap, markerObservations, heightM);
+      osim.skeleton,
+      osim.markersMap,
+      markerIsAnatomical,
+      markerObservations,
+      heightM);
   initializer.runFullPipeline(true);
 
   if (saveToGUI)
@@ -172,9 +187,20 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   std::shared_ptr<dynamics::Skeleton> recoveredSkel
       = osim.skeleton->cloneSkeleton();
 
+  std::map<std::string, bool> markerIsAnatomical;
+  for (auto& pair : osim.markersMap)
+  {
+    markerIsAnatomical[pair.first] = false;
+  }
+  for (std::string& marker : osim.anatomicalMarkers)
+  {
+    markerIsAnatomical[marker] = true;
+  }
+
   IKInitializer initializer(
       osim.skeleton,
       osim.markersMap,
+      markerIsAnatomical,
       markerObservations,
       targetHeight,
       givePerfectScaleInfoToInitializer);
@@ -474,8 +500,22 @@ bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
   osim.skeleton->setBodyScales(
       Eigen::VectorXs::Ones(osim.skeleton->getNumBodyNodes() * 3));
 
+  std::map<std::string, bool> markerIsAnatomical;
+  for (auto& pair : osim.markersMap)
+  {
+    markerIsAnatomical[pair.first] = false;
+  }
+  for (std::string& marker : osim.anatomicalMarkers)
+  {
+    markerIsAnatomical[marker] = true;
+  }
+
   IKInitializer initializer(
-      osim.skeleton, osim.markersMap, markerObservations, targetHeight);
+      osim.skeleton,
+      osim.markersMap,
+      markerIsAnatomical,
+      markerObservations,
+      targetHeight);
 
   // Initial guesses using MDS to center our subsequent least-squares on
   initializer.closedFormMDSJointCenterSolver();
@@ -541,9 +581,22 @@ bool verifyMarkerReconstructionOnOsim(
       markerObservations.push_back(obs);
     }
   }
+  std::map<std::string, bool> markerIsAnatomical;
+  for (auto& pair : osim.markersMap)
+  {
+    markerIsAnatomical[pair.first] = false;
+  }
+  for (std::string& marker : osim.anatomicalMarkers)
+  {
+    markerIsAnatomical[marker] = true;
+  }
 
   IKInitializer initializer(
-      osim.skeleton, osim.markersMap, markerObservations, heightM);
+      osim.skeleton,
+      osim.markersMap,
+      markerIsAnatomical,
+      markerObservations,
+      heightM);
   for (int t = 0; t < markerObservations.size(); t++)
   {
     std::vector<std::string> markerNames
@@ -678,6 +731,178 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
     error += (points_world[i] - points_world_recovered[i]).norm();
   }
   EXPECT_NEAR(error, 0.0, 1e-8);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, RESCALE_POINT_CLOUD_FULLY_CONSTRAINED)
+{
+  srand(42);
+  int numPoints = 5;
+  Eigen::Vector3s scale
+      = (Eigen::Vector3s::Random() * 0.25) + Eigen::Vector3s::Constant(1.0);
+  std::vector<Eigen::Vector3s> points_local;
+  for (int i = 0; i < numPoints; i++)
+  {
+    points_local.push_back(Eigen::Vector3s::Random());
+  }
+
+  std::vector<Eigen::Vector3s> points_scaled;
+  for (int i = 0; i < numPoints; i++)
+  {
+    points_scaled.push_back(points_local[i].cwiseProduct(scale));
+  }
+
+  std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+  for (int i = 0; i < numPoints; i++)
+  {
+    for (int j = i + 1; j < numPoints; j++)
+    {
+      s_t weight = 1.0;
+      s_t distance = (points_scaled[i] - points_scaled[j]).norm();
+      pairDistancesWithWeights.push_back(
+          std::make_tuple(i, j, distance, weight));
+    }
+  }
+
+  Eigen::Vector3s scaleRecovered
+      = IKInitializer::getLocalScale(points_local, pairDistancesWithWeights);
+
+  EXPECT_TRUE(scaleRecovered.isApprox(scale, 1e-8));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, RESCALE_POINT_CLOUD_ONE_AXIS_UNDER_CONSTRAINED)
+{
+  srand(42);
+  int numPoints = 5;
+  Eigen::Vector3s scale
+      = (Eigen::Vector3s::Random() * 0.25) + Eigen::Vector3s::Constant(1.0);
+  std::vector<Eigen::Vector3s> points_local;
+  for (int i = 0; i < numPoints; i++)
+  {
+    Eigen::Vector3s point = Eigen::Vector3s::Random();
+    point(1) = 2.0;
+    points_local.push_back(point);
+  }
+
+  std::vector<Eigen::Vector3s> points_scaled;
+  for (int i = 0; i < numPoints; i++)
+  {
+    points_scaled.push_back(points_local[i].cwiseProduct(scale));
+  }
+
+  std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+  for (int i = 0; i < numPoints; i++)
+  {
+    for (int j = i + 1; j < numPoints; j++)
+    {
+      s_t weight = 1.0;
+      s_t distance = (points_scaled[i] - points_scaled[j]).norm();
+      pairDistancesWithWeights.push_back(
+          std::make_tuple(i, j, distance, weight));
+    }
+  }
+
+  const s_t DEFAULT_SCALE = 1.0;
+  Eigen::Vector3s scaleExpected = scale;
+  scaleExpected(1) = DEFAULT_SCALE;
+
+  Eigen::Vector3s scaleRecovered = IKInitializer::getLocalScale(
+      points_local, pairDistancesWithWeights, DEFAULT_SCALE);
+
+  EXPECT_TRUE(scaleRecovered.isApprox(scaleExpected, 1e-8));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, RESCALE_POINT_CLOUD_TWO_AXIS_UNDER_CONSTRAINED)
+{
+  srand(42);
+  int numPoints = 5;
+  Eigen::Vector3s scale
+      = (Eigen::Vector3s::Random() * 0.25) + Eigen::Vector3s::Constant(1.0);
+  std::vector<Eigen::Vector3s> points_local;
+  for (int i = 0; i < numPoints; i++)
+  {
+    Eigen::Vector3s point = Eigen::Vector3s::Random();
+    point(1) = 2.0;
+    point(2) = 2.0;
+    points_local.push_back(point);
+  }
+
+  std::vector<Eigen::Vector3s> points_scaled;
+  for (int i = 0; i < numPoints; i++)
+  {
+    points_scaled.push_back(points_local[i].cwiseProduct(scale));
+  }
+
+  std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+  for (int i = 0; i < numPoints; i++)
+  {
+    for (int j = i + 1; j < numPoints; j++)
+    {
+      s_t weight = 1.0;
+      s_t distance = (points_scaled[i] - points_scaled[j]).norm();
+      pairDistancesWithWeights.push_back(
+          std::make_tuple(i, j, distance, weight));
+    }
+  }
+
+  const s_t DEFAULT_SCALE = 1.0;
+  Eigen::Vector3s scaleExpected = scale;
+  scaleExpected(1) = DEFAULT_SCALE;
+  scaleExpected(2) = DEFAULT_SCALE;
+
+  Eigen::Vector3s scaleRecovered = IKInitializer::getLocalScale(
+      points_local, pairDistancesWithWeights, DEFAULT_SCALE);
+
+  EXPECT_TRUE(scaleRecovered.isApprox(scaleExpected, 1e-8));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(IKInitializer, RESCALE_POINT_CLOUD_ONE_AXIS_TOO_SMALL)
+{
+  srand(42);
+  int numPoints = 5;
+  Eigen::Vector3s scale
+      = (Eigen::Vector3s::Random() * 0.25) + Eigen::Vector3s::Constant(1.0);
+  std::vector<Eigen::Vector3s> points_local;
+  for (int i = 0; i < numPoints; i++)
+  {
+    Eigen::Vector3s point = Eigen::Vector3s::Random();
+    point(1) *= 0.01;
+    points_local.push_back(point);
+  }
+
+  std::vector<Eigen::Vector3s> points_scaled;
+  for (int i = 0; i < numPoints; i++)
+  {
+    points_scaled.push_back(points_local[i].cwiseProduct(scale));
+  }
+
+  std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+  for (int i = 0; i < numPoints; i++)
+  {
+    for (int j = i + 1; j < numPoints; j++)
+    {
+      s_t weight = 1.0;
+      s_t distance = (points_scaled[i] - points_scaled[j]).norm();
+      pairDistancesWithWeights.push_back(
+          std::make_tuple(i, j, distance, weight));
+    }
+  }
+
+  const s_t DEFAULT_SCALE = 1.0;
+  Eigen::Vector3s scaleExpected = scale;
+  scaleExpected(1) = DEFAULT_SCALE;
+
+  Eigen::Vector3s scaleRecovered = IKInitializer::getLocalScale(
+      points_local, pairDistancesWithWeights, DEFAULT_SCALE);
+
+  EXPECT_TRUE(scaleRecovered.isApprox(scaleExpected, 1e-8));
 }
 #endif
 
@@ -1415,6 +1640,27 @@ TEST(IKInitializer, VISUALIZE_RESULTS_REGRESSION_SUBJECT19)
       "unscaled_generic.osim",
       trcFiles,
       1.79,
+      true);
+}
+*/
+
+/*
+TEST(IKInitializer, VISUALIZE_RESULTS_REGRESSION_ANTOINE_BUG)
+{
+  std::vector<std::string> trcFiles;
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0001/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0002/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0003/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/Antoine_Subj03_input/trials/Mocap0004/markers.trc");
+
+  runOnRealOsim(
+      "dart://sample/osim/Antoine_Subj03_input/unscaled_generic.osim",
+      trcFiles,
+      1.8,
       true);
 }
 */

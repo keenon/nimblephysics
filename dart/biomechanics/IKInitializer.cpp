@@ -1,5 +1,6 @@
 #include "dart/biomechanics/IKInitializer.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -320,6 +321,7 @@ IKInitializer::IKInitializer(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         markers,
+    std::map<std::string, bool> markerInAnatomical,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
     s_t modelHeightM,
     bool dontMergeNearbyJoints)
@@ -330,8 +332,17 @@ IKInitializer::IKInitializer(
   // 1. Convert the marker map to an ordered list
   for (auto& pair : markers)
   {
+    mMarkerNameToIndex[pair.first] = mMarkers.size();
     mMarkerNames.push_back(pair.first);
     mMarkers.push_back(pair.second);
+    if (markerInAnatomical.count(pair.first))
+    {
+      mMarkerIsAnatomical.push_back(markerInAnatomical[pair.first]);
+    }
+    else
+    {
+      mMarkerIsAnatomical.push_back(false);
+    }
   }
 
   Eigen::VectorXs oldPositions = mSkel->getPositions();
@@ -653,6 +664,8 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
+  prescaleBasedOnAnatomicalMarkers(logOutput);
+
   // Use MDS, despite its many flaws, to arrive at decent initial guesses for
   // joint centers that we can use to center the subsequent least-squares fits
   // if a joint doesn't move very much during a trial (like if your arms are at
@@ -660,12 +673,207 @@ void IKInitializer::runFullPipeline(bool logOutput)
   closedFormMDSJointCenterSolver();
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
-  closedFormPivotFindingJointCenterSolver();
+  closedFormPivotFindingJointCenterSolver(logOutput);
   recenterAxisJointsBasedOnBoneAngles();
 
   // Fill in the parts of the body scales and poses that we can in closed form
-  estimateGroupScalesClosedForm(logOutput);
+  estimateGroupScalesClosedForm();
   estimatePosesClosedForm();
+}
+
+//==============================================================================
+/// This takes advantage of the fact that we assume anatomical markers have
+/// pretty much known locations on their body segment. That means that two or
+/// more anatomical markers on the same body segment can tell you about the
+/// body segment scaling, which can then help inform the distances between
+/// those markers and the joints, which helps all the subsequent steps in the
+/// pipeline be more accurate.
+s_t IKInitializer::prescaleBasedOnAnatomicalMarkers(bool logOutput)
+{
+  (void)logOutput;
+
+  Eigen::VectorXs jointWorldCenters
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+  Eigen::VectorXs markerWorldCenters = mSkel->getMarkerWorldPositions(mMarkers);
+
+  // 0. Record the defaultScale value, based on height, if we have it
+  Eigen::VectorXs originalBodyScales = mSkel->getBodyScales();
+  mSkel->setBodyScales(Eigen::VectorXs::Ones(mSkel->getNumBodyNodes() * 3));
+  s_t defaultScale = 1.0;
+  if (mModelHeightM > 0)
+  {
+    s_t defaultHeight
+        = mSkel->getHeight(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
+    if (defaultHeight > 0)
+    {
+      defaultScale = mModelHeightM / defaultHeight;
+    }
+  }
+  mSkel->setBodyScales(originalBodyScales);
+
+  for (auto& stackedBody : mStackedBodies)
+  {
+    // 1. First, we're going to collect all the anatomical markers attached to
+    // this `stackedBody`
+
+    std::vector<std::string> anatomicalMarkerNames;
+    std::vector<Eigen::Vector3s> anatomicalMarkerWorldPositions;
+    std::vector<Eigen::Vector3s> anatomicalMarkerLocalPositions;
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      if (std::find(
+              stackedBody->bodies.begin(),
+              stackedBody->bodies.end(),
+              mMarkers[i].first)
+          != stackedBody->bodies.end())
+      {
+        if (mMarkerIsAnatomical[i])
+        {
+          Eigen::Vector3s markerWorldPosition
+              = markerWorldCenters.segment<3>(i * 3);
+          anatomicalMarkerNames.push_back(mMarkerNames[i]);
+          anatomicalMarkerWorldPositions.push_back(markerWorldPosition);
+          anatomicalMarkerLocalPositions.push_back(
+              stackedBody->bodies[0]->getWorldTransform().inverse()
+              * markerWorldPosition);
+        }
+      }
+    }
+
+    // If there aren't at least two anatomical markers, then we won't have
+    // anything to go on for prescaling this body, so don't worry about it
+    if (anatomicalMarkerNames.size() < 2)
+    {
+      continue;
+    }
+
+    // 2. Now, we need to collect the average distances between the anatomical
+    // markers in the marker data, the variance of those measurements.
+
+    std::map<std::string, std::map<std::string, std::vector<s_t>>>
+        measuredMarkerPairDistances;
+    for (int t = 0; t < mMarkerObservations.size(); t++)
+    {
+      for (int i = 0; i < anatomicalMarkerNames.size(); i++)
+      {
+        for (int j = i + 1; j < anatomicalMarkerNames.size(); j++)
+        {
+          if (mMarkerObservations[t].count(anatomicalMarkerNames[i])
+              && mMarkerObservations[t].count(anatomicalMarkerNames[j]))
+          {
+            measuredMarkerPairDistances
+                [anatomicalMarkerNames[i]][anatomicalMarkerNames[j]]
+                    .push_back(
+                        (mMarkerObservations[t][anatomicalMarkerNames[i]]
+                         - mMarkerObservations[t][anatomicalMarkerNames[j]])
+                            .norm());
+          }
+        }
+      }
+    }
+
+    std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+    for (int i = 0; i < anatomicalMarkerNames.size(); i++)
+    {
+      std::string firstMarker = anatomicalMarkerNames[i];
+      if (measuredMarkerPairDistances.count(firstMarker) == 0)
+        continue;
+      for (int j = i + 1; j < anatomicalMarkerNames.size(); j++)
+      {
+        std::string secondMarker = anatomicalMarkerNames[j];
+        if (measuredMarkerPairDistances[firstMarker].count(secondMarker) == 0)
+          continue;
+
+        std::vector<s_t>& observations
+            = measuredMarkerPairDistances[firstMarker][secondMarker];
+
+        s_t averageMeasuredDistance = 0.0;
+        for (s_t distance : observations)
+        {
+          averageMeasuredDistance += distance;
+        }
+        averageMeasuredDistance /= std::max<int>(observations.size(), 1);
+        s_t variance = 0.0;
+        for (s_t distance : observations)
+        {
+          variance += (distance - averageMeasuredDistance)
+                      * (distance - averageMeasuredDistance);
+        }
+        s_t percentVariance = variance / averageMeasuredDistance;
+        // TODO: come up with a nice formula to use percentVariance to determine
+        // weight
+        (void)percentVariance;
+
+        pairDistancesWithWeights.push_back(
+            std::make_tuple(i, j, averageMeasuredDistance, 1.0));
+      }
+    }
+
+    // 3. Now we're going to try to rescale the body based on the measured
+    // marker pair distances.
+    Eigen::Vector3s scale = getLocalScale(
+        anatomicalMarkerLocalPositions,
+        pairDistancesWithWeights,
+        defaultScale,
+        logOutput);
+
+    // Now we scale the body
+    for (auto& body : stackedBody->bodies)
+    {
+      if (logOutput)
+      {
+        std::cout << "Using anatomical markers to pre-scale body \""
+                  << body->getName() << "\" by " << scale.transpose()
+                  << std::endl;
+      }
+      body->setScale(scale);
+    }
+  }
+
+  // 4. Now, armed with our updated body scales, we're going to recompute the
+  // marker<->joint distances, and joint<->joint distances.
+
+  Eigen::VectorXs updatedJointWorldCenters
+      = mSkel->getJointWorldPositions(mSkel->getJoints());
+  Eigen::VectorXs updatedMarkerWorldCenters
+      = mSkel->getMarkerWorldPositions(mMarkers);
+
+  // 4.1. Update joint<->marker squared distances
+  for (std::shared_ptr<struct StackedJoint> joint : mStackedJoints)
+  {
+    if (mJointToMarkerSquaredDistances.count(joint->name))
+    {
+      auto& map = mJointToMarkerSquaredDistances[joint->name];
+      for (auto& pair2 : map)
+      {
+        pair2.second = (getStackedJointCenterFromJointCentersVector(
+                            joint, updatedJointWorldCenters)
+                        - updatedMarkerWorldCenters.segment<3>(
+                            mMarkerNameToIndex[pair2.first] * 3))
+                           .squaredNorm();
+      }
+    }
+  }
+
+  // 4.2. Update joint<->joint squared distances
+  for (std::shared_ptr<struct StackedJoint> joint1 : mStackedJoints)
+  {
+    for (std::shared_ptr<struct StackedJoint> joint2 : mStackedJoints)
+    {
+      if (mJointToJointSquaredDistances.count(joint1->name)
+          && mJointToJointSquaredDistances[joint1->name].count(joint2->name))
+      {
+        mJointToJointSquaredDistances[joint1->name][joint2->name]
+            = (getStackedJointCenterFromJointCentersVector(
+                   joint1, updatedJointWorldCenters)
+               - getStackedJointCenterFromJointCentersVector(
+                   joint2, updatedJointWorldCenters))
+                  .squaredNorm();
+      }
+    }
+  }
+
+  return 0.0;
 }
 
 //==============================================================================
@@ -706,6 +914,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   s_t totalMarkerError = 0.0;
   int count = 0;
   mJointCenters.clear();
+  mJointCentersEstimateSource.clear();
   for (int t = 0; t < mMarkerObservations.size(); t++)
   {
     std::vector<std::shared_ptr<struct StackedJoint>> joints
@@ -806,6 +1015,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
         // skeleton to resolve which side of the plane to place the joint
         // center.
         Eigen::Vector3s jointCenter = transformed.col(dim - 1);
+        assert(!jointCenter.hasNaN());
         if (isCoplanar(adjacentPointLocationsInNeutralSkel)
             || isCoplanar(adjacentPointLocations))
         {
@@ -826,6 +1036,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
               neutralSkelJointCenterWorldPositionsMap[joint->name],
               adjacentPointLocations,
               jointCenter);
+          assert(!jointCenter.hasNaN());
         }
 
         solvedJointCenters[joint->name] = jointCenter;
@@ -835,6 +1046,13 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
       lastSolvedJointCenters = solvedJointCenters;
     }
     mJointCenters.push_back(lastSolvedJointCenters);
+
+    std::map<std::string, JointCenterEstimateSource> estimateSources;
+    for (auto& pair : lastSolvedJointCenters)
+    {
+      estimateSources[pair.first] = JointCenterEstimateSource::MDS;
+    }
+    mJointCentersEstimateSource.push_back(estimateSources);
   }
   return totalMarkerError / count;
 }
@@ -852,27 +1070,92 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
   {
     mJointCenters.push_back(std::map<std::string, Eigen::Vector3s>());
   }
+  while (mJointCentersEstimateSource.size() < mMarkerObservations.size())
+  {
+    mJointCentersEstimateSource.push_back(
+        std::map<std::string, JointCenterEstimateSource>());
+  }
   while (mJointAxisDirs.size() < mMarkerObservations.size())
   {
     mJointAxisDirs.push_back(std::map<std::string, Eigen::Vector3s>());
   }
 
+  // 0. Precompute all the marker variances
+  std::map<std::string, Eigen::Vector3s> markerMeans;
+  std::map<std::string, int> markerObservationCounts;
+  std::map<std::string, s_t> markerVariances;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    markerMeans[mMarkerNames[i]] = Eigen::Vector3s::Zero();
+    markerVariances[mMarkerNames[i]] = 0.0;
+    markerObservationCounts[mMarkerNames[i]] = 0;
+  }
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      if (mMarkerObservations[t].count(mMarkerNames[i]))
+      {
+        markerMeans[mMarkerNames[i]] += mMarkerObservations[t][mMarkerNames[i]];
+        markerObservationCounts[mMarkerNames[i]]++;
+      }
+    }
+  }
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (markerObservationCounts[mMarkerNames[i]] > 0)
+    {
+      markerMeans[mMarkerNames[i]] /= markerObservationCounts[mMarkerNames[i]];
+    }
+  }
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      if (mMarkerObservations[t].count(mMarkerNames[i]))
+      {
+        Eigen::Vector3s diff = mMarkerObservations[t][mMarkerNames[i]]
+                               - markerMeans[mMarkerNames[i]];
+        markerVariances[mMarkerNames[i]] += diff.squaredNorm();
+      }
+    }
+  }
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    if (markerObservationCounts[mMarkerNames[i]] > 0)
+    {
+      markerVariances[mMarkerNames[i]]
+          /= markerObservationCounts[mMarkerNames[i]];
+    }
+    if (logOutput)
+    {
+      std::cout << "Marker \"" << mMarkerNames[i]
+                << "\" variance: " << markerVariances[mMarkerNames[i]]
+                << std::endl;
+    }
+  }
+
   // 1. Find all the bodies with at least 3 markers on them
   std::map<std::string, int> bodyMarkerCounts;
-  for (auto& marker : mMarkers)
+  for (int i = 0; i < mMarkers.size(); i++)
   {
-    for (auto& stackedBody : mStackedBodies)
+    auto& marker = mMarkers[i];
+    // Only accept markers whose variance is above a certain threshold
+    if (markerVariances[mMarkerNames[i]] > 0.01)
     {
-      if (std::find(
-              stackedBody->bodies.begin(),
-              stackedBody->bodies.end(),
-              marker.first)
-          != stackedBody->bodies.end())
+      for (auto& stackedBody : mStackedBodies)
       {
-        if (bodyMarkerCounts.count(stackedBody->name) == 0)
-          bodyMarkerCounts[stackedBody->name] = 0;
-        bodyMarkerCounts[stackedBody->name]++;
-        break;
+        if (std::find(
+                stackedBody->bodies.begin(),
+                stackedBody->bodies.end(),
+                marker.first)
+            != stackedBody->bodies.end())
+        {
+          if (bodyMarkerCounts.count(stackedBody->name) == 0)
+            bodyMarkerCounts[stackedBody->name] = 0;
+          bodyMarkerCounts[stackedBody->name]++;
+          break;
+        }
       }
     }
   }
@@ -1143,10 +1426,10 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     Eigen::Vector3s childOffset = offsets.segment<3>(3);
 
     s_t error = 0.0;
-    for (int i = 0; i < usableTimesteps.size(); i++)
+    for (int t = 0; t < mMarkerObservations.size(); t++)
     {
-      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][i];
-      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][i];
+      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][t];
+      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][t];
       Eigen::Vector3s parentWorldCenter = parentTransform * parentOffset;
       Eigen::Vector3s childWorldCenter = childTransform * childOffset;
       Eigen::Vector3s jointCenter
@@ -1155,7 +1438,9 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       error += (childWorldCenter - jointCenter).norm();
 
       // 4.4.1. Record the result
-      mJointCenters[usableTimesteps[i]][joint->name] = jointCenter;
+      mJointCenters[t][joint->name] = jointCenter;
+      mJointCentersEstimateSource[t][joint->name]
+          = JointCenterEstimateSource::LEAST_SQUARES_EXACT;
     }
 
     // 4.5. Check if we're on an axis, which will show up if there's a 0
@@ -1188,18 +1473,19 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       Eigen::Vector3s childLocalAxis = nullSpace.segment<3>(3).normalized();
 
       // 4.5.2. Transform the axis direction back to world space
-      for (int i = 0; i < usableTimesteps.size(); i++)
+      for (int t = 0; t < mMarkerObservations.size(); t++)
       {
-        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][i];
-        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][i];
+        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][t];
+        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][t];
         Eigen::Vector3s parentWorldAxis
             = parentTransform.linear() * parentLocalAxis;
         Eigen::Vector3s childWorldAxis
             = childTransform.linear() * childLocalAxis;
         Eigen::Vector3s jointAxis = (parentWorldAxis + childWorldAxis) / 2.0;
         // 4.5.3. Record the result
-        mJointAxisDirs[usableTimesteps[i]][joint->name]
-            = jointAxis.normalized();
+        mJointAxisDirs[t][joint->name] = jointAxis.normalized();
+        mJointCentersEstimateSource[t][joint->name]
+            = JointCenterEstimateSource::LEAST_SQUARES_AXIS;
       }
     }
 
@@ -1383,6 +1669,8 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       Eigen::Isometry3s anchorTransform = pair.second;
       Eigen::Vector3s jointWorldCenter = anchorTransform * jointCenter;
       mJointCenters[t][joint->name] = jointWorldCenter;
+      mJointCentersEstimateSource[t][joint->name]
+          = JointCenterEstimateSource::LEAST_SQUARES_EXACT;
     }
 
     // 5.6. Get the axis direction in the anchor body, along with the
@@ -1409,6 +1697,8 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
         Eigen::Vector3s jointWorldAxis
             = anchorTransform.linear() * jointAxisDir;
         mJointAxisDirs[t][joint->name] = jointWorldAxis.normalized();
+        mJointCentersEstimateSource[t][joint->name]
+            = JointCenterEstimateSource::LEAST_SQUARES_AXIS;
       }
     }
 
@@ -1714,7 +2004,9 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
               continue;
             Eigen::Vector3s markerWorldPos = mMarkerObservations[t][markerName];
             pointsAndRadii.emplace_back(markerWorldPos, sqrt(squaredDistance));
-            weights.push_back(0.01);
+            bool markerIsAnatomical
+                = mMarkerIsAnatomical[mMarkerNameToIndex[markerName]];
+            weights.push_back(markerIsAnatomical ? 1.0 : 0.01);
           }
 
           Eigen::Vector3s newCenter = centerPointOnAxis(
@@ -1758,6 +2050,8 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
           Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
           Eigen::Vector3s newCenter = jointCenter + averageOffset * jointAxis;
           mJointCenters[t][joint->name] = newCenter;
+          mJointCentersEstimateSource[t][joint->name]
+              = JointCenterEstimateSource::LEAST_SQUARES_AXIS;
         }
       }
 
@@ -1792,303 +2086,171 @@ void IKInitializer::estimateGroupScalesClosedForm(bool log)
 
   Eigen::VectorXs jointWorldPositions
       = mSkel->getJointWorldPositions(mSkel->getJoints());
+  Eigen::VectorXs markerWorldPositions
+      = mSkel->getMarkerWorldPositions(mMarkers);
 
-  // 1. Estimate the bone sizes from the joint centers
-
-  // 1.1. Get estimated joint to joint distances from our current joint center
-  // guesses
-  std::map<std::string, std::map<std::string, s_t>>
-      estimatedJointToJointDistances = estimateJointToJointDistances();
-  // 1.2. Find a scale for all the bodies that we can
-  std::map<std::string, Eigen::Vector3s> bodyScales;
-  std::map<std::string, Eigen::Vector3s> bodyScaleWeights;
-  for (std::shared_ptr<struct StackedBody> bodyNode : mStackedBodies)
-  {
-    // 1.2.1. Collect joints adjacent to this body that we can potentially use
-    // to help scale
-    std::vector<std::shared_ptr<struct StackedJoint>> adjacentJoints;
-    adjacentJoints.push_back(bodyNode->parentJoint);
-    for (int i = 0; i < bodyNode->childJoints.size(); i++)
-    {
-      adjacentJoints.push_back(bodyNode->childJoints[i]);
-    }
-
-    // 1.2.2. Find which pairs of joints (expressed as locations in the local
-    // frame of the body), if any, have estimated distances between them
-    std::vector<std::tuple<std::string, std::string, s_t>> jointPairs;
-    std::map<std::string, Eigen::Vector3s> jointsInLocalSpace;
-    for (int i = 0; i < adjacentJoints.size(); i++)
-    {
-      for (int j = i + 1; j < adjacentJoints.size(); j++)
-      {
-        std::shared_ptr<struct StackedJoint> joint1 = adjacentJoints[i];
-        std::shared_ptr<struct StackedJoint> joint2 = adjacentJoints[j];
-        if (estimatedJointToJointDistances.count(joint1->name) > 0
-            && estimatedJointToJointDistances[joint1->name].count(joint2->name)
-                   > 0)
-        {
-          s_t dist = estimatedJointToJointDistances[joint1->name][joint2->name];
-          Eigen::Vector3s joint1WorldPos
-              = getStackedJointCenterFromJointCentersVector(
-                  joint1, jointWorldPositions);
-          Eigen::Vector3s joint2WorldPos
-              = getStackedJointCenterFromJointCentersVector(
-                  joint2, jointWorldPositions);
-          Eigen::Vector3s joint1LocalPos
-              = bodyNode->bodies[0]->getWorldTransform().inverse()
-                * joint1WorldPos;
-          jointsInLocalSpace[joint1->name] = joint1LocalPos;
-          Eigen::Vector3s joint2LocalPos
-              = bodyNode->bodies[0]->getWorldTransform().inverse()
-                * joint2WorldPos;
-          jointsInLocalSpace[joint2->name] = joint2LocalPos;
-          jointPairs.emplace_back(joint1->name, joint2->name, dist);
-        }
-      }
-    }
-
-    // 1.2.3. If we have a single joint pair, then we can use that to scale the
-    // body
-    if (jointPairs.size() == 1)
-    {
-      std::string joint1Name = std::get<0>(jointPairs[0]);
-      std::string joint2Name = std::get<1>(jointPairs[0]);
-      s_t desiredDist = std::get<2>(jointPairs[0]);
-      s_t currentDist
-          = (jointsInLocalSpace[joint1Name] - jointsInLocalSpace[joint2Name])
-                .norm();
-      s_t scale = desiredDist / currentDist;
-      if (log)
-      {
-        std::cout << "Scaling " << bodyNode->name << " by (" << scale
-                  << ") based on " << joint1Name << " and " << joint2Name
-                  << std::endl;
-      }
-      for (auto* body : bodyNode->bodies)
-      {
-        bodyScales[body->getName()] = Eigen::Vector3s(scale, scale, scale);
-        bodyScaleWeights[body->getName()]
-            = Eigen::Vector3s::Ones() * currentDist * currentDist;
-      }
-    }
-    // 1.2.4. If we have multiple joint pairs, then we can use those to scale
-    // along multiple axis at once.
-    else if (jointPairs.size() > 1)
-    {
-      assert(jointsInLocalSpace.size() > 0);
-      std::map<std::string, int> jointToIndex;
-      std::vector<Eigen::Vector3s> jointsInLocalSpaceVector;
-      std::vector<std::string> jointNames;
-      for (auto& pair : jointsInLocalSpace)
-      {
-        jointToIndex[pair.first] = jointToIndex.size();
-        jointNames.push_back(pair.first);
-        jointsInLocalSpaceVector.push_back(pair.second);
-      }
-      assert(jointsInLocalSpaceVector.size() > 0);
-
-      // Default the square distances to the current distances, in case we're
-      // missing some pairs
-      Eigen::MatrixXs squaredDistances = Eigen::MatrixXs::Zero(
-          jointsInLocalSpace.size(), jointsInLocalSpace.size());
-      for (auto& pair1 : jointsInLocalSpace)
-      {
-        for (auto& pair2 : jointsInLocalSpace)
-        {
-          squaredDistances(jointToIndex[pair1.first], jointToIndex[pair2.first])
-              = (pair1.second - pair2.second).squaredNorm();
-        }
-      }
-
-      // Now overwrite the distances we have with the estimated distances
-      for (auto& pair : jointPairs)
-      {
-        std::string joint1Name = std::get<0>(pair);
-        std::string joint2Name = std::get<1>(pair);
-        s_t desiredDist = std::get<2>(pair);
-        squaredDistances(jointToIndex[joint1Name], jointToIndex[joint2Name])
-            = desiredDist * desiredDist;
-        squaredDistances(jointToIndex[joint2Name], jointToIndex[joint1Name])
-            = desiredDist * desiredDist;
-      }
-
-      // Now we can run MDS to get the point cloud
-      Eigen::MatrixXs rawPointCloud
-          = getPointCloudFromDistanceMatrix(squaredDistances);
-
-      // Now we can map the point cloud back to the original locations
-      Eigen::MatrixXs pointCloud
-          = mapPointCloudToData(rawPointCloud, jointsInLocalSpaceVector);
-
-      // If any of the joints are at the origin in our local body coordinates,
-      // we want to re-center the target point cloud so that the same point is
-      // at its origin, or else scaling won't work.
-      int vectorAtOrigin = -1;
-      for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
-      {
-        if (jointsInLocalSpaceVector[i].isZero())
-        {
-          vectorAtOrigin = i;
-        }
-      }
-      if (vectorAtOrigin != -1)
-      {
-        Eigen::Vector3s origin = pointCloud.col(vectorAtOrigin);
-        for (int i = 0; i < pointCloud.cols(); i++)
-        {
-          pointCloud.col(i) -= origin;
-        }
-      }
-
-      // Compute axis scales as the average ratio of the columns of `pointCloud`
-      // to `jointsInLocalSpaceVector`
-      Eigen::Vector3s axisScales = Eigen::Vector3s::Zero();
-      Eigen::Vector3s axisCounts = Eigen::Vector3s::Zero();
-      Eigen::Vector3s axisLengthSum = Eigen::Vector3s::Zero();
-      for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
-      {
-        axisLengthSum += jointsInLocalSpaceVector[i].cwiseProduct(
-            jointsInLocalSpaceVector[i]);
-        for (int axis = 0; axis < 3; axis++)
-        {
-          if (std::abs(jointsInLocalSpaceVector[i](axis)) > 0)
-          {
-            axisScales(axis)
-                += pointCloud(axis, i) / jointsInLocalSpaceVector[i](axis);
-            axisCounts(axis) += 1;
-          }
-        }
-      }
-      int observedAnyAxis = -1;
-      for (int axis = 0; axis < 3; axis++)
-      {
-        if (axisCounts(axis) > 0)
-        {
-          axisScales(axis) /= axisCounts(axis);
-          observedAnyAxis = axis;
-        }
-      }
-      if (observedAnyAxis != -1)
-      {
-        for (int axis = 0; axis < 3; axis++)
-        {
-          if (axisCounts(axis) == 0)
-          {
-            // We have no info about this axis, so assume the scale is whatever
-            // the observed scales were
-            axisScales(axis) = axisScales(observedAnyAxis);
-            if (log)
-            {
-              std::cout
-                  << "Body " << bodyNode->name
-                  << " has no observations with non-zero-length along axis="
-                  << axis << std::endl;
-            }
-          }
-        }
-      }
-      else
-      {
-        std::cout << "Body " << bodyNode->name
-                  << " has no observations with non-zero-length along any "
-                     "axis! This is probably a bug."
-                  << std::endl;
-        axisScales.setConstant(1.0);
-      }
-
-      if (log)
-      {
-        std::cout << "Scaling " << bodyNode->name << " by ("
-                  << axisScales.transpose() << ") based on "
-                  << jointPairs.size() << " pairs of joints" << std::endl;
-        for (auto& pair : jointPairs)
-        {
-          std::cout << "  Pair " << std::get<0>(pair) << " and "
-                    << std::get<1>(pair) << " with distance "
-                    << std::get<2>(pair) << std::endl;
-        }
-        for (int i = 0; i < jointsInLocalSpaceVector.size(); i++)
-        {
-          Eigen::Vector3s target = pointCloud.col(i);
-          Eigen::Vector3s scaled
-              = jointsInLocalSpaceVector[i].cwiseProduct(axisScales);
-          std::cout << "  Joint " << jointNames[i]
-                    << " reconstruction error = " << (target - scaled).norm()
-                    << ": target " << target.transpose() << " vs scaled "
-                    << scaled.transpose() << std::endl;
-        }
-      }
-
-      for (auto* body : bodyNode->bodies)
-      {
-        bodyScales[body->getName()] = axisScales;
-        bodyScaleWeights[body->getName()] = axisLengthSum;
-      }
-    }
-  }
-  // 1.3. Scale any remaining bodies to a default scale based on the height, if
-  // known
-  Eigen::Vector3s defaultScales = Eigen::Vector3s::Ones();
-  Eigen::Vector3s defaultScaleWeights = Eigen::Vector3s::Ones() * 0.01;
-
+  s_t defaultScale = 1.0;
   if (mModelHeightM > 0)
   {
     s_t defaultHeight
         = mSkel->getHeight(Eigen::VectorXs::Zero(mSkel->getNumDofs()));
     if (defaultHeight > 0)
     {
-      s_t ratio = mModelHeightM / defaultHeight;
-      defaultScales = Eigen::Vector3s(ratio, ratio, ratio);
+      defaultScale = mModelHeightM / defaultHeight;
     }
   }
 
-  for (dynamics::BodyNode* bodyNode : mSkel->getBodyNodes())
+  // 1. Find a scale for all the bodies that we can
+  std::map<std::string, Eigen::Vector3s> bodyScales;
+  std::map<std::string, Eigen::Vector3s> bodyScaleWeights;
+  for (std::shared_ptr<struct StackedBody> bodyNode : mStackedBodies)
   {
-    if (bodyScales.count(bodyNode->getName()) == 0)
-    {
-      bodyScales[bodyNode->getName()] = defaultScales;
-      bodyScaleWeights[bodyNode->getName()] = defaultScaleWeights;
-    }
-  }
-  // 1.4. Apply all the scalings to bodies, taking weighted averages over scale
-  // groups
-  for (auto& group : mSkel->getBodyScaleGroups())
-  {
-    Eigen::Vector3s scaleAvg = Eigen::Vector3s::Zero();
-    Eigen::Vector3s weightsSum = Eigen::Vector3s::Zero();
+    std::vector<Eigen::Vector3s> localPoints;
 
-    std::cout << "Scaling group:" << std::endl;
-    for (auto* body : group.nodes)
+    // 1.1. Collect joints adjacent to this body that we can potentially use
+    // to help scale
+    std::vector<std::shared_ptr<struct StackedJoint>> adjacentJoints;
+    // Only use the parent joint to scale if it's not the root joint. The root
+    // joint doesn't really have a meaningful "joint center", so we don't want
+    // to use it to scale.
+    if (bodyNode->parentJoint->parentBody != nullptr)
     {
-      // Prevent divide-by-zero errors
-      Eigen::Vector3s weight = bodyScaleWeights[body->getName()];
-      for (int axis = 0; axis < 3; axis++)
+      adjacentJoints.push_back(bodyNode->parentJoint);
+    }
+    for (int i = 0; i < bodyNode->childJoints.size(); i++)
+    {
+      adjacentJoints.push_back(bodyNode->childJoints[i]);
+    }
+    for (int i = 0; i < adjacentJoints.size(); i++)
+    {
+      Eigen::Vector3s jointWorldPos
+          = getStackedJointCenterFromJointCentersVector(
+              adjacentJoints[i], jointWorldPositions);
+      Eigen::Vector3s jointLocalPos
+          = bodyNode->bodies[0]->getWorldTransform().inverse() * jointWorldPos;
+      localPoints.push_back(jointLocalPos);
+    }
+
+    // 1.2. Collect anatomical markers attached to this body that we can use to
+    // help scale
+    std::vector<std::string> anatomicalMarkers;
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      if (mMarkerIsAnatomical[i]
+          && std::find(
+                 bodyNode->bodies.begin(),
+                 bodyNode->bodies.end(),
+                 mMarkers[i].first)
+                 != bodyNode->bodies.end())
       {
-        if (weight(axis) <= 0)
-          weight(axis) = 1e-5;
+        anatomicalMarkers.push_back(mMarkerNames[i]);
+        Eigen::Vector3s markerLocalPos
+            = bodyNode->bodies[0]->getWorldTransform().inverse()
+              * markerWorldPositions.segment<3>(i * 3);
+        localPoints.push_back(markerLocalPos);
       }
-
-      std::cout << "  " << body->getName() << " = "
-                << bodyScales[body->getName()].transpose() << " with weight "
-                << weight.transpose() << std::endl;
-      scaleAvg += bodyScales[body->getName()].cwiseProduct(weight);
-      weightsSum += weight;
     }
-    scaleAvg = scaleAvg.cwiseQuotient(weightsSum);
-    std::cout << "  -> weighted avg = " << scaleAvg.transpose() << std::endl;
-    for (auto* body : group.nodes)
+
+    // 1.3. Go through all the timesteps, and collect average distances between
+    // the various points of interest (joint center estimates, anatomical
+    // markers) in world space.
+    Eigen::MatrixXd avgDistances
+        = Eigen::MatrixXd::Zero(localPoints.size(), localPoints.size());
+    Eigen::MatrixXi counts
+        = Eigen::MatrixXi::Zero(localPoints.size(), localPoints.size());
+
+    for (int t = 0; t < mMarkerObservations.size(); t++)
     {
-      body->setScale(scaleAvg);
+      for (int i = 0; i < localPoints.size(); i++)
+      {
+        // 1.3.1. For the i'th localPoint, retrieve its world position at time t
+        Eigen::Vector3s point1Pos = Eigen::Vector3s::Zero();
+        if (i < adjacentJoints.size())
+        {
+          // If this is a joint, and we don't have an estimate, skip this point
+          // on this timestep
+          if (mJointCenters[t].count(adjacentJoints[i]->name) == 0)
+            continue;
+          point1Pos = mJointCenters[t][adjacentJoints[i]->name];
+        }
+        else
+        {
+          std::string markerName = anatomicalMarkers[i - adjacentJoints.size()];
+          // If this is a marker, and we don't have an observation, skip this
+          // point on this timestep
+          if (mMarkerObservations[t].count(markerName) == 0)
+            continue;
+          point1Pos = mMarkerObservations[t][markerName];
+        }
+
+        for (int j = i + 1; j < localPoints.size(); j++)
+        {
+          // 1.3.2. For the j'th localPoint, retrieve its world position at time
+          // t
+          Eigen::Vector3s point2Pos = Eigen::Vector3s::Zero();
+          if (j < adjacentJoints.size())
+          {
+            // If this is a joint, and we don't have an estimate, skip this
+            // point on this timestep
+            if (mJointCenters[t].count(adjacentJoints[j]->name) == 0)
+              continue;
+            point2Pos = mJointCenters[t][adjacentJoints[j]->name];
+          }
+          else
+          {
+            std::string markerName
+                = anatomicalMarkers[j - adjacentJoints.size()];
+            // If this is a marker, and we don't have an observation, skip this
+            // point on this timestep
+            if (mMarkerObservations[t].count(markerName) == 0)
+              continue;
+            point2Pos = mMarkerObservations[t][markerName];
+          }
+
+          // 1.3.3. If we make it here, we've got two points we can use to
+          // estimate.
+          s_t distance = (point1Pos - point2Pos).norm();
+          avgDistances(i, j) += distance;
+          avgDistances(j, i) += distance;
+          counts(i, j) += 1;
+          counts(j, i) += 1;
+        }
+      }
+    }
+
+    // 1.4. Now we've got a matrix of average distances between all the points,
+    // we can construct a weighted set of observations and then use our local
+    // scale method to reconstruct the scale of the body.
+    std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights;
+    for (int i = 0; i < localPoints.size(); i++)
+    {
+      for (int j = i + 1; j < localPoints.size(); j++)
+      {
+        if (counts(i, j) > 0)
+        {
+          s_t avgDistance = avgDistances(i, j) / counts(i, j);
+          // TODO: do something clever with the weights
+          s_t weight = 1.0;
+          pairDistancesWithWeights.push_back(
+              std::make_tuple(i, j, avgDistance, weight));
+        }
+      }
+    }
+    Eigen::Vector3s scale = getLocalScale(
+        localPoints, pairDistancesWithWeights, defaultScale, log);
+
+    // 1.5. Apply that scale to all the bodies in this stacked body
+    for (dynamics::BodyNode* body : bodyNode->bodies)
+    {
+      body->setScale(scale);
     }
   }
-  // 1.5. Ensure that the scaling is symmetric across groups, by condensing into
+
+  // 2. Ensure that the scaling is symmetric across groups, by condensing into
   // the group scales vector and then re-setting the body scales from that
   // vector.
   mGroupScales = mSkel->getGroupScales();
   mSkel->setGroupScales(mGroupScales);
-
-  mSkel->setBodyScales(originalBodyScales);
-  mSkel->setPositions(originalPose);
 }
 
 //==============================================================================
@@ -2222,7 +2384,24 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
               annotatedGroup.adjacentJointCenters[j]);
           visibleAdjacentPointNames.push_back(
               "Joint " + annotatedGroup.adjacentJoints[j]->name);
-          visibleAdjacentPointWeights.push_back(1.0);
+          JointCenterEstimateSource estimate
+              = mJointCentersEstimateSource[t].at(
+                  annotatedGroup.adjacentJoints[j]->name);
+          if (estimate == JointCenterEstimateSource::MDS)
+          {
+            // Pretty much ignore MDS estimates when scaling, since those
+            // estimates are based on our scaling guesses in the first place, so
+            // that introduces some circularity into the process
+            visibleAdjacentPointWeights.push_back(1e-6);
+          }
+          else if (estimate == JointCenterEstimateSource::LEAST_SQUARES_EXACT)
+          {
+            visibleAdjacentPointWeights.push_back(1.0);
+          }
+          else if (estimate == JointCenterEstimateSource::LEAST_SQUARES_AXIS)
+          {
+            visibleAdjacentPointWeights.push_back(0.5);
+          }
         }
       }
       for (int j = 0; j < annotatedGroup.adjacentMarkers.size(); j++)
@@ -2235,7 +2414,9 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
               annotatedGroup.adjacentMarkerCenters[j]);
           visibleAdjacentPointNames.push_back(
               "Marker " + annotatedGroup.adjacentMarkers[j]);
-          visibleAdjacentPointWeights.push_back(0.01);
+          bool isAnatomical = mMarkerIsAnatomical
+              [mMarkerNameToIndex[annotatedGroup.adjacentMarkers[j]]];
+          visibleAdjacentPointWeights.push_back(isAnatomical ? 1.0 : 0.01);
         }
       }
       assert(
@@ -2305,6 +2486,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
     for (int pass = 0; pass < NUM_PASSES; pass++)
     {
       std::map<std::string, bool> solvedJoints;
+      std::map<std::string, bool> jointsImpossibleToSolve;
       std::map<std::string, Eigen::Isometry3s> jointChildTransform;
       if (logOutput)
       {
@@ -2330,12 +2512,23 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                 || estimatedBodyWorldTransforms.count(joint->parentBody->name))
               || estimatedBodyWorldTransforms.count(joint->childBody->name)
                      == 0)
+          {
+            jointsImpossibleToSolve[joint->name] = true;
             continue;
+          }
 
           bool solvedAllChildren = true;
           for (int i = 0; i < joint->childBody->childJoints.size(); i++)
           {
-            if (solvedJoints.count(joint->childBody->childJoints[i]->name) == 0)
+            // If we haven't solved this child joint yet, and the child joint
+            // hasn't been marked as being "impossible to solve" because it's
+            // attached to bodies that don't have defined transforms, then we
+            // aren't ready to solve this joint yet
+            if ((solvedJoints.count(joint->childBody->childJoints[i]->name)
+                 == 0)
+                && (jointsImpossibleToSolve.count(
+                        joint->childBody->childJoints[i]->name)
+                    == 0))
             {
               solvedAllChildren = false;
               break;
@@ -2541,6 +2734,11 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                      == 0)
             continue;
 
+          // If this joint isn't connected on both sides to bodies we've got
+          // estimated transforms for, then we can't solve it
+          if (jointsImpossibleToSolve.count(mStackedJoints[i]->name))
+            continue;
+
           std::shared_ptr<struct StackedJoint> joint = mStackedJoints[i];
 
           Eigen::Isometry3s parentTransform = Eigen::Isometry3s::Identity();
@@ -2555,12 +2753,15 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                   = parentTransform;
             }
           }
+          assert(jointChildTransform.count(joint->name) > 0);
           Eigen::Isometry3s childTransform = jointChildTransform[joint->name];
 
           Eigen::Isometry3s totalJointTransform
               = parentTransform.inverse() * childTransform;
 
           Eigen::Isometry3s remainingJointTransform = totalJointTransform;
+          assert(remainingJointTransform.translation().allFinite());
+          assert(remainingJointTransform.linear().allFinite());
           for (int j = 0; j < joint->joints.size(); j++)
           {
             dynamics::Joint* subJoint = joint->joints[j];
@@ -2569,9 +2770,12 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
             // coordinates on this joint
             Eigen::VectorXs pos = subJoint->getNearestPositionToDesiredRotation(
                 remainingJointTransform.linear());
+            assert(pos.allFinite());
             subJoint->setPositions(pos);
             Eigen::Isometry3s recoveredJointTransform
                 = subJoint->getRelativeTransform();
+            assert(recoveredJointTransform.linear().allFinite());
+            assert(recoveredJointTransform.translation().allFinite());
             if (subJoint->getType() == dynamics::FreeJoint::getStaticType()
                 || subJoint->getType()
                        == dynamics::EulerFreeJoint::getStaticType())
@@ -2579,21 +2783,25 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
               Eigen::Vector3s translationOffset
                   = (recoveredJointTransform.translation()
                      - totalJointTransform.translation());
+              assert(translationOffset.allFinite());
               pos.tail<3>() -= translationOffset;
+              assert(pos.tail<3>().allFinite());
               subJoint->setPositions(pos);
               recoveredJointTransform = subJoint->getRelativeTransform();
             }
-            remainingJointTransform
-                = recoveredJointTransform.inverse() * remainingJointTransform;
+            assert(recoveredJointTransform.translation().allFinite());
+            assert(recoveredJointTransform.linear().allFinite());
 
             if (logOutput)
             {
-              s_t translationError = (totalJointTransform.translation()
+              s_t translationError = (remainingJointTransform.translation()
                                       - recoveredJointTransform.translation())
                                          .norm();
-              s_t rotationError = (totalJointTransform.linear()
+              s_t rotationError = (remainingJointTransform.linear()
                                    - recoveredJointTransform.linear())
                                       .norm();
+              assert(
+                  rotationError < 1e3); // This should be numerically impossible
               std::cout
                   << "Re-estimating (this time with a known parent) joint "
                   << subJoint->getName()
@@ -2601,6 +2809,11 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
                   << translationError << "m and " << rotationError
                   << " on rotation" << std::endl;
             }
+
+            assert(remainingJointTransform.translation().allFinite());
+            assert(remainingJointTransform.linear().allFinite());
+            remainingJointTransform
+                = recoveredJointTransform.inverse() * remainingJointTransform;
 
             // 2.2.3. Save our estimate back to our joint angles
             jointAngles.segment(
@@ -2951,6 +3164,99 @@ Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
 }
 
 //==============================================================================
+/// This tries to solve the least-squares problem to get the local scales for
+/// a body, such that the distances between the local points match the input
+/// distances as closely as possible, with a weighted preference.
+Eigen::Vector3s IKInitializer::getLocalScale(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<std::tuple<int, int, s_t, s_t>> pairDistancesWithWeights,
+    s_t defaultAxisScale,
+    bool logOutput)
+{
+  // Special case, if we have no observations, return the default
+  if (pairDistancesWithWeights.size() == 0)
+  {
+    return Eigen::Vector3s::Constant(defaultAxisScale);
+  }
+  // Special case, if we have only one observation, then scale uniformly
+  // according to that observation
+  if (pairDistancesWithWeights.size() == 1)
+  {
+    Eigen::Vector3s& a = localPoints[std::get<0>(pairDistancesWithWeights[0])];
+    Eigen::Vector3s& b = localPoints[std::get<1>(pairDistancesWithWeights[0])];
+    s_t d = std::get<2>(pairDistancesWithWeights[0]);
+    s_t w = std::get<3>(pairDistancesWithWeights[0]);
+    (void)w;
+    s_t ratio = d / (a - b).norm();
+    if (ratio < 0.75 * defaultAxisScale || ratio > 1.25 * defaultAxisScale)
+    {
+      ratio = defaultAxisScale;
+    }
+    return Eigen::Vector3s::Constant(ratio);
+  }
+  // General case, we have more than one observation, and would like to scale
+  // non-uniformly
+  else
+  {
+    // Our basic formula is:
+    // s[0]^2*(a[0]-b[0])^2 + s[1]^2*(a[1]-b[1])^2 + s[2]^2*(a[2]-b[2])^2 = d^2
+
+    Eigen::MatrixXs A
+        = Eigen::MatrixXs::Zero(pairDistancesWithWeights.size(), 3);
+    Eigen::VectorXs distances
+        = Eigen::VectorXs::Zero(pairDistancesWithWeights.size());
+
+    for (int i = 0; i < pairDistancesWithWeights.size(); i++)
+    {
+      Eigen::Vector3s& a
+          = localPoints[std::get<0>(pairDistancesWithWeights[i])];
+      Eigen::Vector3s& b
+          = localPoints[std::get<1>(pairDistancesWithWeights[i])];
+      s_t d = std::get<2>(pairDistancesWithWeights[i]);
+      s_t w = std::get<3>(pairDistancesWithWeights[i]);
+
+      A(i, 0) = w * (a[0] - b[0]) * (a[0] - b[0]);
+      A(i, 1) = w * (a[1] - b[1]) * (a[1] - b[1]);
+      A(i, 2) = w * (a[2] - b[2]) * (a[2] - b[2]);
+      distances(i) = w * d * d;
+    }
+
+    auto svd = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+    Eigen::Vector3s scaleSquared = svd.solve(distances);
+    Eigen::Vector3s scale = scaleSquared.cwiseAbs().cwiseSqrt();
+
+    Eigen::Vector3s outputSensitivity = svd.matrixV() * svd.singularValues();
+    if (logOutput)
+    {
+      std::cout << "Output sensitivity: " << outputSensitivity.transpose()
+                << std::endl;
+    }
+
+    for (int i = 0; i < 3; i++)
+    {
+      // If the singular value is either zero (no info), or indicates that the
+      // scale is way too sensitive (localPoints are too close together along
+      // this axis), then we need to default this scale.
+      if (abs(outputSensitivity(i)) < 0.002 || abs(outputSensitivity(i)) > 100)
+      {
+        scale(i) = defaultAxisScale;
+      }
+      // Also, if we're outside of reasonable scale bounds, just default that
+      // axis, because it indicates that something went wrong in estimating.
+      else if (
+          scale(i) < 0.75 * defaultAxisScale
+          || scale(i) > 1.25 * defaultAxisScale)
+      {
+        scale(i) = defaultAxisScale;
+      }
+    }
+
+    return scale;
+  }
+}
+
+//==============================================================================
 /// This implements the method in "Constrained least-squares optimization for
 /// robust estimation of center of rotation" by Chang and Pollard, 2006. This
 /// is the simpler version, that only supports a single marker.
@@ -2974,9 +3280,9 @@ Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
 Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
     std::vector<std::vector<Eigen::Vector3s>> markerTraces, bool log)
 {
-  // This algorithm performs really poorly if the joint center is less than 0.1
-  // units away from the markers, which often happens when your distance metric
-  // is in meters. To get around this, we pre-scale all the data up by
+  // This algorithm performs really poorly if the joint center is less than
+  // 0.1 units away from the markers, which often happens when your distance
+  // metric is in meters. To get around this, we pre-scale all the data up by
   // SCALE_FACTOR, and scale down the result at the end by the same amount.
   const s_t SCALE_FACTOR = 50.0;
 
@@ -3070,8 +3376,8 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
   }
   assert(result == Eigen::Success);
 
-  // Print the generalized eigenvalues - we use the opposite sign convention for
-  // the eigenvalues as the solver
+  // Print the generalized eigenvalues - we use the opposite sign convention
+  // for the eigenvalues as the solver
   Eigen::VectorXcd complexEigenvalues
       = solver.alphas().cwiseQuotient(solver.betas()).transpose();
   if (log)
@@ -3088,8 +3394,8 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
               << complexEigenvectors << std::endl;
   }
 
-  // Reconstruct the solution from the eigenvectors, described after equation 17
-  // in the paper. To quote: "The best-fit solution is the generalized
+  // Reconstruct the solution from the eigenvectors, described after equation
+  // 17 in the paper. To quote: "The best-fit solution is the generalized
   // eigenvector u with non-negative eigenvalue l which has the least cost
   // according to Eq. (13) and subject to Eq. (14)"
   s_t bestCost = std::numeric_limits<s_t>::infinity();
@@ -3215,8 +3521,8 @@ Eigen::Vector3s IKInitializer::getChangPollard2006JointCenterMultiMarker(
 
   if (!std::isfinite(bestCost))
   {
-    // We fall back to a least-squares fit when there's no valid solution, which
-    // generally means that there was no noise (and therefore no radius
+    // We fall back to a least-squares fit when there's no valid solution,
+    // which generally means that there was no noise (and therefore no radius
     // variability) in the marker data.
     if (log)
     {
@@ -3252,14 +3558,37 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   for (auto& trace : traces)
     dim += trace.size();
 
+  std::vector<int> usableTimesteps;
+  if (traces.size() > 0)
+  {
+    for (int i = 0; i < traces[0].size(); i++)
+    {
+      usableTimesteps.push_back(i);
+    }
+  }
+
+  const int maxSamples = 500;
+  if (usableTimesteps.size() > maxSamples)
+  {
+    std::vector<int> sampledIndices
+        = math::evenlySpacedTimesteps(usableTimesteps.size(), maxSamples);
+    std::vector<int> sampledTimesteps;
+    for (int index : sampledIndices)
+    {
+      sampledTimesteps.push_back(usableTimesteps[index]);
+    }
+    usableTimesteps = sampledTimesteps;
+  }
+
   Eigen::VectorXs f = Eigen::VectorXs::Zero(dim);
   Eigen::MatrixXs A = Eigen::MatrixXs::Zero(dim, 3 + traces.size());
   int rowCursor = 0;
   int colCursor = 3;
   for (auto& trace : traces)
   {
-    for (Eigen::Vector3s& p : trace)
+    for (int i : usableTimesteps)
     {
+      Eigen::Vector3s& p = trace[i];
       f(rowCursor) = p.squaredNorm();
 
       A(rowCursor, 0) = 2 * p(0);

@@ -2323,6 +2323,7 @@ void createFaceFaceContacts(
   prepareConvex2DShape(pointsBConvexSorted, origin, basis2dX, basis2dY);
 
   int numContacts = 0;
+  (void)numContacts;
 
   // All vertices that lie inside the other shape's convex hull are
   // vertex-face contacts.
