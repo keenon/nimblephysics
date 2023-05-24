@@ -652,7 +652,7 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
-  prescaleBasedOnAnatomicalMarkers(logOutput);
+  prescaleBasedOnAnatomicalMarkers();
 
   // Use MDS, despite its many flaws, to arrive at decent initial guesses for
   // joint centers that we can use to center the subsequent least-squares fits
@@ -661,12 +661,12 @@ void IKInitializer::runFullPipeline(bool logOutput)
   closedFormMDSJointCenterSolver();
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
-  closedFormPivotFindingJointCenterSolver(logOutput);
+  closedFormPivotFindingJointCenterSolver();
   recenterAxisJointsBasedOnBoneAngles();
 
   // Fill in the parts of the body scales and poses that we can in closed form
   estimateGroupScalesClosedForm();
-  estimatePosesClosedForm();
+  estimatePosesClosedForm(logOutput);
 }
 
 //==============================================================================
@@ -1625,7 +1625,49 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     std::vector<std::vector<Eigen::Vector3s>> markerTraces;
     for (auto& pair : anchorBodyMarkerClouds)
     {
-      markerTraces.push_back(pair.second);
+      Eigen::Vector3s meanObservation = Eigen::Vector3s::Zero();
+      for (Eigen::Vector3s observation : pair.second)
+      {
+        meanObservation += observation;
+      }
+      meanObservation /= pair.second.size();
+
+      s_t markerVariance = 0;
+      for (Eigen::Vector3s observation : pair.second)
+      {
+        markerVariance += (observation - meanObservation).squaredNorm();
+      }
+      markerVariance /= pair.second.size();
+
+      if (markerVariance > 0.01)
+      {
+        markerTraces.push_back(pair.second);
+        if (logOutput)
+        {
+          std::cout << "Using marker \"" << pair.first << "\" with variance "
+                    << markerVariance << std::endl;
+        }
+      }
+      else
+      {
+        if (logOutput)
+        {
+          std::cout << "Skipping marker \"" << pair.first
+                    << "\" because its variance is " << markerVariance
+                    << std::endl;
+        }
+      }
+    }
+
+    if (markerTraces.size() == 0)
+    {
+      if (logOutput)
+      {
+        std::cout << "Have no markers left after filtering for sufficient "
+                     "variance in local space, so not solving joint \""
+                  << joint->name << "\"" << std::endl;
+      }
+      continue;
     }
 
     // 5.4. Get the local joint center in the anchor body
@@ -2380,7 +2422,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
             // Pretty much ignore MDS estimates when scaling, since those
             // estimates are based on our scaling guesses in the first place, so
             // that introduces some circularity into the process
-            visibleAdjacentPointWeights.push_back(1e-6);
+            visibleAdjacentPointWeights.push_back(1e-3);
           }
           else if (estimate == JointCenterEstimateSource::LEAST_SQUARES_EXACT)
           {
@@ -2411,7 +2453,16 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
           visibleAdjacentPointsInLocalSpace.size()
           == visibleAdjacentPointsInWorldSpace.size());
 
-      if (visibleAdjacentPointsInLocalSpace.size() >= 3)
+      s_t visibleAdjacentPointsWeightSum = 0.0;
+      for (int j = 0; j < visibleAdjacentPointsInLocalSpace.size(); j++)
+      {
+        visibleAdjacentPointsWeightSum += visibleAdjacentPointWeights[j];
+      }
+
+      // We need at least 3 points, and they need to be semi-reliable point
+      // estimates
+      if (visibleAdjacentPointsInLocalSpace.size() >= 3
+          && visibleAdjacentPointsWeightSum >= 2.0)
       {
         // 3.1.2. Compute the root body transform from the visible points, and
         // then use that to compute the other body transforms
