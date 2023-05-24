@@ -75,6 +75,7 @@ runIKInitializer(
   // Populate the markers list.
   // --------------------------
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerList;
+  std::map<std::string, bool> markerIsAnatomical;
   for (auto& pair : standard.markersMap)
   {
     markerList.push_back(pair.second);
@@ -83,11 +84,13 @@ runIKInitializer(
   for (auto marker : standard.anatomicalMarkers)
   {
     std::cout << "Anatomical marker: " << marker << std::endl;
+    markerIsAnatomical[marker] = true;
   }
 
   for (auto marker : standard.trackingMarkers)
   {
     std::cout << "Tracking marker: " << marker << std::endl;
+    markerIsAnatomical[marker] = false;
   }
 
   for (auto marker : standard.markersMap)
@@ -102,9 +105,9 @@ runIKInitializer(
   IKInitializer initializer(
       standard.skeleton,
       standard.markersMap,
+      markerIsAnatomical,
       markerObservationTrials[0],
-      heightM,
-      knownScalesInAdvance);
+      heightM);
   if (knownScalesInAdvance)
   {
     initializer.closedFormMDSJointCenterSolver();
@@ -113,7 +116,7 @@ runIKInitializer(
   }
   else
   {
-    initializer.runFullPipeline(true);
+    initializer.runFullPipeline(false);
   }
 
   return std::make_tuple(

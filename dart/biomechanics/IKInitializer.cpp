@@ -321,10 +321,9 @@ IKInitializer::IKInitializer(
     std::shared_ptr<dynamics::Skeleton> skel,
     std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
         markers,
-    std::map<std::string, bool> markerInAnatomical,
+    std::map<std::string, bool> markerIsAnatomical,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-    s_t modelHeightM,
-    bool dontMergeNearbyJoints)
+    s_t modelHeightM)
   : mSkel(skel),
     mMarkerObservations(markerObservations),
     mModelHeightM(modelHeightM)
@@ -335,9 +334,9 @@ IKInitializer::IKInitializer(
     mMarkerNameToIndex[pair.first] = mMarkers.size();
     mMarkerNames.push_back(pair.first);
     mMarkers.push_back(pair.second);
-    if (markerInAnatomical.count(pair.first))
+    if (markerIsAnatomical.count(pair.first))
     {
-      mMarkerIsAnatomical.push_back(markerInAnatomical[pair.first]);
+      mMarkerIsAnatomical.push_back(markerIsAnatomical[pair.first]);
     }
     else
     {
@@ -377,6 +376,13 @@ IKInitializer::IKInitializer(
     mStackedBodies.push_back(std::make_shared<struct StackedBody>());
     mStackedBodies[i]->bodies.push_back(mSkel->getBodyNode(i));
     mStackedBodies[i]->name = mSkel->getBodyNode(i)->getName();
+    // Count the number of markers on this body.
+    mStackedBodies[i]->numMarkers = 0;
+    for (auto& marker : mMarkers) {
+      if (marker.first->getName() == mStackedBodies[i]->name) {
+        mStackedBodies[i]->numMarkers += 1;
+      }
+    }
   }
   for (int i = 0; i < mSkel->getNumJoints(); i++)
   {
@@ -417,76 +423,58 @@ IKInitializer::IKInitializer(
   assert(mStackedBodies.size() == mSkel->getNumBodyNodes());
   assert(mStackedJoints.size() == mSkel->getNumJoints());
 
-  // 2.2. Collapse the stacked bodies and joints where there are joints that are
-  // parent/child and are "too close" in physical space, which indicates that
-  // the skeleton architect is using multiple low-DOF joints to represent a
-  // single more complex high-DOF joint.
-
+  // 2.2. Collapse "leaf" stacked bodies into their parent bodies if they have
+  // fewer than 3 markers.
   while (true)
   {
-    bool anyToMerge = false;
-    std::pair<
-        std::shared_ptr<struct StackedJoint>,
-        std::shared_ptr<struct StackedJoint>>
-        toMerge;
+    std::shared_ptr<struct StackedJoint> toCollapse = nullptr;
 
-    for (int i = 0; i < mStackedJoints.size(); i++)
-    {
-      Eigen::Vector3s joint1WorldCenter
-          = getStackedJointCenterFromJointCentersVector(
-              mStackedJoints[i], jointWorldPositions);
-      for (auto& childJoint : mStackedJoints[i]->childBody->childJoints)
-      {
-        Eigen::Vector3s joint2WorldCenter
-            = getStackedJointCenterFromJointCentersVector(
-                childJoint, jointWorldPositions);
-        Eigen::Vector3s joint1ToJoint2 = joint2WorldCenter - joint1WorldCenter;
-        s_t joint1ToJoint2Distance = joint1ToJoint2.norm();
-
-        if (joint1ToJoint2Distance < 0.07 && !dontMergeNearbyJoints)
-        {
-          anyToMerge = true;
-          toMerge = std::make_pair(mStackedJoints[i], childJoint);
-          break;
+    // 2.2.1. Find a "leaf" body with fewer than 3 markers and mark the parent
+    // joint to be collapsed.
+    for (auto& mStackedBody : mStackedBodies) {
+      if (mStackedBody->childJoints.empty()) {
+        if (mStackedBody->numMarkers < 3) {
+          toCollapse = mStackedBody->parentJoint;
         }
       }
-      if (anyToMerge)
-        break;
     }
 
-    if (anyToMerge)
+    if (toCollapse != nullptr)
     {
-      // 2.2.1. Merge the joints
-      std::shared_ptr<struct StackedJoint> mergedJoint = toMerge.first;
-      std::shared_ptr<struct StackedJoint> jointToDelete = toMerge.second;
-      std::shared_ptr<struct StackedBody> bodyToDelete
-          = jointToDelete->parentBody;
-      std::shared_ptr<struct StackedBody> mergedBody = jointToDelete->childBody;
-      std::cout << "Merging joints \"" << jointToDelete->name << "\" into \""
-                << mergedJoint->name << "\"" << std::endl;
-      std::cout << " -> As a result merging bodies \"" << bodyToDelete->name
-                << "\" into \"" << mergedBody->name << "\"" << std::endl;
+      // 2.2.2. Merge the connected bodies
+      std::shared_ptr<struct StackedBody> parentBody = toCollapse->parentBody;
+      std::shared_ptr<struct StackedBody> childBody = toCollapse->childBody;
+      std::cout << "Discovered leaf body \"" << childBody->name << "\" with "
+                << "fewer than 3 markers." << std::endl;
+      std::cout << " -> As a result merging bodies \"" << childBody->name
+                << "\" into \"" << parentBody->name << "\"" << std::endl;
+      parentBody->numMarkers += childBody->numMarkers;
+      parentBody->bodies.insert(
+          parentBody->bodies.end(),
+          childBody->bodies.begin(),
+          childBody->bodies.end());
+      // Re-attach all the child joints to the parent body
+      for (auto& childJoint : childBody->childJoints)
+      {
+        childJoint->parentBody = parentBody;
+        parentBody->childJoints.push_back(childJoint);
+      }
 
-      mergedJoint->joints.insert(
-          mergedJoint->joints.end(),
-          jointToDelete->joints.begin(),
-          jointToDelete->joints.end());
-      mergedBody->bodies.insert(
-          mergedBody->bodies.end(),
-          bodyToDelete->bodies.begin(),
-          bodyToDelete->bodies.end());
-      mergedJoint->childBody = mergedBody;
-      mergedBody->parentJoint = mergedJoint;
-
-      // 2.2.2. Remove the joint and body from the lists
-      auto jointToDeleteIterator = std::find(
-          mStackedJoints.begin(), mStackedJoints.end(), jointToDelete);
+      // 2.2.3. Remove the joint and body from the lists
+      auto jointToDeleteIterator
+          = std::find(mStackedJoints.begin(), mStackedJoints.end(), toCollapse);
       assert(jointToDeleteIterator != mStackedJoints.end());
       mStackedJoints.erase(jointToDeleteIterator);
-      auto bodyToDeleteIterator = std::find(
-          mStackedBodies.begin(), mStackedBodies.end(), bodyToDelete);
+      auto bodyToDeleteIterator
+          = std::find(mStackedBodies.begin(), mStackedBodies.end(), childBody);
       assert(bodyToDeleteIterator != mStackedBodies.end());
       mStackedBodies.erase(bodyToDeleteIterator);
+      auto childJointToDeletIterator = std::find(
+          parentBody->childJoints.begin(),
+          parentBody->childJoints.end(),
+          toCollapse);
+      assert(jointToDeleteIterator != parentBody->childJoints.end());
+      parentBody->childJoints.erase(childJointToDeletIterator);
     }
     else
     {

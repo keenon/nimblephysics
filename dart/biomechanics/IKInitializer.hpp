@@ -52,6 +52,7 @@ struct StackedBody
   std::vector<dynamics::BodyNode*> bodies;
   std::shared_ptr<struct StackedJoint> parentJoint;
   std::vector<std::shared_ptr<struct StackedJoint>> childJoints;
+  double numMarkers;
 };
 
 enum JointCenterEstimateSource
@@ -80,8 +81,7 @@ public:
           markers,
       std::map<std::string, bool> markerIsAnatomical,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
-      s_t modelHeightM = -1.0,
-      bool dontMergeNearbyJoints = false);
+      s_t modelHeightM = -1.0);
 
   //////////////////////////////////////////////////////////////////////////////
   // Core entrypoint
