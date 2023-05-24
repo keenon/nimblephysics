@@ -4242,8 +4242,18 @@ MarkerInitialization MarkerFitter::getInitialization(
     // non-convex IK and hope for the best. Instead, run the least-squares IK
     // initializer.
 
+    std::map<std::string, bool> markerIsAnatomical;
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      markerIsAnatomical[mMarkerNames[i]] = !mMarkerIsTracking[i];
+    }
+
     IKInitializer initializer(
-        mSkeleton, mMarkerMap, markerObservations, mHeightPrior);
+        mSkeleton,
+        mMarkerMap,
+        markerIsAnatomical,
+        markerObservations,
+        mHeightPrior);
     initializer.runFullPipeline();
 
     // For now, we're just going to use the poses and scales, and then leave the
