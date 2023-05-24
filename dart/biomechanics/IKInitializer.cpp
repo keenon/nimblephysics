@@ -22,7 +22,9 @@
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
+#include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
+#include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
@@ -323,10 +325,12 @@ IKInitializer::IKInitializer(
         markers,
     std::map<std::string, bool> markerIsAnatomical,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+    std::vector<bool> newClip,
     s_t modelHeightM)
   : mSkel(skel),
     mMarkerObservations(markerObservations),
-    mModelHeightM(modelHeightM)
+    mModelHeightM(modelHeightM),
+    mNewClip(newClip)
 {
   // 1. Convert the marker map to an ordered list
   for (auto& pair : markers)
@@ -378,8 +382,10 @@ IKInitializer::IKInitializer(
     mStackedBodies[i]->name = mSkel->getBodyNode(i)->getName();
     // Count the number of markers on this body.
     mStackedBodies[i]->numMarkers = 0;
-    for (auto& marker : mMarkers) {
-      if (marker.first->getName() == mStackedBodies[i]->name) {
+    for (auto& marker : mMarkers)
+    {
+      if (marker.first->getName() == mStackedBodies[i]->name)
+      {
         mStackedBodies[i]->numMarkers += 1;
       }
     }
@@ -431,9 +437,12 @@ IKInitializer::IKInitializer(
 
     // 2.2.1. Find a "leaf" body with fewer than 3 markers and mark the parent
     // joint to be collapsed.
-    for (auto& mStackedBody : mStackedBodies) {
-      if (mStackedBody->childJoints.empty()) {
-        if (mStackedBody->numMarkers < 3) {
+    for (auto& mStackedBody : mStackedBodies)
+    {
+      if (mStackedBody->childJoints.empty())
+      {
+        if (mStackedBody->numMarkers < 3)
+        {
           toCollapse = mStackedBody->parentJoint;
         }
       }
@@ -666,7 +675,8 @@ void IKInitializer::runFullPipeline(bool logOutput)
 
   // Fill in the parts of the body scales and poses that we can in closed form
   estimateGroupScalesClosedForm();
-  estimatePosesClosedForm(logOutput);
+  // estimatePosesClosedForm(logOutput);
+  estimatePosesWithIK(logOutput);
 }
 
 //==============================================================================
@@ -2284,6 +2294,146 @@ void IKInitializer::estimateGroupScalesClosedForm(bool log)
 }
 
 //==============================================================================
+/// This takes the current guesses for the joint centers and the group scales,
+/// and just runs straightforward IK to get the body positions.
+s_t IKInitializer::estimatePosesWithIK(bool logOutput)
+{
+  std::shared_ptr<dynamics::Skeleton> skelBallJoints
+      = mSkel->convertSkeletonToBallJoints();
+  Eigen::VectorXs lastPose = Eigen::VectorXs::Zero(mSkel->getNumDofs());
+  s_t avgLoss = 0.0;
+  mPoses.clear();
+  for (int t = 0; t < mMarkerObservations.size(); t++)
+  {
+    // 1. Find a linearized list of markers to target
+    std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+    std::vector<Eigen::Vector3s> markerPoses;
+    std::vector<bool> anatomicalMarkers;
+    for (int i = 0; i < mMarkers.size(); i++)
+    {
+      if (mMarkerObservations[t].count(mMarkerNames[i]))
+      {
+        markers.emplace_back(
+            skelBallJoints->getBodyNode(mMarkers[i].first->getName()),
+            mMarkers[i].second);
+        markerPoses.push_back(mMarkerObservations[t][mMarkerNames[i]]);
+        anatomicalMarkers.push_back(mMarkerIsAnatomical[i]);
+      }
+    }
+    Eigen::VectorXs markerTarget = Eigen::VectorXs::Zero(markers.size() * 3);
+    for (int i = 0; i < markers.size(); i++)
+    {
+      markerTarget.segment<3>(i * 3) = markerPoses[i];
+    }
+
+    // 2. Convert the visible joints over into pointers to the ball joints
+    // skeleton
+    std::vector<dynamics::Joint*> joints;
+    std::vector<std::vector<int>> jointClusters;
+    std::vector<Eigen::Vector3s> jointPoses;
+    for (int i = 0; i < mStackedJoints.size(); i++)
+    {
+      if (mJointCenters[t].count(mStackedJoints[i]->name))
+      {
+        jointPoses.push_back(mJointCenters[t][mStackedJoints[i]->name]);
+        std::vector<int> clusterIndices;
+        for (dynamics::Joint* joint : mStackedJoints[i]->joints)
+        {
+          clusterIndices.push_back(joints.size());
+          joints.push_back(skelBallJoints->getJoint(joint->getName()));
+        }
+        jointClusters.push_back(clusterIndices);
+      }
+    }
+    Eigen::VectorXs jointClusterTarget
+        = Eigen::VectorXs::Zero(joints.size() * 3);
+    for (int i = 0; i < joints.size(); i++)
+    {
+      jointClusterTarget.segment<3>(i * 3) = jointPoses[i];
+    }
+
+    // 3. Solve the actual IK
+    s_t ikLoss = math::solveIK(
+        mSkel->convertPositionsToBallSpace(lastPose),
+        mSkel->getPositionUpperLimits(),
+        mSkel->getPositionLowerLimits(),
+        markerTarget.size() + jointClusterTarget.size(),
+        [&](const Eigen::VectorXs& pos, bool clamp) {
+          // 3.1. Set poses on the ball joint skeleton, by default not clamping
+          // to limits
+          skelBallJoints->setPositions(pos);
+          if (clamp)
+          {
+            // If we're clamping to limits, do it in the original skeleton joint
+            // space, not in ball space
+            mSkel->setPositions(mSkel->convertPositionsFromBallSpace(pos));
+            mSkel->clampPositionsToLimits();
+            skelBallJoints->setPositions(
+                mSkel->convertPositionsToBallSpace(mSkel->getPositions()));
+          }
+          return skelBallJoints->getPositions();
+        },
+        [&](Eigen::Ref<Eigen::VectorXs> diff, Eigen::Ref<Eigen::MatrixXs> jac) {
+          // 3.2. Evaluate the error and the Jacobian relating dError / dPos
+
+          // 3.2.1. First we need to compute the marker error, and marker
+          // Jacobian
+          Eigen::VectorXs markerPositions
+              = skelBallJoints->getMarkerWorldPositions(markers);
+          diff.segment(0, markerPositions.size())
+              = markerPositions - markerTarget;
+          jac.block(0, 0, markerPositions.size(), jac.cols())
+              = skelBallJoints
+                    ->getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+
+          // 3.2.2. Next we need to compute the joint cluster error, and joint
+          // cluster Jacobian
+          Eigen::VectorXs jointPositions
+              = skelBallJoints->getJointWorldPositions(joints);
+          Eigen::MatrixXs jointJacobian
+              = skelBallJoints->getJointWorldPositionsJacobianWrtJointPositions(
+                  joints);
+          jac.block(
+                 markerPositions.size(),
+                 0,
+                 jointClusters.size() * 3,
+                 jac.cols())
+              .setZero();
+          for (int i = 0; i < jointClusters.size(); i++)
+          {
+            int clusterRow = markerPositions.size() + i * 3;
+            Eigen::Vector3s clusterCenter = Eigen::Vector3s::Zero();
+            for (int j : jointClusters[i])
+            {
+              clusterCenter
+                  += jointPositions.segment<3>(j * 3) / jointClusters[i].size();
+              jac.block(clusterRow, 0, 3, jac.cols())
+                  += jointJacobian.block(j * 3, 0, 3, jac.cols())
+                     / jointClusters[i].size();
+            }
+            Eigen::Vector3s clusterTarget
+                = jointClusterTarget.segment<3>(i * 3);
+            diff.segment<3>(clusterRow) = clusterCenter - clusterTarget;
+          }
+        },
+        [&](Eigen::Ref<Eigen::VectorXs> pos) {
+          pos = skelBallJoints->getRandomPose();
+        },
+        math::IKConfig()
+            .setLogOutput(logOutput)
+            .setMaxRestarts(mNewClip[t] || t == 0 ? 100 : 1)
+            .setConvergenceThreshold(1e-10));
+    mPoses.push_back(mSkel->getPositions());
+    mPosesClosedFormEstimateAvailable.push_back(
+        Eigen::VectorXi::Zero(mSkel->getNumDofs()));
+    avgLoss += ikLoss;
+    lastPose = mSkel->getPositions();
+  }
+  avgLoss /= mMarkerObservations.size();
+  return avgLoss;
+}
+
+//==============================================================================
 /// WARNING: You must have already called estimateGroupScalesClosedForm()!
 /// This uses the joint centers to estimate the body positions.
 s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
@@ -2739,7 +2889,14 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
         }
 
         if (!foundJointToSolve)
+        {
+          // All the joints should either be marked as "solved" or "impossible
+          // to solve"
+          assert(
+              jointsImpossibleToSolve.size() + solvedJoints.size()
+              == mStackedJoints.size());
           break;
+        }
       }
 
       // Now we want to do one more pass, this time going from the root back out
@@ -2869,7 +3026,9 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
           break;
         }
         if (!foundJointToSolve)
+        {
           break;
+        }
       }
     }
 

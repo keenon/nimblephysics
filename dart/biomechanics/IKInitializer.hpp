@@ -81,6 +81,7 @@ public:
           markers,
       std::map<std::string, bool> markerIsAnatomical,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      std::vector<bool> newClip,
       s_t modelHeightM = -1.0);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -141,6 +142,10 @@ public:
   /// bone sizes (based on distance between joint centers) and then use that to
   /// get the group scale vector.
   void estimateGroupScalesClosedForm(bool logOutput = false);
+
+  /// This takes the current guesses for the joint centers and the group scales,
+  /// and just runs straightforward IK to get the body positions.
+  s_t estimatePosesWithIK(bool logOutput = false);
 
   /// WARNING: You must have already called estimateGroupScalesClosedForm()!
   /// This uses the joint centers to estimate the body positions.
@@ -289,6 +294,7 @@ protected:
   std::vector<std::string> mMarkerNames;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  std::vector<bool> mNewClip;
   std::vector<bool> mMarkerIsAnatomical;
   std::map<std::string, int> mMarkerNameToIndex;
 

@@ -4253,6 +4253,7 @@ MarkerInitialization MarkerFitter::getInitialization(
         mMarkerMap,
         markerIsAnatomical,
         markerObservations,
+        newClip,
         mHeightPrior);
     initializer.runFullPipeline();
 

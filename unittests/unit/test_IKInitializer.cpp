@@ -35,6 +35,7 @@ void runOnRealOsim(
   osim.skeleton->autogroupSymmetricSuffixes();
   osim.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<bool> newClip;
   for (std::string trcFile : trcFiles)
   {
     auto trc = OpenSimParser::loadTRC(trcFile);
@@ -43,6 +44,7 @@ void runOnRealOsim(
     {
       auto& obs = trc.markerTimesteps[i];
       markerObservations.push_back(obs);
+      newClip.push_back(i == 0);
     }
   }
 
@@ -61,6 +63,7 @@ void runOnRealOsim(
       osim.markersMap,
       markerIsAnatomical,
       markerObservations,
+      newClip,
       heightM);
   initializer.runFullPipeline(true);
 
@@ -72,48 +75,55 @@ void runOnRealOsim(
     server.setFramesPerSecond(30);
     server.renderSkeleton(osim.skeleton);
 
+    std::vector<std::map<std::string, Eigen::Isometry3s>>
+        estimatedBodyTransforms = initializer.getBodyTransforms();
     std::map<std::string, bool> createdBodies;
     for (int t = 0; t < markerObservations.size(); t++)
     {
       osim.skeleton->setPositions(initializer.getPoses()[t]);
       server.renderSkeleton(osim.skeleton);
 
-      for (auto& pair : initializer.getBodyTransforms()[t])
+      if (t < estimatedBodyTransforms.size())
       {
-        dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
-        for (int i = 0; i < body->getNumShapeNodes(); i++)
+        for (auto& pair : estimatedBodyTransforms[t])
         {
-          dynamics::ShapeNode* shape = body->getShapeNode(i);
-          if (shape->hasVisualAspect())
+          dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
+          for (int i = 0; i < body->getNumShapeNodes(); i++)
           {
-            std::shared_ptr<dynamics::Shape> shapePtr = shape->getShape();
-            if (shapePtr->getType() == MeshShape::getStaticType())
+            dynamics::ShapeNode* shape = body->getShapeNode(i);
+            if (shape->hasVisualAspect())
             {
-              std::shared_ptr<dynamics::MeshShape> meshShape
-                  = std::static_pointer_cast<dynamics::MeshShape>(shapePtr);
-              Eigen::Isometry3s shapeTransform
-                  = pair.second * shape->getRelativeTransform();
+              std::shared_ptr<dynamics::Shape> shapePtr = shape->getShape();
+              if (shapePtr->getType() == MeshShape::getStaticType())
+              {
+                std::shared_ptr<dynamics::MeshShape> meshShape
+                    = std::static_pointer_cast<dynamics::MeshShape>(shapePtr);
+                Eigen::Isometry3s shapeTransform
+                    = pair.second * shape->getRelativeTransform();
 
-              std::string shapeName = body->getName() + "-" + std::to_string(i);
-              if (createdBodies.count(shapeName) == 0)
-              {
-                server.createMeshFromShape(
-                    shapeName,
-                    meshShape,
-                    shapeTransform.translation(),
-                    math::matrixToEulerXYZ(shapeTransform.linear()),
-                    body->getScale(),
-                    Eigen::Vector4s(0, 1, 0, 0.7));
-                server.setObjectTooltip(
-                    shapeName, "Estimated " + body->getName());
-                createdBodies[shapeName] = true;
-              }
-              else
-              {
-                server.setObjectPosition(
-                    shapeName, shapeTransform.translation());
-                server.setObjectRotation(
-                    shapeName, math::matrixToEulerXYZ(shapeTransform.linear()));
+                std::string shapeName
+                    = body->getName() + "-" + std::to_string(i);
+                if (createdBodies.count(shapeName) == 0)
+                {
+                  server.createMeshFromShape(
+                      shapeName,
+                      meshShape,
+                      shapeTransform.translation(),
+                      math::matrixToEulerXYZ(shapeTransform.linear()),
+                      body->getScale(),
+                      Eigen::Vector4s(0, 1, 0, 0.7));
+                  server.setObjectTooltip(
+                      shapeName, "Estimated " + body->getName());
+                  createdBodies[shapeName] = true;
+                }
+                else
+                {
+                  server.setObjectPosition(
+                      shapeName, shapeTransform.translation());
+                  server.setObjectRotation(
+                      shapeName,
+                      math::matrixToEulerXYZ(shapeTransform.linear()));
+                }
               }
             }
           }
@@ -169,6 +179,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   Eigen::VectorXs goldGroupScales = osim.skeleton->getGroupScales();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<bool> newClip;
   std::vector<Eigen::VectorXs> poses;
   std::vector<Eigen::VectorXs> jointCenters;
   for (int t = 0; t < 10; t++)
@@ -182,6 +193,9 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         osim.skeleton->getMarkerMapWorldPositions(osim.markersMap));
     jointCenters.push_back(
         osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints()));
+    // There's no continuity between any of our random poses, so we always need
+    // to completely restart the IK from timestep to timestep
+    newClip.push_back(true);
   }
 
   // Reset to neutral scale, unless we're testing the IKInitializer with perfect
@@ -213,6 +227,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
       osim.markersMap,
       markerIsAnatomical,
       markerObservations,
+      newClip,
       targetHeight);
 
   std::map<std::string, std::map<std::string, s_t>>
@@ -254,7 +269,7 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
   // initializer.reestimateDistancesFromJointCenters();
   // markerError = initializer.closedFormMDSJointCenterSolver(true);
   initializer.estimateGroupScalesClosedForm(false);
-  s_t markerErrorFromIK = initializer.estimatePosesClosedForm(false);
+  s_t markerErrorFromIK = initializer.estimatePosesWithIK(false);
   (void)markerErrorFromIK;
   for (int t = 0; t < markerObservations.size(); t++)
   {
@@ -366,32 +381,35 @@ bool verifyReconstructionOnSyntheticRandomPosesOsim(
         }
       }
 
-      for (auto& pair : estimatedBodyTransforms[t])
+      if (estimatedBodyTransforms.size() > t)
       {
-        dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
-        for (int i = 0; i < body->getNumShapeNodes(); i++)
+        for (auto& pair : estimatedBodyTransforms[t])
         {
-          dynamics::ShapeNode* shape = body->getShapeNode(i);
-          if (shape->hasVisualAspect())
+          dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
+          for (int i = 0; i < body->getNumShapeNodes(); i++)
           {
-            std::shared_ptr<dynamics::Shape> shapePtr = shape->getShape();
-            if (shapePtr->getType() == MeshShape::getStaticType())
+            dynamics::ShapeNode* shape = body->getShapeNode(i);
+            if (shape->hasVisualAspect())
             {
-              std::shared_ptr<dynamics::MeshShape> meshShape
-                  = std::static_pointer_cast<dynamics::MeshShape>(shapePtr);
-              Eigen::Isometry3s shapeTransform
-                  = pair.second * shape->getRelativeTransform();
+              std::shared_ptr<dynamics::Shape> shapePtr = shape->getShape();
+              if (shapePtr->getType() == MeshShape::getStaticType())
+              {
+                std::shared_ptr<dynamics::MeshShape> meshShape
+                    = std::static_pointer_cast<dynamics::MeshShape>(shapePtr);
+                Eigen::Isometry3s shapeTransform
+                    = pair.second * shape->getRelativeTransform();
 
-              server.createMeshFromShape(
-                  body->getName() + "-" + std::to_string(i),
-                  meshShape,
-                  shapeTransform.translation(),
-                  math::matrixToEulerXYZ(shapeTransform.linear()),
-                  body->getScale(),
-                  Eigen::Vector4s(0, 1, 0, 0.7));
-              server.setObjectTooltip(
-                  body->getName() + "-" + std::to_string(i),
-                  "Estimated " + body->getName());
+                server.createMeshFromShape(
+                    body->getName() + "-" + std::to_string(i),
+                    meshShape,
+                    shapeTransform.translation(),
+                    math::matrixToEulerXYZ(shapeTransform.linear()),
+                    body->getScale(),
+                    Eigen::Vector4s(0, 1, 0, 0.7));
+                server.setObjectTooltip(
+                    body->getName() + "-" + std::to_string(i),
+                    "Estimated " + body->getName());
+              }
             }
           }
         }
@@ -493,6 +511,7 @@ bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
   Eigen::VectorXs goldGroupScales = osim.skeleton->getGroupScales();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<bool> newClip;
   std::vector<Eigen::VectorXs> poses;
   std::vector<Eigen::VectorXs> jointCenters;
   for (int t = 0; t < 50; t++)
@@ -504,6 +523,9 @@ bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
         osim.skeleton->getMarkerMapWorldPositions(osim.markersMap));
     jointCenters.push_back(
         osim.skeleton->getJointWorldPositions(osim.skeleton->getJoints()));
+    // There's no continuity between any of our random poses, so we always need
+    // to completely restart the IK from timestep to timestep
+    newClip.push_back(true);
   }
 
   // Reset to neutral scale
@@ -525,6 +547,7 @@ bool verifyJointCenterReconstructionOnSyntheticRandomPosesOsim(
       osim.markersMap,
       markerIsAnatomical,
       markerObservations,
+      newClip,
       targetHeight);
 
   // Initial guesses using MDS to center our subsequent least-squares on
@@ -582,13 +605,16 @@ bool verifyMarkerReconstructionOnOsim(
   (void)heightM;
   auto osim = OpenSimParser::parseOsim(openSimPath);
   std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<bool> newClip;
   for (std::string trcFile : trcFiles)
   {
     auto trc = OpenSimParser::loadTRC(trcFile);
     // Add the marker observations to our list
-    for (auto& obs : trc.markerTimesteps)
+    for (int t = 0; t < trc.markerTimesteps.size(); t++)
     {
+      auto& obs = trc.markerTimesteps[t];
       markerObservations.push_back(obs);
+      newClip.push_back(t == 0);
     }
   }
   std::map<std::string, bool> markerIsAnatomical;
@@ -606,6 +632,7 @@ bool verifyMarkerReconstructionOnOsim(
       osim.markersMap,
       markerIsAnatomical,
       markerObservations,
+      newClip,
       heightM);
   for (int t = 0; t < markerObservations.size(); t++)
   {
