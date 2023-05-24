@@ -664,7 +664,7 @@ IKInitializer::IKInitializer(
 /// the public fields of this class
 void IKInitializer::runFullPipeline(bool logOutput)
 {
-  prescaleBasedOnAnatomicalMarkers(logOutput);
+  prescaleBasedOnAnatomicalMarkers();
 
   // Use MDS, despite its many flaws, to arrive at decent initial guesses for
   // joint centers that we can use to center the subsequent least-squares fits
@@ -1637,7 +1637,49 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     std::vector<std::vector<Eigen::Vector3s>> markerTraces;
     for (auto& pair : anchorBodyMarkerClouds)
     {
-      markerTraces.push_back(pair.second);
+      Eigen::Vector3s meanObservation = Eigen::Vector3s::Zero();
+      for (Eigen::Vector3s observation : pair.second)
+      {
+        meanObservation += observation;
+      }
+      meanObservation /= pair.second.size();
+
+      s_t markerVariance = 0;
+      for (Eigen::Vector3s observation : pair.second)
+      {
+        markerVariance += (observation - meanObservation).squaredNorm();
+      }
+      markerVariance /= pair.second.size();
+
+      if (markerVariance > 0.01)
+      {
+        markerTraces.push_back(pair.second);
+        if (logOutput)
+        {
+          std::cout << "Using marker \"" << pair.first << "\" with variance "
+                    << markerVariance << std::endl;
+        }
+      }
+      else
+      {
+        if (logOutput)
+        {
+          std::cout << "Skipping marker \"" << pair.first
+                    << "\" because its variance is " << markerVariance
+                    << std::endl;
+        }
+      }
+    }
+
+    if (markerTraces.size() == 0)
+    {
+      if (logOutput)
+      {
+        std::cout << "Have no markers left after filtering for sufficient "
+                     "variance in local space, so not solving joint \""
+                  << joint->name << "\"" << std::endl;
+      }
+      continue;
     }
 
     // 5.4. Get the local joint center in the anchor body

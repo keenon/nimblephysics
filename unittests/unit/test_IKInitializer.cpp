@@ -71,13 +71,14 @@ void runOnRealOsim(
     server::GUIRecording server;
     server.setFramesPerSecond(30);
     server.renderSkeleton(osim.skeleton);
+
+    std::map<std::string, bool> createdBodies;
     for (int t = 0; t < markerObservations.size(); t++)
     {
       osim.skeleton->setPositions(initializer.getPoses()[t]);
       server.renderSkeleton(osim.skeleton);
 
-      /*
-      for (auto& pair : initializer.mBodyTransforms[t])
+      for (auto& pair : initializer.getBodyTransforms()[t])
       {
         dynamics::BodyNode* body = osim.skeleton->getBodyNode(pair.first);
         for (int i = 0; i < body->getNumShapeNodes(); i++)
@@ -93,21 +94,31 @@ void runOnRealOsim(
               Eigen::Isometry3s shapeTransform
                   = pair.second * shape->getRelativeTransform();
 
-              server.createMeshFromShape(
-                  body->getName() + "-" + std::to_string(i),
-                  meshShape,
-                  shapeTransform.translation(),
-                  math::matrixToEulerXYZ(shapeTransform.linear()),
-                  body->getScale(),
-                  Eigen::Vector4s(0, 1, 0, 0.7));
-              server.setObjectTooltip(
-                  body->getName() + "-" + std::to_string(i),
-                  "Estimated " + body->getName());
+              std::string shapeName = body->getName() + "-" + std::to_string(i);
+              if (createdBodies.count(shapeName) == 0)
+              {
+                server.createMeshFromShape(
+                    shapeName,
+                    meshShape,
+                    shapeTransform.translation(),
+                    math::matrixToEulerXYZ(shapeTransform.linear()),
+                    body->getScale(),
+                    Eigen::Vector4s(0, 1, 0, 0.7));
+                server.setObjectTooltip(
+                    shapeName, "Estimated " + body->getName());
+                createdBodies[shapeName] = true;
+              }
+              else
+              {
+                server.setObjectPosition(
+                    shapeName, shapeTransform.translation());
+                server.setObjectRotation(
+                    shapeName, math::matrixToEulerXYZ(shapeTransform.linear()));
+              }
             }
           }
         }
       }
-      */
 
       server.deleteObjectsByPrefix("line_");
       auto jointMap = initializer.getJointsAttachedToObservedMarkersCenters(t);
