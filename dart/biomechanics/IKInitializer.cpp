@@ -673,12 +673,12 @@ void IKInitializer::runFullPipeline(bool logOutput)
   closedFormMDSJointCenterSolver();
   // Use the pivot finding, where there is the huge wealth of marker information
   // (3+ markers on adjacent body segments) to make it possible
-  closedFormPivotFindingJointCenterSolver(logOutput);
+  closedFormPivotFindingJointCenterSolver();
   recenterAxisJointsBasedOnBoneAngles();
 
   // Fill in the parts of the body scales and poses that we can in closed form
   estimateGroupScalesClosedForm();
-  estimatePosesClosedForm();
+  estimatePosesClosedForm(logOutput);
 }
 
 //==============================================================================
@@ -2434,7 +2434,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
             // Pretty much ignore MDS estimates when scaling, since those
             // estimates are based on our scaling guesses in the first place, so
             // that introduces some circularity into the process
-            visibleAdjacentPointWeights.push_back(1e-6);
+            visibleAdjacentPointWeights.push_back(1e-3);
           }
           else if (estimate == JointCenterEstimateSource::LEAST_SQUARES_EXACT)
           {
@@ -2465,7 +2465,16 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
           visibleAdjacentPointsInLocalSpace.size()
           == visibleAdjacentPointsInWorldSpace.size());
 
-      if (visibleAdjacentPointsInLocalSpace.size() >= 3)
+      s_t visibleAdjacentPointsWeightSum = 0.0;
+      for (int j = 0; j < visibleAdjacentPointsInLocalSpace.size(); j++)
+      {
+        visibleAdjacentPointsWeightSum += visibleAdjacentPointWeights[j];
+      }
+
+      // We need at least 3 points, and they need to be semi-reliable point
+      // estimates
+      if (visibleAdjacentPointsInLocalSpace.size() >= 3
+          && visibleAdjacentPointsWeightSum >= 2.0)
       {
         // 3.1.2. Compute the root body transform from the visible points, and
         // then use that to compute the other body transforms
