@@ -1383,6 +1383,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     std::vector<MarkerInitialization> jointInits;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
+      std::cout << "Running joint init pipeline for trial " << i << "/"
+                << markerObservationTrials.size() << std::endl;
       jointInits.push_back(
           runJointsPipeline(markerObservationTrials[i], params));
     }
@@ -4236,6 +4238,7 @@ MarkerInitialization MarkerFitter::getInitialization(
       result.observedJoints.size() + result.unobservedJoints.size()
       == mSkeleton->getNumJoints());
 
+  std::cout << " joints: " << params.joints.size() << std::endl;
   if (params.joints.size() == 0)
   {
     // 1. If we don't have any joint center information yet, don't just run

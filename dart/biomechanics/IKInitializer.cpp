@@ -2305,7 +2305,146 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
   mPoses.clear();
   for (int t = 0; t < mMarkerObservations.size(); t++)
   {
-    // 1. Find a linearized list of markers to target
+    if (t % 100 == 0 || t == mMarkerObservations.size() - 1)
+    {
+      std::cout << "IKInitializer solved IK " << t << "/"
+                << mMarkerObservations.size() << std::endl;
+    }
+    bool newClip = mNewClip[t] || t == 0;
+    // 1. Solve IK for new clips using ball joints
+    if (newClip)
+    {
+      // 1.1. Find a linearized list of markers to target
+      std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
+      std::vector<Eigen::Vector3s> markerPoses;
+      std::vector<bool> anatomicalMarkers;
+      for (int i = 0; i < mMarkers.size(); i++)
+      {
+        if (mMarkerObservations[t].count(mMarkerNames[i]))
+        {
+          markers.emplace_back(
+              skelBallJoints->getBodyNode(mMarkers[i].first->getName()),
+              mMarkers[i].second);
+          markerPoses.push_back(mMarkerObservations[t][mMarkerNames[i]]);
+          anatomicalMarkers.push_back(mMarkerIsAnatomical[i]);
+        }
+      }
+      Eigen::VectorXs markerTarget = Eigen::VectorXs::Zero(markers.size() * 3);
+      for (int i = 0; i < markers.size(); i++)
+      {
+        markerTarget.segment<3>(i * 3) = markerPoses[i];
+      }
+
+      // 1.2. Convert the visible joints over into pointers to the ball joints
+      // skeleton
+      std::vector<dynamics::Joint*> joints;
+      std::vector<std::vector<int>> jointClusters;
+      std::vector<Eigen::Vector3s> jointPoses;
+      for (int i = 0; i < mStackedJoints.size(); i++)
+      {
+        if (mJointCenters[t].count(mStackedJoints[i]->name))
+        {
+          jointPoses.push_back(mJointCenters[t][mStackedJoints[i]->name]);
+          std::vector<int> clusterIndices;
+          for (dynamics::Joint* joint : mStackedJoints[i]->joints)
+          {
+            clusterIndices.push_back(joints.size());
+            joints.push_back(skelBallJoints->getJoint(joint->getName()));
+          }
+          jointClusters.push_back(clusterIndices);
+        }
+      }
+      Eigen::VectorXs jointClusterTarget
+          = Eigen::VectorXs::Zero(joints.size() * 3);
+      for (int i = 0; i < joints.size(); i++)
+      {
+        jointClusterTarget.segment<3>(i * 3) = jointPoses[i];
+      }
+
+      // 1.3. Solve the actual IK
+      math::solveIK(
+          mSkel->convertPositionsToBallSpace(lastPose),
+          mSkel->getPositionUpperLimits(),
+          mSkel->getPositionLowerLimits(),
+          markerTarget.size() + jointClusterTarget.size(),
+          [&](const Eigen::VectorXs& pos, bool clamp) {
+            // 1.3.1. Set poses on the ball joint skeleton, by default not
+            // clamping to limits
+            skelBallJoints->setPositions(pos);
+            if (clamp)
+            {
+              // If we're clamping to limits, do it in the original skeleton
+              // joint space, not in ball space
+              mSkel->setPositions(mSkel->convertPositionsFromBallSpace(pos));
+              mSkel->clampPositionsToLimits();
+              skelBallJoints->setPositions(
+                  mSkel->convertPositionsToBallSpace(mSkel->getPositions()));
+            }
+            return skelBallJoints->getPositions();
+          },
+          [&](Eigen::Ref<Eigen::VectorXs> diff,
+              Eigen::Ref<Eigen::MatrixXs> jac) {
+            // 1.3.2. Evaluate the error and the Jacobian relating dError / dPos
+
+            // 1.3.2.1. First we need to compute the marker error, and marker
+            // Jacobian
+            Eigen::VectorXs markerPositions
+                = skelBallJoints->getMarkerWorldPositions(markers);
+            diff.segment(0, markerPositions.size())
+                = markerPositions - markerTarget;
+            jac.block(0, 0, markerPositions.size(), jac.cols())
+                = skelBallJoints
+                      ->getMarkerWorldPositionsJacobianWrtJointPositions(
+                          markers);
+            for (int i = 0; i < anatomicalMarkers.size(); i++)
+            {
+              if (!anatomicalMarkers[i])
+              {
+                diff.segment(i * 3, 3) *= 0.1;
+                jac.block(i * 3, 0, 3, jac.cols()) *= 0.1;
+              }
+            }
+
+            // 1.3.2.2. Next we need to compute the joint cluster error, and
+            // joint cluster Jacobian
+            Eigen::VectorXs jointPositions
+                = skelBallJoints->getJointWorldPositions(joints);
+            Eigen::MatrixXs jointJacobian
+                = skelBallJoints
+                      ->getJointWorldPositionsJacobianWrtJointPositions(joints);
+            jac.block(
+                   markerPositions.size(),
+                   0,
+                   jointClusters.size() * 3,
+                   jac.cols())
+                .setZero();
+            for (int i = 0; i < jointClusters.size(); i++)
+            {
+              int clusterRow = markerPositions.size() + i * 3;
+              Eigen::Vector3s clusterCenter = Eigen::Vector3s::Zero();
+              for (int j : jointClusters[i])
+              {
+                clusterCenter += jointPositions.segment<3>(j * 3)
+                                 / jointClusters[i].size();
+                jac.block(clusterRow, 0, 3, jac.cols())
+                    += jointJacobian.block(j * 3, 0, 3, jac.cols())
+                       / jointClusters[i].size();
+              }
+              Eigen::Vector3s clusterTarget
+                  = jointClusterTarget.segment<3>(i * 3);
+              diff.segment<3>(clusterRow) = clusterCenter - clusterTarget;
+            }
+          },
+          [&](Eigen::Ref<Eigen::VectorXs> pos) {
+            pos = skelBallJoints->getRandomPose();
+          },
+          math::IKConfig()
+              .setLogOutput(logOutput)
+              .setMaxRestarts(100)
+              .setConvergenceThreshold(1e-10));
+    }
+    // 2. Solve all clips using ordinary joints (no ball joints)
+    // 2.1. Find a linearized list of markers to target
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
     std::vector<Eigen::Vector3s> markerPoses;
     std::vector<bool> anatomicalMarkers;
@@ -2313,9 +2452,7 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
     {
       if (mMarkerObservations[t].count(mMarkerNames[i]))
       {
-        markers.emplace_back(
-            skelBallJoints->getBodyNode(mMarkers[i].first->getName()),
-            mMarkers[i].second);
+        markers.emplace_back(mMarkers[i]);
         markerPoses.push_back(mMarkerObservations[t][mMarkerNames[i]]);
         anatomicalMarkers.push_back(mMarkerIsAnatomical[i]);
       }
@@ -2326,7 +2463,7 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
       markerTarget.segment<3>(i * 3) = markerPoses[i];
     }
 
-    // 2. Convert the visible joints over into pointers to the ball joints
+    // 2.2. Convert the visible joints over into pointers to the ball joints
     // skeleton
     std::vector<dynamics::Joint*> joints;
     std::vector<std::vector<int>> jointClusters;
@@ -2340,7 +2477,7 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
         for (dynamics::Joint* joint : mStackedJoints[i]->joints)
         {
           clusterIndices.push_back(joints.size());
-          joints.push_back(skelBallJoints->getJoint(joint->getName()));
+          joints.push_back(mSkel->getJoint(joint->getName()));
         }
         jointClusters.push_back(clusterIndices);
       }
@@ -2352,47 +2489,51 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
       jointClusterTarget.segment<3>(i * 3) = jointPoses[i];
     }
 
-    // 3. Solve the actual IK
+    // 2.3. Solve the actual IK
     s_t ikLoss = math::solveIK(
-        mSkel->convertPositionsToBallSpace(lastPose),
+        mSkel->getPositions(),
         mSkel->getPositionUpperLimits(),
         mSkel->getPositionLowerLimits(),
         markerTarget.size() + jointClusterTarget.size(),
         [&](const Eigen::VectorXs& pos, bool clamp) {
-          // 3.1. Set poses on the ball joint skeleton, by default not clamping
-          // to limits
-          skelBallJoints->setPositions(pos);
+          // 2.3.1. Set poses on the ball joint skeleton, by default not
+          // clamping to limits
+          mSkel->setPositions(pos);
           if (clamp)
           {
-            // If we're clamping to limits, do it in the original skeleton joint
-            // space, not in ball space
-            mSkel->setPositions(mSkel->convertPositionsFromBallSpace(pos));
+            // If we're clamping to limits, do it in the original skeleton
+            // joint space, not in ball space
             mSkel->clampPositionsToLimits();
-            skelBallJoints->setPositions(
-                mSkel->convertPositionsToBallSpace(mSkel->getPositions()));
           }
-          return skelBallJoints->getPositions();
+          return mSkel->getPositions();
         },
         [&](Eigen::Ref<Eigen::VectorXs> diff, Eigen::Ref<Eigen::MatrixXs> jac) {
-          // 3.2. Evaluate the error and the Jacobian relating dError / dPos
+          // 2.3.2. Evaluate the error and the Jacobian relating dError / dPos
 
-          // 3.2.1. First we need to compute the marker error, and marker
+          // 2.3.2.1. First we need to compute the marker error, and marker
           // Jacobian
           Eigen::VectorXs markerPositions
-              = skelBallJoints->getMarkerWorldPositions(markers);
+              = mSkel->getMarkerWorldPositions(markers);
           diff.segment(0, markerPositions.size())
               = markerPositions - markerTarget;
           jac.block(0, 0, markerPositions.size(), jac.cols())
-              = skelBallJoints
-                    ->getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+              = mSkel->getMarkerWorldPositionsJacobianWrtJointPositions(
+                  markers);
+          for (int i = 0; i < anatomicalMarkers.size(); i++)
+          {
+            if (!anatomicalMarkers[i])
+            {
+              diff.segment(i * 3, 3) *= 0.1;
+              jac.block(i * 3, 0, 3, jac.cols()) *= 0.1;
+            }
+          }
 
-          // 3.2.2. Next we need to compute the joint cluster error, and joint
+          // 2.3.2.2. Next we need to compute the joint cluster error, and joint
           // cluster Jacobian
           Eigen::VectorXs jointPositions
-              = skelBallJoints->getJointWorldPositions(joints);
+              = mSkel->getJointWorldPositions(joints);
           Eigen::MatrixXs jointJacobian
-              = skelBallJoints->getJointWorldPositionsJacobianWrtJointPositions(
-                  joints);
+              = mSkel->getJointWorldPositionsJacobianWrtJointPositions(joints);
           jac.block(
                  markerPositions.size(),
                  0,
@@ -2416,13 +2557,14 @@ s_t IKInitializer::estimatePosesWithIK(bool logOutput)
             diff.segment<3>(clusterRow) = clusterCenter - clusterTarget;
           }
         },
-        [&](Eigen::Ref<Eigen::VectorXs> pos) {
-          pos = skelBallJoints->getRandomPose();
-        },
+        [&](Eigen::Ref<Eigen::VectorXs> pos) { pos = mSkel->getRandomPose(); },
         math::IKConfig()
             .setLogOutput(logOutput)
-            .setMaxRestarts(mNewClip[t] || t == 0 ? 100 : 1)
+            .setMaxRestarts(1)
+            .setStartClamped(true)
             .setConvergenceThreshold(1e-10));
+
+    // 3. Save the result
     mPoses.push_back(mSkel->getPositions());
     mPosesClosedFormEstimateAvailable.push_back(
         Eigen::VectorXi::Zero(mSkel->getNumDofs()));
