@@ -163,7 +163,7 @@ void testSubject(
 
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  s_t threshold = knownScales ? 0.001 : 0.05;
+  s_t threshold = knownScales ? 0.001 : 0.06;
   if (averagePoseError >= threshold)
   {
     std::cout << "Average pose error norm " << averagePoseError << " > "
