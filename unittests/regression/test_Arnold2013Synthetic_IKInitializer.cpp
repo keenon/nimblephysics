@@ -74,18 +74,7 @@ void testSubject(
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
-  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
-  {
-    standard.skeleton->setScaleGroupUniformScaling(
-        standard.skeleton->getBodyNode("hand_r"));
-  }
   standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
-  standard.skeleton->setPositionLowerLimit(0, -M_PI);
-  standard.skeleton->setPositionUpperLimit(0, M_PI);
-  standard.skeleton->setPositionLowerLimit(1, -M_PI);
-  standard.skeleton->setPositionUpperLimit(1, M_PI);
-  standard.skeleton->setPositionLowerLimit(2, -M_PI);
-  standard.skeleton->setPositionUpperLimit(2, M_PI);
 
   // Populate the markers list.
   // --------------------------
@@ -147,27 +136,38 @@ void testSubject(
       = OpenSimParser::parseOsim(prefix + subject + "/" + subject + ".osim");
   auto goldIK = OpenSimParser::loadMot(
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
+  std::vector<std::string> goldDOFs;
+  std::map<std::string, int> dofMap;
+  for (int idof = 0; idof < (int)goldOsim.skeleton->getNumDofs(); ++idof) {
+    goldDOFs.push_back(goldOsim.skeleton->getDof(idof)->getName());
+    dofMap[goldDOFs.back()] =
+        osimFile.skeleton->getDof(goldDOFs.back())->getIndexInSkeleton();
+  }
 
   // Compare poses.
   // --------------
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(poses[0].size());
-  for (int i = 0; i < poses.size(); i++)
-  {
-    Eigen::VectorXs diff = poses[i] - goldPoses.col(i);
-    // Only could those joint with a closed form estimate available
-    diff = diff.cwiseProduct(posesClosedForeEstimateAvailable[i].cast<s_t>());
-    totalError += diff.cwiseAbs().sum() / diff.size();
-    averagePerDofError += diff.cwiseAbs();
+  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  Eigen::VectorXs thisPerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  for (int i = 0; i < (int)poses.size(); ++i) {
+    for (int idof = 0; idof < (int)goldDOFs.size(); ++idof) {
+      thisPerDofError(dofMap[goldDOFs[idof]])
+          = std::abs(goldPoses.col(i)(idof) - poses[i](dofMap[goldDOFs[idof]]));
+    }
+    totalError += thisPerDofError.sum() / thisPerDofError.size();
+    averagePerDofError += thisPerDofError;
   }
+
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  s_t threshold = knownScales ? 0.03 : 0.18;
+  s_t threshold = knownScales ? 0.001 : 0.05;
   if (averagePoseError >= threshold)
   {
-    std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
-              << std::endl;
+    std::cout << "Average pose error norm " << averagePoseError << " > "
+              << threshold << "." << std::endl;
     for (int i = 0; i < averagePerDofError.size(); i++)
     {
       std::cout << "  " << osimFile.skeleton->getDof(i)->getName() << ": "
@@ -366,7 +366,7 @@ TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_01)
   testSubject("subject01", 1.808, true);
 }
 
-//==============================================================================
+////==============================================================================
 TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_02)
 {
   testSubject("subject02", 1.853, true);
