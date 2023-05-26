@@ -40,9 +40,8 @@ runIKInitializer(
 
   // Initialize data structures.
   // ---------------------------
-  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
-      markerObservationTrials;
-  std::vector<int> framesPerSecond;
+  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations;
+  std::vector<bool> newClip;
 
   // Fill marker and GRF data structures.
   // ------------------------------------
@@ -50,8 +49,13 @@ runIKInitializer(
   {
     // Markers.
     OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[itrial]);
-    framesPerSecond.push_back(trc.framesPerSecond);
-    markerObservationTrials.push_back(trc.markerTimesteps);
+    // Add the marker observations to our list
+    for (int i = 0; i < (int)trc.markerTimesteps.size(); i++)
+    {
+      auto& obs = trc.markerTimesteps[i];
+      markerObservations.push_back(obs);
+      newClip.push_back(i == 0);
+    }
   }
 
   // Load the model.
@@ -59,18 +63,7 @@ runIKInitializer(
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
-  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
-  {
-    standard.skeleton->setScaleGroupUniformScaling(
-        standard.skeleton->getBodyNode("hand_r"));
-  }
   standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
-  standard.skeleton->setPositionLowerLimit(0, -M_PI);
-  standard.skeleton->setPositionUpperLimit(0, M_PI);
-  standard.skeleton->setPositionLowerLimit(1, -M_PI);
-  standard.skeleton->setPositionUpperLimit(1, M_PI);
-  standard.skeleton->setPositionLowerLimit(2, -M_PI);
-  standard.skeleton->setPositionUpperLimit(2, M_PI);
 
   // Populate the markers list.
   // --------------------------
@@ -106,13 +99,15 @@ runIKInitializer(
       standard.skeleton,
       standard.markersMap,
       markerIsAnatomical,
-      markerObservationTrials[0],
+      markerObservations,
+      newClip,
       heightM);
   if (knownScalesInAdvance)
   {
     initializer.closedFormMDSJointCenterSolver();
     initializer.estimateGroupScalesClosedForm();
-    initializer.estimatePosesClosedForm();
+//    initializer.estimatePosesClosedForm();
+    initializer.estimatePosesWithIK(false);
   }
   else
   {
@@ -132,7 +127,7 @@ void testSubject(
 
   std::cout << "Testing " << subject << "..." << std::endl;
 
-  // Run MarkerFitter.
+  // Run IKInitializer.
   // -----------------
   std::string prefix = "dart://sample/regression/Arnold2013Synthetic/";
   std::vector<std::string> trcFiles;
@@ -158,27 +153,38 @@ void testSubject(
       = OpenSimParser::parseOsim(prefix + subject + "/" + subject + ".osim");
   auto goldIK = OpenSimParser::loadMot(
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
+  std::vector<std::string> goldDOFs;
+  std::map<std::string, int> dofMap;
+  for (int idof = 0; idof < (int)goldOsim.skeleton->getNumDofs(); ++idof) {
+    goldDOFs.push_back(goldOsim.skeleton->getDof(idof)->getName());
+    dofMap[goldDOFs.back()] =
+        osimFile.skeleton->getDof(goldDOFs.back())->getIndexInSkeleton();
+  }
 
   // Compare poses.
   // --------------
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(poses[0].size());
-  for (int i = 0; i < poses.size(); i++)
-  {
-    Eigen::VectorXs diff = poses[i] - goldPoses.col(i);
-    // Only could those joint with a closed form estimate available
-    diff = diff.cwiseProduct(posesClosedForeEstimateAvailable[i].cast<s_t>());
-    totalError += diff.cwiseAbs().sum() / diff.size();
-    averagePerDofError += diff.cwiseAbs();
+  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  Eigen::VectorXs thisPerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  for (int i = 0; i < (int)poses.size(); ++i) {
+    for (int idof = 0; idof < (int)goldDOFs.size(); ++idof) {
+      thisPerDofError(dofMap[goldDOFs[idof]])
+          = std::abs(goldPoses.col(i)(idof) - poses[i](dofMap[goldDOFs[idof]]));
+    }
+    totalError += thisPerDofError.sum() / thisPerDofError.size();
+    averagePerDofError += thisPerDofError;
   }
+
   s_t averagePoseError = totalError / (s_t)poses.size();
   averagePerDofError /= (s_t)poses.size();
-  s_t threshold = knownScales ? 0.03 : 0.18;
+  s_t threshold = knownScales ? 0.001 : 0.05;
   if (averagePoseError >= threshold)
   {
-    std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
-              << std::endl;
+    std::cout << "Average pose error norm " << averagePoseError << " > "
+              << threshold << "." << std::endl;
     for (int i = 0; i < averagePerDofError.size(); i++)
     {
       std::cout << "  " << osimFile.skeleton->getDof(i)->getName() << ": "
@@ -186,11 +192,6 @@ void testSubject(
     }
   }
   EXPECT_LE(averagePoseError, threshold);
-
-  // Marker errors.
-  // --------------
-  // EXPECT_TRUE(finalKinematicsReport.averageRootMeanSquaredError < 0.01);
-  // EXPECT_TRUE(finalKinematicsReport.averageMaxError < 0.02);
 
   // Joint centers.
   // --------------
@@ -237,7 +238,18 @@ void testSubject(
     bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
   }
   s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_LE(averageBodyScaleError, knownScales ? 0.01 : 0.03);
+  double bodyScaleThreshold = knownScales ? 0.01 : 0.03;
+  if (averageBodyScaleError >= bodyScaleThreshold)
+  {
+    std::cout << "Average body scale error " << averageBodyScaleError << " > "
+              << bodyScaleThreshold << "." << std::endl;
+    for (int i = 0; i < bodyScaleErrors.size(); i++)
+    {
+      std::cout << "  " << bodies[i]->getName() << ": "
+                << bodyScaleErrors[i] << std::endl;
+    }
+  }
+  EXPECT_LE(averageBodyScaleError, bodyScaleThreshold);
 }
 
 //==============================================================================
@@ -246,7 +258,7 @@ TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_01)
   testSubject("subject01", 1.808, true);
 }
 
-//==============================================================================
+////==============================================================================
 TEST(Arnold2013Synthetic, KNOWN_SCALES_IN_ADVANCE_SUBJECT_02)
 {
   testSubject("subject02", 1.853, true);

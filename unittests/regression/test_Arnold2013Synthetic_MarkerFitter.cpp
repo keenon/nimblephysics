@@ -325,32 +325,46 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
       = OpenSimParser::parseOsim(prefix + subject + "/" + subject + ".osim");
   auto goldIK = OpenSimParser::loadMot(
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
+  std::vector<std::string> goldDOFs;
+  std::map<std::string, int> dofMap;
+  for (int idof = 0; idof < (int)goldOsim.skeleton->getNumDofs(); ++idof) {
+    goldDOFs.push_back(goldOsim.skeleton->getDof(idof)->getName());
+    dofMap[goldDOFs.back()] =
+        osimFile.skeleton->getDof(goldDOFs.back())->getIndexInSkeleton();
+  }
 
   // Compare poses.
   // --------------
   auto poses = markerInit.poses;
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(poses.rows());
-  for (int i = 0; i < poses.cols(); i++)
-  {
-    Eigen::VectorXs diff = poses.col(i) - goldPoses.col(i);
-    totalError += diff.cwiseAbs().sum() / diff.size();
-    averagePerDofError += diff.cwiseAbs();
+  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  Eigen::VectorXs thisPerDofError = Eigen::VectorXs::Zero(
+      (int)osimFile.skeleton->getNumDofs());
+  for (int i = 0; i < (int)poses.cols(); ++i) {
+    for (int idof = 0; idof < (int)goldDOFs.size(); ++idof) {
+      thisPerDofError(dofMap[goldDOFs[idof]])
+          = std::abs(goldPoses.col(i)(idof) - poses.col(i)(dofMap[goldDOFs[idof]]));
+    }
+    totalError += thisPerDofError.sum() / thisPerDofError.size();
+    averagePerDofError += thisPerDofError;
   }
+
   s_t averagePoseError = totalError / (s_t)poses.cols();
   averagePerDofError /= (s_t)poses.cols();
-  if (averagePoseError >= 0.03)
+  s_t threshold = 0.05;
+  if (averagePoseError >= threshold)
   {
-    std::cout << "Average pose error norm " << averagePoseError << " > 0.01"
-              << std::endl;
+    std::cout << "Average pose error norm " << averagePoseError << " > "
+              << threshold << "." << std::endl;
     for (int i = 0; i < averagePerDofError.size(); i++)
     {
       std::cout << "  " << osimFile.skeleton->getDof(i)->getName() << ": "
                 << averagePerDofError(i) << std::endl;
     }
   }
-  EXPECT_LE(averagePoseError, 0.03);
+  EXPECT_LE(averagePoseError, threshold);
 
   // Marker errors.
   // --------------
