@@ -2581,18 +2581,24 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
   }
 
   // Check that we computed a valid height.
-  if (height == 0) {
+  if (height == 0)
+  {
     std::cout << "ERROR: getHeight() computed a height of 0. Exiting..."
               << std::endl;
+    assert(height >= 0);
     exit(1);
-  } else if (height < 0) {
-    std::cout << "WARNING: getHeight() computed a negative height of "
-              << height << ". Exiting..." << std::endl;
+  }
+  else if (height < 0)
+  {
+    std::cout << "WARNING: getHeight() computed a negative height of " << height
+              << ". Exiting..." << std::endl;
+    assert(height >= 0);
     exit(1);
-  } else {
+  }
+  else
+  {
     return height;
   }
-
 }
 
 //==============================================================================

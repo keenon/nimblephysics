@@ -1380,13 +1380,13 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
 
     // 3.1. First, get the joint inits for all the trials, since we need to be
     // able to sort clips by joint variability
-    std::vector<MarkerInitialization> jointInits;
+    std::vector<s_t> markerVariabilities;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
       std::cout << "Running joint init pipeline for trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
-      jointInits.push_back(
-          runJointsPipeline(markerObservationTrials[i], params));
+      markerVariabilities.push_back(
+          computeMarkerDistanceMatrixVariability(markerObservationTrials[i]));
     }
 
     // 3.2. Sort the trials by the amount of joint variability in each one
@@ -1400,8 +1400,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
         orderedByJointVariability.end(),
         [&](int a, int b) {
           // Sort by joint marker variability
-          return jointInits[a].jointMarkerVariability.norm()
-                 > jointInits[b].jointMarkerVariability.norm();
+          return markerVariabilities[a] > markerVariabilities[b];
         });
     std::vector<int> inverseOrderedByJointVariability;
     inverseOrderedByJointVariability.resize(orderedByJointVariability.size());
@@ -1416,9 +1415,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
       std::cout << std::to_string(i) << ": " << orderedByJointVariability[i]
-                << " variability norm = "
-                << jointInits[orderedByJointVariability[i]]
-                       .jointMarkerVariability.norm()
+                << " marker variability norm = "
+                << markerVariabilities[orderedByJointVariability[i]]
                 << std::endl;
     }
 
@@ -1486,25 +1484,26 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       {
         int cursor = trialSampledAtIndex[i];
         int size = markerObservationTrials[i].size();
-        jointInits[i].groupScales = overallInit.groupScales;
-        jointInits[i].markerOffsets = overallInit.markerOffsets;
-        jointInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
-        jointInits[i].joints = overallInit.joints;
-        jointInits[i].jointMarkerVariability
-            = overallInit.jointMarkerVariability;
-        jointInits[i].jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
-        jointInits[i].jointLoss = overallInit.jointLoss;
-        jointInits[i].jointWeights = overallInit.jointWeights;
-        jointInits[i].axisWeights = overallInit.axisWeights;
-        jointInits[i].axisLoss = overallInit.axisLoss;
-        jointInits[i].poses = overallInit.poses.block(
+
+        MarkerInitialization result;
+        result.groupScales = overallInit.groupScales;
+        result.markerOffsets = overallInit.markerOffsets;
+        result.updatedMarkerMap = overallInit.updatedMarkerMap;
+        result.joints = overallInit.joints;
+        result.jointMarkerVariability = overallInit.jointMarkerVariability;
+        result.jointsAdjacentMarkers = overallInit.jointsAdjacentMarkers;
+        result.jointLoss = overallInit.jointLoss;
+        result.jointWeights = overallInit.jointWeights;
+        result.axisWeights = overallInit.axisWeights;
+        result.axisLoss = overallInit.axisLoss;
+        result.poses = overallInit.poses.block(
             0, cursor, overallInit.poses.rows(), size);
-        jointInits[i].poseScores = overallInit.poseScores.segment(cursor, size);
-        jointInits[i].jointCenters = overallInit.jointCenters.block(
+        result.poseScores = overallInit.poseScores.segment(cursor, size);
+        result.jointCenters = overallInit.jointCenters.block(
             0, cursor, overallInit.jointCenters.rows(), size);
-        jointInits[i].jointAxis = overallInit.jointAxis.block(
+        result.jointAxis = overallInit.jointAxis.block(
             0, cursor, overallInit.jointAxis.rows(), size);
-        separateInits.push_back(jointInits[i]);
+        separateInits.push_back(result);
       }
       else
       {
@@ -1698,32 +1697,55 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
   std::vector<bool> newClip;
   for (int i = 0; i < markerObservations.size(); i++)
   {
-    newClip.push_back(false);
+    newClip.push_back(i == 0);
   }
 
-  // 1. Find the initial scaling + IK
-  MarkerInitialization init = runJointsPipeline(
-      markerObservations,
-      InitialMarkerFitParams(params).setDontRescaleBodies(true));
-  // 2. Re-initialize the problem, but pass in the joint centers we just found
-  MarkerInitialization reinit = getInitialization(
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+      updatedMarkerMap;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    std::string name = mMarkerNames[i];
+    Eigen::Vector3s offset = Eigen::Vector3s::Zero();
+    if (params.markerOffsets.count(name))
+    {
+      offset = params.markerOffsets[name];
+    }
+    updatedMarkerMap[name] = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
+        mMarkerMap[name].first, mMarkerMap[name].second + offset);
+  }
+  mSkeleton->setGroupScales(params.groupScales);
+
+  std::map<std::string, bool> markerIsAnatomical;
+  for (int i = 0; i < mMarkerNames.size(); i++)
+  {
+    markerIsAnatomical[mMarkerNames[i]] = !mMarkerIsTracking[i];
+  }
+  IKInitializer initializer(
+      mSkeleton,
+      updatedMarkerMap,
+      markerIsAnatomical,
       markerObservations,
       newClip,
-      InitialMarkerFitParams(params)
-          .setJointCentersAndWeights(
-              init.joints,
-              init.jointCenters,
-              init.jointsAdjacentMarkers,
-              init.jointWeights)
-          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
-          .setInitPoses(init.poses)
-          .setDontRescaleBodies(true)
-          .setDontMoveMarkers(true));
-  // 3. Do a final smoothing pass
-  MarkerInitialization smoothed
-      = smoothOutIK(markerObservations, newClip, reinit);
+      -1.0,
+      true);
+  initializer.runFullPipeline();
 
-  return smoothed;
+  MarkerInitialization result;
+  // For now, we're just going to use the poses and scales, and then leave the
+  // joint centers to the non-convex optimization pipeline. We could (and
+  // maybe should?) use the joint centers that the least-squares algo finds
+  // directly. That would require some refactoring, since those joint centers
+  // are for "stacked joints" which may be multiple joints in the skeleton at
+  // once.
+  result.poses = Eigen::MatrixXs::Zero(
+      mSkeleton->getNumDofs(), markerObservations.size());
+  result.groupScales = params.groupScales;
+  for (int i = 0; i < markerObservations.size(); i++)
+  {
+    result.poses.col(i) = initializer.getPoses()[i];
+  }
+
+  return result;
 }
 
 //==============================================================================
@@ -4916,6 +4938,102 @@ MarkerInitialization MarkerFitter::getInitialization(
   result.axisWeights = params.axisWeights;
 
   return result;
+}
+
+//==============================================================================
+/// For when we need to subsample trials, because the user uploaded a bunch of
+/// trials and it would overwhelm the bilevel optimizer, we can subsample them
+/// down to a smaller number of trials by ranking on this quantity. This tells
+/// us how much the markers for a trial move with respect to each other over
+/// the course of the trial. More motion is better.
+s_t MarkerFitter::computeMarkerDistanceMatrixVariability(
+    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+        markerObservations)
+{
+  std::vector<std::string> markerNames;
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (auto& pair : markerObservations[t])
+    {
+      if (std::find(markerNames.begin(), markerNames.end(), pair.first)
+          == markerNames.end())
+      {
+        markerNames.push_back(pair.first);
+      }
+    }
+  }
+
+  // 1. Go through and find the mean distances
+
+  Eigen::MatrixXs pairMeans
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  Eigen::MatrixXs pairObservationCounts
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (int i = 0; i < markerNames.size() - 1; i++)
+    {
+      if (markerObservations[t].count(markerNames[i]))
+      {
+        for (int j = i + 1; j < markerNames.size(); j++)
+        {
+          if (markerObservations[t].count(markerNames[j]))
+          {
+            s_t dist = (markerObservations[t].at(markerNames[i])
+                        - markerObservations[t].at(markerNames[j]))
+                           .norm();
+            pairMeans(i, j) += dist;
+            pairObservationCounts(i, j) += 1;
+          }
+        }
+      }
+    }
+  }
+
+  pairMeans = pairMeans.cwiseQuotient(pairObservationCounts);
+
+  // 2. Compute the variance
+
+  Eigen::MatrixXs pairVariance
+      = Eigen::MatrixXs::Zero(markerNames.size(), markerNames.size());
+  for (int t = 0; t < markerObservations.size(); t++)
+  {
+    for (int i = 0; i < markerNames.size() - 1; i++)
+    {
+      if (markerObservations[t].count(markerNames[i]))
+      {
+        for (int j = i + 1; j < markerNames.size(); j++)
+        {
+          if (markerObservations[t].count(markerNames[j]))
+          {
+            s_t dist = (markerObservations[t].at(markerNames[i])
+                        - markerObservations[t].at(markerNames[j]))
+                           .norm();
+            s_t diff = dist - pairMeans(i, j);
+            pairVariance(i, j) += diff * diff;
+          }
+        }
+      }
+    }
+  }
+
+  pairVariance.cwiseQuotient(pairObservationCounts);
+
+  // 3. Go through and compute the sum normalized RMSE
+
+  s_t sum = 0.0;
+  for (int i = 0; i < markerNames.size(); i++)
+  {
+    for (int j = 0; j < markerNames.size(); j++)
+    {
+      if (pairObservationCounts(i, j) > 0)
+      {
+        sum += sqrt(pairVariance(i, j)) / pairMeans(i, j);
+      }
+    }
+  }
+
+  return sum;
 }
 
 //==============================================================================

@@ -708,6 +708,15 @@ public:
       const std::vector<bool>& newClip,
       InitialMarkerFitParams params);
 
+  /// For when we need to subsample trials, because the user uploaded a bunch of
+  /// trials and it would overwhelm the bilevel optimizer, we can subsample them
+  /// down to a smaller number of trials by ranking on this quantity. This tells
+  /// us how much the markers for a trial move with respect to each other over
+  /// the course of the trial. More motion is better.
+  static s_t computeMarkerDistanceMatrixVariability(
+      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+          markerObservations);
+
   /// This computes the IK diff for joint positions, given a bunch of weighted
   /// joint centers and also a bunch of weighted joint axis.
   static void computeJointIKDiff(

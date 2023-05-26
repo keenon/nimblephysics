@@ -1584,6 +1584,10 @@ std::vector<MarkerInitialization> runEngine(
     = std::map<std::string, Eigen::Vector3s>(),
     Eigen::VectorXs staticPose = Eigen::VectorXs::Zero(0))
 {
+  assert(markerObservationTrials.size() > 0);
+  assert(markerObservationTrials[0].size() > 0);
+  assert(markerObservationTrials[0][0].size() > 0);
+
   OpenSimFile standard = OpenSimParser::parseOsim(modelPath);
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
@@ -6606,18 +6610,18 @@ TEST(DynamicsFitter, MARKERS_SAM_DATA)
   std::vector<std::string> grfFiles;
   std::vector<std::string> imuFiles;
 
-  // trcFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
-  // grfFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
-  // trcFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
-  // grfFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
-  // trcFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
-  // grfFiles.push_back(
-  //     "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run200/grf.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run300/grf.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/Hamner_subject17/trials/run400/grf.mot");
   trcFiles.push_back(
       "dart://sample/grf/Hamner_subject17/trials/run500/markers.trc");
   grfFiles.push_back(
@@ -6686,7 +6690,36 @@ TEST(MarkerFitter, ANTOINE_BUG_1)
       79.1,
       1.8,
       "male",
-      true);
+      true,
+      false,
+      -1);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFitter, JANELLE_BUG_1)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
+
+  c3dFiles.push_back("dart://sample/grf/janelle_bug1/trials/box2/markers.c3d");
+
+  //  {"massKg": 79.1, "heightM": 1.8, "sex": "male", "skeletonPreset":
+  //  "custom"}
+  runEngine(
+      "dart://sample/grf/janelle_bug1/unscaled_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      imuFiles,
+      74.2,
+      1.7,
+      "male",
+      true,
+      false,
+      50);
 }
 #endif
 

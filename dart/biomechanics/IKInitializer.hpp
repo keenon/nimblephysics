@@ -82,7 +82,8 @@ public:
       std::map<std::string, bool> markerIsAnatomical,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
       std::vector<bool> newClip,
-      s_t modelHeightM = -1.0);
+      s_t modelHeightM = -1.0,
+      bool dontRescale = false);
 
   //////////////////////////////////////////////////////////////////////////////
   // Core entrypoint
@@ -293,6 +294,7 @@ public:
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   s_t mModelHeightM;
+  bool mDontRescale;
   std::vector<std::string> mMarkerNames;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
