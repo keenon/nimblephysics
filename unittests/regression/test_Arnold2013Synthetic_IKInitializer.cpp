@@ -16,6 +16,7 @@
 #include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/MeshShape.hpp"
 #include "dart/math/MathTypes.hpp"
 
 #include "GradientTestUtils.hpp"
@@ -25,23 +26,31 @@ using namespace dart;
 using namespace biomechanics;
 using namespace math;
 
-//==============================================================================
-std::tuple<
-    std::vector<Eigen::VectorXs>,
-    std::vector<Eigen::VectorXi>,
-    Eigen::VectorXs,
-    OpenSimFile>
-runIKInitializer(
-    std::string modelPath,
-    std::vector<std::string> trcFiles,
-    s_t heightM,
-    bool knownScalesInAdvance = false)
+void testSubject(
+    const std::string& subject, const s_t& height, bool knownScales = false)
 {
+
+  std::cout << "Testing " << subject << "..." << std::endl;
+
+  // Run IKInitializer
+  // -----------------
+  std::string prefix = "dart://sample/regression/Arnold2013Synthetic/";
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  trcFiles.push_back(prefix + subject + "/trials/walk2/markers.trc");
+  grfFiles.push_back(prefix + subject + "/trials/walk2/grf.mot");
+  (void)height;
+  std::string modelPath = knownScales
+                              ? (prefix + subject + "/" + subject + ".osim")
+                              : (prefix + "unscaled_generic.osim");
+  s_t heightM = knownScales ? -1.0 : height;
+  bool knownScalesInAdvance = knownScales;
 
   // Initialize data structures.
   // ---------------------------
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservationTrials;
+  std::vector<std::vector<bool>> newClipTrials;
   std::vector<int> framesPerSecond;
 
   // Fill marker and GRF data structures.
@@ -52,6 +61,12 @@ runIKInitializer(
     OpenSimTRC trc = OpenSimParser::loadTRC(trcFiles[itrial]);
     framesPerSecond.push_back(trc.framesPerSecond);
     markerObservationTrials.push_back(trc.markerTimesteps);
+    std::vector<bool> newClip;
+    for (int i = 0; i < trc.markerTimesteps.size(); i++)
+    {
+      newClip.push_back(i == 0);
+    }
+    newClipTrials.push_back(newClip);
   }
 
   // Load the model.
@@ -107,50 +122,24 @@ runIKInitializer(
       standard.markersMap,
       markerIsAnatomical,
       markerObservationTrials[0],
+      newClipTrials[0],
       heightM);
   if (knownScalesInAdvance)
   {
     initializer.closedFormMDSJointCenterSolver();
     initializer.estimateGroupScalesClosedForm();
-    initializer.estimatePosesClosedForm();
+    initializer.estimatePosesWithIK();
   }
   else
   {
     initializer.runFullPipeline(false);
   }
 
-  return std::make_tuple(
-      initializer.getPoses(),
-      initializer.getPosesClosedFormEstimateAvailable(),
-      initializer.getGroupScales(),
-      standard);
-}
-
-void testSubject(
-    const std::string& subject, const s_t& height, bool knownScales = false)
-{
-
-  std::cout << "Testing " << subject << "..." << std::endl;
-
-  // Run MarkerFitter.
-  // -----------------
-  std::string prefix = "dart://sample/regression/Arnold2013Synthetic/";
-  std::vector<std::string> trcFiles;
-  std::vector<std::string> grfFiles;
-  trcFiles.push_back(prefix + subject + "/trials/walk2/markers.trc");
-  grfFiles.push_back(prefix + subject + "/trials/walk2/grf.mot");
-  (void)height;
-  const auto tuple = runIKInitializer(
-      knownScales ? (prefix + subject + "/" + subject + ".osim")
-                  : (prefix + "unscaled_generic.osim"),
-      trcFiles,
-      knownScales ? -1.0 : height,
-      knownScales);
-  std::vector<Eigen::VectorXs> poses = std::get<0>(tuple);
+  std::vector<Eigen::VectorXs> poses = initializer.getPoses();
   std::vector<Eigen::VectorXi> posesClosedForeEstimateAvailable
-      = std::get<1>(tuple);
-  Eigen::VectorXs groupScales = std::get<2>(tuple);
-  OpenSimFile osimFile = std::get<3>(tuple);
+      = initializer.getPosesClosedFormEstimateAvailable();
+  Eigen::VectorXs groupScales = initializer.getGroupScales();
+  OpenSimFile osimFile = standard;
 
   // Load ground-truth results.
   // --------------------------
@@ -187,17 +176,88 @@ void testSubject(
   }
   EXPECT_LE(averagePoseError, threshold);
 
+  auto goldSkeleton = goldOsim.skeleton;
+  auto goldJoints = goldSkeleton->getJoints();
+
   // Marker errors.
   // --------------
   // EXPECT_TRUE(finalKinematicsReport.averageRootMeanSquaredError < 0.01);
   // EXPECT_TRUE(finalKinematicsReport.averageMaxError < 0.02);
 
-  // Joint centers.
+  // Virtual joint centers.
+  // --------------
+  std::vector<std::shared_ptr<struct StackedJoint>>& stackedJoints
+      = initializer.getStackedJoints();
+  std::vector<std::map<std::string, Eigen::Vector3s>>& jointCenters
+      = initializer.getJointCenters();
+
+  std::map<std::string, s_t> avgAnalyticalJointError;
+  std::map<std::string, int> analyticalJointObservationCount;
+  std::map<std::string, std::map<std::string, int>> analyticalJointSourceCount;
+  for (int i = 0; i < stackedJoints.size(); i++)
+  {
+    avgAnalyticalJointError[stackedJoints[i]->name] = 0.0;
+    analyticalJointObservationCount[stackedJoints[i]->name] = 0;
+    analyticalJointSourceCount[stackedJoints[i]->name]
+        = std::map<std::string, int>();
+  }
+  for (int t = 0; t < jointCenters.size(); t++)
+  {
+    goldSkeleton->setPositions(goldPoses.col(t));
+    Eigen::VectorXs goldJointPoses
+        = goldSkeleton->getJointWorldPositions(goldJoints);
+    for (int i = 0; i < stackedJoints.size(); i++)
+    {
+      std::shared_ptr<struct StackedJoint>& stackedJoint = stackedJoints[i];
+      if (jointCenters[t].count(stackedJoint->name))
+      {
+        Eigen::Vector3s goldJointCenter = Eigen::Vector3s::Zero();
+        for (int k = 0; k < stackedJoint->joints.size(); k++)
+        {
+          goldJointCenter += goldJointPoses.segment<3>(
+              3 * stackedJoint->joints[k]->getJointIndexInSkeleton());
+        }
+        goldJointCenter /= stackedJoint->joints.size();
+        s_t jointDist
+            = (jointCenters[t][stackedJoint->name] - goldJointCenter).norm();
+        avgAnalyticalJointError[stackedJoint->name] += jointDist;
+        analyticalJointObservationCount[stackedJoint->name]++;
+
+        std::string debugJointEstimateSource
+            = initializer.debugJointEstimateSource(t, stackedJoint->name);
+        if (analyticalJointSourceCount[stackedJoint->name].count(
+                debugJointEstimateSource)
+            == 0)
+        {
+          analyticalJointSourceCount[stackedJoint->name]
+                                    [debugJointEstimateSource]
+              = 0;
+        }
+        analyticalJointSourceCount[stackedJoint->name]
+                                  [debugJointEstimateSource]++;
+      }
+    }
+  }
+  for (int i = 0; i < stackedJoints.size(); i++)
+  {
+    avgAnalyticalJointError[stackedJoints[i]->name]
+        /= analyticalJointObservationCount[stackedJoints[i]->name];
+    std::cout << "Analytical Joint \"" << stackedJoints[i]->name
+              << "\" got avg error "
+              << avgAnalyticalJointError[stackedJoints[i]->name] << "m on "
+              << analyticalJointObservationCount[stackedJoints[i]->name]
+              << " observations" << std::endl;
+    for (auto& pair : analyticalJointSourceCount[stackedJoints[i]->name])
+    {
+      std::cout << "   source \"" << pair.first << "\" on " << pair.second
+                << " frames" << std::endl;
+    }
+  }
+
+  // Real joint centers.
   // --------------
   auto skeleton = osimFile.skeleton;
   auto joints = skeleton->getJoints();
-  auto goldSkeleton = goldOsim.skeleton;
-  auto goldJoints = goldSkeleton->getJoints();
   Eigen::VectorXs avgJointError
       = Eigen::VectorXs::Zero(skeleton->getNumJoints());
   for (int i = 0; i < poses.size(); i++)
@@ -225,7 +285,40 @@ void testSubject(
   s_t averageJointCenterError = avgJointError.mean();
   EXPECT_LE(averageJointCenterError, knownScales ? 0.02 : 0.08);
 
-  // Body scales.
+  // Get at body scaling: Measure absolute distances between joint centers in
+  // the neutral pose
+  // ------------
+  skeleton->setPositions(Eigen::VectorXs::Zero(skeleton->getNumDofs()));
+  goldSkeleton->setPositions(Eigen::VectorXs::Zero(goldSkeleton->getNumDofs()));
+
+  Eigen::VectorXs jointPoses = skeleton->getJointWorldPositions(joints);
+  Eigen::VectorXs goldJointPoses
+      = goldSkeleton->getJointWorldPositions(goldJoints);
+
+  s_t avgRelativeError = 0.0;
+  for (int i = 0; i < joints.size(); i++)
+  {
+    for (int j = 0; j < joints.size(); j++)
+    {
+      s_t dist = (jointPoses.segment<3>(3 * i) - jointPoses.segment<3>(3 * j))
+                     .norm();
+      s_t goldDist = (goldJointPoses.segment<3>(3 * i)
+                      - goldJointPoses.segment<3>(3 * j))
+                         .norm();
+      s_t error = std::abs(dist - goldDist);
+      s_t relativeError = error;
+      if (goldDist > 0)
+      {
+        relativeError /= goldDist;
+      }
+      avgRelativeError += relativeError;
+    }
+  }
+  avgRelativeError /= joints.size() * joints.size();
+  EXPECT_LE(avgRelativeError, knownScales ? 0.01 : 0.035);
+
+  /*
+  // Relative body scales
   // ------------
   auto bodies = skeleton->getBodyNodes();
   auto goldBodies = goldSkeleton->getBodyNodes();
@@ -234,10 +327,37 @@ void testSubject(
   {
     Eigen::Vector3s bodyScale = bodies[i]->getScale();
     Eigen::Vector3s goldBodyScale = goldBodies[i]->getScale();
-    bodyScaleErrors[i] = (bodyScale - goldBodyScale).norm();
+
+    Eigen::Vector3s meshScale = bodyScale;
+    Eigen::Vector3s goldMeshScale = goldBodyScale;
+    for (int k = 0; k < bodies[i]->getNumShapeNodes(); k++)
+    {
+      auto* shapeNode = bodies[i]->getShapeNode(k);
+      auto* goldShapeNode = goldBodies[i]->getShapeNode(k);
+      if (shapeNode->getShape()->getType()
+          == dynamics::MeshShape::getStaticType())
+      {
+        auto* meshShape
+            = static_cast<dynamics::MeshShape*>(shapeNode->getShape().get());
+        auto* goldMeshShape = static_cast<dynamics::MeshShape*>(
+            goldShapeNode->getShape().get());
+        meshScale = meshShape->getScale();
+        goldMeshScale = goldMeshShape->getScale();
+      }
+    }
+
+    bodyScaleErrors[i] = (meshScale - goldMeshScale).norm();
+
+    Eigen::Matrix3s compare;
+    compare.col(0) = bodyScale;
+    compare.col(1) = goldBodyScale;
+    compare.col(2) = bodyScale - goldBodyScale;
+    std::cout << "Body " << bodies[i]->getName()
+              << " error norm: " << bodyScaleErrors[i] << std::endl
+              << "guess - gold - diff: " << std::endl
+              << compare << std::endl;
   }
-  s_t averageBodyScaleError = bodyScaleErrors.mean();
-  EXPECT_LE(averageBodyScaleError, knownScales ? 0.01 : 0.03);
+  */
 }
 
 //==============================================================================

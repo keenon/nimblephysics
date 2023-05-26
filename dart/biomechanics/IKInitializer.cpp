@@ -3985,6 +3985,37 @@ IKInitializer::getJointCenters()
 }
 
 //==============================================================================
+std::string IKInitializer::debugJointEstimateSource(
+    int timestep, std::string jointName)
+{
+  if (timestep < 0 || timestep > mJointCentersEstimateSource.size())
+  {
+    return "Invalid timestep";
+  }
+  if (mJointCentersEstimateSource[timestep].find(jointName)
+      == mJointCentersEstimateSource[timestep].end())
+  {
+    return "No estimate";
+  }
+  JointCenterEstimateSource source
+      = mJointCentersEstimateSource[timestep][jointName];
+  if (source == JointCenterEstimateSource::MDS)
+  {
+    return "MDS";
+  }
+  else if (source == JointCenterEstimateSource::LEAST_SQUARES_EXACT)
+  {
+    return "LEAST_SQUARES_EXACT";
+  }
+  else if (source == JointCenterEstimateSource::LEAST_SQUARES_AXIS)
+  {
+    return "LEAST_SQUARES_AXIS";
+  }
+
+  return "Unrecognized source";
+}
+
+//==============================================================================
 std::vector<std::map<std::string, Eigen::Vector3s>>&
 IKInitializer::getJointAxisDirs()
 {
