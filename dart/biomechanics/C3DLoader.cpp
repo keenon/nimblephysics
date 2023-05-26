@@ -345,6 +345,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     for (int j = 0; j < forcePlatforms.size(); j++)
     {
       int frame = analogFramesPerFrame * (t + startFrame);
+      result.forcePlates[j].timestamps.push_back(t / frameRate);
       result.forcePlates[j].forces.push_back(
           forcePlatforms[j].forces()[frame] * forcePlateForceScaleFactors[j]);
       result.forcePlates[j].moments.push_back(
