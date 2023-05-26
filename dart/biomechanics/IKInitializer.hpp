@@ -265,6 +265,8 @@ public:
 
   std::vector<std::map<std::string, Eigen::Vector3s>>& getJointCenters();
 
+  std::string debugJointEstimateSource(int timestep, std::string jointName);
+
   std::vector<std::map<std::string, Eigen::Vector3s>>& getJointAxisDirs();
 
   std::map<std::string, std::map<std::string, s_t>>&
