@@ -3118,6 +3118,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       if (downsampleClock <= 0)
       {
         downsampleClock = downsampleByFactor;
+        forcePlate.timestamps.push_back(timestamps[t]);
         forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
         forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
         forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);

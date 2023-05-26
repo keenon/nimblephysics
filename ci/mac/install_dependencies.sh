@@ -13,7 +13,7 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="10.9"
+export MACOSX_DEPLOYMENT_TARGET="11.0"
 
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
@@ -280,8 +280,8 @@ sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libas
 # brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="71"
-ICU4C_FULL_VERSION="71.1"
+ICU4C_MAJOR_VERSION="72"
+ICU4C_FULL_VERSION="72.1"
 if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
       pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 else

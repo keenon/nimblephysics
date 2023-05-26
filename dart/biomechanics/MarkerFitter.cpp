@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <fstream>
 
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
@@ -7727,6 +7728,71 @@ void MarkerFitter::addZeroConstraint(
 void MarkerFitter::removeZeroConstraint(std::string name)
 {
   mZeroConstraints.erase(name);
+}
+
+//==============================================================================
+/// This writes a unified CSV with columns describing the results for the trial
+  /// associated with this MarkerInitialization.
+void MarkerFitter::writeCSVData(
+    std::string path,
+    const MarkerInitialization& init,
+    const std::vector<s_t>& rmsMarkerErrors,
+    const std::vector<s_t>& maxMarkerErrors,
+    const std::vector<s_t>& timestamps)
+{
+  // Convenience function.
+  auto writeVectorToCSV = [](std::ofstream& csvFile, Eigen::VectorXs& vec) {
+    for (int i = 0; i < vec.size(); i++) {
+      csvFile << "," << vec(i);
+    }
+  };
+
+  std::ofstream csvFile;
+  csvFile.open(path);
+
+  csvFile << "time";
+  for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+  {
+    csvFile << ",pos_" << mSkeleton->getDof(i)->getName();
+  }
+  for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+  {
+    csvFile << ",vel_" << mSkeleton->getDof(i)->getName();
+  }
+  for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+  {
+    csvFile << ",acc_" << mSkeleton->getDof(i)->getName();
+  }
+  csvFile << ",marker_error_rms,marker_error_max";
+
+  (void)init;
+  int nrows = init.poses.cols();
+  s_t dt = timestamps[1] - timestamps[0];
+  assert(rmsMarkerError.size() == nrows);
+  assert(maxMarkerError.size() == nrows);
+  for (int t = 0; t < nrows; t++)
+  {
+    csvFile << std::endl;
+    csvFile << timestamps[t];
+    Eigen::VectorXs q = init.poses.col(t);
+    Eigen::VectorXs dq = Eigen::VectorXs::Zero(q.size());
+    Eigen::VectorXs ddq = Eigen::VectorXs::Zero(q.size());
+    if (t > 0 && t < nrows - 1)
+    {
+      dq = (init.poses.col(t) - init.poses.col(t - 1)) / dt;
+      ddq = (init.poses.col(t + 1) - 2 * init.poses.col(t)
+             + init.poses.col(t - 1)) / (dt * dt);
+    }
+
+    writeVectorToCSV(csvFile, q);
+    writeVectorToCSV(csvFile, dq);
+    writeVectorToCSV(csvFile, ddq);
+
+    // Marker errors.
+    csvFile << "," << rmsMarkerErrors[t] << "," << maxMarkerErrors[t];
+  }
+
+  csvFile.close();
 }
 
 //==============================================================================
