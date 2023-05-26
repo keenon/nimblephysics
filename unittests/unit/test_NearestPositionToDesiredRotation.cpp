@@ -25,7 +25,7 @@
 using namespace dart;
 using namespace dynamics;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 template <typename JointType>
 bool testNearestPosition(
@@ -155,6 +155,11 @@ TEST(NEAREST_POSITION_TO_ROTATION, FREE_JOINT)
   EXPECT_TRUE(testNearestPosition<dynamics::FreeJoint>());
 }
 #endif
+
+// TODO: Our formula for getting the nearest approximation to a rotation matrix
+// along a single axis is wrong, so these tests fail. We should fix this, but I
+// can't figure out a better formula, and the current one seems to work well
+// enough for now.
 
 #ifdef ALL_TESTS
 TEST(NEAREST_POSITION_TO_ROTATION, UNIVERSAL_JOINT)

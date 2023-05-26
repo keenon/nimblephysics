@@ -4500,16 +4500,58 @@ s_t getClosestRotationalApproximation(
   R_bw.col(1) = y;
   R_bw.col(2) = axis;
 
+  if (R_bw.determinant() < 0)
+  {
+    R_bw.col(2) *= -1;
+  }
+
   // Get our desired rotation in the coordinate space of the `axis` basis
   Eigen::Matrix3s R_b = R_bw.transpose() * desiredRotation * R_bw;
 
   // Now the top left corner of R_b is our rotation matrix in 2D, about the
   // `axis` basis
   Eigen::Matrix2s twoDimensionalRotation = R_b.block<2, 2>(0, 0);
-  Eigen::Transform<s_t, 2, Eigen::Affine> t(twoDimensionalRotation);
-  Eigen::Matrix2s normalizedTwoDimensional = t.rotation();
+  Eigen::JacobiSVD<Eigen::Matrix2s> svd(
+      twoDimensionalRotation, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix2s U = svd.matrixU();
+  Eigen::Matrix2s V = svd.matrixV();
+  Eigen::Matrix2s normalizedTwoDimensional = U * V.transpose();
+  if (normalizedTwoDimensional.determinant() < 0)
+  {
+    normalizedTwoDimensional.col(1) *= -1;
+  }
   s_t angle
       = atan2(normalizedTwoDimensional(1, 0), normalizedTwoDimensional(0, 0));
+
+  // And now, perform gradient descent using a finite-differenced gradient!
+
+  s_t cost = (desiredRotation - math::expMapRot(axis * angle)).norm();
+  const s_t eps = 1e-3;
+  s_t stepSize = 1e-2;
+  for (int iter = 0; iter < 100; iter++)
+  {
+    s_t plusCost
+        = (desiredRotation - math::expMapRot(axis * (angle + eps))).norm();
+    s_t minusCost
+        = (desiredRotation - math::expMapRot(axis * (angle - eps))).norm();
+    s_t grad = (plusCost - minusCost) / (2 * eps);
+
+    while (stepSize > 1e-12)
+    {
+      s_t proposedAngle = angle - grad * stepSize;
+      s_t proposedCost
+          = (desiredRotation - math::expMapRot(axis * proposedAngle)).norm();
+      if (proposedCost < cost)
+      {
+        cost = proposedCost;
+        angle = proposedAngle;
+        stepSize *= 1.2;
+        break;
+      }
+      stepSize *= 0.5;
+    }
+  }
+
   return angle;
 }
 

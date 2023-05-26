@@ -60,6 +60,12 @@ ZeroDofJoint::Properties ZeroDofJoint::getZeroDofJointProperties() const
 }
 
 //==============================================================================
+bool ZeroDofJoint::isFixed() const
+{
+  return true;
+}
+
+//==============================================================================
 bool ZeroDofJoint::hasDof(const DegreeOfFreedom*) const
 {
   return false;

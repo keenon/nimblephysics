@@ -62,6 +62,10 @@ public:
   /// Get the Properties of this ZeroDofJoint
   Properties getZeroDofJointProperties() const;
 
+  /// Return true if this joint has the same upperlimit and lowerlimit on
+  /// positions
+  bool isFixed() const;
+
   //----------------------------------------------------------------------------
   // Interface for generalized coordinates
   //----------------------------------------------------------------------------
