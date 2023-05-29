@@ -2803,10 +2803,10 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   bool inHeader = true;
 
-  std::vector<std::string> colNames;
-  std::vector<int> colToPlate;
-  std::vector<int> colToCOP;
-  std::vector<int> colToWrench;
+  std::vector<std::string> colNames = std::vector<std::string>();
+  std::vector<int> colToPlate = std::vector<int>();
+  std::vector<int> colToCOP = std::vector<int>();
+  std::vector<int> colToWrench = std::vector<int>();
   int numPlates = 0;
 
   std::vector<s_t> timestamps;
@@ -3060,7 +3060,12 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         wrenchRows.push_back(wrenches);
         timestamps.push_back(timestamp);
       }
-      lineNumber++;
+      // Ignore whitespace in a .MOT file between "endheader" and the names of
+      // the columns
+      if (lineNumber > 0 || colNames.size() > 0)
+      {
+        lineNumber++;
+      }
     }
 
     start = end + 1; // "\n".length()
