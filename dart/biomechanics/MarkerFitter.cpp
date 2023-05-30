@@ -1701,6 +1701,7 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
     newClip.push_back(i == 0);
   }
 
+  /*
   std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
       updatedMarkerMap;
   for (int i = 0; i < mMarkerNames.size(); i++)
@@ -1747,6 +1748,36 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
   }
 
   return result;
+  */
+
+  // 1. Find the initial scaling + IK
+  MarkerInitialization init = getInitialization(
+      markerObservations, newClip, InitialMarkerFitParams(params).setDontRescaleBodies(true).setDontMoveMarkers(true));
+  mSkeleton->setGroupScales(init.groupScales);
+
+  // 2. Find the joint centers
+  findJointCenters(init, newClip, markerObservations);
+  assert(init.joints.size() * 3 == init.jointCenters.rows());
+  findAllJointAxis(init, newClip, markerObservations);
+  computeJointConfidences(init, markerObservations);
+  assert(init.joints.size() * 3 == init.jointCenters.rows());
+
+  // 3. Re-initialize the problem, but pass in the joint centers we just found
+  MarkerInitialization reinit = getInitialization(
+      markerObservations,
+      newClip,
+      InitialMarkerFitParams(params)
+          .setJointCentersAndWeights(
+              init.joints,
+              init.jointCenters,
+              init.jointsAdjacentMarkers,
+              init.jointWeights)
+          .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
+          .setInitPoses(init.poses)
+          .setDontRescaleBodies(true)
+          .setDontMoveMarkers(true));
+  
+  return reinit;
 }
 
 //==============================================================================
