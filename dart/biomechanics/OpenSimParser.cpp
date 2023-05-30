@@ -2803,10 +2803,10 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   bool inHeader = true;
 
-  std::vector<std::string> colNames;
-  std::vector<int> colToPlate;
-  std::vector<int> colToCOP;
-  std::vector<int> colToWrench;
+  std::vector<std::string> colNames = std::vector<std::string>();
+  std::vector<int> colToPlate = std::vector<int>();
+  std::vector<int> colToCOP = std::vector<int>();
+  std::vector<int> colToWrench = std::vector<int>();
   int numPlates = 0;
 
   std::vector<s_t> timestamps;
@@ -3060,7 +3060,12 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         wrenchRows.push_back(wrenches);
         timestamps.push_back(timestamp);
       }
-      lineNumber++;
+      // Ignore whitespace in a .MOT file between "endheader" and the names of
+      // the columns
+      if (lineNumber > 0 || colNames.size() > 0)
+      {
+        lineNumber++;
+      }
     }
 
     start = end + 1; // "\n".length()
@@ -3098,6 +3103,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   // Process result into its final form
 
+  s_t roundTimestampsToNearest = 1.0 / targetFramesPerSecond;
   std::vector<ForcePlate> forcePlates;
   for (int i = 0; i < numPlates; i++)
   {
@@ -3118,7 +3124,9 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       if (downsampleClock <= 0)
       {
         downsampleClock = downsampleByFactor;
-        forcePlate.timestamps.push_back(timestamps[t]);
+        s_t timestampRoundedToNearest = std::ceil(
+            timestamps[t] / roundTimestampsToNearest) * roundTimestampsToNearest;
+        forcePlate.timestamps.push_back(timestampRoundedToNearest);
         forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
         forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
         forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);

@@ -7768,8 +7768,8 @@ void MarkerFitter::writeCSVData(
   (void)init;
   int nrows = init.poses.cols();
   s_t dt = timestamps[1] - timestamps[0];
-  assert(rmsMarkerError.size() == nrows);
-  assert(maxMarkerError.size() == nrows);
+  assert(rmsMarkerErrors.size() == nrows);
+  assert(maxMarkerErrors.size() == nrows);
   for (int t = 0; t < nrows; t++)
   {
     csvFile << std::endl;
