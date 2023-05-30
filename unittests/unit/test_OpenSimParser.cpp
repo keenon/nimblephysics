@@ -932,7 +932,7 @@ TEST(OpenSimParser, LOAD_IMU_DATA)
 #endif
 
 #ifdef ALL_TESTS
-TEST(OpenSimParser, LOAD_WEIRD_GRF)
+TEST(OpenSimParser, LOAD_WHITESPACE_GRF)
 {
   std::vector<ForcePlate> data
       = OpenSimParser::loadGRF("dart://sample/osim/WeirdFormatTests/grf.mot");
@@ -947,5 +947,17 @@ TEST(OpenSimParser, LOAD_WEIRD_TRC)
   auto data = OpenSimParser::loadTRC(
       "dart://sample/osim/WeirdFormatTests/markers.trc");
   EXPECT_TRUE(data.markerTimesteps.size() > 0);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_WHITESPACE_GRF_AND_TRC)
+{
+  auto trc = OpenSimParser::loadTRC(
+      "dart://sample/osim/WeirdFormatTests/markers.trc");
+  std::vector<ForcePlate> data = OpenSimParser::loadGRF(
+      "dart://sample/osim/WeirdFormatTests/grf.mot", trc.framesPerSecond);
+  EXPECT_TRUE(data.size() > 0);
+  EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
 }
 #endif
