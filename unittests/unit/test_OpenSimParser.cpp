@@ -962,3 +962,18 @@ TEST(OpenSimParser, LOAD_WHITESPACE_GRF_AND_TRC)
   EXPECT_EQ(data[0].timestamps[data[0].timestamps.size()-1], trc.timestamps[trc.timestamps.size()-1]);
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_TIMESTAMP_ROUNDING)
+{
+  auto trc = OpenSimParser::loadTRC(
+      "dart://sample/osim/WeirdFormatTests/markers_Squat2.trc");
+  std::vector<ForcePlate> data = OpenSimParser::loadGRF(
+      "dart://sample/osim/WeirdFormatTests/grf_Squat2.mot", trc.framesPerSecond);
+  EXPECT_TRUE(data.size() > 0);
+  EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
+  for (int i = 0; i < data[0].timestamps.size(); i++) {
+    EXPECT_EQ(data[0].timestamps[i], trc.timestamps[i]);
+  }
+}
+#endif

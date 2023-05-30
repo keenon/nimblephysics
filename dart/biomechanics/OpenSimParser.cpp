@@ -2816,7 +2816,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   int lineNumber = 0;
   auto start = 0U;
   auto end = content.find("\n");
-  while (end != std::string::npos)
+  while (true)
   {
     std::string line = content.substr(start, end - start);
 
@@ -3068,6 +3068,10 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       }
     }
 
+    if (end == std::string::npos)
+    {
+      break;
+    }
     start = end + 1; // "\n".length()
     end = content.find("\n", start);
   }
@@ -3100,6 +3104,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       downsampleByFactor = framesPerSecond / targetFramesPerSecond;
     }
   }
+  (void)downsampleByFactor;
 
   // Process result into its final form
 
@@ -3110,7 +3115,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
     forcePlates.emplace_back();
     ForcePlate& forcePlate = forcePlates[forcePlates.size() - 1];
 
-    int downsampleClock = 0;
     Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
     Eigen::Vector6s wrenchAvg = Eigen::Vector6s::Zero();
     int numAveraged = 0;
@@ -3119,14 +3123,12 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       copAvg += copRows[t][i];
       wrenchAvg += wrenchRows[t][i];
       numAveraged++;
-      downsampleClock--;
-
-      if (downsampleClock <= 0)
-      {
-        downsampleClock = downsampleByFactor;
-        s_t timestampRoundedToNearest = std::ceil(
-            timestamps[t] / roundTimestampsToNearest) * roundTimestampsToNearest;
-        forcePlate.timestamps.push_back(timestampRoundedToNearest);
+      s_t timestampRoundedToNearest = std::round(
+          timestamps[t] / roundTimestampsToNearest) * roundTimestampsToNearest;
+      s_t diff = timestamps[t] - timestampRoundedToNearest;
+      if (std::abs(diff) < 1e-8) {
+        // std::cout << "Using timestep " << timestamps[t] << std::endl;
+        forcePlate.timestamps.push_back(timestamps[t]);
         forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
         forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
         forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);
@@ -3134,6 +3136,9 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         numAveraged = 0;
         copAvg.setZero();
         wrenchAvg.setZero();
+      }
+      else {
+        // std::cout << "Skipping timestep " << timestamps[t] << std::endl;
       }
     }
   }
