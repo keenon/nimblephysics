@@ -3103,6 +3103,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   // Process result into its final form
 
+  s_t roundTimestampsToNearest = 1.0 / targetFramesPerSecond;
   std::vector<ForcePlate> forcePlates;
   for (int i = 0; i < numPlates; i++)
   {
@@ -3123,7 +3124,9 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
       if (downsampleClock <= 0)
       {
         downsampleClock = downsampleByFactor;
-        forcePlate.timestamps.push_back(timestamps[t]);
+        s_t timestampRoundedToNearest = std::ceil(
+            timestamps[t] / roundTimestampsToNearest) * roundTimestampsToNearest;
+        forcePlate.timestamps.push_back(timestampRoundedToNearest);
         forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
         forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
         forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);

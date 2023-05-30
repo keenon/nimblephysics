@@ -959,5 +959,6 @@ TEST(OpenSimParser, LOAD_WHITESPACE_GRF_AND_TRC)
       "dart://sample/osim/WeirdFormatTests/grf.mot", trc.framesPerSecond);
   EXPECT_TRUE(data.size() > 0);
   EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
+  EXPECT_EQ(data[0].timestamps[data[0].timestamps.size()-1], trc.timestamps[trc.timestamps.size()-1]);
 }
 #endif
