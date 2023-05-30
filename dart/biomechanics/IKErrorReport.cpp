@@ -4,7 +4,10 @@
 #include <ostream>
 #include <string>
 
+#include "dart/utils/StringUtils.hpp"
+
 namespace dart {
+using namespace utils;
 namespace biomechanics {
 
 IKErrorReport::IKErrorReport(
@@ -29,10 +32,11 @@ IKErrorReport::IKErrorReport(
   {
     for (auto& pair : observations[i])
     {
-      if (std::find(markerNames.begin(), markerNames.end(), pair.first)
+      std::string trimmedMarkerName = trim(pair.first);
+      if (std::find(markerNames.begin(), markerNames.end(), trimmedMarkerName)
           == markerNames.end())
       {
-        markerNames.push_back(pair.first);
+        markerNames.push_back(trimmedMarkerName);
       }
     }
   }

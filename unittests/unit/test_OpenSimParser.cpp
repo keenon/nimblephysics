@@ -977,3 +977,19 @@ TEST(OpenSimParser, LOAD_TIMESTAMP_ROUNDING)
   }
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_TRC_NEWLINES_IN_TOKENS)
+{
+  auto data = OpenSimParser::loadTRC(
+      "dart://sample/osim/WeirdFormatTests/markers_StairUp3.trc");
+  EXPECT_TRUE(data.markerTimesteps.size() > 0);
+  for (int t = 0; t < data.markerTimesteps.size(); t++) {
+    for (auto& pair : data.markerTimesteps[t])
+    {
+      // std::cout << pair.first << std::endl;
+      EXPECT_TRUE(pair.first.find_first_of("\n") == std::string::npos);
+    }
+  }
+}
+#endif

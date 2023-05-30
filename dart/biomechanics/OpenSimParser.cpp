@@ -55,6 +55,7 @@
 #include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/XmlHelpers.hpp"
 #include "dart/utils/sdf/SdfParser.hpp"
+#include "dart/utils/StringUtils.hpp"
 
 using namespace std;
 
@@ -71,25 +72,6 @@ using namespace std;
 namespace dart {
 using namespace utils;
 namespace biomechanics {
-
-const std::string WHITESPACE = " \n\r\t\f\v";
-
-std::string ltrim(const std::string& s)
-{
-  size_t start = s.find_first_not_of(WHITESPACE);
-  return (start == std::string::npos) ? "" : s.substr(start);
-}
-
-std::string rtrim(const std::string& s)
-{
-  size_t end = s.find_last_not_of(WHITESPACE);
-  return (end == std::string::npos) ? "" : s.substr(0, end + 1);
-}
-
-std::string trim(const std::string& s)
-{
-  return rtrim(ltrim(s));
-}
 
 std::string to_string(double d)
 {
@@ -2147,7 +2129,7 @@ void OpenSimParser::saveTRC(
   std::vector<std::string> markerNames;
   for (auto& pair : markerTimesteps[0])
   {
-    markerNames.push_back(pair.first);
+    markerNames.push_back(trim(pair.first));
   }
 
   std::ofstream trcFile;
@@ -2453,7 +2435,7 @@ void OpenSimParser::saveMot(
   motFile << "time";
   for (int i = 0; i < skel->getNumDofs(); i++)
   {
-    motFile << "\t" << skel->getDof(i)->getName();
+    motFile << "\t" << trim(skel->getDof(i)->getName());
   }
   motFile << "\n";
 
@@ -2497,7 +2479,7 @@ void OpenSimParser::saveIDMot(
   motFile << "time";
   for (int i = 0; i < skel->getNumDofs(); i++)
   {
-    motFile << "\t" << skel->getDof(i)->getName();
+    motFile << "\t" << trim(skel->getDof(i)->getName());
     if (3 <= i && i < 6)
     {
       motFile << "_force";
@@ -2620,7 +2602,7 @@ void OpenSimParser::saveProcessedGRFMot(
   motFile << "time";
   for (int i = 0; i < contactBodies.size(); i++)
   {
-    std::string name = contactBodies[i]->getName();
+    std::string name = trim(contactBodies[i]->getName());
     motFile << "\t"
             << "ground_force_" + name + "_vx";
     motFile << "\t"
@@ -2706,7 +2688,7 @@ void OpenSimParser::saveBodyLocationsMot(
 
   for (int i = 0; i < skel->getNumBodyNodes(); i++)
   {
-    std::string bodyName = skel->getBodyNode(i)->getName();
+    std::string bodyName = trim(skel->getBodyNode(i)->getName());
 
     motFile << "\t" << bodyName << "_x\t" << bodyName << "_y\t" << bodyName
             << "_z";
@@ -2760,7 +2742,7 @@ void OpenSimParser::saveMarkerLocationsMot(
   std::vector<std::string> markerNames;
   for (auto& pair : markers)
   {
-    std::string markerName = pair.first;
+    std::string markerName = trim(pair.first);
     markerNames.push_back(markerName);
 
     motFile << "\t" << markerName << "_x\t" << markerName << "_y\t"
