@@ -1701,55 +1701,6 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
     newClip.push_back(i == 0);
   }
 
-  /*
-  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
-      updatedMarkerMap;
-  for (int i = 0; i < mMarkerNames.size(); i++)
-  {
-    std::string name = mMarkerNames[i];
-    Eigen::Vector3s offset = Eigen::Vector3s::Zero();
-    if (params.markerOffsets.count(name))
-    {
-      offset = params.markerOffsets[name];
-    }
-    updatedMarkerMap[name] = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-        mMarkerMap[name].first, mMarkerMap[name].second + offset);
-  }
-  mSkeleton->setGroupScales(params.groupScales);
-
-  std::map<std::string, bool> markerIsAnatomical;
-  for (int i = 0; i < mMarkerNames.size(); i++)
-  {
-    markerIsAnatomical[mMarkerNames[i]] = !mMarkerIsTracking[i];
-  }
-  IKInitializer initializer(
-      mSkeleton,
-      updatedMarkerMap,
-      markerIsAnatomical,
-      markerObservations,
-      newClip,
-      -1.0,
-      true);
-  initializer.runFullPipeline();
-
-  MarkerInitialization result;
-  // For now, we're just going to use the poses and scales, and then leave the
-  // joint centers to the non-convex optimization pipeline. We could (and
-  // maybe should?) use the joint centers that the least-squares algo finds
-  // directly. That would require some refactoring, since those joint centers
-  // are for "stacked joints" which may be multiple joints in the skeleton at
-  // once.
-  result.poses = Eigen::MatrixXs::Zero(
-      mSkeleton->getNumDofs(), markerObservations.size());
-  result.groupScales = params.groupScales;
-  for (int i = 0; i < markerObservations.size(); i++)
-  {
-    result.poses.col(i) = initializer.getPoses()[i];
-  }
-
-  return result;
-  */
-
   // 1. Find the initial scaling + IK
   MarkerInitialization init = getInitialization(
       markerObservations, newClip, InitialMarkerFitParams(params).setDontRescaleBodies(true).setDontMoveMarkers(true));
