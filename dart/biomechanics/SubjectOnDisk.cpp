@@ -163,14 +163,17 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
     auto& trialHeader = header.trial_header(i);
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> missingGRFReason;
+    std::vector<s_t> residualNorms;
     for (int t = 0; t < trialHeader.missing_grf_size(); t++)
     {
       missingGRF.push_back(trialHeader.missing_grf(t));
       missingGRFReason.push_back(
           missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
+      residualNorms.push_back(trialHeader.residual(t));
     }
     mProbablyMissingGRF.push_back(missingGRF);
     mMissingGRFReason.push_back(missingGRFReason);
+    mTrialResidualNorms.push_back(residualNorms);
     mTrialLength.push_back(trialHeader.trial_length());
     mTrialTimesteps.push_back(trialHeader.trial_timestep());
     std::vector<bool> dofPositionsObserved;
@@ -371,6 +374,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     std::shared_ptr<Frame> frame = std::make_shared<Frame>();
     frame->trial = trial;
     frame->t = startFrame + i;
+    frame->residual = mTrialResidualNorms[trial][frame->t];
     frame->probablyMissingGRF = mProbablyMissingGRF[trial][frame->t];
     frame->missingGRFReason = mMissingGRFReason[trial][frame->t];
     frame->pos = Eigen::VectorXd(mNumDofs);
@@ -470,6 +474,7 @@ void SubjectOnDisk::writeSubject(
     std::vector<Eigen::MatrixXs>& trialComPoses,
     std::vector<Eigen::MatrixXs>& trialComVels,
     std::vector<Eigen::MatrixXs>& trialComAccs,
+    std::vector<std::vector<s_t>> trialResidualNorms,
     // These are generalized 6-dof wrenches applied to arbitrary bodies
     // (generally by foot-ground contact, though other things too)
     std::vector<std::string>& groundForceBodies,
@@ -527,6 +532,7 @@ void SubjectOnDisk::writeSubject(
       trialHeader->add_missing_grf(probablyMissingGRF[i][t]);
       trialHeader->add_missing_grf_reason(
           missingGRFReasonToProto(missingGRFReason[i][t]));
+      trialHeader->add_residual(trialResidualNorms[i][t]);
     }
     trialHeader->set_trial_timestep(trialTimesteps[i]);
     trialHeader->set_trial_length(trialPoses[i].cols());
@@ -721,6 +727,15 @@ std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(int trial)
     return std::vector<bool>();
   }
   return mDofAccelerationFiniteDifferenced[trial];
+}
+
+std::vector<s_t> SubjectOnDisk::getTrialResidualNorms(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<s_t>();
+  }
+  return mTrialResidualNorms[trial];
 }
 
 /// This returns the list of contact body names for this Subject

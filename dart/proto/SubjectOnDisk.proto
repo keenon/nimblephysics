@@ -37,6 +37,8 @@ message SubjectOnDiskTrialHeader {
   // downstream applications won't want to try to predict the acceleration on
   // these DOFs directly.
   repeated bool dof_acceleration_finite_differenced = 7;
+  // This records the residual of the inverse dynamics solution for each frame in this trial.
+  repeated float residual = 8;
 }
 
 message SubjectOnDiskHeader {

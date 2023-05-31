@@ -33,6 +33,10 @@ void SubjectOnDisk(py::module& m)
                 &dart::biomechanics::Frame::t,
                 "The frame number in this trial.")
             .def_readwrite(
+                "residual",
+                &dart::biomechanics::Frame::residual,
+                "The norm of the root residual force on this trial.")
+            .def_readwrite(
                 "probablyMissingGRF",
                 &dart::biomechanics::Frame::probablyMissingGRF,
                 R"doc(
@@ -190,6 +194,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("trialComPoses"),
                 ::py::arg("trialComVels"),
                 ::py::arg("trialComAccs"),
+                ::py::arg("trialResidualNorms"),
                 // These are generalized 6-dof wrenches applied to arbitrary
                 // bodies (generally by foot-ground contact, though other things
                 // too)
@@ -251,6 +256,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "have their accelerations from finite-differencing during this "
                 "trial (as opposed to observed directly through a "
                 "accelerometer or IMU)")
+            .def(
+                "getTrialResidualNorms",
+                &dart::biomechanics::SubjectOnDisk::getTrialResidualNorms,
+                ::py::arg("trial"),
+                "This returns the vector of scalars indicating the norm of the "
+                "root residual forces + torques on each timestep of a given "
+                "trial")
             .def(
                 "getProbablyMissingGRF",
                 &dart::biomechanics::SubjectOnDisk::getProbablyMissingGRF,

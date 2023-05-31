@@ -18,6 +18,7 @@ struct Frame
 {
   int trial;
   int t;
+  s_t residual;
   bool probablyMissingGRF;
   MissingGRFReason missingGRFReason;
 
@@ -94,6 +95,7 @@ public:
       std::vector<Eigen::MatrixXs>& trialComPoses,
       std::vector<Eigen::MatrixXs>& trialComVels,
       std::vector<Eigen::MatrixXs>& trialComAccs,
+      std::vector<std::vector<s_t>> trialResidualNorms,
       // These are generalized 6-dof wrenches applied to arbitrary bodies
       // (generally by foot-ground contact, though other things too)
       std::vector<std::string>& groundForceBodies,
@@ -135,6 +137,8 @@ public:
   std::vector<bool> getDofVelocitiesFiniteDifferenced(int trial);
 
   std::vector<bool> getDofAccelerationsFiniteDifferenced(int trial);
+
+  std::vector<s_t> getTrialResidualNorms(int trial);
 
   /// This returns the list of contact body names for this Subject
   std::vector<std::string> getGroundContactBodies();
@@ -181,6 +185,8 @@ protected:
   // downstream applications won't want to try to predict the acceleration on
   // these DOFs directly.
   std::vector<std::vector<bool>> mDofAccelerationFiniteDifferenced;
+  // These are the norms of the residuals on each frame, for each trial
+  std::vector<std::vector<s_t>> mTrialResidualNorms;
 
   // This is the only array that has the potential to be somewhat large in
   // memory, but we really want to know this information when randomly picking

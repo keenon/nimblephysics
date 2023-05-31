@@ -68,6 +68,7 @@ bool testWriteSubjectToDisk(
   std::vector<std::vector<bool>> dofPositionObserved;
   std::vector<std::vector<bool>> dofVelocityFiniteDifferenced;
   std::vector<std::vector<bool>> dofAccelerationFiniteDifferenced;
+  std::vector<std::vector<s_t>> residualNorms;
   std::vector<Eigen::MatrixXs> trialComPoses;
   std::vector<Eigen::MatrixXs> trialComVelocities;
   std::vector<Eigen::MatrixXs> trialComAccelerations;
@@ -176,15 +177,18 @@ bool testWriteSubjectToDisk(
     std::vector<bool> positionObserved;
     std::vector<bool> velocityFiniteDifferenced;
     std::vector<bool> accelerationFiniteDifferenced;
+    std::vector<s_t> residuals;
     for (int i = 0; i < poseTrials[trial].rows(); i++)
     {
       positionObserved.push_back(i % 2 == 0);
       velocityFiniteDifferenced.push_back(i % 3 == 0);
       accelerationFiniteDifferenced.push_back(i % 4 == 0);
+      residuals.push_back(i);
     }
     dofPositionObserved.push_back(positionObserved);
     dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
     dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
+    residualNorms.push_back(residuals);
 
     trialComPoses.push_back(
         Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
@@ -222,6 +226,7 @@ bool testWriteSubjectToDisk(
       trialComPoses,
       trialComVelocities,
       trialComAccelerations,
+      residualNorms,
       groundForceBodies,
       groundBodyWrenchTrials,
       groundBodyCopTorqueForceTrials,

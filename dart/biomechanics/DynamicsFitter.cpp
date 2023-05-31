@@ -15722,6 +15722,7 @@ void DynamicsFitter::writeSubjectOnDisk(
   std::vector<Eigen::MatrixXs> trialComPositions;
   std::vector<Eigen::MatrixXs> trialComVelocities;
   std::vector<Eigen::MatrixXs> trialComAccelerations;
+  std::vector<std::vector<s_t>> trialResiduals;
 
   std::vector<std::string> groundContactBodyNames;
   for (auto* node : init->grfBodyNodes)
@@ -15752,6 +15753,7 @@ void DynamicsFitter::writeSubjectOnDisk(
     std::vector<bool> positionObserved;
     std::vector<bool> velocityFiniteDifferenced;
     std::vector<bool> accelerationFiniteDifferenced;
+    std::vector<s_t> rootResidualNorms;
 
     for (int i = 0; i < mSkeleton->getNumDofs(); i++)
     {
@@ -15778,6 +15780,7 @@ void DynamicsFitter::writeSubjectOnDisk(
                                 : helper.calculateInverseDynamics(
                                     q, dq, ddq, init->grfTrials[trial].col(t));
       taus.col(t - 1) = tau;
+      rootResidualNorms.push_back(tau.head<6>().norm());
 
       bodyWrenches.col(t - 1) = init->grfTrials[trial].col(t);
       Eigen::VectorXs footContactData
@@ -15852,6 +15855,7 @@ void DynamicsFitter::writeSubjectOnDisk(
     dofPositionObserved.push_back(positionObserved);
     dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
     dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
+    trialResiduals.push_back(rootResidualNorms);
   }
 
   SubjectOnDisk::writeSubject(
@@ -15870,6 +15874,7 @@ void DynamicsFitter::writeSubjectOnDisk(
       trialComPositions,
       trialComVelocities,
       trialComAccelerations,
+      trialResiduals,
       groundContactBodyNames,
       trialGroundBodyWrenches,
       trialGroundBodyCopTorqueForce,
