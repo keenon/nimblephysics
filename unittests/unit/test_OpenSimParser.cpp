@@ -993,3 +993,17 @@ TEST(OpenSimParser, LOAD_TRC_NEWLINES_IN_TOKENS)
   }
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_GRF_EXTRA_NEWLINE)
+{
+  int targetFramesPerSecond = 2000;
+  auto data = OpenSimParser::loadGRF(
+      "dart://sample/osim/WeirdFormatTests/grf_extra_line.mot",
+      targetFramesPerSecond);
+  auto forcePlate = data[0];
+  EXPECT_TRUE(forcePlate.timestamps.size() == 3679);
+  EXPECT_TRUE(forcePlate.forces.size() == 3679);
+  EXPECT_TRUE(forcePlate.moments.size() == 3679);
+}
+#endif

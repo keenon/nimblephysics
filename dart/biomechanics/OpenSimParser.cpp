@@ -2827,7 +2827,10 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         (void)value;
       }
     }
-    else
+    // If we're past the header and encounter an empty line, don't parse it
+    // and skip to the next line. This will skip extra lines at the end of the
+    // file.
+    else if (!line.empty())
     {
       int tokenNumber = 0;
       std::string whitespace = " \t";
