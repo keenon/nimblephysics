@@ -14426,12 +14426,15 @@ void DynamicsFitter::runIPOPTOptimization(
               << std::endl;
     return;
   }
-  if (problem->mBlocks.size() == 0) {
+  if (problem->mBlocks.size() == 0)
+  {
     delete problem;
-    std::cout << "WARNING: Optimization problem had no timesteps to optimize over! "
-                 "This usually means all of your trials were marked as having GRF "
-                 "data that was sufficiently hard to match with the markers that "
-                 "we couldn't find a solution." << std::endl;
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
     return;
   }
 
@@ -15710,9 +15713,16 @@ void DynamicsFitter::writeSubjectOnDisk(
   std::vector<Eigen::MatrixXs> trialGroundBodyWrenches;
   std::vector<Eigen::MatrixXs> trialGroundBodyCopTorqueForce;
   std::vector<std::vector<bool>> trialProbablyMissingGRF;
+  std::vector<std::vector<bool>> dofPositionObserved;
+  std::vector<std::vector<bool>> dofVelocityFiniteDifferenced;
+  std::vector<std::vector<bool>> dofAccelerationFiniteDifferenced;
   std::vector<std::vector<MissingGRFReason>> trialMissingGRFReason;
   std::vector<std::string> customValueNames;
   std::vector<std::vector<Eigen::MatrixXs>> customValues;
+  std::vector<Eigen::MatrixXs> trialComPositions;
+  std::vector<Eigen::MatrixXs> trialComVelocities;
+  std::vector<Eigen::MatrixXs> trialComAccelerations;
+  std::vector<std::vector<s_t>> trialResiduals;
 
   std::vector<std::string> groundContactBodyNames;
   for (auto* node : init->grfBodyNodes)
@@ -15737,6 +15747,20 @@ void DynamicsFitter::writeSubjectOnDisk(
         = Eigen::MatrixXs::Zero(groundContactBodyNames.size() * 9, timesteps);
     std::vector<bool> probablyMissingGRF;
     std::vector<MissingGRFReason> missingGRFReason;
+    Eigen::MatrixXs comPos = Eigen::MatrixXs::Zero(3, timesteps);
+    Eigen::MatrixXs comVel = Eigen::MatrixXs::Zero(3, timesteps);
+    Eigen::MatrixXs comAcc = Eigen::MatrixXs::Zero(3, timesteps);
+    std::vector<bool> positionObserved;
+    std::vector<bool> velocityFiniteDifferenced;
+    std::vector<bool> accelerationFiniteDifferenced;
+    std::vector<s_t> rootResidualNorms;
+
+    for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+    {
+      positionObserved.push_back(true);
+      velocityFiniteDifferenced.push_back(false);
+      accelerationFiniteDifferenced.push_back(false);
+    }
 
     for (int t = 1; t < init->poseTrials[trial].cols() - 1; t++)
     {
@@ -15756,6 +15780,7 @@ void DynamicsFitter::writeSubjectOnDisk(
                                 : helper.calculateInverseDynamics(
                                     q, dq, ddq, init->grfTrials[trial].col(t));
       taus.col(t - 1) = tau;
+      rootResidualNorms.push_back(tau.head<6>().norm());
 
       bodyWrenches.col(t - 1) = init->grfTrials[trial].col(t);
       Eigen::VectorXs footContactData
@@ -15807,6 +15832,13 @@ void DynamicsFitter::writeSubjectOnDisk(
 
       probablyMissingGRF.push_back(init->probablyMissingGRF[trial][t]);
       missingGRFReason.push_back(init->missingGRFReason[trial][t]);
+
+      mSkeleton->setPositions(q);
+      mSkeleton->setVelocities(dq);
+      mSkeleton->setAccelerations(ddq);
+      comPos.col(t) = mSkeleton->getCOM();
+      comVel.col(t) = mSkeleton->getCOMLinearVelocity();
+      comAcc.col(t) = mSkeleton->getCOMLinearAcceleration();
     }
 
     trialPoses.push_back(poses);
@@ -15817,6 +15849,13 @@ void DynamicsFitter::writeSubjectOnDisk(
     trialGroundBodyCopTorqueForce.push_back(bodyCopTorqueForce);
     trialProbablyMissingGRF.push_back(probablyMissingGRF);
     trialMissingGRFReason.push_back(missingGRFReason);
+    trialComPositions.push_back(comPos);
+    trialComVelocities.push_back(comVel);
+    trialComAccelerations.push_back(comAcc);
+    dofPositionObserved.push_back(positionObserved);
+    dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
+    dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
+    trialResiduals.push_back(rootResidualNorms);
   }
 
   SubjectOnDisk::writeSubject(
@@ -15828,7 +15867,14 @@ void DynamicsFitter::writeSubjectOnDisk(
       trialAccs,
       trialProbablyMissingGRF,
       trialMissingGRFReason,
+      dofPositionObserved,
+      dofVelocityFiniteDifferenced,
+      dofAccelerationFiniteDifferenced,
       trialTaus,
+      trialComPositions,
+      trialComVelocities,
+      trialComAccelerations,
+      trialResiduals,
       groundContactBodyNames,
       trialGroundBodyWrenches,
       trialGroundBodyCopTorqueForce,

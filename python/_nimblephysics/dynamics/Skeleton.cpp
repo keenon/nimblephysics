@@ -147,7 +147,7 @@ void Skeleton(
       .def_readwrite(
           "vel", &dynamics::Skeleton::ContactInverseDynamicsResult::vel)
       .def_readwrite(
-          "nextVel", &dynamics::Skeleton::ContactInverseDynamicsResult::nextVel)
+          "acc", &dynamics::Skeleton::ContactInverseDynamicsResult::acc)
       .def(
           "sumError",
           &dynamics::Skeleton::ContactInverseDynamicsResult::sumError);
@@ -179,8 +179,7 @@ void Skeleton(
       .def_readwrite(
           "vel", &dynamics::Skeleton::MultipleContactInverseDynamicsResult::vel)
       .def_readwrite(
-          "nextVel",
-          &dynamics::Skeleton::MultipleContactInverseDynamicsResult::nextVel)
+          "acc", &dynamics::Skeleton::MultipleContactInverseDynamicsResult::acc)
       .def(
           "sumError",
           &dynamics::Skeleton::MultipleContactInverseDynamicsResult::sumError)
@@ -222,9 +221,9 @@ void Skeleton(
           &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
               velocities)
       .def_readwrite(
-          "nextVelocities",
+          "accelerations",
           &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
-              nextVelocities)
+              accelerations)
       .def_readwrite(
           "prevContactForces",
           &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
@@ -1135,16 +1134,16 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
       .def(
           "getInverseDynamics",
           &dart::dynamics::Skeleton::getInverseDynamics,
-          ::py::arg("nextVel"))
+          ::py::arg("accelerations"))
       .def(
           "getContactInverseDynamics",
           &dart::dynamics::Skeleton::getContactInverseDynamics,
-          ::py::arg("nextVel"),
+          ::py::arg("accelerations"),
           ::py::arg("contactBody"))
       .def(
           "getMultipleContactInverseDynamics",
           &dart::dynamics::Skeleton::getMultipleContactInverseDynamics,
-          ::py::arg("nextVel"),
+          ::py::arg("accelerations"),
           ::py::arg("contactBodies"),
           ::py::arg("bodyWrenchGuesses") = std::vector<Eigen::Vector6s>())
       .def(
