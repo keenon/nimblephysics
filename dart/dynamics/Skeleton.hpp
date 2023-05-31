@@ -1924,14 +1924,14 @@ public:
     // These are the setup of the inverse dynamics problem
     Eigen::VectorXs pos;
     Eigen::VectorXs vel;
-    Eigen::VectorXs nextVel;
+    Eigen::VectorXs acc;
 
     /// This computes how much the actual dynamics we get when we apply this
     /// solution differ from the goal solution.
     s_t sumError();
   };
 
-  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
+  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& accelerations);
 
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired
@@ -1939,7 +1939,8 @@ public:
   /// `contactBody`, which can be post-processed down to individual contact
   /// results.
   ContactInverseDynamicsResult getContactInverseDynamics(
-      const Eigen::VectorXs& nextVel, const dynamics::BodyNode* contactBody);
+      const Eigen::VectorXs& accelerations,
+      const dynamics::BodyNode* contactBody);
 
   struct MultipleContactInverseDynamicsResult
   {
@@ -1952,7 +1953,7 @@ public:
     // These are the setup of the inverse dynamics problem
     Eigen::VectorXs pos;
     Eigen::VectorXs vel;
-    Eigen::VectorXs nextVel;
+    Eigen::VectorXs acc;
 
     /// This computes how much the actual dynamics we get when we apply this
     /// solution differ from the goal solution.
@@ -1974,7 +1975,7 @@ public:
   /// dynamics we use a heuristic: we find the inverse dynamics that minimizes
   /// the joint torques.
   MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
-      const Eigen::VectorXs& nextVel,
+      const Eigen::VectorXs& accelerations,
       std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector6s> bodyWrenchGuesses);
 
@@ -2009,7 +2010,7 @@ public:
   /// optimization problem object that can be used by
   /// getMultipleContactInverseDynamicsNearCoP()
   MultipleContactCoPProblem createMultipleContactInverseDynamicsNearCoPProblem(
-      const Eigen::VectorXs& nextVel,
+      const Eigen::VectorXs& accelerations,
       std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector9s> copWrenchGuesses,
       s_t groundHeight,
@@ -2019,7 +2020,7 @@ public:
   /// it resolves ambiguity by attempting to find contact forces that are as
   /// closes as possible to the center-of-pressure (CoP) guesses.
   MultipleContactInverseDynamicsResult getMultipleContactInverseDynamicsNearCoP(
-      const Eigen::VectorXs& nextVel,
+      const Eigen::VectorXs& accelerations,
       std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector6s> bodyWrenchGuesses,
       s_t groundHeight,
@@ -2041,7 +2042,7 @@ public:
     // One column per timestep
     Eigen::MatrixXs positions;
     Eigen::MatrixXs velocities;
-    Eigen::MatrixXs nextVelocities;
+    Eigen::MatrixXs accelerations;
 
     // Problem setup
     std::vector<Eigen::Vector6s> prevContactForces;

@@ -7,9 +7,9 @@
 
 #include <Eigen/Dense>
 
+#include "dart/biomechanics/enums.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
-#include "dart/biomechanics/enums.hpp"
 
 namespace dart {
 namespace biomechanics {
@@ -25,16 +25,26 @@ struct Frame
   Eigen::VectorXd vel;
   Eigen::VectorXd acc;
   Eigen::VectorXd tau;
-  // We don't use `std::map` here because somehow the Pybind wrapper for it is
-  // excruciatingly slow
-  std::vector<std::pair<std::string, Eigen::Vector6d>> groundContactWrenches;
-  // These are the original force-plate data in world space
-  std::vector<std::pair<std::string, Eigen::Vector3d>>
-      groundContactCenterOfPressure;
-  std::vector<std::pair<std::string, Eigen::Vector3d>> groundContactTorque;
-  std::vector<std::pair<std::string, Eigen::Vector3d>> groundContactForce;
-  // The timestep we used during this trial
-  s_t dt;
+  // These are boolean values (0 or 1) for each contact body indicating whether
+  // or not it's in contact
+  Eigen::VectorXi contact;
+  // These are each 6-vector of contact body wrenches, all concatenated together
+  Eigen::VectorXd groundContactWrenches;
+  // These are each 3-vector for each contact body, concatenated together
+  Eigen::VectorXd groundContactCenterOfPressure;
+  Eigen::VectorXd groundContactTorque;
+  Eigen::VectorXd groundContactForce;
+  // These are the center of mass kinematics
+  Eigen::Vector3s comPos;
+  Eigen::Vector3s comVel;
+  Eigen::Vector3s comAcc;
+  // These are masks for which DOFs are observed
+  Eigen::VectorXi posObserved;
+  // These are masks for which DOFs have been finite differenced (if they
+  // haven't been finite differenced, they're from real sensors and therefore
+  // more trustworthy)
+  Eigen::VectorXi velFiniteDifferenced;
+  Eigen::VectorXi accFiniteDifferenced;
   // We include this to allow the binary format to store/load a bunch of new
   // types of values while remaining backwards compatible.
   std::vector<std::pair<std::string, Eigen::VectorXd>> customValues;
@@ -49,7 +59,7 @@ struct Frame
 class SubjectOnDisk
 {
 public:
-  SubjectOnDisk(const std::string& path, bool printDebuggingDetails = false);
+  SubjectOnDisk(const std::string& path);
 
   /// This will read the skeleton from the binary, and optionally use the passed
   /// in Geometry folder.
@@ -77,7 +87,13 @@ public:
       std::vector<Eigen::MatrixXs>& trialAccs,
       std::vector<std::vector<bool>>& probablyMissingGRF,
       std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
+      std::vector<std::vector<bool>>& dofPositionsObserved,
+      std::vector<std::vector<bool>>& dofVelocitiesFiniteDifferenced,
+      std::vector<std::vector<bool>>& dofAccelerationFiniteDifferenced,
       std::vector<Eigen::MatrixXs>& trialTaus,
+      std::vector<Eigen::MatrixXs>& trialComPoses,
+      std::vector<Eigen::MatrixXs>& trialComVels,
+      std::vector<Eigen::MatrixXs>& trialComAccs,
       // These are generalized 6-dof wrenches applied to arbitrary bodies
       // (generally by foot-ground contact, though other things too)
       std::vector<std::string>& groundForceBodies,
@@ -99,6 +115,9 @@ public:
   /// This returns the length of the trial
   int getTrialLength(int trial);
 
+  /// This returns the timestep size for the trial
+  s_t getTrialTimestep(int trial);
+
   /// This returns the number of DOFs for the model on this Subject
   int getNumDofs();
 
@@ -110,6 +129,12 @@ public:
   /// This returns the vector of enums of type 'MissingGRFReason', which labels
   /// why each time step was identified as 'probablyMissingGRF'.
   std::vector<MissingGRFReason> getMissingGRFReason(int trial);
+
+  std::vector<bool> getDofPositionsObserved(int trial);
+
+  std::vector<bool> getDofVelocitiesFiniteDifferenced(int trial);
+
+  std::vector<bool> getDofAccelerationsFiniteDifferenced(int trial);
 
   /// This returns the list of contact body names for this Subject
   std::vector<std::string> getGroundContactBodies();
@@ -140,10 +165,23 @@ protected:
   std::vector<s_t> mTrialTimesteps;
   std::vector<std::string> mCustomValues;
   std::vector<int> mCustomValueLengths;
-  int mModelLength;
-  int mModelSectionStart;
   int mDataSectionStart;
   int mFrameSize;
+  // If we're projecting a lower-body-only dataset onto a full-body model, then
+  // there will be DOFs that we don't get to observe. Downstream applications
+  // will want to ignore these DOFs.
+  std::vector<std::vector<bool>> mDofPositionsObserved;
+  // If we didn't use gyros to measure rotational velocity directly, then the
+  // velocity on this joint is likely to be noisy. If that's true, downstream
+  // applications won't want to try to predict the velocity on these DOFs
+  // directly.
+  std::vector<std::vector<bool>> mDofVelocitiesFiniteDifferenced;
+  // If we didn't use accelerometers to measure acceleration directly, then the
+  // acceleration on this joint is likely to be noisy. If that's true,
+  // downstream applications won't want to try to predict the acceleration on
+  // these DOFs directly.
+  std::vector<std::vector<bool>> mDofAccelerationFiniteDifferenced;
+
   // This is the only array that has the potential to be somewhat large in
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.

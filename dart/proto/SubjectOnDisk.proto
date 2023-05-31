@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package dart.proto;
+
+enum MissingGRFReason { notMissingGRF = 0;
+                        measuredGrfZeroWhenAccelerationNonZero = 1;
+                        unmeasuredExternalForceDetected = 2;
+                        torqueDiscrepancy = 3;
+                        forceDiscrepancy = 4;
+                        notOverForcePlate = 5;
+                        missingImpact = 6;
+                        missingBlip = 7;
+                        shiftGRF = 8;
+                      };
+
+message SubjectOnDiskTrialHeader {
+  // This is the only array that has the potential to be somewhat large in
+  // memory, but we really want to know this information when randomly picking
+  // frames from the subject to sample.
+  repeated bool missing_GRF = 1;
+  repeated MissingGRFReason missing_GRF_reason = 2;
+  // This is how many frames are in this trial
+  int32 trial_length = 3;
+  // This is the timestep used in this trial (assumed constant throughout the trial)
+  double trial_timestep = 4;
+  // If we're projecting a lower-body-only dataset onto a full-body model, then
+  // there will be DOFs that we don't get to observe. Downstream applications
+  // will want to ignore these DOFs.
+  repeated bool dof_positions_observed = 5;
+  // If we didn't use gyros to measure rotational velocity directly, then the
+  // velocity on this joint is likely to be noisy. If that's true, downstream
+  // applications won't want to try to predict the velocity on these DOFs
+  // directly.
+  repeated bool dof_velocities_finite_differenced = 6;
+  // If we didn't use accelerometers to measure acceleration directly, then the
+  // acceleration on this joint is likely to be noisy. If that's true,
+  // downstream applications won't want to try to predict the acceleration on
+  // these DOFs directly.
+  repeated bool dof_acceleration_finite_differenced = 7;
+}
+
+message SubjectOnDiskHeader {
+  int32 num_dofs = 1;
+  int32 num_trials = 2;
+  repeated string ground_contact_body = 3;
+  repeated string custom_value_name = 6;
+  repeated int32 custom_value_length = 7;
+  string model_osim_text = 8;
+  repeated SubjectOnDiskTrialHeader trial_header = 9;
+  // The trial names, if provided, or empty strings
+  repeated string trial_name = 10;
+  // An optional link to the web where this subject came from
+  string href = 11;
+  // Any text-based notes on the subject data, like citations etc
+  string notes = 12;
+  // The version number for this file format
+  int32 version = 13;
+  // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
+  int32 frame_size = 14;
+}
+
+message SubjectOnDiskFrame {
+  // The values for all the DOFs
+  repeated double pos = 1;
+  repeated double vel = 2;
+  repeated double acc = 3;
+  repeated double tau = 4;
+  // This is an array of 6-vectors, one per ground contact body
+  repeated double ground_contact_wrench = 5;
+  // These are the original force-plate data in world space, one per ground contact body
+  repeated double ground_contact_center_of_pressure = 6;
+  repeated double ground_contact_torque = 7;
+  repeated double ground_contact_force = 8;
+  // These are the center of mass kinematics
+  repeated double com_pos = 9;
+  repeated double com_vel = 10;
+  repeated double com_acc = 11;
+  // We include this to allow the binary format to store/load a bunch of new
+  // types of values while remaining backwards compatible.
+  repeated double custom_values = 12;
+}

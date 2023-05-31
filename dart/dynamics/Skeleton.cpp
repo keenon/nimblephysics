@@ -9402,8 +9402,7 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 
   // Compute one timestep
   skel->computeForwardDynamics();
-  skel->integrateVelocities(skel->getTimeStep());
-  Eigen::VectorXs realNextVel = skel->getVelocities();
+  Eigen::VectorXs realAcc = skel->getAccelerations();
 
   /*
   Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
@@ -9415,7 +9414,7 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
   */
 
   // Compute the error
-  s_t error = (realNextVel - nextVel).norm();
+  s_t error = (realAcc - acc).norm();
 
   // Reset to old forces
   skel->setPositions(oldPos);
@@ -9429,11 +9428,10 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 //==============================================================================
 /// This solves a simple inverse dynamics problem to get force we need to
 /// apply to arrive at "nextVel" at the next timestep.
-Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
+Eigen::VectorXs Skeleton::getInverseDynamics(
+    const Eigen::VectorXs& accelerations)
 {
-  Eigen::VectorXs accel
-      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
-  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
                                        - getExternalForces() + getDampingForce()
                                        + getSpringForce();
@@ -9447,14 +9445,14 @@ Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
 /// `contactBody`, which can be post-processed down to individual contact
 /// results.
 Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
-    const Eigen::VectorXs& nextVel, const dynamics::BodyNode* contactBody)
+    const Eigen::VectorXs& accelerations, const dynamics::BodyNode* contactBody)
 {
   ContactInverseDynamicsResult result;
   result.skel = this;
   result.contactBody = contactBody;
   result.pos = getPositions();
   result.vel = getVelocities();
-  result.nextVel = nextVel;
+  result.acc = accelerations;
 
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
@@ -9478,8 +9476,7 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   math::Jacobian jac = getJacobian(contactBody);
   Eigen::Matrix6s jacBlock = jac.block<6, 6>(0, 0).transpose();
 
-  Eigen::VectorXs accel
-      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
+  Eigen::VectorXs accel = accelerations;
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
@@ -9527,8 +9524,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
 
   // Compute one timestep
   skel->computeForwardDynamics();
-  skel->integrateVelocities(skel->getTimeStep());
-  Eigen::VectorXs realNextVel = skel->getVelocities();
+  Eigen::VectorXs realAcc = skel->getAccelerations();
 
   /*
   Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
@@ -9540,7 +9536,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
   */
 
   // Compute the error
-  s_t error = (realNextVel - nextVel).norm();
+  s_t error = (realAcc - acc).norm();
 
   // Reset to old forces
   skel->setPositions(oldPos);
@@ -9578,7 +9574,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::computeGuessLoss()
 /// you'll need good initial guesses.
 Skeleton::MultipleContactInverseDynamicsResult
 Skeleton::getMultipleContactInverseDynamics(
-    const Eigen::VectorXs& nextVel,
+    const Eigen::VectorXs& accelerations,
     std::vector<const dynamics::BodyNode*> bodies,
     std::vector<Eigen::Vector6s> bodyWrenchGuesses)
 {
@@ -9587,7 +9583,7 @@ Skeleton::getMultipleContactInverseDynamics(
   result.contactBodies = bodies;
   result.pos = getPositions();
   result.vel = getVelocities();
-  result.nextVel = nextVel;
+  result.acc = accelerations;
 
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
@@ -9619,8 +9615,7 @@ Skeleton::getMultipleContactInverseDynamics(
   }
   Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
 
-  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
-      (nextVel - getVelocities()) / getTimeStep());
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
                                        - getExternalForces() + getDampingForce()
@@ -9697,7 +9692,7 @@ Skeleton::getMultipleContactInverseDynamics(
 
 Skeleton::MultipleContactCoPProblem
 Skeleton::createMultipleContactInverseDynamicsNearCoPProblem(
-    const Eigen::VectorXs& nextVel,
+    const Eigen::VectorXs& accelerations,
     std::vector<const dynamics::BodyNode*> bodies,
     std::vector<Eigen::Vector9s> copWrenchGuesses,
     s_t groundHeight,
@@ -9716,8 +9711,7 @@ Skeleton::createMultipleContactInverseDynamicsNearCoPProblem(
     jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
   }
   Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
-  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
-      (nextVel - getVelocities()) / getTimeStep());
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
                                        - getExternalForces() + getDampingForce()
                                        + getSpringForce();
@@ -9913,7 +9907,7 @@ Eigen::VectorXs Skeleton::MultipleContactCoPProblem::clampToNearestLegalValues(
 /// closes as possible to the center-of-pressure (CoP) guesses.
 Skeleton::MultipleContactInverseDynamicsResult
 Skeleton::getMultipleContactInverseDynamicsNearCoP(
-    const Eigen::VectorXs& nextVel,
+    const Eigen::VectorXs& accelerations,
     std::vector<const dynamics::BodyNode*> bodies,
     std::vector<Eigen::Vector6s> bodyWrenchGuesses,
     s_t groundHeight,
@@ -9926,7 +9920,7 @@ Skeleton::getMultipleContactInverseDynamicsNearCoP(
   result.contactBodies = bodies;
   result.pos = getPositions();
   result.vel = getVelocities();
-  result.nextVel = nextVel;
+  result.acc = accelerations;
 
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
@@ -9972,13 +9966,13 @@ Skeleton::getMultipleContactInverseDynamicsNearCoP(
 
   MultipleContactCoPProblem problem
       = createMultipleContactInverseDynamicsNearCoPProblem(
-          nextVel, bodies, copWrenchGuesses, groundHeight, verticalAxis);
+          accelerations, bodies, copWrenchGuesses, groundHeight, verticalAxis);
   problem.weightForceToMeters = weightForceToMeters;
 
   // Eigen::VectorXs x = problem.getInitialGuess();
 
-  auto initialResult
-      = getMultipleContactInverseDynamics(nextVel, bodies, bodyWrenchGuesses);
+  auto initialResult = getMultipleContactInverseDynamics(
+      accelerations, bodies, bodyWrenchGuesses);
 
   // Find an initial guess that's legal, and we'll only take legal steps from
   // here
@@ -10144,11 +10138,10 @@ s_t Skeleton::MultipleContactInverseDynamicsOverTimeResult::sumError()
 
     // Compute one timestep
     skel->computeForwardDynamics();
-    skel->integrateVelocities(skel->getTimeStep());
-    Eigen::VectorXs realNextVel = skel->getVelocities();
+    Eigen::VectorXs realAcc = skel->getAccelerations();
 
     // Compute the error
-    error += (realNextVel - nextVelocities.col(i)).norm();
+    error += (realAcc - accelerations.col(i)).norm();
   }
 
   // Reset to old forces
@@ -10243,7 +10236,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 
   result.positions = Eigen::MatrixXs::Zero(dofs, timesteps);
   result.velocities = Eigen::MatrixXs::Zero(dofs, timesteps);
-  result.nextVelocities = Eigen::MatrixXs::Zero(dofs, timesteps);
+  result.accelerations = Eigen::MatrixXs::Zero(dofs, timesteps);
   result.jointTorques = Eigen::MatrixXs::Zero(dofs, timesteps);
 
   std::vector<Eigen::MatrixXs> timestepJacs;
@@ -10303,7 +10296,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 
     result.positions.col(i) = positions.col(i);
     result.velocities.col(i) = vel;
-    result.nextVelocities.col(i) = nextVel;
+    result.accelerations.col(i) = accel;
 
     setPositions(positions.col(i));
     setVelocities(vel);

@@ -58,18 +58,47 @@ void SubjectOnDisk(py::module& m)
                 &dart::biomechanics::Frame::tau,
                 "The joint control forces on this frame.")
             .def_readwrite(
+                "comPos",
+                &dart::biomechanics::Frame::comPos,
+                "The position of the COM, in world space")
+            .def_readwrite(
+                "comVel",
+                &dart::biomechanics::Frame::comPos,
+                "The velocity of the COM, in world space")
+            .def_readwrite(
+                "comAcc",
+                &dart::biomechanics::Frame::comPos,
+                "The acceleration of the COM, in world space")
+            .def_readwrite(
+                "posObserved",
+                &dart::biomechanics::Frame::posObserved,
+                "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
+                "that this DOF was observed on this frame")
+            .def_readwrite(
+                "velFiniteDifferenced",
+                &dart::biomechanics::Frame::velFiniteDifferenced,
+                "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
+                "that this DOF got its velocity through finite differencing, "
+                "and therefore may be somewhat unreliable")
+            .def_readwrite(
+                "accFiniteDifferenced",
+                &dart::biomechanics::Frame::accFiniteDifferenced,
+                "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
+                "that this DOF got its acceleration through finite "
+                "differencing, and therefore may be somewhat unreliable")
+            .def_readwrite(
                 "groundContactWrenches",
                 &dart::biomechanics::Frame::groundContactWrenches,
                 R"doc(
-This is a list of pairs of (:code:`body_name`, :code:`body_wrench`), where :code:`body_wrench` is a 6 vector (first 3 are torque, last 3 are force). 
+This is a vector of concatenated contact body wrenches :code:`body_wrench`, where :code:`body_wrench` is a 6 vector (first 3 are torque, last 3 are force). 
 :code:`body_wrench` is expressed in the local frame of the body at :code:`body_name`, and assumes that the skeleton is set to positions `pos`.
 
 Here's an example usage
 .. code-block::
-    for name, wrench in frame.groundContactWrenches:
-        body: nimble.dynamics.BodyNode = skel.getBodyNode(name)
-        torque_local = wrench[:3]
-        force_local = wrench[3:]
+    for i, bodyName in enumerate(subject.getContactBodies()):
+        body: nimble.dynamics.BodyNode = skel.getBodyNode(bodyName)
+        torque_local = wrench[i*6:i*6+3]
+        force_local = wrench[i*6+3:i*6+6]
         # For example, to rotate the force to the world frame
         R_wb = body.getWorldTransform().rotation()
         force_world = R_wb @ force_local
@@ -80,27 +109,23 @@ Note that these are specified in the local body frame, acting on the body at its
                 "groundContactCenterOfPressure",
                 &dart::biomechanics::Frame::groundContactCenterOfPressure,
                 R"doc(
-            This is a list of pairs of (:code:`body name`, :code:`CoP`), where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+            This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
             expressed in the world frame.
         )doc")
             .def_readwrite(
                 "groundContactTorque",
                 &dart::biomechanics::Frame::groundContactTorque,
                 R"doc(
-            This is a list of pairs of (:code:`body name`, :code:`tau`), where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+            This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
             .def_readwrite(
                 "groundContactForce",
                 &dart::biomechanics::Frame::groundContactForce,
                 R"doc(
-            This is a list of pairs of (:code:`body name`, :code:`f`), where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+            This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
-            .def_readwrite(
-                "dt",
-                &dart::biomechanics::Frame::dt,
-                "This is the size of the simulation timestep at this frame.")
             .def_readwrite(
                 "customValues",
                 &dart::biomechanics::Frame::customValues,
@@ -118,10 +143,7 @@ Note that these are specified in the local body frame, acting on the body at its
             dart::biomechanics::SubjectOnDisk,
             std::shared_ptr<dart::biomechanics::SubjectOnDisk>>(
             m, "SubjectOnDisk")
-            .def(
-                ::py::init<std::string, bool>(),
-                ::py::arg("path"),
-                ::py::arg("printDebuggingDetails") = false)
+            .def(::py::init<std::string>(), ::py::arg("path"))
             .def(
                 "readSkel",
                 &dart::biomechanics::SubjectOnDisk::readSkel,
@@ -161,7 +183,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("trialAccs"),
                 ::py::arg("probablyMissingGRF"),
                 ::py::arg("missingGRFReason"),
+                ::py::arg("dofPositionsObserved"),
+                ::py::arg("dofVelocitiesFiniteDifferenced"),
+                ::py::arg("dofAccelerationsFiniteDifferenced"),
                 ::py::arg("trialTaus"),
+                ::py::arg("trialComPoses"),
+                ::py::arg("trialComVels"),
+                ::py::arg("trialComAccs"),
                 // These are generalized 6-dof wrenches applied to arbitrary
                 // bodies (generally by foot-ground contact, though other things
                 // too)
@@ -193,6 +221,36 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::getTrialLength,
                 ::py::arg("trial"),
                 "This returns the length of the trial requested")
+            .def(
+                "getTrialTimestep",
+                &dart::biomechanics::SubjectOnDisk::getTrialTimestep,
+                ::py::arg("trial"),
+                "This returns the timestep size for the trial requested, in "
+                "seconds per frame")
+            .def(
+                "getDofPositionsObserved",
+                &dart::biomechanics::SubjectOnDisk::getDofPositionsObserved,
+                ::py::arg("trial"),
+                "This returns the vector of booleans indicating which DOFs "
+                "have their positions observed during this trial")
+            .def(
+                "getDofVelocitiesFiniteDifferenced",
+                &dart::biomechanics::SubjectOnDisk::
+                    getDofVelocitiesFiniteDifferenced,
+                ::py::arg("trial"),
+                "This returns the vector of booleans indicating which DOFs "
+                "have their velocities from finite-differencing during this "
+                "trial (as opposed to observed directly through a gyroscope or "
+                "IMU)")
+            .def(
+                "getDofAccelerationsFiniteDifferenced",
+                &dart::biomechanics::SubjectOnDisk::
+                    getDofAccelerationsFiniteDifferenced,
+                ::py::arg("trial"),
+                "This returns the vector of booleans indicating which DOFs "
+                "have their accelerations from finite-differencing during this "
+                "trial (as opposed to observed directly through a "
+                "accelerometer or IMU)")
             .def(
                 "getProbablyMissingGRF",
                 &dart::biomechanics::SubjectOnDisk::getProbablyMissingGRF,
