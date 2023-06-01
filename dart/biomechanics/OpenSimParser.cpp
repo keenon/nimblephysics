@@ -3073,13 +3073,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
            >= targetTimestamps[targetTimestamps.size() - 1]);
   }
 
-  // Print out targetTimestamps
-  std::cout << "targetTimestamps: ";
-  for (int i = 0; i < (int)targetTimestamps.size(); i++)
-  {
-    std::cout << targetTimestamps[i] << " ";
-  }
-
   // Find a vector of indices where the timestamps are closest to the values in
   // targetTimestamps.
   std::vector<int> targetTimestampIndices;
@@ -3097,8 +3090,6 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
         closestIndex = j;
       }
     }
-    std::cout << "Saving index " << closestIndex << " for timestamp "
-              << targetTimestamp << std::endl;
     targetTimestampIndices.push_back(closestIndex);
   }
 
