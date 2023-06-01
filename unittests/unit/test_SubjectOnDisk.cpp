@@ -158,6 +158,7 @@ bool testWriteSubjectToDisk(
 
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> grfReason;
+    std::vector<s_t> residuals;
     for (int t = 0; t < poseTrials[trial].cols(); t++)
     {
       missingGRF.push_back(t % 10 == 0);
@@ -170,25 +171,24 @@ bool testWriteSubjectToDisk(
       {
         grfReason.push_back(MissingGRFReason::notMissingGRF);
       }
+      residuals.push_back(t);
     }
     missingGRFReason.push_back(grfReason);
     probablyMissingGRFData.push_back(missingGRF);
+    residualNorms.push_back(residuals);
 
     std::vector<bool> positionObserved;
     std::vector<bool> velocityFiniteDifferenced;
     std::vector<bool> accelerationFiniteDifferenced;
-    std::vector<s_t> residuals;
     for (int i = 0; i < poseTrials[trial].rows(); i++)
     {
       positionObserved.push_back(i % 2 == 0);
       velocityFiniteDifferenced.push_back(i % 3 == 0);
       accelerationFiniteDifferenced.push_back(i % 4 == 0);
-      residuals.push_back(i);
     }
     dofPositionObserved.push_back(positionObserved);
     dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
     dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
-    residualNorms.push_back(residuals);
 
     trialComPoses.push_back(
         Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
@@ -409,10 +409,13 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
 
   std::string path = "./testSubject.bin";
 
-  EXPECT_TRUE(testWriteSubjectToDisk(
-      path,
-      "dart://sample/osim/OpenCapTest/Subject4/Models/"
-      "unscaled_generic.osim",
-      motFiles,
-      grfFiles));
+  for (int i = 0; i < 10; i++)
+  {
+    EXPECT_TRUE(testWriteSubjectToDisk(
+        path,
+        "dart://sample/osim/OpenCapTest/Subject4/Models/"
+        "unscaled_generic.osim",
+        motFiles,
+        grfFiles));
+  }
 }

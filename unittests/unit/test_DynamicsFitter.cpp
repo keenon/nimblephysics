@@ -234,8 +234,7 @@ bool testInverseDynamicsFormula(
   applyExternalForces(skel, worldForces);
   skel->setControlForces(originalTau);
   skel->computeForwardDynamics();
-  skel->integrateVelocities(skel->getTimeStep());
-  Eigen::VectorXs nextVel = skel->getVelocities();
+  Eigen::VectorXs acc = skel->getAccelerations();
 
   // Reset
   skel->setPositions(originalPos);
@@ -244,7 +243,7 @@ bool testInverseDynamicsFormula(
   skel->setControlForces(Eigen::VectorXs::Zero(skel->getNumDofs()));
 
   // ID method
-  Eigen::VectorXs taus = skel->getInverseDynamics(nextVel);
+  Eigen::VectorXs taus = skel->getInverseDynamics(acc);
 
   if (!equals(taus, originalTau, 1e-8))
   {
@@ -266,7 +265,6 @@ bool testInverseDynamicsFormula(
   // Eigen::VectorXs (M * (nextV - originalVel) / dt) + C - Fs = tau;
 
   Eigen::MatrixXs M = skel->getMassMatrix();
-  Eigen::VectorXs acc = (nextVel - originalVel) / skel->getTimeStep();
   Eigen::VectorXs C = skel->getCoriolisAndGravityForces();
   Eigen::VectorXs Fs = Eigen::VectorXs::Zero(skel->getNumDofs());
   for (auto& pair : worldForces)
@@ -3415,10 +3413,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
-  // TODO: enable this if you need a specific starting mass for your subject for a test
-  // s_t mass = standard.skeleton->getLinkMasses().sum();
-  // s_t scaleBy = 78.5 / mass;
-  // standard.skeleton->setLinkMasses(
+  // TODO: enable this if you need a specific starting mass for your subject for
+  // a test s_t mass = standard.skeleton->getLinkMasses().sum(); s_t scaleBy
+  // = 78.5 / mass; standard.skeleton->setLinkMasses(
   //     standard.skeleton->getLinkMasses() * scaleBy);
 
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
