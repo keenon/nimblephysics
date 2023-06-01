@@ -409,10 +409,13 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
 
   std::string path = "./testSubject.bin";
 
-  EXPECT_TRUE(testWriteSubjectToDisk(
-      path,
-      "dart://sample/osim/OpenCapTest/Subject4/Models/"
-      "unscaled_generic.osim",
-      motFiles,
-      grfFiles));
+  for (int i = 0; i < 10; i++)
+  {
+    EXPECT_TRUE(testWriteSubjectToDisk(
+        path,
+        "dart://sample/osim/OpenCapTest/Subject4/Models/"
+        "unscaled_generic.osim",
+        motFiles,
+        grfFiles));
+  }
 }

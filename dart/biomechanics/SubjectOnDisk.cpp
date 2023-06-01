@@ -690,7 +690,7 @@ void SubjectOnDisk::writeSubject(
           frame.add_com_acc(trialComAccs[trial](i, t));
         }
       }
-      if (customValues.size() >= trial)
+      if (customValues.size() > trial)
       {
         for (int i = 0; i < customValues[trial].size(); i++)
         {
@@ -723,11 +723,11 @@ void SubjectOnDisk::writeSubject(
         header.SerializeToString(&headerSerialized);
 
         // 1.5. Write the length of the message as an integer header
-        int64_t messageSize = headerSerialized.size();
-        fwrite(&messageSize, sizeof(int64_t), 1, file);
+        int64_t headerSize = headerSerialized.size();
+        fwrite(&headerSize, sizeof(int64_t), 1, file);
 
         // 1.6. Write the serialized data to the file
-        fwrite(headerSerialized.c_str(), sizeof(char), messageSize, file);
+        fwrite(headerSerialized.c_str(), sizeof(char), headerSize, file);
 
         firstTrial = false;
       }

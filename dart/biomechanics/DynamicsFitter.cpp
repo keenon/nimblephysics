@@ -15837,9 +15837,9 @@ void DynamicsFitter::writeSubjectOnDisk(
       mSkeleton->setPositions(q);
       mSkeleton->setVelocities(dq);
       mSkeleton->setAccelerations(ddq);
-      comPos.col(t) = mSkeleton->getCOM();
-      comVel.col(t) = mSkeleton->getCOMLinearVelocity();
-      comAcc.col(t) = mSkeleton->getCOMLinearAcceleration();
+      comPos.col(t - 1).head<3>() = mSkeleton->getCOM();
+      comVel.col(t - 1).head<3>() = mSkeleton->getCOMLinearVelocity();
+      comAcc.col(t - 1).head<3>() = mSkeleton->getCOMLinearAcceleration();
     }
 
     trialPoses.push_back(poses);
