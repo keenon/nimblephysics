@@ -53,7 +53,7 @@ std::tuple<MarkerInitialization, IKErrorReport, OpenSimFile> runMarkerFitter(
     markerObservationTrials.push_back(trc.markerTimesteps);
     // Ground reaction forces.
     std::vector<ForcePlate> grf
-        = OpenSimParser::loadGRF(grfFiles[itrial], trc.framesPerSecond);
+        = OpenSimParser::loadGRF(grfFiles[itrial], trc.timestamps);
     forcePlates.push_back(grf);
   }
 
@@ -327,10 +327,11 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
       goldOsim.skeleton, prefix + subject + "/coordinates.sto");
   std::vector<std::string> goldDOFs;
   std::map<std::string, int> dofMap;
-  for (int idof = 0; idof < (int)goldOsim.skeleton->getNumDofs(); ++idof) {
+  for (int idof = 0; idof < (int)goldOsim.skeleton->getNumDofs(); ++idof)
+  {
     goldDOFs.push_back(goldOsim.skeleton->getDof(idof)->getName());
-    dofMap[goldDOFs.back()] =
-        osimFile.skeleton->getDof(goldDOFs.back())->getIndexInSkeleton();
+    dofMap[goldDOFs.back()]
+        = osimFile.skeleton->getDof(goldDOFs.back())->getIndexInSkeleton();
   }
 
   // Compare poses.
@@ -338,14 +339,16 @@ void testSubject(const std::string& subject, const s_t& height, const s_t& mass)
   auto poses = markerInit.poses;
   auto goldPoses = goldIK.poses;
   s_t totalError = 0.0;
-  Eigen::VectorXs averagePerDofError = Eigen::VectorXs::Zero(
-      (int)osimFile.skeleton->getNumDofs());
-  Eigen::VectorXs thisPerDofError = Eigen::VectorXs::Zero(
-      (int)osimFile.skeleton->getNumDofs());
-  for (int i = 0; i < (int)poses.cols(); ++i) {
-    for (int idof = 0; idof < (int)goldDOFs.size(); ++idof) {
-      thisPerDofError(dofMap[goldDOFs[idof]])
-          = std::abs(goldPoses.col(i)(idof) - poses.col(i)(dofMap[goldDOFs[idof]]));
+  Eigen::VectorXs averagePerDofError
+      = Eigen::VectorXs::Zero((int)osimFile.skeleton->getNumDofs());
+  Eigen::VectorXs thisPerDofError
+      = Eigen::VectorXs::Zero((int)osimFile.skeleton->getNumDofs());
+  for (int i = 0; i < (int)poses.cols(); ++i)
+  {
+    for (int idof = 0; idof < (int)goldDOFs.size(); ++idof)
+    {
+      thisPerDofError(dofMap[goldDOFs[idof]]) = std::abs(
+          goldPoses.col(i)(idof) - poses.col(i)(dofMap[goldDOFs[idof]]));
     }
     totalError += thisPerDofError.sum() / thisPerDofError.size();
     averagePerDofError += thisPerDofError;

@@ -84,7 +84,7 @@ bool testWriteSubjectToDisk(
     for (int i = 0; i < grfFiles.size(); i++)
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], mot.timestamps);
       forcePlateTrials.push_back(grf);
     }
   }
@@ -154,10 +154,13 @@ bool testWriteSubjectToDisk(
     for (int t = 0; t < poseTrials[trial].cols(); t++)
     {
       missingGRF.push_back(t % 10 == 0);
-      if (t % 10 == 0) {
+      if (t % 10 == 0)
+      {
         grfReason.push_back(
             MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero);
-      } else {
+      }
+      else
+      {
         grfReason.push_back(MissingGRFReason::notMissingGRF);
       }
     }

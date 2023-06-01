@@ -3262,7 +3262,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], trc.timestamps);
       forcePlateTrials.push_back(grf);
     }
     else
@@ -3415,10 +3415,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
 
   standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
-  // TODO: enable this if you need a specific starting mass for your subject for a test
-  // s_t mass = standard.skeleton->getLinkMasses().sum();
-  // s_t scaleBy = 78.5 / mass;
-  // standard.skeleton->setLinkMasses(
+  // TODO: enable this if you need a specific starting mass for your subject for
+  // a test s_t mass = standard.skeleton->getLinkMasses().sum(); s_t scaleBy
+  // = 78.5 / mass; standard.skeleton->setLinkMasses(
   //     standard.skeleton->getLinkMasses() * scaleBy);
 
   std::shared_ptr<DynamicsInitialization> init = createInitialization(
@@ -3818,7 +3817,7 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], trc.timestamps);
       forcePlateTrials.push_back(grf);
     }
     else
