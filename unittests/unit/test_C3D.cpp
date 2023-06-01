@@ -11,6 +11,7 @@
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/common/ResourceRetriever.hpp"
 #include "dart/common/Uri.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/C3D.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
@@ -22,8 +23,9 @@
 
 using namespace dart;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
+#ifdef ALL_TESTS
 TEST(C3D, COMPARE_TO_TRC)
 {
   biomechanics::C3D c3d
@@ -59,19 +61,22 @@ TEST(C3D, COMPARE_TO_TRC)
     }
   }
 }
+#endif
 
 #ifdef ALL_TESTS
-TEST(C3D, LOAD)
+TEST(C3D, TEST_VERTICAL_CONVENTION)
 {
-  biomechanics::C3D c3d
-      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/JA1Gait35.c3d");
-  // = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/S01DS402.c3d");
-  // = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/S01DB201.c3d");
-
-  std::shared_ptr<server::GUIWebsocketServer> server
-      = std::make_shared<server::GUIWebsocketServer>();
-  server->serve(8070);
-  server->renderBasis(1.0);
-  biomechanics::C3DLoader::debugToGUI(c3d, server);
+  biomechanics::C3D c3d = biomechanics::C3DLoader::loadC3D(
+      "dart://sample/grf/UpsideDownData/trial1.c3d");
+  Eigen::Vector3s sum = Eigen::Vector3s::Zero();
+  for (int i = 0; i < c3d.forcePlates.size(); i++)
+  {
+    for (int t = 0; t < c3d.forcePlates[i].timestamps.size(); t++)
+    {
+      sum += c3d.forcePlates[i].forces[t];
+    }
+  }
+  // We expect the total force to be pointing upwards, overall
+  EXPECT_GE(sum(1), 0);
 }
 #endif

@@ -11,8 +11,10 @@
 #include <tinyxml2.h>
 
 #include "dart/biomechanics/OpenSimParser.hpp"
+#include "dart/biomechanics/enums.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/proto/SubjectOnDisk.pb.h"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 
@@ -35,10 +37,68 @@ struct FileHeader
 };
 }
 
-SubjectOnDisk::SubjectOnDisk(
-    const std::string& path, bool printDebuggingDetails)
-  : mPath(path)
+proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
 {
+  switch (reason)
+  {
+    case notMissingGRF:
+      return proto::MissingGRFReason::notMissingGRF;
+    case measuredGrfZeroWhenAccelerationNonZero:
+      return proto::MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
+    case unmeasuredExternalForceDetected:
+      return proto::MissingGRFReason::unmeasuredExternalForceDetected;
+    case torqueDiscrepancy:
+      return proto::MissingGRFReason::torqueDiscrepancy;
+    case forceDiscrepancy:
+      return proto::MissingGRFReason::forceDiscrepancy;
+    case notOverForcePlate:
+      return proto::MissingGRFReason::notOverForcePlate;
+    case missingImpact:
+      return proto::MissingGRFReason::missingImpact;
+    case missingBlip:
+      return proto::MissingGRFReason::missingBlip;
+    case shiftGRF:
+      return proto::MissingGRFReason::shiftGRF;
+  }
+  return proto::MissingGRFReason::notMissingGRF;
+}
+
+MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
+{
+  switch (reason)
+  {
+    case proto::MissingGRFReason::notMissingGRF:
+      return notMissingGRF;
+    case proto::MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero:
+      return measuredGrfZeroWhenAccelerationNonZero;
+    case proto::MissingGRFReason::unmeasuredExternalForceDetected:
+      return unmeasuredExternalForceDetected;
+    case proto::MissingGRFReason::torqueDiscrepancy:
+      return torqueDiscrepancy;
+    case proto::MissingGRFReason::forceDiscrepancy:
+      return forceDiscrepancy;
+    case proto::MissingGRFReason::notOverForcePlate:
+      return notOverForcePlate;
+    case proto::MissingGRFReason::missingImpact:
+      return missingImpact;
+    case proto::MissingGRFReason::missingBlip:
+      return missingBlip;
+    case proto::MissingGRFReason::shiftGRF:
+      return shiftGRF;
+      // These are just here to keep Clang from complaining
+    case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return notMissingGRF;
+      break;
+    case proto::MissingGRFReason_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return notMissingGRF;
+      break;
+  }
+  return notMissingGRF;
+}
+
+SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
+{
+  // 1. Open the file
   FILE* file = fopen(path.c_str(), "r");
   if (file == nullptr)
   {
@@ -46,284 +106,115 @@ SubjectOnDisk::SubjectOnDisk(
               << path << std::endl;
     throw new std::exception();
   }
-
-  struct FileHeader header;
-  int read_items = fread(&header, sizeof(struct FileHeader), 1, file);
-  if (header.magic != 424242 || read_items != 1)
+  // 2. Read the length of the message from the integer header
+  int64_t headerSize = -1;
+  int64_t elementsRead = fread(&headerSize, sizeof(int64_t), 1, file);
+  if (elementsRead != 1)
   {
     std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << path << ": bad header.magic = " << header.magic << std::endl;
+              << path
+              << ": was unable to read header size, probably because the file "
+                 "is length 0?"
+              << std::endl;
     throw new std::exception();
   }
-  if (header.version != 1)
+  // 3. Allocate a buffer to hold the serialized data
+  std::vector<char> serializedHeader(headerSize);
+
+  // 4. Read the serialized data from the file
+  int64_t bytesRead
+      = fread(serializedHeader.data(), sizeof(char), headerSize, file);
+
+  if (bytesRead != headerSize)
   {
-    std::cout << "SubjectOnDisk attempting to read a binary file with "
-                 "unsupported version "
-              << header.version << " (currently only support version 1)"
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << path << ": was unable to read full requested header size "
+              << headerSize << ", instead only got " << bytesRead << " bytes."
               << std::endl;
     throw new std::exception();
   }
 
-  mNumDofs = header.numDofs;
-  mNumTrials = header.numTrials;
-
-  // Read the href
-  int32_t hrefLen;
-  read_items = fread(&hrefLen, sizeof(int32_t), 1, file);
-  if (hrefLen < 0 || hrefLen > 2000 || read_items != 1)
+  // 5. Deserialize the data into a Protobuf object
+  proto::SubjectOnDiskHeader header;
+  bool parseSuccess
+      = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
+  if (!parseSuccess)
   {
     std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << path << ": bad string len for href = " << hrefLen << std::endl;
-    throw new std::exception();
-  }
-  char* hrefRaw = (char*)malloc(sizeof(char) * (hrefLen + 1));
-  read_items = fread(hrefRaw, sizeof(char), hrefLen, file);
-  (void)read_items;
-  hrefRaw[hrefLen] = 0;
-  mHref = std::string(hrefRaw);
-  free(hrefRaw);
-
-  // Read the notes
-  int32_t notesLen;
-  read_items = fread(&notesLen, sizeof(int32_t), 1, file);
-  if (notesLen < 0 || notesLen > 100000 || read_items != 1)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << path << ": bad string len for notes = " << notesLen
+              << path << ": got an error parsing the protobuf file header."
               << std::endl;
     throw new std::exception();
   }
-  char* notesRaw = (char*)malloc(sizeof(char) * (notesLen + 1));
-  read_items = fread(notesRaw, sizeof(char), notesLen, file);
-  (void)read_items;
-  notesRaw[notesLen] = 0;
-  mNotes = std::string(notesRaw);
-  free(notesRaw);
 
-  // Read trial names
-  for (int i = 0; i < mNumTrials; i++)
+  // 6. Get the data out of the protobuf object
+  mNumDofs = header.num_dofs();
+  mNumTrials = header.num_trials();
+  for (int i = 0; i < header.ground_contact_body_size(); i++)
   {
-    int32_t len;
-    read_items = fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 255 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad string len for trial [" << i << "] name = " << len
-          << std::endl;
-      throw new std::exception();
-    }
-    char* rawTrialName = (char*)malloc(sizeof(char) * (len + 1));
-    read_items = fread(rawTrialName, sizeof(char), len, file);
-    if (read_items != len) {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad string len for trial [" << i << "] name = " << len
-          << ". Only read " << read_items << "/" << len << " chars" << std::endl;
-      throw new std::exception();
-    }
-    rawTrialName[len] = 0;
-    std::string trialName(rawTrialName);
-    mTrialNames.push_back(trialName);
-    if (printDebuggingDetails)
-    {
-      std::cout << "Read trial name: " << trialName << std::endl;
-    }
-    free(rawTrialName);
+    mGroundContactBodies.push_back(header.ground_contact_body(i));
   }
-
-  // Read contact body names
-  int32_t numContactBodies = header.numGroundContactBodies;
-  for (int i = 0; i < numContactBodies; i++)
+  for (int i = 0; i < header.custom_value_name_size(); i++)
   {
-    int32_t len;
-    read_items = fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 255 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad string len for contact body [" << i
-          << "] name = " << len << std::endl;
-      throw new std::exception();
-    }
-    char* body = (char*)malloc(sizeof(char) * (len + 1));
-    read_items = fread(body, sizeof(char), len, file);
-    (void)read_items;
-    body[len] = 0;
-    std::string bodyName(body);
-    mGroundContactBodies.push_back(bodyName);
-    if (printDebuggingDetails)
-    {
-      std::cout << "Read contact body name: " << bodyName << std::endl;
-    }
-    free(body);
+    mCustomValues.push_back(header.custom_value_name(i));
+    mCustomValueLengths.push_back(header.custom_value_length(i));
   }
-
-  // Read custom value names and sizes
-  int32_t numCustomValues = header.numCustomValues;
-  int customValuesTotalDim = 0;
-  for (int i = 0; i < numCustomValues; i++)
+  for (int i = 0; i < header.trial_name_size(); i++)
   {
-    int32_t dataLen;
-    read_items = fread(&dataLen, sizeof(int32_t), 1, file);
-    if (dataLen < 0 || dataLen > 100000 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad data length for custom value [" << i
-          << "] name = " << dataLen << std::endl;
-      throw new std::exception();
-    }
-    customValuesTotalDim += dataLen;
-    int32_t strLen;
-    read_items = fread(&strLen, sizeof(int32_t), 1, file);
-    if (strLen < 0 || strLen > 512 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad string length for custom value [" << i
-          << "] name = " << strLen << std::endl;
-      throw new std::exception();
-    }
-    char* custom = (char*)malloc(sizeof(char) * (strLen + 1));
-    read_items = fread(custom, sizeof(char), strLen, file);
-    (void)read_items;
-    custom[strLen] = 0;
-    std::string customValue(custom);
-    mCustomValues.push_back(customValue);
-    mCustomValueLengths.push_back(dataLen);
-    if (printDebuggingDetails)
-    {
-      std::cout << "Read custom value: " << customValue
-                << " with length = " << dataLen << std::endl;
-    }
-    free(custom);
-  }
-
-  // Read trial lengths
-  for (int i = 0; i < mNumTrials; i++)
-  {
-    int32_t len;
-    read_items = fread(&len, sizeof(int32_t), 1, file);
-    if (len < 0 || len > 10000000 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": bad trial len for trial [" << i << "] = " << len
-          << std::endl;
-      throw new std::exception();
-    }
-    if (printDebuggingDetails)
-    {
-      std::cout << "Read trial " << i << " len = " << len << std::endl;
-    }
-    mTrialLength.push_back((int)len);
-  }
-
-  // Read trial timesteps
-  for (int i = 0; i < mNumTrials; i++)
-  {
-    double timestep;
-    read_items = fread(&timestep, sizeof(double), 1, file);
-    if (read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": trial timesteps suddenly reached EOF" << std::endl;
-      throw new std::exception();
-    }
-    (void)read_items;
-    if (printDebuggingDetails)
-    {
-      std::cout << "Read trial " << i << " timestep = " << timestep
-                << std::endl;
-    }
-    mTrialTimesteps.push_back(timestep);
-  }
-
-  // Read the `probablyMissingGrf` data
-  for (int i = 0; i < mNumTrials; i++)
-  {
-    // Read a magic header, to make sure we don't get lost
-    int32_t magic;
-    read_items = fread(&magic, sizeof(int32_t), 1, file);
-    if (magic != 424242 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": before the probablyMissingGRF array for trial " << i
-          << ", got bad magic = " << magic << std::endl;
-      throw new std::exception();
-    }
-
-    std::vector<bool> probablyMissingGRF;
-    for (int t = 0; t < mTrialLength[i]; t++)
-    {
-      int8_t b;
-      read_items = fread(&b, sizeof(int8_t), 1, file);
-      if (read_items != 1)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << path << ": probablyMissingGRF section suddenly reached EOF" << std::endl;
-        throw new std::exception();
-      }
-      probablyMissingGRF.push_back(b);
-    }
-    mProbablyMissingGRF.push_back(probablyMissingGRF);
-  }
-
-  // Read the `missingGRFReason` data
-  for (int i = 0; i < mNumTrials; i++)
-  {
-    // Read a magic header, to make sure we don't get lost
-    int32_t magic;
-    read_items = fread(&magic, sizeof(int32_t), 1, file);
-    if (magic != 424242 || read_items != 1)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << path << ": before the missingGRFReason array for trial " << i
-          << ", got bad magic = " << magic << std::endl;
-      throw new std::exception();
-    }
-
+    auto& trialHeader = header.trial_header(i);
+    std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> missingGRFReason;
-    for (int t = 0; t < mTrialLength[i]; t++)
+    std::vector<s_t> residualNorms;
+    for (int t = 0; t < trialHeader.missing_grf_size(); t++)
     {
-      int8_t b;
-      read_items = fread(&b, sizeof(int8_t), 1, file);
-      if (read_items != 1)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << path << ": missingGRFReason section suddenly reached EOF" << std::endl;
-        throw new std::exception();
-      }
-      auto b_enum = static_cast<MissingGRFReason>(b);
-      missingGRFReason.push_back(b_enum);
+      missingGRF.push_back(trialHeader.missing_grf(t));
+      missingGRFReason.push_back(
+          missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
+      residualNorms.push_back(trialHeader.residual(t));
     }
+    mProbablyMissingGRF.push_back(missingGRF);
     mMissingGRFReason.push_back(missingGRFReason);
-  }
+    mTrialResidualNorms.push_back(residualNorms);
+    mTrialLength.push_back(trialHeader.trial_length());
+    mTrialTimesteps.push_back(trialHeader.trial_timestep());
+    std::vector<bool> dofPositionsObserved;
+    std::vector<bool> dofVelocitiesFiniteDifferenced;
+    std::vector<bool> dofAccelerationFiniteDifferenced;
+    for (int i = 0; i < trialHeader.dof_positions_observed_size(); i++)
+    {
+      dofPositionsObserved.push_back(trialHeader.dof_positions_observed(i));
+      dofVelocitiesFiniteDifferenced.push_back(
+          trialHeader.dof_velocities_finite_differenced(i));
+      dofAccelerationFiniteDifferenced.push_back(
+          trialHeader.dof_acceleration_finite_differenced(i));
+    }
+    mDofPositionsObserved.push_back(dofPositionsObserved);
+    mDofVelocitiesFiniteDifferenced.push_back(dofVelocitiesFiniteDifferenced);
+    mDofAccelerationFiniteDifferenced.push_back(
+        dofAccelerationFiniteDifferenced);
 
-  int32_t modelLen;
-  read_items = fread(&modelLen, sizeof(int32_t), 1, file);
-  if (read_items != 1)
-  {
-    std::cout
-        << "SubjectOnDisk attempting to read a corrupted binary file at "
-        << path << ": model length section suddenly reached EOF" << std::endl;
-    throw new std::exception();
+    mTrialNames.push_back(header.trial_name(i));
   }
-  mModelLength = modelLen;
-  mModelSectionStart = ftell(file);
-  mDataSectionStart = mModelSectionStart + modelLen;
-
-  // Magic number, pos, vel, acc, tau, contact wrenches, and custom values
-  mFrameSize = sizeof(int32_t)
-               + (((mNumDofs * 4) + (mGroundContactBodies.size() * 6)
-                   + (mGroundContactBodies.size() * 9) + customValuesTotalDim)
-                  * sizeof(float64_t));
+  // int32 num_dofs = 1;
+  // int32 num_trials = 2;
+  // repeated string ground_contact_body = 3;
+  // repeated string custom_value_name = 6;
+  // repeated int32 custom_value_length = 7;
+  // string model_osim_text = 8;
+  // repeated SubjectOnDiskTrialHeader trial_header = 9;
+  // // The trial names, if provided, or empty strings
+  // repeated string trial_name = 10;
+  // // An optional link to the web where this subject came from
+  // string href = 11;
+  // // Any text-based notes on the subject data, like citations etc
+  // string notes = 12;
+  // // The version number for this file format
+  // int32 version = 13;
+  // // This is the size of each frame in bytes. This should be constant across
+  // all frames in the file, to allow easy seeking. int32 frame_size = 14;
+  mHref = header.href();
+  mNotes = header.notes();
+  mFrameSize = header.frame_size();
+  mDataSectionStart = sizeof(int64_t) + headerSize;
 
   fclose(file);
 }
@@ -341,25 +232,58 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
                          .getFilesystemPath();
   }
 
+  // 1. Open the file
   FILE* file = fopen(mPath.c_str(), "r");
-
-  fseek(file, mModelSectionStart, SEEK_SET);
-  char* rawOsimContents = (char*)malloc(sizeof(char) * (mModelLength + 1));
-  int read_items = fread(rawOsimContents, sizeof(char), mModelLength, file);
-  if (read_items != mModelLength)
+  if (file == nullptr)
   {
-    std::cout
-        << "SubjectOnDisk attempting to read a corrupted binary file at "
-        << mPath << ": model file text contained unexpected EOF" << std::endl;
+    std::cout << "SubjectOnDisk attempting to open file that deos not exist: "
+              << mPath << std::endl;
     throw new std::exception();
   }
-  rawOsimContents[mModelLength - 1] = 0;
+  // 2. Read the length of the message from the integer header
+  int64_t headerSize = -1;
+  int64_t elementsRead = fread(&headerSize, sizeof(int64_t), 1, file);
+  if (elementsRead != 1)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath
+              << ": was unable to read header size, probably because the file "
+                 "is length 0?"
+              << std::endl;
+    throw new std::exception();
+  }
+  // 3. Allocate a buffer to hold the serialized data
+  std::vector<char> serializedHeader(headerSize);
+
+  // 4. Read the serialized data from the file
+  int64_t bytesRead
+      = fread(serializedHeader.data(), sizeof(char), headerSize, file);
+
+  if (bytesRead != headerSize)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath << ": was unable to read full requested header size "
+              << headerSize << ", instead only got " << bytesRead << " bytes."
+              << std::endl;
+    throw new std::exception();
+  }
+
+  // 5. Deserialize the data into a Protobuf object
+  proto::SubjectOnDiskHeader header;
+  bool parseSuccess
+      = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
+  if (!parseSuccess)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath << ": got an error parsing the protobuf file header."
+              << std::endl;
+    throw new std::exception();
+  }
+
   tinyxml2::XMLDocument osimFile;
-  osimFile.Parse(rawOsimContents);
+  osimFile.Parse(header.model_osim_text().c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
-
-  free(rawOsimContents);
 
   fclose(file);
 
@@ -382,8 +306,10 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
 
   std::vector<std::shared_ptr<Frame>> result;
 
+  // 1. Open the file
   FILE* file = fopen(mPath.c_str(), "r");
 
+  // 2. Seek to the right place in the file to read this frame
   int linearFrameStart = 0;
   for (int i = 0; i < trial; i++)
   {
@@ -404,142 +330,121 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     return result;
   }
 
-  fseek(file, mDataSectionStart + (mFrameSize * linearFrameStart), SEEK_SET);
-
-  int read_items;
+  int offsetBytes = mDataSectionStart + (mFrameSize * linearFrameStart);
+  fseek(file, offsetBytes, SEEK_SET);
 
   for (int i = 0; i < numFramesToRead; i++)
   {
-    int32_t magic;
-    read_items = fread(&magic, sizeof(int32_t), 1, file);
-    if (magic != 424242 || read_items != 1)
+    // 3. Allocate a buffer to hold the serialized data
+    std::vector<char> serializedFrame(mFrameSize);
+
+    // 4. Read the serialized data from the file
+    int64_t bytesRead
+        = fread(serializedFrame.data(), sizeof(char), mFrameSize, file);
+
+    if (bytesRead != mFrameSize)
     {
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << mPath << ": before frame " << linearFrameStart + i << " (trial "
-          << trial << " frame " << startFrame + i
-          << "), got bad magic = " << magic << std::endl;
+          << mPath << ": was unable to read full requested frame size "
+          << mFrameSize << " at offset " << (offsetBytes + i * mFrameSize)
+          << ", corresponding to trial " << trial << " and frame "
+          << startFrame + i << " (" << i << " into a " << numFramesToRead
+          << " frame read), instead only got " << bytesRead << " bytes."
+          << std::endl;
       throw new std::exception();
     }
 
-    result.push_back(std::make_shared<Frame>());
-    std::shared_ptr<Frame>& frame = result.at(result.size() - 1);
+    // 5. Deserialize the data into a protobuf object
+    proto::SubjectOnDiskFrame proto;
+    bool parseSuccess
+        = proto.ParseFromArray(serializedFrame.data(), serializedFrame.size());
+    if (!parseSuccess)
+    {
+      std::cout
+          << "SubjectOnDisk attempting to read a corrupted binary file at "
+          << mPath << ": got an error parsing frame at offset "
+          << (offsetBytes + i * mFrameSize) << ", corresponding to trial "
+          << trial << " and frame " << startFrame + i << " (" << i << " into a "
+          << numFramesToRead << " frame read)." << std::endl;
+      throw new std::exception();
+    }
+
+    // 6. Copy the results out into a frame
+    std::shared_ptr<Frame> frame = std::make_shared<Frame>();
     frame->trial = trial;
     frame->t = startFrame + i;
-    frame->dt = mTrialTimesteps[trial];
+    frame->residual = mTrialResidualNorms[trial][frame->t];
     frame->probablyMissingGRF = mProbablyMissingGRF[trial][frame->t];
     frame->missingGRFReason = mMissingGRFReason[trial][frame->t];
     frame->pos = Eigen::VectorXd(mNumDofs);
     frame->vel = Eigen::VectorXd(mNumDofs);
     frame->acc = Eigen::VectorXd(mNumDofs);
     frame->tau = Eigen::VectorXd(mNumDofs);
-    read_items = fread(frame->pos.data(), sizeof(float64_t), mNumDofs, file);
-    if (read_items != mNumDofs)
+    for (int i = 0; i < mNumDofs; i++)
     {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-      throw new std::exception();
+      frame->pos(i) = proto.pos(i);
+      frame->vel(i) = proto.vel(i);
+      frame->acc(i) = proto.acc(i);
+      frame->tau(i) = proto.tau(i);
     }
-    read_items = fread(frame->vel.data(), sizeof(float64_t), mNumDofs, file);
-    if (read_items != mNumDofs)
+    // These are boolean values (0 or 1) for each contact body indicating
+    // whether or not it's in contact
+    frame->contact = Eigen::VectorXi::Zero(mGroundContactBodies.size());
+    // These are each 6-vector of contact body wrenches, all concatenated
+    // together
+    frame->groundContactWrenches
+        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 6);
+    // These are each 3-vector for each contact body, concatenated together
+    frame->groundContactCenterOfPressure
+        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
+    frame->groundContactTorque
+        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
+    frame->groundContactForce
+        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
+    for (int i = 0; i < mGroundContactBodies.size(); i++)
     {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-      throw new std::exception();
-    }
-    read_items = fread(frame->acc.data(), sizeof(float64_t), mNumDofs, file);
-    if (read_items != mNumDofs)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-      throw new std::exception();
-    }
-    read_items = fread(frame->tau.data(), sizeof(float64_t), mNumDofs, file);
-    if (read_items != mNumDofs)
-    {
-      std::cout
-          << "SubjectOnDisk attempting to read a corrupted binary file at "
-          << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-      throw new std::exception();
+      for (int j = 0; j < 6; j++)
+      {
+        frame->groundContactWrenches(i * 6 + j)
+            = proto.ground_contact_wrench(i * 6 + j);
+      }
+      s_t contactNorm = frame->groundContactWrenches.segment<6>(i * 6).norm();
+      if (contactNorm > 1.0)
+      {
+        frame->contact(i) = 1;
+      }
+      for (int j = 0; j < 3; j++)
+      {
+        frame->groundContactCenterOfPressure(i * 3 + j)
+            = proto.ground_contact_center_of_pressure(i * 3 + j);
+        frame->groundContactTorque(i * 3 + j)
+            = proto.ground_contact_torque(i * 3 + j);
+        frame->groundContactForce(i * 3 + j)
+            = proto.ground_contact_force(i * 3 + j);
+      }
     }
 
-    for (int b = 0; b < mGroundContactBodies.size(); b++)
+    frame->comPos = Eigen::Vector3s::Zero();
+    frame->comVel = Eigen::Vector3s::Zero();
+    frame->comAcc = Eigen::Vector3s::Zero();
+    for (int i = 0; i < 3; i++)
     {
-      frame->groundContactWrenches.emplace_back(
-          mGroundContactBodies[b], Eigen::Vector6d());
-      read_items = fread(
-          frame->groundContactWrenches[b].second.data(),
-          sizeof(float64_t),
-          6,
-          file);
-      if (read_items != 6)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-        throw new std::exception();
-      }
+      frame->comPos(i) = proto.com_pos(i);
+      frame->comVel(i) = proto.com_vel(i);
+      frame->comAcc(i) = proto.com_acc(i);
     }
-    for (int b = 0; b < mGroundContactBodies.size(); b++)
+
+    frame->posObserved = Eigen::VectorXi::Zero(mNumDofs);
+    frame->velFiniteDifferenced = Eigen::VectorXi::Zero(mNumDofs);
+    frame->accFiniteDifferenced = Eigen::VectorXi::Zero(mNumDofs);
+    for (int i = 0; i < mNumDofs; i++)
     {
-      frame->groundContactCenterOfPressure.emplace_back(
-          mGroundContactBodies[b], Eigen::Vector3d());
-      read_items = fread(
-          frame->groundContactCenterOfPressure[b].second.data(),
-          sizeof(float64_t),
-          3,
-          file);
-      if (read_items != 3)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-        throw new std::exception();
-      }
-      frame->groundContactTorque.emplace_back(
-          mGroundContactBodies[b], Eigen::Vector3d());
-      read_items = fread(
-          frame->groundContactTorque[b].second.data(),
-          sizeof(float64_t),
-          3,
-          file);
-      if (read_items != 3)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-        throw new std::exception();
-      }
-      frame->groundContactForce.emplace_back(
-          mGroundContactBodies[b], Eigen::Vector3d());
-      read_items = fread(
-          frame->groundContactForce[b].second.data(),
-          sizeof(float64_t),
-          3,
-          file);
-      if (read_items != 3)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-        throw new std::exception();
-      }
-    }
-    for (int b = 0; b < mCustomValues.size(); b++)
-    {
-      int len = mCustomValueLengths[b];
-      frame->customValues.emplace_back(mCustomValues[b], Eigen::VectorXd(len));
-      read_items = fread(frame->customValues[b].second.data(), sizeof(float64_t), len, file);
-      if (read_items != len)
-      {
-        std::cout
-            << "SubjectOnDisk attempting to read a corrupted binary file at "
-            << mPath << ": frame data for frame " << (startFrame + i) << " had unexpected EOF" << std::endl;
-        throw new std::exception();
-      }
+      frame->posObserved(i) = mDofPositionsObserved[trial][i];
+      frame->velFiniteDifferenced(i)
+          = mDofVelocitiesFiniteDifferenced[trial][i];
+      frame->accFiniteDifferenced(i)
+          = mDofAccelerationFiniteDifferenced[trial][i];
     }
   }
 
@@ -562,7 +467,14 @@ void SubjectOnDisk::writeSubject(
     std::vector<Eigen::MatrixXs>& trialAccs,
     std::vector<std::vector<bool>>& probablyMissingGRF,
     std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
+    std::vector<std::vector<bool>>& dofPositionsObserved,
+    std::vector<std::vector<bool>>& dofVelocitiesFiniteDifferenced,
+    std::vector<std::vector<bool>>& dofAccelerationFiniteDifferenced,
     std::vector<Eigen::MatrixXs>& trialTaus,
+    std::vector<Eigen::MatrixXs>& trialComPoses,
+    std::vector<Eigen::MatrixXs>& trialComVels,
+    std::vector<Eigen::MatrixXs>& trialComAccs,
+    std::vector<std::vector<s_t>> trialResidualNorms,
     // These are generalized 6-dof wrenches applied to arbitrary bodies
     // (generally by foot-ground contact, though other things too)
     std::vector<std::string>& groundForceBodies,
@@ -578,29 +490,7 @@ void SubjectOnDisk::writeSubject(
     const std::string& sourceHref,
     const std::string& notes)
 {
-  (void)outputPath;
-  (void)openSimFilePath;
-  (void)trialPoses;
-  (void)trialVels;
-  (void)trialAccs;
-  (void)trialTaus;
-  (void)groundForceBodies;
-  (void)trialGroundBodyWrenches;
-  (void)trialGroundBodyCopTorqueForce;
-  (void)trialTimesteps;
-  (void)probablyMissingGRF;
-  (void)missingGRFReason;
-  (void)customValueNames;
-  (void)customValues;
-
-  // Read the whole OpenSim file in as a string
-  auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
-  newRetriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  newRetriever->addSchemaRetriever(
-      "dart", utils::DartResourceRetriever::create());
-  const std::string openSimRawXML = newRetriever->readAll(openSimFilePath);
-
+  // 0. Open the file
   FILE* file = fopen(outputPath.c_str(), "w");
   if (file == nullptr)
   {
@@ -608,176 +498,248 @@ void SubjectOnDisk::writeSubject(
     return;
   }
 
-  // Write the header
-  struct FileHeader header;
-  header.magic = 424242;
-  header.version = 1;
-  header.numDofs = trialPoses[0].rows();
-  header.numTrials = trialPoses.size();
-  header.numGroundContactBodies = groundForceBodies.size();
-  header.numCustomValues = customValueNames.size();
-  fwrite(&header, sizeof(struct FileHeader), 1, file);
+  /////////////////////////////////////////////////////////////////////////////
+  // 1. Serialize and write the header to the file
+  /////////////////////////////////////////////////////////////////////////////
 
-  // Write the href
-  int32_t hrefLen = sourceHref.length();
-  fwrite(&hrefLen, sizeof(int32_t), 1, file);
-  fwrite(sourceHref.c_str(), sizeof(char), hrefLen, file);
+  // 1.1. Read the whole OpenSim file in as a string
+  auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
+  newRetriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  newRetriever->addSchemaRetriever(
+      "dart", utils::DartResourceRetriever::create());
+  const std::string openSimRawXML = newRetriever->readAll(openSimFilePath);
 
-  // Write the notes
-  int32_t notesLen = notes.length();
-  fwrite(&notesLen, sizeof(int32_t), 1, file);
-  fwrite(notes.c_str(), sizeof(char), notesLen, file);
-
-  // Write trial names
-  for (int i = 0; i < header.numTrials; i++)
+  // 1.2. Populate the protobuf header object in memory
+  proto::SubjectOnDiskHeader header;
+  header.set_num_dofs(trialPoses.size() > 0 ? trialPoses[0].rows() : 0);
+  header.set_num_trials(trialPoses.size());
+  for (std::string& body : groundForceBodies)
   {
-    std::string trialName = "";
-    if (trialNames.size() > i)
-    {
-      trialName = trialNames[i];
-    }
-    int32_t len = trialName.length();
-    fwrite(&len, sizeof(int32_t), 1, file);
-    fwrite(trialName.c_str(), sizeof(char), len, file);
+    header.add_ground_contact_body(body);
   }
-
-  // Write contact body names
-  for (int i = 0; i < groundForceBodies.size(); i++)
-  {
-    int32_t len = groundForceBodies[i].length();
-    fwrite(&len, sizeof(int32_t), 1, file);
-    fwrite(groundForceBodies[i].c_str(), sizeof(char), len, file);
-  }
-
-  // Write custom value names and lengths
   for (int i = 0; i < customValueNames.size(); i++)
   {
-    int32_t dataLen = customValues[0][i].rows();
-    int32_t strLen = customValueNames[i].size();
-    fwrite(&dataLen, sizeof(int32_t), 1, file);
-    fwrite(&strLen, sizeof(int32_t), 1, file);
-    fwrite(customValueNames[i].c_str(), sizeof(char), strLen, file);
+    header.add_custom_value_name(customValueNames[i]);
+    header.add_custom_value_length(
+        customValues.size() > 0 ? customValues[0][i].rows() : 0);
   }
-
-  // Write trial lengths
-  for (int i = 0; i < trialPoses.size(); i++)
+  header.set_model_osim_text(openSimRawXML);
+  for (int i = 0; i < trialNames.size(); i++)
   {
-    int32_t len = trialPoses[i].cols();
-    fwrite(&len, sizeof(int32_t), 1, file);
-  }
-
-  // Write trial timesteps
-  for (int i = 0; i < trialPoses.size(); i++)
-  {
-    double timestep = trialTimesteps[i];
-    fwrite(&timestep, sizeof(double), 1, file);
-  }
-
-  // Write the `probablyMissingGrf` data
-  for (int i = 0; i < trialPoses.size(); i++)
-  {
-    // Write a magic header, to make sure we don't get lost
-    int32_t magic = 424242;
-    fwrite(&magic, sizeof(int32_t), 1, file);
-
-    for (int t = 0; t < probablyMissingGRF[i].size(); t++)
+    auto* trialHeader = header.add_trial_header();
+    if (probablyMissingGRF.size() > i && missingGRFReason.size() > i
+        && trialResidualNorms.size() > i)
     {
-      int8_t b = probablyMissingGRF[i][t];
-      fwrite(&b, sizeof(int8_t), 1, file);
+      for (int t = 0; t < probablyMissingGRF[i].size(); t++)
+      {
+        trialHeader->add_missing_grf(probablyMissingGRF[i][t]);
+        if (missingGRFReason[i].size() > t)
+        {
+          trialHeader->add_missing_grf_reason(
+              missingGRFReasonToProto(missingGRFReason[i][t]));
+        }
+        else
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "missingGRFReason out-of-bounds for trial "
+                    << i << " at time " << t << ", defaulting to notMissingGRF"
+                    << std::endl;
+          trialHeader->add_missing_grf_reason(
+              missingGRFReasonToProto(notMissingGRF));
+        }
+        if (trialResidualNorms[i].size() > t)
+        {
+          trialHeader->add_residual(trialResidualNorms[i][t]);
+        }
+        else
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "residual out-of-bounds for trial "
+                    << i << " at time " << t << ", defaulting to 0"
+                    << std::endl;
+          trialHeader->add_residual(0);
+        }
+      }
     }
-  }
-
-  // Write the `missingGRFReason` data
-  for (int i = 0; i < trialPoses.size(); i++)
-  {
-    // Write a magic header, to make sure we don't get lost
-    int32_t magic = 424242;
-    fwrite(&magic, sizeof(int32_t), 1, file);
-
-    for (int t = 0; t < missingGRFReason[i].size(); t++)
+    else
     {
-      int8_t b = missingGRFReason[i][t];
-      fwrite(&b, sizeof(int8_t), 1, file);
+      std::cout
+          << "SubjectOnDisk::writeSubject() passed bad info: "
+             "probablyMissingGRF, missingGRFReason, or trialResidualNorms "
+             "out-of-bounds for trial "
+          << i << std::endl;
     }
+    trialHeader->set_trial_timestep(trialTimesteps[i]);
+    trialHeader->set_trial_length(trialPoses[i].cols());
+    for (int j = 0; j < dofPositionsObserved[i].size(); j++)
+    {
+      trialHeader->add_dof_positions_observed(dofPositionsObserved[i][j]);
+      trialHeader->add_dof_velocities_finite_differenced(
+          dofVelocitiesFiniteDifferenced[i][j]);
+      trialHeader->add_dof_acceleration_finite_differenced(
+          dofAccelerationFiniteDifferenced[i][j]);
+    }
+
+    header.add_trial_name(trialNames[i]);
   }
+  header.set_href(sourceHref);
+  header.set_notes(notes);
+  header.set_version(1);
 
-  // Embed the model file XML directly in the binary
-  int32_t modelLen = openSimRawXML.size();
-  fwrite(&modelLen, sizeof(int32_t), 1, file);
-  fwrite(openSimRawXML.c_str(), sizeof(char), modelLen, file);
+  // 1.3. Continues in next section, after we know the size of the first
+  // serialized frame...
 
-  const int dofs = trialPoses[0].rows();
+  /////////////////////////////////////////////////////////////////////////////
+  // 2. Serialize and write the frames to the file
+  /////////////////////////////////////////////////////////////////////////////
 
-  // Write out all the frames
+  bool firstTrial = true;
+  int expectedFrameSize = -1;
+  (void)expectedFrameSize;
   for (int trial = 0; trial < trialPoses.size(); trial++)
   {
     for (int t = 0; t < trialPoses[trial].cols(); t++)
     {
-      // Always begin each from with a magic number, to allow error checking on
-      // retrieval
-      int32_t magic = 424242;
-      fwrite(&magic, sizeof(int32_t), 1, file);
-
-      // Then write, in order: pos, vel, acc, tau, external wrenches, and
-      // finally custom values
-
-      // pos
-      fwrite(
-          trialPoses[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          dofs,
-          file);
-      // vel
-      fwrite(
-          trialVels[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          dofs,
-          file);
-      // acc
-      fwrite(
-          trialAccs[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          dofs,
-          file);
-      // tau
-      fwrite(
-          trialTaus[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          dofs,
-          file);
-      // external wrenches
-      assert(
-          trialGroundBodyWrenches[trial].rows()
-          == groundForceBodies.size() * 6);
-      fwrite(
-          trialGroundBodyWrenches[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          trialGroundBodyWrenches[trial].rows(),
-          file);
-      // GRF data is COP-Torque-Force
-      assert(
-          trialGroundBodyCopTorqueForce[trial].rows()
-          == groundForceBodies.size() * 9);
-      fwrite(
-          trialGroundBodyCopTorqueForce[trial].col(t).cast<float64_t>().data(),
-          sizeof(float64_t),
-          trialGroundBodyCopTorqueForce[trial].rows(),
-          file);
-      // custom values
-      for (int i = 0; i < customValueNames.size(); i++)
+      // 2.1. Populate the protobuf frame object in memory
+      proto::SubjectOnDiskFrame frame;
+      if (trialPoses.size() > trial && trialPoses[trial].cols() > t
+          && trialVels.size() > trial && trialVels[trial].cols() > t
+          && trialAccs.size() > trial && trialAccs[trial].cols() > t)
       {
-        fwrite(
-            customValues[trial][i].col(t).cast<float64_t>().data(),
-            sizeof(float64_t),
-            customValues[trial][i].rows(),
-            file);
+        for (int i = 0; i < trialPoses[trial].rows(); i++)
+        {
+          frame.add_pos(trialPoses[trial](i, t));
+          frame.add_vel(trialVels[trial](i, t));
+          frame.add_acc(trialAccs[trial](i, t));
+          frame.add_tau(trialTaus[trial](i, t));
+        }
       }
+      else
+      {
+        std::cout
+            << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
+               "trialVels, or trialAccs out-of-bounds for trial "
+            << trial << " frame " << t << std::endl;
+      }
+
+      if (trialGroundBodyWrenches.size() > trial
+          && trialGroundBodyWrenches[trial].cols() > t
+          && trialGroundBodyWrenches[trial].rows()
+                 == 6 * groundForceBodies.size()
+          && trialGroundBodyCopTorqueForce.size() > trial
+          && trialGroundBodyCopTorqueForce[trial].cols() > t
+          && trialGroundBodyCopTorqueForce[trial].rows()
+                 == 9 * groundForceBodies.size())
+      {
+        for (int i = 0; i < groundForceBodies.size(); i++)
+        {
+          for (int j = 0; j < 6; j++)
+          {
+            frame.add_ground_contact_wrench(
+                trialGroundBodyWrenches[trial](i * 6 + j, t));
+          }
+          for (int j = 0; j < 3; j++)
+          {
+            frame.add_ground_contact_center_of_pressure(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + j, t));
+            frame.add_ground_contact_torque(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + 3 + j, t));
+            frame.add_ground_contact_force(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + 6 + j, t));
+          }
+        }
+      }
+      else
+      {
+        std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                     "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce "
+                     "out-of-bounds for trial "
+                  << trial << " frame " << t << std::endl;
+      }
+      for (int i = 0; i < 3; i++)
+      {
+        if (trialComPoses.size() < trial || trialComPoses[trial].cols() < t)
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "trialComPoses out-of-bounds for trial "
+                    << trial << std::endl;
+          frame.add_com_pos(0);
+        }
+        else
+        {
+          frame.add_com_pos(trialComPoses[trial](i, t));
+        }
+        if (trialComVels.size() < trial || trialComVels[trial].cols() < t)
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "trialComVels out-of-bounds for trial "
+                    << trial << std::endl;
+          frame.add_com_vel(0);
+        }
+        else
+        {
+          frame.add_com_vel(trialComVels[trial](i, t));
+        }
+        if (trialComAccs.size() < trial || trialComAccs[trial].cols() < t)
+        {
+          frame.add_com_acc(0);
+        }
+        else
+        {
+          frame.add_com_acc(trialComAccs[trial](i, t));
+        }
+      }
+      if (customValues.size() > trial)
+      {
+        for (int i = 0; i < customValues[trial].size(); i++)
+        {
+          for (int j = 0; j < customValues[trial][i].rows(); j++)
+          {
+            frame.add_custom_values(customValues[trial][i](j, t));
+          }
+        }
+      }
+
+      // 2.2. Serialize the protobuf header object
+      std::string frameSerialized = "";
+      frame.SerializeToString(&frameSerialized);
+
+      // 2.3. Get the length of the serialized message
+      int64_t messageSize = frameSerialized.size();
+
+      // If this is the first trial, we need to finish the header with
+      // information about the size of serialized frame objects and write the
+      // header first
+      if (firstTrial)
+      {
+        // 1.3. Continued from previous section... Write the size of the frame
+        // binaries
+        expectedFrameSize = messageSize;
+        header.set_frame_size(messageSize);
+
+        // 1.4. Serialize the protobuf header object
+        std::string headerSerialized = "";
+        header.SerializeToString(&headerSerialized);
+
+        // 1.5. Write the length of the message as an integer header
+        int64_t headerSize = headerSerialized.size();
+        fwrite(&headerSize, sizeof(int64_t), 1, file);
+
+        // 1.6. Write the serialized data to the file
+        fwrite(headerSerialized.c_str(), sizeof(char), headerSize, file);
+
+        firstTrial = false;
+      }
+      // We need all frames to be exactly the same size, in order to support
+      // random seeking in the file
+      assert(messageSize == expectedFrameSize);
+
+      // 2.4. Write the serialized data to the file
+      fwrite(frameSerialized.c_str(), sizeof(char), messageSize, file);
     }
   }
 
-  // size_t fread(void *ptr, size_t size_of_elements, size_t number_of_elements,
-  // FILE *a_file); size_t fwrite(const void *ptr, size_t size_of_elements,
-  // size_t number_of_elements, FILE *a_file);
   fclose(file);
 }
 
@@ -795,6 +757,16 @@ int SubjectOnDisk::getTrialLength(int trial)
     return 0;
   }
   return mTrialLength[trial];
+}
+
+/// This returns the timestep size for the trial
+s_t SubjectOnDisk::getTrialTimestep(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return 0.01;
+  }
+  return mTrialTimesteps[trial];
 }
 
 /// This returns the number of DOFs for the model on this Subject
@@ -824,6 +796,42 @@ std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRFReason(int trial)
     return std::vector<MissingGRFReason>();
   }
   return mMissingGRFReason[trial];
+}
+
+std::vector<bool> SubjectOnDisk::getDofPositionsObserved(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<bool>();
+  }
+  return mDofPositionsObserved[trial];
+}
+
+std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<bool>();
+  }
+  return mDofVelocitiesFiniteDifferenced[trial];
+}
+
+std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<bool>();
+  }
+  return mDofAccelerationFiniteDifferenced[trial];
+}
+
+std::vector<s_t> SubjectOnDisk::getTrialResidualNorms(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<s_t>();
+  }
+  return mTrialResidualNorms[trial];
 }
 
 /// This returns the list of contact body names for this Subject

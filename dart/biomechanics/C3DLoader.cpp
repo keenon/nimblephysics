@@ -341,7 +341,6 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       }
     }
 
-    std::vector<Eigen::Vector9s> thisFrameGRFs;
     for (int j = 0; j < forcePlatforms.size(); j++)
     {
       int frame = analogFramesPerFrame * (t + startFrame);
@@ -381,6 +380,20 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       {
         up *= -1;
       }
+    }
+    // Flip the direction of "up" if the force plates are showing up as
+    // producing downward sum forces
+    s_t sumForcesUp = 0.0;
+    for (int i = 0; i < result.forcePlates.size(); i++)
+    {
+      for (int t = 0; t < result.forcePlates[i].forces.size(); t++)
+      {
+        sumForcesUp += up.dot(result.forcePlates[i].forces[t]);
+      }
+    }
+    if (sumForcesUp < 0)
+    {
+      up *= -1;
     }
 
     // Try to get "up" to point exactly along a unit axis, to make subsequent

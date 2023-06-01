@@ -65,6 +65,13 @@ bool testWriteSubjectToDisk(
   std::vector<Eigen::MatrixXs> groundBodyCopTorqueForceTrials;
   std::vector<std::vector<bool>> probablyMissingGRFData;
   std::vector<std::vector<MissingGRFReason>> missingGRFReason;
+  std::vector<std::vector<bool>> dofPositionObserved;
+  std::vector<std::vector<bool>> dofVelocityFiniteDifferenced;
+  std::vector<std::vector<bool>> dofAccelerationFiniteDifferenced;
+  std::vector<std::vector<s_t>> residualNorms;
+  std::vector<Eigen::MatrixXs> trialComPoses;
+  std::vector<Eigen::MatrixXs> trialComVelocities;
+  std::vector<Eigen::MatrixXs> trialComAccelerations;
   std::vector<std::string> customValueNames;
   std::vector<std::vector<Eigen::MatrixXs>> customValueTrials;
 
@@ -151,6 +158,7 @@ bool testWriteSubjectToDisk(
 
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> grfReason;
+    std::vector<s_t> residuals;
     for (int t = 0; t < poseTrials[trial].cols(); t++)
     {
       missingGRF.push_back(t % 10 == 0);
@@ -163,9 +171,31 @@ bool testWriteSubjectToDisk(
       {
         grfReason.push_back(MissingGRFReason::notMissingGRF);
       }
+      residuals.push_back(t);
     }
     missingGRFReason.push_back(grfReason);
     probablyMissingGRFData.push_back(missingGRF);
+    residualNorms.push_back(residuals);
+
+    std::vector<bool> positionObserved;
+    std::vector<bool> velocityFiniteDifferenced;
+    std::vector<bool> accelerationFiniteDifferenced;
+    for (int i = 0; i < poseTrials[trial].rows(); i++)
+    {
+      positionObserved.push_back(i % 2 == 0);
+      velocityFiniteDifferenced.push_back(i % 3 == 0);
+      accelerationFiniteDifferenced.push_back(i % 4 == 0);
+    }
+    dofPositionObserved.push_back(positionObserved);
+    dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
+    dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
+
+    trialComPoses.push_back(
+        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
+    trialComVelocities.push_back(
+        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
+    trialComAccelerations.push_back(
+        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
   }
 
   std::vector<std::string> trialNames;
@@ -189,7 +219,14 @@ bool testWriteSubjectToDisk(
       accTrials,
       probablyMissingGRFData,
       missingGRFReason,
+      dofPositionObserved,
+      dofVelocityFiniteDifferenced,
+      dofAccelerationFiniteDifferenced,
       tauTrials,
+      trialComPoses,
+      trialComVelocities,
+      trialComAccelerations,
+      residualNorms,
       groundForceBodies,
       groundBodyWrenchTrials,
       groundBodyCopTorqueForceTrials,
@@ -247,7 +284,7 @@ bool testWriteSubjectToDisk(
       std::cout << "Checking frame " << frame->trial << ":" << frame->t
                 << std::endl;
 
-      if (abs(frame->dt - timesteps[frame->trial]) > 1e-8)
+      if (abs(subject.getTrialTimestep(trial) - timesteps[frame->trial]) > 1e-8)
       {
         std::cout << "dt not recovered" << std::endl;
         return false;
@@ -288,13 +325,14 @@ bool testWriteSubjectToDisk(
         std::cout << "Tau not recovered" << std::endl;
         return false;
       }
-      for (int b = 0; b < frame->groundContactWrenches.size(); b++)
+      for (int b = 0; b < subject.getGroundContactBodies().size(); b++)
       {
         Eigen::Vector6s originalWrench
             = groundBodyWrenchTrials[frame->trial].col(frame->t).segment<6>(
                 b * 6);
-        if (!equals(
-                originalWrench, frame->groundContactWrenches[b].second, 1e-8))
+        Eigen::Vector6s recoveredWrench
+            = frame->groundContactWrenches.segment<6>(b * 6);
+        if (!equals(originalWrench, recoveredWrench, 1e-8))
         {
           std::cout << "Body wrench not recovered" << std::endl;
           return false;
@@ -303,10 +341,9 @@ bool testWriteSubjectToDisk(
             = groundBodyCopTorqueForceTrials[frame->trial]
                   .col(frame->t)
                   .segment<3>(b * 9);
-        if (!equals(
-                originalCoP,
-                frame->groundContactCenterOfPressure[b].second,
-                1e-8))
+        Eigen::Vector3s recoveredCoP
+            = frame->groundContactCenterOfPressure.segment<3>(b * 3);
+        if (!equals(originalCoP, recoveredCoP, 1e-8))
         {
           std::cout << "GRF CoP not recovered" << std::endl;
           return false;
@@ -315,7 +352,9 @@ bool testWriteSubjectToDisk(
             = groundBodyCopTorqueForceTrials[frame->trial]
                   .col(frame->t)
                   .segment<3>((b * 9) + 3);
-        if (!equals(originalTau, frame->groundContactTorque[b].second, 1e-8))
+        Eigen::Vector3s recoveredTau
+            = frame->groundContactTorque.segment<3>(b * 3);
+        if (!equals(originalTau, recoveredTau, 1e-8))
         {
           std::cout << "GRF Tau not recovered" << std::endl;
           return false;
@@ -323,7 +362,9 @@ bool testWriteSubjectToDisk(
         Eigen::Vector3s originalF = groundBodyCopTorqueForceTrials[frame->trial]
                                         .col(frame->t)
                                         .segment<3>((b * 9) + 6);
-        if (!equals(originalF, frame->groundContactForce[b].second, 1e-8))
+        Eigen::Vector3s recoveredF
+            = frame->groundContactForce.segment<3>(b * 3);
+        if (!equals(originalF, recoveredF, 1e-8))
         {
           std::cout << "GRF Force not recovered" << std::endl;
           return false;
@@ -368,10 +409,13 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
 
   std::string path = "./testSubject.bin";
 
-  EXPECT_TRUE(testWriteSubjectToDisk(
-      path,
-      "dart://sample/osim/OpenCapTest/Subject4/Models/"
-      "unscaled_generic.osim",
-      motFiles,
-      grfFiles));
+  for (int i = 0; i < 10; i++)
+  {
+    EXPECT_TRUE(testWriteSubjectToDisk(
+        path,
+        "dart://sample/osim/OpenCapTest/Subject4/Models/"
+        "unscaled_generic.osim",
+        motFiles,
+        grfFiles));
+  }
 }

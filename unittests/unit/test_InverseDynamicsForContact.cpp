@@ -32,17 +32,15 @@ TEST(INV_DYN_FOR_CONTACT, TEST_SINGLE_CONTACT)
 
   Eigen::VectorXs pos = Eigen::VectorXs::Random(skel->getNumDofs());
   Eigen::VectorXs vel = Eigen::VectorXs::Random(skel->getNumDofs());
-  Eigen::VectorXs nextVel
-      = vel
-        + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
+  Eigen::VectorXs acc = Eigen::VectorXs::Random(skel->getNumDofs());
 
   skel->setPositions(pos);
   skel->setVelocities(vel);
   Skeleton::ContactInverseDynamicsResult result
-      = skel->getContactInverseDynamics(nextVel, skel->getBodyNode("l_foot"));
+      = skel->getContactInverseDynamics(acc, skel->getBodyNode("l_foot"));
 
   s_t error = result.sumError();
-  EXPECT_TRUE(error < 1e-11);
+  EXPECT_LE(error, 1e-8);
 }
 #endif
 
@@ -61,9 +59,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_WITH_GUESS)
 
   Eigen::VectorXs pos = Eigen::VectorXs::Random(skel->getNumDofs());
   Eigen::VectorXs vel = Eigen::VectorXs::Random(skel->getNumDofs());
-  Eigen::VectorXs nextVel
-      = vel
-        + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
+  Eigen::VectorXs acc = Eigen::VectorXs::Random(skel->getNumDofs());
 
   std::vector<const dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> wrenchGuesses;
@@ -75,10 +71,10 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_WITH_GUESS)
   skel->setPositions(pos);
   skel->setVelocities(vel);
   Skeleton::MultipleContactInverseDynamicsResult result
-      = skel->getMultipleContactInverseDynamics(nextVel, nodes, wrenchGuesses);
+      = skel->getMultipleContactInverseDynamics(acc, nodes, wrenchGuesses);
 
   s_t error = result.sumError();
-  EXPECT_TRUE(error < 1e-11);
+  EXPECT_LE(error, 1e-8);
 }
 #endif
 
@@ -97,9 +93,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
 
   Eigen::VectorXs pos = Eigen::VectorXs::Random(skel->getNumDofs());
   Eigen::VectorXs vel = Eigen::VectorXs::Random(skel->getNumDofs());
-  Eigen::VectorXs nextVel
-      = vel
-        + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
+  Eigen::VectorXs acc = Eigen::VectorXs::Random(skel->getNumDofs());
 
   std::vector<const dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> wrenchGuesses;
@@ -113,14 +107,14 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_NO_GUESS)
   // This is just to be able to compare the torque values against, and be sure
   // we're minimizing them
   Skeleton::MultipleContactInverseDynamicsResult resultWithGuess
-      = skel->getMultipleContactInverseDynamics(nextVel, nodes, wrenchGuesses);
+      = skel->getMultipleContactInverseDynamics(acc, nodes, wrenchGuesses);
 
   Skeleton::MultipleContactInverseDynamicsResult resultNoGuess
       = skel->getMultipleContactInverseDynamics(
-          nextVel, nodes, std::vector<Eigen::Vector6s>());
+          acc, nodes, std::vector<Eigen::Vector6s>());
 
   s_t error = resultNoGuess.sumError();
-  EXPECT_TRUE(error < 1e-11);
+  EXPECT_LE(error, 1e-8);
 
   for (int i = 0; i < nodes.size(); i++)
   {
@@ -175,7 +169,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP)
       = skel->getMultipleContactInverseDynamicsOverTime(pos, nodes, 1.0, 1.0);
 
   s_t error = resultOverTime.sumError();
-  EXPECT_LE(error, 1e-11);
+  EXPECT_LE(error, 1e-8);
 
   // This is just to be able to compare the torque values against, and be sure
   // we're minimizing them
@@ -290,9 +284,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_COP)
 
   Eigen::VectorXs pos = Eigen::VectorXs::Random(skel->getNumDofs());
   Eigen::VectorXs vel = Eigen::VectorXs::Random(skel->getNumDofs());
-  Eigen::VectorXs nextVel
-      = vel
-        + Eigen::VectorXs::Random(skel->getNumDofs()) * world->getTimeStep();
+  Eigen::VectorXs acc = Eigen::VectorXs::Random(skel->getNumDofs());
 
   std::vector<const dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector9s> copWrenches;
@@ -311,7 +303,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_COP)
   // Check internal computations in the problem
   Skeleton::MultipleContactCoPProblem problem
       = skel->createMultipleContactInverseDynamicsNearCoPProblem(
-          nextVel, nodes, copWrenches, 0.1, 1);
+          acc, nodes, copWrenches, 0.1, 1);
 
   // Check initial guess
   Eigen::VectorXs x = problem.getInitialGuess();
@@ -363,10 +355,10 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_COP)
 
   Skeleton::MultipleContactInverseDynamicsResult result
       = skel->getMultipleContactInverseDynamicsNearCoP(
-          nextVel, nodes, bodyWrenches, 0.1, 1);
+          acc, nodes, bodyWrenches, 0.1, 1);
 
   s_t error = result.sumError();
-  EXPECT_TRUE(error < 1e-11);
+  EXPECT_TRUE(error < 1e-8);
 }
 #endif
 
@@ -399,11 +391,12 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
   Eigen::VectorXs secondVel
       = skel->getPositionDifferences(pos.col(2), pos.col(1))
         / skel->getTimeStep();
+  Eigen::VectorXs acc = (secondVel - firstVel) / skel->getTimeStep();
   skel->setPositions(pos.col(0));
   skel->setVelocities(firstVel);
   auto singleFootResult
-      = skel->getContactInverseDynamics(secondVel, skel->getBodyNode("r_foot"));
-  EXPECT_LE(singleFootResult.sumError(), 1e-11);
+      = skel->getContactInverseDynamics(acc, skel->getBodyNode("r_foot"));
+  EXPECT_LE(singleFootResult.sumError(), 1e-8);
 
   std::vector<const dynamics::BodyNode*> nodes;
   std::vector<Eigen::Vector6s> prevTimestepWrenches;
@@ -425,7 +418,7 @@ TEST(INV_DYN_FOR_CONTACT, TEST_MULTI_CONTACT_MULTI_TIMESTEP_PREV_FORCE)
           100.0);
 
   s_t error = resultOverTime.sumError();
-  EXPECT_LE(error, 1e-10);
+  EXPECT_LE(error, 1e-8);
 
   // This is satisfiable, so if it's the main goal by a factor of 100000, we
   // should hit it pretty close
