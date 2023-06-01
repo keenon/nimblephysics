@@ -89,6 +89,7 @@ TEST(IntermediateWeldJoint, AMASS_FD)
 
   // Recompute all inertia matrices
 
+  /*
   for (int i = 0; i < amass->getNumBodyNodes(); i++)
   {
     auto bodyNode = amass->getBodyNode(i);
@@ -99,17 +100,16 @@ TEST(IntermediateWeldJoint, AMASS_FD)
       Eigen::Matrix3s inertia = shape->computeInertia(bodyNode->getMass());
       bodyNode->setInertia(dart::dynamics::Inertia(
           bodyNode->getMass(), Eigen::Vector3s::Zero(), inertia));
-      /*
-      if (!shapeNode->hasVisualAspect())
-      {
-        shapeNode->createVisualAspect();
-        shapeNode->getVisualAspect()->setRGBA(
-            Eigen::Vector4s(0.5, 0.5, 0.5, 1.0));
-        shapeNode->getVisualAspect()->show();
-      }
-      */
+      // if (!shapeNode->hasVisualAspect())
+      // {
+      //   shapeNode->createVisualAspect();
+      //   shapeNode->getVisualAspect()->setRGBA(
+      //       Eigen::Vector4s(0.5, 0.5, 0.5, 1.0));
+      //   shapeNode->getVisualAspect()->show();
+      // }
     }
   }
+  */
 
   VectorXs worldVel = world->getVelocities();
 

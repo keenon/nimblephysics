@@ -15146,10 +15146,6 @@ void DynamicsFitter::computePerfectGRFs(
                                init->poseTrials[trial].col(t - 1))
                            / dt;
       mSkeleton->setVelocities(dq);
-      Eigen::VectorXs nextDq = mSkeleton->getPositionDifferences(
-                                   init->poseTrials[trial].col(t + 1),
-                                   init->poseTrials[trial].col(t))
-                               / dt;
       Eigen::VectorXs ddq = (mSkeleton->getPositionDifferences(
                                  init->poseTrials[trial].col(t + 1),
                                  init->poseTrials[trial].col(t))
@@ -15199,7 +15195,7 @@ void DynamicsFitter::computePerfectGRFs(
       if (onlyOneActive && onlyOneForcePlateActive)
       {
         auto result = mSkeleton->getContactInverseDynamics(
-            nextDq, init->grfBodyNodes[activeFootIndex]);
+            ddq, init->grfBodyNodes[activeFootIndex]);
         perfectTorques.col(t) = result.jointTorques;
         Eigen::Vector6s worldWrench = math::dAdInvT(
             init->grfBodyNodes[activeFootIndex]->getWorldTransform(),
@@ -15250,7 +15246,7 @@ void DynamicsFitter::computePerfectGRFs(
               sensorWorldGRF.segment<6>(i * 6)));
         }
         auto resultCops = mSkeleton->getMultipleContactInverseDynamicsNearCoP(
-            nextDq,
+            ddq,
             constFootNodes,
             localWrenches,
             init->groundHeight[trial],
@@ -15780,7 +15776,12 @@ void DynamicsFitter::writeSubjectOnDisk(
                                 : helper.calculateInverseDynamics(
                                     q, dq, ddq, init->grfTrials[trial].col(t));
       taus.col(t - 1) = tau;
-      rootResidualNorms.push_back(tau.head<6>().norm());
+
+      s_t rootNorm = tau.size() > 6
+                         ? tau.head<6>().norm()
+                         : 0.0; // If there are 6 or fewer DOFs, then this
+                                // skeleton doesn't have a normal root
+      rootResidualNorms.push_back(rootNorm);
 
       bodyWrenches.col(t - 1) = init->grfTrials[trial].col(t);
       Eigen::VectorXs footContactData

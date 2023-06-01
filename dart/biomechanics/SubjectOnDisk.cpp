@@ -512,7 +512,7 @@ void SubjectOnDisk::writeSubject(
 
   // 1.2. Populate the protobuf header object in memory
   proto::SubjectOnDiskHeader header;
-  header.set_num_dofs(trialPoses[0].rows());
+  header.set_num_dofs(trialPoses.size() > 0 ? trialPoses[0].rows() : 0);
   header.set_num_trials(trialPoses.size());
   for (std::string& body : groundForceBodies)
   {
@@ -521,18 +521,54 @@ void SubjectOnDisk::writeSubject(
   for (int i = 0; i < customValueNames.size(); i++)
   {
     header.add_custom_value_name(customValueNames[i]);
-    header.add_custom_value_length(customValues[0][i].rows());
+    header.add_custom_value_length(
+        customValues.size() > 0 ? customValues[0][i].rows() : 0);
   }
   header.set_model_osim_text(openSimRawXML);
   for (int i = 0; i < trialNames.size(); i++)
   {
     auto* trialHeader = header.add_trial_header();
-    for (int t = 0; t < probablyMissingGRF[i].size(); t++)
+    if (probablyMissingGRF.size() > i && missingGRFReason.size() > i
+        && trialResidualNorms.size() > i)
     {
-      trialHeader->add_missing_grf(probablyMissingGRF[i][t]);
-      trialHeader->add_missing_grf_reason(
-          missingGRFReasonToProto(missingGRFReason[i][t]));
-      trialHeader->add_residual(trialResidualNorms[i][t]);
+      for (int t = 0; t < probablyMissingGRF[i].size(); t++)
+      {
+        trialHeader->add_missing_grf(probablyMissingGRF[i][t]);
+        if (missingGRFReason[i].size() > t)
+        {
+          trialHeader->add_missing_grf_reason(
+              missingGRFReasonToProto(missingGRFReason[i][t]));
+        }
+        else
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "missingGRFReason out-of-bounds for trial "
+                    << i << " at time " << t << ", defaulting to notMissingGRF"
+                    << std::endl;
+          trialHeader->add_missing_grf_reason(
+              missingGRFReasonToProto(notMissingGRF));
+        }
+        if (trialResidualNorms[i].size() > t)
+        {
+          trialHeader->add_residual(trialResidualNorms[i][t]);
+        }
+        else
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "residual out-of-bounds for trial "
+                    << i << " at time " << t << ", defaulting to 0"
+                    << std::endl;
+          trialHeader->add_residual(0);
+        }
+      }
+    }
+    else
+    {
+      std::cout
+          << "SubjectOnDisk::writeSubject() passed bad info: "
+             "probablyMissingGRF, missingGRFReason, or trialResidualNorms "
+             "out-of-bounds for trial "
+          << i << std::endl;
     }
     trialHeader->set_trial_timestep(trialTimesteps[i]);
     trialHeader->set_trial_length(trialPoses[i].cols());
@@ -567,41 +603,101 @@ void SubjectOnDisk::writeSubject(
     {
       // 2.1. Populate the protobuf frame object in memory
       proto::SubjectOnDiskFrame frame;
-      for (int i = 0; i < trialPoses[trial].rows(); i++)
+      if (trialPoses.size() > trial && trialPoses[trial].cols() > t
+          && trialVels.size() > trial && trialVels[trial].cols() > t
+          && trialAccs.size() > trial && trialAccs[trial].cols() > t)
       {
-        frame.add_pos(trialPoses[trial](i, t));
-        frame.add_vel(trialVels[trial](i, t));
-        frame.add_acc(trialAccs[trial](i, t));
-        frame.add_tau(trialTaus[trial](i, t));
+        for (int i = 0; i < trialPoses[trial].rows(); i++)
+        {
+          frame.add_pos(trialPoses[trial](i, t));
+          frame.add_vel(trialVels[trial](i, t));
+          frame.add_acc(trialAccs[trial](i, t));
+          frame.add_tau(trialTaus[trial](i, t));
+        }
       }
-      for (int i = 0; i < groundForceBodies.size(); i++)
+      else
       {
-        for (int j = 0; j < 6; j++)
+        std::cout
+            << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
+               "trialVels, or trialAccs out-of-bounds for trial "
+            << trial << " frame " << t << std::endl;
+      }
+
+      if (trialGroundBodyWrenches.size() > trial
+          && trialGroundBodyWrenches[trial].cols() > t
+          && trialGroundBodyWrenches[trial].rows()
+                 == 6 * groundForceBodies.size()
+          && trialGroundBodyCopTorqueForce.size() > trial
+          && trialGroundBodyCopTorqueForce[trial].cols() > t
+          && trialGroundBodyCopTorqueForce[trial].rows()
+                 == 9 * groundForceBodies.size())
+      {
+        for (int i = 0; i < groundForceBodies.size(); i++)
         {
-          frame.add_ground_contact_wrench(
-              trialGroundBodyWrenches[trial](i * 6 + j, t));
+          for (int j = 0; j < 6; j++)
+          {
+            frame.add_ground_contact_wrench(
+                trialGroundBodyWrenches[trial](i * 6 + j, t));
+          }
+          for (int j = 0; j < 3; j++)
+          {
+            frame.add_ground_contact_center_of_pressure(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + j, t));
+            frame.add_ground_contact_torque(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + 3 + j, t));
+            frame.add_ground_contact_force(
+                trialGroundBodyCopTorqueForce[trial](i * 9 + 6 + j, t));
+          }
         }
-        for (int j = 0; j < 3; j++)
-        {
-          frame.add_ground_contact_center_of_pressure(
-              trialGroundBodyCopTorqueForce[trial](i * 9 + j, t));
-          frame.add_ground_contact_torque(
-              trialGroundBodyCopTorqueForce[trial](i * 9 + 3 + j, t));
-          frame.add_ground_contact_force(
-              trialGroundBodyCopTorqueForce[trial](i * 9 + 6 + j, t));
-        }
+      }
+      else
+      {
+        std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                     "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce "
+                     "out-of-bounds for trial "
+                  << trial << " frame " << t << std::endl;
       }
       for (int i = 0; i < 3; i++)
       {
-        frame.add_com_pos(trialComPoses[trial](i, t));
-        frame.add_com_vel(trialComVels[trial](i, t));
-        frame.add_com_acc(trialComAccs[trial](i, t));
-      }
-      for (int i = 0; i < customValues[trial].size(); i++)
-      {
-        for (int j = 0; j < customValues[trial][i].rows(); j++)
+        if (trialComPoses.size() < trial || trialComPoses[trial].cols() < t)
         {
-          frame.add_custom_values(customValues[trial][i](j, t));
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "trialComPoses out-of-bounds for trial "
+                    << trial << std::endl;
+          frame.add_com_pos(0);
+        }
+        else
+        {
+          frame.add_com_pos(trialComPoses[trial](i, t));
+        }
+        if (trialComVels.size() < trial || trialComVels[trial].cols() < t)
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "trialComVels out-of-bounds for trial "
+                    << trial << std::endl;
+          frame.add_com_vel(0);
+        }
+        else
+        {
+          frame.add_com_vel(trialComVels[trial](i, t));
+        }
+        if (trialComAccs.size() < trial || trialComAccs[trial].cols() < t)
+        {
+          frame.add_com_acc(0);
+        }
+        else
+        {
+          frame.add_com_acc(trialComAccs[trial](i, t));
+        }
+      }
+      if (customValues.size() >= trial)
+      {
+        for (int i = 0; i < customValues[trial].size(); i++)
+        {
+          for (int j = 0; j < customValues[trial][i].rows(); j++)
+          {
+            frame.add_custom_values(customValues[trial][i](j, t));
+          }
         }
       }
 

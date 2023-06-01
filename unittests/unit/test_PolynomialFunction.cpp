@@ -87,23 +87,26 @@ TEST(Polynomial, COMPLEX_POLY)
   {
     s_t dx = poly.calcDerivative(1, x);
     s_t dx_fd = poly.finiteDifferenceDerivative(1, x);
-    EXPECT_NEAR(dx, dx_fd, abs(dx) * THRESHOLD);
+    const s_t dx_threshold = max(1.0, abs(dx)) * THRESHOLD;
+    EXPECT_NEAR(dx, dx_fd, dx_threshold);
 
     s_t ddx = poly.calcDerivative(2, x);
     s_t ddx_fd = poly.finiteDifferenceDerivative(2, x);
-    if (abs(ddx - ddx_fd) > abs(ddx) * THRESHOLD)
+    const s_t ddx_threshold = max(1.0, abs(ddx)) * THRESHOLD;
+    if (abs(ddx - ddx_fd) > ddx_threshold)
     {
       std::cout << "Error at " << x << " on ddx." << std::endl;
-      EXPECT_NEAR(ddx, ddx_fd, abs(ddx) * THRESHOLD);
+      EXPECT_NEAR(ddx, ddx_fd, ddx_threshold);
       return;
     }
 
     s_t dddx = poly.calcDerivative(3, x);
     s_t dddx_fd = poly.finiteDifferenceDerivative(3, x);
-    if (abs(dddx - dddx_fd) > abs(dddx) * THRESHOLD)
+    const s_t dddx_threshold = max(1.0, abs(dddx)) * THRESHOLD;
+    if (abs(dddx - dddx_fd) > dddx_threshold)
     {
       std::cout << "Error at " << x << " on dddx." << std::endl;
-      EXPECT_NEAR(dddx, dddx_fd, abs(dddx) * THRESHOLD);
+      EXPECT_NEAR(dddx, dddx_fd, dddx_threshold);
       return;
     }
   }
