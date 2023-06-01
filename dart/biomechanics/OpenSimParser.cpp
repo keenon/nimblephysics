@@ -17,6 +17,7 @@
 
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -3067,36 +3068,44 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   // Check that the values in timestamps cover the range of values in
   // targetTimestamps
   if (!targetTimestamps.empty()) {
-    assert(timestamps.size() > 0);
-    assert(timestamps[0] <= targetTimestamps[0]);
-    assert(timestamps[timestamps.size() - 1]
-           >= targetTimestamps[targetTimestamps.size() - 1]);
+    bool outOfRangeEarly = timestamps[0] > targetTimestamps[0];
+    bool outOfRangeLate = timestamps[timestamps.size() - 1]
+                          < targetTimestamps[targetTimestamps.size() - 1];
+    THROW_IF(outOfRangeEarly || outOfRangeLate, "Values in argument "
+        "'targetTimestamps' are out of range of the timestamps in the file.");
   }
 
   // Find a vector of indices where the timestamps are closest to the values in
   // targetTimestamps.
   std::vector<int> targetTimestampIndices;
-  for (int i = 0; i < (int)targetTimestamps.size(); i++)
-  {
-    s_t targetTimestamp = targetTimestamps[i];
-    int closestIndex = 0;
-    s_t closestDistance = std::numeric_limits<s_t>::infinity();
-    for (int j = 0; j < (int)timestamps.size(); j++)
-    {
-      s_t distance = std::abs(timestamps[j] - targetTimestamp);
-      if (distance < closestDistance)
-      {
-        closestDistance = distance;
-        closestIndex = j;
-      }
+  if (targetTimestamps.empty()) {
+    for (int i = 0; i < (int)timestamps.size(); i++) {
+      targetTimestampIndices.push_back(i);
     }
-    targetTimestampIndices.push_back(closestIndex);
+  } else {
+    for (int i = 0; i < (int)targetTimestamps.size(); i++)
+    {
+      s_t targetTimestamp = targetTimestamps[i];
+      int closestIndex = 0;
+      s_t closestDistance = std::numeric_limits<s_t>::infinity();
+      for (int j = 0; j < (int)timestamps.size(); j++)
+      {
+        s_t distance = std::abs(timestamps[j] - targetTimestamp);
+        if (distance < closestDistance)
+        {
+          closestDistance = distance;
+          closestIndex = j;
+        }
+      }
+      targetTimestampIndices.push_back(closestIndex);
+    }
   }
 
   // Check that targetTimestampIndices is monotonically increasing.
-  for (int i = 1; i < (int)targetTimestampIndices.size(); i++)
-  {
-    assert(targetTimestampIndices[i] > targetTimestampIndices[i - 1]);
+  for (int i = 1; i < (int)targetTimestampIndices.size(); i++) {
+    THROW_IF(targetTimestampIndices[i] <= targetTimestampIndices[i - 1],
+             "Expected the timestamps found based on targetTimestamps to be "
+             "monotonically increasing, but they are not.");
   }
 
   std::vector<ForcePlate> forcePlates;

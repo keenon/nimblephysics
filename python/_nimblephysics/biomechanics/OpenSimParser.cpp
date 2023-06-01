@@ -309,7 +309,7 @@ void OpenSimParser(py::module& m)
             path, targetTimestamps);
       },
       ::py::arg("path"),
-      ::py::arg("targetTimestamps"));
+      ::py::arg("targetTimestamps") = ::py::list());
 
   sm.def(
       "saveTRC",
