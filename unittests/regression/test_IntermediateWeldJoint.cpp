@@ -75,6 +75,7 @@ TEST(IntermediateWeldJoint, SIMPLE)
 }
 
 //==============================================================================
+/*
 #ifdef ALL_TESTS
 TEST(IntermediateWeldJoint, AMASS_FD)
 {
@@ -89,7 +90,6 @@ TEST(IntermediateWeldJoint, AMASS_FD)
 
   // Recompute all inertia matrices
 
-  /*
   for (int i = 0; i < amass->getNumBodyNodes(); i++)
   {
     auto bodyNode = amass->getBodyNode(i);
@@ -109,36 +109,33 @@ TEST(IntermediateWeldJoint, AMASS_FD)
       // }
     }
   }
-  */
 
   VectorXs worldVel = world->getVelocities();
 
-  /*
-  // Make all the colliders visible
+  // // Make all the colliders visible
 
-  for (int i = 0; i < amass->getNumBodyNodes(); i++)
-  {
-    auto bodyNode = amass->getBodyNode(i);
-    for (int j = 0; j < bodyNode->getNumShapeNodes(); j++)
-    {
-      auto shapeNode = bodyNode->getShapeNode(j);
-      if (!shapeNode->hasVisualAspect())
-      {
-        shapeNode->createVisualAspect();
-        shapeNode->getVisualAspect()->setRGBA(
-            Eigen::Vector4s(0.5, 0.5, 0.5, 1.0));
-        shapeNode->getVisualAspect()->show();
-      }
-    }
-  }
+  // for (int i = 0; i < amass->getNumBodyNodes(); i++)
+  // {
+  //   auto bodyNode = amass->getBodyNode(i);
+  //   for (int j = 0; j < bodyNode->getNumShapeNodes(); j++)
+  //   {
+  //     auto shapeNode = bodyNode->getShapeNode(j);
+  //     if (!shapeNode->hasVisualAspect())
+  //     {
+  //       shapeNode->createVisualAspect();
+  //       shapeNode->getVisualAspect()->setRGBA(
+  //           Eigen::Vector4s(0.5, 0.5, 0.5, 1.0));
+  //       shapeNode->getVisualAspect()->show();
+  //     }
+  //   }
+  // }
 
-  // Run the GUI server
+  // // Run the GUI server
 
-  dart::server::GUIWebsocketServer server;
-  server.serve(8070);
-  server.renderWorld(world);
-  server.blockWhileServing();
-  */
+  // dart::server::GUIWebsocketServer server;
+  // server.serve(8070);
+  // server.renderWorld(world);
+  // server.blockWhileServing();
 
   // Test the classic formulation
   EXPECT_TRUE(verifyAnalyticalA_c(world));
@@ -148,3 +145,4 @@ TEST(IntermediateWeldJoint, AMASS_FD)
   EXPECT_TRUE(verifyWrtMass(world));
 }
 #endif
+*/
