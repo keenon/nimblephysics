@@ -88,12 +88,9 @@ bool testWriteSubjectToDisk(
     s_t dt = 1.0 / (s_t)framesPerSecond;
     timesteps.push_back(dt);
 
-    for (int i = 0; i < grfFiles.size(); i++)
-    {
-      std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], framesPerSecond);
-      forcePlateTrials.push_back(grf);
-    }
+    std::vector<ForcePlate> grf
+        = OpenSimParser::loadGRF(grfFiles[i], mot.timestamps);
+    forcePlateTrials.push_back(grf);
   }
 
   // This code trims all the timesteps down, if we asked for that

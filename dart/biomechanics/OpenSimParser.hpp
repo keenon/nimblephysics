@@ -282,7 +282,7 @@ public:
   /// This grabs the GRF forces from a *.mot file
   static std::vector<ForcePlate> loadGRF(
       const common::Uri& uri,
-      int targetFramesPerSecond = 100,
+      const std::vector<double>& targetTimestamps = {},
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// This loads IMU data from a CSV file, where the headers of columns are

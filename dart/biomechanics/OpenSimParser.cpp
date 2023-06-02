@@ -17,6 +17,7 @@
 
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
@@ -2774,7 +2775,7 @@ void OpenSimParser::saveMarkerLocationsMot(
 /// This grabs the GRF forces from a *.mot file
 std::vector<ForcePlate> OpenSimParser::loadGRF(
     const common::Uri& uri,
-    int targetFramesPerSecond,
+    const std::vector<double>& targetTimestamps,
     const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
@@ -3064,67 +3065,60 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   assert(timestamps.size() == copRows.size());
   assert(timestamps.size() == wrenchRows.size());
 
-  int downsampleByFactor = 1;
-  if (timestamps.size() > 1)
-  {
-    int frames = timestamps.size();
-    s_t elapsed = timestamps[timestamps.size() - 1] - timestamps[0];
-    int framesPerSecond = roundToNearestMultiple((int)(frames / elapsed), 10);
-    if (framesPerSecond < targetFramesPerSecond)
-    {
-      std::cout << "WARNING!!! OpenSimParser is trying to load "
-                   "ground-reaction-force data from "
-                << uri.toString()
-                << ", but the requested target frames per second ("
-                << targetFramesPerSecond
-                << ", probably to match a corresponding .trc file) is HIGHER "
-                   "than the file's native frames per second ("
-                << framesPerSecond
-                << "). We don't yet support up-sampling GRF data, so this will "
-                   "result in mismatched data!"
-                << std::endl;
+  // Check that the values in timestamps cover the range of values in
+  // targetTimestamps
+  if (!targetTimestamps.empty()) {
+    bool outOfRangeEarly = timestamps[0] > targetTimestamps[0];
+    bool outOfRangeLate = timestamps[timestamps.size() - 1]
+                          < targetTimestamps[targetTimestamps.size() - 1];
+    THROW_IF(outOfRangeEarly || outOfRangeLate, "Values in argument "
+        "'targetTimestamps' are out of range of the timestamps in the file.");
+  }
+
+  // Find a vector of indices where the timestamps are closest to the values in
+  // targetTimestamps.
+  std::vector<int> targetTimestampIndices;
+  if (targetTimestamps.empty()) {
+    for (int i = 0; i < (int)timestamps.size(); i++) {
+      targetTimestampIndices.push_back(i);
     }
-    else
+  } else {
+    for (int i = 0; i < (int)targetTimestamps.size(); i++)
     {
-      downsampleByFactor = framesPerSecond / targetFramesPerSecond;
+      s_t targetTimestamp = targetTimestamps[i];
+      int closestIndex = 0;
+      s_t closestDistance = std::numeric_limits<s_t>::infinity();
+      for (int j = 0; j < (int)timestamps.size(); j++)
+      {
+        s_t distance = std::abs(timestamps[j] - targetTimestamp);
+        if (distance < closestDistance)
+        {
+          closestDistance = distance;
+          closestIndex = j;
+        }
+      }
+      targetTimestampIndices.push_back(closestIndex);
     }
   }
-  (void)downsampleByFactor;
 
-  // Process result into its final form
+  // Check that targetTimestampIndices is monotonically increasing.
+  for (int i = 1; i < (int)targetTimestampIndices.size(); i++) {
+    THROW_IF(targetTimestampIndices[i] <= targetTimestampIndices[i - 1],
+             "Expected the timestamps found based on targetTimestamps to be "
+             "monotonically increasing, but they are not.");
+  }
 
-  s_t roundTimestampsToNearest = 1.0 / targetFramesPerSecond;
   std::vector<ForcePlate> forcePlates;
   for (int i = 0; i < numPlates; i++)
   {
     forcePlates.emplace_back();
     ForcePlate& forcePlate = forcePlates[forcePlates.size() - 1];
-
-    Eigen::Vector3s copAvg = Eigen::Vector3s::Zero();
-    Eigen::Vector6s wrenchAvg = Eigen::Vector6s::Zero();
-    int numAveraged = 0;
-    for (int t = 0; t < timestamps.size(); t++)
+    for (auto t : targetTimestampIndices)
     {
-      copAvg += copRows[t][i];
-      wrenchAvg += wrenchRows[t][i];
-      numAveraged++;
-      s_t timestampRoundedToNearest = std::round(
-          timestamps[t] / roundTimestampsToNearest) * roundTimestampsToNearest;
-      s_t diff = timestamps[t] - timestampRoundedToNearest;
-      if (std::abs(diff) < 1e-8) {
-        // std::cout << "Using timestep " << timestamps[t] << std::endl;
-        forcePlate.timestamps.push_back(timestamps[t]);
-        forcePlate.centersOfPressure.push_back(copAvg / numAveraged);
-        forcePlate.moments.push_back(wrenchAvg.segment<3>(0) / numAveraged);
-        forcePlate.forces.push_back(wrenchAvg.segment<3>(3) / numAveraged);
-
-        numAveraged = 0;
-        copAvg.setZero();
-        wrenchAvg.setZero();
-      }
-      else {
-        // std::cout << "Skipping timestep " << timestamps[t] << std::endl;
-      }
+      forcePlate.timestamps.push_back(timestamps[t]);
+      forcePlate.centersOfPressure.push_back(copRows[t][i]);
+      forcePlate.moments.push_back(wrenchRows[t][i].segment<3>(0));
+      forcePlate.forces.push_back(wrenchRows[t][i].segment<3>(3));
     }
   }
 

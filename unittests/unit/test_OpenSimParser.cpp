@@ -416,8 +416,7 @@ TEST(OpenSimParser, LOAD_GRF)
 {
   std::vector<ForcePlate> grf = OpenSimParser::loadGRF(
       "dart://sample/osim/Rajagopal2015_v3_scaled/"
-      "S01DN603_grf.mot",
-      10);
+      "S01DN603_grf.mot");
 }
 #endif
 
@@ -426,8 +425,7 @@ TEST(OpenSimParser, LOAD_NORMAL_GRF)
 {
   std::vector<ForcePlate> forcePlates = OpenSimParser::loadGRF(
       "dart://sample/osim/Rajagopal2015_v3_scaled/"
-      "S01DN603_grf.mot",
-      10);
+      "S01DN603_grf.mot");
 
   EXPECT_EQ(forcePlates.size(), 2);
 }
@@ -438,8 +436,7 @@ TEST(OpenSimParser, LOAD_WEIRD_GRF)
 {
   std::vector<ForcePlate> forcePlates = OpenSimParser::loadGRF(
       "dart://sample/osim/WeirdGRF/"
-      "weird.mot",
-      10);
+      "weird.mot");
 
   EXPECT_EQ(forcePlates.size(), 2);
 }
@@ -956,10 +953,11 @@ TEST(OpenSimParser, LOAD_WHITESPACE_GRF_AND_TRC)
   auto trc = OpenSimParser::loadTRC(
       "dart://sample/osim/WeirdFormatTests/markers.trc");
   std::vector<ForcePlate> data = OpenSimParser::loadGRF(
-      "dart://sample/osim/WeirdFormatTests/grf.mot", trc.framesPerSecond);
+      "dart://sample/osim/WeirdFormatTests/grf.mot", trc.timestamps);
   EXPECT_TRUE(data.size() > 0);
   EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
-  EXPECT_EQ(data[0].timestamps[data[0].timestamps.size()-1], trc.timestamps[trc.timestamps.size()-1]);
+  EXPECT_EQ(data[0].timestamps[data[0].timestamps.size()-1],
+            trc.timestamps[trc.timestamps.size()-1]);
 }
 #endif
 
@@ -969,7 +967,7 @@ TEST(OpenSimParser, LOAD_TIMESTAMP_ROUNDING)
   auto trc = OpenSimParser::loadTRC(
       "dart://sample/osim/WeirdFormatTests/markers_Squat2.trc");
   std::vector<ForcePlate> data = OpenSimParser::loadGRF(
-      "dart://sample/osim/WeirdFormatTests/grf_Squat2.mot", trc.framesPerSecond);
+      "dart://sample/osim/WeirdFormatTests/grf_Squat2.mot", trc.timestamps);
   EXPECT_TRUE(data.size() > 0);
   EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
   for (int i = 0; i < data[0].timestamps.size(); i++) {
@@ -997,10 +995,8 @@ TEST(OpenSimParser, LOAD_TRC_NEWLINES_IN_TOKENS)
 #ifdef ALL_TESTS
 TEST(OpenSimParser, LOAD_GRF_EXTRA_NEWLINE)
 {
-  int targetFramesPerSecond = 2000;
   auto data = OpenSimParser::loadGRF(
-      "dart://sample/osim/WeirdFormatTests/grf_extra_line.mot",
-      targetFramesPerSecond);
+      "dart://sample/osim/WeirdFormatTests/grf_extra_line.mot");
   auto forcePlate = data[0];
   EXPECT_TRUE(forcePlate.timestamps.size() == 3679);
   EXPECT_TRUE(forcePlate.forces.size() == 3679);

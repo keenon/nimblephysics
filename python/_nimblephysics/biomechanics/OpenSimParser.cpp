@@ -303,12 +303,13 @@ void OpenSimParser(py::module& m)
 
   sm.def(
       "loadGRF",
-      +[](const std::string& path, int targetFramesPerSecond) {
+      +[](const std::string& path,
+          const std::vector<double>& targetTimestamps) {
         return dart::biomechanics::OpenSimParser::loadGRF(
-            path, targetFramesPerSecond);
+            path, targetTimestamps);
       },
       ::py::arg("path"),
-      ::py::arg("targetFramesPerSecond") = 100);
+      ::py::arg("targetTimestamps") = ::py::list());
 
   sm.def(
       "saveTRC",

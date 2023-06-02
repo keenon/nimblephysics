@@ -2001,7 +2001,7 @@ std::vector<MarkerInitialization> runEngine(
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], trc.timestamps);
       forcePlates.push_back(grf);
     }
     else

@@ -3260,7 +3260,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], trc.timestamps);
       forcePlateTrials.push_back(grf);
     }
     else
@@ -3815,7 +3815,7 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
     if (i < grfFiles.size())
     {
       std::vector<ForcePlate> grf
-          = OpenSimParser::loadGRF(grfFiles[i], trc.framesPerSecond);
+          = OpenSimParser::loadGRF(grfFiles[i], trc.timestamps);
       forcePlateTrials.push_back(grf);
     }
     else
