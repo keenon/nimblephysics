@@ -1435,10 +1435,10 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     Eigen::Vector3s childOffset = offsets.segment<3>(3);
 
     s_t error = 0.0;
-    for (int t = 0; t < mMarkerObservations.size(); t++)
+    for (int i = 0; i < usableTimesteps.size(); i++)
     {
-      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][t];
-      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][t];
+      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][usableTimesteps[i]];
+      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][usableTimesteps[i]];
       Eigen::Vector3s parentWorldCenter = parentTransform * parentOffset;
       Eigen::Vector3s childWorldCenter = childTransform * childOffset;
       Eigen::Vector3s jointCenter
@@ -1446,9 +1446,12 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       error += (parentWorldCenter - jointCenter).norm();
       error += (childWorldCenter - jointCenter).norm();
 
+      // We can be in funny coordinate systems, but check that nothing crazy has resulted.
+      assert(!jointCenter.hasNaN() && jointCenter.norm() < 1e10);
+
       // 4.4.1. Record the result
-      mJointCenters[t][joint->name] = jointCenter;
-      mJointCentersEstimateSource[t][joint->name]
+      mJointCenters[usableTimesteps[i]][joint->name] = jointCenter;
+      mJointCentersEstimateSource[usableTimesteps[i]][joint->name]
           = JointCenterEstimateSource::LEAST_SQUARES_EXACT;
     }
 
@@ -1482,18 +1485,18 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       Eigen::Vector3s childLocalAxis = nullSpace.segment<3>(3).normalized();
 
       // 4.5.2. Transform the axis direction back to world space
-      for (int t = 0; t < mMarkerObservations.size(); t++)
+      for (int i = 0; i < usableTimesteps.size(); i++)
       {
-        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][t];
-        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][t];
+        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][usableTimesteps[i]];
+        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][usableTimesteps[i]];
         Eigen::Vector3s parentWorldAxis
             = parentTransform.linear() * parentLocalAxis;
         Eigen::Vector3s childWorldAxis
             = childTransform.linear() * childLocalAxis;
         Eigen::Vector3s jointAxis = (parentWorldAxis + childWorldAxis) / 2.0;
         // 4.5.3. Record the result
-        mJointAxisDirs[t][joint->name] = jointAxis.normalized();
-        mJointCentersEstimateSource[t][joint->name]
+        mJointAxisDirs[usableTimesteps[i]][joint->name] = jointAxis.normalized();
+        mJointCentersEstimateSource[usableTimesteps[i]][joint->name]
             = JointCenterEstimateSource::LEAST_SQUARES_AXIS;
       }
     }
@@ -2024,10 +2027,10 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
 
               // 2.3.1.2. Find the ratio on the current skeleton for these two
               // joints between (distance) / (distance perpendicular to axis)
-              Eigen::Vector3s jointCenter = mJointCenters[t][joint->name];
-              Eigen::Vector3s jointAxis = mJointAxisDirs[t][joint->name];
+              Eigen::Vector3s jointCenter = mJointCenters[t].at(joint->name);
+              Eigen::Vector3s jointAxis = mJointAxisDirs[t].at(joint->name);
               Eigen::Vector3s adjacentJointCenter
-                  = mJointCenters[t][pointJoint->name];
+                  = mJointCenters[t].at(pointJoint->name);
               Eigen::Vector3s offset = adjacentJointCenter - jointCenter;
               s_t distAlongAxis = offset.dot(jointAxis);
               Eigen::Vector3s offsetParallel = distAlongAxis * jointAxis;
