@@ -171,6 +171,21 @@ int LabeledMarkerTrace::getIndexForTimestep(int t)
 }
 
 //==============================================================================
+/// Returns the label of the point at the last timestep, or an empty string if
+/// the length of the trace is 0
+std::string LabeledMarkerTrace::getLastLabel()
+{
+  if (mMarkerLabels.size() == 0)
+  {
+    return "";
+  }
+  else
+  {
+    return mMarkerLabels[mMarkerLabels.size() - 1];
+  }
+}
+
+//==============================================================================
 /// Pick the best label for this trace
 std::string LabeledMarkerTrace::getBestLabel(
     std::vector<std::string> alreadyTaken)
@@ -436,6 +451,10 @@ std::vector<LabeledMarkerTrace> LabeledMarkerTrace::createRawTraces(
       {
         s_t dist = traces[activeTraces[j]].pointToAppendDistance(
             t, markerObservations[t].at(markerNames[i]), true);
+        if (traces[activeTraces[j]].getLastLabel() != markerNames[i])
+        {
+          dist += 0.04;
+        }
         if (dist > mergeDistance)
         {
           weights(i, j) = -1 * std::numeric_limits<double>::infinity();

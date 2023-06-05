@@ -39,7 +39,7 @@
 using namespace dart;
 using namespace biomechanics;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(MarkerFixer, SPRINTER_ARM_RIPPLE)
@@ -48,7 +48,9 @@ TEST(MarkerFixer, SPRINTER_ARM_RIPPLE)
   OpenSimTRC markerTrajectories = OpenSimParser::loadTRC(
       "dart://sample/grf/Sprinter2/MarkerData/JA1Gait35.trc");
 
-  RippleReductionProblem problem(markerTrajectories.markerTimesteps);
+  RippleReductionProblem problem(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
   MarkersErrorReport report;
   problem.smooth(&report);
   for (std::string warning : report.warnings)
@@ -71,7 +73,7 @@ TEST(MarkerFixer, FIX_SPRINT_MARKERS)
   auto report = MarkerFixer::generateDataErrorsReport(
       markerTrajectories.markerTimesteps,
       (1.0 / (s_t)markerTrajectories.framesPerSecond));
-  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  for (auto& timestep : report->markerObservationsAttemptedFixed)
   {
     for (auto pair : timestep)
     {
@@ -121,15 +123,15 @@ TEST(MarkerFixer, COMPARISON_TEST)
   auto report = MarkerFixer::generateDataErrorsReport(
       markerTrajectories.markerTimesteps,
       (1.0 / (s_t)markerTrajectories.framesPerSecond));
-  for (auto& msg : report.info)
+  for (auto& msg : report->info)
   {
     std::cout << "INFO: " << msg << std::endl;
   }
-  for (auto& msg : report.warnings)
+  for (auto& msg : report->warnings)
   {
     std::cout << "WARNING: " << msg << std::endl;
   }
-  for (auto& timestep : report.markerObservationsAttemptedFixed)
+  for (auto& timestep : report->markerObservationsAttemptedFixed)
   {
     for (auto pair : timestep)
     {
@@ -144,21 +146,78 @@ TEST(MarkerFixer, COMPARISON_TEST)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFixer, PASS_THROUGH_UNCHANGED)
 {
   // Get the raw marker trajectory data
   auto markerTrajectories = OpenSimParser::loadTRC(
-      "dart://sample/grf/AddBiomechanicsTutorialFiles/motion_capture_walk_trimmed.trc");
+      "dart://sample/grf/AddBiomechanicsTutorialFiles/"
+      "motion_capture_walk_trimmed.trc");
 
   auto report = MarkerFixer::generateDataErrorsReport(
       markerTrajectories.markerTimesteps,
       (1.0 / (s_t)markerTrajectories.framesPerSecond));
-  for (std::string warning : report->warnings) {
+  for (std::string warning : report->warnings)
+  {
     std::cout << "WARN: " << warning << std::endl;
   }
 
   EXPECT_EQ(0, report->warnings.size());
   EXPECT_EQ(0, report->info.size());
 }
-// #endif
+#endif
+
+#ifdef ALL_TESTS
+TEST(MarkerFixer, OPENCAP_DJ2)
+{
+  // Get the raw marker trajectory data
+  auto markerTrajectories = OpenSimParser::loadTRC(
+      "dart://sample/osim/OpenCapTest/subject3/MarkerData/Mocap/DJ2.trc");
+
+  auto report = MarkerFixer::generateDataErrorsReport(
+      markerTrajectories.markerTimesteps,
+      (1.0 / (s_t)markerTrajectories.framesPerSecond));
+
+  // RP5MT
+  server::GUIRecording server;
+
+  std::vector<std::map<std::string, Eigen::Vector3s>> drawObservations
+      = markerTrajectories
+            .markerTimesteps; // report->markerObservationsAttemptedFixed;
+
+  std::map<std::string, std::vector<Eigen::Vector3s>> fullTraces;
+  for (int i = 0; i < drawObservations.size(); i++)
+  {
+    for (auto& pair : drawObservations[i])
+    {
+      fullTraces[pair.first].push_back(pair.second);
+    }
+  }
+  for (auto& pair : fullTraces)
+  {
+    server.createLine(
+        "line_" + pair.first, std::vector<Eigen::Vector3s>(pair.second));
+  }
+  for (auto& pair : drawObservations[0])
+  {
+    server.createSphere(pair.first, 0.01, pair.second);
+    server.setObjectTooltip(pair.first, pair.first);
+  }
+  server.saveFrame();
+
+  std::map<std::string, std::vector<Eigen::Vector3s>> markerTraces;
+  for (int i = 0; i < drawObservations.size(); i++)
+  {
+    for (auto& pair : drawObservations[i])
+    {
+      markerTraces[pair.first].push_back(pair.second);
+      server.setObjectPosition(pair.first, pair.second);
+      server.createLine(
+          "line_" + pair.first,
+          std::vector<Eigen::Vector3s>(markerTraces[pair.first]));
+    }
+    server.saveFrame();
+  }
+  server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+}
+#endif
