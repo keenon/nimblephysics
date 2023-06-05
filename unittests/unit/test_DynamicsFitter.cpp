@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+//#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -6295,6 +6295,47 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
       true);
 }
 #endif
+
+//#ifdef ALL_TESTS
+TEST(DynamicsFitter, HAMNER_SUBJECT04)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  trcFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run200/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run300/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run400/markers.trc");
+  trcFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run500/markers.trc");
+  grfFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run200/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run300/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run400/grf.mot");
+  grfFiles.push_back(
+      "dart://sample/osim/HamnerSubject04/subject04/trials/run500/grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/osim/HamnerSubject04/subject04/unscaled_generic.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+//#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SAM_DATA)

@@ -1,0 +1,18 @@
+{
+  "subjectTags": [
+    "healthy"
+  ],
+  "sex": "male",
+  "massKg": 80.47,
+  "heightM": 1.772,
+  "email": "biomechanics.db@gmail.com",
+  "skeletonPreset": "custom",
+  "disableDynamics": false,
+  "footBodyNames": [
+    "calcn_r",
+    "calcn_l"
+  ],
+  "shiftGRF": false,
+  "maxTrialsToSolveMassOver": 4,
+  "segmentTrials": true
+}
