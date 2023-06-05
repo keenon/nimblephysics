@@ -25,6 +25,7 @@
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
+#include "dart/math/Helpers.hpp"
 #include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
 
@@ -2035,6 +2036,9 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
               s_t impliedDistance = offsetPerp.norm() * neutralRatio;
 
               // 2.3.1.3. Record the implied distance to our objective set
+              assert(
+                  !std::isnan(impliedDistance)
+                  && std::abs(impliedDistance) < 3.0);
               pointsAndRadii.emplace_back(
                   mJointCenters[t][pointJoint->name], impliedDistance);
               weights.push_back(1.0);
@@ -2053,6 +2057,10 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
             if (mMarkerObservations[t].count(markerName) == 0)
               continue;
             Eigen::Vector3s markerWorldPos = mMarkerObservations[t][markerName];
+            assert(
+                !std::isnan(squaredDistance)
+                && std::abs(squaredDistance) < 3.0 * 3.0
+                && squaredDistance > 0.0);
             pointsAndRadii.emplace_back(markerWorldPos, sqrt(squaredDistance));
             bool markerIsAnatomical
                 = mMarkerIsAnatomical[mMarkerNameToIndex[markerName]];
@@ -2064,6 +2072,7 @@ s_t IKInitializer::recenterAxisJointsBasedOnBoneAngles(bool logOutput)
               mJointAxisDirs[t][joint->name],
               pointsAndRadii,
               weights);
+          assert(!newCenter.hasNaN());
           s_t distAlongAxis = (newCenter - mJointCenters[t][joint->name])
                                   .dot(mJointAxisDirs[t][joint->name]);
           averageOffset += distAlongAxis;
@@ -4174,6 +4183,7 @@ Eigen::Vector3s IKInitializer::centerPointOnAxis(
       bestRoot = root;
     }
   }
+  assert(math::isNan(bestRoot) == false);
 
   return center + bestRoot * axis;
 }
