@@ -6050,6 +6050,32 @@ TEST(MarkerFitter, SAM_DATA)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, OPENCAP_DATA)
+{
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+  std::vector<std::string> imuFiles;
+  trcFiles.push_back(
+      "dart://sample/osim/OpenCapTest/subject3/MarkerData/Mocap/DJ2.trc");
+  grfFiles.push_back(
+      "dart://sample/osim/OpenCapTest/subject3/ForceData/DJ2_forces.mot");
+
+  runEngine(
+      "dart://sample/osim/OpenCapTest/subject3/OpenSimData/Mocap/Model/"
+      "LaiArnoldModified2017_poly_withArms_weldHand_generic.osim",
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      imuFiles,
+      63.5,
+      1.69,
+      "female",
+      true);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SYNTHETIC_SUBJECT_18)
 {
   std::vector<std::string> c3dFiles;

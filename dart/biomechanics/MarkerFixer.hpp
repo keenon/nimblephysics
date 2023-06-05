@@ -78,6 +78,9 @@ public:
   /// Returns the index in this trace for the specified timestep
   int getIndexForTimestep(int t);
 
+  /// Returns the label of the point at the last timestep, or an empty string if the length of the trace is 0
+  std::string getLastLabel();
+
   /// Pick the best label for this trace
   std::string getBestLabel(std::vector<std::string> alreadyTaken);
 

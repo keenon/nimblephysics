@@ -1047,6 +1047,7 @@ class DARTView {
         positions[cursor++] = points[i][2] * SCALE_FACTOR;
       }
 
+      (line as any).geometry.setDrawRange( 0, points.length );
       (line as any).geometry.attributes.position.needsUpdate = true; // required after the first render
       // line.geometry.computeBoundingBox();
       // line.geometry.computeBoundingSphere();
