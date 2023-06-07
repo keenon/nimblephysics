@@ -717,6 +717,14 @@ class ContactInverseDynamicsResult():
     def __init__(self) -> None: ...
     def sumError(self) -> float: ...
     @property
+    def acc(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @acc.setter
+    def acc(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
     def contactBody(self) -> BodyNode:
         """
         :type: BodyNode
@@ -739,14 +747,6 @@ class ContactInverseDynamicsResult():
         """
     @jointTorques.setter
     def jointTorques(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
-    @property
-    def nextVel(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
-        """
-        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
-        """
-    @nextVel.setter
-    def nextVel(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
         pass
     @property
     def pos(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -3152,6 +3152,14 @@ class MultipleContactInverseDynamicsOverTimeResult():
     def computeSmoothnessLoss(self) -> float: ...
     def sumError(self) -> float: ...
     @property
+    def accelerations(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
+    @accelerations.setter
+    def accelerations(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
+        pass
+    @property
     def contactBodies(self) -> typing.List[BodyNode]:
         """
         :type: typing.List[BodyNode]
@@ -3174,14 +3182,6 @@ class MultipleContactInverseDynamicsOverTimeResult():
         """
     @jointTorques.setter
     def jointTorques(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
-        pass
-    @property
-    def nextVelocities(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
-        """
-        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
-        """
-    @nextVelocities.setter
-    def nextVelocities(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
         pass
     @property
     def positions(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
@@ -3229,6 +3229,14 @@ class MultipleContactInverseDynamicsResult():
     def computeGuessLoss(self) -> float: ...
     def sumError(self) -> float: ...
     @property
+    def acc(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @acc.setter
+    def acc(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
     def contactBodies(self) -> typing.List[BodyNode]:
         """
         :type: typing.List[BodyNode]
@@ -3259,14 +3267,6 @@ class MultipleContactInverseDynamicsResult():
         """
     @jointTorques.setter
     def jointTorques(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
-        pass
-    @property
-    def nextVel(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
-        """
-        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
-        """
-    @nextVel.setter
-    def nextVel(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
         pass
     @property
     def pos(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -4591,7 +4591,7 @@ class Skeleton(MetaSkeleton):
     def getConstraintForces(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     @typing.overload
     def getConstraintForces(self, arg0: int) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
-    def getContactInverseDynamics(self, nextVel: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactBody: BodyNode) -> ContactInverseDynamicsResult: ...
+    def getContactInverseDynamics(self, accelerations: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactBody: BodyNode) -> ContactInverseDynamicsResult: ...
     def getControlForceLowerLimits(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def getControlForceUpperLimits(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     @typing.overload
@@ -4661,7 +4661,7 @@ class Skeleton(MetaSkeleton):
     def getInvMassMatrix(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     @typing.overload
     def getInvMassMatrix(self, arg0: int) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
-    def getInverseDynamics(self, nextVel: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
+    def getInverseDynamics(self, accelerations: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     @typing.overload
     def getJacobian(self, node: JacobianNode) -> numpy.ndarray[numpy.float64, _Shape[6, n]]: ...
     @typing.overload
@@ -4723,7 +4723,7 @@ class Skeleton(MetaSkeleton):
     def getMassMatrix(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     @typing.overload
     def getMassMatrix(self, arg0: int) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
-    def getMultipleContactInverseDynamics(self, nextVel: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactBodies: typing.List[BodyNode], bodyWrenchGuesses: typing.List[numpy.ndarray[numpy.float64, _Shape[6, 1]]] = []) -> MultipleContactInverseDynamicsResult: ...
+    def getMultipleContactInverseDynamics(self, accelerations: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactBodies: typing.List[BodyNode], bodyWrenchGuesses: typing.List[numpy.ndarray[numpy.float64, _Shape[6, 1]]] = []) -> MultipleContactInverseDynamicsResult: ...
     def getMultipleContactInverseDynamicsOverTime(self, positions: numpy.ndarray[numpy.float64, _Shape[m, n]], contactBodies: typing.List[BodyNode], smoothingWeight: float, minTorqueWeight: float, velocityPenalty: typing.Callable[[float], float], prevContactForces: typing.List[numpy.ndarray[numpy.float64, _Shape[6, 1]]] = [], prevContactWeight: float = 0.0, magnitudeCosts: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64)) -> MultipleContactInverseDynamicsOverTimeResult: ...
     def getName(self) -> str: ...
     def getNumBodyNodes(self) -> int: ...

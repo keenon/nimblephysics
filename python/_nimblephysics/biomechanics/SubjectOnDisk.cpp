@@ -48,51 +48,68 @@ void SubjectOnDisk(py::module& m)
             .def_readwrite(
                 "pos",
                 &dart::biomechanics::Frame::pos,
+                py::return_value_policy::reference_internal,
                 "The joint positions on this frame.")
             .def_readwrite(
                 "vel",
                 &dart::biomechanics::Frame::vel,
+                py::return_value_policy::reference_internal,
                 "The joint velocities on this frame.")
             .def_readwrite(
                 "acc",
                 &dart::biomechanics::Frame::acc,
+                py::return_value_policy::reference_internal,
                 "The joint accelerations on this frame.")
             .def_readwrite(
                 "tau",
                 &dart::biomechanics::Frame::tau,
+                py::return_value_policy::reference_internal,
                 "The joint control forces on this frame.")
+            .def_readwrite(
+                "contact",
+                &dart::biomechanics::Frame::contact,
+                py::return_value_policy::reference_internal,
+                "A vector of [0,1] booleans for if a body is in contact with "
+                "the ground.")
             .def_readwrite(
                 "comPos",
                 &dart::biomechanics::Frame::comPos,
+                py::return_value_policy::reference_internal,
                 "The position of the COM, in world space")
             .def_readwrite(
                 "comVel",
-                &dart::biomechanics::Frame::comPos,
+                &dart::biomechanics::Frame::comVel,
+                py::return_value_policy::reference_internal,
                 "The velocity of the COM, in world space")
             .def_readwrite(
                 "comAcc",
-                &dart::biomechanics::Frame::comPos,
+                &dart::biomechanics::Frame::comAcc,
+                py::return_value_policy::reference_internal,
                 "The acceleration of the COM, in world space")
             .def_readwrite(
                 "posObserved",
                 &dart::biomechanics::Frame::posObserved,
+                py::return_value_policy::reference_internal,
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF was observed on this frame")
             .def_readwrite(
                 "velFiniteDifferenced",
                 &dart::biomechanics::Frame::velFiniteDifferenced,
+                py::return_value_policy::reference_internal,
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF got its velocity through finite differencing, "
                 "and therefore may be somewhat unreliable")
             .def_readwrite(
                 "accFiniteDifferenced",
                 &dart::biomechanics::Frame::accFiniteDifferenced,
+                py::return_value_policy::reference_internal,
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF got its acceleration through finite "
                 "differencing, and therefore may be somewhat unreliable")
             .def_readwrite(
                 "groundContactWrenches",
                 &dart::biomechanics::Frame::groundContactWrenches,
+                py::return_value_policy::reference_internal,
                 R"doc(
 This is a vector of concatenated contact body wrenches :code:`body_wrench`, where :code:`body_wrench` is a 6 vector (first 3 are torque, last 3 are force). 
 :code:`body_wrench` is expressed in the local frame of the body at :code:`body_name`, and assumes that the skeleton is set to positions `pos`.
@@ -112,6 +129,7 @@ Note that these are specified in the local body frame, acting on the body at its
             .def_readwrite(
                 "groundContactCenterOfPressure",
                 &dart::biomechanics::Frame::groundContactCenterOfPressure,
+                py::return_value_policy::reference_internal,
                 R"doc(
             This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
             expressed in the world frame.
@@ -119,6 +137,7 @@ Note that these are specified in the local body frame, acting on the body at its
             .def_readwrite(
                 "groundContactTorque",
                 &dart::biomechanics::Frame::groundContactTorque,
+                py::return_value_policy::reference_internal,
                 R"doc(
             This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
@@ -126,6 +145,7 @@ Note that these are specified in the local body frame, acting on the body at its
             .def_readwrite(
                 "groundContactForce",
                 &dart::biomechanics::Frame::groundContactForce,
+                py::return_value_policy::reference_internal,
                 R"doc(
             This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
@@ -133,6 +153,7 @@ Note that these are specified in the local body frame, acting on the body at its
             .def_readwrite(
                 "customValues",
                 &dart::biomechanics::Frame::customValues,
+                py::return_value_policy::reference_internal,
                 "This is list of :code:`Pair[str, np.ndarray]` of unspecified "
                 "values. The idea here is to allow the format to be easily "
                 "extensible with unusual data (for example, exoskeleton "
@@ -165,6 +186,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("trial"),
                 ::py::arg("startFrame"),
                 ::py::arg("numFramesToRead") = 1,
+                ::py::arg("contactThreshold") = 1.0,
                 "This will read from disk and allocate a number of "
                 ":code:`Frame` "
                 "objects. These Frame objects are assumed to be short-lived, "

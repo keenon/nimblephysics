@@ -1468,8 +1468,8 @@ public:
       s_t regularizeCopDriftCompensation = 1.0,
       int maxBuckets = 100,
       bool detectUnmeasuredTorque = true,
-      s_t avgPositionChangeThreshold = 0.08,
-      s_t avgAngularChangeThreshold = 0.15,
+      s_t avgPositionChangeThreshold = 0.20,
+      s_t avgAngularChangeThreshold = 0.20,
       bool reoptimizeAnatomicalMarkers = false,
       bool reoptimizeTrackingMarkers = true);
 

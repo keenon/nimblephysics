@@ -38,7 +38,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -383,6 +383,7 @@ bool testWriteSubjectToDisk(
   return true;
 }
 
+#ifdef ALL_TESTS
 TEST(SubjectOnDisk, WRITE_THEN_READ)
 {
   std::vector<std::string> trialNames;
@@ -416,3 +417,20 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
         grfFiles));
   }
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(SubjectOnDisk, HAMNER_RUNNING)
+{
+  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  retriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  retriever->addSchemaRetriever("dart", DartResourceRetriever::create());
+  std::string path = retriever->getFilePath(
+      "dart://sample/subjectOnDisk/HamnerRunning2013Subject01.bin");
+
+  SubjectOnDisk subject(path);
+  EXPECT_EQ(subject.getNumTrials(), 4);
+  EXPECT_GT(subject.readFrames(0, 7, 10).size(), 0);
+}
+#endif
