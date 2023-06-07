@@ -13,6 +13,7 @@ __all__ = [
     "MJCFExporter",
     "SdfParser",
     "SkelParser",
+    "StringUtils",
     "UniversalLoader"
 ]
 

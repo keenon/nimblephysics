@@ -298,7 +298,7 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 ///
 /// On OOB access, prints an error and returns an empty vector.
 std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
-    int trial, int startFrame, int numFramesToRead)
+    int trial, int startFrame, int numFramesToRead, s_t contactThreshold)
 {
   (void)trial;
   (void)startFrame;
@@ -410,7 +410,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
             = proto.ground_contact_wrench(i * 6 + j);
       }
       s_t contactNorm = frame->groundContactWrenches.segment<6>(i * 6).norm();
-      if (contactNorm > 1.0)
+      if (contactNorm > contactThreshold)
       {
         frame->contact(i) = 1;
       }
@@ -446,6 +446,8 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
       frame->accFiniteDifferenced(i)
           = mDofAccelerationFiniteDifferenced[trial][i];
     }
+
+    result.push_back(frame);
   }
 
   fclose(file);

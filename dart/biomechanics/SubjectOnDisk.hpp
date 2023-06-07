@@ -72,7 +72,10 @@ public:
   ///
   /// On OOB access, prints an error and returns an empty vector.
   std::vector<std::shared_ptr<Frame>> readFrames(
-      int trial, int startFrame, int numFramesToRead = 1);
+      int trial,
+      int startFrame,
+      int numFramesToRead = 1,
+      s_t contactThreshold = 1.0);
 
   /// This writes a subject out to disk in a compressed and random-seekable
   /// binary format.
