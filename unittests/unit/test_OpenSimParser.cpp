@@ -956,8 +956,9 @@ TEST(OpenSimParser, LOAD_WHITESPACE_GRF_AND_TRC)
       "dart://sample/osim/WeirdFormatTests/grf.mot", trc.timestamps);
   EXPECT_TRUE(data.size() > 0);
   EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
-  EXPECT_EQ(data[0].timestamps[data[0].timestamps.size()-1],
-            trc.timestamps[trc.timestamps.size()-1]);
+  EXPECT_EQ(
+      data[0].timestamps[data[0].timestamps.size() - 1],
+      trc.timestamps[trc.timestamps.size() - 1]);
 }
 #endif
 
@@ -970,7 +971,8 @@ TEST(OpenSimParser, LOAD_TIMESTAMP_ROUNDING)
       "dart://sample/osim/WeirdFormatTests/grf_Squat2.mot", trc.timestamps);
   EXPECT_TRUE(data.size() > 0);
   EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
-  for (int i = 0; i < data[0].timestamps.size(); i++) {
+  for (int i = 0; i < data[0].timestamps.size(); i++)
+  {
     EXPECT_EQ(data[0].timestamps[i], trc.timestamps[i]);
   }
 }
@@ -982,7 +984,8 @@ TEST(OpenSimParser, LOAD_TRC_NEWLINES_IN_TOKENS)
   auto data = OpenSimParser::loadTRC(
       "dart://sample/osim/WeirdFormatTests/markers_StairUp3.trc");
   EXPECT_TRUE(data.markerTimesteps.size() > 0);
-  for (int t = 0; t < data.markerTimesteps.size(); t++) {
+  for (int t = 0; t < data.markerTimesteps.size(); t++)
+  {
     for (auto& pair : data.markerTimesteps[t])
     {
       // std::cout << pair.first << std::endl;
@@ -1001,5 +1004,21 @@ TEST(OpenSimParser, LOAD_GRF_EXTRA_NEWLINE)
   EXPECT_TRUE(forcePlate.timestamps.size() == 3679);
   EXPECT_TRUE(forcePlate.forces.size() == 3679);
   EXPECT_TRUE(forcePlate.moments.size() == 3679);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_GRF_INTERSECTING_BUT_NOT_IDENTICAL_TIME_RANGES)
+{
+  auto trc
+      = OpenSimParser::loadTRC("dart://sample/osim/Tiziana2019/markers.trc");
+  std::vector<ForcePlate> data = OpenSimParser::loadGRF(
+      "dart://sample/osim/Tiziana2019/grf.mot", trc.timestamps);
+  EXPECT_TRUE(data.size() > 0);
+  EXPECT_EQ(data[0].forces.size(), trc.timestamps.size());
+  for (int i = 0; i < data[0].timestamps.size(); i++)
+  {
+    EXPECT_EQ(data[0].timestamps[i], trc.timestamps[i]);
+  }
 }
 #endif
