@@ -255,7 +255,21 @@ bool testWriteSubjectToDisk(
     emgObservations.push_back(emgTrial);
   }
   std::vector<std::string> subjectTags;
+  for (int i = 0; i < 10; i++)
+  {
+    subjectTags.push_back("subject_tag_" + std::to_string(i));
+  }
   std::vector<std::vector<std::string>> trialTags;
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    std::vector<std::string> trialTag;
+    for (int i = 0; i < trial + 3; i++)
+    {
+      trialTag.push_back(
+          "trial_" + std::to_string(trial) + "_tag_" + std::to_string(i));
+    }
+    trialTags.push_back(trialTag);
+  }
 
   SubjectOnDisk::writeSubject(
       outputFilePath,
@@ -356,6 +370,40 @@ bool testWriteSubjectToDisk(
                     << std::endl;
           return false;
         }
+      }
+    }
+  }
+
+  std::vector<std::string> recoveredTags = subject.getSubjectTags();
+  if (recoveredTags.size() != subjectTags.size())
+  {
+    std::cout << "Failed to recover correct number of subject tags!"
+              << std::endl;
+    return false;
+  }
+  for (int i = 0; i < recoveredTags.size(); i++)
+  {
+    if (recoveredTags[i] != subjectTags[i])
+    {
+      std::cout << "Failed to recover correct subject tag!" << std::endl;
+      return false;
+    }
+  }
+  for (int trial = 0; trial < trialTags.size(); trial++)
+  {
+    std::vector<std::string> recoveredTags = subject.getTrialTags(trial);
+    if (recoveredTags.size() != trialTags[trial].size())
+    {
+      std::cout << "Failed to recover correct number of trial tags!"
+                << std::endl;
+      return false;
+    }
+    for (int i = 0; i < recoveredTags.size(); i++)
+    {
+      if (recoveredTags[i] != trialTags[trial][i])
+      {
+        std::cout << "Failed to recover correct trial tag!" << std::endl;
+        return false;
       }
     }
   }
