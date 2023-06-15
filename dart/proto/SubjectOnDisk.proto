@@ -39,6 +39,14 @@ message SubjectOnDiskTrialHeader {
   repeated bool dof_acceleration_finite_differenced = 7;
   // This records the residual of the inverse dynamics solution for each frame in this trial.
   repeated float residual = 8;
+  // This records the tags this trial was assigned with on the AddBiomechanics platform
+  repeated string trial_tag = 9;
+  // This is the number of force plates present on this trial
+  int32 num_force_plates = 10;
+  // If there are force plates, we can optionally include each force plate's corners here, concatenated as 4 3-vectors per plate
+  repeated double force_plate_corners = 11;
+  // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
+  repeated float joints_max_velocity = 12;
 }
 
 message SubjectOnDiskHeader {
@@ -59,6 +67,22 @@ message SubjectOnDiskHeader {
   int32 version = 13;
   // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
   int32 frame_size = 14;
+  // Subject details
+  string biological_sex = 15;
+  double height_m = 16;
+  double mass_kg = 17;
+  int32 age_years = 18;
+  // Details about the marker data as it will appear on each frame
+  repeated string marker_name = 19;
+  // Details about the imu data as it will appear on each frame
+  repeated string acc_name = 20;
+  repeated string gyro_name = 21;
+  // Details about the EMG data as it will appear on each frame
+  repeated string emg_name = 23;
+  // This is how many samples of each EMG we get per timestep (the multiple of the mocap sampling frequency for our EMG data, usually ~10)
+  int32 emg_dim = 24;
+  // Details about the subject tags provided on the AddBiomechanics platform
+  repeated string subject_tag = 22;
 }
 
 message SubjectOnDiskFrame {
@@ -80,4 +104,15 @@ message SubjectOnDiskFrame {
   // We include this to allow the binary format to store/load a bunch of new
   // types of values while remaining backwards compatible.
   repeated double custom_values = 12;
+  // These are marker observations on this frame, with all NaNs indicating that that marker was not observed on this frame
+  repeated double marker_obs = 13;
+  // These are IMU observations on this frame, with all NaNs indicating that that imu was not observed on this frame
+  repeated double acc_obs = 14;
+  repeated double gyro_obs = 15;
+  // These are the EMG observations on this frame
+  repeated double emg_obs = 19;
+  // These are the raw force plate readings, per force plate, without any assignment to feet or any post-processing
+  repeated double raw_force_plate_cop = 16;
+  repeated double raw_force_plate_torque = 17;
+  repeated double raw_force_plate_force = 18;
 }

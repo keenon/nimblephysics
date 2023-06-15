@@ -15658,10 +15658,18 @@ void DynamicsFitter::writeSubjectOnDisk(
     std::string outputPath,
     std::string openSimFilePath,
     std::shared_ptr<DynamicsInitialization> init,
+    std::string biologicalSex,
+    s_t massKg,
+    s_t heightM,
+    int ageYears,
     bool useAdjustedGRFs,
     std::vector<std::string> trialNames,
+    std::vector<std::string> subjectTags,
+    std::vector<std::vector<std::string>> trialTags,
     std::string href,
-    std::string notes)
+    std::string notes,
+    std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>
+        emgObservationTrials)
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
@@ -15844,7 +15852,21 @@ void DynamicsFitter::writeSubjectOnDisk(
       trialGroundBodyCopTorqueForce,
       customValueNames,
       customValues,
+      // These are the markers, gyros and accelerometers
+      init->markerObservationTrials,
+      init->accObservationTrials,
+      init->gyroObservationTrials,
+      emgObservationTrials,
+      // These are the raw force plate details
+      init->forcePlateTrials,
+      // This is the subject info
+      biologicalSex,
+      heightM,
+      massKg,
+      ageYears,
       trialNames,
+      subjectTags,
+      trialTags,
       href,
       notes);
 }

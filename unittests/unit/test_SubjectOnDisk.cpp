@@ -38,7 +38,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -207,6 +207,70 @@ bool testWriteSubjectToDisk(
       = "A sprinter originally recorded by blah blah blah. Please cite bibtex "
         "{} blah blah blah if you use this data specifically.";
 
+  std::string biologicalSex = "unknown";
+  s_t heightM = 1.8;
+  s_t massKg = 80;
+  int age = 30;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      markerObservations;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      accObservations;
+  std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
+      gyroObservations;
+  std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>
+      emgObservations;
+
+  std::vector<std::string> markerNames;
+  for (int i = 0; i < 10; i++)
+  {
+    markerNames.push_back("marker_" + std::to_string(i));
+  }
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrial;
+    std::vector<std::map<std::string, Eigen::Vector3s>> accTrial;
+    std::vector<std::map<std::string, Eigen::Vector3s>> gyroTrial;
+    std::vector<std::map<std::string, Eigen::VectorXs>> emgTrial;
+    for (int t = 0; t < poseTrials[trial].cols(); t++)
+    {
+      std::map<std::string, Eigen::Vector3s> markers;
+      std::map<std::string, Eigen::Vector3s> accs;
+      std::map<std::string, Eigen::Vector3s> gyros;
+      std::map<std::string, Eigen::VectorXs> emg;
+      for (int j = 0; j < t % markerNames.size(); j++)
+      {
+        markers[markerNames[j]] = Eigen::Vector3s::Random();
+        accs[markerNames[j]] = Eigen::Vector3s::Random();
+        gyros[markerNames[j]] = Eigen::Vector3s::Random();
+        emg[markerNames[j]] = Eigen::VectorXs::Random(5);
+      }
+      markerTrial.push_back(markers);
+      accTrial.push_back(accs);
+      gyroTrial.push_back(gyros);
+      emgTrial.push_back(emg);
+    }
+    markerObservations.push_back(markerTrial);
+    accObservations.push_back(accTrial);
+    gyroObservations.push_back(gyroTrial);
+    emgObservations.push_back(emgTrial);
+  }
+  std::vector<std::string> subjectTags;
+  for (int i = 0; i < 10; i++)
+  {
+    subjectTags.push_back("subject_tag_" + std::to_string(i));
+  }
+  std::vector<std::vector<std::string>> trialTags;
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    std::vector<std::string> trialTag;
+    for (int i = 0; i < trial + 3; i++)
+    {
+      trialTag.push_back(
+          "trial_" + std::to_string(trial) + "_tag_" + std::to_string(i));
+    }
+    trialTags.push_back(trialTag);
+  }
+
   SubjectOnDisk::writeSubject(
       outputFilePath,
       openSimFilePath,
@@ -229,7 +293,18 @@ bool testWriteSubjectToDisk(
       groundBodyCopTorqueForceTrials,
       customValueNames,
       customValueTrials,
+      markerObservations,
+      accObservations,
+      gyroObservations,
+      emgObservations,
+      forcePlateTrials,
+      biologicalSex,
+      heightM,
+      massKg,
+      age,
       trialNames,
+      subjectTags,
+      trialTags,
       originalHref,
       originalNotes);
 
@@ -268,6 +343,80 @@ bool testWriteSubjectToDisk(
     return false;
   }
 
+  for (int trial = 0; trial < forcePlateTrials.size(); trial++)
+  {
+    if (subject.getNumForcePlates(trial) != forcePlateTrials[trial].size())
+    {
+      std::cout << "Failed to recover correct number of force plates!"
+                << std::endl;
+      return false;
+    }
+    for (int plate = 0; plate < forcePlateTrials[trial].size(); plate++)
+    {
+      ForcePlate& original = forcePlateTrials[trial][plate];
+      std::vector<Eigen::Vector3s> corners
+          = subject.getForcePlateCorners(trial, plate);
+      if (original.corners.size() != corners.size())
+      {
+        std::cout << "Failed to recover correct number of force plate corners!"
+                  << std::endl;
+        return false;
+      }
+      for (int c = 0; c < original.corners.size(); c++)
+      {
+        if (original.corners[c] != corners[c])
+        {
+          std::cout << "Failed to recover correct force plate corner!"
+                    << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+
+  std::vector<std::string> recoveredTags = subject.getSubjectTags();
+  if (recoveredTags.size() != subjectTags.size())
+  {
+    std::cout << "Failed to recover correct number of subject tags!"
+              << std::endl;
+    return false;
+  }
+  for (int i = 0; i < recoveredTags.size(); i++)
+  {
+    if (recoveredTags[i] != subjectTags[i])
+    {
+      std::cout << "Failed to recover correct subject tag!" << std::endl;
+      return false;
+    }
+  }
+  for (int trial = 0; trial < trialTags.size(); trial++)
+  {
+    std::vector<std::string> recoveredTags = subject.getTrialTags(trial);
+    if (recoveredTags.size() != trialTags[trial].size())
+    {
+      std::cout << "Failed to recover correct number of trial tags!"
+                << std::endl;
+      return false;
+    }
+    for (int i = 0; i < recoveredTags.size(); i++)
+    {
+      if (recoveredTags[i] != trialTags[trial][i])
+      {
+        std::cout << "Failed to recover correct trial tag!" << std::endl;
+        return false;
+      }
+    }
+  }
+  for (int trial = 0; trial < velTrials.size(); trial++)
+  {
+    std::vector<s_t> maxVels = subject.getTrialMaxJointVelocity(trial);
+    for (int t = 0; t < velTrials[trial].cols(); t++)
+    {
+      EXPECT_NEAR(
+          maxVels[t], velTrials[trial].col(t).cwiseAbs().maxCoeff(), 1e-6);
+    }
+  }
+
   for (int i = 0; i < 500; i++)
   {
     int trial = rand() % subject.getNumTrials();
@@ -276,6 +425,110 @@ bool testWriteSubjectToDisk(
     std::vector<std::shared_ptr<biomechanics::Frame>> readResult
         = subject.readFrames(trial, frame, 5);
 
+    for (int j = 0; j < readResult.size(); j++)
+    {
+      int timestep = frame + j;
+      std::map<std::string, Eigen::Vector3s> originalMarkers
+          = markerObservations[trial][timestep];
+      if (readResult[j]->markerObservations.size() != originalMarkers.size())
+      {
+        std::cout << "Failed to recover correct number of marker observations!"
+                  << std::endl;
+        return false;
+      }
+      for (auto& pair : readResult[j]->markerObservations)
+      {
+        if (originalMarkers.at(pair.first) != pair.second)
+        {
+          std::cout << "Failed to recover correct marker observation!"
+                    << std::endl;
+          return false;
+        }
+      }
+      std::map<std::string, Eigen::Vector3s> originalGyros
+          = gyroObservations[trial][timestep];
+      if (readResult[j]->gyroObservations.size() != originalGyros.size())
+      {
+        std::cout << "Failed to recover correct number of gyro observations!"
+                  << std::endl;
+        return false;
+      }
+      for (auto& pair : readResult[j]->gyroObservations)
+      {
+        if (originalGyros.at(pair.first) != pair.second)
+        {
+          std::cout << "Failed to recover correct gyro observation!"
+                    << std::endl;
+          return false;
+        }
+      }
+      std::map<std::string, Eigen::Vector3s> originalAccs
+          = accObservations[trial][timestep];
+      if (readResult[j]->accObservations.size() != originalAccs.size())
+      {
+        std::cout
+            << "Failed to recover correct number of accelerometer observations!"
+            << std::endl;
+        return false;
+      }
+      for (auto& pair : readResult[j]->accObservations)
+      {
+        if (originalAccs.at(pair.first) != pair.second)
+        {
+          std::cout << "Failed to recover correct accelerometer observation!"
+                    << std::endl;
+          return false;
+        }
+      }
+      std::map<std::string, Eigen::VectorXs> originalEmg
+          = emgObservations[trial][timestep];
+      if (readResult[j]->emgSignals.size() != originalEmg.size())
+      {
+        std::cout << "Failed to recover correct number of EMG observations!"
+                  << std::endl;
+        return false;
+      }
+      for (auto& pair : readResult[j]->emgSignals)
+      {
+        if (originalEmg.at(pair.first) != pair.second)
+        {
+          std::cout << "Failed to recover correct EMG observation!"
+                    << std::endl;
+          return false;
+        }
+      }
+      if (forcePlateTrials[trial].size()
+          != readResult[j]->rawForcePlateForces.size())
+      {
+        std::cout << "Failed to recover correct number of raw force values!"
+                  << std::endl;
+        return false;
+      }
+      for (int f = 0; f < forcePlateTrials[trial].size(); f++)
+      {
+        if (forcePlateTrials[trial][f].forces[timestep]
+            != readResult[j]->rawForcePlateForces[f])
+        {
+          std::cout << "Failed to recover correct raw force value!"
+                    << std::endl;
+          return false;
+        }
+        if (forcePlateTrials[trial][f].moments[timestep]
+            != readResult[j]->rawForcePlateTorques[f])
+        {
+          std::cout << "Failed to recover correct raw torque value!"
+                    << std::endl;
+          return false;
+        }
+        if (forcePlateTrials[trial][f].centersOfPressure[timestep]
+            != readResult[j]->rawForcePlateCenterOfPressures[f])
+        {
+          std::cout << "Failed to recover correct raw center of pressure value!"
+                    << std::endl;
+          return false;
+        }
+      }
+    }
     for (auto& frame : readResult)
     {
       std::cout << "Checking frame " << frame->trial << ":" << frame->t
@@ -383,6 +636,7 @@ bool testWriteSubjectToDisk(
   return true;
 }
 
+#ifdef ALL_TESTS
 TEST(SubjectOnDisk, WRITE_THEN_READ)
 {
   std::vector<std::string> trialNames;
@@ -416,3 +670,20 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
         grfFiles));
   }
 }
+#endif
+
+#ifdef ALL_TESTS
+TEST(SubjectOnDisk, HAMNER_RUNNING)
+{
+  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  retriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  retriever->addSchemaRetriever("dart", DartResourceRetriever::create());
+  std::string path = retriever->getFilePath(
+      "dart://sample/subjectOnDisk/HamnerRunning2013Subject01.bin");
+
+  SubjectOnDisk subject(path);
+  EXPECT_EQ(subject.getNumTrials(), 4);
+  EXPECT_GT(subject.readFrames(0, 7, 10).size(), 0);
+}
+#endif

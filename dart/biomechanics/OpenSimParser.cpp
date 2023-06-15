@@ -54,9 +54,9 @@
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/MJCFExporter.hpp"
+#include "dart/utils/StringUtils.hpp"
 #include "dart/utils/XmlHelpers.hpp"
 #include "dart/utils/sdf/SdfParser.hpp"
-#include "dart/utils/StringUtils.hpp"
 
 using namespace std;
 
@@ -3065,64 +3065,121 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
   assert(timestamps.size() == copRows.size());
   assert(timestamps.size() == wrenchRows.size());
 
-  // Check that the values in timestamps cover the range of values in
-  // targetTimestamps
-  if (!targetTimestamps.empty()) {
-    bool outOfRangeEarly = timestamps[0] > targetTimestamps[0];
-    bool outOfRangeLate = timestamps[timestamps.size() - 1]
-                          < targetTimestamps[targetTimestamps.size() - 1];
-    NIMBLE_THROW_IF(outOfRangeEarly || outOfRangeLate, "Values in argument "
-        "'targetTimestamps' are out of range of the timestamps in the file.");
-  }
-
-  // Find a vector of indices where the timestamps are closest to the values in
-  // targetTimestamps.
-  std::vector<int> targetTimestampIndices;
-  if (targetTimestamps.empty()) {
-    for (int i = 0; i < (int)timestamps.size(); i++) {
-      targetTimestampIndices.push_back(i);
-    }
-  } else {
-    for (int i = 0; i < (int)targetTimestamps.size(); i++)
+  if (!targetTimestamps.empty())
+  {
+    // If we've got a list of targetTimestamps, we want to just go ahead and
+    // find the values for the GRF at exactly those timestamps, interpolating if
+    // necessary. For the temporal out-of-bounds case, which does sometimes
+    // happen (e.g. in the Tiziana 2019 Nature dataset), we just provide zero
+    // GRFs on the OOB timesteps.
+    std::vector<ForcePlate> forcePlates;
+    for (int i = 0; i < numPlates; i++)
     {
-      s_t targetTimestamp = targetTimestamps[i];
-      int closestIndex = 0;
-      s_t closestDistance = std::numeric_limits<s_t>::infinity();
-      for (int j = 0; j < (int)timestamps.size(); j++)
+      forcePlates.emplace_back();
+    }
+
+    for (int t = 0; t < (int)targetTimestamps.size(); t++)
+    {
+      s_t targetTimestamp = targetTimestamps[t];
+      if (targetTimestamp < timestamps[0] - 1e-3
+          || targetTimestamp > timestamps[timestamps.size() - 1] + 1e-3)
       {
-        s_t distance = std::abs(timestamps[j] - targetTimestamp);
-        if (distance < closestDistance)
+        // If we're requesting a timestamp that's out of bounds, then just pad
+        // the GRFs with 0s
+        for (int i = 0; i < numPlates; i++)
         {
-          closestDistance = distance;
-          closestIndex = j;
+          forcePlates[i].timestamps.push_back(targetTimestamp);
+          forcePlates[i].centersOfPressure.push_back(Eigen::Vector3s::Zero());
+          forcePlates[i].moments.push_back(Eigen::Vector3s::Zero());
+          forcePlates[i].forces.push_back(Eigen::Vector3s::Zero());
         }
       }
-      targetTimestampIndices.push_back(closestIndex);
+      else
+      {
+        int closestIndex = 0;
+        s_t closestDistance = std::numeric_limits<s_t>::infinity();
+        for (int j = 0; j < (int)timestamps.size(); j++)
+        {
+          s_t distance = std::abs(timestamps[j] - targetTimestamp);
+          if (distance < closestDistance)
+          {
+            closestDistance = distance;
+            closestIndex = j;
+          }
+        }
+        if (std::abs(timestamps[closestIndex] - targetTimestamp) <= 1e-3)
+        {
+          // This means we just requested a timestamp pretty much directly, so
+          // no blending is required
+          for (int i = 0; i < numPlates; i++)
+          {
+            forcePlates[i].timestamps.push_back(targetTimestamp);
+            forcePlates[i].centersOfPressure.push_back(
+                copRows[closestIndex][i]);
+            forcePlates[i].moments.push_back(
+                wrenchRows[closestIndex][i].segment<3>(0));
+            forcePlates[i].forces.push_back(
+                wrenchRows[closestIndex][i].segment<3>(3));
+          }
+        }
+        else
+        {
+          // We're going to have to interpolate (linearly) between two
+          // timestamps, because we didn't find an exact match for the requested
+          // timestamp in our loaded data.
+          int highIndex = closestIndex;
+          int lowIndex = closestIndex - 1;
+          if (timestamps[closestIndex] < targetTimestamp)
+          {
+            highIndex = closestIndex + 1;
+            lowIndex = closestIndex;
+          }
+          // Avoid divide by zero exceptions by clipping timestep size to be at
+          // least 1e-4
+          s_t timestep
+              = std::max(timestamps[highIndex] - timestamps[lowIndex], 1e-4);
+          s_t alpha = (targetTimestamp - timestamps[lowIndex]) / timestep;
+          // Push an interpolated value between the two timestamps onto the
+          // force plates
+          for (int i = 0; i < numPlates; i++)
+          {
+            forcePlates[i].timestamps.push_back(targetTimestamp);
+            forcePlates[i].centersOfPressure.push_back(
+                copRows[lowIndex][i] * (1 - alpha)
+                + copRows[highIndex][i] * alpha);
+            forcePlates[i].moments.push_back(
+                wrenchRows[lowIndex][i].segment<3>(0) * (1 - alpha)
+                + wrenchRows[highIndex][i].segment<3>(0) * alpha);
+            forcePlates[i].forces.push_back(
+                wrenchRows[lowIndex][i].segment<3>(3) * (1 - alpha)
+                + wrenchRows[highIndex][i].segment<3>(3) * alpha);
+          }
+        }
+      }
     }
-  }
 
-  // Check that targetTimestampIndices is monotonically increasing.
-  for (int i = 1; i < (int)targetTimestampIndices.size(); i++) {
-    NIMBLE_THROW_IF(targetTimestampIndices[i] <= targetTimestampIndices[i - 1],
-             "Expected the timestamps found based on targetTimestamps to be "
-             "monotonically increasing, but they are not.");
+    return forcePlates;
   }
-
-  std::vector<ForcePlate> forcePlates;
-  for (int i = 0; i < numPlates; i++)
+  else
   {
-    forcePlates.emplace_back();
-    ForcePlate& forcePlate = forcePlates[forcePlates.size() - 1];
-    for (auto t : targetTimestampIndices)
+    // If we didn't get any target timestamps, then just put the data directly
+    // into an array and return it.
+    std::vector<ForcePlate> forcePlates;
+    for (int i = 0; i < numPlates; i++)
     {
-      forcePlate.timestamps.push_back(timestamps[t]);
-      forcePlate.centersOfPressure.push_back(copRows[t][i]);
-      forcePlate.moments.push_back(wrenchRows[t][i].segment<3>(0));
-      forcePlate.forces.push_back(wrenchRows[t][i].segment<3>(3));
+      forcePlates.emplace_back();
+      ForcePlate& forcePlate = forcePlates[forcePlates.size() - 1];
+      for (int t = 0; t < timestamps.size(); t++)
+      {
+        forcePlate.timestamps.push_back(timestamps[t]);
+        forcePlate.centersOfPressure.push_back(copRows[t][i]);
+        forcePlate.moments.push_back(wrenchRows[t][i].segment<3>(0));
+        forcePlate.forces.push_back(wrenchRows[t][i].segment<3>(3));
+      }
     }
-  }
 
-  return forcePlates;
+    return forcePlates;
+  }
 }
 
 //==============================================================================

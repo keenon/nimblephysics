@@ -42,7 +42,7 @@ def filterJustMarkers(inputPath: nimblephysics_libs._nimblephysics.common.Uri, o
     pass
 def getScaleAndMarkerOffsets(standardSkeleton: nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile, scaledSkeleton: nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimScaleAndMarkerOffsets:
     pass
-def loadGRF(path: str, targetFramesPerSecond: int = 100) -> typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate]:
+def loadGRF(path: str, targetTimestamps: typing.List[float] = []) -> typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate]:
     pass
 def loadMot(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, path: str) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimMot:
     pass

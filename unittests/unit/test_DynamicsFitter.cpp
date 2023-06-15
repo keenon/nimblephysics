@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-//#define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -3128,8 +3128,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         "../../../testBinary.bin",
         modelPath,
         init,
+        "unknown",
+        68.0,
+        1.8,
+        30,
         false,
         trialNames,
+        std::vector<std::string>(),
+        std::vector<std::vector<std::string>>(),
         "http://test.demo",
         "Generated in test_DynamicsFitter");
 
@@ -6296,7 +6302,7 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SPRINTER_WITH_SPINE)
 }
 #endif
 
-//#ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, HAMNER_SUBJECT04)
 {
   std::vector<std::string> motFiles;
@@ -6335,7 +6341,7 @@ TEST(DynamicsFitter, HAMNER_SUBJECT04)
       0,
       true);
 }
-//#endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_SAM_DATA)
