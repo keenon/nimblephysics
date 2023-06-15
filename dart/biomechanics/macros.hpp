@@ -6,7 +6,10 @@
 namespace dart {
 namespace biomechanics {
 
-#define THROW_IF(condition, message) \
+#define NIMBLE_THROW(message) \
+    throw std::runtime_error(message); \
+
+#define NIMBLE_THROW_IF(condition, message) \
     do { \
         if (condition) { \
             throw std::runtime_error(message); \

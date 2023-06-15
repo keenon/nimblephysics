@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "performance-inefficient-string-concatenation"
 #include "dart/biomechanics/OpenSimParser.hpp"
 
 #include <algorithm>
@@ -3071,7 +3073,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
     bool outOfRangeEarly = timestamps[0] > targetTimestamps[0];
     bool outOfRangeLate = timestamps[timestamps.size() - 1]
                           < targetTimestamps[targetTimestamps.size() - 1];
-    THROW_IF(outOfRangeEarly || outOfRangeLate, "Values in argument "
+    NIMBLE_THROW_IF(outOfRangeEarly || outOfRangeLate, "Values in argument "
         "'targetTimestamps' are out of range of the timestamps in the file.");
   }
 
@@ -3103,7 +3105,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
 
   // Check that targetTimestampIndices is monotonically increasing.
   for (int i = 1; i < (int)targetTimestampIndices.size(); i++) {
-    THROW_IF(targetTimestampIndices[i] <= targetTimestampIndices[i - 1],
+    NIMBLE_THROW_IF(targetTimestampIndices[i] <= targetTimestampIndices[i - 1],
              "Expected the timestamps found based on targetTimestamps to be "
              "monotonically increasing, but they are not.");
   }
@@ -4337,13 +4339,11 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   }
   else
   {
-    std::cout << "ERROR: Nimble OpenSimParser doesn't yet support joint type \""
-              << jointType
-              << "\". Nimble's support for OpenSim features is still under "
-                 "construction, so support may be added in the future. For "
-                 "now, though, we're exiting with failure."
-              << std::endl;
-    exit(1);
+    std::string msg = "Nimble OpenSimParser doesn't yet support joint "
+        "type \"" + jointType + "\". Nimble's support for OpenSim features is "
+        "still under construction, so support may be added in the future. For "
+        "now, though, we're exiting with failure.";
+    NIMBLE_THROW(msg);
   }
 
   assert(childBody != nullptr);
@@ -5258,11 +5258,10 @@ OpenSimFile OpenSimParser::readOsim40(
     }
     else
     {
-      std::cout << "ERROR loading *.osim file: Joint " << name
-                << " has child body \"" << childName
-                << "\", yet the child was not found in the <BodySet>"
-                << std::endl;
-      exit(1);
+      std::string msg = "Loading *.osim file: Joint " + name + " has child "
+                        "body \"" + childName + "\", yet the child was not "
+                        "found in the <BodySet>";
+      NIMBLE_THROW(msg);
     }
 
     jointCursor = jointCursor->NextSiblingElement();
@@ -5478,3 +5477,4 @@ OpenSimFile OpenSimParser::readOsim40(
 
 }; // namespace biomechanics
 }; // namespace dart
+#pragma clang diagnostic pop

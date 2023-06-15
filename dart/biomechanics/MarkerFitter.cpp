@@ -17,6 +17,7 @@
 #include "dart/biomechanics/IKInitializer.hpp"
 #include "dart/biomechanics/MarkerFixer.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/Joint.hpp"
@@ -904,16 +905,11 @@ MarkerFitter::MarkerFitter(
           }
         }
         assert(foundMarker);
-        if (!foundMarker)
-        {
-          std::cout << "ERROR: static trial marker "
-                    << mStaticTrialMarkerNames[i]
-                    << " did not appear in the markerset. This is a runtime "
-                       "error, because it should have been filtered out in "
-                       "MarkerFitter::setStaticTrial(). Exit 1"
-                    << std::endl;
-          exit(1);
-        }
+        NIMBLE_THROW_IF(!foundMarker,
+                        "Static trial marker " + mStaticTrialMarkerNames[i]
+                          + " did not appear in the markerset. This is a "
+                          "runtime error, because it should have been "
+                          "filtered out in MarkerFitter::setStaticTrial().");
       }
 
       // 7.3. Actually compute the loss, which is just over the marker positions
@@ -4855,15 +4851,11 @@ MarkerInitialization MarkerFitter::getInitialization(
         }
       }
       assert(foundMarker);
-      if (!foundMarker)
-      {
-        std::cout << "ERROR: static trial marker " << mStaticTrialMarkerNames[i]
-                  << " did not appear in the markerset. This is a runtime "
-                     "error, because it should have been filtered out in "
-                     "MarkerFitter::setStaticTrial(). Exit 1"
-                  << std::endl;
-        exit(1);
-      }
+      NIMBLE_THROW_IF(!foundMarker,
+                      "Static trial marker " + mStaticTrialMarkerNames[i]
+                      + " did not appear in the markerset. This is a runtime "
+                      "error, because it should have been filtered out in "
+                      "MarkerFitter::setStaticTrial().";);
     }
 
     Eigen::VectorXs rootPos = mStaticTrialPose.head(6);
@@ -6731,12 +6723,8 @@ void MarkerFitter::findJointCenters(
   }
   */
 
-  if (initialization.poses.hasNaN())
-  {
-    std::cout << "IK initialization in findJointCenters() has NaNs!"
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(initialization.poses.hasNaN(),
+                  "IK initialization in findJointCenters() NaNs.");
 
   // 2. Actually compute the joint centers (multi threaded)
   std::vector<std::future<std::shared_ptr<SphereFitJointCenterProblem>>>
