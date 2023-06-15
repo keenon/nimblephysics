@@ -174,9 +174,9 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
       missingGRFReason.push_back(
           missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
       residualNorms.push_back(trialHeader.residual(t));
-      if (version > 1 && trialHeader.joint_max_velocity_size() > t)
+      if (version > 1 && trialHeader.joints_max_velocity_size() > t)
       {
-        maxJointVelocity.push_back(trialHeader.joint_max_velocity(t));
+        maxJointVelocity.push_back(trialHeader.joints_max_velocity(t));
       }
     }
     mProbablyMissingGRF.push_back(missingGRF);
@@ -771,7 +771,7 @@ void SubjectOnDisk::writeSubject(
     for (int t = 0; t < trialVels[trial].cols(); t++)
     {
       s_t maxVel = trialVels[trial].col(t).cwiseAbs().maxCoeff();
-      trialHeader->add_joint_max_velocity(maxVel);
+      trialHeader->add_joints_max_velocity(maxVel);
     }
 
     header.add_trial_name(trialNames[trial]);
