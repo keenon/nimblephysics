@@ -407,6 +407,15 @@ bool testWriteSubjectToDisk(
       }
     }
   }
+  for (int trial = 0; trial < velTrials.size(); trial++)
+  {
+    std::vector<s_t> maxVels = subject.getTrialMaxJointVelocity(trial);
+    for (int t = 0; t < velTrials[trial].cols(); t++)
+    {
+      EXPECT_NEAR(
+          maxVels[t], velTrials[trial].col(t).cwiseAbs().maxCoeff(), 1e-6);
+    }
+  }
 
   for (int i = 0; i < 500; i++)
   {

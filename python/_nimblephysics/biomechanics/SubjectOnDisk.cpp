@@ -365,6 +365,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "root residual forces + torques on each timestep of a given "
                 "trial")
             .def(
+                "getTrialMaxJointVelocity",
+                &dart::biomechanics::SubjectOnDisk::getTrialMaxJointVelocity,
+                ::py::arg("trial"),
+                "This returns the vector of scalars indicating the maximum "
+                "absolute velocity of all DOFs on each timestep of a given "
+                "trial")
+            .def(
                 "getProbablyMissingGRF",
                 &dart::biomechanics::SubjectOnDisk::getProbablyMissingGRF,
                 ::py::arg("trial"),

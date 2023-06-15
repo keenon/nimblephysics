@@ -167,16 +167,22 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> missingGRFReason;
     std::vector<s_t> residualNorms;
+    std::vector<s_t> maxJointVelocity;
     for (int t = 0; t < trialHeader.missing_grf_size(); t++)
     {
       missingGRF.push_back(trialHeader.missing_grf(t));
       missingGRFReason.push_back(
           missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
       residualNorms.push_back(trialHeader.residual(t));
+      if (version > 1 && trialHeader.joint_max_velocity_size() > t)
+      {
+        maxJointVelocity.push_back(trialHeader.joint_max_velocity(t));
+      }
     }
     mProbablyMissingGRF.push_back(missingGRF);
     mMissingGRFReason.push_back(missingGRFReason);
     mTrialResidualNorms.push_back(residualNorms);
+    mTrialMaxJointVelocity.push_back(maxJointVelocity);
     mTrialLength.push_back(trialHeader.trial_length());
     mTrialTimesteps.push_back(trialHeader.trial_timestep());
     std::vector<bool> dofPositionsObserved;
@@ -762,6 +768,12 @@ void SubjectOnDisk::writeSubject(
       maxNumForcePlates = forcePlates[trial].size();
     }
 
+    for (int t = 0; t < trialVels[trial].cols(); t++)
+    {
+      s_t maxVel = trialVels[trial].col(t).cwiseAbs().maxCoeff();
+      trialHeader->add_joint_max_velocity(maxVel);
+    }
+
     header.add_trial_name(trialNames[trial]);
   }
   header.set_href(sourceHref);
@@ -1260,6 +1272,17 @@ std::vector<s_t> SubjectOnDisk::getTrialResidualNorms(int trial)
     return std::vector<s_t>();
   }
   return mTrialResidualNorms[trial];
+}
+
+/// This returns the maximum absolute velocity of any DOF at each timestep for a
+/// given trial
+std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<s_t>();
+  }
+  return mTrialMaxJointVelocity[trial];
 }
 
 /// This returns the list of contact body names for this Subject

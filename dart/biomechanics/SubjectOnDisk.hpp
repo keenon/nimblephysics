@@ -177,6 +177,10 @@ public:
 
   std::vector<s_t> getTrialResidualNorms(int trial);
 
+  /// This returns the maximum absolute velocity of any DOF at each timestep for
+  /// a given trial
+  std::vector<s_t> getTrialMaxJointVelocity(int trial);
+
   /// This returns the list of contact body names for this Subject
   std::vector<std::string> getGroundContactBodies();
 
@@ -249,6 +253,8 @@ protected:
   std::vector<std::vector<bool>> mDofAccelerationFiniteDifferenced;
   // These are the norms of the residuals on each frame, for each trial
   std::vector<std::vector<s_t>> mTrialResidualNorms;
+  // These are the maximum absolute DOF velocity on each frame, for each trial
+  std::vector<std::vector<s_t>> mTrialMaxJointVelocity;
 
   // This is the only array that has the potential to be somewhat large in
   // memory, but we really want to know this information when randomly picking
