@@ -151,6 +151,70 @@ Note that these are specified in the local body frame, acting on the body at its
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
             .def_readwrite(
+                "markerObservations",
+                &dart::biomechanics::Frame::markerObservations,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`Pair[str, np.ndarray]` of the marker "
+                "observations at this frame. Markers that were not observed "
+                "will not be present in this list. For the full specification "
+                "of the markerset, load the model from the "
+                ":code:`SubjectOnDisk`")
+            .def_readwrite(
+                "accObservations",
+                &dart::biomechanics::Frame::accObservations,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`Pair[str, np.ndarray]` of the "
+                "accelerometers observations at this frame. Accelerometers "
+                "that were not observed (perhaps due to time offsets in "
+                "uploaded data) will not be present in this list. For the full "
+                "specification of the accelerometer set, load the model from "
+                "the :code:`SubjectOnDisk`")
+            .def_readwrite(
+                "gyroObservations",
+                &dart::biomechanics::Frame::gyroObservations,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`Pair[str, np.ndarray]` of the "
+                "gyroscope observations at this frame. Gyroscopes that were "
+                "not observed (perhaps due to time offsets in uploaded data) "
+                "will not be present in this list. For the full specification "
+                "of the gyroscope set, load the model from the "
+                ":code:`SubjectOnDisk`")
+            .def_readwrite(
+                "rawForcePlateCenterOfPressures",
+                &dart::biomechanics::Frame::rawForcePlateCenterOfPressures,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`np.ndarray` of the original center of "
+                "pressure readings on each force plate, without any processing "
+                "by AddBiomechanics. These are the original inputs that were "
+                "used to create this SubjectOnDisk.")
+            .def_readwrite(
+                "rawForcePlateTorques",
+                &dart::biomechanics::Frame::rawForcePlateTorques,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`np.ndarray` of the original torque "
+                "readings on each force plate, without any processing "
+                "by AddBiomechanics. These are the original inputs that were "
+                "used to create this SubjectOnDisk.")
+            .def_readwrite(
+                "rawForcePlateForces",
+                &dart::biomechanics::Frame::rawForcePlateForces,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`np.ndarray` of the original force "
+                "readings on each force plate, without any processing "
+                "by AddBiomechanics. These are the original inputs that were "
+                "used to create this SubjectOnDisk.")
+            .def_readwrite(
+                "emgSignals",
+                &dart::biomechanics::Frame::emgSignals,
+                py::return_value_policy::reference_internal,
+                "This is list of :code:`Pair[str, np.ndarray]` of the "
+                "EMG signals at this frame. EMG signals are generally "
+                "preserved at a higher sampling frequency than the motion "
+                "capture, so the `np.ndarray` vector will be a number of "
+                "samples that were captured during this single motion capture "
+                "frame. For example, if EMG is at 1000Hz and mocap is at "
+                "100Hz, the `np.ndarray` vector will be of length 10.")
+            .def_readwrite(
                 "customValues",
                 &dart::biomechanics::Frame::customValues,
                 py::return_value_policy::reference_internal,
@@ -228,9 +292,24 @@ Note that these are specified in the local body frame, acting on the body at its
                 // compatible.
                 ::py::arg("customValueNames"),
                 ::py::arg("customValues"),
+                // These are the markers, gyros and accelerometers, and EMGs
+                ::py::arg("markerObservations"),
+                ::py::arg("accObservations"),
+                ::py::arg("gyroObservations"),
+                ::py::arg("emgObservations"),
+                // The raw original force plate data
+                ::py::arg("forcePlates"),
+                // This is the subject info
+                ::py::arg("biologicalSex"),
+                ::py::arg("heightM"),
+                ::py::arg("massKg"),
+                ::py::arg("ageYears"),
                 // The provenance info, optional, for investigating where
                 // training data came from after its been aggregated
                 ::py::arg("trialNames") = std::vector<std::string>(),
+                ::py::arg("subjectTags") = std::vector<std::string>(),
+                ::py::arg("trialTags")
+                = std::vector<std::vector<std::string>>(),
                 ::py::arg("sourceHref") = "",
                 ::py::arg("notes") = "",
                 "This writes a subject out to disk in a compressed and "
@@ -286,6 +365,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "root residual forces + torques on each timestep of a given "
                 "trial")
             .def(
+                "getTrialMaxJointVelocity",
+                &dart::biomechanics::SubjectOnDisk::getTrialMaxJointVelocity,
+                ::py::arg("trial"),
+                "This returns the vector of scalars indicating the maximum "
+                "absolute velocity of all DOFs on each timestep of a given "
+                "trial")
+            .def(
                 "getProbablyMissingGRF",
                 &dart::biomechanics::SubjectOnDisk::getProbablyMissingGRF,
                 ::py::arg("trial"),
@@ -324,6 +410,48 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::getNotes,
                 "The notes (if any) added by the person who uploaded this data "
                 "to AddBiomechanics.")
+            .def(
+                "getBiologicalSex",
+                &dart::biomechanics::SubjectOnDisk::getBiologicalSex,
+                "This returns a string, one of \"male\", \"female\", or "
+                "\"unknown\".")
+            .def(
+                "getHeightM",
+                &dart::biomechanics::SubjectOnDisk::getHeightM,
+                "This returns the height in meters, or 0.0 if unknown.")
+            .def(
+                "getMassKg",
+                &dart::biomechanics::SubjectOnDisk::getMassKg,
+                "This returns the mass in kilograms, or 0.0 if unknown.")
+            .def(
+                "getAgeYears",
+                &dart::biomechanics::SubjectOnDisk::getAgeYears,
+                "This returns the age of the subject, or 0 if unknown.")
+            .def(
+                "getSubjectTags",
+                &dart::biomechanics::SubjectOnDisk::getSubjectTags,
+                "This returns the list of tags attached to this subject, which "
+                "are arbitrary strings from the AddBiomechanics platform.")
+            .def(
+                "getTrialTags",
+                &dart::biomechanics::SubjectOnDisk::getTrialTags,
+                ::py::arg("trial"),
+                "This returns the list of tags attached to a given trial "
+                "index, which are arbitrary strings from the AddBiomechanics "
+                "platform.")
+            .def(
+                "getNumForcePlates",
+                &dart::biomechanics::SubjectOnDisk::getNumForcePlates,
+                ::py::arg("trial"),
+                "The number of force plates in the source data.")
+            .def(
+                "getForcePlateCorners",
+                &dart::biomechanics::SubjectOnDisk::getForcePlateCorners,
+                ::py::arg("trial"),
+                ::py::arg("forcePlate"),
+                "Get an array of force plate corners (as 3D vectors) for the "
+                "given force plate in the given trial. Empty array on "
+                "out-of-bounds access.")
             .def(
                 "getContactBodies",
                 &dart::biomechanics::SubjectOnDisk::getGroundContactBodies,
