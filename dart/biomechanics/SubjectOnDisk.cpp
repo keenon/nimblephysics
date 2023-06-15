@@ -1,5 +1,6 @@
 #include "dart/biomechanics/SubjectOnDisk.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -147,6 +148,8 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
   }
 
   // 6. Get the data out of the protobuf object
+  int version = header.version();
+
   mNumDofs = header.num_dofs();
   mNumTrials = header.num_trials();
   for (int i = 0; i < header.ground_contact_body_size(); i++)
@@ -164,16 +167,22 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> missingGRFReason;
     std::vector<s_t> residualNorms;
+    std::vector<s_t> maxJointVelocity;
     for (int t = 0; t < trialHeader.missing_grf_size(); t++)
     {
       missingGRF.push_back(trialHeader.missing_grf(t));
       missingGRFReason.push_back(
           missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
       residualNorms.push_back(trialHeader.residual(t));
+      if (version > 1 && trialHeader.joints_max_velocity_size() > t)
+      {
+        maxJointVelocity.push_back(trialHeader.joints_max_velocity(t));
+      }
     }
     mProbablyMissingGRF.push_back(missingGRF);
     mMissingGRFReason.push_back(missingGRFReason);
     mTrialResidualNorms.push_back(residualNorms);
+    mTrialMaxJointVelocity.push_back(maxJointVelocity);
     mTrialLength.push_back(trialHeader.trial_length());
     mTrialTimesteps.push_back(trialHeader.trial_timestep());
     std::vector<bool> dofPositionsObserved;
@@ -191,9 +200,69 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
     mDofVelocitiesFiniteDifferenced.push_back(dofVelocitiesFiniteDifferenced);
     mDofAccelerationFiniteDifferenced.push_back(
         dofAccelerationFiniteDifferenced);
-
+    if (version > 1)
+    {
+      std::vector<std::string> trialTags;
+      for (int i = 0; i < trialHeader.trial_tag_size(); i++)
+      {
+        trialTags.push_back(trialHeader.trial_tag(i));
+      }
+      mTrialTags.push_back(trialTags);
+    }
+    int numForcePlates = trialHeader.num_force_plates();
+    mTrialNumForcePlates.push_back(numForcePlates);
+    std::vector<std::vector<Eigen::Vector3s>> forcePlateCorners;
+    for (int i = 0; i < numForcePlates; i++)
+    {
+      std::vector<Eigen::Vector3s> corners;
+      for (int corner = 0; corner < trialHeader.force_plate_corners_size() / 3;
+           corner++)
+      {
+        Eigen::Vector3s pt(
+            trialHeader.force_plate_corners(i * 3 + 0),
+            trialHeader.force_plate_corners(i * 3 + 1),
+            trialHeader.force_plate_corners(i * 3 + 2));
+        corners.push_back(pt);
+      }
+      forcePlateCorners.push_back(corners);
+    }
+    mTrialForcePlateCorners.push_back(forcePlateCorners);
     mTrialNames.push_back(header.trial_name(i));
   }
+
+  if (version > 1)
+  {
+    mBiologicalSex = header.biological_sex();
+    mMassKg = header.mass_kg();
+    mHeightM = header.height_m();
+    mAgeYears = header.age_years();
+    for (int i = 0; i < header.subject_tag_size(); i++)
+    {
+      mSubjectTags.push_back(header.subject_tag(i));
+    }
+    mMarkerNames.resize(header.marker_name_size());
+    for (int i = 0; i < header.marker_name_size(); i++)
+    {
+      mMarkerNames[i] = header.marker_name(i);
+    }
+    mAccNames.resize(header.acc_name_size());
+    for (int i = 0; i < header.acc_name_size(); i++)
+    {
+      mAccNames[i] = header.acc_name(i);
+    }
+    mGyroNames.resize(header.gyro_name_size());
+    for (int i = 0; i < header.gyro_name_size(); i++)
+    {
+      mGyroNames[i] = header.gyro_name(i);
+    }
+    mEmgNames.resize(header.emg_name_size());
+    for (int i = 0; i < header.emg_name_size(); i++)
+    {
+      mEmgNames[i] = header.emg_name(i);
+    }
+    mEmgDim = header.emg_dim();
+  }
+
   // int32 num_dofs = 1;
   // int32 num_trials = 2;
   // repeated string ground_contact_body = 3;
@@ -446,6 +515,78 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
       frame->accFiniteDifferenced(i)
           = mDofAccelerationFiniteDifferenced[trial][i];
     }
+    // 7. Read out the marker, accelerometer, and gyro info as pairs
+    for (int i = 0; i < mMarkerNames.size(); i++)
+    {
+      Eigen::Vector3s marker(
+          proto.marker_obs(i * 3 + 0),
+          proto.marker_obs(i * 3 + 1),
+          proto.marker_obs(i * 3 + 2));
+      if (!marker.hasNaN())
+      {
+        frame->markerObservations.emplace_back(mMarkerNames[i], marker);
+      }
+    }
+    for (int i = 0; i < mAccNames.size(); i++)
+    {
+      Eigen::Vector3s acc(
+          proto.acc_obs(i * 3 + 0),
+          proto.acc_obs(i * 3 + 1),
+          proto.acc_obs(i * 3 + 2));
+      if (!acc.hasNaN())
+      {
+        frame->accObservations.emplace_back(mAccNames[i], acc);
+      }
+    }
+    for (int i = 0; i < mGyroNames.size(); i++)
+    {
+      Eigen::Vector3s gyro(
+          proto.gyro_obs(i * 3 + 0),
+          proto.gyro_obs(i * 3 + 1),
+          proto.gyro_obs(i * 3 + 2));
+      if (!gyro.hasNaN())
+      {
+        frame->gyroObservations.emplace_back(mGyroNames[i], gyro);
+      }
+    }
+    for (int i = 0; i < mEmgNames.size(); i++)
+    {
+      Eigen::VectorXs emgSequence(mEmgDim);
+      for (int j = 0; j < mEmgDim; j++)
+      {
+        emgSequence(j) = proto.emg_obs(i * mEmgDim + j);
+      }
+      if (!emgSequence.hasNaN())
+      {
+        frame->emgSignals.emplace_back(mEmgNames[i], emgSequence);
+      }
+    }
+    int numForcePlates = 0;
+    if (mTrialNumForcePlates.size() > trial)
+    {
+      numForcePlates = mTrialNumForcePlates[trial];
+    }
+    for (int i = 0; i < numForcePlates; i++)
+    {
+      Eigen::Vector3s forceCop(
+          proto.raw_force_plate_cop(i * 3 + 0),
+          proto.raw_force_plate_cop(i * 3 + 1),
+          proto.raw_force_plate_cop(i * 3 + 2));
+      Eigen::Vector3s forceTorques(
+          proto.raw_force_plate_torque(i * 3 + 0),
+          proto.raw_force_plate_torque(i * 3 + 1),
+          proto.raw_force_plate_torque(i * 3 + 2));
+      Eigen::Vector3s force(
+          proto.raw_force_plate_force(i * 3 + 0),
+          proto.raw_force_plate_force(i * 3 + 1),
+          proto.raw_force_plate_force(i * 3 + 2));
+      if (!forceCop.hasNaN() && !forceTorques.hasNaN() && !force.hasNaN())
+      {
+        frame->rawForcePlateCenterOfPressures.push_back(forceCop);
+        frame->rawForcePlateTorques.push_back(forceTorques);
+        frame->rawForcePlateForces.push_back(force);
+      }
+    }
 
     result.push_back(frame);
   }
@@ -486,9 +627,27 @@ void SubjectOnDisk::writeSubject(
     // types of values while remaining backwards compatible.
     std::vector<std::string>& customValueNames,
     std::vector<std::vector<Eigen::MatrixXs>> customValues,
+    // These are the markers, gyros and accelerometers
+    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
+        markerObservations,
+    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
+        accObservations,
+    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
+        gyroObservations,
+    const std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>&
+        emgObservations,
+    // This is raw force plate data
+    std::vector<std::vector<ForcePlate>>& forcePlates,
+    // This is the subject info
+    const std::string& biologicalSex,
+    double heightM,
+    double massKg,
+    int ageYears,
     // The provenance info, optional, for investigating where training data
     // came from after its been aggregated
     std::vector<std::string> trialNames,
+    std::vector<std::string> subjectTags,
+    std::vector<std::vector<std::string>> trialTags,
     const std::string& sourceHref,
     const std::string& notes)
 {
@@ -527,38 +686,39 @@ void SubjectOnDisk::writeSubject(
         customValues.size() > 0 ? customValues[0][i].rows() : 0);
   }
   header.set_model_osim_text(openSimRawXML);
-  for (int i = 0; i < trialNames.size(); i++)
+  int maxNumForcePlates = 0;
+  for (int trial = 0; trial < trialNames.size(); trial++)
   {
     auto* trialHeader = header.add_trial_header();
-    if (probablyMissingGRF.size() > i && missingGRFReason.size() > i
-        && trialResidualNorms.size() > i)
+    if (probablyMissingGRF.size() > trial && missingGRFReason.size() > trial
+        && trialResidualNorms.size() > trial)
     {
-      for (int t = 0; t < probablyMissingGRF[i].size(); t++)
+      for (int t = 0; t < probablyMissingGRF[trial].size(); t++)
       {
-        trialHeader->add_missing_grf(probablyMissingGRF[i][t]);
-        if (missingGRFReason[i].size() > t)
+        trialHeader->add_missing_grf(probablyMissingGRF[trial][t]);
+        if (missingGRFReason[trial].size() > t)
         {
           trialHeader->add_missing_grf_reason(
-              missingGRFReasonToProto(missingGRFReason[i][t]));
+              missingGRFReasonToProto(missingGRFReason[trial][t]));
         }
         else
         {
           std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
                        "missingGRFReason out-of-bounds for trial "
-                    << i << " at time " << t << ", defaulting to notMissingGRF"
-                    << std::endl;
+                    << trial << " at time " << t
+                    << ", defaulting to notMissingGRF" << std::endl;
           trialHeader->add_missing_grf_reason(
               missingGRFReasonToProto(notMissingGRF));
         }
-        if (trialResidualNorms[i].size() > t)
+        if (trialResidualNorms[trial].size() > t)
         {
-          trialHeader->add_residual(trialResidualNorms[i][t]);
+          trialHeader->add_residual(trialResidualNorms[trial][t]);
         }
         else
         {
           std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
                        "residual out-of-bounds for trial "
-                    << i << " at time " << t << ", defaulting to 0"
+                    << trial << " at time " << t << ", defaulting to 0"
                     << std::endl;
           trialHeader->add_residual(0);
         }
@@ -570,24 +730,156 @@ void SubjectOnDisk::writeSubject(
           << "SubjectOnDisk::writeSubject() passed bad info: "
              "probablyMissingGRF, missingGRFReason, or trialResidualNorms "
              "out-of-bounds for trial "
-          << i << std::endl;
+          << trial << std::endl;
     }
-    trialHeader->set_trial_timestep(trialTimesteps[i]);
-    trialHeader->set_trial_length(trialPoses[i].cols());
-    for (int j = 0; j < dofPositionsObserved[i].size(); j++)
+    trialHeader->set_trial_timestep(trialTimesteps[trial]);
+    trialHeader->set_trial_length(trialPoses[trial].cols());
+    for (int j = 0; j < dofPositionsObserved[trial].size(); j++)
     {
-      trialHeader->add_dof_positions_observed(dofPositionsObserved[i][j]);
+      trialHeader->add_dof_positions_observed(dofPositionsObserved[trial][j]);
       trialHeader->add_dof_velocities_finite_differenced(
-          dofVelocitiesFiniteDifferenced[i][j]);
+          dofVelocitiesFiniteDifferenced[trial][j]);
       trialHeader->add_dof_acceleration_finite_differenced(
-          dofAccelerationFiniteDifferenced[i][j]);
+          dofAccelerationFiniteDifferenced[trial][j]);
+    }
+    if (trialTags.size() > trial)
+    {
+      for (std::string& tag : trialTags[trial])
+      {
+        trialHeader->add_trial_tag(tag);
+      }
+    }
+    trialHeader->set_num_force_plates(forcePlates[trial].size());
+    for (auto& trialPlates : forcePlates[trial])
+    {
+      for (Eigen::Vector3s& corner : trialPlates.corners)
+      {
+        for (int i = 0; i < 3; i++)
+        {
+          trialHeader->add_force_plate_corners(corner(i));
+        }
+      }
+    }
+    // Keep track of the largest number of force plates in any trial, because we
+    // need to pad all trials to this number with NaNs, in order to keep the
+    // frames the same size to support random disk seeks.
+    if (forcePlates[trial].size() > maxNumForcePlates)
+    {
+      maxNumForcePlates = forcePlates[trial].size();
     }
 
-    header.add_trial_name(trialNames[i]);
+    for (int t = 0; t < trialVels[trial].cols(); t++)
+    {
+      s_t maxVel = trialVels[trial].col(t).cwiseAbs().maxCoeff();
+      trialHeader->add_joints_max_velocity(maxVel);
+    }
+
+    header.add_trial_name(trialNames[trial]);
   }
   header.set_href(sourceHref);
   header.set_notes(notes);
-  header.set_version(1);
+  header.set_version(2);
+
+  header.set_biological_sex(biologicalSex);
+  header.set_mass_kg(massKg);
+  header.set_height_m(heightM);
+  header.set_age_years(ageYears);
+  for (std::string& tag : subjectTags)
+  {
+    header.add_subject_tag(tag);
+  }
+
+  std::vector<std::string> markerNames;
+  std::vector<std::string> accNames;
+  std::vector<std::string> gyroNames;
+  std::vector<std::string> emgNames;
+  for (int trial = 0; trial < markerObservations.size(); trial++)
+  {
+    for (int t = 0; t < markerObservations[trial].size(); t++)
+    {
+      for (auto& pair : markerObservations[trial][t])
+      {
+        if (std::find(markerNames.begin(), markerNames.end(), pair.first)
+            == markerNames.end())
+        {
+          markerNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  for (int trial = 0; trial < accObservations.size(); trial++)
+  {
+    for (int t = 0; t < accObservations[trial].size(); t++)
+    {
+      for (auto& pair : accObservations[trial][t])
+      {
+        if (std::find(accNames.begin(), accNames.end(), pair.first)
+            == accNames.end())
+        {
+          accNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  for (int trial = 0; trial < gyroObservations.size(); trial++)
+  {
+    for (int t = 0; t < gyroObservations[trial].size(); t++)
+    {
+      for (auto& pair : gyroObservations[trial][t])
+      {
+        if (std::find(gyroNames.begin(), gyroNames.end(), pair.first)
+            == gyroNames.end())
+        {
+          gyroNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  int emgDim = 0;
+  for (int trial = 0; trial < emgObservations.size(); trial++)
+  {
+    for (int t = 0; t < emgObservations[trial].size(); t++)
+    {
+      for (auto& pair : emgObservations[trial][t])
+      {
+        if (std::find(emgNames.begin(), emgNames.end(), pair.first)
+            == emgNames.end())
+        {
+          emgNames.push_back(pair.first);
+        }
+        if (emgDim == 0)
+        {
+          emgDim = pair.second.size();
+        }
+        else if (emgDim != pair.second.size())
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "emgObservations have inconsistent dimensions for trial "
+                    << trial << " timestep " << t << " for emg " << pair.first
+                    << ". Expected " << emgDim << " but got "
+                    << pair.second.size() << std::endl;
+        }
+      }
+    }
+  }
+
+  for (std::string& name : markerNames)
+  {
+    header.add_marker_name(name);
+  }
+  for (std::string& name : accNames)
+  {
+    header.add_acc_name(name);
+  }
+  for (std::string& name : gyroNames)
+  {
+    header.add_gyro_name(name);
+  }
+  for (std::string& name : emgNames)
+  {
+    header.add_emg_name(name);
+  }
+  header.set_emg_dim(emgDim);
 
   // 1.3. Continues in next section, after we know the size of the first
   // serialized frame...
@@ -699,6 +991,152 @@ void SubjectOnDisk::writeSubject(
           for (int j = 0; j < customValues[trial][i].rows(); j++)
           {
             frame.add_custom_values(customValues[trial][i](j, t));
+          }
+        }
+      }
+      if (markerObservations.size() > trial
+          && markerObservations[trial].size() > t)
+      {
+        for (std::string& name : markerNames)
+        {
+          if (markerObservations[trial][t].find(name)
+              != markerObservations[trial][t].end())
+          {
+            frame.add_marker_obs(markerObservations[trial][t].at(name)(0));
+            frame.add_marker_obs(markerObservations[trial][t].at(name)(1));
+            frame.add_marker_obs(markerObservations[trial][t].at(name)(2));
+          }
+          else
+          {
+            frame.add_marker_obs(nan(""));
+            frame.add_marker_obs(nan(""));
+            frame.add_marker_obs(nan(""));
+          }
+        }
+      }
+      else
+      {
+        for (int i = 0; i < markerNames.size(); i++)
+        {
+          frame.add_marker_obs(nan(""));
+          frame.add_marker_obs(nan(""));
+          frame.add_marker_obs(nan(""));
+        }
+      }
+      if (accObservations.size() > trial && accObservations[trial].size() > t)
+      {
+        for (std::string& name : accNames)
+        {
+          if (accObservations[trial][t].find(name)
+              != accObservations[trial][t].end())
+          {
+            frame.add_acc_obs(accObservations[trial][t].at(name)(0));
+            frame.add_acc_obs(accObservations[trial][t].at(name)(1));
+            frame.add_acc_obs(accObservations[trial][t].at(name)(2));
+          }
+          else
+          {
+            frame.add_acc_obs(nan(""));
+            frame.add_acc_obs(nan(""));
+            frame.add_acc_obs(nan(""));
+          }
+        }
+      }
+      else
+      {
+        for (int i = 0; i < accNames.size(); i++)
+        {
+          frame.add_acc_obs(nan(""));
+          frame.add_acc_obs(nan(""));
+          frame.add_acc_obs(nan(""));
+        }
+      }
+      if (gyroObservations.size() > trial && gyroObservations[trial].size() > t)
+      {
+        for (std::string& name : gyroNames)
+        {
+          if (gyroObservations[trial][t].find(name)
+              != gyroObservations[trial][t].end())
+          {
+            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(0));
+            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(1));
+            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(2));
+          }
+          else
+          {
+            frame.add_gyro_obs(nan(""));
+            frame.add_gyro_obs(nan(""));
+            frame.add_gyro_obs(nan(""));
+          }
+        }
+      }
+      else
+      {
+        for (int i = 0; i < gyroNames.size(); i++)
+        {
+          frame.add_gyro_obs(nan(""));
+          frame.add_gyro_obs(nan(""));
+          frame.add_gyro_obs(nan(""));
+        }
+      }
+      if (emgObservations.size() > trial && emgObservations[trial].size() > t)
+      {
+        for (std::string& name : emgNames)
+        {
+          if (emgObservations[trial][t].find(name)
+              != emgObservations[trial][t].end())
+          {
+            for (int i = 0; i < emgDim; i++)
+            {
+              frame.add_emg_obs(emgObservations[trial][t].at(name)(i));
+            }
+          }
+          else
+          {
+            for (int i = 0; i < emgDim; i++)
+            {
+              frame.add_emg_obs(nan(""));
+            }
+          }
+        }
+      }
+      else
+      {
+        for (int i = 0; i < emgNames.size(); i++)
+        {
+          for (int j = 0; j < emgDim; j++)
+          {
+            frame.add_emg_obs(nan(""));
+          }
+        }
+      }
+
+      for (int forcePlateIdx = 0; forcePlateIdx < maxNumForcePlates;
+           forcePlateIdx++)
+      {
+        if (trial < forcePlates.size()
+            && forcePlateIdx < forcePlates[trial].size()
+            && forcePlates[trial][forcePlateIdx].centersOfPressure.size() > t
+            && forcePlates[trial][forcePlateIdx].forces.size() > t
+            && forcePlates[trial][forcePlateIdx].moments.size() > t)
+        {
+          for (int i = 0; i < 3; i++)
+          {
+            frame.add_raw_force_plate_cop(
+                forcePlates[trial][forcePlateIdx].centersOfPressure[t](i));
+            frame.add_raw_force_plate_torque(
+                forcePlates[trial][forcePlateIdx].moments[t](i));
+            frame.add_raw_force_plate_force(
+                forcePlates[trial][forcePlateIdx].forces[t](i));
+          }
+        }
+        else
+        {
+          for (int i = 0; i < 3; i++)
+          {
+            frame.add_raw_force_plate_cop(std::nan(""));
+            frame.add_raw_force_plate_torque(std::nan(""));
+            frame.add_raw_force_plate_force(std::nan(""));
           }
         }
       }
@@ -836,6 +1274,17 @@ std::vector<s_t> SubjectOnDisk::getTrialResidualNorms(int trial)
   return mTrialResidualNorms[trial];
 }
 
+/// This returns the maximum absolute velocity of any DOF at each timestep for a
+/// given trial
+std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(int trial)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<s_t>();
+  }
+  return mTrialMaxJointVelocity[trial];
+}
+
 /// This returns the list of contact body names for this Subject
 std::vector<std::string> SubjectOnDisk::getGroundContactBodies()
 {
@@ -877,6 +1326,68 @@ std::string SubjectOnDisk::getTrialName(int trial)
     return "";
   }
   return mTrialNames[trial];
+}
+
+std::string SubjectOnDisk::getBiologicalSex()
+{
+  return mBiologicalSex;
+}
+
+double SubjectOnDisk::getHeightM()
+{
+  return mHeightM;
+}
+
+double SubjectOnDisk::getMassKg()
+{
+  return mMassKg;
+}
+
+/// This gets the tags associated with the subject, if there are any.
+std::vector<std::string> SubjectOnDisk::getSubjectTags()
+{
+  return mSubjectTags;
+}
+
+/// This gets the tags associated with the trial, if there are any.
+std::vector<std::string> SubjectOnDisk::getTrialTags(int trial)
+{
+  if (trial < mTrialTags.size())
+  {
+    return mTrialTags[trial];
+  }
+  else
+  {
+    return std::vector<std::string>();
+  }
+}
+
+int SubjectOnDisk::getAgeYears()
+{
+  return mAgeYears;
+}
+
+/// This returns the number of raw force plates that were used to generate the
+/// data
+int SubjectOnDisk::getNumForcePlates(int trial)
+{
+  return mTrialNumForcePlates[trial];
+}
+
+/// This returns the corners (in 3D space) of the selected force plate, for
+/// this trial. Empty arrays on out of bounds.
+std::vector<Eigen::Vector3s> SubjectOnDisk::getForcePlateCorners(
+    int trial, int forcePlate)
+{
+  if (trial < 0 || trial >= mNumTrials)
+  {
+    return std::vector<Eigen::Vector3s>();
+  }
+  if (forcePlate < 0 || forcePlate >= mTrialNumForcePlates[trial])
+  {
+    return std::vector<Eigen::Vector3s>();
+  }
+  return mTrialForcePlateCorners[trial][forcePlate];
 }
 
 /// This gets the href link associated with the subject, if there is one.

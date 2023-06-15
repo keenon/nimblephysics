@@ -3128,8 +3128,14 @@ std::shared_ptr<DynamicsInitialization> runEngine(
         "../../../testBinary.bin",
         modelPath,
         init,
+        "unknown",
+        68.0,
+        1.8,
+        30,
         false,
         trialNames,
+        std::vector<std::string>(),
+        std::vector<std::vector<std::string>>(),
         "http://test.demo",
         "Generated in test_DynamicsFitter");
 
