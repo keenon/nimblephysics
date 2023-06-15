@@ -4394,11 +4394,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   }
   else
   {
-    std::string msg = "Nimble OpenSimParser doesn't yet support joint "
+    NIMBLE_THROW("Nimble OpenSimParser doesn't yet support joint "
         "type \"" + jointType + "\". Nimble's support for OpenSim features is "
         "still under construction, so support may be added in the future. For "
-        "now, though, we're exiting with failure.";
-    NIMBLE_THROW(msg);
+        "now, though, we're exiting with failure.");
   }
 
   assert(childBody != nullptr);
@@ -5313,10 +5312,9 @@ OpenSimFile OpenSimParser::readOsim40(
     }
     else
     {
-      std::string msg = "Loading *.osim file: Joint " + name + " has child "
-                        "body \"" + childName + "\", yet the child was not "
-                        "found in the <BodySet>";
-      NIMBLE_THROW(msg);
+      NIMBLE_THROW("Loading *.osim file: Joint " + name + " has child "
+                   "body \"" + childName + "\", yet the child was not "
+                   "found in the <BodySet>");
     }
 
     jointCursor = jointCursor->NextSiblingElement();
