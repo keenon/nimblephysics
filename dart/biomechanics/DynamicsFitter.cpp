@@ -27,6 +27,7 @@
 #include "dart/biomechanics/MarkerLabeller.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/biomechanics/SubjectOnDisk.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
 #include "dart/dynamics/EulerJoint.hpp"
@@ -774,10 +775,8 @@ Eigen::Matrix6s ResidualForceHelper::calculateRootResidualJacobianWrtPosition(
   Eigen::VectorXs originalPos = mSkel->getPositions();
 
   assert(false && "This method currently fails tests. Do not call it!");
-  std::cout << "called calculateRootResidualJacobianWrtPosition(), but it's "
-               "broken, so exit(1)!"
-            << std::endl;
-  exit(1);
+  NIMBLE_THROW("Called calculateRootResidualJacobianWrtPosition(), but it "
+               "is broken.");
 
   mSkel->setPositions(q);
 
@@ -5130,14 +5129,11 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
   }
   */
 
-  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
-  {
-    std::cout << "Don't ask for loss before you've called "
-                 "DynamicsFitter::estimateFootGroundContacts() with this init "
-                 "object! Killing the process with exit 1."
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(
+      mInit->probablyMissingGRF.size() != mInit->poseTrials.size(),
+      "You must call DynamicsFitter::estimateFootGroundContacts() with this "
+      "init object before calling DynamicsFitProblem::computeLoss().");
+
 
   s_t massRegularization
       = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
@@ -5419,14 +5415,10 @@ s_t DynamicsFitProblem::computeLossParallel(
   }
   */
 
-  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
-  {
-    std::cout << "Don't ask for loss before you've called "
-                 "DynamicsFitter::estimateFootGroundContacts() with this init "
-                 "object! Killing the process with exit 1."
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(
+      mInit->probablyMissingGRF.size() != mInit->poseTrials.size(),
+      "You must call DynamicsFitter::estimateFootGroundContacts() with this "
+      "init object before calling DynamicsFitProblem::computeLossParallel().");
 
   s_t massRegularization
       = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
@@ -5730,14 +5722,10 @@ s_t DynamicsFitProblem::computeLossParallel(
               << ",mkRMS=" << markerRMS << "]" << std::endl;
   }
 
-  // // Check against linear:
-  // s_t linearSum = computeLoss(x, logExplanation);
-  // if (abs(linearSum - sum) > 1e-10)
-  // {
-  //   std::cout << "Parallel doesn't equal linear loss! Diff="
-  //             << abs(linearSum - sum) << std::endl;
-  //   exit(1);
-  // }
+    //   // Check against linear:
+    //   s_t linearSum = computeLoss(x, logExplanation);
+    //   NIMBLE_THROW_IF(abs(linearSum - sum) > 1e-10,
+    //                   "Parallel doesn't equal linear loss!");
 
   return sum;
 }
@@ -5795,14 +5783,10 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
   }
   if (mIncludePoses)
   */
-  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
-  {
-    std::cout << "Don't ask for gradients before you've called "
-                 "DynamicsFitter::estimateFootGroundContacts() with this init "
-                 "object! Killing the process with exit 1."
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(mInit->probablyMissingGRF.size() < mInit->poseTrials.size(),
+                "Don't ask for gradients before you've called "
+                "DynamicsFitter::estimateFootGroundContacts() with this init "
+                "object!");
 
   int posesCursor = 0;
   if (mConfig.mIncludeMasses)
@@ -6474,14 +6458,10 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
   }
   if (mIncludePoses)
   */
-  if (mInit->probablyMissingGRF.size() < mInit->poseTrials.size())
-  {
-    std::cout << "Don't ask for gradients before you've called "
-                 "DynamicsFitter::estimateFootGroundContacts() with this init "
-                 "object! Killing the process with exit 1."
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(
+      mInit->probablyMissingGRF.size() != mInit->poseTrials.size(),
+      "You must call DynamicsFitter::estimateFootGroundContacts() with this "
+      "init object before you ask for gradients!");
 
   int posesCursor = 0;
   if (mConfig.mIncludeMasses)
@@ -8418,25 +8398,19 @@ bool DynamicsFitProblem::get_bounds_info(
   // Our constraint function has to be 0
   Eigen::Map<Eigen::VectorXd> constraintUpperBounds(g_u, m);
   Eigen::VectorXs constraintUpperBoundsValue = getConstraintUpperBounds();
-  if (constraintUpperBoundsValue.size() != m)
-  {
-    std::cout << "Got a constraint upper bounds vector that was the wrong "
-                 "size! Expected "
-              << m << " but got " << constraintUpperBoundsValue.size()
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(constraintUpperBoundsValue.size() != m,
+                  "Got a constraint upper bounds vector that was the wrong "
+                  "size! Expected "
+                  + std::to_string(m) + " but got "
+                  + std::to_string(constraintUpperBoundsValue.size()));
   constraintUpperBounds = constraintUpperBoundsValue.cast<double>();
   Eigen::Map<Eigen::VectorXd> constraintLowerBounds(g_l, m);
   Eigen::VectorXs constraintLowerBoundsValue = getConstraintLowerBounds();
-  if (constraintLowerBoundsValue.size() != m)
-  {
-    std::cout << "Got a constraint lower bounds vector that was the wrong "
-                 "size! Expected "
-              << m << " but got " << constraintLowerBoundsValue.size()
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(constraintLowerBoundsValue.size() != m,
+                  "Got a constraint lower bounds vector that was the wrong "
+                  "size! Expected "
+                  + std::to_string(m) + " but got "
+                  + std::to_string(constraintLowerBoundsValue.size()));
   constraintLowerBounds = constraintLowerBoundsValue.cast<double>();
 
   return true;
@@ -9092,16 +9066,13 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
         markerObservationTrials,
     std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment)
 {
-  if (markerObservationTrials.size() != kinematicInit.size())
-  {
-    std::cout
-        << "ERROR: Passed a different number of markerObservationTrials ("
-        << markerObservationTrials.size() << ") than kinematic inits ("
-        << kinematicInit.size()
-        << ") to DynamicsFitter::createInitialization()! Exiting with code 1."
-        << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(markerObservationTrials.size() != kinematicInit.size(),
+                  "Passed a different number of markerObservationTrials ("
+                      + std::to_string(markerObservationTrials.size())
+                      + ") than kinematic inits ("
+                      + std::to_string(kinematicInit.size())
+                      + ") to DynamicsFitter::createInitialization()!");
+
   // Split the incoming poses into individual trial matrices
   std::vector<Eigen::MatrixXs> poseTrials;
   for (int trial = 0; trial < markerObservationTrials.size(); trial++)
@@ -9291,13 +9262,10 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositions(
 {
   Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
-
-  if (trial >= init->poseTrials.size())
-  {
-    std::cout << "Trying to get com positions on an out-of-bounds trial: "
-              << trial << " >= " << init->poseTrials.size() << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(trial >= (int)init->poseTrials.size(),
+                  "Trying to get com positions on an out-of-bounds trial: "
+                      + std::to_string(trial) + " >= "
+                      + std::to_string(init->poseTrials.size()));
   const Eigen::MatrixXs& poses = init->poseTrials[trial];
 
   std::vector<Eigen::Vector3s> coms;
@@ -9332,14 +9300,11 @@ std::vector<Eigen::Vector3s> DynamicsFitter::comPositionsToCenterResiduals(
 {
   Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
-
-  if (trial >= init->poseTrials.size())
-  {
-    std::cout << "Trying to get com positions to center residuals on an "
-                 "out-of-bounds trial: "
-              << trial << " >= " << init->poseTrials.size() << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(trial >= (int)init->poseTrials.size(),
+                  "Trying to get com positions to center residuals on an "
+                  "out-of-bounds trial: "
+                      + std::to_string(trial) + " >= "
+                      + std::to_string(init->poseTrials.size()));
   const Eigen::MatrixXs& poses = init->poseTrials[trial];
   s_t dt = init->trialTimesteps[trial];
 
@@ -14442,13 +14407,11 @@ void DynamicsFitter::runIPOPTOptimization(
   Eigen::VectorXs x = problem->flatten();
   Eigen::VectorXs fd = problem->finiteDifferenceGradient(x);
   Eigen::VectorXs analytical = problem->computeGradient(x);
-  if (problem->debugErrors(fd, analytical, 1e-8))
-  {
-    std::cout << "Detected gradient errors in DynamicsFitter!! Quitting."
-              << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(
+      problem->debugErrors(fd, analytical, 1e-8),
+      "Detected gradient errors in DynamicsFitter!."
   */
+
   std::cout << "BEGINNING OPTIMIZATION WITH LOSS: "
             << problem->computeLoss(problem->flatten()) << std::endl;
   if (config.mConstrainResidualsZero)
@@ -16633,13 +16596,10 @@ void DynamicsFitter::saveDynamicsToGUI(
   Eigen::Vector4s accLayerColor = Eigen::Vector4s(0.0, 0.0, 1.0, 1.0);
   std::string markersLayerName = "Marker Traces";
   Eigen::Vector4s markersLayerColor = Eigen::Vector4s(1.0, 0.0, 0.0, 1.0);
-
-  if (trialIndex >= init->poseTrials.size())
-  {
-    std::cout << "Trying to visualize an out-of-bounds trialIndex: "
-              << trialIndex << " >= " << init->poseTrials.size() << std::endl;
-    exit(1);
-  }
+  NIMBLE_THROW_IF(trialIndex >= (int)init->poseTrials.size(),
+                  "Trying to visualize an out-of-bounds trialIndex: "
+                      + std::to_string(trialIndex) + " >= "
+                      + std::to_string(init->poseTrials.size()));
 
   Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();
