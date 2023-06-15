@@ -4855,7 +4855,7 @@ MarkerInitialization MarkerFitter::getInitialization(
                       "Static trial marker " + mStaticTrialMarkerNames[i]
                       + " did not appear in the markerset. This is a runtime "
                       "error, because it should have been filtered out in "
-                      "MarkerFitter::setStaticTrial().";);
+                      "MarkerFitter::setStaticTrial().");
     }
 
     Eigen::VectorXs rootPos = mStaticTrialPose.head(6);

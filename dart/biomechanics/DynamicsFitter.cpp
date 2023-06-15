@@ -16577,7 +16577,7 @@ void DynamicsFitter::saveDynamicsToGUI(
   NIMBLE_THROW_IF(trialIndex >= (int)init->poseTrials.size(),
                   "Trying to visualize an out-of-bounds trialIndex: "
                       + std::to_string(trialIndex) + " >= "
-                      + std::to_string(init->poseTrials.size()););
+                      + std::to_string(init->poseTrials.size()));
 
   Eigen::VectorXs originalMasses = mSkeleton->getLinkMasses();
   Eigen::VectorXs originalPoses = mSkeleton->getPositions();

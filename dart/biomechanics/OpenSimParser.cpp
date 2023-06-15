@@ -1,5 +1,3 @@
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "performance-inefficient-string-concatenation"
 #include "dart/biomechanics/OpenSimParser.hpp"
 
 #include <algorithm>
@@ -5477,4 +5475,3 @@ OpenSimFile OpenSimParser::readOsim40(
 
 }; // namespace biomechanics
 }; // namespace dart
-#pragma clang diagnostic pop
