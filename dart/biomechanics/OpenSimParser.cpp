@@ -2359,6 +2359,7 @@ OpenSimParser::translateOsimMarkers(
   replaceOsimMarkers(
       targetModelPath, convertedMarkers, isAnatomical, outputPath);
 
+  /*
   /// If we're saving to a GUI
   server::GUIRecording server;
   server.renderSkeleton(originalModel.skeleton, "original");
@@ -2366,6 +2367,7 @@ OpenSimParser::translateOsimMarkers(
       targetModel.skeleton, "target", Eigen::Vector4s(1, 0, 0, 1));
   server.saveFrame();
   server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+  */
 
   // 6. We also find the markers that we couldn't deterministically convert with
   // equal meshes, and return them
