@@ -9,6 +9,7 @@ world.setTimeStep(0.01)
 # Create the Rajagopal human body model (from the files shipped with Nimble, licensed under a separate MIT license)
 
 skel: nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
+bodyNodes = skel.skeleton.getBodyNodes()
 world.addSkeleton(skel.skeleton)
 
 # Run a gui
@@ -18,11 +19,12 @@ gui.serve(8080)
 gui.nativeAPI().renderWorld(world)
 
 # Animate the knees back and forth
-ticker: nimble.realtime.Ticker = nimble.realtime.Ticker(world.getTimeStep() * 10)
+ticker: nimble.realtime.Ticker = nimble.realtime.Ticker(
+    world.getTimeStep() * 10)
 
 
 def onTick(now):
-  progress = (now % 2000) / 2000.0
+    progress = (now % 2000) / 2000.0
 
 
 ticker.registerTickListener(onTick)

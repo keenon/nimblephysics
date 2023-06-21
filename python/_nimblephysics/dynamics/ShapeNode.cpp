@@ -107,9 +107,19 @@ void ShapeNode(py::module& m)
           +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3s {
             return self->getOffset();
           })
-      .def("createVisualAspect", &dart::dynamics::ShapeNode::createVisualAspect<>, py::return_value_policy::reference_internal)
-      .def("createCollisionAspect", &dart::dynamics::ShapeNode::createCollisionAspect<>, py::return_value_policy::reference_internal)
-      .def("createDynamicsAspect", &dart::dynamics::ShapeNode::createDynamicsAspect<>, py::return_value_policy::reference_internal);
+      .def("getName", &dart::dynamics::ShapeNode::getName)
+      .def(
+          "createVisualAspect",
+          &dart::dynamics::ShapeNode::createVisualAspect<>,
+          py::return_value_policy::reference_internal)
+      .def(
+          "createCollisionAspect",
+          &dart::dynamics::ShapeNode::createCollisionAspect<>,
+          py::return_value_policy::reference_internal)
+      .def(
+          "createDynamicsAspect",
+          &dart::dynamics::ShapeNode::createDynamicsAspect<>,
+          py::return_value_policy::reference_internal);
 }
 
 } // namespace python
