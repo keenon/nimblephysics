@@ -259,6 +259,20 @@ void OpenSimParser(py::module& m)
       ::py::arg("outputPath"));
 
   sm.def(
+      "translateOsimMarkers",
+      +[](const common::Uri& originalModelPath,
+          const common::Uri& targetModelPath,
+          const std::string& outputPath,
+          bool verbose) {
+        return dart::biomechanics::OpenSimParser::translateOsimMarkers(
+            originalModelPath, targetModelPath, outputPath, verbose);
+      },
+      ::py::arg("originalModelPath"),
+      ::py::arg("targetModelPath"),
+      ::py::arg("outputPath"),
+      ::py::arg("verbose") = false);
+
+  sm.def(
       "replaceOsimMarkers",
       +[](const common::Uri& uri,
           const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&

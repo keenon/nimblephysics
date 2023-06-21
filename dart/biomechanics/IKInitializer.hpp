@@ -188,20 +188,6 @@ public:
   static Eigen::MatrixXs getPointCloudFromDistanceMatrix(
       const Eigen::MatrixXs& distances);
 
-  /// This will rotate and translate a point cloud to match the first N points
-  /// as closely as possible to the passed in matrix
-  static Eigen::MatrixXs mapPointCloudToData(
-      const Eigen::MatrixXs& pointCloud,
-      std::vector<Eigen::Vector3s> firstNPoints);
-
-  /// This will give the world transform necessary to apply to the local points
-  /// (worldT * p[i] for all localPoints) to get the local points to match the
-  /// world points as closely as possible.
-  static Eigen::Isometry3s getPointCloudToPointCloudTransform(
-      std::vector<Eigen::Vector3s> localPoints,
-      std::vector<Eigen::Vector3s> worldPoints,
-      std::vector<s_t> weights);
-
   /// This tries to solve the least-squares problem to get the local scales for
   /// a body, such that the distances between the local points match the input
   /// distances as closely as possible, with a weighted preference.

@@ -17,6 +17,7 @@
 
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/IKErrorReport.hpp"
+#include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/biomechanics/macros.hpp"
 #include "dart/common/Uri.hpp"
 #include "dart/dynamics/BallJoint.hpp"
@@ -51,6 +52,7 @@
 #include "dart/math/PiecewiseLinearFunction.hpp"
 #include "dart/math/PolynomialFunction.hpp"
 #include "dart/math/SimmSpline.hpp"
+#include "dart/server/GUIRecording.hpp"
 #include "dart/utils/CompositeResourceRetriever.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/MJCFExporter.hpp"
@@ -1755,6 +1757,634 @@ void OpenSimParser::moveOsimMarkers(
   }
 
   newFile.SaveFile(outputPath.c_str());
+}
+
+//==============================================================================
+/// Read an original *.osim file (which contains a marker set), and a target
+/// *.osim file, and translate the markers from the original to the target,
+/// and write it out to a new *.osim file
+///
+/// This method returns a pair of lists, (guessedMarkers, missingMarkers).
+/// The guessedMarkers array contains the markers which were placed on the
+/// target model using heuristics. The missingMarkers array contains the
+/// markers which were not placed on the target model, because they could not
+/// be matched to any body even after heuristics were applied (this can often
+/// happen because the markers are on the arms, but the target model has no
+/// arms, for example). These should be reviewed by a person, to verify that
+/// the results look reasonable.
+std::pair<std::vector<std::string>, std::vector<std::string>>
+OpenSimParser::translateOsimMarkers(
+    const common::Uri& originalModelPath,
+    const common::Uri& targetModelPath,
+    const std::string& outputPath,
+    bool verbose)
+{
+  OpenSimFile originalModel = OpenSimParser::parseOsim(originalModelPath);
+  OpenSimFile targetModel = OpenSimParser::parseOsim(targetModelPath);
+
+  originalModel.skeleton->setPositions(
+      Eigen::VectorXs::Zero(originalModel.skeleton->getNumDofs()));
+  targetModel.skeleton->setPositions(
+      Eigen::VectorXs::Zero(targetModel.skeleton->getNumDofs()));
+
+  // 0. Scale the original model to match the target model height
+  s_t originalHeight = originalModel.skeleton->getHeight(
+      originalModel.skeleton->getPositions());
+  s_t targetHeight
+      = targetModel.skeleton->getHeight(targetModel.skeleton->getPositions());
+  s_t scaleOriginalModel = (targetHeight / originalHeight);
+  if (verbose)
+  {
+    std::cout << "Original model height: " << originalHeight << "m"
+              << std::endl;
+    std::cout << "Target model height: " << targetHeight << "m" << std::endl;
+    std::cout << "Scaling original model to: " << scaleOriginalModel
+              << std::endl;
+  }
+  for (int i = 0; i < 100; i++)
+  {
+    s_t error = originalModel.skeleton->getHeight(
+                    originalModel.skeleton->getPositions())
+                - targetModel.skeleton->getHeight(
+                    targetModel.skeleton->getPositions());
+    s_t grad = 2 * error
+               * originalModel.skeleton
+                     ->getGradientOfHeightWrtBodyScales(
+                         originalModel.skeleton->getPositions())
+                     .sum();
+    if (std::abs(grad) < 1e-4)
+      break;
+    scaleOriginalModel -= grad * 0.05;
+    // Want the original height to match the target height
+    originalModel.skeleton->setBodyScales(
+        Eigen::VectorXs::Ones(originalModel.skeleton->getNumBodyNodes() * 3)
+        * scaleOriginalModel);
+    if (verbose)
+    {
+      s_t newHeight = originalModel.skeleton->getHeight(
+          originalModel.skeleton->getPositions());
+      std::cout << "Updated original model height: " << newHeight
+                << "m at scale " << scaleOriginalModel << std::endl;
+    }
+  }
+
+  // 1. To prepare, we want to run through all the meshes on both the original
+  // and target models, and derive an equality between meshes (even if they may
+  // have different file names).
+  std::map<std::string, std::vector<std::string>> equalMeshes;
+  std::map<std::string, Eigen::Isometry3s> originalMeshWorldTransforms;
+  std::map<std::string, Eigen::Isometry3s> targetMeshWorldTransforms;
+  for (int i = 0; i < originalModel.skeleton->getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* originalBody = originalModel.skeleton->getBodyNode(i);
+    for (auto* originalShapeNode : originalBody->getShapeNodes())
+    {
+      if (originalShapeNode->getShape()->getType()
+          == dynamics::MeshShape::getStaticType())
+      {
+        // 1.1. Get all the meshes on the original model
+        dynamics::MeshShape* originalMeshShape
+            = static_cast<dynamics::MeshShape*>(
+                originalShapeNode->getShape().get());
+        originalMeshWorldTransforms[originalMeshShape->getMeshPath()]
+            = originalShapeNode->getWorldTransform();
+        // 1.2. Now we need to compare this mesh with all the meshes on the
+        // target model
+        for (int j = 0; j < targetModel.skeleton->getNumBodyNodes(); j++)
+        {
+          dynamics::BodyNode* targetBody = targetModel.skeleton->getBodyNode(j);
+          for (auto* targetShapeNode : targetBody->getShapeNodes())
+          {
+            if (targetShapeNode->getShape()->getType()
+                == dynamics::MeshShape::getStaticType())
+            {
+              dynamics::MeshShape* targetMeshShape
+                  = static_cast<dynamics::MeshShape*>(
+                      targetShapeNode->getShape().get());
+              targetMeshWorldTransforms[targetMeshShape->getMeshPath()]
+                  = targetShapeNode->getWorldTransform();
+              // 1.3. Now we need to check if the meshes are functionally
+              // equivalent
+              bool equal = true;
+              if (originalMeshShape->getMesh()->mNumMeshes
+                  != targetMeshShape->getMesh()->mNumMeshes)
+              {
+                equal = false;
+              }
+              else
+              {
+                for (int m = 0; m < originalMeshShape->getMesh()->mNumMeshes;
+                     m++)
+                {
+                  if (originalMeshShape->getMesh()->mMeshes[m]->mNumVertices
+                      != targetMeshShape->getMesh()->mMeshes[m]->mNumVertices)
+                  {
+                    equal = false;
+                    break;
+                  }
+
+                  for (int v = 0;
+                       v
+                       < originalMeshShape->getMesh()->mMeshes[m]->mNumVertices;
+                       v++)
+                  {
+                    aiVector3D originalVertex = originalMeshShape->getMesh()
+                                                    ->mMeshes[m]
+                                                    ->mVertices[v];
+                    aiVector3D targetVertex
+                        = targetMeshShape->getMesh()->mMeshes[m]->mVertices[v];
+                    if (originalVertex.x != targetVertex.x
+                        || originalVertex.y != targetVertex.y
+                        || originalVertex.z != targetVertex.z)
+                    {
+                      equal = false;
+                      break;
+                    }
+                  }
+                  if (!equal)
+                    break;
+                }
+              }
+
+              if (equal)
+              {
+                if (verbose)
+                {
+                  std::cout << "Detected that mesh \""
+                            << originalMeshShape->getMeshPath()
+                            << "\" is equivalent to mesh \""
+                            << targetMeshShape->getMeshPath() << "\""
+                            << std::endl;
+                }
+                equalMeshes[originalMeshShape->getMeshPath()].push_back(
+                    targetMeshShape->getMeshPath());
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Next, we convert the markerset on the original model to be expressed in
+  // terms of the meshes on that body
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>>
+      markersOnMeshes;
+  for (auto& pair : originalModel.markersMap)
+  {
+    std::string markerName = pair.first;
+    Eigen::Vector3s markerOffset = pair.second.second;
+    dynamics::BodyNode* body = pair.second.first;
+
+    s_t bestVertexDistance = std::numeric_limits<double>::infinity();
+    for (auto* shape : body->getShapeNodes())
+    {
+      if (shape->getShape()->getType() == dynamics::MeshShape::getStaticType())
+      {
+        dynamics::MeshShape* meshShape
+            = static_cast<dynamics::MeshShape*>(shape->getShape().get());
+        Eigen::Vector3s markerInMeshFrame
+            = shape->getRelativeTransform().inverse() * markerOffset;
+        std::string meshPath = meshShape->getMeshPath();
+
+        for (int i = 0; i < meshShape->getMesh()->mNumMeshes; i++)
+        {
+          aiMesh* mesh = meshShape->getMesh()->mMeshes[i];
+          for (int j = 0; j < mesh->mNumVertices; j++)
+          {
+            aiVector3D vertex = mesh->mVertices[j];
+            Eigen::Vector3s vertexEigen(vertex.x, vertex.y, vertex.z);
+            s_t markerToVertexDistance
+                = (vertexEigen - markerInMeshFrame).norm();
+            if (markerToVertexDistance < bestVertexDistance)
+            {
+              markersOnMeshes[markerName]
+                  = std::pair<std::string, Eigen::Vector3s>(
+                      meshPath, markerInMeshFrame);
+              bestVertexDistance = markerToVertexDistance;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (verbose)
+  {
+    std::cout << "Markers on meshes: " << std::endl;
+    for (auto& pair : markersOnMeshes)
+    {
+      std::cout << "  " << pair.first << " -> " << pair.second.first
+                << std::endl;
+    }
+  }
+
+  // 3. Now that we have the markerset defined on meshes, we convert the
+  // markerset in meshes back into bodies on the target model
+  std::map<std::string, std::pair<std::string, Eigen::Vector3s>>
+      convertedMarkers;
+  for (auto& pair : markersOnMeshes)
+  {
+    std::string markerName = pair.first;
+    std::string meshPath = pair.second.first;
+    Eigen::Vector3s markerOffset = pair.second.second;
+
+    for (int i = 0; i < targetModel.skeleton->getNumBodyNodes(); i++)
+    {
+      dynamics::BodyNode* body = targetModel.skeleton->getBodyNode(i);
+      for (auto* shapeNode : body->getShapeNodes())
+      {
+        if (shapeNode->getShape()->getType()
+            == dynamics::MeshShape::getStaticType())
+        {
+          dynamics::MeshShape* targetMeshShape
+              = static_cast<dynamics::MeshShape*>(shapeNode->getShape().get());
+          std::string targetMeshPath = targetMeshShape->getMeshPath();
+          if (targetMeshPath == meshPath
+              || (equalMeshes.count(meshPath) > 0
+                  && std::find(
+                         equalMeshes.at(meshPath).begin(),
+                         equalMeshes.at(meshPath).end(),
+                         targetMeshPath)
+                         != equalMeshes.at(meshPath).end()))
+          {
+            Eigen::Vector3s markerInBodyFrame
+                = shapeNode->getRelativeTransform() * markerOffset;
+            convertedMarkers[markerName]
+                = std::pair<std::string, Eigen::Vector3s>(
+                    body->getName(), markerInBodyFrame);
+          }
+        }
+      }
+    }
+  }
+
+  std::vector<std::string> failedMarkers;
+  for (auto& pair : originalModel.markersMap)
+  {
+    if (convertedMarkers.count(pair.first) == 0)
+    {
+      failedMarkers.push_back(pair.first);
+      if (verbose)
+      {
+        std::cout << "Failed to convert marker \"" << pair.first
+                  << "\" using exact mesh registration" << std::endl;
+      }
+    }
+  }
+
+  // 4. If we failed to register all the markers (because the meshes are
+  // sufficiently different) then we want to run a more sophisticated
+  // registration where we align the meshes as closely as possible on the two
+  // skeletons, then try to align the markers to the body on the target skeleton
+  // with the nearest vertex.
+  // 4.1. We want to align the target back to the original model. We'll start
+  // with an initial guess based on any meshes the are known equivalent.
+  Eigen::Isometry3s targetRootTransform = Eigen::Isometry3s::Identity();
+  if (failedMarkers.size() > 0)
+  {
+    if (verbose)
+    {
+      std::cout << "We will now attempt to apply heuristics to match up the "
+                   "two skeletons, and see if we can guess the locations of "
+                   "more markers on the target skeleton."
+                << std::endl;
+    }
+    // 4.2. This transform will map the vertices from the target model to match
+    // the original model as closely as possible. We can initialize an estimate
+    // based on matching meshes, if they exist on both skeletons.
+    for (auto& pair : equalMeshes)
+    {
+      std::string originalMeshPath = pair.first;
+      std::string targetMeshPath = pair.second[0];
+      assert(originalMeshWorldTransforms.count(originalMeshPath));
+      Eigen::Isometry3s originalMeshWorldTransform
+          = originalMeshWorldTransforms[originalMeshPath];
+      assert(targetMeshWorldTransforms.count(targetMeshPath));
+      Eigen::Isometry3s targetMeshWorldTransform
+          = targetMeshWorldTransforms[targetMeshPath];
+      // X * Left = Right
+      // X = Right * Left^-1
+      Eigen::Isometry3s targetRootTransformGuess
+          = originalMeshWorldTransform * targetMeshWorldTransform.inverse();
+      // TODO: average multiple guesses, rather than simply overwriting the
+      // previous guess
+      targetRootTransform = targetRootTransformGuess;
+    }
+
+    // 4.3. Given that initial guess for the target root transform, we want to
+    // align all the vertices on the original model with all the vertices on the
+    // target model using iterative-closest-point, to catch any small
+    // differences in the meshes that are otherwise equivalent.
+    std::vector<Eigen::Vector3s> originalVertices;
+    std::vector<Eigen::Vector3s> targetVertices;
+    std::vector<std::string> targetBodyName;
+    for (int i = 0; i < originalModel.skeleton->getNumBodyNodes(); i++)
+    {
+      dynamics::BodyNode* originalBody = originalModel.skeleton->getBodyNode(i);
+      for (auto* originalShapeNode : originalBody->getShapeNodes())
+      {
+        if (originalShapeNode->getShape()->getType()
+            == dynamics::MeshShape::getStaticType())
+        {
+          // 1.1. Get all the meshes on the original model
+          dynamics::MeshShape* originalMeshShape
+              = static_cast<dynamics::MeshShape*>(
+                  originalShapeNode->getShape().get());
+          for (int m = 0; m < originalMeshShape->getMesh()->mNumMeshes; m++)
+          {
+            for (int v = 0;
+                 v < originalMeshShape->getMesh()->mMeshes[m]->mNumVertices;
+                 v++)
+            {
+              aiVector3D aiVertex
+                  = originalMeshShape->getMesh()->mMeshes[m]->mVertices[v];
+              Eigen::Vector3s rawVertex
+                  = Eigen::Vector3s(aiVertex.x, aiVertex.y, aiVertex.z);
+              Eigen::Vector3s vertex
+                  = originalMeshShape->getScale().cwiseProduct(rawVertex);
+              originalVertices.push_back(
+                  originalShapeNode->getWorldTransform() * vertex);
+            }
+          }
+        }
+      }
+    }
+    for (int j = 0; j < targetModel.skeleton->getNumBodyNodes(); j++)
+    {
+      dynamics::BodyNode* targetBody = targetModel.skeleton->getBodyNode(j);
+      for (auto* targetShapeNode : targetBody->getShapeNodes())
+      {
+        if (targetShapeNode->getShape()->getType()
+            == dynamics::MeshShape::getStaticType())
+        {
+          dynamics::MeshShape* targetMeshShape
+              = static_cast<dynamics::MeshShape*>(
+                  targetShapeNode->getShape().get());
+          for (int m = 0; m < targetMeshShape->getMesh()->mNumMeshes; m++)
+          {
+            for (int v = 0;
+                 v < targetMeshShape->getMesh()->mMeshes[m]->mNumVertices;
+                 v++)
+            {
+              aiVector3D aiVertex
+                  = targetMeshShape->getMesh()->mMeshes[m]->mVertices[v];
+              Eigen::Vector3s rawVertex
+                  = Eigen::Vector3s(aiVertex.x, aiVertex.y, aiVertex.z);
+              Eigen::Vector3s vertex
+                  = targetMeshShape->getScale().cwiseProduct(rawVertex);
+              targetVertices.push_back(
+                  targetShapeNode->getWorldTransform() * vertex);
+              targetBodyName.push_back(targetBody->getName());
+            }
+          }
+        }
+      }
+    }
+
+    // 4.3.2. Actually run ICP with our point clouds
+    if (verbose)
+    {
+      std::cout << "Running Iterative Closest Point to align the vertices of "
+                   "the meshes on both models..."
+                << std::endl;
+    }
+    targetRootTransform = math::iterativeClosestPoint(
+        targetVertices, originalVertices, targetRootTransform, verbose);
+    Eigen::Vector6s rootPos = Eigen::Vector6s::Zero();
+    rootPos.tail<3>() = targetRootTransform.translation();
+    targetModel.skeleton->getRootJoint()->setPositions(rootPos);
+
+    // 4.4. Motivated by slight differences in default model bone lengths, at
+    // this point we want to try to scale the original skeleton to match the
+    // target skeleton, so that the markers end up at the correct locations. We
+    // do this by picking pairs of joints on the original and target skeletons,
+    // and then running an IK+Scale step on the original skeleton to try to
+    // match them up.
+    Eigen::VectorXs targetJointCenters
+        = targetModel.skeleton->getJointWorldPositions(
+            targetModel.skeleton->getJoints());
+    Eigen::VectorXs originalJointCenters
+        = originalModel.skeleton->getJointWorldPositions(
+            originalModel.skeleton->getJoints());
+
+    std::vector<dynamics::Joint*> originalJointsToMove;
+    std::vector<Eigen::Vector3s> jointCenterTargets;
+    std::vector<int> targetJointIndices;
+    for (int i = 0; i < originalModel.skeleton->getNumJoints(); i++)
+    {
+      Eigen::Vector3s originalModelJointCenter
+          = originalJointCenters.segment<3>(i * 3);
+      s_t bestDistance = std::numeric_limits<double>::infinity();
+      int bestIndex = -1;
+      for (int j = 0; j < targetModel.skeleton->getNumJoints(); j++)
+      {
+        Eigen::Vector3s targetModelJointCenter
+            = targetJointCenters.segment<3>(j * 3);
+        s_t dist = (originalModelJointCenter - targetModelJointCenter).norm();
+        if (dist < 0.07 && dist < bestDistance)
+        {
+          bestDistance = dist;
+          bestIndex = j;
+        }
+      }
+      if (bestIndex != -1)
+      {
+        // We don't want multiple joints to move to the same target joint,
+        // because that will cause bone scales to go to 0, which is bad. So we
+        // tie break by saying only the closest joint center matches any given
+        // target.
+        auto index = std::find(
+            targetJointIndices.begin(), targetJointIndices.end(), bestIndex);
+        if (index != targetJointIndices.end())
+        {
+          // We want to check the distance that the other joint has, and if
+          // we're better, we want to replace them
+          int otherIndex = std::distance(targetJointIndices.begin(), index);
+          Eigen::Vector3s otherJointCenter
+              = originalJointCenters.segment<3>(otherIndex * 3);
+          s_t otherDist
+              = (jointCenterTargets[otherIndex] - otherJointCenter).norm();
+          // If we're closer to this target joint, then we want to bump this
+          // other joint
+          if (bestDistance < otherDist)
+          {
+            originalJointsToMove[otherIndex]
+                = originalModel.skeleton->getJoint(i);
+            assert(
+                jointCenterTargets[otherIndex]
+                == targetJointCenters.segment<3>(bestIndex * 3));
+            assert(targetJointIndices[otherIndex] == bestIndex);
+          }
+        }
+        else
+        {
+          // We haven't seen this target joint before, so we can add it without
+          // checks
+          originalJointsToMove.push_back(originalModel.skeleton->getJoint(i));
+          jointCenterTargets.push_back(
+              targetJointCenters.segment<3>(bestIndex * 3));
+          targetJointIndices.push_back(bestIndex);
+        }
+      }
+    }
+    Eigen::VectorXs flattenedJointCenterTargets
+        = Eigen::VectorXs::Zero(jointCenterTargets.size() * 3);
+    for (int i = 0; i < jointCenterTargets.size(); i++)
+    {
+      flattenedJointCenterTargets.segment<3>(i * 3) = jointCenterTargets[i];
+    }
+    if (jointCenterTargets.size() > 0)
+    {
+      if (verbose)
+      {
+        std::cout << "Running IK+scaling to try to align the nearest joint "
+                     "centers of both models..."
+                  << std::endl;
+      }
+      // Now we want to actually run the IK + Scaling step
+      MarkerFitter fitter(originalModel.skeleton, originalModel.markersMap);
+      auto result = MarkerFitter::scaleAndFit(
+          &fitter,
+          std::map<std::string, Eigen::Vector3s>(),
+          originalModel.skeleton->getPositions(),
+          std::map<std::string, s_t>(),
+          std::map<std::string, Eigen::Vector3s>(),
+          originalJointsToMove,
+          flattenedJointCenterTargets,
+          Eigen::VectorXs::Ones(flattenedJointCenterTargets.size()),
+          Eigen::VectorXs::Zero(flattenedJointCenterTargets.size() * 6),
+          Eigen::VectorXs::Zero(flattenedJointCenterTargets.size()),
+          originalModel.skeleton->getJoints(),
+          false,
+          0,
+          verbose,
+          false);
+      originalModel.skeleton->setPositions(result.pose);
+      originalModel.skeleton->setGroupScales(result.scale);
+    }
+
+    // 4.5. Now we can get the marker world locations on the original model, and
+    // look for the nearest vertex on the target model (which hasn't changed
+    // size, so we don't need to re-compute its vertices world locations), and
+    // if any are within range we can assign them to the appropriate body.
+    std::map<std::string, Eigen::Vector3s> originalWorldMarkers
+        = originalModel.skeleton->getMarkerMapWorldPositions(
+            originalModel.markersMap);
+    if (verbose)
+    {
+      std::cout << "Now that the skeletons are aligned, trying to find markers "
+                   "to assign to the target model..."
+                << std::endl;
+    }
+    for (auto& pair : originalWorldMarkers)
+    {
+      // We only want to map markers that we couldn't map before (using precise
+      // geometry matching)
+      if (convertedMarkers.count(pair.first) == 0)
+      {
+        std::string markerName = pair.first;
+        std::string originalBodyName
+            = originalModel.markersMap[markerName].first->getName();
+
+        s_t bestDistance = std::numeric_limits<double>::infinity();
+        std::string bestBody = "";
+
+        Eigen::Vector3s targetMarker
+            = targetRootTransform.inverse() * pair.second;
+
+        for (int v = 0; v < targetVertices.size(); v++)
+        {
+          Eigen::Vector3s point = targetVertices[v];
+          s_t dist = (point - targetMarker).norm();
+          s_t bodyNamePenalty = 0.0;
+          // Add the edit distance between originalBodyName and
+          // targetBodyName[v] as a cost to bodyPenalty. TODO: make this handle
+          // small changes like "l_hand" vs. "hand_left" better.
+          if (targetBodyName[v] != originalBodyName)
+          {
+            bodyNamePenalty += 1.0;
+          }
+
+          if (dist < 0.15 && dist + bodyNamePenalty < bestDistance)
+          {
+            bestDistance = dist + bodyNamePenalty;
+            bestBody = targetBodyName[v];
+            break;
+          }
+        }
+
+        if (std::isfinite(bestDistance))
+        {
+          if (verbose)
+          {
+            std::cout
+                << "Marker \"" << markerName << "\" is closest to body \""
+                << bestBody << "\" at distance " << bestDistance
+                << "m from nearest vertex on any mesh attached to that body"
+                << std::endl;
+          }
+          Eigen::Isometry3s bestBodyWorld
+              = targetModel.skeleton->getBodyNode(bestBody)
+                    ->getWorldTransform();
+          convertedMarkers[pair.first]
+              = std::pair<std::string, Eigen::Vector3s>(
+                  bestBody, bestBodyWorld.inverse() * targetMarker);
+        }
+      }
+    }
+  }
+
+  std::map<std::string, bool> isAnatomical;
+  for (auto& pair : convertedMarkers)
+  {
+    isAnatomical[pair.first] = false;
+  }
+  for (std::string marker : targetModel.anatomicalMarkers)
+  {
+    isAnatomical[marker] = true;
+  }
+
+  if (verbose)
+  {
+    std::cout << "Converted markers: " << std::endl;
+    for (auto& pair : convertedMarkers)
+    {
+      std::cout << "  " << pair.first << " -> " << pair.second.first
+                << std::endl;
+    }
+  }
+
+  // 5. Finally, write the converted skeleton back to disk
+  replaceOsimMarkers(
+      targetModelPath, convertedMarkers, isAnatomical, outputPath);
+
+  /// If we're saving to a GUI
+  server::GUIRecording server;
+  server.renderSkeleton(originalModel.skeleton, "original");
+  server.renderSkeleton(
+      targetModel.skeleton, "target", Eigen::Vector4s(1, 0, 0, 1));
+  server.saveFrame();
+  server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+
+  // 6. We also find the markers that we couldn't deterministically convert with
+  // equal meshes, and return them
+
+  std::vector<std::string> guessedMarkers;
+  std::vector<std::string> missingMarkers;
+  for (std::string marker : failedMarkers)
+  {
+    if (convertedMarkers.count(marker) > 0)
+    {
+      guessedMarkers.push_back(marker);
+    }
+    else
+    {
+      missingMarkers.push_back(marker);
+    }
+  }
+
+  return std::make_pair(guessedMarkers, missingMarkers);
 }
 
 //==============================================================================

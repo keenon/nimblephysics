@@ -25,6 +25,7 @@
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/UniversalJoint.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/math/IKSolver.hpp"
 #include "dart/math/MathTypes.hpp"
@@ -997,7 +998,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
         Eigen::MatrixXs pointCloud = getPointCloudFromDistanceMatrix(D);
         assert(!pointCloud.hasNaN());
         Eigen::MatrixXs transformed
-            = mapPointCloudToData(pointCloud, adjacentPointLocations);
+            = math::mapPointCloudToData(pointCloud, adjacentPointLocations);
 
         // 4. Collect error statistics
         s_t pointCloudError = 0.0;
@@ -1303,8 +1304,9 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
         // transform at this frame
         if (identityMarkerCloud.size() >= 3)
         {
-          Eigen::Isometry3s worldTransform = getPointCloudToPointCloudTransform(
-              identityMarkerCloud, currentMarkerCloud, weights);
+          Eigen::Isometry3s worldTransform
+              = math::getPointCloudToPointCloudTransform(
+                  identityMarkerCloud, currentMarkerCloud, weights);
           if (logOutput)
           {
             s_t error = 0.0;
@@ -1437,8 +1439,10 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     s_t error = 0.0;
     for (int i = 0; i < usableTimesteps.size(); i++)
     {
-      Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][usableTimesteps[i]];
-      Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][usableTimesteps[i]];
+      Eigen::Isometry3s parentTransform
+          = bodyTrajectories[parentBodyName][usableTimesteps[i]];
+      Eigen::Isometry3s childTransform
+          = bodyTrajectories[childBodyName][usableTimesteps[i]];
       Eigen::Vector3s parentWorldCenter = parentTransform * parentOffset;
       Eigen::Vector3s childWorldCenter = childTransform * childOffset;
       Eigen::Vector3s jointCenter
@@ -1446,7 +1450,8 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       error += (parentWorldCenter - jointCenter).norm();
       error += (childWorldCenter - jointCenter).norm();
 
-      // We can be in funny coordinate systems, but check that nothing crazy has resulted.
+      // We can be in funny coordinate systems, but check that nothing crazy has
+      // resulted.
       assert(!jointCenter.hasNaN() && jointCenter.norm() < 1e10);
 
       // 4.4.1. Record the result
@@ -1487,15 +1492,18 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
       // 4.5.2. Transform the axis direction back to world space
       for (int i = 0; i < usableTimesteps.size(); i++)
       {
-        Eigen::Isometry3s parentTransform = bodyTrajectories[parentBodyName][usableTimesteps[i]];
-        Eigen::Isometry3s childTransform = bodyTrajectories[childBodyName][usableTimesteps[i]];
+        Eigen::Isometry3s parentTransform
+            = bodyTrajectories[parentBodyName][usableTimesteps[i]];
+        Eigen::Isometry3s childTransform
+            = bodyTrajectories[childBodyName][usableTimesteps[i]];
         Eigen::Vector3s parentWorldAxis
             = parentTransform.linear() * parentLocalAxis;
         Eigen::Vector3s childWorldAxis
             = childTransform.linear() * childLocalAxis;
         Eigen::Vector3s jointAxis = (parentWorldAxis + childWorldAxis) / 2.0;
         // 4.5.3. Record the result
-        mJointAxisDirs[usableTimesteps[i]][joint->name] = jointAxis.normalized();
+        mJointAxisDirs[usableTimesteps[i]][joint->name]
+            = jointAxis.normalized();
         mJointCentersEstimateSource[usableTimesteps[i]][joint->name]
             = JointCenterEstimateSource::LEAST_SQUARES_AXIS;
       }
@@ -2830,7 +2838,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
         // 3.1.2. Compute the root body transform from the visible points, and
         // then use that to compute the other body transforms
         Eigen::Isometry3s rootBodyWorldTransform
-            = getPointCloudToPointCloudTransform(
+            = math::getPointCloudToPointCloudTransform(
                 visibleAdjacentPointsInLocalSpace,
                 visibleAdjacentPointsInWorldSpace,
                 visibleAdjacentPointWeights);
@@ -3029,7 +3037,7 @@ s_t IKInitializer::estimatePosesClosedForm(bool logOutput)
 
             // 3.1.2. Compute the root body transform from the visible points,
             // and then use that to compute the other body transforms
-            childTransform = getPointCloudToPointCloudTransform(
+            childTransform = math::getPointCloudToPointCloudTransform(
                 visibleAdjacentPointsInLocalSpace,
                 visibleAdjacentPointsInWorldSpace,
                 visibleAdjacentPointWeights);
@@ -3415,163 +3423,6 @@ Eigen::MatrixXs IKInitializer::getPointCloudFromDistanceMatrix(
   assert(!k_eigenvectors.hasNaN());
 
   return k_eigenvalues.asDiagonal() * k_eigenvectors.transpose();
-}
-
-//==============================================================================
-/// This will rotate and translate a point cloud to match the first N points
-/// as closely as possible to the passed in matrix
-Eigen::MatrixXs IKInitializer::mapPointCloudToData(
-    const Eigen::MatrixXs& pointCloud,
-    std::vector<Eigen::Vector3s> firstNPoints)
-{
-  Eigen::Matrix<s_t, 3, Eigen::Dynamic> targetPointCloud
-      = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, firstNPoints.size());
-  for (int i = 0; i < firstNPoints.size(); i++)
-  {
-    targetPointCloud.col(i) = firstNPoints[i];
-  }
-  Eigen::Matrix<s_t, 3, Eigen::Dynamic> sourcePointCloud
-      = pointCloud.block(0, 0, 3, firstNPoints.size());
-
-  assert(sourcePointCloud.cols() == targetPointCloud.cols());
-
-  // Compute the centroids of the source and target points
-  Eigen::Vector3s sourceCentroid = sourcePointCloud.rowwise().mean();
-  Eigen::Vector3s targetCentroid = targetPointCloud.rowwise().mean();
-
-#ifndef NDEBUG
-  Eigen::Vector3s sourceAvg = Eigen::Vector3s::Zero();
-  Eigen::Vector3s targetAvg = Eigen::Vector3s::Zero();
-  for (int i = 0; i < sourcePointCloud.cols(); i++)
-  {
-    sourceAvg += sourcePointCloud.col(i);
-    targetAvg += targetPointCloud.col(i);
-  }
-  sourceAvg /= sourcePointCloud.cols();
-  targetAvg /= targetPointCloud.cols();
-  assert((sourceAvg - sourceCentroid).norm() < 1e-12);
-  assert((targetAvg - targetCentroid).norm() < 1e-12);
-#endif
-
-  // Compute the centered source and target points
-  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredSourcePoints
-      = sourcePointCloud.colwise() - sourceCentroid;
-  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredTargetPoints
-      = targetPointCloud.colwise() - targetCentroid;
-
-#ifndef NDEBUG
-  assert(std::abs(centeredSourcePoints.rowwise().mean().norm()) < 1e-8);
-  assert(std::abs(centeredTargetPoints.rowwise().mean().norm()) < 1e-8);
-  for (int i = 0; i < sourcePointCloud.cols(); i++)
-  {
-    Eigen::Vector3s expectedCenteredSourcePoints
-        = sourcePointCloud.col(i) - sourceAvg;
-    assert(
-        (centeredSourcePoints.col(i) - expectedCenteredSourcePoints).norm()
-        < 1e-12);
-    Eigen::Vector3s expectedCenteredTargetPoints
-        = targetPointCloud.col(i) - targetAvg;
-    assert(
-        (centeredTargetPoints.col(i) - expectedCenteredTargetPoints).norm()
-        < 1e-12);
-  }
-#endif
-
-  // Compute the covariance matrix
-  Eigen::Matrix3s covarianceMatrix
-      = centeredTargetPoints * centeredSourcePoints.transpose();
-
-  // Compute the singular value decomposition of the covariance matrix
-  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
-      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
-  Eigen::Matrix3s U = svd.matrixU();
-  Eigen::Matrix3s V = svd.matrixV();
-
-  // Compute the rotation matrix and translation vector
-  Eigen::Matrix3s R = U * V.transpose();
-  // Normally, we would want to check the determinant of R here, to ensure that
-  // we're only doing right-handed rotations. HOWEVER, because we're using a
-  // point cloud, we may actually have to flip the data along an axis to get it
-  // to match up, so we skip the determinant check.
-
-  // Transform the source point cloud to the target point cloud
-  Eigen::MatrixXs transformed = Eigen::MatrixXs::Zero(3, pointCloud.cols());
-  for (int i = 0; i < pointCloud.cols(); i++)
-  {
-    transformed.col(i)
-        = R * (pointCloud.col(i).head<3>() - sourceCentroid) + targetCentroid;
-  }
-  return transformed;
-}
-
-//==============================================================================
-/// This will give the world transform necessary to apply to the local points
-/// (worldT * p[i] for all localPoints) to get the local points to match the
-/// world points as closely as possible.
-Eigen::Isometry3s IKInitializer::getPointCloudToPointCloudTransform(
-    std::vector<Eigen::Vector3s> localPoints,
-    std::vector<Eigen::Vector3s> worldPoints,
-    std::vector<s_t> weights)
-{
-  assert(localPoints.size() > 0);
-  assert(worldPoints.size() > 0);
-  assert(localPoints.size() == worldPoints.size());
-
-  // Compute the centroids of the local and world points
-  Eigen::Vector3s localCentroid = Eigen::Vector3s::Zero();
-  s_t sumWeights = 0.0;
-  for (int i = 0; i < localPoints.size(); i++)
-  {
-    Eigen::Vector3s& point = localPoints[i];
-    sumWeights += weights[i];
-    localCentroid += point * weights[i];
-  }
-  localCentroid /= sumWeights;
-  Eigen::Vector3s worldCentroid = Eigen::Vector3s::Zero();
-  for (int i = 0; i < worldPoints.size(); i++)
-  {
-    Eigen::Vector3s& point = worldPoints[i];
-    worldCentroid += point * weights[i];
-  }
-  worldCentroid /= sumWeights;
-
-  // Compute the centered local and world points
-  std::vector<Eigen::Vector3s> centeredLocalPoints;
-  std::vector<Eigen::Vector3s> centeredWorldPoints;
-  for (int i = 0; i < localPoints.size(); i++)
-  {
-    centeredLocalPoints.push_back(localPoints[i] - localCentroid);
-    centeredWorldPoints.push_back(worldPoints[i] - worldCentroid);
-  }
-
-  // Compute the covariance matrix
-  Eigen::Matrix3s covarianceMatrix = Eigen::Matrix3s::Zero();
-  for (int i = 0; i < localPoints.size(); i++)
-  {
-    covarianceMatrix += weights[i] * centeredWorldPoints[i]
-                        * centeredLocalPoints[i].transpose();
-  }
-
-  // Compute the singular value decomposition of the covariance matrix
-  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
-      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
-  Eigen::Matrix3s U = svd.matrixU();
-  Eigen::Matrix3s V = svd.matrixV();
-
-  // Compute the rotation matrix and translation vector
-  Eigen::Matrix3s R = U * V.transpose();
-  if (R.determinant() < 0)
-  {
-    Eigen::Matrix3s scales = Eigen::Matrix3s::Identity();
-    scales(2, 2) = -1;
-    R = U * scales * V.transpose();
-  }
-  Eigen::Vector3s translation = worldCentroid - R * localCentroid;
-
-  Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
-  transform.linear() = R;
-  transform.translation() = translation;
-  return transform;
 }
 
 //==============================================================================

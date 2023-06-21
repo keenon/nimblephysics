@@ -11,6 +11,7 @@
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/server/GUIRecording.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
@@ -671,8 +672,7 @@ bool verifyMarkerReconstructionOnOsim(
     {
       markerPoints.push_back(markerObservations[t][markerName]);
     }
-    Eigen::MatrixXs mapped
-        = IKInitializer::mapPointCloudToData(P, markerPoints);
+    Eigen::MatrixXs mapped = math::mapPointCloudToData(P, markerPoints);
     for (int i = 0; i < markerPoints.size(); i++)
     {
       s_t reconstructionError = (mapped.col(i) - markerPoints[i]).norm();
@@ -720,7 +720,7 @@ TEST(IKInitializer, RECONSTRUCT_EXAMPLE_CLOUD)
   first3Points.push_back(points[1]);
   first3Points.push_back(points[2]);
 
-  Eigen::MatrixXs mapped = IKInitializer::mapPointCloudToData(P, first3Points);
+  Eigen::MatrixXs mapped = math::mapPointCloudToData(P, first3Points);
   for (int i = 0; i < points.size(); i++)
   {
     s_t reconstructionError = (mapped.col(i) - points[i]).norm();
@@ -752,9 +752,8 @@ TEST(IKInitializer, POINT_CLOUD_TO_CLOUD_TRANSFORM)
     points_world.push_back(T_wb * points_local[i]);
   }
 
-  Eigen::Isometry3s T_wb_recovered
-      = IKInitializer::getPointCloudToPointCloudTransform(
-          points_local, points_world, std::vector<s_t>(numPoints, 1.0));
+  Eigen::Isometry3s T_wb_recovered = math::getPointCloudToPointCloudTransform(
+      points_local, points_world, std::vector<s_t>(numPoints, 1.0));
 
   std::vector<Eigen::Vector3s> points_world_recovered;
   for (int i = 0; i < numPoints; i++)
