@@ -38,6 +38,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 #include "dart/common/Console.hpp"
@@ -4553,6 +4554,229 @@ s_t getClosestRotationalApproximation(
   }
 
   return angle;
+}
+
+//==============================================================================
+/// This will rotate and translate a point cloud to match the first N points
+/// as closely as possible to the passed in matrix
+Eigen::MatrixXs mapPointCloudToData(
+    const Eigen::MatrixXs& pointCloud,
+    std::vector<Eigen::Vector3s> firstNPoints)
+{
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> targetPointCloud
+      = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, firstNPoints.size());
+  for (int i = 0; i < firstNPoints.size(); i++)
+  {
+    targetPointCloud.col(i) = firstNPoints[i];
+  }
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> sourcePointCloud
+      = pointCloud.block(0, 0, 3, firstNPoints.size());
+
+  assert(sourcePointCloud.cols() == targetPointCloud.cols());
+
+  // Compute the centroids of the source and target points
+  Eigen::Vector3s sourceCentroid = sourcePointCloud.rowwise().mean();
+  Eigen::Vector3s targetCentroid = targetPointCloud.rowwise().mean();
+
+#ifndef NDEBUG
+  Eigen::Vector3s sourceAvg = Eigen::Vector3s::Zero();
+  Eigen::Vector3s targetAvg = Eigen::Vector3s::Zero();
+  for (int i = 0; i < sourcePointCloud.cols(); i++)
+  {
+    sourceAvg += sourcePointCloud.col(i);
+    targetAvg += targetPointCloud.col(i);
+  }
+  sourceAvg /= sourcePointCloud.cols();
+  targetAvg /= targetPointCloud.cols();
+  assert((sourceAvg - sourceCentroid).norm() < 1e-12);
+  assert((targetAvg - targetCentroid).norm() < 1e-12);
+#endif
+
+  // Compute the centered source and target points
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredSourcePoints
+      = sourcePointCloud.colwise() - sourceCentroid;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredTargetPoints
+      = targetPointCloud.colwise() - targetCentroid;
+
+#ifndef NDEBUG
+  assert(std::abs(centeredSourcePoints.rowwise().mean().norm()) < 1e-8);
+  assert(std::abs(centeredTargetPoints.rowwise().mean().norm()) < 1e-8);
+  for (int i = 0; i < sourcePointCloud.cols(); i++)
+  {
+    Eigen::Vector3s expectedCenteredSourcePoints
+        = sourcePointCloud.col(i) - sourceAvg;
+    assert(
+        (centeredSourcePoints.col(i) - expectedCenteredSourcePoints).norm()
+        < 1e-12);
+    Eigen::Vector3s expectedCenteredTargetPoints
+        = targetPointCloud.col(i) - targetAvg;
+    assert(
+        (centeredTargetPoints.col(i) - expectedCenteredTargetPoints).norm()
+        < 1e-12);
+  }
+#endif
+
+  // Compute the covariance matrix
+  Eigen::Matrix3s covarianceMatrix
+      = centeredTargetPoints * centeredSourcePoints.transpose();
+
+  // Compute the singular value decomposition of the covariance matrix
+  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix3s U = svd.matrixU();
+  Eigen::Matrix3s V = svd.matrixV();
+
+  // Compute the rotation matrix and translation vector
+  Eigen::Matrix3s R = U * V.transpose();
+  // Normally, we would want to check the determinant of R here, to ensure that
+  // we're only doing right-handed rotations. HOWEVER, because we're using a
+  // point cloud, we may actually have to flip the data along an axis to get it
+  // to match up, so we skip the determinant check.
+
+  // Transform the source point cloud to the target point cloud
+  Eigen::MatrixXs transformed = Eigen::MatrixXs::Zero(3, pointCloud.cols());
+  for (int i = 0; i < pointCloud.cols(); i++)
+  {
+    transformed.col(i)
+        = R * (pointCloud.col(i).head<3>() - sourceCentroid) + targetCentroid;
+  }
+  return transformed;
+}
+
+//==============================================================================
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible.
+Eigen::Isometry3s getPointCloudToPointCloudTransform(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    std::vector<s_t> weights)
+{
+  assert(localPoints.size() > 0);
+  assert(worldPoints.size() > 0);
+  assert(localPoints.size() == worldPoints.size());
+
+  // Compute the centroids of the local and world points
+  Eigen::Vector3s localCentroid = Eigen::Vector3s::Zero();
+  s_t sumWeights = 0.0;
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    Eigen::Vector3s& point = localPoints[i];
+    sumWeights += weights[i];
+    localCentroid += point * weights[i];
+  }
+  localCentroid /= sumWeights;
+  Eigen::Vector3s worldCentroid = Eigen::Vector3s::Zero();
+  for (int i = 0; i < worldPoints.size(); i++)
+  {
+    Eigen::Vector3s& point = worldPoints[i];
+    worldCentroid += point * weights[i];
+  }
+  worldCentroid /= sumWeights;
+
+  // Compute the centered local and world points
+  std::vector<Eigen::Vector3s> centeredLocalPoints;
+  std::vector<Eigen::Vector3s> centeredWorldPoints;
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    centeredLocalPoints.push_back(localPoints[i] - localCentroid);
+    centeredWorldPoints.push_back(worldPoints[i] - worldCentroid);
+  }
+
+  // Compute the covariance matrix
+  Eigen::Matrix3s covarianceMatrix = Eigen::Matrix3s::Zero();
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    covarianceMatrix += weights[i] * centeredWorldPoints[i]
+                        * centeredLocalPoints[i].transpose();
+  }
+
+  // Compute the singular value decomposition of the covariance matrix
+  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix3s U = svd.matrixU();
+  Eigen::Matrix3s V = svd.matrixV();
+
+  // Compute the rotation matrix and translation vector
+  Eigen::Matrix3s R = U * V.transpose();
+  if (R.determinant() < 0)
+  {
+    Eigen::Matrix3s scales = Eigen::Matrix3s::Identity();
+    scales(2, 2) = -1;
+    R = U * scales * V.transpose();
+  }
+  Eigen::Vector3s translation = worldCentroid - R * localCentroid;
+
+  Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+  transform.linear() = R;
+  transform.translation() = translation;
+  return transform;
+}
+
+//==============================================================================
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible. This does not require any mapping
+/// between the vertices, and instead just iteratively builds a correspondance.
+Eigen::Isometry3s iterativeClosestPoint(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    Eigen::Isometry3s transform,
+    bool verbose)
+{
+  Eigen::Isometry3s T = transform;
+  for (int i = 0; i < 10; i++)
+  {
+    // If the meshes don't match and the world is missing detail (for example,
+    // if we're aligning skeleton meshes and localPoints have arms, and the
+    // worldPoints does not), then we want to make sure that we're not using the
+    // localPoints arms to match to the worldPoints torso. So we need to make
+    // sure that we're only matching points that are close to each other.
+
+    std::vector<Eigen::Vector3s> localPointsToMatch;
+    std::vector<Eigen::Vector3s> worldPointsToMatch;
+    std::vector<s_t> weights;
+
+    s_t totalDist = 0.0;
+    for (int j = 0; j < localPoints.size(); j++)
+    {
+      Eigen::Vector3s& localPoint = localPoints[j];
+      Eigen::Vector3s worldPointGuess = T * localPoint;
+      s_t bestDistance = std::numeric_limits<double>::infinity();
+      Eigen::Vector3s bestWorldPoint = Eigen::Vector3s::Zero();
+
+      for (int k = 0; k < worldPoints.size(); k++)
+      {
+        Eigen::Vector3s& worldPoint = worldPoints[k];
+        s_t dist = (worldPoint - worldPointGuess).squaredNorm();
+        if (dist < bestDistance)
+        {
+          bestDistance = dist;
+          bestWorldPoint = worldPoint;
+        }
+      }
+
+      if (bestDistance < 0.05)
+      {
+        localPointsToMatch.push_back(localPoint);
+        worldPointsToMatch.push_back(bestWorldPoint);
+        weights.push_back(1.0);
+        totalDist += bestDistance;
+      }
+    }
+
+    if (verbose)
+    {
+      std::cout << "ICP Iteration " << i << " with "
+                << localPointsToMatch.size() << " points matched, avg dist "
+                << (totalDist / localPointsToMatch.size()) << std::endl;
+    }
+
+    Eigen::Isometry3s newT = getPointCloudToPointCloudTransform(
+        localPointsToMatch, worldPointsToMatch, weights);
+    T = newT;
+  }
+  return T;
 }
 
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)

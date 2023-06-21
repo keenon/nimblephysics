@@ -187,6 +187,25 @@ public:
       const std::string& outputPath,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
+  /// Read an original *.osim file (which contains a marker set), and a target
+  /// *.osim file, and translate the markers from the original to the target,
+  /// and write it out to a new *.osim file
+  ///
+  /// This method returns a pair of lists, (guessedMarkers, missingMarkers).
+  /// The guessedMarkers array contains the markers which were placed on the
+  /// target model using heuristics. The missingMarkers array contains the
+  /// markers which were not placed on the target model, because they could not
+  /// be matched to any body even after heuristics were applied (this can often
+  /// happen because the markers are on the arms, but the target model has no
+  /// arms, for example). These should be reviewed by a person, to verify that
+  /// the results look reasonable.
+  static std::pair<std::vector<std::string>, std::vector<std::string>>
+  translateOsimMarkers(
+      const common::Uri& originalModel,
+      const common::Uri& targetModel,
+      const std::string& outputPath,
+      bool verbose = false);
+
   /// Read an *.osim file, change the mass/COM/MOI for everything, and write it
   /// out to a new *.osim file
   static void replaceOsimInertia(

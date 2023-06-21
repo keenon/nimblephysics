@@ -902,6 +902,30 @@ s_t distanceToSegment(
 s_t getClosestRotationalApproximation(
     const Eigen::Vector3s& axis, const Eigen::Matrix3s& desiredRotation);
 
+/// This will rotate and translate a point cloud to match the first N points
+/// as closely as possible to the passed in matrix
+Eigen::MatrixXs mapPointCloudToData(
+    const Eigen::MatrixXs& pointCloud,
+    std::vector<Eigen::Vector3s> firstNPoints);
+
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible.
+Eigen::Isometry3s getPointCloudToPointCloudTransform(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    std::vector<s_t> weights);
+
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible. This does not require any mapping
+/// between the vertices, and instead just iteratively builds a correspondance.
+Eigen::Isometry3s iterativeClosestPoint(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    Eigen::Isometry3s transform = Eigen::Isometry3s::Identity(),
+    bool verbose = false);
+
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox
 {

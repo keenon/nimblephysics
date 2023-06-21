@@ -2539,7 +2539,7 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
             = static_cast<dynamics::MeshShape*>(shape.get());
         for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
-          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist > maxUp)
@@ -2627,8 +2627,9 @@ Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
       {
         dynamics::MeshShape* mesh
             = static_cast<dynamics::MeshShape*>(shape.get());
-        for (Eigen::Vector3s vertex : mesh->getVertices())
+        for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist > maxUp)
@@ -2750,7 +2751,7 @@ Skeleton::getLowestPointMarkers(Eigen::Vector3s up)
             = static_cast<dynamics::MeshShape*>(shape.get());
         for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
-          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist < minUp)

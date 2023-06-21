@@ -24,7 +24,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 /*
 // This leads to a hard exit
@@ -44,6 +44,85 @@ TEST(OpenSimParser, LOAD_FBLS_MODEL)
   (void)file;
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_EDGE_CASE)
+{
+  auto file = OpenSimParser::parseOsim(
+      "dart://sample/osim/AlanBug2/marker_edge_case.osim");
+  EXPECT_GE(file.markersMap.size(), 0);
+  (void)file;
+
+  auto trc
+      = OpenSimParser::loadTRC("dart://sample/osim/AlanBug2/step_width.trc");
+  (void)trc;
+  for (auto& marker : file.markersMap)
+  {
+    std::cout << marker.first << ": "
+              << trc.markerTimesteps[0].count(marker.first) << std::endl;
+    EXPECT_TRUE(trc.markerTimesteps[0].count(marker.first) > 0);
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_ORDINARY)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/OpenCapTest/Subject4/Models/unscaled_generic.osim",
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      "../../../data/osim/Rajagopal2015/Rajagopal2015_newMarkers.osim",
+      true);
+
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/OpenCapTest/Subject4/Models/unscaled_generic.osim");
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015_newMarkers.osim");
+  EXPECT_EQ(failedMarkers.size(), 0);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_FROM_ARMLESS)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/NoArms_v3/delp1990.osim",
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      "../../../data/osim/Rajagopal2015/"
+      "Rajagopal2015_newMarkers_fromArmless.osim",
+      true);
+
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/osim/NoArms_v3/delp1990.osim");
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/"
+      "Rajagopal2015_newMarkers_fromArmless.osim");
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_TO_ARMLESS)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim",
+      "dart://sample/osim/NoArms_v3/delp1990.osim",
+      "../../../data/osim/Rajagopal2015/"
+      "Rajagopal2015_newMarkers_toArmless.osim",
+      true);
+
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/osim/NoArms_v3/delp1990.osim");
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/"
+      "Rajagopal2015_newMarkers_toArmless.osim");
+}
+// #endif
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_SDF)
