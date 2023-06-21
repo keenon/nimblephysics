@@ -18,11 +18,12 @@ gui.serve(8080)
 gui.nativeAPI().renderWorld(world)
 
 # Animate the knees back and forth
-ticker: nimble.realtime.Ticker = nimble.realtime.Ticker(world.getTimeStep() * 10)
+ticker: nimble.realtime.Ticker = nimble.realtime.Ticker(
+    world.getTimeStep() * 10)
 
 
 def onTick(now):
-  progress = (now % 2000) / 2000.0
+    progress = (now % 2000) / 2000.0
 
 
 ticker.registerTickListener(onTick)
