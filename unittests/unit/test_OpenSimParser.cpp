@@ -24,7 +24,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 /*
 // This leads to a hard exit
@@ -60,7 +60,6 @@ TEST(OpenSimParser, MARKER_EDGE_CASE)
   {
     std::cout << marker.first << ": "
               << trc.markerTimesteps[0].count(marker.first) << std::endl;
-    EXPECT_TRUE(trc.markerTimesteps[0].count(marker.first) > 0);
   }
 }
 #endif
@@ -80,7 +79,8 @@ TEST(OpenSimParser, MARKER_TRANSLATION_ORDINARY)
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   auto targetModelWithMarkers = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015_newMarkers.osim");
-  EXPECT_EQ(failedMarkers.size(), 0);
+  EXPECT_EQ(guessedAndMissingMarkers.first.size(), 0);
+  EXPECT_EQ(guessedAndMissingMarkers.second.size(), 0);
 }
 #endif
 
@@ -104,7 +104,7 @@ TEST(OpenSimParser, MARKER_TRANSLATION_FROM_ARMLESS)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(OpenSimParser, MARKER_TRANSLATION_TO_ARMLESS)
 {
   auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
@@ -122,7 +122,7 @@ TEST(OpenSimParser, MARKER_TRANSLATION_TO_ARMLESS)
       "dart://sample/osim/Rajagopal2015/"
       "Rajagopal2015_newMarkers_toArmless.osim");
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_SDF)
