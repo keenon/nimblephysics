@@ -224,24 +224,10 @@ std::vector<Eigen::Vector3s> MeshShape::getVertices() const
   for (int s = 0; s < scene->mNumMeshes; s++)
   {
     const aiMesh* mesh = scene->mMeshes[s];
-    std::vector<int> indices;
-    for (int f = 0; f < mesh->mNumFaces; f++)
+    for (int v = 0; v < mesh->mNumVertices; v++)
     {
-      const aiFace& face = mesh->mFaces[f];
-      // Only return vertices that are part of a triangle
-      if (face.mNumIndices > 2)
-      {
-        for (int i = 0; i < face.mNumIndices; i++)
-        {
-          int index = face.mIndices[i];
-          if (std::find(indices.begin(), indices.end(), index) == indices.end())
-          {
-            aiVector3D vec = mesh->mVertices[index];
-            vertices.emplace_back(vec.x, vec.y, vec.z);
-            indices.push_back(index);
-          }
-        }
-      }
+      aiVector3D vec = mesh->mVertices[v];
+      vertices.emplace_back(vec.x, vec.y, vec.z);
     }
   }
   return vertices;
