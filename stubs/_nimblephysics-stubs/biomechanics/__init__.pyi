@@ -1984,6 +1984,10 @@ class SubjectOnDisk():
         """
         This returns the length of the trial requested
         """
+    def getTrialMaxJointVelocity(self, trial: int) -> typing.List[float]: 
+        """
+        This returns the vector of scalars indicating the maximum absolute velocity of all DOFs on each timestep of a given trial
+        """
     def getTrialName(self, trial: int) -> str: 
         """
         This returns the human readable name of the specified trial, given by the person who uploaded the data to AddBiomechanics. This isn't necessary for training, but may be useful for analyzing the data.

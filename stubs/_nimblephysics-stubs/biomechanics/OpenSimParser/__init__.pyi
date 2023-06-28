@@ -30,7 +30,8 @@ __all__ = [
     "saveOsimScalingXMLFile",
     "saveProcessedGRFMot",
     "saveRawGRFMot",
-    "saveTRC"
+    "saveTRC",
+    "translateOsimMarkers"
 ]
 
 
@@ -79,4 +80,6 @@ def saveProcessedGRFMot(outputPath: str, timestamps: typing.List[float], bodyNod
 def saveRawGRFMot(outputPath: str, timestamps: typing.List[float], forcePlates: typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate]) -> None:
     pass
 def saveTRC(path: str, timestamps: typing.List[float], markerTimestamps: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+    pass
+def translateOsimMarkers(originalModelPath: nimblephysics_libs._nimblephysics.common.Uri, targetModelPath: nimblephysics_libs._nimblephysics.common.Uri, outputPath: str, verbose: bool = False) -> typing.Tuple[typing.List[str], typing.List[str]]:
     pass
