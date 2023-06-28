@@ -432,10 +432,17 @@ void ForcePlatform::extractDataWithConvention(
           }
         }
 
+        assert(!force_raw.hasNaN());
+        assert(!cop_raw.hasNaN());
+        assert(!tz_raw.hasNaN());
+        assert(!_refFrame.hasNaN());
+
         _F[cmp] = _refFrame * force_raw;
         _CoP[cmp] = _refFrame * cop_raw;
         _Tz[cmp] = _refFrame * tz_raw;
+        assert(!_Tz[cmp].hasNaN());
         _M[cmp] = _F[cmp].cross(_CoP[cmp]) - _Tz[cmp];
+        assert(!_M[cmp].hasNaN());
         _CoP[cmp] += _meanCorners;
 
         ++cmp;
@@ -461,6 +468,7 @@ void ForcePlatform::extractDataWithConvention(
           moment_raw(2)
               = _origin(1) * (ch[1] - ch[0]) + _origin(0) * (ch[2] - ch[3]);
           moment_raw += force_raw.cross(Eigen::Vector3s(0, 0, _origin(2)));
+          assert(!moment_raw.hasNaN());
         }
         else
         {
@@ -484,11 +492,22 @@ void ForcePlatform::extractDataWithConvention(
             moment_raw += force_raw.cross(_origin);
           }
         }
+        assert(!force_raw.hasNaN());
+        assert(!moment_raw.hasNaN());
+        assert(!_refFrame.hasNaN());
         _F[cmp] = _refFrame * force_raw;
         _M[cmp] = _refFrame * moment_raw;
+        assert(!_M[cmp].hasNaN());
 
         Eigen::Vector3s CoP_raw = Eigen::Vector3s(
-            -moment_raw(1) / force_raw(2), moment_raw(0) / force_raw(2), 0);
+            moment_raw(1) == 0 ? 0 : -moment_raw(1) / force_raw(2), moment_raw(0) == 0 ? 0 : moment_raw(0) / force_raw(2), 0);
+        // Avoid NaNs in the CoP data
+        if (moment_raw(1) != 0 && force_raw(2) == 0) {
+          CoP_raw(0) = 0;
+        }
+        if (moment_raw(0) != 0 && force_raw(2) == 0) {
+          CoP_raw(1) = 0;
+        }
         Eigen::Vector3s originNoVertical = _origin;
         originNoVertical(2) = 0.0;
         if (convention == 0)
@@ -500,6 +519,7 @@ void ForcePlatform::extractDataWithConvention(
           _CoP[cmp] = _refFrame * CoP_raw + _meanCorners;
         }
         _Tz[cmp] = _refFrame * (moment_raw - force_raw.cross(-1 * CoP_raw));
+        assert(!_Tz[cmp].hasNaN());
         ++cmp;
       }
     }

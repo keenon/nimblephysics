@@ -64,6 +64,32 @@ TEST(C3D, COMPARE_TO_TRC)
 #endif
 
 #ifdef ALL_TESTS
+TEST(C3D, JA1GAIT35_GRF_CHECK)
+{
+  biomechanics::C3D c3d
+      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/JA1Gait35.c3d");
+  for (int i = 0; i < c3d.forcePlates.size(); i++)
+  {
+    for (int t = 0; t < c3d.forcePlates[i].timestamps.size(); t++)
+    {
+      if (c3d.forcePlates[i].forces[t].hasNaN()) {
+        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+        return;
+      }
+      if (c3d.forcePlates[i].moments[t].hasNaN()) {
+        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+        return;
+      }
+      if (c3d.forcePlates[i].centersOfPressure[t].hasNaN()) {
+        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+        return;
+      }
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(C3D, TEST_VERTICAL_CONVENTION)
 {
   biomechanics::C3D c3d = biomechanics::C3DLoader::loadC3D(

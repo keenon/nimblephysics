@@ -242,6 +242,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     {
       forceScaleFactor = 0.01;
     }
+    assert(!isnan(forceScaleFactor));
     forcePlateForceScaleFactors.push_back(forceScaleFactor);
 
     double momentScaleFactor = 1.0;
@@ -257,6 +258,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     {
       momentScaleFactor = 0.01;
     }
+    assert(!isnan(momentScaleFactor));
     forcePlateMomentScaleFactors.push_back(momentScaleFactor);
 
     std::cout << "forcePlatform forceUnit: " << forcePlatforms[j].forceUnit()
@@ -345,10 +347,13 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     {
       int frame = analogFramesPerFrame * (t + startFrame);
       result.forcePlates[j].timestamps.push_back(t / frameRate);
+      assert(!forcePlatforms[j].forces()[frame].hasNaN());
       result.forcePlates[j].forces.push_back(
           forcePlatforms[j].forces()[frame] * forcePlateForceScaleFactors[j]);
+      assert(!forcePlatforms[j].Tz()[frame].hasNaN());
       result.forcePlates[j].moments.push_back(
           forcePlatforms[j].Tz()[frame] * forcePlateMomentScaleFactors[j]);
+      assert(!forcePlatforms[j].CoP()[frame].hasNaN());
       result.forcePlates[j].centersOfPressure.push_back(
           forcePlatforms[j].CoP()[frame] * forcePlatePositionScaleFactors[j]);
     }
@@ -365,6 +370,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
                   (result.forcePlates[0].corners[2]
                    - result.forcePlates[0].corners[1]))
               .normalized();
+    assert(!up.hasNaN());
     s_t groundLevel = result.forcePlates[0].corners[0].dot(up);
     // Flip the direction of "up" if the markers are showing up as below the
     // ground
@@ -399,6 +405,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     // Try to get "up" to point exactly along a unit axis, to make subsequent
     // math more accurate
     up = up.normalized();
+    assert(!up.hasNaN());
     if (abs(up(0)) < 0.01)
     {
       up(0) = 0;
@@ -412,6 +419,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       up(2) = 0;
     }
     up = up.normalized();
+    assert(!up.hasNaN());
 
     // Complete the "up" vector into a full basis
     Eigen::Matrix3s R = Eigen::Matrix3s::Identity();
@@ -429,6 +437,7 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       // Rotate by 90deg along the Y axis
       R = math::expMapRot(-Eigen::Vector3s::UnitY() * M_PI / 2)
           * math::expMapRot(rotVector);
+      assert(!R.hasNaN());
 
       result.dataRotation = R;
 #ifndef NDEBUG
@@ -461,9 +470,12 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
       for (int t = 0; t < result.forcePlates[i].forces.size(); t++)
       {
         result.forcePlates[i].forces[t] = R * result.forcePlates[i].forces[t];
+        assert(!result.forcePlates[i].forces[t].hasNaN());
         result.forcePlates[i].centersOfPressure[t]
             = R * result.forcePlates[i].centersOfPressure[t];
+        assert(!result.forcePlates[i].centersOfPressure[t].hasNaN());
         result.forcePlates[i].moments[t] = R * result.forcePlates[i].moments[t];
+        assert(!result.forcePlates[i].moments[t].hasNaN());
       }
     }
     for (int t = 0; t < result.markerTimesteps.size(); t++)
