@@ -94,8 +94,8 @@ TEST(OpenSimParser, MARKER_TRANSLATION_FROM_ARMLESS)
       "Rajagopal2015_newMarkers_fromArmless.osim",
       true);
 
-  auto originalModel = OpenSimParser::parseOsim(
-      "dart://sample/osim/osim/NoArms_v3/delp1990.osim");
+  auto originalModel
+      = OpenSimParser::parseOsim("dart://sample/osim/NoArms_v3/delp1990.osim");
   auto targetModel = OpenSimParser::parseOsim(
       "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
   auto targetModelWithMarkers = OpenSimParser::parseOsim(
