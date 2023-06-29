@@ -206,6 +206,28 @@ public:
       const std::string& outputPath,
       bool verbose = false);
 
+  /// This method will use several heuristics, including the names of joints,
+  /// meshes, and bones to determine if this body on this skeleton should be
+  /// considered an "arm," which means basically anything after an articulated
+  /// shoulder joint. Importantly, a torso with fixed meshes normally associated
+  /// with the arms attached to the torso is NOT considered an arm.
+  static bool isArmBodyHeuristic(
+      std::shared_ptr<dynamics::Skeleton> skel, const std::string& bodyName);
+
+  /// This method will use several heuristics, including the names of joints,
+  /// meshes, and bones to determine if this body on this skeleton should be
+  /// considered a "torso"
+  static bool isTorsoBodyHeuristic(
+      std::shared_ptr<dynamics::Skeleton> skel, const std::string& bodyName);
+
+  /// This method will return true if this skeleton has any bodies that return
+  /// true for isArmBodyHeuristic().
+  static bool hasArms(std::shared_ptr<dynamics::Skeleton> skel);
+
+  /// This method will return true if this skeleton has any bodies that return
+  /// true for isTorsoBodyHeuristic().
+  static bool hasTorso(std::shared_ptr<dynamics::Skeleton> skel);
+
   /// Read an *.osim file, change the mass/COM/MOI for everything, and write it
   /// out to a new *.osim file
   static void replaceOsimInertia(

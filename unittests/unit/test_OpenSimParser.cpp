@@ -125,6 +125,73 @@ TEST(OpenSimParser, MARKER_TRANSLATION_TO_ARMLESS)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_1)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/ConversionRegressions/original_1.osim",
+      "dart://sample/osim/ConversionRegressions/target_1.osim",
+      "../../../data/osim/ConversionRegressions/"
+      "result_1.osim",
+      true);
+
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/target_1.osim");
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/original_1.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/"
+      "result_1.osim");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, TEST_ARM_TORSO_DETECTION_RAJAGOPAL)
+{
+  auto withArms = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+
+  EXPECT_TRUE(OpenSimParser::hasArms(withArms.skeleton));
+  EXPECT_TRUE(OpenSimParser::hasTorso(withArms.skeleton));
+
+  EXPECT_FALSE(OpenSimParser::isArmBodyHeuristic(
+      withArms.skeleton, withArms.markersMap["LTOE"].first->getName()));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, TEST_ARM_TORSO_DETECTION_RAJAGOPAL_NOARMS)
+{
+  auto noArms
+      = OpenSimParser::parseOsim("dart://sample/osim/NoArms_v3/delp1990.osim");
+
+  EXPECT_FALSE(OpenSimParser::hasArms(noArms.skeleton));
+  EXPECT_TRUE(OpenSimParser::hasTorso(noArms.skeleton));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, TEST_ARM_TORSO_DETECTION_GAIT_2392)
+{
+  auto pureWalker = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/gait2392_simbody.osim");
+
+  EXPECT_FALSE(OpenSimParser::hasArms(pureWalker.skeleton));
+  EXPECT_TRUE(OpenSimParser::hasTorso(pureWalker.skeleton));
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, TEST_ARM_TORSO_DETECTION_GAIT_2354)
+{
+  auto pureWalker = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/gait2354_simbody.osim");
+
+  EXPECT_FALSE(OpenSimParser::hasArms(pureWalker.skeleton));
+  EXPECT_TRUE(OpenSimParser::hasTorso(pureWalker.skeleton));
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, CONVERT_TO_SDF)
 {
   auto file = OpenSimParser::parseOsim(
