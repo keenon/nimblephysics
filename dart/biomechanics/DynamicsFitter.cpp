@@ -15532,8 +15532,6 @@ void DynamicsFitter::writeCSVData(
   }
   csvFile << ",marker_error_rms,marker_error_max,residual_norm";
 
-
-
   /*
   Eigen::Vector3s cop
       = init->perfectGrfAsCopTorqueForces[trial].block<3, 1>(i * 9, t);
