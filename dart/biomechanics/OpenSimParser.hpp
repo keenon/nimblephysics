@@ -67,7 +67,6 @@ struct OpenSimMot
   Eigen::MatrixXs poses;
 };
 
-
 struct OpenSimGRF
 {
   std::vector<double> timestamps;
