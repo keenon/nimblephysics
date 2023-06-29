@@ -244,7 +244,7 @@ sudo rm -rf benchmark
 # Install ezc3d
 git clone https://github.com/pyomeca/ezc3d.git
 pushd ezc3d
-git checkout Release_1.4.7
+git checkout Release_1.5.4
 mkdir build
 pushd build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..

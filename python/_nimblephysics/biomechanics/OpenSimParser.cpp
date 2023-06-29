@@ -78,6 +78,19 @@ void OpenSimParser(py::module& m)
       .def_readwrite("poses", &dart::biomechanics::OpenSimMot::poses)
       .def_readwrite("timestamps", &dart::biomechanics::OpenSimMot::timestamps);
 
+  ::py::class_<dart::biomechanics::OpenSimMocoTrajectory>(
+        m, "OpenSimMocoTrajectory")
+    .def_readwrite("timestamps",
+                     &dart::biomechanics::OpenSimMocoTrajectory::timestamps)
+    .def_readwrite("excitations",
+                     &dart::biomechanics::OpenSimMocoTrajectory::excitations)
+    .def_readwrite("activations",
+                     &dart::biomechanics::OpenSimMocoTrajectory::activations)
+    .def_readwrite("excitationNames",
+                   &dart::biomechanics::OpenSimMocoTrajectory::excitationNames)
+    .def_readwrite("activationNames",
+                   &dart::biomechanics::OpenSimMocoTrajectory::activationNames);
+
   ::py::class_<dart::biomechanics::OpenSimTRC>(m, "OpenSimTRC")
       .def_readwrite(
           "markerTimesteps", &dart::biomechanics::OpenSimTRC::markerTimesteps)
@@ -345,6 +358,25 @@ void OpenSimParser(py::module& m)
       },
       ::py::arg("skel"),
       ::py::arg("path"));
+
+  sm.def(
+      "loadMocoTrajectory",
+      +[](const std::string& path) {
+        return dart::biomechanics::OpenSimParser::loadMocoTrajectory(path);
+      },
+      ::py::arg("path"));
+
+  sm.def(
+      "appendMocoTrajectoryAndSaveCSV",
+      +[](const std::string& inputPath,
+          const dart::biomechanics::OpenSimMocoTrajectory& mocoTraj,
+          std::string outputPath) {
+        return dart::biomechanics::OpenSimParser::appendMocoTrajectoryAndSaveCSV(
+            inputPath, mocoTraj, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("mocoTraj"),
+      ::py::arg("outputPath"));
 
   sm.def(
       "loadMotAtLowestMarkerRMSERotation",

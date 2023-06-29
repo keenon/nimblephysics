@@ -1101,3 +1101,16 @@ TEST(OpenSimParser, LOAD_GRF_INTERSECTING_BUT_NOT_IDENTICAL_TIME_RANGES)
   }
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, LOAD_MOCO_TRAJECTORY)
+{
+  auto mocoTraj = OpenSimParser::loadMocoTrajectory(
+      "dart://sample/osim/MocoPlotting/walk_moco.sto");
+
+  OpenSimParser::appendMocoTrajectoryAndSaveCSV(
+      "dart://sample/osim/MocoPlotting/tempPlot.csv",
+      mocoTraj,
+      "dart://sample/osim/MocoPlotting/plot.csv");
+}
+#endif
