@@ -102,14 +102,35 @@ bool endsWith(std::string const& fullString, std::string const& ending)
 {
   if (fullString.length() >= ending.length())
   {
-    return (
-        0
-        == fullString.compare(
+    return(0 == fullString.compare(
             fullString.length() - ending.length(), ending.length(), ending));
   }
   else
   {
     return false;
+  }
+}
+
+bool beginsWith(std::string const& fullString, std::string const& beginning)
+{
+  if (fullString.length() >= beginning.length())
+  {
+    return(0 == fullString.compare(0, beginning.length(), beginning));
+  }
+  else
+  {
+    return false;
+  }
+}
+
+template<typename T>
+int findIndex(const std::vector<T>& vec, const T& value) {
+  auto it = std::find(vec.begin(), vec.end(), value);
+
+  if (it != vec.end()) {
+    return std::distance(vec.begin(), it);
+  } else {
+    return -1;
   }
 }
 
@@ -4040,6 +4061,241 @@ createCustomJoint(
 #endif
 
   return std::make_pair(customJoint, childBody);
+}
+
+//==============================================================================
+/// Load excitations and activations from a MocoTrajectory *.sto file.
+OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
+    const common::Uri& uri,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+
+  const std::string content = retriever->readAll(uri);
+  std::vector<double> timestamps;
+  std::vector<Eigen::VectorXs> excitations;
+  std::vector<Eigen::VectorXs> activations;
+  std::vector<std::string> excitationNames;
+  std::vector<std::string> activationNames;
+  std::vector<int> columnToExcitation;
+  std::vector<int> columnToActivation;
+
+  bool inHeader = true;
+
+  int activationCount = 0;
+  int excitationCount = 0;
+  int lineNumber = 0;
+  auto start = 0U;
+  auto end = content.find("\n");
+  while (end != std::string::npos)
+  {
+    std::string line = content.substr(start, end - start);
+
+    // Trim '\r', in case this file was saved on a Windows machine
+    if (line.size() > 0 && line[line.size() - 1] == '\r')
+    {
+      line = line.substr(0, line.size() - 1);
+    }
+
+    if (inHeader)
+    {
+      std::string ENDHEADER = "endheader";
+      if (line.size() >= ENDHEADER.size()
+          && line.substr(0, ENDHEADER.size()) == ENDHEADER)
+      {
+        inHeader = false;
+      }
+      auto tokenEnd = line.find("=");
+      if (tokenEnd != std::string::npos)
+      {
+        std::string variable = line.substr(0, tokenEnd);
+        std::string value = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
+      }
+    }
+    else
+    {
+      int tokenNumber = 0;
+      std::string whitespace = " \t";
+      auto tokenStart = line.find_first_not_of(whitespace);
+      Eigen::VectorXs activationVec;
+      Eigen::VectorXs excitationVec;
+      double timestamp = 0.0;
+      while (tokenStart != std::string::npos)
+      {
+        auto tokenEnd = line.find_first_of(whitespace, tokenStart + 1);
+        std::string token = line.substr(tokenStart, tokenEnd - tokenStart);
+
+        /////////////////////////////////////////////////////////
+        // Process the token, given tokenNumber and lineNumber
+
+        if (lineNumber == 0)
+        {
+          if (tokenNumber > 0)
+          {
+            // token = column label
+            if (beginsWith(token, "/forceset/")) {
+              if (endsWith(token, "/activation")) {
+                columnToActivation.push_back(tokenNumber);
+                activationCount++;
+                activationNames.push_back(token);
+
+              } else {
+                columnToExcitation.push_back(tokenNumber);
+                excitationCount++;
+                excitationNames.push_back(token);
+              }
+            }
+          }
+        }
+        else
+        {
+          double value = atof(token.c_str());
+          if (tokenNumber == 0)
+          {
+            timestamp = value;
+            timestamps.push_back(timestamp);
+          }
+          else
+          {
+            int excIndex = findIndex(columnToExcitation, tokenNumber);
+            int actIndex = findIndex(columnToActivation, tokenNumber);
+
+            if (excIndex != -1)
+            {
+              if (excitationVec.size() == 0)
+              {
+                excitationVec = Eigen::VectorXs::Zero(excitationCount);
+              }
+              excitationVec(excIndex) = value;
+            }
+            else if (actIndex != -1)
+            {
+              if (activationVec.size() == 0)
+              {
+                activationVec = Eigen::VectorXs::Zero(activationCount);
+              }
+              activationVec(actIndex) = value;
+            }
+          }
+        }
+
+        /////////////////////////////////////////////////////////
+
+        tokenNumber++;
+        if (tokenEnd == std::string::npos)
+        {
+          break;
+        }
+        tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
+      }
+
+      lineNumber++;
+    }
+
+    start = end + 1; // "\n".length()
+    end = content.find("\n", start);
+  }
+
+  Eigen::MatrixXs excitationsMatrix
+      = Eigen::MatrixXs::Zero(excitationCount, excitations.size());
+  for (int i = 0; i < (int)excitations.size(); i++)
+  {
+    excitationsMatrix.col(i) = excitations[i];
+  }
+  Eigen::MatrixXs activationsMatrix
+      = Eigen::MatrixXs::Zero(activationCount, activations.size());
+  for (int i = 0; i < (int)activations.size(); i++)
+  {
+    activationsMatrix.col(i) = activations[i];
+  }
+  OpenSimMocoTrajectory mocoTraj;
+  mocoTraj.timestamps = timestamps;
+  mocoTraj.excitations = excitationsMatrix;
+  mocoTraj.activations = activationsMatrix;
+  mocoTraj.excitationNames = excitationNames;
+  mocoTraj.activationNames = activationNames;
+
+  return mocoTraj;
+}
+
+//==============================================================================
+/// Append excitations and activations from a MocoTrajectory to a CSV file and
+/// save it.
+void OpenSimParser::appendMocoTrajectoryAndSaveCSV(
+    const common::Uri& uri,
+    const OpenSimMocoTrajectory& mocoTraj,
+    const std::string& path,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
+{
+  const common::ResourceRetrieverPtr retriever
+      = ensureRetriever(nullOrRetriever);
+  const std::string content = retriever->readAll(uri);
+
+  std::ofstream csvFile;
+  csvFile.open(path);
+
+  // Split content into an array of lines
+  std::vector<std::string> lines;
+  std::istringstream f(content);
+  std::string line;
+  int lineNumber = 0;
+  while (std::getline(f, line))
+  {
+    std::istringstream lineF(line);
+    std::string token;
+
+    if (lineNumber == 0)
+    {
+      int tokenIndex = 0;
+      while (std::getline(lineF, token, ','))
+      {
+        if (tokenIndex == 0)
+        {
+          csvFile << token;
+        }
+        else
+        {
+          csvFile << "," << token;
+        }
+      }
+      for (int i = 0; i < (int)mocoTraj.activationNames.size(); i++)
+      {
+        csvFile << "," << mocoTraj.activationNames[i];
+      }
+      for (int i = 0; i < (int)mocoTraj.excitationNames.size(); i++)
+      {
+        csvFile << "," << mocoTraj.excitationNames[i];
+      }
+    }
+    else
+    {
+      int tokenIndex = 0;
+      while (std::getline(lineF, token, ','))
+      {
+        // First column is always time
+        if (tokenIndex == 0)
+        {
+          csvFile << std::endl << std::stod(token);
+        } else {
+          csvFile << "," << std::stod(token);
+        }
+        tokenIndex++;
+      }
+      for (int i = 0; i < (int)mocoTraj.activationNames.size(); i++)
+      {
+        csvFile << "," << mocoTraj.activations(i, lineNumber);
+      }
+      for (int i = 0; i < (int)mocoTraj.excitationNames.size(); i++)
+      {
+        csvFile << "," << mocoTraj.excitations(i, lineNumber);
+      }
+
+    }
+
+    lineNumber++;
+  }
+  csvFile.close();
 }
 
 //==============================================================================

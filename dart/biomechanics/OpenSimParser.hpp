@@ -67,6 +67,7 @@ struct OpenSimMot
   Eigen::MatrixXs poses;
 };
 
+
 struct OpenSimGRF
 {
   std::vector<double> timestamps;
@@ -79,6 +80,15 @@ struct OpenSimIMUData
   std::vector<double> timestamps;
   std::vector<std::map<std::string, Eigen::Vector3s>> gyroReadings;
   std::vector<std::map<std::string, Eigen::Vector3s>> accReadings;
+};
+
+struct OpenSimMocoTrajectory
+{
+  std::vector<double> timestamps;
+  Eigen::MatrixXs excitations;
+  Eigen::MatrixXs activations;
+  std::vector<std::string> excitationNames;
+  std::vector<std::string> activationNames;
 };
 
 class OpenSimParser
@@ -311,6 +321,19 @@ public:
       const common::Uri& uri,
       bool isAccelInG = true,
       const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// Load excitations and activations from a MocoTrajectory *.sto file.
+  static OpenSimMocoTrajectory loadMocoTrajectory(
+      const common::Uri& uri,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
+
+  /// Append excitations and activations from a MocoTrajectory to a CSV file and
+  /// save it.
+  static void appendMocoTrajectoryAndSaveCSV(
+          const common::Uri& uri,
+          const OpenSimMocoTrajectory& mocoTraj,
+          const std::string& path,
+          const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim
   /// file with all the scales and offsets baked in. This is a utility to go
