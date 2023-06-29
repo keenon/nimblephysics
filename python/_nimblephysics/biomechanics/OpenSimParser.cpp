@@ -370,7 +370,7 @@ void OpenSimParser(py::module& m)
       "appendMocoTrajectoryAndSaveCSV",
       +[](const std::string& inputPath,
           const dart::biomechanics::OpenSimMocoTrajectory& mocoTraj,
-          const std::string& outputPath) {
+          std::string outputPath) {
         return dart::biomechanics::OpenSimParser::appendMocoTrajectoryAndSaveCSV(
             inputPath, mocoTraj, outputPath);
       },

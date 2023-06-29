@@ -332,7 +332,7 @@ public:
   static void appendMocoTrajectoryAndSaveCSV(
           const common::Uri& uri,
           const OpenSimMocoTrajectory& mocoTraj,
-          const std::string& path,
+          std::string path,
           const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim

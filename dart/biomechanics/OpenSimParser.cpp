@@ -4135,15 +4135,17 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
           {
             // token = column label
             if (beginsWith(token, "/forceset/")) {
+              int n = strlen("/forceset/");
+              std::string actuName = token.substr(n, token.length() - n);
               if (endsWith(token, "/activation")) {
                 columnToActivation.push_back(tokenNumber);
                 activationCount++;
-                activationNames.push_back(token);
+                activationNames.push_back(actuName);
 
               } else {
                 columnToExcitation.push_back(tokenNumber);
                 excitationCount++;
-                excitationNames.push_back(token);
+                excitationNames.push_back(actuName + "/excitation");
               }
             }
           }
@@ -4154,13 +4156,11 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
           if (tokenNumber == 0)
           {
             timestamp = value;
-            timestamps.push_back(timestamp);
           }
           else
           {
             int excIndex = findIndex(columnToExcitation, tokenNumber);
             int actIndex = findIndex(columnToActivation, tokenNumber);
-
             if (excIndex != -1)
             {
               if (excitationVec.size() == 0)
@@ -4190,6 +4190,12 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
         tokenStart = line.find_first_not_of(whitespace, tokenEnd + 1);
       }
 
+      if (lineNumber > 0)
+      {
+        excitations.push_back(excitationVec);
+        activations.push_back(activationVec);
+        timestamps.push_back(timestamp);
+      }
       lineNumber++;
     }
 
@@ -4225,7 +4231,7 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
 void OpenSimParser::appendMocoTrajectoryAndSaveCSV(
     const common::Uri& uri,
     const OpenSimMocoTrajectory& mocoTraj,
-    const std::string& path,
+    std::string path,
     const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
@@ -4258,6 +4264,7 @@ void OpenSimParser::appendMocoTrajectoryAndSaveCSV(
         {
           csvFile << "," << token;
         }
+        tokenIndex++;
       }
       for (int i = 0; i < (int)mocoTraj.activationNames.size(); i++)
       {
@@ -4284,13 +4291,12 @@ void OpenSimParser::appendMocoTrajectoryAndSaveCSV(
       }
       for (int i = 0; i < (int)mocoTraj.activationNames.size(); i++)
       {
-        csvFile << "," << mocoTraj.activations(i, lineNumber);
+        csvFile << "," << mocoTraj.activations(i, lineNumber - 1);
       }
       for (int i = 0; i < (int)mocoTraj.excitationNames.size(); i++)
       {
-        csvFile << "," << mocoTraj.excitations(i, lineNumber);
+        csvFile << "," << mocoTraj.excitations(i, lineNumber - 1);
       }
-
     }
 
     lineNumber++;
