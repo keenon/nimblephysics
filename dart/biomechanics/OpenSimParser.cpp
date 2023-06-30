@@ -1808,44 +1808,49 @@ OpenSimParser::translateOsimMarkers(
   targetModel.skeleton->setPositions(
       Eigen::VectorXs::Zero(targetModel.skeleton->getNumDofs()));
 
-  // 0. Scale the original model to match the target model height
-  s_t originalHeight = originalModel.skeleton->getHeight(
-      originalModel.skeleton->getPositions());
-  s_t targetHeight
-      = targetModel.skeleton->getHeight(targetModel.skeleton->getPositions());
-  s_t scaleOriginalModel = (targetHeight / originalHeight);
-  if (verbose)
+  // Only scale the models to match height if they either both have a torso, or
+  // both do not
+  if (hasTorso(originalModel.skeleton) == hasTorso(targetModel.skeleton))
   {
-    std::cout << "Original model height: " << originalHeight << "m"
-              << std::endl;
-    std::cout << "Target model height: " << targetHeight << "m" << std::endl;
-    std::cout << "Scaling original model to: " << scaleOriginalModel
-              << std::endl;
-  }
-  for (int i = 0; i < 100; i++)
-  {
-    s_t error = originalModel.skeleton->getHeight(
-                    originalModel.skeleton->getPositions())
-                - targetModel.skeleton->getHeight(
-                    targetModel.skeleton->getPositions());
-    s_t grad = 2 * error
-               * originalModel.skeleton
-                     ->getGradientOfHeightWrtBodyScales(
-                         originalModel.skeleton->getPositions())
-                     .sum();
-    if (std::abs(grad) < 1e-4)
-      break;
-    scaleOriginalModel -= grad * 0.05;
-    // Want the original height to match the target height
-    originalModel.skeleton->setBodyScales(
-        Eigen::VectorXs::Ones(originalModel.skeleton->getNumBodyNodes() * 3)
-        * scaleOriginalModel);
+    // 0. Scale the original model to match the target model height
+    s_t originalHeight = originalModel.skeleton->getHeight(
+        originalModel.skeleton->getPositions());
+    s_t targetHeight
+        = targetModel.skeleton->getHeight(targetModel.skeleton->getPositions());
+    s_t scaleOriginalModel = (targetHeight / originalHeight);
     if (verbose)
     {
-      s_t newHeight = originalModel.skeleton->getHeight(
-          originalModel.skeleton->getPositions());
-      std::cout << "Updated original model height: " << newHeight
-                << "m at scale " << scaleOriginalModel << std::endl;
+      std::cout << "Original model height: " << originalHeight << "m"
+                << std::endl;
+      std::cout << "Target model height: " << targetHeight << "m" << std::endl;
+      std::cout << "Scaling original model to: " << scaleOriginalModel
+                << std::endl;
+    }
+    for (int i = 0; i < 100; i++)
+    {
+      s_t error = originalModel.skeleton->getHeight(
+                      originalModel.skeleton->getPositions())
+                  - targetModel.skeleton->getHeight(
+                      targetModel.skeleton->getPositions());
+      s_t grad = 2 * error
+                 * originalModel.skeleton
+                       ->getGradientOfHeightWrtBodyScales(
+                           originalModel.skeleton->getPositions())
+                       .sum();
+      if (std::abs(grad) < 1e-4)
+        break;
+      scaleOriginalModel -= grad * 0.05;
+      // Want the original height to match the target height
+      originalModel.skeleton->setBodyScales(
+          Eigen::VectorXs::Ones(originalModel.skeleton->getNumBodyNodes() * 3)
+          * scaleOriginalModel);
+      if (verbose)
+      {
+        s_t newHeight = originalModel.skeleton->getHeight(
+            originalModel.skeleton->getPositions());
+        std::cout << "Updated original model height: " << newHeight
+                  << "m at scale " << scaleOriginalModel << std::endl;
+      }
     }
   }
 
@@ -2041,10 +2046,28 @@ OpenSimParser::translateOsimMarkers(
   }
 
   std::vector<std::string> failedMarkers;
+  bool targetHasArms = hasArms(targetModel.skeleton);
+  bool sourceHasArms = hasArms(originalModel.skeleton);
+
   for (auto& pair : originalModel.markersMap)
   {
     if (convertedMarkers.count(pair.first) == 0)
     {
+      if (sourceHasArms && !targetHasArms)
+      {
+        if (isArmBodyHeuristic(
+                originalModel.skeleton, pair.second.first->getName()))
+        {
+          if (verbose)
+          {
+            std::cout << "Ignoring marker \"" << pair.first
+                      << "\" because it is on an arm, and the target model "
+                         "doesn't have arms"
+                      << std::endl;
+          }
+          continue;
+        }
+      }
       failedMarkers.push_back(pair.first);
       if (verbose)
       {
@@ -2273,9 +2296,9 @@ OpenSimParser::translateOsimMarkers(
           std::map<std::string, Eigen::Vector3s>(),
           originalJointsToMove,
           flattenedJointCenterTargets,
-          Eigen::VectorXs::Ones(flattenedJointCenterTargets.size()),
-          Eigen::VectorXs::Zero(flattenedJointCenterTargets.size() * 6),
-          Eigen::VectorXs::Zero(flattenedJointCenterTargets.size()),
+          Eigen::VectorXs::Ones(originalJointsToMove.size()),
+          Eigen::VectorXs::Zero(originalJointsToMove.size() * 6),
+          Eigen::VectorXs::Zero(originalJointsToMove.size()),
           originalModel.skeleton->getJoints(),
           false,
           0,
@@ -2408,6 +2431,264 @@ OpenSimParser::translateOsimMarkers(
   }
 
   return std::make_pair(guessedMarkers, missingMarkers);
+}
+
+//==============================================================================
+/// This method will use several heuristics, including the names of joints,
+/// meshes, and bones to determine if this body on this skeleton should be
+/// considered an "arm," which means basically anything after an articulated
+/// shoulder joint. Importantly, a torso with fixed meshes normally associated
+/// with the arms attached to the torso is NOT considered an arm.
+bool OpenSimParser::isArmBodyHeuristic(
+    std::shared_ptr<dynamics::Skeleton> skel, const std::string& bodyName)
+{
+  dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+  // Default to "no, it's not an arm" if it doesn't exist
+  if (body == nullptr)
+  {
+    return false;
+  }
+
+  // Trace out the path to the root of the tree
+  std::vector<dynamics::Joint*> jointsToRoot;
+  std::vector<dynamics::BodyNode*> bodiesToRoot;
+  dynamics::Joint* cursor = body->getParentJoint();
+  while (cursor != nullptr)
+  {
+    jointsToRoot.push_back(cursor);
+    if (cursor->getParentBodyNode() != nullptr)
+    {
+      bodiesToRoot.push_back(cursor->getParentBodyNode());
+      cursor = cursor->getParentBodyNode()->getParentJoint();
+    }
+    else
+    {
+      break;
+    }
+  }
+
+  // Check all the names of the joints on the way up the chain, looking for dead
+  // giveaways
+  std::vector<std::string> jointNameHeuristics;
+  jointNameHeuristics.push_back("shoulder");
+  jointNameHeuristics.push_back("elbow");
+  jointNameHeuristics.push_back("wrist");
+  jointNameHeuristics.push_back("hand");
+  jointNameHeuristics.push_back("thumb");
+  jointNameHeuristics.push_back("shld");
+  jointNameHeuristics.push_back("elb");
+  for (dynamics::Joint* joint : jointsToRoot)
+  {
+    std::string name = joint->getName();
+    for (std::string heuristic : jointNameHeuristics)
+    {
+      if (name.find(heuristic) != std::string::npos)
+      {
+        return true;
+      }
+    }
+  }
+
+  // Check all the names of the bodies on the way up the chain, looking for dead
+  // giveaways
+  std::vector<std::string> bodyNameHeuristics;
+  bodyNameHeuristics.push_back("radius");
+  bodyNameHeuristics.push_back("ulna");
+  bodyNameHeuristics.push_back("humerus");
+  bodyNameHeuristics.push_back("scapula");
+  bodyNameHeuristics.push_back("clavicle");
+  bodyNameHeuristics.push_back("hand");
+  bodyNameHeuristics.push_back("forearm");
+  bodyNameHeuristics.push_back("arm");
+  bodyNameHeuristics.push_back("shoulder");
+  bodyNameHeuristics.push_back("elbow");
+  bodyNameHeuristics.push_back("wrist");
+  for (dynamics::BodyNode* body : bodiesToRoot)
+  {
+    std::string name = body->getName();
+    for (std::string heuristic : bodyNameHeuristics)
+    {
+      if (name.find(heuristic) != std::string::npos)
+      {
+        return true;
+      }
+    }
+  }
+
+  // Lastly, we want to check if we're not a torso, then if we or any parent
+  // body has any meshes on it we typically associate with arms,
+  if (!isTorsoBodyHeuristic(skel, bodyName))
+  {
+    std::vector<std::string> meshNameHeuristics;
+    meshNameHeuristics.push_back("radius");
+    meshNameHeuristics.push_back("ulna");
+    meshNameHeuristics.push_back("forearm");
+    meshNameHeuristics.push_back("index_distal");
+    meshNameHeuristics.push_back("index_medial");
+    meshNameHeuristics.push_back("index_proximal");
+    meshNameHeuristics.push_back("metacarpal");
+    meshNameHeuristics.push_back("humerus");
+    meshNameHeuristics.push_back("ring");
+    meshNameHeuristics.push_back("thumb");
+    meshNameHeuristics.push_back("pinky");
+    meshNameHeuristics.push_back("scapula");
+    meshNameHeuristics.push_back("scaphoid");
+    meshNameHeuristics.push_back("trapezium");
+    meshNameHeuristics.push_back("metacarpal");
+    bodiesToRoot.push_back(body);
+    for (dynamics::BodyNode* body : bodiesToRoot)
+    {
+      for (auto* shape : body->getShapeNodes())
+      {
+        if (shape->getShape()->getType()
+            == dynamics::MeshShape::getStaticType())
+        {
+          dynamics::MeshShape* meshShape
+              = static_cast<dynamics::MeshShape*>(shape->getShape().get());
+          std::string meshPath = meshShape->getMeshPath();
+          for (std::string heuristic : meshNameHeuristics)
+          {
+            if (meshPath.find(heuristic) != std::string::npos)
+            {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+//==============================================================================
+/// This method will use several heuristics, including the names of joints,
+/// meshes, and bones to determine if this body on this skeleton should be
+/// considered a "torso"
+bool OpenSimParser::isTorsoBodyHeuristic(
+    std::shared_ptr<dynamics::Skeleton> skel, const std::string& bodyName)
+{
+  dynamics::BodyNode* body = skel->getBodyNode(bodyName);
+  // Default to "no, it's not a torso" if it doesn't exist
+  if (body == nullptr)
+  {
+    return false;
+  }
+
+  // Check all the names of the joints on the way up the chain, looking for dead
+  // giveaways
+  std::vector<std::string> jointNameHeuristics;
+  jointNameHeuristics.push_back("spine");
+  jointNameHeuristics.push_back("lumbar");
+  jointNameHeuristics.push_back("thoracic");
+  jointNameHeuristics.push_back("cervical");
+  jointNameHeuristics.push_back("torso");
+  std::string jointName = body->getParentJoint()->getName();
+  for (std::string heuristic : jointNameHeuristics)
+  {
+    if (jointName.find(heuristic) != std::string::npos)
+    {
+#ifndef NDEBUG
+      std::cout << "Joint " << jointName
+                << " is a torso joint based on name heuristics" << std::endl;
+#endif
+      return true;
+    }
+  }
+
+  // Check all the names of the bodies on the way up the chain, looking for dead
+  // giveaways
+  std::vector<std::string> bodyNameHeuristics;
+  // bodyNameHeuristics.push_back("torso"); <- turns out the gait2392 model has
+  // a "torso" body, which is really just the pelvis, so this isn't indicative
+  bodyNameHeuristics.push_back("thorax");
+  bodyNameHeuristics.push_back("head");
+  bodyNameHeuristics.push_back("ribs");
+  bodyNameHeuristics.push_back("lumbar");
+  bodyNameHeuristics.push_back("neck");
+  bodyNameHeuristics.push_back("skull");
+  for (std::string heuristic : bodyNameHeuristics)
+  {
+    if (bodyName.find(heuristic) != std::string::npos)
+    {
+#ifndef NDEBUG
+      std::cout << "Body " << bodyName
+                << " is a torso body based on name heuristics" << std::endl;
+#endif
+      return true;
+    }
+  }
+
+  std::vector<std::string> meshNameHeuristics;
+  meshNameHeuristics.push_back("ribs");
+  meshNameHeuristics.push_back("thorax");
+  meshNameHeuristics.push_back("spine");
+  meshNameHeuristics.push_back("skull");
+  meshNameHeuristics.push_back("hat");
+  meshNameHeuristics.push_back("jaw");
+  meshNameHeuristics.push_back("neck");
+  meshNameHeuristics.push_back("vertibrae");
+  for (auto* shape : body->getShapeNodes())
+  {
+    if (shape->getShape()->getType() == dynamics::MeshShape::getStaticType())
+    {
+      dynamics::MeshShape* meshShape
+          = static_cast<dynamics::MeshShape*>(shape->getShape().get());
+      std::string meshPath = meshShape->getMeshPath();
+      for (std::string heuristic : meshNameHeuristics)
+      {
+        if (meshPath.find(heuristic) != std::string::npos)
+        {
+#ifndef NDEBUG
+          std::cout << "Mesh " << meshPath
+                    << " is a torso mesh based on name heuristics" << std::endl;
+#endif
+
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+//==============================================================================
+/// This method will return true if this skeleton has any bodies that return
+/// true for isArmBodyHeuristic().
+bool OpenSimParser::hasArms(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    if (isArmBodyHeuristic(skel, skel->getBodyNode(i)->getName()))
+    {
+#ifndef NDEBUG
+      std::cout << "Skeleton " << skel->getName() << " has arm body "
+                << skel->getBodyNode(i)->getName() << std::endl;
+#endif
+      return true;
+    }
+  }
+  return false;
+}
+
+//==============================================================================
+/// This method will return true if this skeleton has any bodies that return
+/// true for isTorsoBodyHeuristic().
+bool OpenSimParser::hasTorso(std::shared_ptr<dynamics::Skeleton> skel)
+{
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    if (isTorsoBodyHeuristic(skel, skel->getBodyNode(i)->getName()))
+    {
+#ifndef NDEBUG
+      std::cout << "Skeleton " << skel->getName() << " has torso body "
+                << skel->getBodyNode(i)->getName() << std::endl;
+#endif
+      return true;
+    }
+  }
+  return false;
 }
 
 //==============================================================================

@@ -4725,6 +4725,7 @@ Eigen::Isometry3s iterativeClosestPoint(
     bool verbose)
 {
   Eigen::Isometry3s T = transform;
+  s_t lastAvgError = std::numeric_limits<s_t>::infinity();
   for (int i = 0; i < 10; i++)
   {
     // If the meshes don't match and the world is missing detail (for example,
@@ -4765,12 +4766,20 @@ Eigen::Isometry3s iterativeClosestPoint(
       }
     }
 
+    s_t avgError = (totalDist / localPointsToMatch.size());
     if (verbose)
     {
       std::cout << "ICP Iteration " << i << " with "
                 << localPointsToMatch.size() << " points matched, avg dist "
-                << (totalDist / localPointsToMatch.size()) << std::endl;
+                << avgError << std::endl;
     }
+
+    if (avgError >= lastAvgError)
+    {
+      // We're either not getting better, or we're getting worse, so terminate
+      break;
+    }
+    lastAvgError = avgError;
 
     Eigen::Isometry3s newT = getPointCloudToPointCloudTransform(
         localPointsToMatch, worldPointsToMatch, weights);

@@ -286,6 +286,38 @@ void OpenSimParser(py::module& m)
       ::py::arg("verbose") = false);
 
   sm.def(
+      "isArmBodyHeuristic",
+      +[](std::shared_ptr<dynamics::Skeleton> skel, std::string bodyName) {
+        return dart::biomechanics::OpenSimParser::isArmBodyHeuristic(
+            skel, bodyName);
+      },
+      ::py::arg("skel"),
+      ::py::arg("bodyName"));
+
+  sm.def(
+      "isTorsoBodyHeuristic",
+      +[](std::shared_ptr<dynamics::Skeleton> skel, std::string bodyName) {
+        return dart::biomechanics::OpenSimParser::isTorsoBodyHeuristic(
+            skel, bodyName);
+      },
+      ::py::arg("skel"),
+      ::py::arg("bodyName"));
+
+  sm.def(
+      "hasArms",
+      +[](std::shared_ptr<dynamics::Skeleton> skel) {
+        return dart::biomechanics::OpenSimParser::hasArms(skel);
+      },
+      ::py::arg("skel"));
+
+  sm.def(
+      "hasTorso",
+      +[](std::shared_ptr<dynamics::Skeleton> skel) {
+        return dart::biomechanics::OpenSimParser::hasTorso(skel);
+      },
+      ::py::arg("skel"));
+
+  sm.def(
       "replaceOsimMarkers",
       +[](const common::Uri& uri,
           const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&

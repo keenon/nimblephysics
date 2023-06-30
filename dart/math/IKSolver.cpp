@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "dart/math/FiniteDifference.hpp"
@@ -243,7 +244,7 @@ s_t solveIK(
         eval,
         IKConfig(config).setMaxStepCount(20));
 
-    if (result.loss < bestError && result.clamped)
+    if (result.loss < bestError && (result.clamped || !isfinite(bestError)))
     {
       bestError = result.loss;
       bestResult = result.pos;
@@ -358,6 +359,7 @@ IKResult refineIK(
           std::cout << "Terminating IK search after " << i
                     << " iterations with loss: " << currentError << std::endl;
         }
+        lastError = currentError;
         break;
       }
       if (errorChange > 0)
@@ -385,6 +387,7 @@ IKResult refineIK(
                          "with loss: "
                       << currentError << std::endl;
           }
+          lastError = currentError;
           break;
         }
       }
