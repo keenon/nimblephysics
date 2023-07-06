@@ -226,39 +226,38 @@ std::vector<s_t> readVecX(tinyxml2::XMLElement* elem)
   return values;
 }
 
-dynamics::EulerJoint::AxisOrder getAxisOrder(
+std::pair<dynamics::EulerJoint::AxisOrder, bool> getAxisOrder(
     std::vector<Eigen::Vector3s> axisList)
 {
   if (axisList[0].cwiseAbs() == Eigen::Vector3s::UnitX()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitY()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitZ())
   {
-    return dynamics::EulerJoint::AxisOrder::XYZ;
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XYZ, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitY()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitX())
   {
-    return dynamics::EulerJoint::AxisOrder::ZYX;
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::ZYX, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitX()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitY())
   {
-    return dynamics::EulerJoint::AxisOrder::ZXY;
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::ZXY, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitX()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitY())
   {
-    return dynamics::EulerJoint::AxisOrder::XZY;
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XZY, false);
   }
-  assert(false);
   // don't break the build when building as prod
-  return dynamics::EulerJoint::AxisOrder::XYZ;
+  return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XYZ, true);
 }
 
 Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
@@ -1653,7 +1652,8 @@ void OpenSimParser::replaceOsimMarkers(
     marker->SetAttribute("name", pair.first.c_str());
 
     tinyxml2::XMLElement* body = marker->InsertNewChildElement(isOldFormat ? "socket_parent_frame" : "body");
-    body->SetText(pair.second.first.c_str());
+    std::string bodyName = isOldFormat ? "/bodyset/" + pair.second.first : pair.second.first;
+    body->SetText(bodyName.c_str());
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
     Eigen::Vector3s markerOffset = pair.second.second;
@@ -4282,7 +4282,12 @@ createCustomJoint(
 
   assert(customFunctions.size() == 6);
 
-  dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+  auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
+  dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
+  bool axisOrderError = axisOrderAndErrorFlag.second;
+  if (axisOrderError) {
+    NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
+  }
   Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
   customJoint->setAxisOrder(axisOrder);
   customJoint->setFlipAxisMap(flips);
@@ -5049,11 +5054,17 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     }
     else if (allLinear && !anySpline && dofNames.size() == 6)
     {
-      dynamics::EulerJoint::AxisOrder axisOrder = getAxisOrder(eulerAxisOrder);
+      auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
+      dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
+      bool axisOrderError = axisOrderAndErrorFlag.second;
+      if (axisOrderError) {
+        NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
+      }
       dynamics::EulerJoint::AxisOrder transOrder
-          = getAxisOrder(transformAxisOrder);
-      (void)transOrder;
-      assert(transOrder == dynamics::EulerJoint::AxisOrder::XYZ);
+          = getAxisOrder(transformAxisOrder).first;
+      if (transOrder != dynamics::EulerJoint::AxisOrder::XYZ) {
+        NIMBLE_THROW("Invalid transform order for Euler joint: " + jointName);
+      }
 
       Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
 
@@ -5184,8 +5195,12 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       }
       else
       {
-        dynamics::EulerJoint::AxisOrder axisOrder
-            = getAxisOrder(eulerAxisOrder);
+        auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
+        dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
+        bool axisOrderError = axisOrderAndErrorFlag.second;
+        if (axisOrderError) {
+          NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
+        }
         Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
         // assert(!flips[0] && !flips[1] && !flips[2]);
 
@@ -5627,6 +5642,10 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                  coordinateCursor->FirstChildElement("clamped")->GetText()))
                  == "true";
 
+    if (joint->getNumDofs() <= i) {
+      break;
+    }
+
     dynamics::DegreeOfFreedom* dof = joint->getDof(i);
     dof->setName(dofName);
 
@@ -5812,7 +5831,9 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         geometryRetriever);
   }
 
-  assert(childBody != nullptr);
+  if (childBody == nullptr) {
+    NIMBLE_THROW("Nimble OpenSimParser caught an error reading Joint \"" + jointName + "\". It has no child body. Please check that your OpenSim file is valid.");
+  }
 
   return std::pair<dynamics::Joint*, dynamics::BodyNode*>(joint, childBody);
 }

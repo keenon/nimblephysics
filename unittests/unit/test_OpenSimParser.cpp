@@ -24,7 +24,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 /*
 // This leads to a hard exit
@@ -162,6 +162,22 @@ TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_2)
       "dart://sample/osim/ConversionRegressions/"
       "result_2.osim");
   EXPECT_GE(targetModelWithMarkers.markersMap.size(), 5);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, ZERO_DOF_SEGFAULT_REGRESSION)
+{
+  auto result = OpenSimParser::parseOsim(
+      "dart://sample/osim/ZeroDofBug/unscaled_generic.osim");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, RETURN_11_SEGFAULT_REGRESSION)
+{
+  EXPECT_ANY_THROW(OpenSimParser::parseOsim(
+      "dart://sample/osim/Return11/unscaled_generic.osim"));
 }
 #endif
 
