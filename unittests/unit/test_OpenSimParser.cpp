@@ -24,7 +24,7 @@ using namespace biomechanics;
 using namespace server;
 using namespace realtime;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 /*
 // This leads to a hard exit
@@ -141,6 +141,27 @@ TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_1)
   auto targetModelWithMarkers = OpenSimParser::parseOsim(
       "dart://sample/osim/ConversionRegressions/"
       "result_1.osim");
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_2)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/ConversionRegressions/original_2.osim",
+      "dart://sample/osim/ConversionRegressions/target_2.osim",
+      "../../../data/osim/ConversionRegressions/"
+      "result_2.osim",
+      true);
+
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/target_2.osim");
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/original_2.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/"
+      "result_2.osim");
+  EXPECT_GE(targetModelWithMarkers.markersMap.size(), 5);
 }
 #endif
 

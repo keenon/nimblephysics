@@ -346,14 +346,14 @@ OpenSimFile OpenSimParser::parseOsim(
   OpenSimFile result;
   if (jointSet != nullptr)
   {
-    // This is the newer format, where JointSet specifies the joints separately
+    // This is the older format, where JointSet specifies the joints separately
     // from the body hierarchy
     result = readOsim40(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
   else
   {
-    // This is the older format, where Joints are specified as childen of Bodies
+    // This is the newer format, where Joints are specified as childen of Bodies
     result = readOsim30(
         docElement, fileNameForErrorDisplay, geometryFolder, geometryRetriever);
   }
@@ -1607,6 +1607,8 @@ void OpenSimParser::replaceOsimMarkers(
              "<OpenSimDocument> element.\n";
     return;
   }
+  tinyxml2::XMLElement* jointSet = modelElement->FirstChildElement("JointSet");
+  bool isOldFormat = jointSet != nullptr;
 
   //--------------------------------------------------------------------------
   // Go through the body nodes and adjust the scaling
@@ -1650,7 +1652,7 @@ void OpenSimParser::replaceOsimMarkers(
     */
     marker->SetAttribute("name", pair.first.c_str());
 
-    tinyxml2::XMLElement* body = marker->InsertNewChildElement("body");
+    tinyxml2::XMLElement* body = marker->InsertNewChildElement(isOldFormat ? "socket_parent_frame" : "body");
     body->SetText(pair.second.first.c_str());
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
