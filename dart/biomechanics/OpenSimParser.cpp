@@ -1652,7 +1652,8 @@ void OpenSimParser::replaceOsimMarkers(
     marker->SetAttribute("name", pair.first.c_str());
 
     tinyxml2::XMLElement* body = marker->InsertNewChildElement(isOldFormat ? "socket_parent_frame" : "body");
-    body->SetText(pair.second.first.c_str());
+    std::string bodyName = isOldFormat ? "/bodyset/" + pair.second.first : pair.second.first;
+    body->SetText(bodyName.c_str());
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
     Eigen::Vector3s markerOffset = pair.second.second;
