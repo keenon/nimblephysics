@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
+
 #include <dart/dynamics/DegreeOfFreedom.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
@@ -473,6 +475,11 @@ void DegreeOfFreedom(py::module& m)
           "getSkeleton",
           +[](dart::dynamics::DegreeOfFreedom* self)
               -> dart::dynamics::SkeletonPtr { return self->getSkeleton(); })
+      .def(
+          "getJointName",
+          +[](dart::dynamics::DegreeOfFreedom* self) -> std::string {
+            return self->getJoint()->getName();
+          })
       .def(
           "getSkeleton",
           +[](const dart::dynamics::DegreeOfFreedom* self)
