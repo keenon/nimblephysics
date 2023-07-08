@@ -657,12 +657,6 @@ void Skeleton(
           ::py::return_value_policy::reference_internal,
           ::py::arg("index"))
       .def(
-          "getDofs",
-          +[](const dart::dynamics::Skeleton* self)
-              -> std::vector<const dart::dynamics::DegreeOfFreedom*> {
-            return self->getDofs();
-          })
-      .def(
           "getIndexOf",
           +[](const dart::dynamics::Skeleton* self,
               const dart::dynamics::DegreeOfFreedom* _dof) -> std::size_t {
