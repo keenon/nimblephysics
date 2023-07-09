@@ -39,7 +39,7 @@
 
 // #define ALL_TESTS
 
-// #define FUNCTIONAL_TESTS
+#define FUNCTIONAL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -8071,14 +8071,15 @@ TEST(MarkerFitter, CARMAGO_TEST)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(MarkerFitter, CRASH_C3D)
 {
   std::string sex = "female";
   s_t massKg = 66.9;
   s_t heightM = 1.525;
 
-  OpenSimFile standard = OpenSimParser::parseOsim("dart://sample/osim/P04_MarkerCrash/unscaled_generic.osim");
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/P04_MarkerCrash/unscaled_generic.osim");
   standard.skeleton->zeroTranslationInCustomFunctions();
   standard.skeleton->autogroupSymmetricSuffixes();
   if (standard.skeleton->getBodyNode("hand_r") != nullptr)
@@ -8201,12 +8202,11 @@ TEST(MarkerFitter, CRASH_C3D)
 
   C3D c3d
       = C3DLoader::loadC3D("dart://sample/osim/P04_MarkerCrash/1.5mps_05.c3d");
-  
-  std::shared_ptr<MarkersErrorReport> report
-      = fitter.generateDataErrorsReport(
-          c3d.markerTimesteps, 1.0 / (s_t)c3d.framesPerSecond);
+
+  std::shared_ptr<MarkersErrorReport> report = fitter.generateDataErrorsReport(
+      c3d.markerTimesteps, 1.0 / (s_t)c3d.framesPerSecond);
 }
-// #endif
+#endif
 
 #ifdef ALL_TESTS
 TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_CALIBRATION)
