@@ -102,7 +102,9 @@ bool endsWith(std::string const& fullString, std::string const& ending)
 {
   if (fullString.length() >= ending.length())
   {
-    return(0 == fullString.compare(
+    return (
+        0
+        == fullString.compare(
             fullString.length() - ending.length(), ending.length(), ending));
   }
   else
@@ -115,7 +117,7 @@ bool beginsWith(std::string const& fullString, std::string const& beginning)
 {
   if (fullString.length() >= beginning.length())
   {
-    return(0 == fullString.compare(0, beginning.length(), beginning));
+    return (0 == fullString.compare(0, beginning.length(), beginning));
   }
   else
   {
@@ -123,13 +125,17 @@ bool beginsWith(std::string const& fullString, std::string const& beginning)
   }
 }
 
-template<typename T>
-int findIndex(const std::vector<T>& vec, const T& value) {
+template <typename T>
+int findIndex(const std::vector<T>& vec, const T& value)
+{
   auto it = std::find(vec.begin(), vec.end(), value);
 
-  if (it != vec.end()) {
+  if (it != vec.end())
+  {
     return std::distance(vec.begin(), it);
-  } else {
+  }
+  else
+  {
     return -1;
   }
 }
@@ -233,31 +239,36 @@ std::pair<dynamics::EulerJoint::AxisOrder, bool> getAxisOrder(
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitY()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitZ())
   {
-    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XYZ, false);
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(
+        dynamics::EulerJoint::AxisOrder::XYZ, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitY()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitX())
   {
-    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::ZYX, false);
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(
+        dynamics::EulerJoint::AxisOrder::ZYX, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitX()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitY())
   {
-    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::ZXY, false);
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(
+        dynamics::EulerJoint::AxisOrder::ZXY, false);
   }
   else if (
       axisList[0].cwiseAbs() == Eigen::Vector3s::UnitX()
       && axisList[1].cwiseAbs() == Eigen::Vector3s::UnitZ()
       && axisList[2].cwiseAbs() == Eigen::Vector3s::UnitY())
   {
-    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XZY, false);
+    return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(
+        dynamics::EulerJoint::AxisOrder::XZY, false);
   }
   // don't break the build when building as prod
-  return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(dynamics::EulerJoint::AxisOrder::XYZ, true);
+  return std::make_pair<dynamics::EulerJoint::AxisOrder, bool>(
+      dynamics::EulerJoint::AxisOrder::XYZ, true);
 }
 
 Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
@@ -1651,8 +1662,10 @@ void OpenSimParser::replaceOsimMarkers(
     */
     marker->SetAttribute("name", pair.first.c_str());
 
-    tinyxml2::XMLElement* body = marker->InsertNewChildElement(isOldFormat ? "socket_parent_frame" : "body");
-    std::string bodyName = isOldFormat ? "/bodyset/" + pair.second.first : pair.second.first;
+    tinyxml2::XMLElement* body = marker->InsertNewChildElement(
+        isOldFormat ? "socket_parent_frame" : "body");
+    std::string bodyName
+        = isOldFormat ? "/bodyset/" + pair.second.first : pair.second.first;
     body->SetText(bodyName.c_str());
 
     tinyxml2::XMLElement* location = marker->InsertNewChildElement("location");
@@ -2314,16 +2327,58 @@ OpenSimParser::translateOsimMarkers(
     // look for the nearest vertex on the target model (which hasn't changed
     // size, so we don't need to re-compute its vertices world locations), and
     // if any are within range we can assign them to the appropriate body.
-    std::map<std::string, Eigen::Vector3s> originalWorldMarkers
-        = originalModel.skeleton->getMarkerMapWorldPositions(
-            originalModel.markersMap);
+    std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
+        failedMarkersMap;
+    for (std::string failedMarker : failedMarkers)
+    {
+      failedMarkersMap[failedMarker] = originalModel.markersMap[failedMarker];
+    }
+    std::map<std::string, Eigen::Vector3s> failedWorldMarkers
+        = originalModel.skeleton->getMarkerMapWorldPositions(failedMarkersMap);
     if (verbose)
     {
       std::cout << "Now that the skeletons are aligned, trying to find markers "
                    "to assign to the target model..."
                 << std::endl;
     }
-    for (auto& pair : originalWorldMarkers)
+
+    targetVertices.clear();
+    targetBodyName.clear();
+    for (int j = 0; j < targetModel.skeleton->getNumBodyNodes(); j++)
+    {
+      dynamics::BodyNode* targetBody = targetModel.skeleton->getBodyNode(j);
+      for (auto* targetShapeNode : targetBody->getShapeNodes())
+      {
+        if (targetShapeNode->getShape()->getType()
+            == dynamics::MeshShape::getStaticType())
+        {
+          std::cout << "Found mesh on body \"" << targetBody->getName() << "\""
+                    << std::endl;
+          dynamics::MeshShape* targetMeshShape
+              = static_cast<dynamics::MeshShape*>(
+                  targetShapeNode->getShape().get());
+          for (int m = 0; m < targetMeshShape->getMesh()->mNumMeshes; m++)
+          {
+            for (int v = 0;
+                 v < targetMeshShape->getMesh()->mMeshes[m]->mNumVertices;
+                 v++)
+            {
+              aiVector3D aiVertex
+                  = targetMeshShape->getMesh()->mMeshes[m]->mVertices[v];
+              Eigen::Vector3s rawVertex
+                  = Eigen::Vector3s(aiVertex.x, aiVertex.y, aiVertex.z);
+              Eigen::Vector3s vertex
+                  = targetMeshShape->getScale().cwiseProduct(rawVertex);
+              targetVertices.push_back(
+                  targetShapeNode->getWorldTransform() * vertex);
+              targetBodyName.push_back(targetBody->getName());
+            }
+          }
+        }
+      }
+    }
+
+    for (auto& pair : failedWorldMarkers)
     {
       // We only want to map markers that we couldn't map before (using precise
       // geometry matching)
@@ -2333,49 +2388,62 @@ OpenSimParser::translateOsimMarkers(
         std::string originalBodyName
             = originalModel.markersMap[markerName].first->getName();
 
-        s_t bestDistance = std::numeric_limits<double>::infinity();
-        std::string bestBody = "";
-
-        Eigen::Vector3s targetMarker
-            = targetRootTransform.inverse() * pair.second;
-
-        for (int v = 0; v < targetVertices.size(); v++)
+        dynamics::BodyNode* targetBodyGuess
+            = targetModel.skeleton->getBodyNode(originalBodyName);
+        if (targetBodyGuess != nullptr)
         {
-          Eigen::Vector3s point = targetVertices[v];
-          s_t dist = (point - targetMarker).norm();
-          s_t bodyNamePenalty = 0.0;
-          // Add the edit distance between originalBodyName and
-          // targetBodyName[v] as a cost to bodyPenalty. TODO: make this handle
-          // small changes like "l_hand" vs. "hand_left" better.
-          if (targetBodyName[v] != originalBodyName)
-          {
-            bodyNamePenalty += 1.0;
-          }
-
-          if (dist < 0.15 && dist + bodyNamePenalty < bestDistance)
-          {
-            bestDistance = dist + bodyNamePenalty;
-            bestBody = targetBodyName[v];
-            break;
-          }
-        }
-
-        if (std::isfinite(bestDistance))
-        {
-          if (verbose)
-          {
-            std::cout
-                << "Marker \"" << markerName << "\" is closest to body \""
-                << bestBody << "\" at distance " << bestDistance
-                << "m from nearest vertex on any mesh attached to that body"
-                << std::endl;
-          }
-          Eigen::Isometry3s bestBodyWorld
-              = targetModel.skeleton->getBodyNode(bestBody)
-                    ->getWorldTransform();
+          // If the target skeleton has a body with the same name (e.g.
+          // "femur_r" and "femur_r"), then we want to short-circuit the vertex
+          // matching, and just assign to that body
+          Eigen::Vector3s targetMarker
+              = targetBodyGuess->getWorldTransform().inverse() * pair.second;
           convertedMarkers[pair.first]
               = std::pair<std::string, Eigen::Vector3s>(
-                  bestBody, bestBodyWorld.inverse() * targetMarker);
+                  originalBodyName, targetMarker);
+        }
+        else
+        {
+          std::cout << "WARNING: Failed to find a body on the target model "
+                       "with the same name as \""
+                    << originalBodyName << "\"" << std::endl;
+          s_t bestDistance = std::numeric_limits<double>::infinity();
+          std::string bestBody = "";
+
+          Eigen::Vector3s targetMarker
+              = targetRootTransform.inverse() * pair.second;
+
+          for (int v = 0; v < targetVertices.size(); v++)
+          {
+            Eigen::Vector3s point = targetVertices[v];
+            s_t dist = (point - targetMarker).norm();
+
+            if (dist < 0.15 && dist < bestDistance)
+            {
+              bestDistance = dist;
+              bestBody = targetBodyName[v];
+              break;
+            }
+          }
+
+          if (std::isfinite(bestDistance))
+          {
+            if (verbose)
+            {
+              std::cout
+                  << "Marker \"" << markerName
+                  << "\", originally attached to a body named \""
+                  << originalBodyName << "\" is closest to body \"" << bestBody
+                  << "\" at distance " << bestDistance
+                  << "m from nearest vertex on any mesh attached to that body"
+                  << std::endl;
+            }
+            Eigen::Isometry3s bestBodyWorld
+                = targetModel.skeleton->getBodyNode(bestBody)
+                      ->getWorldTransform();
+            convertedMarkers[pair.first]
+                = std::pair<std::string, Eigen::Vector3s>(
+                    bestBody, bestBodyWorld.inverse() * targetMarker);
+          }
         }
       }
     }
@@ -4285,7 +4353,8 @@ createCustomJoint(
   auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
   dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
   bool axisOrderError = axisOrderAndErrorFlag.second;
-  if (axisOrderError) {
+  if (axisOrderError)
+  {
     NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
   }
   Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
@@ -4354,8 +4423,7 @@ createCustomJoint(
 //==============================================================================
 /// Load excitations and activations from a MocoTrajectory *.sto file.
 OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
-    const common::Uri& uri,
-    const common::ResourceRetrieverPtr& nullOrRetriever)
+    const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
       = ensureRetriever(nullOrRetriever);
@@ -4398,7 +4466,8 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
       if (tokenEnd != std::string::npos)
       {
         std::string variable = line.substr(0, tokenEnd);
-        std::string value = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
+        std::string value
+            = line.substr(tokenEnd + 1, line.size() - tokenEnd - 1);
       }
     }
     else
@@ -4422,15 +4491,18 @@ OpenSimMocoTrajectory OpenSimParser::loadMocoTrajectory(
           if (tokenNumber > 0)
           {
             // token = column label
-            if (beginsWith(token, "/forceset/")) {
+            if (beginsWith(token, "/forceset/"))
+            {
               int n = strlen("/forceset/");
               std::string actuName = token.substr(n, token.length() - n);
-              if (endsWith(token, "/activation")) {
+              if (endsWith(token, "/activation"))
+              {
                 columnToActivation.push_back(tokenNumber);
                 activationCount++;
                 activationNames.push_back(actuName);
-
-              } else {
+              }
+              else
+              {
                 columnToExcitation.push_back(tokenNumber);
                 excitationCount++;
                 excitationNames.push_back(actuName + "/excitation");
@@ -4572,7 +4644,9 @@ void OpenSimParser::appendMocoTrajectoryAndSaveCSV(
         if (tokenIndex == 0)
         {
           csvFile << std::endl << std::stod(token);
-        } else {
+        }
+        else
+        {
           csvFile << "," << std::stod(token);
         }
         tokenIndex++;
@@ -5057,12 +5131,14 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
       dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
       bool axisOrderError = axisOrderAndErrorFlag.second;
-      if (axisOrderError) {
+      if (axisOrderError)
+      {
         NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
       }
       dynamics::EulerJoint::AxisOrder transOrder
           = getAxisOrder(transformAxisOrder).first;
-      if (transOrder != dynamics::EulerJoint::AxisOrder::XYZ) {
+      if (transOrder != dynamics::EulerJoint::AxisOrder::XYZ)
+      {
         NIMBLE_THROW("Invalid transform order for Euler joint: " + jointName);
       }
 
@@ -5198,7 +5274,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         auto axisOrderAndErrorFlag = getAxisOrder(eulerAxisOrder);
         dynamics::EulerJoint::AxisOrder axisOrder = axisOrderAndErrorFlag.first;
         bool axisOrderError = axisOrderAndErrorFlag.second;
-        if (axisOrderError) {
+        if (axisOrderError)
+        {
           NIMBLE_THROW("Invalid axis order for Euler joint: " + jointName);
         }
         Eigen::Vector3s flips = getAxisFlips(eulerAxisOrder);
@@ -5642,7 +5719,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
                  coordinateCursor->FirstChildElement("clamped")->GetText()))
                  == "true";
 
-    if (joint->getNumDofs() <= i) {
+    if (joint->getNumDofs() <= i)
+    {
       break;
     }
 
@@ -5831,7 +5909,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
         geometryRetriever);
   }
 
-  if (childBody == nullptr) {
+  if (childBody == nullptr)
+  {
     NIMBLE_THROW("Nimble OpenSimParser caught an error reading Joint \"" + jointName + "\". It has no child body. Please check that your OpenSim file is valid.");
   }
 

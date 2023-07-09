@@ -166,6 +166,67 @@ TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_2)
 #endif
 
 #ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_3)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/ConversionRegressions/original_3.osim",
+      "dart://sample/osim/ConversionRegressions/target_3.osim",
+      "../../../data/osim/ConversionRegressions/"
+      "result_3.osim",
+      true);
+
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/target_3.osim");
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/original_3.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/"
+      "result_3.osim");
+  for (auto& pair : targetModelWithMarkers.markersMap)
+  {
+    std::string originalBodyName
+        = originalModel.markersMap[pair.first].first->getName();
+    std::string convertedBodyName
+        = targetModelWithMarkers.markersMap[pair.first].first->getName();
+    std::cout << pair.first << ": originally on body " << originalBodyName
+              << ", now on body " << convertedBodyName << std::endl;
+  }
+
+  EXPECT_GE(targetModelWithMarkers.markersMap.size(), 5);
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(OpenSimParser, MARKER_TRANSLATION_REGRESSION_4)
+{
+  auto guessedAndMissingMarkers = OpenSimParser::translateOsimMarkers(
+      "dart://sample/osim/ConversionRegressions/original_4.osim",
+      "dart://sample/osim/ConversionRegressions/target_4.osim",
+      "../../../data/osim/ConversionRegressions/"
+      "result_4.osim",
+      true);
+
+  auto targetModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/target_4.osim");
+  auto originalModel = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/original_4.osim");
+  auto targetModelWithMarkers = OpenSimParser::parseOsim(
+      "dart://sample/osim/ConversionRegressions/"
+      "result_4.osim");
+  for (auto& pair : targetModelWithMarkers.markersMap)
+  {
+    std::string originalBodyName
+        = originalModel.markersMap[pair.first].first->getName();
+    std::string convertedBodyName
+        = targetModelWithMarkers.markersMap[pair.first].first->getName();
+    std::cout << pair.first << ": originally on body " << originalBodyName
+              << ", now on body " << convertedBodyName << std::endl;
+  }
+  EXPECT_GE(targetModelWithMarkers.markersMap.size(), 5);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(OpenSimParser, ZERO_DOF_SEGFAULT_REGRESSION)
 {
   auto result = OpenSimParser::parseOsim(
