@@ -51,6 +51,7 @@ namespace python {
 void ForcePlate(py::module& m)
 {
   ::py::class_<dart::biomechanics::ForcePlate>(m, "ForcePlate")
+      .def(::py::init<>())
       .def_readwrite(
           "worldOrigin", &dart::biomechanics::ForcePlate::worldOrigin)
       .def_readwrite("timestamps", &dart::biomechanics::ForcePlate::timestamps)
@@ -60,13 +61,15 @@ void ForcePlate(py::module& m)
           &dart::biomechanics::ForcePlate::centersOfPressure)
       .def_readwrite("moments", &dart::biomechanics::ForcePlate::moments)
       .def_readwrite("forces", &dart::biomechanics::ForcePlate::forces)
-      .def("trim",
-              &dart::biomechanics::ForcePlate::trim,
-              ::py::arg("newStartTime"),
-              ::py::arg("newEndTime"))
-          .def_static("copyForcePlate",
-              &dart::biomechanics::ForcePlate::copyForcePlate,
-              ::py::arg("plate"));
+      .def(
+          "trim",
+          &dart::biomechanics::ForcePlate::trim,
+          ::py::arg("newStartTime"),
+          ::py::arg("newEndTime"))
+      .def_static(
+          "copyForcePlate",
+          &dart::biomechanics::ForcePlate::copyForcePlate,
+          ::py::arg("plate"));
 }
 
 } // namespace python

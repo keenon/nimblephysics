@@ -82,6 +82,10 @@ public:
   /// in Geometry folder.
   std::shared_ptr<dynamics::Skeleton> readSkel(std::string geometryFolder = "");
 
+  /// This will read the raw OpenSim XML file text out of the binary, and return
+  /// it as a string
+  std::string readRawOsimFileText();
+
   /// This will read from disk and allocate a number of Frame objects.
   /// These Frame objects are assumed to be
   /// short-lived, to save working memory.

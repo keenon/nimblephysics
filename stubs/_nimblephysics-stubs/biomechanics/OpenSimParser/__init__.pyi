@@ -8,11 +8,17 @@ import numpy
 _Shape = typing.Tuple[int, ...]
 
 __all__ = [
+    "appendMocoTrajectoryAndSaveCSV",
     "convertOsimToMJCF",
     "convertOsimToSDF",
     "filterJustMarkers",
     "getScaleAndMarkerOffsets",
+    "hasArms",
+    "hasTorso",
+    "isArmBodyHeuristic",
+    "isTorsoBodyHeuristic",
     "loadGRF",
+    "loadMocoTrajectory",
     "loadMot",
     "loadMotAtLowestMarkerRMSERotation",
     "loadTRC",
@@ -35,6 +41,8 @@ __all__ = [
 ]
 
 
+def appendMocoTrajectoryAndSaveCSV(inputPath: str, mocoTraj: nimblephysics_libs._nimblephysics.biomechanics.OpenSimMocoTrajectory, outputPath: str) -> None:
+    pass
 def convertOsimToMJCF(uri: nimblephysics_libs._nimblephysics.common.Uri, outputPath: str, mergeBodiesInto: typing.Dict[str, str]) -> bool:
     pass
 def convertOsimToSDF(uri: nimblephysics_libs._nimblephysics.common.Uri, outputPath: str, mergeBodiesInto: typing.Dict[str, str]) -> bool:
@@ -43,7 +51,17 @@ def filterJustMarkers(inputPath: nimblephysics_libs._nimblephysics.common.Uri, o
     pass
 def getScaleAndMarkerOffsets(standardSkeleton: nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile, scaledSkeleton: nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimScaleAndMarkerOffsets:
     pass
+def hasArms(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> bool:
+    pass
+def hasTorso(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> bool:
+    pass
+def isArmBodyHeuristic(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, bodyName: str) -> bool:
+    pass
+def isTorsoBodyHeuristic(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, bodyName: str) -> bool:
+    pass
 def loadGRF(path: str, targetTimestamps: typing.List[float] = []) -> typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate]:
+    pass
+def loadMocoTrajectory(path: str) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimMocoTrajectory:
     pass
 def loadMot(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, path: str) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimMot:
     pass

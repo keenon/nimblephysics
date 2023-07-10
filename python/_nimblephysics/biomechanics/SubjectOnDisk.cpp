@@ -245,6 +245,11 @@ Note that these are specified in the local body frame, acting on the body at its
                 "expect that your skeleton will not display if you attempt to "
                 "visualize it.")
             .def(
+                "readRawOsimFileText",
+                &dart::biomechanics::SubjectOnDisk::readRawOsimFileText,
+                "This will read the raw OpenSim file XML out of the "
+                "SubjectOnDisk, and return it as a string.")
+            .def(
                 "readFrames",
                 &dart::biomechanics::SubjectOnDisk::readFrames,
                 ::py::arg("trial"),

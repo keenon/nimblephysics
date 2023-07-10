@@ -37,6 +37,7 @@ __all__ = [
     "MissingGRFReason",
     "NeuralMarkerLabeller",
     "OpenSimFile",
+    "OpenSimMocoTrajectory",
     "OpenSimMot",
     "OpenSimParser",
     "OpenSimScaleAndMarkerOffsets",
@@ -686,6 +687,7 @@ class DynamicsInitialization():
         pass
     pass
 class ForcePlate():
+    def __init__(self) -> None: ...
     @staticmethod
     def copyForcePlate(plate: ForcePlate) -> ForcePlate: ...
     def trim(self, newStartTime: float, newEndTime: float) -> None: ...
@@ -1781,6 +1783,48 @@ class OpenSimFile():
     def warnings(self, arg0: typing.List[str]) -> None:
         pass
     pass
+class OpenSimMocoTrajectory():
+    @property
+    def activationNames(self) -> typing.List[str]:
+        """
+        :type: typing.List[str]
+        """
+    @activationNames.setter
+    def activationNames(self, arg0: typing.List[str]) -> None:
+        pass
+    @property
+    def activations(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
+    @activations.setter
+    def activations(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
+        pass
+    @property
+    def excitationNames(self) -> typing.List[str]:
+        """
+        :type: typing.List[str]
+        """
+    @excitationNames.setter
+    def excitationNames(self, arg0: typing.List[str]) -> None:
+        pass
+    @property
+    def excitations(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
+    @excitations.setter
+    def excitations(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
+        pass
+    @property
+    def timestamps(self) -> typing.List[float]:
+        """
+        :type: typing.List[float]
+        """
+    @timestamps.setter
+    def timestamps(self, arg0: typing.List[float]) -> None:
+        pass
+    pass
 class OpenSimMot():
     @property
     def poses(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
@@ -2007,6 +2051,10 @@ class SubjectOnDisk():
     def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
         """
         This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
+        """
+    def readRawOsimFileText(self) -> str: 
+        """
+        This will read the raw OpenSim file XML out of the SubjectOnDisk, and return it as a string.
         """
     def readSkel(self, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: 
         """

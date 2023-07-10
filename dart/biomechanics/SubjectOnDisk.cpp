@@ -359,6 +359,61 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
   return osimParsed.skeleton;
 }
 
+/// This will read the raw OpenSim XML file text out of the binary, and return
+/// it as a string
+std::string SubjectOnDisk::readRawOsimFileText()
+{
+  // 1. Open the file
+  FILE* file = fopen(mPath.c_str(), "r");
+  if (file == nullptr)
+  {
+    std::cout << "SubjectOnDisk attempting to open file that deos not exist: "
+              << mPath << std::endl;
+    throw new std::exception();
+  }
+  // 2. Read the length of the message from the integer header
+  int64_t headerSize = -1;
+  int64_t elementsRead = fread(&headerSize, sizeof(int64_t), 1, file);
+  if (elementsRead != 1)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath
+              << ": was unable to read header size, probably because the file "
+                 "is length 0?"
+              << std::endl;
+    throw new std::exception();
+  }
+  // 3. Allocate a buffer to hold the serialized data
+  std::vector<char> serializedHeader(headerSize);
+
+  // 4. Read the serialized data from the file
+  int64_t bytesRead
+      = fread(serializedHeader.data(), sizeof(char), headerSize, file);
+
+  if (bytesRead != headerSize)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath << ": was unable to read full requested header size "
+              << headerSize << ", instead only got " << bytesRead << " bytes."
+              << std::endl;
+    throw new std::exception();
+  }
+
+  // 5. Deserialize the data into a Protobuf object
+  proto::SubjectOnDiskHeader header;
+  bool parseSuccess
+      = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
+  if (!parseSuccess)
+  {
+    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+              << mPath << ": got an error parsing the protobuf file header."
+              << std::endl;
+    throw new std::exception();
+  }
+
+  return header.model_osim_text();
+}
+
 /// This will read from disk and allocate a number of Frame objects,
 /// optionally sharing the same Skeleton pointer for efficiency if
 /// `shareSkeletonPtr` is true, (though that means it won't be threadsafe to
