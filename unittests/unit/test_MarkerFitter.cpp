@@ -8209,6 +8209,143 @@ TEST(MarkerFitter, CRASH_C3D)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, CRASH_C3D_2)
+{
+  std::string sex = "female";
+  s_t massKg = 66.9;
+  s_t heightM = 1.525;
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/osim/JH_01_MarkerCrash/unscaled_generic.osim");
+  standard.skeleton->zeroTranslationInCustomFunctions();
+  standard.skeleton->autogroupSymmetricSuffixes();
+  if (standard.skeleton->getBodyNode("hand_r") != nullptr)
+  {
+    standard.skeleton->setScaleGroupUniformScaling(
+        standard.skeleton->getBodyNode("hand_r"));
+  }
+  standard.skeleton->autogroupSymmetricPrefixes("ulna", "radius");
+  standard.skeleton->setPositionLowerLimit(0, -M_PI);
+  standard.skeleton->setPositionUpperLimit(0, M_PI);
+  standard.skeleton->setPositionLowerLimit(1, -M_PI);
+  standard.skeleton->setPositionUpperLimit(1, M_PI);
+  standard.skeleton->setPositionLowerLimit(2, -M_PI);
+  standard.skeleton->setPositionUpperLimit(2, M_PI);
+
+  std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markerList;
+  for (auto& pair : standard.markersMap)
+  {
+    markerList.push_back(pair.second);
+  }
+  // Create MarkerFitter
+  MarkerFitter fitter(standard.skeleton, standard.markersMap);
+
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      imuMap;
+  for (auto& pair : standard.imuMap)
+  {
+    imuMap[pair.first] = std::make_pair(
+        standard.skeleton->getBodyNode(pair.second.first), pair.second.second);
+  }
+  fitter.setImuMap(imuMap);
+
+  // fitter.setIgnoreJointLimits(true);
+
+  // fitter.setInitialIKSatisfactoryLoss(0.005);
+  // fitter.setInitialIKMaxRestarts(50);
+  fitter.setInitialIKSatisfactoryLoss(1e-5);
+  fitter.setInitialIKMaxRestarts(150);
+  fitter.setIterationLimit(400);
+  if (standard.anatomicalMarkers.size() > 10)
+  {
+    // If there are at least 10 tracking markers
+    std::cout << "Setting tracking markers based on OSIM model." << std::endl;
+    fitter.setTrackingMarkers(standard.trackingMarkers);
+  }
+  else
+  {
+    // Set all the triads to be tracking markers, instead of anatomical
+    std::cout << "WARNING!! Guessing tracking markers." << std::endl;
+    fitter.setTriadsToTracking();
+  }
+  // This is 1.0x the values in the default code
+  fitter.setRegularizeAnatomicalMarkerOffsets(10.0);
+  // This is 1.0x the default value
+  fitter.setRegularizeTrackingMarkerOffsets(0.05);
+  // These are 2x the values in the default code
+  // fitter.setMinSphereFitScore(3e-5 * 2)
+  // fitter.setMinAxisFitScore(6e-5 * 2)
+  fitter.setMinSphereFitScore(0.01);
+  fitter.setMinAxisFitScore(0.001);
+  // Default max joint weight is 0.5, so this is 2x the default value
+  fitter.setMaxJointWeight(1.0);
+
+  fitter.setStaticTrialWeight(0.1);
+
+  // Try regularizing the pelvis joints
+  fitter.setRegularizePelvisJointsWithVirtualSpring(0.1);
+
+  // fitter.setDebugLoss(true);
+
+  // Create Anthropometric prior
+  std::shared_ptr<Anthropometrics> anthropometrics
+      = Anthropometrics::loadFromFile(
+          "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
+  std::vector<std::string> cols = anthropometrics->getMetricNames();
+  // cols.push_back("Weightlbs");
+  // cols.push_back("Heightin");
+  cols.push_back("weightkg");
+  std::shared_ptr<MultivariateGaussian> gauss;
+  if (sex == "male")
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_MALE_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  else if (sex == "female")
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_FEMALE_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  else
+  {
+    gauss = MultivariateGaussian::loadFromCSV(
+        "dart://sample/osim/ANSUR/ANSUR_II_BOTH_Public.csv",
+        cols,
+        0.001); // mm -> m
+  }
+  std::map<std::string, s_t> observedValues;
+  std::cout << "Anthro before conditioning:" << std::endl;
+  gauss->debugToStdout();
+  // Annoyingly, the ANSUR dataset doesn't store the mass data as kg, it stores
+  // it as tenths of kgs, and it stores all distances in millimeters. For
+  // convenience, when we load the data from the CSV, we scale everything down
+  // by 0.001 (to do mm -> m conversion). To get the mass column back to kg, we
+  // need to multiply by 0.01.
+  observedValues["weightkg"] = massKg * 0.01;
+  observedValues["stature"] = heightM;
+  gauss = gauss->condition(observedValues);
+  std::cout << "Anthro after conditioning:" << std::endl;
+  gauss->debugToStdout();
+  anthropometrics->setDistribution(gauss);
+
+  fitter.setAnthropometricPrior(anthropometrics, 0.1);
+  fitter.setExplicitHeightPrior(heightM, 0.1);
+
+  std::vector<std::shared_ptr<MarkersErrorReport>> reports;
+
+  C3D c3d
+      = C3DLoader::loadC3D("dart://sample/osim/JH_01_MarkerCrash/JH_01.c3d");
+
+  std::shared_ptr<MarkersErrorReport> report = fitter.generateDataErrorsReport(
+      c3d.markerTimesteps, 1.0 / (s_t)c3d.framesPerSecond);
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, RECOVER_SYNTHETIC_DATA_END_TO_END_CALIBRATION)
 {
   std::vector<std::string> motFiles;
