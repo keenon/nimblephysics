@@ -477,11 +477,12 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
           << mPath << ": was unable to read full requested frame size "
-          << mFrameSize << " at offset " << (offsetBytes + i * mFrameSize)
+          << mFrameSize << " at offset "
+          << (offsetBytes + i * stride * mFrameSize)
           << ", corresponding to trial " << trial << " and frame "
-          << startFrame + i << " (" << i << " into a " << numFramesToRead
-          << " frame read), instead only got " << bytesRead << " bytes."
-          << std::endl;
+          << startFrame + (i * stride) << " (" << i * stride << " into a "
+          << numFramesToRead << " frame read), instead only got " << bytesRead
+          << " bytes." << std::endl;
       throw new std::exception();
     }
 
@@ -494,8 +495,9 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
       std::cout
           << "SubjectOnDisk attempting to read a corrupted binary file at "
           << mPath << ": got an error parsing frame at offset "
-          << (offsetBytes + i * mFrameSize) << ", corresponding to trial "
-          << trial << " and frame " << startFrame + i << " (" << i << " into a "
+          << (offsetBytes + i * stride * mFrameSize)
+          << ", corresponding to trial " << trial << " and frame "
+          << startFrame + (i * stride) << " (" << i * stride << " into a "
           << numFramesToRead << " frame read)." << std::endl;
       throw new std::exception();
     }
@@ -503,7 +505,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     // 6. Copy the results out into a frame
     std::shared_ptr<Frame> frame = std::make_shared<Frame>();
     frame->trial = trial;
-    frame->t = startFrame + i;
+    frame->t = startFrame + (i * stride);
     frame->residual = mTrialResidualNorms[trial][frame->t];
     frame->probablyMissingGRF = mProbablyMissingGRF[trial][frame->t];
     frame->missingGRFReason = mMissingGRFReason[trial][frame->t];
