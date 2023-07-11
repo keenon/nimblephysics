@@ -95,6 +95,7 @@ public:
       int trial,
       int startFrame,
       int numFramesToRead = 1,
+      int stride = 1,
       s_t contactThreshold = 1.0);
 
   /// This writes a subject out to disk in a compressed and random-seekable

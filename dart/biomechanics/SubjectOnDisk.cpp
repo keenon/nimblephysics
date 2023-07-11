@@ -422,10 +422,15 @@ std::string SubjectOnDisk::readRawOsimFileText()
 ///
 /// On OOB access, prints an error and returns an empty vector.
 std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
-    int trial, int startFrame, int numFramesToRead, s_t contactThreshold)
+    int trial,
+    int startFrame,
+    int numFramesToRead,
+    int stride,
+    s_t contactThreshold)
 {
   (void)trial;
   (void)startFrame;
+  (void)stride;
   (void)numFramesToRead;
 
   std::vector<std::shared_ptr<Frame>> result;
@@ -433,7 +438,6 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
   // 1. Open the file
   FILE* file = fopen(mPath.c_str(), "r");
 
-  // 2. Seek to the right place in the file to read this frame
   int linearFrameStart = 0;
   for (int i = 0; i < trial; i++)
   {
@@ -454,11 +458,13 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     return result;
   }
 
-  int offsetBytes = mDataSectionStart + (mFrameSize * linearFrameStart);
-  fseek(file, offsetBytes, SEEK_SET);
-
   for (int i = 0; i < numFramesToRead; i++)
   {
+    // 2. Seek to the right place in the file to read this frame
+    int offsetBytes = mDataSectionStart + (mFrameSize * linearFrameStart)
+                      + (i * stride * mFrameSize);
+    fseek(file, offsetBytes, SEEK_SET);
+
     // 3. Allocate a buffer to hold the serialized data
     std::vector<char> serializedFrame(mFrameSize);
 

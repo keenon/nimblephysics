@@ -2048,7 +2048,7 @@ class SubjectOnDisk():
         """
         This returns the timestep size for the trial requested, in seconds per frame
         """
-    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
+    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, stride: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
         """
         This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
         """

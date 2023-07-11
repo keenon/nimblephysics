@@ -687,3 +687,23 @@ TEST(SubjectOnDisk, HAMNER_RUNNING)
   EXPECT_GT(subject.readFrames(0, 7, 10).size(), 0);
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(SubjectOnDisk, HAMNER_RUNNING_READ_WITH_DATA_STRIDE)
+{
+  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
+  retriever->addSchemaRetriever(
+      "file", std::make_shared<common::LocalResourceRetriever>());
+  retriever->addSchemaRetriever("dart", DartResourceRetriever::create());
+  std::string path = retriever->getFilePath(
+      "dart://sample/subjectOnDisk/HamnerRunning2013Subject01.bin");
+
+  SubjectOnDisk subject(path);
+  EXPECT_EQ(subject.getNumTrials(), 4);
+  auto frames = subject.readFrames(0, 7, 10, 5);
+  EXPECT_GT(frames.size(), 2);
+  EXPECT_EQ(frames[0]->t, 7);
+  EXPECT_EQ(frames[1]->t, 7 + 5);
+  EXPECT_EQ(frames[2]->t, 7 + 10);
+}
+#endif

@@ -255,6 +255,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("trial"),
                 ::py::arg("startFrame"),
                 ::py::arg("numFramesToRead") = 1,
+                ::py::arg("stride") = 1,
                 ::py::arg("contactThreshold") = 1.0,
                 "This will read from disk and allocate a number of "
                 ":code:`Frame` "
