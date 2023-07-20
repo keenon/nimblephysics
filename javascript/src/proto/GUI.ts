@@ -73,13 +73,15 @@ export namespace dart.proto {
         }
     }
     export class Command extends pb_1.Message {
-        #one_of_decls = [[31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
+        #one_of_decls = [[31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
         constructor(data?: any[] | ({} & (({
             set_frames_per_second?: SetFramesPerSecond;
             clear_all?: never;
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -115,6 +117,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -150,6 +154,8 @@ export namespace dart.proto {
             layer?: CreateLayer;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -185,6 +191,8 @@ export namespace dart.proto {
             layer?: never;
             box?: CreateBox;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -220,6 +228,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: CreateSphere;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -255,6 +265,82 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: CreateCone;
+            cylinder?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
+            enable_drag?: never;
+            enable_edit_tooltip?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            cone?: never;
+            cylinder?: CreateCylinder;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
+            enable_drag?: never;
+            enable_edit_tooltip?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: CreateCapsule;
             line?: never;
             mesh?: never;
@@ -290,6 +376,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: CreateLine;
             mesh?: never;
@@ -325,6 +413,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: CreateMesh;
@@ -360,6 +450,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -395,6 +487,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -430,6 +524,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -465,6 +561,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -500,6 +598,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -535,6 +635,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -570,6 +672,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -605,6 +709,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -640,6 +746,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -675,6 +783,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -710,6 +820,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -745,6 +857,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -780,6 +894,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -815,6 +931,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -850,6 +968,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -885,6 +1005,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -920,6 +1042,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -955,6 +1079,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -990,6 +1116,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1025,6 +1153,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1060,6 +1190,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1095,6 +1227,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1130,6 +1264,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1165,6 +1301,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1200,6 +1338,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1235,6 +1375,8 @@ export namespace dart.proto {
             layer?: never;
             box?: never;
             sphere?: never;
+            cone?: never;
+            cylinder?: never;
             capsule?: never;
             line?: never;
             mesh?: never;
@@ -1282,6 +1424,12 @@ export namespace dart.proto {
                 }
                 if ("sphere" in data && data.sphere != undefined) {
                     this.sphere = data.sphere;
+                }
+                if ("cone" in data && data.cone != undefined) {
+                    this.cone = data.cone;
+                }
+                if ("cylinder" in data && data.cylinder != undefined) {
+                    this.cylinder = data.cylinder;
                 }
                 if ("capsule" in data && data.capsule != undefined) {
                     this.capsule = data.capsule;
@@ -1401,6 +1549,18 @@ export namespace dart.proto {
         }
         set sphere(value: CreateSphere) {
             pb_1.Message.setOneofWrapperField(this, 9, this.#one_of_decls[0], value);
+        }
+        get cone() {
+            return pb_1.Message.getWrapperField(this, CreateCone, 36) as CreateCone;
+        }
+        set cone(value: CreateCone) {
+            pb_1.Message.setOneofWrapperField(this, 36, this.#one_of_decls[0], value);
+        }
+        get cylinder() {
+            return pb_1.Message.getWrapperField(this, CreateCylinder, 35) as CreateCylinder;
+        }
+        set cylinder(value: CreateCylinder) {
+            pb_1.Message.setOneofWrapperField(this, 35, this.#one_of_decls[0], value);
         }
         get capsule() {
             return pb_1.Message.getWrapperField(this, CreateCapsule, 10) as CreateCapsule;
@@ -1578,7 +1738,7 @@ export namespace dart.proto {
         }
         get command() {
             const cases: {
-                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "set_object_tooltip" | "delete_object_tooltip" | "enable_drag" | "enable_edit_tooltip" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
+                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "cone" | "cylinder" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "set_object_tooltip" | "delete_object_tooltip" | "enable_drag" | "enable_edit_tooltip" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
             } = {
                 0: "none",
                 31: "set_frames_per_second",
@@ -1586,6 +1746,8 @@ export namespace dart.proto {
                 1: "layer",
                 2: "box",
                 9: "sphere",
+                36: "cone",
+                35: "cylinder",
                 10: "capsule",
                 11: "line",
                 3: "mesh",
@@ -1616,7 +1778,7 @@ export namespace dart.proto {
                 27: "set_slider_max",
                 28: "set_plot_data"
             };
-            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
+            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
         }
         static fromObject(data: {
             set_frames_per_second?: ReturnType<typeof SetFramesPerSecond.prototype.toObject>;
@@ -1624,6 +1786,8 @@ export namespace dart.proto {
             layer?: ReturnType<typeof CreateLayer.prototype.toObject>;
             box?: ReturnType<typeof CreateBox.prototype.toObject>;
             sphere?: ReturnType<typeof CreateSphere.prototype.toObject>;
+            cone?: ReturnType<typeof CreateCone.prototype.toObject>;
+            cylinder?: ReturnType<typeof CreateCylinder.prototype.toObject>;
             capsule?: ReturnType<typeof CreateCapsule.prototype.toObject>;
             line?: ReturnType<typeof CreateLine.prototype.toObject>;
             mesh?: ReturnType<typeof CreateMesh.prototype.toObject>;
@@ -1669,6 +1833,12 @@ export namespace dart.proto {
             }
             if (data.sphere != null) {
                 message.sphere = CreateSphere.fromObject(data.sphere);
+            }
+            if (data.cone != null) {
+                message.cone = CreateCone.fromObject(data.cone);
+            }
+            if (data.cylinder != null) {
+                message.cylinder = CreateCylinder.fromObject(data.cylinder);
             }
             if (data.capsule != null) {
                 message.capsule = CreateCapsule.fromObject(data.capsule);
@@ -1766,6 +1936,8 @@ export namespace dart.proto {
                 layer?: ReturnType<typeof CreateLayer.prototype.toObject>;
                 box?: ReturnType<typeof CreateBox.prototype.toObject>;
                 sphere?: ReturnType<typeof CreateSphere.prototype.toObject>;
+                cone?: ReturnType<typeof CreateCone.prototype.toObject>;
+                cylinder?: ReturnType<typeof CreateCylinder.prototype.toObject>;
                 capsule?: ReturnType<typeof CreateCapsule.prototype.toObject>;
                 line?: ReturnType<typeof CreateLine.prototype.toObject>;
                 mesh?: ReturnType<typeof CreateMesh.prototype.toObject>;
@@ -1810,6 +1982,12 @@ export namespace dart.proto {
             }
             if (this.sphere != null) {
                 data.sphere = this.sphere.toObject();
+            }
+            if (this.cone != null) {
+                data.cone = this.cone.toObject();
+            }
+            if (this.cylinder != null) {
+                data.cylinder = this.cylinder.toObject();
             }
             if (this.capsule != null) {
                 data.capsule = this.capsule.toObject();
@@ -1914,6 +2092,10 @@ export namespace dart.proto {
                 writer.writeMessage(2, this.box, () => this.box.serialize(writer));
             if (this.sphere !== undefined)
                 writer.writeMessage(9, this.sphere, () => this.sphere.serialize(writer));
+            if (this.cone !== undefined)
+                writer.writeMessage(36, this.cone, () => this.cone.serialize(writer));
+            if (this.cylinder !== undefined)
+                writer.writeMessage(35, this.cylinder, () => this.cylinder.serialize(writer));
             if (this.capsule !== undefined)
                 writer.writeMessage(10, this.capsule, () => this.capsule.serialize(writer));
             if (this.line !== undefined)
@@ -1995,6 +2177,12 @@ export namespace dart.proto {
                         break;
                     case 9:
                         reader.readMessage(message.sphere, () => message.sphere = CreateSphere.deserialize(reader));
+                        break;
+                    case 36:
+                        reader.readMessage(message.cone, () => message.cone = CreateCone.deserialize(reader));
+                        break;
+                    case 35:
+                        reader.readMessage(message.cylinder, () => message.cylinder = CreateCylinder.deserialize(reader));
                         break;
                     case 10:
                         reader.readMessage(message.capsule, () => message.capsule = CreateCapsule.deserialize(reader));
@@ -2681,6 +2869,324 @@ export namespace dart.proto {
         }
         static deserializeBinary(bytes: Uint8Array): CreateSphere {
             return CreateSphere.deserialize(bytes);
+        }
+    }
+    export class CreateCone extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+            data?: number[];
+            layer?: number;
+            cast_shadows?: boolean;
+            receive_shadows?: boolean;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [2], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+                if ("data" in data && data.data != undefined) {
+                    this.data = data.data;
+                }
+                if ("layer" in data && data.layer != undefined) {
+                    this.layer = data.layer;
+                }
+                if ("cast_shadows" in data && data.cast_shadows != undefined) {
+                    this.cast_shadows = data.cast_shadows;
+                }
+                if ("receive_shadows" in data && data.receive_shadows != undefined) {
+                    this.receive_shadows = data.receive_shadows;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get data() {
+            return pb_1.Message.getField(this, 2) as number[];
+        }
+        set data(value: number[]) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get layer() {
+            return pb_1.Message.getField(this, 3) as number;
+        }
+        set layer(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        get cast_shadows() {
+            return pb_1.Message.getField(this, 4) as boolean;
+        }
+        set cast_shadows(value: boolean) {
+            pb_1.Message.setField(this, 4, value);
+        }
+        get receive_shadows() {
+            return pb_1.Message.getField(this, 5) as boolean;
+        }
+        set receive_shadows(value: boolean) {
+            pb_1.Message.setField(this, 5, value);
+        }
+        static fromObject(data: {
+            key?: number;
+            data?: number[];
+            layer?: number;
+            cast_shadows?: boolean;
+            receive_shadows?: boolean;
+        }) {
+            const message = new CreateCone({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            if (data.data != null) {
+                message.data = data.data;
+            }
+            if (data.layer != null) {
+                message.layer = data.layer;
+            }
+            if (data.cast_shadows != null) {
+                message.cast_shadows = data.cast_shadows;
+            }
+            if (data.receive_shadows != null) {
+                message.receive_shadows = data.receive_shadows;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+                data?: number[];
+                layer?: number;
+                cast_shadows?: boolean;
+                receive_shadows?: boolean;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            if (this.data != null) {
+                data.data = this.data;
+            }
+            if (this.layer != null) {
+                data.layer = this.layer;
+            }
+            if (this.cast_shadows != null) {
+                data.cast_shadows = this.cast_shadows;
+            }
+            if (this.receive_shadows != null) {
+                data.receive_shadows = this.receive_shadows;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (this.data !== undefined)
+                writer.writePackedFloat(2, this.data);
+            if (this.layer !== undefined)
+                writer.writeInt32(3, this.layer);
+            if (this.cast_shadows !== undefined)
+                writer.writeBool(4, this.cast_shadows);
+            if (this.receive_shadows !== undefined)
+                writer.writeBool(5, this.receive_shadows);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): CreateCone {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new CreateCone();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    case 2:
+                        message.data = reader.readPackedFloat();
+                        break;
+                    case 3:
+                        message.layer = reader.readInt32();
+                        break;
+                    case 4:
+                        message.cast_shadows = reader.readBool();
+                        break;
+                    case 5:
+                        message.receive_shadows = reader.readBool();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): CreateCone {
+            return CreateCone.deserialize(bytes);
+        }
+    }
+    export class CreateCylinder extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+            data?: number[];
+            layer?: number;
+            cast_shadows?: boolean;
+            receive_shadows?: boolean;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [2], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+                if ("data" in data && data.data != undefined) {
+                    this.data = data.data;
+                }
+                if ("layer" in data && data.layer != undefined) {
+                    this.layer = data.layer;
+                }
+                if ("cast_shadows" in data && data.cast_shadows != undefined) {
+                    this.cast_shadows = data.cast_shadows;
+                }
+                if ("receive_shadows" in data && data.receive_shadows != undefined) {
+                    this.receive_shadows = data.receive_shadows;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get data() {
+            return pb_1.Message.getField(this, 2) as number[];
+        }
+        set data(value: number[]) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get layer() {
+            return pb_1.Message.getField(this, 3) as number;
+        }
+        set layer(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        get cast_shadows() {
+            return pb_1.Message.getField(this, 4) as boolean;
+        }
+        set cast_shadows(value: boolean) {
+            pb_1.Message.setField(this, 4, value);
+        }
+        get receive_shadows() {
+            return pb_1.Message.getField(this, 5) as boolean;
+        }
+        set receive_shadows(value: boolean) {
+            pb_1.Message.setField(this, 5, value);
+        }
+        static fromObject(data: {
+            key?: number;
+            data?: number[];
+            layer?: number;
+            cast_shadows?: boolean;
+            receive_shadows?: boolean;
+        }) {
+            const message = new CreateCylinder({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            if (data.data != null) {
+                message.data = data.data;
+            }
+            if (data.layer != null) {
+                message.layer = data.layer;
+            }
+            if (data.cast_shadows != null) {
+                message.cast_shadows = data.cast_shadows;
+            }
+            if (data.receive_shadows != null) {
+                message.receive_shadows = data.receive_shadows;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+                data?: number[];
+                layer?: number;
+                cast_shadows?: boolean;
+                receive_shadows?: boolean;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            if (this.data != null) {
+                data.data = this.data;
+            }
+            if (this.layer != null) {
+                data.layer = this.layer;
+            }
+            if (this.cast_shadows != null) {
+                data.cast_shadows = this.cast_shadows;
+            }
+            if (this.receive_shadows != null) {
+                data.receive_shadows = this.receive_shadows;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (this.data !== undefined)
+                writer.writePackedFloat(2, this.data);
+            if (this.layer !== undefined)
+                writer.writeInt32(3, this.layer);
+            if (this.cast_shadows !== undefined)
+                writer.writeBool(4, this.cast_shadows);
+            if (this.receive_shadows !== undefined)
+                writer.writeBool(5, this.receive_shadows);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): CreateCylinder {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new CreateCylinder();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    case 2:
+                        message.data = reader.readPackedFloat();
+                        break;
+                    case 3:
+                        message.layer = reader.readInt32();
+                        break;
+                    case 4:
+                        message.cast_shadows = reader.readBool();
+                        break;
+                    case 5:
+                        message.receive_shadows = reader.readBool();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): CreateCylinder {
+            return CreateCylinder.deserialize(bytes);
         }
     }
     export class CreateCapsule extends pb_1.Message {

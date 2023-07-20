@@ -68,6 +68,14 @@ std::string GUIStateMachine::getCurrentStateAsJson()
   {
     encodeCreateCapsule(list, pair.second);
   }
+  for (auto pair : mCones)
+  {
+    encodeCreateCone(list, pair.second);
+  }
+  for (auto pair : mCylinders)
+  {
+    encodeCreateCylinder(list, pair.second);
+  }
   for (auto pair : mLines)
   {
     encodeCreateLine(list, pair.second);
@@ -514,6 +522,67 @@ void GUIStateMachine::renderSkeletonInertiaCubes(
   }
 }
 
+/// This either creates or moves an arrow to have the new start and end points
+void GUIStateMachine::renderArrow(
+    Eigen::Vector3s start,
+    Eigen::Vector3s end,
+    s_t bodyRadius,
+    s_t tipRadius,
+    Eigen::Vector4s color,
+    const std::string& prefix,
+    const std::string& layer)
+{
+  std::string cylinderKey = prefix + "_cylinder";
+  std::string coneKey = prefix + "_cone";
+
+  s_t length = (end - start).norm();
+  s_t headRatio = 0.5;
+  s_t headLength = length * headRatio;
+  s_t bodyLength = length * (1.0 - headRatio);
+
+  Eigen::Vector3s bodyCenter
+      = start + (end - start).normalized() * bodyLength * 0.5;
+  Eigen::Vector3s headCenter
+      = end + (start - end).normalized() * headLength * 0.5;
+
+  Eigen::Matrix3s R = Eigen::Matrix3s::Zero();
+  R.col(1) = (end - start).normalized();
+  Eigen::Vector3s cross = Eigen::Vector3s::UnitX();
+  if ((R.col(1) - cross).norm() < 1e-8)
+  {
+    cross = Eigen::Vector3s::UnitZ();
+  }
+  R.col(0) = R.col(1).cross(cross).normalized();
+  R.col(2) = R.col(1).cross(R.col(0)).normalized();
+  Eigen::Vector3s euler = math::matrixToEulerXYZ(R);
+
+  // If this arrow alread exists, just update it
+  if (mCones.find(coneKey) != mCones.end()
+      && mCylinders.find(cylinderKey) != mCylinders.end())
+  {
+    setObjectPosition(cylinderKey, bodyCenter);
+    setObjectRotation(cylinderKey, euler);
+    setObjectScale(
+        cylinderKey, Eigen::Vector3s(bodyRadius, bodyLength, bodyRadius));
+    setObjectColor(cylinderKey, color);
+
+    setObjectPosition(coneKey, headCenter);
+    setObjectRotation(coneKey, euler);
+    setObjectScale(coneKey, Eigen::Vector3s(tipRadius, headLength, tipRadius));
+    setObjectColor(coneKey, color);
+  }
+  // If it doesn't yet exist, we've got to create the objects
+  else
+  {
+    createCylinder(cylinderKey, 1.0, 1.0, bodyCenter, euler, color, layer);
+    setObjectScale(
+        cylinderKey, Eigen::Vector3s(bodyRadius, bodyLength, bodyRadius));
+
+    createCone(coneKey, 1.0, 1.0, headCenter, euler, color, layer);
+    setObjectScale(coneKey, Eigen::Vector3s(tipRadius, headLength, tipRadius));
+  }
+}
+
 /// This is a high-level command that renders a given trajectory as a bunch of
 /// lines in the world, one per body
 void GUIStateMachine::renderTrajectoryLines(
@@ -661,6 +730,8 @@ void GUIStateMachine::clear()
 
   mBoxes.clear();
   mSpheres.clear();
+  mCylinders.clear();
+  mCones.clear();
   mCapsules.clear();
   mLines.clear();
   mMeshes.clear();
@@ -761,6 +832,64 @@ void GUIStateMachine::createSphere(
 
   queueCommand([this, key](proto::CommandList& list) {
     encodeCreateSphere(list, mSpheres[key]);
+  });
+}
+
+/// This creates a cone in the web GUI under a specified key
+void GUIStateMachine::createCone(
+    std::string key,
+    s_t radius,
+    s_t height,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Cone& cone = mCones[key];
+  cone.key = key;
+  cone.radius = radius;
+  cone.height = height;
+  cone.pos = pos;
+  cone.euler = euler;
+  cone.color = color;
+  cone.layer = layer;
+  cone.castShadows = castShadows;
+  cone.receiveShadows = receiveShadows;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCone(list, mCones[key]);
+  });
+}
+
+/// This creates a cylinder in the web GUI under a specified key
+void GUIStateMachine::createCylinder(
+    std::string key,
+    s_t radius,
+    s_t height,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
+  Cylinder& cylinder = mCylinders[key];
+  cylinder.key = key;
+  cylinder.radius = radius;
+  cylinder.height = height;
+  cylinder.pos = pos;
+  cylinder.euler = euler;
+  cylinder.color = color;
+  cylinder.layer = layer;
+  cylinder.castShadows = castShadows;
+  cylinder.receiveShadows = receiveShadows;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCylinder(list, mCylinders[key]);
   });
 }
 
@@ -1025,6 +1154,10 @@ bool GUIStateMachine::hasObject(const std::string& key)
     return true;
   if (mCapsules.find(key) != mCapsules.end())
     return true;
+  if (mCylinders.find(key) != mCylinders.end())
+    return true;
+  if (mCones.find(key) != mCones.end())
+    return true;
   if (mLines.find(key) != mLines.end())
     return true;
   if (mMeshes.find(key) != mMeshes.end())
@@ -1044,6 +1177,10 @@ Eigen::Vector3s GUIStateMachine::getObjectPosition(const std::string& key)
     return mSpheres[key].pos;
   if (mCapsules.find(key) != mCapsules.end())
     return mCapsules[key].pos;
+  if (mCones.find(key) != mCones.end())
+    return mCones[key].pos;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders[key].pos;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].pos;
   return Eigen::Vector3s::Zero();
@@ -1059,6 +1196,10 @@ Eigen::Vector3s GUIStateMachine::getObjectRotation(const std::string& key)
     return mBoxes[key].euler;
   if (mCapsules.find(key) != mCapsules.end())
     return mCapsules[key].euler;
+  if (mCones.find(key) != mCones.end())
+    return mCones[key].euler;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders[key].euler;
   if (mMeshes.find(key) != mMeshes.end())
     return mMeshes[key].euler;
   return Eigen::Vector3s::Zero();
@@ -1076,6 +1217,10 @@ Eigen::Vector4s GUIStateMachine::getObjectColor(const std::string& key)
     return mSpheres[key].color;
   if (mCapsules.find(key) != mCapsules.end())
     return mCapsules[key].color;
+  if (mCones.find(key) != mCones.end())
+    return mCones[key].color;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders[key].color;
   if (mLines.find(key) != mLines.end())
     return mLines[key].color;
   if (mMeshes.find(key) != mMeshes.end())
@@ -1116,6 +1261,14 @@ void GUIStateMachine::setObjectPosition(
   {
     mCapsules[key].pos = pos;
   }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones[key].pos = pos;
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders[key].pos = pos;
+  }
   if (mMeshes.find(key) != mMeshes.end())
   {
     mMeshes[key].pos = pos;
@@ -1143,6 +1296,14 @@ void GUIStateMachine::setObjectRotation(
   if (mCapsules.find(key) != mCapsules.end())
   {
     mCapsules[key].euler = euler;
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders[key].euler = euler;
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones[key].euler = euler;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
@@ -1184,6 +1345,14 @@ void GUIStateMachine::setObjectColor(
   {
     mCapsules[key].color = color;
   }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders[key].color = color;
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones[key].color = color;
+  }
 
   queueCommand([&](proto::CommandList& list) {
     proto::Command* command = list.add_command();
@@ -1213,6 +1382,21 @@ void GUIStateMachine::setObjectScale(
   if (mMeshes.find(key) != mMeshes.end())
   {
     mMeshes[key].scale = scale;
+  }
+  if (mCapsules.find(key) != mCapsules.end())
+  {
+    mCapsules[key].height = scale(1);
+    mCapsules[key].radius = scale(0);
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders[key].height = scale(1);
+    mCylinders[key].radius = scale(0);
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones[key].height = scale(1);
+    mCones[key].radius = scale(0);
   }
 
   queueCommand([&](proto::CommandList& list) {
@@ -1290,6 +1474,8 @@ void GUIStateMachine::deleteObject(const std::string& key)
   mLines.erase(key);
   mMeshes.erase(key);
   mCapsules.erase(key);
+  mCones.erase(key);
+  mCylinders.erase(key);
   mTooltips.erase(key);
 
   queueCommand([&](proto::CommandList& list) {
@@ -1361,6 +1547,34 @@ void GUIStateMachine::deleteObjectsByPrefix(const std::string& prefix)
   }
 
   for (auto& pair : mCapsules)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mCylinders)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mCones)
   {
     if (prefix.size() <= pair.first.size())
     {
@@ -1957,6 +2171,49 @@ void GUIStateMachine::encodeCreateSphere(
        << (sphere.receiveShadows ? "true" : "false");
   json << "}";
   */
+}
+
+void GUIStateMachine::encodeCreateCone(proto::CommandList& list, Cone& cone)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_cone()->set_key(getStringCode(cone.key));
+  command->mutable_cone()->set_layer(getStringCode(cone.layer));
+  command->mutable_cone()->set_cast_shadows(cone.castShadows);
+  command->mutable_cone()->set_receive_shadows(cone.receiveShadows);
+  command->mutable_cone()->add_data((double)cone.radius);
+  command->mutable_cone()->add_data((double)cone.height);
+  command->mutable_cone()->add_data((double)cone.pos(0));
+  command->mutable_cone()->add_data((double)cone.pos(1));
+  command->mutable_cone()->add_data((double)cone.pos(2));
+  command->mutable_cone()->add_data((double)cone.euler(0));
+  command->mutable_cone()->add_data((double)cone.euler(1));
+  command->mutable_cone()->add_data((double)cone.euler(2));
+  command->mutable_cone()->add_data((double)cone.color(0));
+  command->mutable_cone()->add_data((double)cone.color(1));
+  command->mutable_cone()->add_data((double)cone.color(2));
+  command->mutable_cone()->add_data((double)cone.color(3));
+}
+
+void GUIStateMachine::encodeCreateCylinder(
+    proto::CommandList& list, Cylinder& cylinder)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_cylinder()->set_key(getStringCode(cylinder.key));
+  command->mutable_cylinder()->set_layer(getStringCode(cylinder.layer));
+  command->mutable_cylinder()->set_cast_shadows(cylinder.castShadows);
+  command->mutable_cylinder()->set_receive_shadows(cylinder.receiveShadows);
+  command->mutable_cylinder()->add_data((double)cylinder.radius);
+  command->mutable_cylinder()->add_data((double)cylinder.height);
+  command->mutable_cylinder()->add_data((double)cylinder.pos(0));
+  command->mutable_cylinder()->add_data((double)cylinder.pos(1));
+  command->mutable_cylinder()->add_data((double)cylinder.pos(2));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(0));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(1));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(2));
+  command->mutable_cylinder()->add_data((double)cylinder.color(0));
+  command->mutable_cylinder()->add_data((double)cylinder.color(1));
+  command->mutable_cylinder()->add_data((double)cylinder.color(2));
+  command->mutable_cylinder()->add_data((double)cylinder.color(3));
 }
 
 void GUIStateMachine::encodeCreateCapsule(

@@ -2088,6 +2088,72 @@ public:
       Eigen::MatrixXs magnitudeCosts = EMPTY);
 
   //----------------------------------------------------------------------------
+  /// \{ \name Energy Accounting
+  //----------------------------------------------------------------------------
+
+  typedef struct JointEnergyTransmitter
+  {
+    std::string name;
+    Eigen::Vector3s worldCenter;
+    std::string parentBody;
+    Eigen::Vector3s parentCenter;
+    std::string childBody;
+    Eigen::Vector3s childCenter;
+
+    // Power flowing to parent. Positive numbers increase parent's energy,
+    // negative numbers decrease it.
+    s_t powerToParent;
+    // Power flowing to child. Positive numbers increase child's energy,
+    // negative numbers decrease it.
+    s_t powerToChild;
+  } JointEnergyTransmitter;
+
+  typedef struct ContactEnergyTransmitter
+  {
+    Eigen::Vector3s worldCenter;
+    Eigen::Vector3s worldForce;
+    Eigen::Vector3s worldMoment;
+    std::string contactBody;
+    Eigen::Vector3s contactBodyCenter;
+
+    // The rate of power being transmitted between the ground and the body
+    s_t powerToBody;
+  } ContactEnergyTransmitter;
+
+  typedef struct EnergyAccountingFrame
+  {
+    // The current amount of energy in each of the body segments, split across
+    // both categories.
+    Eigen::VectorXs bodyKineticEnergy;
+    Eigen::VectorXs bodyPotentialEnergy;
+    std::vector<Eigen::Vector3s> bodyCenters;
+
+    // The rates of power flowing into / out of each body
+    Eigen::VectorXs bodyKineticEnergyDeriv;
+    Eigen::VectorXs bodyPotentialEnergyDeriv;
+
+    Eigen::VectorXs bodyGravityPower;
+    Eigen::VectorXs bodyExternalForcePower;
+    Eigen::VectorXs bodyParentJointPower;
+    Eigen::VectorXs bodyChildJointPowerSum;
+    std::vector<std::vector<s_t>> bodyChildJointPowers;
+
+    // Each joint energy transfer
+    std::vector<JointEnergyTransmitter> joints;
+    // Each contact energy transfer
+    std::vector<ContactEnergyTransmitter> contacts;
+  } EnergyAccountingFrame;
+
+  /// This will create an "accounting frame" of data at the current moment
+  EnergyAccountingFrame getEnergyAccounting(
+      s_t heightZeroPoint = 0.0,
+      std::vector<dynamics::BodyNode*> contactBodies
+      = std::vector<dynamics::BodyNode*>(),
+      std::vector<Eigen::Vector3s> cops = std::vector<Eigen::Vector3s>(),
+      std::vector<Eigen::Vector3s> forces = std::vector<Eigen::Vector3s>(),
+      std::vector<Eigen::Vector3s> moments = std::vector<Eigen::Vector3s>());
+
+  //----------------------------------------------------------------------------
   /// \{ \name Support Polygon
   //----------------------------------------------------------------------------
 

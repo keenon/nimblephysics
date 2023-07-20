@@ -141,6 +141,8 @@ class DARTView {
   tooltipEditListeners: ((key: number, tooltip: string) => void)[];
 
   sphereGeometry: THREE.SphereBufferGeometry;
+  coneGeometry: THREE.ConeBufferGeometry;
+  cylinderGeometry: THREE.CylinderBufferGeometry;
 
   layers: Map<number, Layer>;
 
@@ -316,6 +318,8 @@ class DARTView {
       NUM_SPHERE_SEGMENTS,
       NUM_SPHERE_SEGMENTS
     );
+    this.coneGeometry = new THREE.ConeBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
+    this.cylinderGeometry = new THREE.CylinderBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
   }
 
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
@@ -491,6 +495,44 @@ class DARTView {
           command.sphere.receive_shadows === true
         );
       }
+    }
+    else if (command.cone != null) {
+      const data = command.cone.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCone(
+        command.cone.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cone.layer,
+        command.cone.cast_shadows === true,
+        command.cone.receive_shadows === true
+      );
+    }
+    else if (command.cylinder != null) {
+      const data = command.cylinder.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCylinder(
+        command.cylinder.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cylinder.layer,
+        command.cylinder.cast_shadows === true,
+        command.cylinder.receive_shadows === true
+      );
     }
     else if (command.capsule != null) {
       const data = command.capsule.data;
@@ -947,6 +989,108 @@ class DARTView {
   };
 
   /**
+   * This adds a cone to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCone = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.coneGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a cylinder to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCylinder = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.cylinderGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
    * This adds a capsule to the scene
    *
    * Must call render() to see results!
@@ -1297,8 +1441,11 @@ class DARTView {
    */
   setObjectScale = (key: number, scale: number[]) => {
     const obj = this.objects.get(key);
-    // Don't dynamically set scales on capsules
-    if (obj && this.objectType.get(key) != "capsule") {
+    // // Don't dynamically set scales on capsules
+    // if (obj && this.objectType.get(key) != "capsule") {
+    //   (obj as any).scale.set(scale[0], scale[1], scale[2]);
+    // }
+    if (obj) {
       (obj as any).scale.set(scale[0], scale[1], scale[2]);
     }
   };

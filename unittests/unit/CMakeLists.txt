@@ -31,6 +31,7 @@ dart_add_test("unit" test_MarkerFitterAxisDetection)
 dart_add_test("unit" test_AssignmentMatcher)
 dart_add_test("unit" test_MarkerTrace)
 dart_add_test("unit" test_NearestPositionToDesiredRotation)
+dart_add_test("unit" test_EnergyAccounting)
 
 if(DART_USE_ARBITRARY_PRECISION)
   dart_add_test("unit" test_MPFR)

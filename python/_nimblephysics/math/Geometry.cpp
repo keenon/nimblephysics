@@ -135,6 +135,42 @@ void Geometry(py::module& m)
       ::py::arg("S"));
 
   m.def(
+      "dAdT",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+        // std::cout << "T: " << std::endl << T.matrix() << std::endl;
+        // std::cout << "S: " << std::endl << S << std::endl;
+        Eigen::Vector6s result = dart::math::dAdT(T, S);
+        // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
+        return result;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
+      "dAdInvT",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+        // std::cout << "T: " << std::endl << T.matrix() << std::endl;
+        // std::cout << "S: " << std::endl << S << std::endl;
+        Eigen::Vector6s result = dart::math::dAdInvT(T, S);
+        // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
+        return result;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
       "rightMultiplyInFreeJointSpace",
       +[](const Eigen::Matrix3s& R,
           const Eigen::Vector3s& p,

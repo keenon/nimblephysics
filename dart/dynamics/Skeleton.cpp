@@ -37,6 +37,7 @@
 #include <limits>
 #include <queue>
 #include <string>
+#include <valarray>
 #include <vector>
 
 #include "dart/common/Console.hpp"
@@ -10370,6 +10371,201 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
   setVelocities(oldVel);
   setControlForces(oldControl);
   return result;
+}
+
+//==============================================================================
+/// This will create an "accounting frame" of data at the current moment
+Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
+    s_t heightZeroPoint,
+    std::vector<dynamics::BodyNode*> contactBodies,
+    std::vector<Eigen::Vector3s> cops,
+    std::vector<Eigen::Vector3s> forces,
+    std::vector<Eigen::Vector3s> moments)
+{
+  EnergyAccountingFrame frame;
+  if (contactBodies.size() != cops.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as cops"
+              << std::endl;
+    exit(1);
+  }
+  if (contactBodies.size() != forces.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as forces"
+              << std::endl;
+    exit(1);
+  }
+  if (contactBodies.size() != moments.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as moments"
+              << std::endl;
+    exit(1);
+  }
+
+  // Get the current stocks of energy in each body
+  Eigen::VectorXs jointWorldCenters = getJointWorldPositions(getJoints());
+  frame.bodyKineticEnergy = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyPotentialEnergy = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s bodyCenter = getBodyNode(i)->getCOM();
+
+    frame.bodyKineticEnergy(i) = getBodyNode(i)->computeKineticEnergy();
+    frame.bodyCenters.push_back(bodyCenter);
+
+    s_t bodyHeight = heightZeroPoint
+                     - getBodyNode(i)->getWorldTransform().translation().dot(
+                         getGravity().normalized());
+    frame.bodyPotentialEnergy(i)
+        = bodyHeight * getBodyNode(i)->getMass() * getGravity().norm();
+  }
+
+  // Compute the flows of energy through each joint
+  computeInverseDynamics(true);
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = getJoint(i);
+
+    JointEnergyTransmitter jointTransmitter;
+    jointTransmitter.name = joint->getName();
+    jointTransmitter.childBody = joint->getChildBodyNode()->getName();
+    if (joint->getParentBodyNode() != nullptr)
+    {
+      jointTransmitter.parentBody = joint->getParentBodyNode()->getName();
+      jointTransmitter.parentCenter
+          = frame.bodyCenters[joint->getParentBodyNode()->getIndexInSkeleton()];
+    }
+    else
+    {
+      jointTransmitter.parentBody = "ground";
+      jointTransmitter.parentCenter = Eigen::Vector3s::Zero();
+    }
+    jointTransmitter.childCenter
+        = frame.bodyCenters[joint->getChildBodyNode()->getIndexInSkeleton()];
+    jointTransmitter.worldCenter = jointWorldCenters.segment<3>(i * 3);
+    // These are set later, when we're computing power at each body
+    jointTransmitter.powerToChild = 0.0;
+    jointTransmitter.powerToParent = 0.0;
+
+    frame.joints.push_back(jointTransmitter);
+  }
+
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    ContactEnergyTransmitter contactTransmitter;
+    contactTransmitter.contactBody = contactBodies[i]->getName();
+    contactTransmitter.worldCenter = cops[i];
+    contactTransmitter.worldForce = forces[i];
+    contactTransmitter.worldMoment = moments[i];
+    contactTransmitter.contactBodyCenter
+        = frame.bodyCenters[contactBodies[i]->getIndexInSkeleton()];
+    Eigen::Vector6s worldF;
+    worldF.head<3>() = moments[i];
+    worldF.tail<3>() = forces[i];
+    Eigen::Vector6s worldV
+        = contactBodies[i]->getSpatialVelocity(Frame::World(), Frame::World());
+    contactTransmitter.powerToBody = worldF.dot(worldV);
+
+    frame.contacts.push_back(contactTransmitter);
+  }
+
+  frame.bodyKineticEnergyDeriv = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyPotentialEnergyDeriv = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyParentJointPower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyGravityPower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyChildJointPowerSum = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyExternalForcePower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = getBodyNode(i);
+
+    // For notes and ground truth on how all this is computed, see
+    // updateTransmittedForceID()
+
+    // body->getCOMSpatialVelocity()
+    const Eigen::Vector6s& V = body->getSpatialVelocity();
+    const Eigen::Vector6s& V_dot = body->getSpatialAcceleration();
+    const Eigen::Matrix6s& I = body->getSpatialInertia();
+
+    s_t kineticEnergyRecovered = 0.5 * V.dot(I * V);
+    if (kineticEnergyRecovered != frame.bodyKineticEnergy(i))
+    {
+      std::cout << "Kinetic energy recovered on body " << i << " doesn't match!"
+                << std::endl;
+      std::cout << "Recovered: " << kineticEnergyRecovered << std::endl;
+      std::cout << "Actual: " << frame.bodyKineticEnergy(i) << std::endl;
+      std::cout << "Diff: "
+                << kineticEnergyRecovered - frame.bodyKineticEnergy(i)
+                << std::endl;
+      assert(false);
+    }
+
+    Eigen::Vector6s totalForceIDFormula = I * V_dot - math::dad(V, I * V);
+    s_t powerFromCoriolis = V.dot(math::dad(V, I * V));
+    if (std::abs(powerFromCoriolis) > 1e-8)
+    {
+      std::cout << "Coriolis power on body " << i << " non-zero! "
+                << powerFromCoriolis << std::endl;
+    }
+
+    Eigen::Vector6s gravityForce
+        = I * math::AdInvRLinear(body->getWorldTransform(), getGravity());
+    Eigen::Vector6s totalForceFDFormula
+        = body->getBodyForce() + gravityForce + body->getExternalForceLocal();
+    s_t powerFromParent = V.dot(body->getBodyForce());
+    frame.joints[body->getParentJoint()->getJointIndexInSkeleton()].powerToChild
+        = powerFromParent;
+    frame.bodyParentJointPower(i) = powerFromParent;
+    frame.bodyGravityPower(i) = V.dot(gravityForce);
+    frame.bodyExternalForcePower(i) = V.dot(body->getExternalForceLocal());
+    std::vector<s_t> childPowers;
+    for (int c = 0; c < body->getNumChildBodyNodes(); c++)
+    {
+      Joint* childJoint = body->getChildJoint(c);
+      dynamics::BodyNode* childBodyNode = childJoint->getChildBodyNode();
+      totalForceFDFormula -= math::dAdInvT(
+          childJoint->getRelativeTransform(), childBodyNode->getBodyForce());
+      s_t powerFromChild = V.dot(-math::dAdInvT(
+          childJoint->getRelativeTransform(), childBodyNode->getBodyForce()));
+      frame.bodyChildJointPowerSum(i) += powerFromChild;
+      childPowers.push_back(powerFromChild);
+
+      frame.joints[childJoint->getJointIndexInSkeleton()].powerToParent
+          = powerFromChild;
+    }
+    frame.bodyChildJointPowers.push_back(childPowers);
+
+    if ((totalForceFDFormula - totalForceIDFormula).norm() > 1e-8)
+    {
+      std::cout << "Two sides of total force equality do not match!"
+                << std::endl;
+      Eigen::MatrixXs compare = Eigen::MatrixXs(6, 3);
+      compare.col(0) = totalForceFDFormula;
+      compare.col(1) = totalForceIDFormula;
+      compare.col(2) = totalForceFDFormula - totalForceIDFormula;
+      std::cout << "FD formula - ID formula - Diff" << std::endl
+                << compare << std::endl;
+    }
+
+    frame.bodyKineticEnergyDeriv(i) = V.dot(totalForceIDFormula);
+    frame.bodyPotentialEnergyDeriv(i) = V.dot(-gravityForce);
+
+    s_t powerSum = frame.bodyExternalForcePower(i) + frame.bodyGravityPower(i)
+                   + frame.bodyParentJointPower(i)
+                   + frame.bodyChildJointPowerSum(i);
+    if (abs(powerSum - frame.bodyKineticEnergyDeriv(i)) > 1e-7)
+    {
+      std::cout << "Power sum doesn't match kinetic energy deriv for body "
+                << getBodyNode(i)->getName() << "! Got sum: " << powerSum
+                << ", but have deriv " << frame.bodyKineticEnergyDeriv(i)
+                << std::endl;
+    }
+  }
+
+  return frame;
 }
 
 //==============================================================================
