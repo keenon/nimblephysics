@@ -7,6 +7,7 @@ import Slider from "./components/Slider";
 import SimplePlot from "./components/SimplePlot";
 import RichPlot from "./components/RichPlot";
 import { dart } from './proto/GUI';
+import { MeshLine, MeshLineMaterial } from './THREE.MeshLine';
 import VERSION_NUM from "../../VERSION.txt";
 import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
@@ -128,6 +129,8 @@ class DARTView {
   running: boolean;
 
   objects: Map<number, THREE.Group | THREE.Mesh | THREE.Line>;
+  meshLines: Map<number, MeshLine>;
+  meshLineGeometry: Map<number, THREE.Geometry>;
   objectColors: Map<number, number[]>;
   keys: Map<THREE.Object3D, number>;
   textures: Map<number, THREE.Texture>;
@@ -170,6 +173,8 @@ class DARTView {
     this.hovering = []
 
     this.objects = new Map();
+    this.meshLines = new Map();
+    this.meshLineGeometry = new Map();
     this.objectColors = new Map();
     this.keys = new Map();
     this.disposeHandlers = new Map();
@@ -569,7 +574,7 @@ class DARTView {
         vertices[vertices.length-1].push(command.line.points[i]);
       }
 
-      this.createLine(
+      this.createMeshLine(
         command.line.key,
         vertices,
         color,
@@ -901,6 +906,7 @@ class DARTView {
       if (color.length > 3 && color[3] < 1.0) {
         material.transparent = true;
         material.opacity = color[3];
+        material.depthWrite = castShadows;
       }
     }
     else {
@@ -910,6 +916,7 @@ class DARTView {
       if (color.length > 3 && color[3] < 1.0) {
         material.transparent = true;
         material.opacity = color[3];
+        material.depthWrite = castShadows;
       }
       const geometry = new THREE.BoxBufferGeometry(
         SCALE_FACTOR,
@@ -1233,6 +1240,162 @@ class DARTView {
   };
 
   /**
+   * This adds a line to the scene
+   *
+   * Must call render() to see results!
+   */
+  createMeshLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
+    this.objectType.set(key, "line");
+    this.objectColors.set(key, color);
+    // Try not to recreate geometry. If we already created a line in the past,
+    // let's just update its buffers instead of creating fresh ones.
+    if (this.objects.has(key)) {
+      // console.log("Not creating line " + key);
+      const mesh: THREE.Mesh = this.objects.get(key) as any;
+      const line: MeshLine = this.meshLines.get(key) as any;
+
+      (mesh as any).material.color = new THREE.Color(
+        color[0],
+        color[1],
+        color[2]
+      );
+
+      const positions = line._attributes.position.array;
+      const next = line._attributes.next.array;
+      const previous = line._attributes.previous.array;
+
+      for (let i = 0; i < points.length; i++) {
+        positions[i*6] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 1] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 2] = points[i][2] * SCALE_FACTOR;
+        positions[i*6 + 3] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 4] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 5] = points[i][2] * SCALE_FACTOR;
+      }
+
+      ///////////////////////////////////////////////
+      var l = positions.length / 6;
+
+      const compareV3 = function(a, b) {
+        var aa = a * 6;
+        var ab = b * 6;
+        return (
+          positions[aa] === positions[ab] &&
+          positions[aa + 1] === positions[ab + 1] &&
+          positions[aa + 2] === positions[ab + 2]
+        )
+      }
+      const copyV3 = function(a) {
+        var aa = a * 6
+        return [positions[aa], positions[aa + 1], positions[aa + 2]]
+      }
+
+      var v;
+      let previousCursor = 0;
+      let nextCursor = 0;
+
+      // initial previous points
+      if (compareV3(0, l - 1)) {
+        v = copyV3(l - 2)
+      } else {
+        v = copyV3(0)
+      }
+      // this.previous.push(v[0], v[1], v[2])
+      // this.previous.push(v[0], v[1], v[2])
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+
+      for (var j = 0; j < l; j++) {
+        if (j < l - 1) {
+          // points previous to poisitions
+          v = copyV3(j)
+          // this.previous.push(v[0], v[1], v[2])
+          // this.previous.push(v[0], v[1], v[2])
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+        }
+        if (j > 0) {
+          // points after poisitions
+          v = copyV3(j)
+          // this.next.push(v[0], v[1], v[2])
+          // this.next.push(v[0], v[1], v[2])
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+        }
+      }
+
+      // last next point
+      if (compareV3(l - 1, 0)) {
+        v = copyV3(1)
+      } else {
+        v = copyV3(l - 1)
+      }
+      // this.next.push(v[0], v[1], v[2])
+      // this.next.push(v[0], v[1], v[2])
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      ///////////////////////////////////////////////
+
+      // (line as any).process();
+      line._attributes.position.needsUpdate = true;
+      line._attributes.previous.needsUpdate = true;
+      line._attributes.next.needsUpdate = true;
+    } else {
+      // Create the line geometry used for storing verticies
+      let linePoints: THREE.Vector3[] = [];
+      for (let i = 0; i < points.length; i++) {
+        linePoints.push(
+          new THREE.Vector3(
+            points[i][0] * SCALE_FACTOR,
+            points[i][1] * SCALE_FACTOR,
+            points[i][2] * SCALE_FACTOR
+          )
+        );
+      }
+
+      const pathMaterial = new MeshLineMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+        linewidth: 2,
+      });
+      const line = new MeshLine();
+      (line as any).setPoints(linePoints, p => 1.5 * p);
+      const mesh = new THREE.Mesh(line, pathMaterial);
+      mesh.frustumCulled = false;
+
+      this.meshLines.set(key, line);
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        pathMaterial.dispose();
+        line.dispose();
+      });
+      this.keys.set(mesh, key);
+
+      this.view.add(key, mesh);
+    }
+
+    if (layer != null && this.layers.has(layer)) {
+      // console.log(this.layers.get(layer).name + ": " + this.layers.get(layer).shown);
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
    * This registers a tooltip for a specific object in the view
    */
   setTooltip = (key: number, tooltip: string) => {
@@ -1359,6 +1522,7 @@ class DARTView {
       mesh.rotation.y = euler[1];
       mesh.rotation.z = euler[2];
       mesh.castShadow = castShadows;
+      mesh.material.depthWrite = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(scale[0], scale[1], scale[2]);
 

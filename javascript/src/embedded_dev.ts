@@ -78,8 +78,8 @@ const ReactTestBed = () => {
       loadingProgress,
       recording: loaded ? rawArray : null,
       style: {
-        width: "800px",
-        height: "500px"
+        width: "1600px",
+        height: "850px"
       },
       key: 'gui',
       playing: playing,
