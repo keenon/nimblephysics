@@ -2,7 +2,7 @@ import NimbleStandalone from "./NimbleStandalone";
 import NimbleStandaloneReact from "./NimbleStandaloneReact";
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import rawBinary from '!!arraybuffer-loader!./data/movement2.bin';
+import rawURL from '!!file-loader!./data/movement2.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/spring_spine_3_35cm_0N.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/sprint_zero_residuals.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/constant_curve.bin';
@@ -10,9 +10,6 @@ import rawBinary from '!!arraybuffer-loader!./data/movement2.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/sprint_3.1cm_44N.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/walk_1.2cm_1.4N.bin';
 // import rawBinary from '!!arraybuffer-loader!./data/marker_trace.bin';
-
-const rawArray = new Uint8Array(rawBinary);
-console.log(rawArray);
 
 const ReactTestBed = () => {
   const [show, setShow] = useState(true);
@@ -74,9 +71,7 @@ const ReactTestBed = () => {
     }
 
     children.push(React.createElement(NimbleStandaloneReact, {
-      loading,
-      loadingProgress,
-      recording: loaded ? rawArray : null,
+      loadUrl: rawURL,
       style: {
         width: "1600px",
         height: "850px"

@@ -2,9 +2,7 @@ import React, { useRef, useEffect, useCallback } from "react";
 import NimbleStandalone from "./NimbleStandalone";
 
 type NimbleStandaloneReactProps = {
-  loading: boolean;
-  loadingProgress: number;
-  recording: any;
+  loadUrl: string;
   style?: any;
   className?: any;
   // Making the controls accessible from the mounted component
@@ -18,21 +16,7 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
   // This is responsible for calling the imperitive methods on the GUI to reflect what's currently going on in the props.
   const setLoadingPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
     if (gui != null) {
-      if (pr.loading) {
-        gui.setLoadingProgress(pr.loadingProgress);
-      }
-      else {
-        gui.hideLoadingBar();
-        if (pr.recording != null) {
-          gui.setRecording(pr.recording);
-          // Call onWindowResize() a few times right after mounting, to try to prevent grey screen syndrome
-          for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-              gui.view.view.onWindowResize();
-            }, i * 200);
-          }
-        }
-      }
+      gui.loadRecording(pr.loadUrl);
     }
   };
 
@@ -70,7 +54,7 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
   // Handle the props changes
   useEffect(() => {
     setLoadingPropsOnStandalone(standalone.current, props);
-  }, [props.loading, props.loadingProgress, props.recording]);
+  }, [props.loadUrl]);
 
   useEffect(() => {
     const pr = props;

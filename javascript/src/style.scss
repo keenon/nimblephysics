@@ -52,6 +52,15 @@
       rgba(141, 25, 233, 1) 100%);
 }
 
+.NimbleStandalone-progress-bar-loaded {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 5px;
+  width: 100%;
+  background: rgb(55, 55, 55);
+}
+
 .NimbleStandalone-progress-bar {
   position: absolute;
   top: 0;

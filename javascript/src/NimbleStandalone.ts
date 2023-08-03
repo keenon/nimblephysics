@@ -9,8 +9,9 @@ class NimbleStandalone {
   view: NimbleView | null;
   lastRecordingHash: string;
   rawBytes: Uint8Array;
-  framePointers: number[];
-  frameSizes: number[];
+  rawFrameBytes: Uint8Array[];
+  estimatedTotalFrames: number;
+
   playing: boolean;
   scrubbing: boolean;
   startedPlaying: number;
@@ -18,6 +19,7 @@ class NimbleStandalone {
   playbackMultiple: number;
   msPerFrame: number;
   startFrame: number;
+  renderedFirstFrame: boolean;
   lastFrame: number;
   scrubFrame: number;
 
@@ -26,6 +28,7 @@ class NimbleStandalone {
   viewContainer: HTMLDivElement;
   progressBarContainer: HTMLDivElement;
   progressBarBackground: HTMLDivElement;
+  progressBarLoaded: HTMLDivElement;
   progressBar: HTMLDivElement;
   progressScrub: HTMLDivElement;
 
@@ -41,9 +44,12 @@ class NimbleStandalone {
   frameChangedListener: ((frame: number) => void) | null;
   playPausedListener: ((playing: boolean) => void) | null;
 
+  cancelDownload: (() => void) | null;
+
   constructor(container: HTMLElement) {
     this.frameChangedListener = null;
     this.playPausedListener = null;
+    this.cancelDownload = null;
 
     this.viewContainer = document.createElement("div");
     this.viewContainer.className = "NimbleStandalone-container";
@@ -88,6 +94,10 @@ class NimbleStandalone {
     this.progressBar.className = "NimbleStandalone-progress-bar";
     this.progressBarContainer.appendChild(this.progressBar);
 
+    this.progressBarLoaded = document.createElement("div");
+    this.progressBarLoaded.className = "NimbleStandalone-progress-bar-loaded";
+    this.progressBarContainer.appendChild(this.progressBarLoaded);
+
     this.progressScrub = document.createElement("div");
     this.progressScrub.className = "NimbleStandalone-progress-bar-scrub";
     this.progressBarContainer.appendChild(this.progressScrub);
@@ -101,7 +111,7 @@ class NimbleStandalone {
       if (percentage < 0) percentage = 0;
       if (percentage > 1) percentage = 1;
       if (this.playing) this.togglePlay();
-      this.scrubFrame = Math.round(this.framePointers.length * percentage); 
+      this.scrubFrame = Math.round(this.estimatedTotalFrames * percentage); 
       this.setProgress(percentage);
     };
 
@@ -129,12 +139,13 @@ class NimbleStandalone {
     });
 
     this.lastRecordingHash = "";
-    this.framePointers = [];
-    this.frameSizes = [];
+    this.rawFrameBytes = [];
+    this.estimatedTotalFrames = 100;
     this.animationKey = 0;
     this.playing = false;
     this.scrubbing = false;
     this.startedPlaying = new Date().getTime();
+    this.renderedFirstFrame = false;
     this.lastFrame = -1;
     this.scrubFrame = 0;
     this.originalMsPerFrame = 20.0;
@@ -195,10 +206,18 @@ class NimbleStandalone {
       this.view.dispose();
       this.viewContainer.remove();
     }
+    if (this.cancelDownload != null) {
+      this.cancelDownload();
+    }
     this.playing = false;
     this.view = null;
     window.removeEventListener("keydown", this.keyboardListener);
   };
+
+  setLoadedProgress = (percentage: number) => {
+    this.progressBarLoaded.style.width = (1.0 - percentage) * 100 + "%";
+    this.progressBarLoaded.style.left = percentage * 100 + "%";
+  }
 
   setProgress = (percentage: number) => {
     this.progressBar.style.width = (1.0 - percentage) * 100 + "%";
@@ -282,36 +301,140 @@ class NimbleStandalone {
    * @param url The URL to load a recording from, in order to play back
    */
   loadRecording = (url: string) => {
-    this.setLoadingType("loading");
-    this.setLoadingProgress(0.0);
+    if (this.cancelDownload != null) {
+      // Ignore this call, user must cancel the existing download before starting a new one
+      return;
+    }
 
-    let xhr = new XMLHttpRequest();
-    xhr.open("GET", url);
+    const abortController = new AbortController();
+    const abortSignal = abortController.signal;
+    this.cancelDownload = () => {
+      abortController.abort();
+      this.cancelDownload = null;
+    }
 
-    xhr.onprogress = (event) => {
-      console.log(`Received ${event.loaded} of ${event.total}`);
-      this.setLoadingProgress(event.loaded / event.total);
-    };
+    this.rawFrameBytes = [];
 
-    xhr.onload = () => {
-      if (xhr.status != 200) {
-        console.log(`Error ${xhr.status}: ${xhr.statusText}`);
-      } else {
-        let response = JSON.parse(xhr.response);
-        this.setRecording(response);
+    this.setLoadedProgress(0.0);
+
+    fetch(url, {
+      method: 'get',
+      signal: abortSignal
+    }).then((response) => {
+      console.log(response);
+      if (response != null && response.body != null) {
+        const reader = response.body.getReader();
+
+        const contentLength = parseInt(response.headers.get('Content-Length') ?? '0');
+
+        let bytesReceived = 0;
+
+        let currentFrameCursor: number[] = [0];
+        let currentFrameBytes: Uint8Array[] = [new Uint8Array(4)];
+        let isSizeFrame: boolean[] = [true];
+
+        const processBytes = ({ done, value }) => {
+            // Result objects contain two properties:
+            // done  - true if the stream has already given all its data.
+            // value - some data. 'undefined' if the reader is canceled.
+            if (value == null) {
+              this.estimatedTotalFrames = this.rawFrameBytes.length;
+              this.setLoadedProgress(1.0);
+              if (!this.playing) {
+                this.togglePlay();
+              }
+              return;
+            }
+
+            let valueCursor = 0;
+
+            while (valueCursor < value.length) {
+              const valueRemainingBytes = value.length - valueCursor;
+              const currentFrameRemainingBytes = currentFrameBytes[0].length - currentFrameCursor[0];
+              // If we can finish this frame with this read:
+              if (currentFrameRemainingBytes <= valueRemainingBytes) {
+                for (let i = 0; i < currentFrameRemainingBytes; i++) {
+                  currentFrameBytes[0][currentFrameCursor[0]] = value[valueCursor];
+                  currentFrameCursor[0] += 1;
+                  valueCursor += 1;
+                }
+
+                if (isSizeFrame[0]) {
+                  const u32bytes = currentFrameBytes[0].buffer.slice(0, 4);
+                  const size = new Uint32Array(u32bytes)[0];
+                  if (size == 0) {
+                    break;
+                  }
+                  currentFrameBytes[0] = new Uint8Array(size);
+                  currentFrameCursor[0] = 0;
+                  isSizeFrame[0] = false;
+                }
+                else {
+                  this.rawFrameBytes.push(currentFrameBytes[0]);
+
+                  if (this.rawFrameBytes.length > 1) {
+                    // Average all except the first frame
+                    let totalFrameBytes = 0;
+                    for (let i = 1; i < this.rawFrameBytes.length; i++) {
+                      totalFrameBytes += this.rawFrameBytes[i].length;
+                    }
+                    const avgFrameBytes = totalFrameBytes / (this.rawFrameBytes.length - 1);
+                    // Include the first frame as a special case
+                    this.estimatedTotalFrames = 1 + Math.round((contentLength - this.rawFrameBytes[0].length) / avgFrameBytes);
+
+                    this.setLoadedProgress(this.rawFrameBytes.length / this.estimatedTotalFrames);
+                  }
+
+                  // Immediately show the first frame
+                  if (this.rawFrameBytes.length == 1) {
+                    this.lastFrame = -1;
+                    this.setFrame(0);
+                    this.view.view.onWindowResize();
+                  }
+
+                  currentFrameBytes[0] = new Uint8Array(4);
+                  currentFrameCursor[0] = 0;
+                  isSizeFrame[0] = true;
+                }
+              }
+              // If we can't finish this frame with this read, just do as well as we can
+              else {
+                for (let i = 0; i < valueRemainingBytes; i++) {
+                  currentFrameBytes[0][currentFrameCursor[0]] = value[valueCursor];
+                  currentFrameCursor[0] += 1;
+                  valueCursor += 1;
+                }
+              }
+            }
+
+            bytesReceived += value.byteLength;
+
+            if (done) {
+              this.estimatedTotalFrames = this.rawFrameBytes.length;
+              this.setLoadedProgress(1.0);
+              if (!this.playing) {
+                this.togglePlay();
+              }
+              return;
+            }
+
+            // Read some more, and call this function again
+            // Note that here we create a new view over the original buffer.
+            return reader
+              .read()
+              .then(processBytes);
+        };
+
+        // read() returns a promise that fulfills when a value has been received
+        reader
+          .read()
+          .then(processBytes);
       }
-    };
-
-    xhr.send();
+    });
   };
 
   getRecordingFrame: (number) => dart.proto.CommandList = (index: number) => {
-    let cursor: number = this.framePointers[index];
-    // const u32bytes = this.rawBytes.buffer.slice(cursor, cursor+4); // last four bytes as a new `ArrayBuffer`
-    // const size = new Uint32Array(u32bytes)[0];
-    const size = this.frameSizes[index];
-    cursor += 4;
-    let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(this.rawBytes.subarray(cursor, cursor + size));
+    let command: dart.proto.CommandList = dart.proto.CommandList.deserialize(this.rawFrameBytes[index]);
     return command;
   };
 
@@ -326,8 +449,6 @@ class NimbleStandalone {
     if (hash !== this.lastRecordingHash) {
       this.lastRecordingHash = hash;
       this.rawBytes = rawBytes;
-      this.framePointers = [];
-      this.frameSizes = [];
 
       let cursor = [0];
 
@@ -339,10 +460,10 @@ class NimbleStandalone {
           while (cursor[0] < rawBytes.length) {
             // Read thet size byte
             this.setLoadingProgress(cursor[0] / rawBytes.buffer.byteLength);
-            this.framePointers.push(cursor[0]);
+            // this.framePointers.push(cursor[0]);
             const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
             const size = new Uint32Array(u32bytes)[0];
-            this.frameSizes.push(size);
+            // this.frameSizes.push(size);
             cursor[0] += 4;
             cursor[0] += size;
 
@@ -425,7 +546,7 @@ class NimbleStandalone {
   getCurrentFrame = () => {
     const elapsed: number = new Date().getTime() - this.startedPlaying;
     const currentFrame = (this.startFrame + Math.round(elapsed / this.msPerFrame)) %
-      this.framePointers.length;
+      this.estimatedTotalFrames;
     return currentFrame;
   };
 
@@ -434,18 +555,21 @@ class NimbleStandalone {
   };
 
   setFrame = (frameNumber: number) => {
-    if (this.rawBytes != null && frameNumber != this.lastFrame) {
+    if (frameNumber != this.lastFrame) {
       if (frameNumber < this.lastFrame) {
         // Reset at the beginning
         this.lastFrame = -1;
         // Deliberately skip the first frame when looping back, for efficiency. The first frame usually has a bunch of creation of meshes and stuff, which is expensive to decode and hangs the browser.
-        if (frameNumber == 0) {
+        if (this.renderedFirstFrame && frameNumber == 0) {
           frameNumber = 1;
         }
       }
-      this.setProgress(frameNumber / this.framePointers.length);
+      
+      this.setProgress(frameNumber / this.estimatedTotalFrames);
       if (this.view != null) {
-        this.getRecordingFrame(frameNumber).command.forEach(this.handleCommand);
+        if (frameNumber < this.rawFrameBytes.length) {
+          this.getRecordingFrame(frameNumber).command.forEach(this.handleCommand);
+        }
 
         // This is the slower but more correct method.
         /*
@@ -454,6 +578,9 @@ class NimbleStandalone {
         }
         */
         this.view.render();
+        if (frameNumber == 0) {
+          this.renderedFirstFrame = true;
+        }
       }
       this.lastFrame = frameNumber;
     }

@@ -1576,6 +1576,10 @@ class DARTView {
    */
   setObjectColor = (key: number, color: number[], save: boolean = true) => {
     const obj = this.objects.get(key);
+    if (obj == null) {
+      // console.warn("Object "+key+" attempted to setColor(), but is missing");
+      return;
+    }
     if (save) {
       this.objectColors.set(key, color);
     }
