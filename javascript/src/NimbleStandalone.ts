@@ -35,6 +35,7 @@ class NimbleStandalone {
   loadingContainerMounted: boolean;
   loadingTitle: HTMLDivElement;
   loadingContainer: HTMLDivElement;
+  loadingProgressBarOuterContainer: HTMLDivElement;
   loadingProgressBarContainer: HTMLDivElement;
   loadingProgressBarBg: HTMLDivElement;
 
@@ -168,15 +169,15 @@ class NimbleStandalone {
     this.loadingTitle.innerHTML = "nimble<b>viewer</b> loading...";
     this.loadingContainer.appendChild(this.loadingTitle);
 
-    const loadingProgressBarOuterContainer = document.createElement("div");
-    loadingProgressBarOuterContainer.className =
+    this.loadingProgressBarOuterContainer = document.createElement("div");
+    this.loadingProgressBarOuterContainer.className =
       "NimbleStandalone-loading-bar-container";
-    this.loadingContainer.appendChild(loadingProgressBarOuterContainer);
+    this.loadingContainer.appendChild(this.loadingProgressBarOuterContainer);
 
     const loadingContainerInnerBg = document.createElement("div");
     loadingContainerInnerBg.className =
       "NimbleStandalone-loading-bar-container-inner-bg";
-    loadingProgressBarOuterContainer.appendChild(loadingContainerInnerBg);
+    this.loadingProgressBarOuterContainer.appendChild(loadingContainerInnerBg);
 
     this.loadingProgressBarContainer = document.createElement("div");
     this.loadingProgressBarContainer.className =
@@ -285,6 +286,12 @@ class NimbleStandalone {
     this.loadingProgressBarBg.style.width = (1.0 / progress) * 100 + "%";
   };
 
+  setLoadingProgressError = () => {
+    this.loadingContainer.style.backgroundColor = "#eb7575";
+    this.loadingProgressBarOuterContainer.remove();
+    this.loadingTitle.innerHTML = "nimble<b>viewer</b> error loading file!";
+  }
+
   /**
    * This hides the loading bar, which unmounts it from the DOM (if it was previously mounted).
    */
@@ -326,7 +333,7 @@ class NimbleStandalone {
       signal: abortSignal
     }).then((response) => {
       console.log(response);
-      if (response != null && response.body != null) {
+      if (response != null && response.body != null && response.ok) {
         let body = response.body;
         if (url.endsWith('gz')) {
           console.log("Nimble Visualizer is unzipping the target recording, because it was compressed with Gzip.");
@@ -450,6 +457,12 @@ class NimbleStandalone {
           .read()
           .then(processBytes);
       }
+      else {
+        this.setLoadingProgressError();
+      }
+    }).catch((reason) => {
+      console.error(reason);
+      this.setLoadingProgressError();
     });
   };
 
