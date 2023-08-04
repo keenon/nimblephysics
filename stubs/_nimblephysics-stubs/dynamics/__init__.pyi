@@ -36,6 +36,7 @@ __all__ = [
     "CompositeJoiner_EmbedStateAndProperties_GenericJoint_SE3GenericJointStateGenericJointUniqueProperties_Joint",
     "CompositeJoiner_EmbedStateAndProperties_GenericJoint_SO3GenericJointStateGenericJointUniqueProperties_Joint",
     "ConeShape",
+    "ContactEnergyTransmitter",
     "ContactInverseDynamicsResult",
     "CustomJoint1",
     "CustomJoint2",
@@ -74,6 +75,7 @@ __all__ = [
     "EmbedStateAndProperties_GenericJoint_R6GenericJointState_GenericJointUniqueProperties",
     "EmbedStateAndProperties_GenericJoint_SE3GenericJointState_GenericJointUniqueProperties",
     "EmbedStateAndProperties_GenericJoint_SO3GenericJointState_GenericJointUniqueProperties",
+    "EnergyAccountingFrame",
     "Entity",
     "EulerFreeJoint",
     "EulerJoint",
@@ -106,6 +108,7 @@ __all__ = [
     "Inertia",
     "JacobianNode",
     "Joint",
+    "JointEnergyTransmitter",
     "JointProperties",
     "LineSegmentShape",
     "MeshShape",
@@ -713,6 +716,57 @@ class ConeShape(Shape):
     def setHeight(self, height: float) -> None: ...
     def setRadius(self, radius: float) -> None: ...
     pass
+class ContactEnergyTransmitter():
+    def __init__(self) -> None: ...
+    @property
+    def contactBody(self) -> str:
+        """
+        :type: str
+        """
+    @contactBody.setter
+    def contactBody(self, arg0: str) -> None:
+        pass
+    @property
+    def contactBodyCenter(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @contactBodyCenter.setter
+    def contactBodyCenter(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    @property
+    def powerToBody(self) -> float:
+        """
+        :type: float
+        """
+    @powerToBody.setter
+    def powerToBody(self, arg0: float) -> None:
+        pass
+    @property
+    def worldCenter(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @worldCenter.setter
+    def worldCenter(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    @property
+    def worldForce(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @worldForce.setter
+    def worldForce(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    @property
+    def worldMoment(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @worldMoment.setter
+    def worldMoment(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    pass
 class ContactInverseDynamicsResult():
     def __init__(self) -> None: ...
     def sumError(self) -> float: ...
@@ -1138,6 +1192,105 @@ class EmbedStateAndProperties_GenericJoint_R6GenericJointState_GenericJointUniqu
 class EmbedStateAndProperties_GenericJoint_SE3GenericJointState_GenericJointUniqueProperties(RequiresAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SE3_GenericJointState_GenericJointUniqueProperties, SpecializedForAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SE3_GenericJointState_GenericJointUniqueProperties, nimblephysics_libs._nimblephysics.common.Composite):
     pass
 class EmbedStateAndProperties_GenericJoint_SO3GenericJointState_GenericJointUniqueProperties(RequiresAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SO3_GenericJointState_GenericJointUniqueProperties, SpecializedForAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SO3_GenericJointState_GenericJointUniqueProperties, nimblephysics_libs._nimblephysics.common.Composite):
+    pass
+class EnergyAccountingFrame():
+    def __init__(self) -> None: ...
+    @property
+    def bodyCenters(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @bodyCenters.setter
+    def bodyCenters(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        pass
+    @property
+    def bodyChildJointPowerSum(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyChildJointPowerSum.setter
+    def bodyChildJointPowerSum(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyChildJointPowers(self) -> typing.List[typing.List[float]]:
+        """
+        :type: typing.List[typing.List[float]]
+        """
+    @bodyChildJointPowers.setter
+    def bodyChildJointPowers(self, arg0: typing.List[typing.List[float]]) -> None:
+        pass
+    @property
+    def bodyExternalForcePower(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyExternalForcePower.setter
+    def bodyExternalForcePower(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyGravityPower(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyGravityPower.setter
+    def bodyGravityPower(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyKineticEnergy(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyKineticEnergy.setter
+    def bodyKineticEnergy(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyKineticEnergyDeriv(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyKineticEnergyDeriv.setter
+    def bodyKineticEnergyDeriv(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyParentJointPower(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyParentJointPower.setter
+    def bodyParentJointPower(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyPotentialEnergy(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyPotentialEnergy.setter
+    def bodyPotentialEnergy(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def bodyPotentialEnergyDeriv(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @bodyPotentialEnergyDeriv.setter
+    def bodyPotentialEnergyDeriv(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def contacts(self) -> typing.List[ContactEnergyTransmitter]:
+        """
+        :type: typing.List[ContactEnergyTransmitter]
+        """
+    @contacts.setter
+    def contacts(self, arg0: typing.List[ContactEnergyTransmitter]) -> None:
+        pass
+    @property
+    def joints(self) -> typing.List[JointEnergyTransmitter]:
+        """
+        :type: typing.List[JointEnergyTransmitter]
+        """
+    @joints.setter
+    def joints(self, arg0: typing.List[JointEnergyTransmitter]) -> None:
+        pass
     pass
 class Frame(Entity):
     @staticmethod
@@ -2715,6 +2868,73 @@ class TemplatedJacobianBodyNode(JacobianNode, Frame, Entity):
     def getWorldJacobian(self, offset: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, n]]: ...
     pass
 class EmbedStateAndPropertiesOnTopOf_GenericJoint_SO3_GenericJointState_GenericJointUniqueProperties_Joint(CompositeJoiner_EmbedStateAndProperties_GenericJoint_SO3GenericJointStateGenericJointUniqueProperties_Joint, EmbedStateAndProperties_GenericJoint_SO3GenericJointState_GenericJointUniqueProperties, RequiresAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SO3_GenericJointState_GenericJointUniqueProperties, SpecializedForAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_SO3_GenericJointState_GenericJointUniqueProperties, nimblephysics_libs._nimblephysics.common.Composite, Joint):
+    pass
+class JointEnergyTransmitter():
+    def __init__(self) -> None: ...
+    @property
+    def childBody(self) -> str:
+        """
+        :type: str
+        """
+    @childBody.setter
+    def childBody(self, arg0: str) -> None:
+        pass
+    @property
+    def childCenter(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @childCenter.setter
+    def childCenter(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @name.setter
+    def name(self, arg0: str) -> None:
+        pass
+    @property
+    def parentBody(self) -> str:
+        """
+        :type: str
+        """
+    @parentBody.setter
+    def parentBody(self, arg0: str) -> None:
+        pass
+    @property
+    def parentCenter(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @parentCenter.setter
+    def parentCenter(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
+    @property
+    def powerToChild(self) -> float:
+        """
+        :type: float
+        """
+    @powerToChild.setter
+    def powerToChild(self, arg0: float) -> None:
+        pass
+    @property
+    def powerToParent(self) -> float:
+        """
+        :type: float
+        """
+    @powerToParent.setter
+    def powerToParent(self, arg0: float) -> None:
+        pass
+    @property
+    def worldCenter(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @worldCenter.setter
+    def worldCenter(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        pass
     pass
 class GenericJointProperties_R1(JointProperties, GenericJointUniqueProperties_R1):
     @typing.overload
@@ -4603,6 +4823,7 @@ class Skeleton(MetaSkeleton):
     def getCoriolisForces(self, arg0: int) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def getDof(self, name: str) -> DegreeOfFreedom: ...
     def getDofByIndex(self, index: int) -> DegreeOfFreedom: ...
+    def getEnergyAccounting(self, heightAtZeroPoint: float = 0, referenceFrameVelocity: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0., 0., 0.]), contactBodies: typing.List[BodyNode] = [], cops: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]] = [], forces: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]] = [], moments: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]] = []) -> EnergyAccountingFrame: ...
     @typing.overload
     def getExternalForces(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     @typing.overload

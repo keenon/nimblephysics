@@ -3355,9 +3355,10 @@ export namespace dart.proto {
             points?: number[];
             color?: number[];
             layer?: number;
+            width?: number[];
         }) {
             super();
-            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [2, 3], this.#one_of_decls);
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [2, 3, 5], this.#one_of_decls);
             if (!Array.isArray(data) && typeof data == "object") {
                 if ("key" in data && data.key != undefined) {
                     this.key = data.key;
@@ -3370,6 +3371,9 @@ export namespace dart.proto {
                 }
                 if ("layer" in data && data.layer != undefined) {
                     this.layer = data.layer;
+                }
+                if ("width" in data && data.width != undefined) {
+                    this.width = data.width;
                 }
             }
         }
@@ -3397,11 +3401,18 @@ export namespace dart.proto {
         set layer(value: number) {
             pb_1.Message.setField(this, 4, value);
         }
+        get width() {
+            return pb_1.Message.getField(this, 5) as number[];
+        }
+        set width(value: number[]) {
+            pb_1.Message.setField(this, 5, value);
+        }
         static fromObject(data: {
             key?: number;
             points?: number[];
             color?: number[];
             layer?: number;
+            width?: number[];
         }) {
             const message = new CreateLine({});
             if (data.key != null) {
@@ -3416,6 +3427,9 @@ export namespace dart.proto {
             if (data.layer != null) {
                 message.layer = data.layer;
             }
+            if (data.width != null) {
+                message.width = data.width;
+            }
             return message;
         }
         toObject() {
@@ -3424,6 +3438,7 @@ export namespace dart.proto {
                 points?: number[];
                 color?: number[];
                 layer?: number;
+                width?: number[];
             } = {};
             if (this.key != null) {
                 data.key = this.key;
@@ -3436,6 +3451,9 @@ export namespace dart.proto {
             }
             if (this.layer != null) {
                 data.layer = this.layer;
+            }
+            if (this.width != null) {
+                data.width = this.width;
             }
             return data;
         }
@@ -3451,6 +3469,8 @@ export namespace dart.proto {
                 writer.writePackedFloat(3, this.color);
             if (this.layer !== undefined)
                 writer.writeInt32(4, this.layer);
+            if (this.width !== undefined)
+                writer.writePackedFloat(5, this.width);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -3471,6 +3491,9 @@ export namespace dart.proto {
                         break;
                     case 4:
                         message.layer = reader.readInt32();
+                        break;
+                    case 5:
+                        message.width = reader.readPackedFloat();
                         break;
                     default: reader.skipField();
                 }

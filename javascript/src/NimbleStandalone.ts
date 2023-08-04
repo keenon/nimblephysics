@@ -471,63 +471,6 @@ class NimbleStandalone {
     return command;
   };
 
-  /**
-   * This replaces the set of recorded commands we're replaying
-   *
-   * @param recording The JSON object representing a recording of timestep(s) command(s)
-   */
-  setRecording = (rawBytes: Uint8Array) => {
-    const hash = createHash().update(rawBytes).digest("hex");
-
-    if (hash !== this.lastRecordingHash) {
-      this.lastRecordingHash = hash;
-      this.rawBytes = rawBytes;
-
-      let cursor = [0];
-
-      this.setLoadingType("unzipping data");
-      let parseMoreBytes = () => {
-        const startTime = new Date().getTime();
-
-        if (cursor[0] < rawBytes.length) {
-          while (cursor[0] < rawBytes.length) {
-            // Read thet size byte
-            this.setLoadingProgress(cursor[0] / rawBytes.buffer.byteLength);
-            // this.framePointers.push(cursor[0]);
-            const u32bytes = rawBytes.buffer.slice(cursor[0], cursor[0]+4); // last four bytes as a new `ArrayBuffer`
-            const size = new Uint32Array(u32bytes)[0];
-            // this.frameSizes.push(size);
-            cursor[0] += 4;
-            cursor[0] += size;
-
-            const elapsed = new Date().getTime() - startTime;
-            if (elapsed > 200) {
-              break;
-            }
-          }
-          requestAnimationFrame(parseMoreBytes);
-        }
-        else {
-          setTimeout(() => {
-            this.hideLoadingBar();
-            this.setLoadingType("loading");
-            this.setFrame(0);
-            this.view.view.onWindowResize();
-            if (!this.playing) {
-              this.togglePlay();
-            }
-          }, 100);
-        }
-      };
-      parseMoreBytes();
-    }
-    else {
-      setTimeout(() => {
-        this.hideLoadingBar();
-      }, 100);
-    }
-  };
-
   registerPlayPauseListener = (playPausedListener: ((playing: boolean) => void) | null) => {
     this.playPausedListener = playPausedListener;
   };

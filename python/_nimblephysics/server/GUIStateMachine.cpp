@@ -195,7 +195,8 @@ void GUIStateMachine(py::module& m)
           ::py::arg("key"),
           ::py::arg("points"),
           ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
-          ::py::arg("layer") = "")
+          ::py::arg("layer") = "",
+          ::py::arg("width") = std::vector<s_t>())
       .def(
           "createMeshFromShape",
           &dart::server::GUIStateMachine::createMeshFromShape,

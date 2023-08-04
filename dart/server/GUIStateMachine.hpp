@@ -211,7 +211,8 @@ public:
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
       const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
-      const std::string& layer = "");
+      const std::string& layer = "",
+      const std::vector<s_t>& width = std::vector<s_t>());
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -534,6 +535,7 @@ protected:
     std::string layer;
     std::vector<Eigen::Vector3s> points;
     Eigen::Vector4s color;
+    std::vector<s_t> width;
   };
   std::unordered_map<std::string, Line> mLines;
 

@@ -1243,6 +1243,7 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
           "getEnergyAccounting",
           &dart::dynamics::Skeleton::getEnergyAccounting,
           ::py::arg("heightAtZeroPoint") = 0,
+          ::py::arg("referenceFrameVelocity") = Eigen::Vector3s::Zero(),
           ::py::arg("contactBodies") = std::vector<dynamics::BodyNode*>(),
           ::py::arg("cops") = std::vector<Eigen::Vector3s>(),
           ::py::arg("forces") = std::vector<Eigen::Vector3s>(),

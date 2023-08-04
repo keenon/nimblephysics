@@ -473,7 +473,7 @@ void GUIStateMachine::renderSkeleton(
             setObjectPosition(shapeName, pos);
           if (getObjectRotation(shapeName) != euler)
             setObjectRotation(shapeName, euler);
-          if (getObjectColor(shapeName) != color)
+          if (getObjectColor(shapeName) != color && !useOriginalColor)
             setObjectColor(shapeName, color);
         }
       }
@@ -928,7 +928,8 @@ void GUIStateMachine::createLine(
     std::string key,
     const std::vector<Eigen::Vector3s>& points,
     const Eigen::Vector4s& color,
-    const std::string& layer)
+    const std::string& layer,
+    const std::vector<s_t>& width)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -937,6 +938,7 @@ void GUIStateMachine::createLine(
   line.points = points;
   line.color = color;
   line.layer = layer;
+  line.width = width;
 
   queueCommand([this, key](proto::CommandList& list) {
     encodeCreateLine(list, mLines[key]);
@@ -2252,6 +2254,10 @@ void GUIStateMachine::encodeCreateLine(proto::CommandList& list, Line& line)
     command->mutable_line()->add_points((double)point(0));
     command->mutable_line()->add_points((double)point(1));
     command->mutable_line()->add_points((double)point(2));
+  }
+  for (s_t width : line.width)
+  {
+    command->mutable_line()->add_width(width);
   }
 }
 

@@ -112,6 +112,7 @@ message CreateLine {
   repeated float points = 2;
   repeated float color = 3;
   int32 layer = 4;
+  repeated float width = 5;
 }
 
 message CreateMesh {

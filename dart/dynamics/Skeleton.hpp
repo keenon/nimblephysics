@@ -2147,6 +2147,7 @@ public:
   /// This will create an "accounting frame" of data at the current moment
   EnergyAccountingFrame getEnergyAccounting(
       s_t heightZeroPoint = 0.0,
+      Eigen::Vector3s referenceFrameVelocity = Eigen::Vector3s::Zero(),
       std::vector<dynamics::BodyNode*> contactBodies
       = std::vector<dynamics::BodyNode*>(),
       std::vector<Eigen::Vector3s> cops = std::vector<Eigen::Vector3s>(),

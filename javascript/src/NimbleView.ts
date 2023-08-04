@@ -588,12 +588,14 @@ class DARTView {
         }
         vertices[vertices.length-1].push(command.line.points[i]);
       }
+      const width: number[] = command.line.width;
 
       this.createMeshLine(
         command.line.key,
         vertices,
         color,
-        command.line.layer
+        command.line.layer,
+        width
       );
     }
     else if (command.mesh != null) {
@@ -1191,7 +1193,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
+  createLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
     this.objectType.set(key, "line");
     this.objectColors.set(key, color);
     // Try not to recreate geometry. If we already created a line in the past,
@@ -1259,7 +1261,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createMeshLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
+  createMeshLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
     this.objectType.set(key, "line");
     this.objectColors.set(key, color);
     // Try not to recreate geometry. If we already created a line in the past,
@@ -1367,6 +1369,15 @@ class DARTView {
       next[nextCursor++] = v[2];
       ///////////////////////////////////////////////
 
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
       // (line as any).process();
       line._attributes.position.needsUpdate = true;
       line._attributes.previous.needsUpdate = true;
@@ -1389,7 +1400,17 @@ class DARTView {
         linewidth: 2,
       });
       const line = new MeshLine();
-      (line as any).setPoints(linePoints, p => 1.5 * p);
+      (line as any).setPoints(linePoints, p => p);
+
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
       const mesh = new THREE.Mesh(line, pathMaterial);
       mesh.frustumCulled = false;
 

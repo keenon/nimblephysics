@@ -10377,6 +10377,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 /// This will create an "accounting frame" of data at the current moment
 Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
     s_t heightZeroPoint,
+    Eigen::Vector3s referenceFrameVelocity,
     std::vector<dynamics::BodyNode*> contactBodies,
     std::vector<Eigen::Vector3s> cops,
     std::vector<Eigen::Vector3s> forces,
@@ -10413,7 +10414,12 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
   {
     Eigen::Vector3s bodyCenter = getBodyNode(i)->getCOM();
 
-    frame.bodyKineticEnergy(i) = getBodyNode(i)->computeKineticEnergy();
+    Eigen::Vector6s V = getBodyNode(i)->getSpatialVelocity();
+    V.tail<3>() += getBodyNode(i)->getWorldTransform().linear().transpose()
+                   * referenceFrameVelocity;
+    const Eigen::Matrix6s& G = getBodyNode(i)->getSpatialInertia();
+    frame.bodyKineticEnergy(i) = 0.5 * V.dot(G * V);
+
     frame.bodyCenters.push_back(bodyCenter);
 
     s_t bodyHeight = heightZeroPoint
@@ -10467,6 +10473,7 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
     worldF.tail<3>() = forces[i];
     Eigen::Vector6s worldV
         = contactBodies[i]->getSpatialVelocity(Frame::World(), Frame::World());
+    worldV.tail<3>() += referenceFrameVelocity;
     contactTransmitter.powerToBody = worldF.dot(worldV);
 
     frame.contacts.push_back(contactTransmitter);
@@ -10486,7 +10493,12 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
     // updateTransmittedForceID()
 
     // body->getCOMSpatialVelocity()
-    const Eigen::Vector6s& V = body->getSpatialVelocity();
+    Eigen::Vector6s V_offset = Eigen::Vector6s::Zero();
+    V_offset.tail<3>()
+        += getBodyNode(i)->getWorldTransform().linear().transpose()
+           * referenceFrameVelocity;
+    Eigen::Vector6s V = getBodyNode(i)->getSpatialVelocity();
+    V += V_offset;
     const Eigen::Vector6s& V_dot = body->getSpatialAcceleration();
     const Eigen::Matrix6s& I = body->getSpatialInertia();
 
@@ -10503,12 +10515,32 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
       assert(false);
     }
 
-    Eigen::Vector6s totalForceIDFormula = I * V_dot - math::dad(V, I * V);
-    s_t powerFromCoriolis = V.dot(math::dad(V, I * V));
+    Eigen::Vector6s coriolisForce = math::dad(V, I * V);
+    Eigen::Vector6s coriolisForceFromOriginal
+        = math::dad(body->getSpatialVelocity(), I * body->getSpatialVelocity());
+    Eigen::Vector6s coriolisForceFromOffset
+        = coriolisForce
+          - coriolisForceFromOriginal; // math::dad(V_offset, I * V_offset);
+    Eigen::Vector6s totalForceIDFormula = I * V_dot - coriolisForceFromOriginal;
+    s_t powerFromCoriolis = V.dot(coriolisForce);
     if (std::abs(powerFromCoriolis) > 1e-8)
     {
       std::cout << "Coriolis power on body " << i << " non-zero! "
                 << powerFromCoriolis << std::endl;
+    }
+    if ((coriolisForceFromOriginal + coriolisForceFromOffset - coriolisForce)
+            .norm()
+        > 1e-12)
+    {
+      std::cout << "Coriolis: " << std::endl << coriolisForce << std::endl;
+      std::cout << "Coriolis from original: " << std::endl
+                << coriolisForceFromOriginal << std::endl;
+      std::cout << "Coriolis from offset: " << std::endl
+                << coriolisForceFromOffset << std::endl;
+      assert(
+          (coriolisForceFromOriginal + coriolisForceFromOffset - coriolisForce)
+              .norm()
+          < 1e-12);
     }
 
     Eigen::Vector6s gravityForce
@@ -10548,10 +10580,13 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
       compare.col(2) = totalForceFDFormula - totalForceIDFormula;
       std::cout << "FD formula - ID formula - Diff" << std::endl
                 << compare << std::endl;
+      std::cout << "Coriolis Force from Vel Offset: " << std::endl
+                << coriolisForceFromOffset << std::endl;
     }
 
     frame.bodyKineticEnergyDeriv(i) = V.dot(totalForceIDFormula);
-    frame.bodyPotentialEnergyDeriv(i) = V.dot(-gravityForce);
+    frame.bodyPotentialEnergyDeriv(i)
+        = body->getSpatialVelocity().dot(-gravityForce);
 
     s_t powerSum = frame.bodyExternalForcePower(i) + frame.bodyGravityPower(i)
                    + frame.bodyParentJointPower(i)

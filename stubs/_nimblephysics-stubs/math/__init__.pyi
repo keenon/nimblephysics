@@ -14,6 +14,8 @@ __all__ = [
     "MultivariateGaussian",
     "Quaternion",
     "Random",
+    "dAdInvT",
+    "dAdT",
     "eulerXYXToMatrix",
     "eulerXYZToMatrix",
     "eulerXZXToMatrix",
@@ -189,6 +191,10 @@ class Random():
 def AdR(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
     pass
 def AdT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.float64, _Shape[3, 1]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
+    pass
+def dAdInvT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.float64, _Shape[3, 1]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
+    pass
+def dAdT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.float64, _Shape[3, 1]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
     pass
 def eulerXYXToMatrix(angle: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 3]]:
     pass
