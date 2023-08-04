@@ -306,12 +306,27 @@ class DARTView {
 
     this.uiContainer.appendChild(instructions);
 
-    this.layersTable = document.createElement("table");
-    this.layersTable.className = "GUI_layers";
+    const layersTableOuter = document.createElement("table");
+    layersTableOuter.className = "GUI_layers";
+
+    const layersTableHead = document.createElement("thead");
+
+    const layersTableHeadRow = document.createElement("tr");
+    const layersTableHeadElem = document.createElement("td");
+    layersTableHeadElem.colSpan = 2;
+    layersTableHeadElem.innerHTML = "Layers";
+    layersTableHeadRow.appendChild(layersTableHeadElem);
+    layersTableHead.appendChild(layersTableHeadRow);
+    layersTableOuter.appendChild(layersTableHead);
+
+    const layersTableBody = document.createElement("tbody");
+    layersTableOuter.appendChild(layersTableBody);
+    this.layersTable = layersTableBody;
+
 
     const layersTableHolder = document.createElement("div");
     layersTableHolder.className = "GUI_layers_container";
-    layersTableHolder.appendChild(this.layersTable);
+    layersTableHolder.appendChild(layersTableOuter);
 
     this.uiContainer.appendChild(layersTableHolder);
 

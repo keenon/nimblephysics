@@ -317,6 +317,10 @@ class NimbleStandalone {
 
     this.setLoadedProgress(0.0);
 
+    // Until we get the first frame loaded, we're "loading"
+    this.setLoadingType('loading');
+    this.setLoadingProgress(0.0);
+
     fetch(url, {
       method: 'get',
       signal: abortSignal
@@ -394,6 +398,10 @@ class NimbleStandalone {
 
                   // Immediately show the first frame
                   if (this.rawFrameBytes.length == 1) {
+                    // Clear the loading bar
+                    this.setLoadingProgress(1.0);
+                    this.hideLoadingBar();
+
                     this.lastFrame = -1;
                     this.setFrame(0);
                     this.view.view.onWindowResize();
@@ -410,6 +418,11 @@ class NimbleStandalone {
                   currentFrameBytes[0][currentFrameCursor[0]] = value[valueCursor];
                   currentFrameCursor[0] += 1;
                   valueCursor += 1;
+                }
+                // If we're still loading the first frame (which can sometimes take a while, because it generally describes all the meshes and textures used)
+                if (this.rawFrameBytes.length == 0) {
+                  let progress = currentFrameCursor[0] / currentFrameBytes[0].length;
+                  this.setLoadingProgress(progress);
                 }
               }
             }

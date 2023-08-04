@@ -339,18 +339,31 @@ $triangle-size: 5px;
     color: #848484;
     /* font-weight: bold; */
     font-size: 13px;
-    border: 1px solid #848484;
-    border-radius: 5px;
-    padding: 5px;
+    // border: 1px solid #848484;
+    // border-radius: 5px;
+    // padding: 5px;
   }
 
   .GUI_layers {
     border-collapse: collapse;
   }
 
+  .GUI_layers thead {
+    background-color: white;
+    border-bottom: 1px solid #cfcfcf;
+  }
+
+  .GUI_layers tbody {
+    background-color: #ededed;
+  }
+
+  .GUI_layers tbody tr:hover {
+    background-color: #dcdcdc;
+  }
+
   .GUI_layers td {
     vertical-align: middle;
     /* border: 1px solid black; */
-    padding: 2px;
+    padding: 5px;
   }
 }
