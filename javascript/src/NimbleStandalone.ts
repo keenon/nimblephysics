@@ -323,7 +323,14 @@ class NimbleStandalone {
     }).then((response) => {
       console.log(response);
       if (response != null && response.body != null) {
-        const reader = response.body.getReader();
+        let body = response.body;
+        if (url.endsWith('gz')) {
+          console.log("Nimble Visualizer is unzipping the target recording, because it was compressed with Gzip.");
+          body = body.pipeThrough(
+            new DecompressionStream('gzip')
+          );
+        }
+        const reader = body.getReader();
 
         const contentLength = parseInt(response.headers.get('Content-Length') ?? '0');
 
