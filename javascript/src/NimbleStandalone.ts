@@ -26,6 +26,7 @@ class NimbleStandalone {
   animationKey: number;
 
   viewContainer: HTMLDivElement;
+  playPauseButton: HTMLButtonElement;
   progressBarContainer: HTMLDivElement;
   progressBarBackground: HTMLDivElement;
   progressBarLoaded: HTMLDivElement;
@@ -58,7 +59,15 @@ class NimbleStandalone {
     this.view = new NimbleView(this.viewContainer, true);
 
     const instructions = document.createElement("div");
-    instructions.innerHTML = "Press [Space] to Play/Pause"
+    this.playPauseButton = document.createElement("button");
+    this.playPauseButton.innerHTML = "Play";
+    this.playPauseButton.addEventListener("click", () => {
+      this.togglePlay();
+    });
+    this.playPauseButton.className =
+      "NimbleStandalone-progress-play-pause";
+    // instructions.innerHTML = "Press [Space] to Play/Pause"
+    instructions.appendChild(this.playPauseButton);
     instructions.className =
       "NimbleStandalone-progress-instructions";
     this.viewContainer.appendChild(instructions);
@@ -479,6 +488,12 @@ class NimbleStandalone {
    */
   togglePlay = () => {
     this.playing = !this.playing;
+    if (this.playing) {
+      this.playPauseButton.innerHTML = "Pause";
+    }
+    else {
+      this.playPauseButton.innerHTML = "Play";
+    }
     if (this.playPausedListener != null) {
       this.playPausedListener(this.playing);
     }
@@ -495,6 +510,12 @@ class NimbleStandalone {
   setPlaying = (playing: boolean) => {
     if (this.rawBytes != null && playing != this.playing) {
       this.playing = playing;
+      if (this.playing) {
+        this.playPauseButton.innerHTML = "Pause";
+      }
+      else {
+        this.playPauseButton.innerHTML = "Play";
+      }
       if (this.playing) {
         this.startFrame = this.lastFrame;
         this.startedPlaying = new Date().getTime();

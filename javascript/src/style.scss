@@ -7,9 +7,14 @@
   height: 100%;
 }
 
+.NimbleStandalone-progress-play-pause {
+  padding: 10px;
+  font-size: 14px;
+}
+
 .NimbleStandalone-progress-instructions {
   position: absolute;
-  bottom: 50px;
+  bottom: 70px;
   left: 20px;
   height: 20px;
   width: calc(100% - 40px);
