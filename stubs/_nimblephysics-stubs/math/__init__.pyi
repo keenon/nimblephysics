@@ -10,8 +10,10 @@ __all__ = [
     "AdT",
     "AngleAxis",
     "BoundingBox",
+    "GraphFlowDiscretizer",
     "Isometry3",
     "MultivariateGaussian",
+    "ParticlePath",
     "Quaternion",
     "Random",
     "dAdInvT",
@@ -90,6 +92,17 @@ class BoundingBox():
     def getMax(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: ...
     def getMin(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: ...
     pass
+class GraphFlowDiscretizer():
+    def __init__(self, numNodes: int, arcs: typing.List[typing.Tuple[int, int]], nodeAttachedToSink: typing.List[bool]) -> None: ...
+    def cleanUpArcRates(self, energyLevels: numpy.ndarray[numpy.float64, _Shape[m, n]], arcRates: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
+        """
+        This will find the least-squares closest rates of transfer across the arcs to end up with the energy levels at each node we got over time. The idea here is that arc rates may not perfectly reflect the observed changes in energy levels.
+        """
+    def discretize(self, maxSimultaneousParticles: int, energyLevels: numpy.ndarray[numpy.float64, _Shape[m, n]], arcRates: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> typing.List[ParticlePath]: 
+        """
+        This will attempt to create a set of ParticlePath objects that map the recorded graph node levels and flows as closely as possible. The particles can be created and destroyed within the arcs.
+        """
+    pass
 class Isometry3():
     @staticmethod
     def Identity() -> Isometry3: ...
@@ -141,6 +154,32 @@ class MultivariateGaussian():
     def getVariableNames(self) -> typing.List[str]: ...
     @staticmethod
     def loadFromCSV(file: str, columns: typing.List[str], units: float = 1.0) -> MultivariateGaussian: ...
+    pass
+class ParticlePath():
+    @property
+    def energyValue(self) -> float:
+        """
+        :type: float
+        """
+    @energyValue.setter
+    def energyValue(self, arg0: float) -> None:
+        pass
+    @property
+    def nodeHistory(self) -> typing.List[int]:
+        """
+        :type: typing.List[int]
+        """
+    @nodeHistory.setter
+    def nodeHistory(self, arg0: typing.List[int]) -> None:
+        pass
+    @property
+    def startTime(self) -> int:
+        """
+        :type: int
+        """
+    @startTime.setter
+    def startTime(self, arg0: int) -> None:
+        pass
     pass
 class Quaternion():
     """
