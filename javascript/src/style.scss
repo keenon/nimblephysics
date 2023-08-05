@@ -8,6 +8,8 @@
 }
 
 .NimbleStandalone-progress-play-pause {
+  position: relative;
+  z-index: 99;
   padding: 10px;
   font-size: 14px;
 }
@@ -16,7 +18,7 @@
   position: absolute;
   bottom: 70px;
   left: 20px;
-  height: 20px;
+  height: 40px;
   width: calc(100% - 40px);
   text-align: left;
   font-family: "Advent Pro", sans-serif;
