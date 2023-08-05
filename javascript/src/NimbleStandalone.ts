@@ -78,7 +78,6 @@ class NimbleStandalone {
     playbackSpeedContainer.appendChild(this.playbackSpeed);
     this.playbackSpeed.oninput = (e: Event) => {
       const val: number = parseFloat(this.playbackSpeed.value);
-      this.playbackSpeedDisplay.innerHTML = val+'x speed';
       this.setPlaybackSpeed(val);
     }
 
@@ -512,6 +511,10 @@ class NimbleStandalone {
    * This sets our playback speed to a multiple of the fundamental number for this data.
    */
   setPlaybackSpeed = (multiple: number) => {
+    if (parseFloat(this.playbackSpeed.value) != multiple) {
+      this.playbackSpeed.value = multiple.toString();
+    }
+    this.playbackSpeedDisplay.innerHTML = multiple+'x speed';
     this.startFrame = this.getCurrentFrame();
     this.startedPlaying = new Date().getTime();
 

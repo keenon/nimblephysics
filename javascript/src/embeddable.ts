@@ -2,7 +2,7 @@ import NimbleStandaloneReact from "./NimbleStandaloneReact";
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 
-const embedNimbleVisualizer = (div: HTMLElement, rawURL: string) => {
+const embedNimbleVisualizer = (div: HTMLElement, rawURL: string, defaultPlaybackSpeed: number = 1.0) => {
   console.log("Embedding Nimble Visualizer for "+rawURL+" into page.");
   console.log(div);
   // Clear the pre-existing contents of the div
@@ -42,7 +42,8 @@ const embedNimbleVisualizer = (div: HTMLElement, rawURL: string) => {
       frame: frame,
       onFrameChange: (frame) => {
         setFrame(frame);
-      }
+      },
+      defaultPlaybackSpeed: defaultPlaybackSpeed
     }));
 
     return React.createElement(

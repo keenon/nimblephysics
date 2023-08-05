@@ -5,6 +5,7 @@ type NimbleStandaloneReactProps = {
   loadUrl: string;
   style?: any;
   className?: any;
+  defaultPlaybackSpeed?: number;
   // Making the controls accessible from the mounted component
   playing?: boolean;
   onPlayPause?: (playing: boolean) => void;
@@ -17,6 +18,7 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
   const setLoadingPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
     if (gui != null) {
       gui.loadRecording(pr.loadUrl);
+      gui.setPlaybackSpeed(pr.defaultPlaybackSpeed || 1);
     }
   };
 

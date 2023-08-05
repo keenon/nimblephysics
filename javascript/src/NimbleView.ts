@@ -1276,6 +1276,10 @@ class DARTView {
         color[1],
         color[2]
       );
+      if (color.length > 3 && color[3] < 1.0) {
+        (mesh as any).material.transparent = true;
+        (mesh as any).material.opacity = color[3];
+      }
 
       const positions = line._attributes.position.array;
       const next = line._attributes.next.array;
@@ -1399,6 +1403,10 @@ class DARTView {
         color: new THREE.Color(color[0], color[1], color[2]),
         linewidth: 2,
       });
+      if (color.length > 3 && color[3] < 1.0) {
+        pathMaterial.transparent = true;
+        pathMaterial.opacity = color[3];
+      }
       const line = new MeshLine();
       (line as any).setPoints(linePoints, p => p);
 
