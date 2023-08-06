@@ -28,7 +28,7 @@
 
 .NimbleStandalone-playback-speed-container {
   position: absolute;
-  bottom: 80px;
+  bottom: 110px;
   left: 20px;
   height: 20px;
   width: calc(100% - 40px);
@@ -38,16 +38,16 @@
 
 .NimbleStandalone-progress-bar-container {
   position: absolute;
-  bottom: 20px;
+  bottom: 40px;
   left: 20px;
-  height: 20px;
+  height: 40px;
   width: calc(100% - 40px);
   cursor: pointer;
 }
 
 .NimbleStandalone-progress-bar-bg {
   position: absolute;
-  top: 0;
+  top: 20px;
   left: 0;
   height: 5px;
   width: 100%;
@@ -61,7 +61,7 @@
 
 .NimbleStandalone-progress-bar-loaded {
   position: absolute;
-  top: 0;
+  top: 20px;
   left: 0;
   height: 5px;
   width: 100%;
@@ -70,7 +70,7 @@
 
 .NimbleStandalone-progress-bar {
   position: absolute;
-  top: 0;
+  top: 20px;
   right: 0;
   height: 5px;
   width: 100%;
@@ -82,7 +82,7 @@
   position: absolute;
   pointer-events: none;
   user-select: none;
-  top: 0px;
+  top: 20px;
   left: 0%;
   height: 20px;
   width: 20px;

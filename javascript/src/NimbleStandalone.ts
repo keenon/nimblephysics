@@ -223,9 +223,24 @@ class NimbleStandalone {
     window.removeEventListener("keydown", this.keyboardListener);
   };
 
+  getRemainingLoadedMillis = () => {
+    const currentFrame = this.lastFrame;
+    const bufferFrames = this.rawFrameBytes.length;
+    const availableFrames = bufferFrames - currentFrame;
+    const availableTime = availableFrames * this.msPerFrame;
+    return availableTime;
+  };
+
   setLoadedProgress = (percentage: number) => {
     this.progressBarLoaded.style.width = (1.0 - percentage) * 100 + "%";
     this.progressBarLoaded.style.left = percentage * 100 + "%";
+
+    // As we're buffering, if we buffer up enough for 1s of playback, start playing
+    if (!this.playing) {
+      if (this.getRemainingLoadedMillis() > 1000) {
+        this.togglePlay();
+      }
+    }
   }
 
   setProgress = (percentage: number) => {
@@ -447,9 +462,6 @@ class NimbleStandalone {
             if (done) {
               this.estimatedTotalFrames = this.rawFrameBytes.length;
               this.setLoadedProgress(1.0);
-              if (!this.playing) {
-                this.togglePlay();
-              }
               return;
             }
 
@@ -489,6 +501,10 @@ class NimbleStandalone {
   togglePlay = () => {
     this.playing = !this.playing;
     if (this.playing) {
+      if (this.getRemainingLoadedMillis() < 500) {
+        // Start back at the beginning if we reached the end and we want to play anyways
+        this.lastFrame = -1;
+      }
       this.playPauseButton.innerHTML = "Pause";
     }
     else {
@@ -569,6 +585,12 @@ class NimbleStandalone {
       if (this.view != null) {
         if (frameNumber < this.rawFrameBytes.length) {
           this.getRecordingFrame(frameNumber).command.forEach(this.handleCommand);
+        }
+        else {
+          // Stop playing, if we've reached the end of our loaded content
+          if (this.playing) {
+            this.togglePlay();
+          }
         }
 
         // This is the slower but more correct method.
