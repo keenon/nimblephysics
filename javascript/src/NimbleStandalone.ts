@@ -111,9 +111,7 @@ class NimbleStandalone {
     this.progressScrub.className = "NimbleStandalone-progress-bar-scrub";
     this.progressBarContainer.appendChild(this.progressScrub);
 
-    const processMouseEvent = (e: MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    const processEvent = (e: MouseEvent | Touch) => {
       const rect = this.progressBarContainer.getBoundingClientRect();
       const x = e.clientX - rect.left;
       let percentage = x / rect.width;
@@ -124,20 +122,70 @@ class NimbleStandalone {
       this.setProgress(percentage);
     };
 
-    this.progressBarContainer.addEventListener("mousedown", (e: MouseEvent) => {
-      processMouseEvent(e);
+    const startEvent = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.touches) {
+        processEvent(event.touches[0]); // Get the first touch
+      } else {
+        processEvent(event);
+      }
 
       this.scrubbing = true;
       this.startAnimation();
 
-      window.addEventListener("mousemove", processMouseEvent);
-      const mouseUp = () => {
-        window.removeEventListener("mousemove", processMouseEvent);
-        window.removeEventListener("mousup", mouseUp);
-        this.scrubbing = false;
+      const moveEvent = (event) => {
+        // try {
+        //   event.preventDefault();
+        // }
+        // catch (e) {
+        //   // Ignore
+        // }
+
+        if (event.touches) {
+          processEvent(event.touches[0]); // Get the first touch
+        } else {
+          processEvent(event);
+        }
       };
-      window.addEventListener("mouseup", mouseUp);
-    });
+
+      const endEvent = () => {
+        if (this.scrubbing) {
+          window.removeEventListener("mousemove", moveEvent);
+          window.removeEventListener("mouseup", endEvent);
+          window.removeEventListener("touchmove", moveEvent);
+          window.removeEventListener("touchend", endEvent);
+          this.scrubbing = false;
+        }
+      };
+
+      if (event.touches) {
+        window.addEventListener("touchmove", moveEvent);
+        window.addEventListener("touchend", endEvent);
+      } else {
+        window.addEventListener("mousemove", moveEvent);
+        window.addEventListener("mouseup", endEvent);
+      }
+    };
+
+    this.progressBarContainer.addEventListener("mousedown", startEvent);
+    this.progressBarContainer.addEventListener("touchstart", startEvent);
+
+
+    // this.progressBarContainer.addEventListener("mousedown", (e: MouseEvent) => {
+    //   processMouseEvent(e);
+
+    //   this.scrubbing = true;
+    //   this.startAnimation();
+
+    //   window.addEventListener("mousemove", processMouseEvent);
+    //   const mouseUp = () => {
+    //     window.removeEventListener("mousemove", processMouseEvent);
+    //     window.removeEventListener("mousup", mouseUp);
+    //     this.scrubbing = false;
+    //   };
+    //   window.addEventListener("mouseup", mouseUp);
+    // });
 
     window.addEventListener("keydown", this.keyboardListener);
 
