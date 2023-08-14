@@ -36,7 +36,7 @@ brew install eigen
 brew install openssl@1.1
 if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
       # x86 Macs
-      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/ || :
 else
       # ARM64 Macs
       # TODO: unsudo this command
