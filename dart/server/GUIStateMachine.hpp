@@ -95,6 +95,16 @@ public:
       std::string prefix = "trajectory",
       const std::string& layer = "");
 
+  /// This either creates or moves an arrow to have the new start and end points
+  void renderArrow(
+      Eigen::Vector3s start,
+      Eigen::Vector3s end,
+      s_t bodyRadius,
+      s_t tipRadius,
+      Eigen::Vector4s color = Eigen::Vector4s(1, 0, 0, 0.5),
+      const std::string& prefix = "arrow",
+      const std::string& layer = "");
+
   /// This is a high-level command that renders a wrench on a body node
   void renderBodyWrench(
       const dynamics::BodyNode* body,
@@ -160,6 +170,30 @@ public:
       bool castShadows = false,
       bool receiveShadows = false);
 
+  /// This creates a cone in the web GUI under a specified key
+  void createCone(
+      std::string key,
+      s_t radius,
+      s_t height,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a cylinder in the web GUI under a specified key
+  void createCylinder(
+      std::string key,
+      s_t radius,
+      s_t height,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
   /// This creates a capsule in the web GUI under a specified key
   void createCapsule(
       std::string key,
@@ -177,7 +211,8 @@ public:
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
       const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
-      const std::string& layer = "");
+      const std::string& layer = "",
+      const std::vector<s_t>& width = std::vector<s_t>());
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -453,6 +488,34 @@ protected:
   };
   std::unordered_map<std::string, Sphere> mSpheres;
 
+  struct Cone
+  {
+    std::string key;
+    std::string layer;
+    s_t radius;
+    s_t height;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector4s color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Cone> mCones;
+
+  struct Cylinder
+  {
+    std::string key;
+    std::string layer;
+    s_t radius;
+    s_t height;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector4s color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Cylinder> mCylinders;
+
   struct Capsule
   {
     std::string key;
@@ -472,6 +535,7 @@ protected:
     std::string layer;
     std::vector<Eigen::Vector3s> points;
     Eigen::Vector4s color;
+    std::vector<s_t> width;
   };
   std::unordered_map<std::string, Line> mLines;
 
@@ -591,6 +655,8 @@ protected:
   void encodeCreateLayer(proto::CommandList& list, Layer& layer);
   void encodeCreateBox(proto::CommandList& list, Box& box);
   void encodeCreateSphere(proto::CommandList& list, Sphere& sphere);
+  void encodeCreateCone(proto::CommandList& list, Cone& cone);
+  void encodeCreateCylinder(proto::CommandList& list, Cylinder& cylinder);
   void encodeCreateCapsule(proto::CommandList& list, Capsule& capsule);
   void encodeCreateLine(proto::CommandList& list, Line& line);
   void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);

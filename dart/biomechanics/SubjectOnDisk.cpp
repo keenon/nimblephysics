@@ -541,11 +541,6 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
         frame->groundContactWrenches(i * 6 + j)
             = proto.ground_contact_wrench(i * 6 + j);
       }
-      s_t contactNorm = frame->groundContactWrenches.segment<6>(i * 6).norm();
-      if (contactNorm > contactThreshold)
-      {
-        frame->contact(i) = 1;
-      }
       for (int j = 0; j < 3; j++)
       {
         frame->groundContactCenterOfPressure(i * 3 + j)
@@ -554,6 +549,11 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
             = proto.ground_contact_torque(i * 3 + j);
         frame->groundContactForce(i * 3 + j)
             = proto.ground_contact_force(i * 3 + j);
+      }
+      s_t contactNorm = frame->groundContactForce.segment<3>(i * 3).norm();
+      if (contactNorm > contactThreshold)
+      {
+        frame->contact(i) = 1;
       }
     }
 

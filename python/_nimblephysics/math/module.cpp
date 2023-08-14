@@ -40,6 +40,7 @@ namespace python {
 void Random(py::module& sm);
 void Geometry(py::module& sm);
 void MultivariateGaussian(py::module& sm);
+void GraphFlowDiscretizer(py::module& sm);
 
 void dart_math(py::module& m)
 {
@@ -48,6 +49,7 @@ void dart_math(py::module& m)
   Random(sm);
   Geometry(sm);
   MultivariateGaussian(sm);
+  GraphFlowDiscretizer(sm);
 }
 
 } // namespace python

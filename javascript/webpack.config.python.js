@@ -8,7 +8,8 @@ const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = false;
 
 module.exports = {
   entry: {
-    live: "./src/live.ts"
+    live: "./src/live.ts",
+    embeddable: "./src/embeddable.ts"
   },
   module: {
     rules: [

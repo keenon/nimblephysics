@@ -313,3 +313,36 @@ TEST(REALTIME, GUI_SERVER_2)
   server.blockWhileServing();
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(REALTIME, ARROW)
+{
+  GUIWebsocketServer server;
+  server.serve(8070);
+
+  server.createCylinder(
+      "cyl", 0.1, 1.0, Eigen::Vector3s::Zero(), Eigen::Vector3s::Zero());
+  server.createCone(
+      "cone", 0.2, 1.0, Eigen::Vector3s::UnitY(), Eigen::Vector3s::Zero());
+  server.renderBasis();
+
+  server.renderArrow(
+      Eigen::Vector3s::Zero(), Eigen::Vector3s::Ones() * 2, 0.2, 0.4);
+
+  std::vector<Eigen::Vector3s> points;
+  points.push_back(Eigen::Vector3s::Zero());
+  points.push_back(Eigen::Vector3s::Ones() * 2);
+  server.createLine("line", points);
+
+  Ticker ticker(0.01);
+  ticker.registerTickListener([&](long time) {
+    Eigen::Vector3s endPoint = Eigen::Vector3s::Ones() * 2;
+    endPoint(1) = sin((s_t)time / 1000);
+    server.renderArrow(Eigen::Vector3s::Zero(), endPoint, 0.2, 0.4);
+  });
+
+  server.registerConnectionListener([&]() { ticker.start(); });
+
+  server.blockWhileServing();
+}
+#endif

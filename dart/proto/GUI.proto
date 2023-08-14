@@ -13,6 +13,8 @@ message Command {
     CreateLayer layer = 1;
     CreateBox box = 2;
     CreateSphere sphere = 9;
+    CreateCone cone = 36;
+    CreateCylinder cylinder = 35;
     CreateCapsule capsule = 10;
     CreateLine line = 11;
     CreateMesh mesh = 3;
@@ -78,6 +80,24 @@ message CreateSphere {
   bool receive_shadows = 5;
 }
 
+message CreateCone {
+  int32 key = 1;
+  // Concatenates radius, height, pos, euler, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 2;
+  int32 layer = 3;
+  bool cast_shadows = 4;
+  bool receive_shadows = 5;
+}
+
+message CreateCylinder {
+  int32 key = 1;
+  // Concatenates radius, height, pos, euler, and color into a single vector, saving a few bytes of proto headers
+  repeated float data = 2;
+  int32 layer = 3;
+  bool cast_shadows = 4;
+  bool receive_shadows = 5;
+}
+
 message CreateCapsule {
   int32 key = 1;
   // Concatenates radius, height, pos, euler, and color into a single vector, saving a few bytes of proto headers
@@ -92,6 +112,7 @@ message CreateLine {
   repeated float points = 2;
   repeated float color = 3;
   int32 layer = 4;
+  repeated float width = 5;
 }
 
 message CreateMesh {

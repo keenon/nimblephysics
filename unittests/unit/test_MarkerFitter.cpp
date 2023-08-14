@@ -5993,6 +5993,39 @@ TEST(MarkerFitter, SINGLE_TRIAL_GIMBAL_LOCK)
 #endif
 
 #ifdef ALL_TESTS
+TEST(MarkerFitter, GNARLY_COP_DATA)
+{
+  C3DLoader loader;
+  C3D c3d = loader.loadC3D("dart://sample/c3d/S09DA101.c3d");
+  GUIRecording recording;
+  recording.setFramesPerSecond(c3d.framesPerSecond);
+
+  for (int t = 0; t < c3d.markerTimesteps.size(); t++)
+  {
+    for (int i = 0; i < c3d.forcePlates.size(); i++)
+    {
+      Eigen::Vector3s force = c3d.forcePlates[i].forces[t];
+      Eigen::Vector3s cop = c3d.forcePlates[i].centersOfPressure[t];
+      std::vector<Eigen::Vector3s> line;
+      line.push_back(cop);
+      line.push_back(cop + (force * 0.001));
+      Eigen::Vector4s color = Eigen::Vector4s::Unit(i);
+      color(3) = 1.0;
+      recording.createLine("grf_" + std::to_string(i), line, color);
+      recording.createSphere(
+          "cop_" + std::to_string(i),
+          Eigen::Vector3s::Ones() * (force.norm() * 0.0005),
+          cop,
+          color);
+    }
+    recording.saveFrame();
+  }
+
+  recording.writeFramesJson("../../../javascript/src/data/movement2.bin");
+}
+#endif
+
+#ifdef ALL_TESTS
 TEST(MarkerFitter, SINGLE_TRIAL_MICHAEL)
 {
   std::vector<std::string> c3dFiles;

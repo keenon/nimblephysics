@@ -94,12 +94,109 @@ void GUIStateMachine(py::module& m)
           ::py::arg("castShadows") = true,
           ::py::arg("receiveShadows") = false)
       .def(
+          "createCapsule",
+          +[](dart::server::GUIStateMachine* self,
+              std::string key,
+              s_t radius,
+              s_t height,
+              Eigen::Vector3s pos,
+              Eigen::Vector3s euler,
+              Eigen::Vector4s color,
+              std::string layer,
+              bool castShadows,
+              bool receiveShadows) {
+            self->createCapsule(
+                key,
+                radius,
+                height,
+                pos,
+                euler,
+                color,
+                layer,
+                castShadows,
+                receiveShadows);
+          },
+          ::py::arg("key"),
+          ::py::arg("radius"),
+          ::py::arg("height"),
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+          ::py::arg("layer") = "",
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
+      .def(
+          "createCone",
+          +[](dart::server::GUIStateMachine* self,
+              std::string key,
+              s_t radius,
+              s_t height,
+              Eigen::Vector3s pos,
+              Eigen::Vector3s euler,
+              Eigen::Vector4s color,
+              std::string layer,
+              bool castShadows,
+              bool receiveShadows) {
+            self->createCone(
+                key,
+                radius,
+                height,
+                pos,
+                euler,
+                color,
+                layer,
+                castShadows,
+                receiveShadows);
+          },
+          ::py::arg("key"),
+          ::py::arg("radius"),
+          ::py::arg("height"),
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+          ::py::arg("layer") = "",
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
+      .def(
+          "createCylinder",
+          +[](dart::server::GUIStateMachine* self,
+              std::string key,
+              s_t radius,
+              s_t height,
+              Eigen::Vector3s pos,
+              Eigen::Vector3s euler,
+              Eigen::Vector4s color,
+              std::string layer,
+              bool castShadows,
+              bool receiveShadows) {
+            self->createCylinder(
+                key,
+                radius,
+                height,
+                pos,
+                euler,
+                color,
+                layer,
+                castShadows,
+                receiveShadows);
+          },
+          ::py::arg("key"),
+          ::py::arg("radius"),
+          ::py::arg("height"),
+          ::py::arg("pos") = Eigen::Vector3s::Zero(),
+          ::py::arg("euler") = Eigen::Vector3s::Zero(),
+          ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+          ::py::arg("layer") = "",
+          ::py::arg("castShadows") = true,
+          ::py::arg("receiveShadows") = false)
+      .def(
           "createLine",
           &dart::server::GUIStateMachine::createLine,
           ::py::arg("key"),
           ::py::arg("points"),
           ::py::arg("color") = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
-          ::py::arg("layer") = "")
+          ::py::arg("layer") = "",
+          ::py::arg("width") = std::vector<s_t>())
       .def(
           "createMeshFromShape",
           &dart::server::GUIStateMachine::createMeshFromShape,
@@ -302,6 +399,17 @@ void GUIStateMachine(py::module& m)
           ::py::arg("skeleton"),
           ::py::arg("prefix") = "world",
           ::py::arg("overrideColor") = -1 * Eigen::Vector4s::Ones(),
+          ::py::arg("layer") = "",
+          ::py::call_guard<py::gil_scoped_release>())
+      .def(
+          "renderArrow",
+          &dart::server::GUIStateMachine::renderArrow,
+          ::py::arg("start"),
+          ::py::arg("end"),
+          ::py::arg("bodyRadius"),
+          ::py::arg("tipRadius"),
+          ::py::arg("color") = Eigen::Vector4s(1, 0, 0, 0.5),
+          ::py::arg("prefix") = "arrow",
           ::py::arg("layer") = "",
           ::py::call_guard<py::gil_scoped_release>())
       .def(

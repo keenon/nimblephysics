@@ -7,6 +7,7 @@ import Slider from "./components/Slider";
 import SimplePlot from "./components/SimplePlot";
 import RichPlot from "./components/RichPlot";
 import { dart } from './proto/GUI';
+import { MeshLine, MeshLineMaterial } from './THREE.MeshLine';
 import VERSION_NUM from "../../VERSION.txt";
 import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
@@ -128,6 +129,8 @@ class DARTView {
   running: boolean;
 
   objects: Map<number, THREE.Group | THREE.Mesh | THREE.Line>;
+  meshLines: Map<number, MeshLine>;
+  meshLineGeometry: Map<number, THREE.Geometry>;
   objectColors: Map<number, number[]>;
   keys: Map<THREE.Object3D, number>;
   textures: Map<number, THREE.Texture>;
@@ -141,6 +144,8 @@ class DARTView {
   tooltipEditListeners: ((key: number, tooltip: string) => void)[];
 
   sphereGeometry: THREE.SphereBufferGeometry;
+  coneGeometry: THREE.ConeBufferGeometry;
+  cylinderGeometry: THREE.CylinderBufferGeometry;
 
   layers: Map<number, Layer>;
 
@@ -168,6 +173,8 @@ class DARTView {
     this.hovering = []
 
     this.objects = new Map();
+    this.meshLines = new Map();
+    this.meshLineGeometry = new Map();
     this.objectColors = new Map();
     this.keys = new Map();
     this.disposeHandlers = new Map();
@@ -299,12 +306,27 @@ class DARTView {
 
     this.uiContainer.appendChild(instructions);
 
-    this.layersTable = document.createElement("table");
-    this.layersTable.className = "GUI_layers";
+    const layersTableOuter = document.createElement("table");
+    layersTableOuter.className = "GUI_layers";
+
+    const layersTableHead = document.createElement("thead");
+
+    const layersTableHeadRow = document.createElement("tr");
+    const layersTableHeadElem = document.createElement("td");
+    layersTableHeadElem.colSpan = 2;
+    layersTableHeadElem.innerHTML = "Layers";
+    layersTableHeadRow.appendChild(layersTableHeadElem);
+    layersTableHead.appendChild(layersTableHeadRow);
+    layersTableOuter.appendChild(layersTableHead);
+
+    const layersTableBody = document.createElement("tbody");
+    layersTableOuter.appendChild(layersTableBody);
+    this.layersTable = layersTableBody;
+
 
     const layersTableHolder = document.createElement("div");
     layersTableHolder.className = "GUI_layers_container";
-    layersTableHolder.appendChild(this.layersTable);
+    layersTableHolder.appendChild(layersTableOuter);
 
     this.uiContainer.appendChild(layersTableHolder);
 
@@ -316,6 +338,8 @@ class DARTView {
       NUM_SPHERE_SEGMENTS,
       NUM_SPHERE_SEGMENTS
     );
+    this.coneGeometry = new THREE.ConeBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
+    this.cylinderGeometry = new THREE.CylinderBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
   }
 
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
@@ -492,6 +516,44 @@ class DARTView {
         );
       }
     }
+    else if (command.cone != null) {
+      const data = command.cone.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCone(
+        command.cone.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cone.layer,
+        command.cone.cast_shadows === true,
+        command.cone.receive_shadows === true
+      );
+    }
+    else if (command.cylinder != null) {
+      const data = command.cylinder.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCylinder(
+        command.cylinder.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cylinder.layer,
+        command.cylinder.cast_shadows === true,
+        command.cylinder.receive_shadows === true
+      );
+    }
     else if (command.capsule != null) {
       const data = command.capsule.data;
       const radius: number = data[0];
@@ -526,12 +588,14 @@ class DARTView {
         }
         vertices[vertices.length-1].push(command.line.points[i]);
       }
+      const width: number[] = command.line.width;
 
-      this.createLine(
+      this.createMeshLine(
         command.line.key,
         vertices,
         color,
-        command.line.layer
+        command.line.layer,
+        width
       );
     }
     else if (command.mesh != null) {
@@ -859,6 +923,7 @@ class DARTView {
       if (color.length > 3 && color[3] < 1.0) {
         material.transparent = true;
         material.opacity = color[3];
+        material.depthWrite = castShadows;
       }
     }
     else {
@@ -868,6 +933,7 @@ class DARTView {
       if (color.length > 3 && color[3] < 1.0) {
         material.transparent = true;
         material.opacity = color[3];
+        material.depthWrite = castShadows;
       }
       const geometry = new THREE.BoxBufferGeometry(
         SCALE_FACTOR,
@@ -932,6 +998,108 @@ class DARTView {
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
     mesh.scale.set(radii[0], radii[1], radii[2]);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a cone to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCone = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.coneGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a cylinder to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCylinder = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.cylinderGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
@@ -1025,7 +1193,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createLine = (key: number, points: number[][], color: number[], layer: number | undefined) => {
+  createLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
     this.objectType.set(key, "line");
     this.objectColors.set(key, color);
     // Try not to recreate geometry. If we already created a line in the past,
@@ -1080,6 +1248,189 @@ class DARTView {
       this.keys.set(path, key);
 
       this.view.add(key, path);
+    }
+
+    if (layer != null && this.layers.has(layer)) {
+      // console.log(this.layers.get(layer).name + ": " + this.layers.get(layer).shown);
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a line to the scene
+   *
+   * Must call render() to see results!
+   */
+  createMeshLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
+    this.objectType.set(key, "line");
+    this.objectColors.set(key, color);
+    // Try not to recreate geometry. If we already created a line in the past,
+    // let's just update its buffers instead of creating fresh ones.
+    if (this.objects.has(key)) {
+      // console.log("Not creating line " + key);
+      const mesh: THREE.Mesh = this.objects.get(key) as any;
+      const line: MeshLine = this.meshLines.get(key) as any;
+
+      (mesh as any).material.color = new THREE.Color(
+        color[0],
+        color[1],
+        color[2]
+      );
+      if (color.length > 3 && color[3] < 1.0) {
+        (mesh as any).material.transparent = true;
+        (mesh as any).material.opacity = color[3];
+      }
+
+      const positions = line._attributes.position.array;
+      const next = line._attributes.next.array;
+      const previous = line._attributes.previous.array;
+
+      for (let i = 0; i < points.length; i++) {
+        positions[i*6] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 1] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 2] = points[i][2] * SCALE_FACTOR;
+        positions[i*6 + 3] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 4] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 5] = points[i][2] * SCALE_FACTOR;
+      }
+
+      ///////////////////////////////////////////////
+      var l = positions.length / 6;
+
+      const compareV3 = function(a, b) {
+        var aa = a * 6;
+        var ab = b * 6;
+        return (
+          positions[aa] === positions[ab] &&
+          positions[aa + 1] === positions[ab + 1] &&
+          positions[aa + 2] === positions[ab + 2]
+        )
+      }
+      const copyV3 = function(a) {
+        var aa = a * 6
+        return [positions[aa], positions[aa + 1], positions[aa + 2]]
+      }
+
+      var v;
+      let previousCursor = 0;
+      let nextCursor = 0;
+
+      // initial previous points
+      if (compareV3(0, l - 1)) {
+        v = copyV3(l - 2)
+      } else {
+        v = copyV3(0)
+      }
+      // this.previous.push(v[0], v[1], v[2])
+      // this.previous.push(v[0], v[1], v[2])
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+
+      for (var j = 0; j < l; j++) {
+        if (j < l - 1) {
+          // points previous to poisitions
+          v = copyV3(j)
+          // this.previous.push(v[0], v[1], v[2])
+          // this.previous.push(v[0], v[1], v[2])
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+        }
+        if (j > 0) {
+          // points after poisitions
+          v = copyV3(j)
+          // this.next.push(v[0], v[1], v[2])
+          // this.next.push(v[0], v[1], v[2])
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+        }
+      }
+
+      // last next point
+      if (compareV3(l - 1, 0)) {
+        v = copyV3(1)
+      } else {
+        v = copyV3(l - 1)
+      }
+      // this.next.push(v[0], v[1], v[2])
+      // this.next.push(v[0], v[1], v[2])
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      ///////////////////////////////////////////////
+
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
+      // (line as any).process();
+      line._attributes.position.needsUpdate = true;
+      line._attributes.previous.needsUpdate = true;
+      line._attributes.next.needsUpdate = true;
+    } else {
+      // Create the line geometry used for storing verticies
+      let linePoints: THREE.Vector3[] = [];
+      for (let i = 0; i < points.length; i++) {
+        linePoints.push(
+          new THREE.Vector3(
+            points[i][0] * SCALE_FACTOR,
+            points[i][1] * SCALE_FACTOR,
+            points[i][2] * SCALE_FACTOR
+          )
+        );
+      }
+
+      const pathMaterial = new MeshLineMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+        linewidth: 2,
+      });
+      if (color.length > 3 && color[3] < 1.0) {
+        pathMaterial.transparent = true;
+        pathMaterial.opacity = color[3];
+      }
+      const line = new MeshLine();
+      (line as any).setPoints(linePoints, p => p);
+
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
+      const mesh = new THREE.Mesh(line, pathMaterial);
+      mesh.frustumCulled = false;
+
+      this.meshLines.set(key, line);
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        pathMaterial.dispose();
+        line.dispose();
+      });
+      this.keys.set(mesh, key);
+
+      this.view.add(key, mesh);
     }
 
     if (layer != null && this.layers.has(layer)) {
@@ -1215,6 +1566,7 @@ class DARTView {
       mesh.rotation.y = euler[1];
       mesh.rotation.z = euler[2];
       mesh.castShadow = castShadows;
+      mesh.material.depthWrite = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(scale[0], scale[1], scale[2]);
 
@@ -1268,6 +1620,10 @@ class DARTView {
    */
   setObjectColor = (key: number, color: number[], save: boolean = true) => {
     const obj = this.objects.get(key);
+    if (obj == null) {
+      // console.warn("Object "+key+" attempted to setColor(), but is missing");
+      return;
+    }
     if (save) {
       this.objectColors.set(key, color);
     }
@@ -1297,8 +1653,11 @@ class DARTView {
    */
   setObjectScale = (key: number, scale: number[]) => {
     const obj = this.objects.get(key);
-    // Don't dynamically set scales on capsules
-    if (obj && this.objectType.get(key) != "capsule") {
+    // // Don't dynamically set scales on capsules
+    // if (obj && this.objectType.get(key) != "capsule") {
+    //   (obj as any).scale.set(scale[0], scale[1], scale[2]);
+    // }
+    if (obj) {
       (obj as any).scale.set(scale[0], scale[1], scale[2]);
     }
   };

@@ -241,6 +241,105 @@ void Skeleton(
           &dynamics::Skeleton::MultipleContactInverseDynamicsOverTimeResult::
               computeSmoothnessLoss);
 
+  /*
+    typedef struct EnergyAccountingFrame
+    {
+      // The current amount of energy in each of the body segments, split across
+      // both categories.
+      Eigen::VectorXs bodyKineticEnergy;
+      Eigen::VectorXs bodyPotentialEnergy;
+      std::vector<Eigen::Vector3s> bodyCenters;
+
+      // Each joint energy transfer
+      std::vector<JointEnergyTransmitter> joints;
+      // Each contact energy transfer
+      std::vector<ContactEnergyTransmitter> contacts;
+    } EnergyAccountingFrame;
+  */
+  ::py::class_<dart::dynamics::Skeleton::JointEnergyTransmitter>(
+      m, "JointEnergyTransmitter")
+      .def(::py::init<>())
+      .def_readwrite("name", &dynamics::Skeleton::JointEnergyTransmitter::name)
+      .def_readwrite(
+          "worldCenter",
+          &dynamics::Skeleton::JointEnergyTransmitter::worldCenter)
+      .def_readwrite(
+          "parentBody", &dynamics::Skeleton::JointEnergyTransmitter::parentBody)
+      .def_readwrite(
+          "parentCenter",
+          &dynamics::Skeleton::JointEnergyTransmitter::parentCenter)
+      .def_readwrite(
+          "childBody", &dynamics::Skeleton::JointEnergyTransmitter::childBody)
+      .def_readwrite(
+          "childCenter",
+          &dynamics::Skeleton::JointEnergyTransmitter::childCenter)
+      .def_readwrite(
+          "powerToParent",
+          &dynamics::Skeleton::JointEnergyTransmitter::powerToParent)
+      .def_readwrite(
+          "powerToChild",
+          &dynamics::Skeleton::JointEnergyTransmitter::powerToChild);
+
+  ::py::class_<dart::dynamics::Skeleton::ContactEnergyTransmitter>(
+      m, "ContactEnergyTransmitter")
+      .def(::py::init<>())
+      .def_readwrite(
+          "worldCenter",
+          &dynamics::Skeleton::ContactEnergyTransmitter::worldCenter)
+      .def_readwrite(
+          "worldForce",
+          &dynamics::Skeleton::ContactEnergyTransmitter::worldForce)
+      .def_readwrite(
+          "worldMoment",
+          &dynamics::Skeleton::ContactEnergyTransmitter::worldMoment)
+      .def_readwrite(
+          "contactBody",
+          &dynamics::Skeleton::ContactEnergyTransmitter::contactBody)
+      .def_readwrite(
+          "contactBodyCenter",
+          &dynamics::Skeleton::ContactEnergyTransmitter::contactBodyCenter)
+      .def_readwrite(
+          "powerToBody",
+          &dynamics::Skeleton::ContactEnergyTransmitter::powerToBody);
+
+  ::py::class_<dart::dynamics::Skeleton::EnergyAccountingFrame>(
+      m, "EnergyAccountingFrame")
+      .def(::py::init<>())
+      .def_readwrite(
+          "bodyCenters",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyCenters)
+      .def_readwrite(
+          "bodyKineticEnergy",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyKineticEnergy)
+      .def_readwrite(
+          "bodyPotentialEnergy",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyPotentialEnergy)
+      .def_readwrite(
+          "bodyKineticEnergyDeriv",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyKineticEnergyDeriv)
+      .def_readwrite(
+          "bodyPotentialEnergyDeriv",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyPotentialEnergyDeriv)
+      .def_readwrite(
+          "bodyParentJointPower",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyParentJointPower)
+      .def_readwrite(
+          "bodyGravityPower",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyGravityPower)
+      .def_readwrite(
+          "bodyExternalForcePower",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyExternalForcePower)
+      .def_readwrite(
+          "bodyChildJointPowerSum",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyChildJointPowerSum)
+      .def_readwrite(
+          "bodyChildJointPowers",
+          &dynamics::Skeleton::EnergyAccountingFrame::bodyChildJointPowers)
+      .def_readwrite(
+          "contacts", &dynamics::Skeleton::EnergyAccountingFrame::contacts)
+      .def_readwrite(
+          "joints", &dynamics::Skeleton::EnergyAccountingFrame::joints);
+
   skeleton
       .def(::py::init(+[]() -> dart::dynamics::SkeletonPtr {
         return dart::dynamics::Skeleton::create();
@@ -1140,6 +1239,15 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
           ::py::arg("prevContactForces") = std::vector<Eigen::Vector6s>(),
           ::py::arg("prevContactWeight") = 0.0,
           ::py::arg("magnitudeCosts") = dart::dynamics::Skeleton::EMPTY)
+      .def(
+          "getEnergyAccounting",
+          &dart::dynamics::Skeleton::getEnergyAccounting,
+          ::py::arg("heightAtZeroPoint") = 0,
+          ::py::arg("referenceFrameVelocity") = Eigen::Vector3s::Zero(),
+          ::py::arg("contactBodies") = std::vector<dynamics::BodyNode*>(),
+          ::py::arg("cops") = std::vector<Eigen::Vector3s>(),
+          ::py::arg("forces") = std::vector<Eigen::Vector3s>(),
+          ::py::arg("moments") = std::vector<Eigen::Vector3s>())
       .def(
           "getSupportVersion",
           +[](const dart::dynamics::Skeleton* self) -> std::size_t {
