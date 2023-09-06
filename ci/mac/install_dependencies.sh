@@ -36,8 +36,8 @@ brew install eigen
 brew install openssl@1.1
 if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
       # x86 Macs
-      # We now get permission denied to do this, so we'll just skip it
-      # cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/ || :
+      # If this fails, we skip it
+      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/ || :
 else
       # ARM64 Macs
       # TODO: unsudo this command
