@@ -12,26 +12,26 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
-          - python-version: 3.7
+          - python-version: "3.7"
             PYTHON_VERSION_CODE: cp37-cp37m
             MAC_VERSION_TAG: macosx_10_15 # TODO should be macosx_11_0
-            PYTHON_VERSION_NUMBER: 3.6
-          - python-version: 3.8
+            PYTHON_VERSION_NUMBER: "3.6"
+          - python-version: "3.8"
             PYTHON_VERSION_CODE: cp38-cp38
             MAC_VERSION_TAG: macosx_10_15 # TODO should be macosx_11_0
-            PYTHON_VERSION_NUMBER: 3.8
-          - python-version: 3.9
+            PYTHON_VERSION_NUMBER: "3.8"
+          - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
             MAC_VERSION_TAG: macosx_11_0
-            PYTHON_VERSION_NUMBER: 3.9
-          - python-version: 3.10
+            PYTHON_VERSION_NUMBER: "3.9"
+          - python-version: "3.10"
             PYTHON_VERSION_CODE: cp310-cp310
             MAC_VERSION_TAG: macosx_11_0
-            PYTHON_VERSION_NUMBER: 3.10
-          - python-version: 3.11
+            PYTHON_VERSION_NUMBER: "3.10"
+          - python-version: "3.11"
             PYTHON_VERSION_CODE: cp311-cp311
             MAC_VERSION_TAG: macosx_11_0
-            PYTHON_VERSION_NUMBER: 3.11
+            PYTHON_VERSION_NUMBER: "3.11"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
