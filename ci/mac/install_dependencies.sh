@@ -51,7 +51,7 @@ pushd libccd
 git checkout v2.1
 mkdir build
 pushd build
-cmake .. -DENABLE_DOUBLE_PRECISION=ON
+cmake .. -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -63,7 +63,7 @@ pushd assimp
 git checkout v5.0.1
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -76,7 +76,7 @@ brew install lapack
 git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
-./configure
+CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" ./configure
 # make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
 sudo make install
 popd
@@ -88,7 +88,7 @@ sudo rm -rf ThirdParty-Mumps
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-./configure --with-mumps --disable-java
+CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" ./configure --with-mumps --disable-java
 sudo make install -j
 popd
 sudo rm -rf Ipopt
@@ -100,7 +100,7 @@ pushd pybind11
 git checkout v2.11.1
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -137,7 +137,7 @@ pushd tinyxml2
 git checkout 8.0.0
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -159,7 +159,7 @@ git clone https://github.com/robotology-dependencies/tinyxml.git
 pushd tinyxml
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -170,7 +170,7 @@ git clone https://github.com/ros/urdfdom_headers.git
 pushd urdfdom_headers
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -181,7 +181,7 @@ git clone https://github.com/ros/console_bridge.git
 pushd console_bridge
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -192,7 +192,7 @@ git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install -j
 popd
 popd
@@ -224,6 +224,7 @@ pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
+      -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
       ../..
 sudo make install -j
 popd
@@ -236,7 +237,7 @@ git clone https://github.com/google/googletest.git benchmark/googletest
 pushd benchmark
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install
 popd
 popd
@@ -248,7 +249,7 @@ pushd ezc3d
 git checkout Release_1.5.4
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
 sudo make install
 popd
 popd
