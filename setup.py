@@ -85,6 +85,10 @@ class CMakeBuild(build_ext):
                 print('Using PYTHON_LIBRARY='+PYTHON_LIBRARY)
                 cmake_args += ['-DPYTHON_INCLUDE_DIR:PATH='+PYTHON_INCLUDE_DIR]
                 cmake_args += ['-DPYTHON_LIBRARY:FILEPATH='+PYTHON_LIBRARY]
+            elif platform.system() == 'Darwin':
+                machine = platform.machine()
+                if machine == "x86_64":
+                    cmake_args += ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
             build_args += ['--', '-j2']
 
         env = os.environ.copy()
