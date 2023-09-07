@@ -76,7 +76,7 @@ brew install lapack
 git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
-CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" ./configure
+./configure # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" 
 # make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
 sudo make install
 popd
@@ -88,7 +88,7 @@ sudo rm -rf ThirdParty-Mumps
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" ./configure --with-mumps --disable-java
+./configure --with-mumps --disable-java # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64"
 sudo make install -j
 popd
 sudo rm -rf Ipopt
