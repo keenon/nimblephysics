@@ -261,7 +261,7 @@ sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/
 sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
 sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
 sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
-sudo install_name_tool -id /usr/local/lib/libtinyxml2.6.2.dylib /usr/local/lib/libtinyxml2.6.2.dylib
+sudo install_name_tool -id /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib
 # install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
 # install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
 sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
