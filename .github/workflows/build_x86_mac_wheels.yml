@@ -57,7 +57,7 @@ jobs:
       - name: Build wheel
         run: |
           cd ci/mac
-          ./build_wheels.sh
+          ./build_wheels_x86_64.sh
         env:
           PYTHON: ${{ matrix.PYTHON }}
           ARCHFLAGS: "-arch x86_64"
