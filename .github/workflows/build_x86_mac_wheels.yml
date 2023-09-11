@@ -60,6 +60,7 @@ jobs:
           ./build_wheels.sh
         env:
           PYTHON: ${{ matrix.PYTHON }}
+          ARCHFLAGS: "-arch x86_64"
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
       - name: Publish artifact
