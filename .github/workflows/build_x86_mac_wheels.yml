@@ -61,6 +61,10 @@ jobs:
         env:
           PYTHON: ${{ matrix.PYTHON }}
           ARCHFLAGS: "-arch x86_64"
+          CFLAGS: "-arch x86_64"
+          CXXFLAGS: "-arch x86_64"
+          ARCHFLAGS: "-arch x86_64"
+          _PYTHON_HOST_PLATFORM: "macosx-10.9-x86_64"
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
       - name: Publish artifact

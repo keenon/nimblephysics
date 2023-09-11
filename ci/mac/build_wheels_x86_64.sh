@@ -21,7 +21,7 @@ rm -rf build/*
 # rm -rf wheelhouse/*
 
 # Actually build the code
-python setup.py sdist bdist_wheel --plat-name macosx-11.7-x86_64
+python setup.py sdist bdist_wheel --plat-name macosx-10.9-x86_64
 
 # Install delocate, to bundle dependencies into the wheel
 pushd dist
