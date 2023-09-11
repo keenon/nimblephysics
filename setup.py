@@ -66,6 +66,10 @@ class CMakeBuild(build_ext):
         if ext.target is not None:
             build_args += ['--target', ext.target]
 
+        print('Running system specific logic:')
+        print('platform.system(): '+str(platform.system()))
+        print('platform.machine(): '+str(platform.machine()))
+
         if platform.system() == "Windows":
             cmake_args += [
                 '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
@@ -90,6 +94,8 @@ class CMakeBuild(build_ext):
                 if machine == "x86_64":
                     cmake_args += ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
             build_args += ['--', '-j2']
+
+        cmake_args += ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
 
         env = os.environ.copy()
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),
