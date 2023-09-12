@@ -203,6 +203,8 @@ popd
 sudo rm -rf urdfdom
 file /usr/local/lib/liburdfdom_sensor.3.0.dylib
 lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
+otool -L /usr/local/lib/liburdfdom_sensor.dylib
+install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
@@ -269,6 +271,7 @@ sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/
 sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
 sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
 sudo install_name_tool -id /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib
+sudo install_name_tool -id /usr/local/lib/libezc3d.dylib /usr/local/lib/libezc3d.dylib
 # install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
 # install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
 sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
