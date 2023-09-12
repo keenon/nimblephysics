@@ -21,7 +21,9 @@ fi
 # Continue if the file exists
 file $1/_nimblephysics.so
 lipo -info $1/_nimblephysics.so
-PYTHONPATH=$PP python3 -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
+otool -L $1/_nimblephysics.so
+export DYLD_PRINT_LIBRARIES=1
+PYTHONPATH=$PP python3 -vv -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
 PYTHONPATH=$PP pybind11-stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
 touch stubs/_nimblephysics-stubs/py.typed
 mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
