@@ -66,6 +66,7 @@ jobs:
           _PYTHON_HOST_PLATFORM: "macosx-10.9-x86_64"
           PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
+          DYLD_PRINT_LIBRARIES: 1
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:

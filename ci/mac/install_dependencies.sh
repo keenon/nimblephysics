@@ -166,6 +166,8 @@ sudo make install -j
 popd
 popd
 sudo rm -rf tinyxml
+file /usr/local/lib/libtinyxml.2.6.2.dylib
+lipo -info /usr/local/lib/libtinyxml.2.6.2.dylib
 
 # Install urdfdom_headers
 git clone https://github.com/ros/urdfdom_headers.git
@@ -199,6 +201,8 @@ sudo make install -j
 popd
 popd
 sudo rm -rf urdfdom
+file /usr/local/lib/liburdfdom_sensor.3.0.dylib
+lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
