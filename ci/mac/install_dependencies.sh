@@ -13,7 +13,9 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="11.0"
+# export MACOSX_DEPLOYMENT_TARGET="11.0"
+export MACOSX_DEPLOYMENT_TARGET="10.9"
+export CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
 
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
@@ -100,7 +102,7 @@ pushd pybind11
 git checkout v2.11.1
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -137,7 +139,7 @@ pushd tinyxml2
 git checkout 8.0.0
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -159,7 +161,7 @@ git clone https://github.com/robotology-dependencies/tinyxml.git
 pushd tinyxml
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -170,7 +172,7 @@ git clone https://github.com/ros/urdfdom_headers.git
 pushd urdfdom_headers
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -181,7 +183,7 @@ git clone https://github.com/ros/console_bridge.git
 pushd console_bridge
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -192,7 +194,7 @@ git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -224,6 +226,7 @@ pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
+      $CMAKE_FLAGS \
       ../..
 sudo make install -j
 popd
@@ -236,7 +239,7 @@ git clone https://github.com/google/googletest.git benchmark/googletest
 pushd benchmark
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS ..
 sudo make install
 popd
 popd
@@ -248,7 +251,7 @@ pushd ezc3d
 git checkout Release_1.5.4
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON $CMAKE_FLAGS ..
 sudo make install
 popd
 popd
