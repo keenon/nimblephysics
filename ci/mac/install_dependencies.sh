@@ -203,9 +203,26 @@ popd
 sudo rm -rf urdfdom
 file /usr/local/lib/liburdfdom_sensor.3.0.dylib
 lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
+
+echo "Fixing path on liburdfdom_sensor.dylib"
 otool -L /usr/local/lib/liburdfdom_sensor.dylib
 sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
 otool -L /usr/local/lib/liburdfdom_sensor.dylib
+
+echo "Fixing path on liburdfdom_model.dylib"
+otool -L /usr/local/lib/liburdfdom_model.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model.dylib
+otool -L /usr/local/lib/liburdfdom_model.dylib
+
+echo "Fixing path on liburdfdom_world.dylib"
+otool -L /usr/local/lib/liburdfdom_world.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_world.dylib
+otool -L /usr/local/lib/liburdfdom_world.dylib
+
+echo "Fixing path on liburdfdom_model_state.dylib"
+otool -L /usr/local/lib/liburdfdom_model_state.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model_state.dylib
+otool -L /usr/local/lib/liburdfdom_model_state.dylib
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
