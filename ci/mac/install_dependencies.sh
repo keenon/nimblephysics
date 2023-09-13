@@ -204,7 +204,8 @@ sudo rm -rf urdfdom
 file /usr/local/lib/liburdfdom_sensor.3.0.dylib
 lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
 otool -L /usr/local/lib/liburdfdom_sensor.dylib
-install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
+otool -L /usr/local/lib/liburdfdom_sensor.dylib
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
