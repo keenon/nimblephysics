@@ -24,8 +24,9 @@ class View {
   onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void;
   onTooltipHoveroff: () => void;
   onEditTooltip: (key: number) => void;
+  onRerender: () => void;
 
-  constructor(scene: THREE.Scene, parent: HTMLElement, onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void, onTooltipHoveroff: () => void, onEditTooltip: (key: number) => void) {
+  constructor(scene: THREE.Scene, parent: HTMLElement, onTooltipHoveron: (keys: number[], tooltip: string, top_x: number, top_y: number) => void, onTooltipHoveroff: () => void, onEditTooltip: (key: number) => void, onRerender: () => void) {
     this.scene = scene;
     this.container = document.createElement("div");
     this.container.className = "View__container";
@@ -34,6 +35,7 @@ class View {
     this.onTooltipHoveron = onTooltipHoveron;
     this.onTooltipHoveroff = onTooltipHoveroff;
     this.onEditTooltip = onEditTooltip;
+    this.onRerender = onRerender;
 
     // these two lines are essentially this.refreshSize(), but fix TS errors
     this.width = this.parent.getBoundingClientRect().width;
@@ -103,12 +105,15 @@ class View {
 
     this.orbitControls.addEventListener("change", () => {
       this.composer.render();
+      this.onRerender();
     });
     this.dragControls.addEventListener("drag", () => {
       this.composer.render();
+      this.onRerender();
     });
 
     this.composer.render();
+    this.onRerender();
   }
 
   /**
@@ -139,6 +144,33 @@ class View {
     this.scene.add(obj);
     this.recomputeDragList();
     this.recomputeTooltipList();
+  };
+
+  centerObject = (key: number) => {
+    let obj = this.inScene.get(key);
+    if (obj == null) {
+      return;
+    }
+    const boundingBox = new THREE.Box3().setFromObject(obj);
+    const center = new THREE.Vector3();
+    boundingBox.getCenter(center);
+    this.camera.lookAt(center);
+    this.orbitControls.target = center;
+    this.composer.render();
+    this.onRerender();
+  };
+
+  getObjectScreenPosition = (key: number) => {
+    let obj = this.inScene.get(key);
+    if (obj == null) {
+      return [0, 0];
+    }
+    let vector = new THREE.Vector3();
+    vector.setFromMatrixPosition(obj.matrixWorld);
+    vector.project(this.camera);
+    const x = Math.round((0.5 + vector.x / 2) * this.width);
+    const y = Math.round((0.5 - vector.y / 2) * this.height);
+    return [x, y];
   };
 
   remove = (key: number) => {
@@ -243,11 +275,13 @@ class View {
     this.renderer.setSize(this.width, this.height);
     this.composer.setSize(this.width, this.height);
     this.composer.render();
+    this.onRerender();
   };
 
   render = () => {
     this.orbitControls.update();
     this.composer.render();
+    this.onRerender();
   };
 }
 

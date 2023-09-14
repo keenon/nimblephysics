@@ -120,6 +120,60 @@ class Layer {
   };
 }
 
+class ObjectWarning {
+  view: DARTView;
+  objectKey: number;
+  warningKey: number;
+  warning: string;
+  shown: boolean;
+  div: HTMLElement;
+  button: HTMLButtonElement;
+
+  constructor(view: DARTView, key: number, warningKey: number, warning: string) {
+    this.objectKey = key;
+    this.warningKey = warningKey;
+    this.warning = warning;
+    this.shown = true;
+    this.view = view;
+    this.div = document.createElement("div");
+    this.div.addEventListener("mouseover", () => {
+      this.view.onMouseoverWarning(this.warningKey);
+    });
+    this.div.addEventListener("mouseout", () => {
+      this.view.onMouseoutWarning(this.warningKey);
+    });
+    this.div.className = "ObjectWarning";
+    this.div.style.position = "absolute";
+    this.div.innerHTML = this.warning;
+    this.button = document.createElement("button");
+    this.button.innerHTML = "Dismiss";
+    this.button.onclick = () => {
+      this.view.dismissWarning(this.warningKey);
+      this.remove();
+    };
+    this.div.appendChild(this.button);
+    this.view.uiContainer.appendChild(this.div);
+  }
+
+  update = () => {
+    const pos = this.view.view.getObjectScreenPosition(this.objectKey);
+    if (pos != null) {
+      // The magic offsets are so that the CSS arrow points to the object
+      this.div.style.top = (pos[1] + 15) + "px";
+      this.div.style.left = (pos[0] - 20) + "px";
+      this.div.style.display = "block";
+    }
+  }
+
+  remove = () => {
+    this.div.remove();
+  }
+
+  focus = () => {
+    const pos = this.view.view.centerObject(this.objectKey);
+  }
+}
+
 class DARTView {
   scene: THREE.Scene;
   container: HTMLElement;
@@ -136,6 +190,10 @@ class DARTView {
   textures: Map<number, THREE.Texture>;
   disposeHandlers: Map<number, () => void>;
   objectType: Map<number, string>;
+  objectWarnings: Map<number, ObjectWarning>;
+  mouseoverWarning: number;
+  mouseoverWarningListeners: Map<number, (over: boolean) => void>;
+  dismissedWarnings: Set<number>;
 
   uiElements: Map<number, Text | Button | Slider | SimplePlot | RichPlot>;
 
@@ -181,6 +239,10 @@ class DARTView {
     this.textures = new Map();
     this.uiElements = new Map();
     this.objectType = new Map();
+    this.objectWarnings = new Map();
+    this.mouseoverWarning = -1;
+    this.mouseoverWarningListeners = new Map();
+    this.dismissedWarnings = new Set();
     this.dragListeners = [];
     this.dragEndListeners = [];
     this.tooltipEditListeners = [];
@@ -227,7 +289,7 @@ class DARTView {
     updateCamera();
     */
 
-    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff, this.onEditTooltip);
+    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff, this.onEditTooltip, this.onRerender);
     this.running = false;
 
     this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
@@ -259,6 +321,7 @@ class DARTView {
 
     const logo = document.createElement("svg");
     logo.innerHTML = logoSvg;
+    logo.style.width = "30px";
     title.appendChild(logo);
 
     const titleText = document.createElement("span");
@@ -314,7 +377,7 @@ class DARTView {
     const layersTableHeadRow = document.createElement("tr");
     const layersTableHeadElem = document.createElement("td");
     layersTableHeadElem.colSpan = 2;
-    layersTableHeadElem.innerHTML = "Layers";
+    layersTableHeadElem.innerHTML = "LAYERS";
     layersTableHeadRow.appendChild(layersTableHeadElem);
     layersTableHead.appendChild(layersTableHeadRow);
     layersTableOuter.appendChild(layersTableHead);
@@ -410,6 +473,43 @@ class DARTView {
     });
     textField.focus();
   };
+
+  onRerender = () => {
+    // Update the warning elements, if we have any
+    this.objectWarnings.forEach((v, k) => v.update());
+  };
+
+  focusOnWarning = (warningKey: number) => {
+    const warningObject = this.objectWarnings.get(warningKey);
+    if (warningObject != null) {
+      warningObject.focus();
+    }
+  }
+
+  onMouseoverWarning = (key: number) => {
+    this.mouseoverWarning = key;
+  }
+
+  onMouseoutWarning = (key: number) => {
+    if (this.mouseoverWarning === key) {
+      this.mouseoverWarning = -1;
+    }
+  }
+
+  isWarningMouseover = (key: number) => {
+    return this.mouseoverWarning === key;
+  }
+
+  dismissWarning = (key: number) => {
+    this.dismissedWarnings.add(key);
+  }
+
+  isWarningDismissed = (key: number) => {
+    if (this.dismissedWarnings.has(key) && this.dismissedWarnings.get(key)) {
+      return true;
+    }
+    return false;
+  }
 
   tooltipMousemoveListener = (e: MouseEvent) => {
     if (this.editingTooltip) {
@@ -578,6 +678,12 @@ class DARTView {
     }
     else if (command.delete_object_tooltip != null) {
       this.deleteTooltip(command.delete_object_tooltip.key);
+    }
+    else if (command.set_object_warning != null) {
+      this.setObjectWarning(command.set_object_warning.key, command.set_object_warning.warning_key, command.set_object_warning.warning);
+    }
+    else if (command.delete_object_warning != null) {
+      this.deleteObjectWarning(command.delete_object_warning.key, command.delete_object_warning.warning_key);
     }
     else if (command.line != null) {
       const color: number[] = [command.line.color[0], command.line.color[1], command.line.color[2], command.line.color[3]];
@@ -1451,6 +1557,28 @@ class DARTView {
    */
   deleteTooltip = (key: number) => {
     this.view.removeTooltip(key);
+  }
+
+  /**
+   * This registers a warning for a specific object in the view.
+   */
+  setObjectWarning = (key: number, warningKey: number, warning: string) => {
+    if (!this.objectWarnings.has(warningKey)) {
+      console.log("Creating ObjectWarning for key "+key);
+      const objectWarning = new ObjectWarning(this, key, warningKey, warning);
+      this.objectWarnings.set(warningKey, objectWarning);
+    }
+  }
+
+  /**
+   * This removes a warning for a specific object in the view.
+   */
+  deleteObjectWarning = (key: number, warningKey: number) => {
+    if (this.objectWarnings.has(warningKey)) {
+      const objectWarning = this.objectWarnings.get(warningKey);
+      objectWarning.remove();
+      this.objectWarnings.delete(warningKey);
+    }
   }
 
   /**
