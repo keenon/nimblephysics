@@ -591,38 +591,27 @@ class NimbleStandalone {
    * This turns playback on or off.
    */
   togglePlay = () => {
-    this.playing = !this.playing;
-    if (this.playing) {
-      if (this.getRemainingLoadedMillis() < 500) {
-        // Start back at the beginning if we reached the end and we want to play anyways
-        this.lastFrame = -1;
-      }
-      this.playPauseButton.innerHTML = pauseSvg;
-    }
-    else {
-      this.playPauseButton.innerHTML = playSvg;
-    }
-    if (this.playPausedListener != null) {
-      this.playPausedListener(this.playing);
-    }
-    if (this.playing) {
-      this.startFrame = this.lastFrame;
-      this.startedPlaying = new Date().getTime();
-      this.startAnimation();
-    }
+    this.setPlaying(!this.playing);
   };
 
   /**
    * Sets whether or not we're currently playing.
    */
   setPlaying = (playing: boolean) => {
-    if (this.rawBytes != null && playing != this.playing) {
+    if (playing != this.playing) {
       this.playing = playing;
       if (this.playing) {
-        this.playPauseButton.innerHTML = "Pause";
+        if (this.getRemainingLoadedMillis() < 500) {
+          // Start back at the beginning if we reached the end and we want to play anyways
+          this.lastFrame = -1;
+        }
+        this.playPauseButton.innerHTML = pauseSvg;
       }
       else {
-        this.playPauseButton.innerHTML = "Play";
+        this.playPauseButton.innerHTML = playSvg;
+      }
+      if (this.playPausedListener != null) {
+        this.playPausedListener(this.playing);
       }
       if (this.playing) {
         this.startFrame = this.lastFrame;
