@@ -522,10 +522,15 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
 //==============================================================================
 /// This will check if markers
 /// obviously "flip" during the trajectory, and unflip them.
-void C3DLoader::fixupMarkerFlips(C3D* c3d)
+std::vector<std::vector<std::pair<std::string, std::string>>>
+C3DLoader::fixupMarkerFlips(C3D* c3d)
 {
+  std::vector<std::vector<std::pair<std::string, std::string>>> flips;
+  // Include the 0 timestep in our list of flips, even though it's always empty
+  flips.emplace_back();
   for (int i = 1; i < c3d->markerTimesteps.size(); i++)
   {
+    flips.emplace_back();
     std::unordered_map<std::string, std::string> closestMarkerFromLastTimestep;
 
     for (std::string& marker : c3d->markers)
@@ -569,9 +574,11 @@ void C3DLoader::fixupMarkerFlips(C3D* c3d)
         c3d->markerTimesteps[i][otherMarker] = tmp;
         closestMarkerFromLastTimestep[marker] = marker;
         closestMarkerFromLastTimestep[otherMarker] = otherMarker;
+        flips[flips.size() - 1].emplace_back(marker, otherMarker);
       }
     }
   }
+  return flips;
 }
 
 //==============================================================================

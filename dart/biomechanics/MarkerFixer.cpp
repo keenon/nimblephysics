@@ -861,6 +861,9 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   std::vector<std::map<std::string, Eigen::Vector3s>> correctedObservations;
   for (int t = 0; t < immutableMarkerObservations.size(); t++)
   {
+    std::vector<std::tuple<std::string, Eigen::Vector3s, std::string>>
+        droppedMarkerWarningsFrame;
+
     std::map<std::string, Eigen::Vector3s> frame;
     for (int j = 0; j < traces.size(); j++)
     {
@@ -876,6 +879,12 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
               + " dropped for accelerating too fast ("
               + std::to_string((double)traces[j].mAccNorm[index])
               + " m/s^2) on frame " + std::to_string(t));
+          droppedMarkerWarningsFrame.emplace_back(
+              traces[j].mMarkerLabels[index],
+              traces[j].mPoints[index],
+              "accelerating too fast ("
+                  + std::to_string((double)traces[j].mAccNorm[index])
+                  + " m/s^2)");
         }
         else if (
             index < traces[j].mDropPointForStillness.size()
@@ -885,6 +894,12 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
               "Marker " + traceLabels[j] + " dropped for velocity too slow ("
               + std::to_string((double)traces[j].mVelNorm[index])
               + " m/s) on sequential frame " + std::to_string(t));
+          droppedMarkerWarningsFrame.emplace_back(
+              traces[j].mMarkerLabels[index],
+              traces[j].mPoints[index],
+              "velocity too slow ("
+                  + std::to_string((double)traces[j].mVelNorm[index])
+                  + " m/s^2)");
         }
         else
         {
@@ -894,6 +909,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
       }
     }
     correctedObservations.push_back(frame);
+    report->droppedMarkerWarnings.push_back(droppedMarkerWarningsFrame);
   }
 
   // 2.1. Count the number of observations of each marker name
@@ -912,6 +928,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
 
   // 2.2. Drop any marker observations that occur too infrequently.
   std::vector<std::string> markersToDrop;
+  std::map<std::string, s_t> markerDropPercentage;
   for (auto& pair : observationCount)
   {
     s_t percentage = (s_t)pair.second / (s_t)immutableMarkerObservations.size();
@@ -921,13 +938,24 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
           "Dropping marker \"" + pair.first + "\", only on "
           + std::to_string(percentage * 100) + " percent of frames");
       markersToDrop.push_back(pair.first);
+      markerDropPercentage[pair.first] = percentage;
     }
   }
-  for (auto& obs : correctedObservations)
+  for (int t = 0; t < correctedObservations.size(); t++)
   {
+    std::map<std::string, Eigen::Vector3s>& obs = correctedObservations[t];
     for (std::string drop : markersToDrop)
     {
-      obs.erase(drop);
+      if (obs.count(drop) > 0)
+      {
+        obs.erase(drop);
+        report->droppedMarkerWarnings[t].emplace_back(
+            drop,
+            obs[drop],
+            "dropped for appearing only on "
+                + std::to_string(markerDropPercentage[drop] * 100)
+                + " percent of frames");
+      }
     }
   }
 
@@ -993,6 +1021,12 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     consolidatedTraces[label].push_back(traces[i]);
   }
 
+  for (int t = 0; t < correctedObservations.size(); t++)
+  {
+    std::vector<std::pair<std::string, std::string>> markersRenamedFromToFrame;
+    report->markersRenamedFromTo.push_back(markersRenamedFromToFrame);
+  }
+
   for (auto& pair : consolidatedTraces)
   {
     std::vector<LabeledMarkerTrace> tracesGroup = pair.second;
@@ -1025,6 +1059,16 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
       else if (merged.mMaxTime < tracesGroup[i].mMinTime)
       {
         merged = merged.concat(tracesGroup[i]);
+      }
+    }
+
+    for (int i = 0; i < merged.mTimes.size(); i++)
+    {
+      int t = merged.mTimes[i];
+      if (merged.mMarkerLabels[i] != pair.first)
+      {
+        report->markersRenamedFromTo[t].emplace_back(
+            merged.mMarkerLabels[i], pair.first);
       }
     }
 

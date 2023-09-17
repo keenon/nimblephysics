@@ -56,7 +56,13 @@ void MarkerFixer(py::module& m)
       .def_readwrite(
           "markerObservationsAttemptedFixed",
           &dart::biomechanics::MarkersErrorReport::
-              markerObservationsAttemptedFixed);
+              markerObservationsAttemptedFixed)
+      .def_readwrite(
+          "droppedMarkerWarnings",
+          &dart::biomechanics::MarkersErrorReport::droppedMarkerWarnings)
+      .def_readwrite(
+          "markersRenamedFromTo",
+          &dart::biomechanics::MarkersErrorReport::markersRenamedFromTo);
 
   ::py::class_<dart::biomechanics::MarkerFixer>(m, "MarkerFixer")
       .def_static(

@@ -201,7 +201,7 @@ class C3DLoader():
     @staticmethod
     def debugToGUI(file: C3D, server: nimblephysics_libs._nimblephysics.server.GUIWebsocketServer) -> None: ...
     @staticmethod
-    def fixupMarkerFlips(c3d: C3D) -> None: ...
+    def fixupMarkerFlips(c3d: C3D) -> typing.List[typing.List[typing.Tuple[str, str]]]: ...
     @staticmethod
     def loadC3D(uri: str) -> C3D: ...
     pass
@@ -308,10 +308,10 @@ class DynamicsFitter():
     def computePerfectGRFs(self, init: DynamicsInitialization) -> None: ...
     @staticmethod
     @typing.overload
-    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, kinematicInits: typing.List[MarkerInitialization], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = []) -> DynamicsInitialization: ...
+    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markerMap: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], poseTrials: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = []) -> DynamicsInitialization: ...
     @staticmethod
     @typing.overload
-    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markerMap: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], poseTrials: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = []) -> DynamicsInitialization: ...
+    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, kinematicInits: typing.List[MarkerInitialization], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = []) -> DynamicsInitialization: ...
     def estimateFootGroundContacts(self, init: DynamicsInitialization, ignoreFootNotOverForcePlate: bool = False) -> None: ...
     def estimateLinkMassesFromAcceleration(self, init: DynamicsInitialization, regularizationWeight: float = 50.0) -> None: ...
     def impliedCOMForces(self, init: DynamicsInitialization, trial: int, includeGravity: numpy.ndarray[numpy.float64, _Shape[3, 1]] = True) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
@@ -691,6 +691,7 @@ class ForcePlate():
     @staticmethod
     def copyForcePlate(plate: ForcePlate) -> ForcePlate: ...
     def trim(self, newStartTime: float, newEndTime: float) -> None: ...
+    def trimToIndexes(self, start: int, end: int) -> None: ...
     @property
     def centersOfPressure(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
         """
@@ -1645,6 +1646,14 @@ class MarkerTrace():
     pass
 class MarkersErrorReport():
     @property
+    def droppedMarkerWarnings(self) -> typing.List[typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]], str]]]:
+        """
+        :type: typing.List[typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]], str]]]
+        """
+    @droppedMarkerWarnings.setter
+    def droppedMarkerWarnings(self, arg0: typing.List[typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]], str]]]) -> None:
+        pass
+    @property
     def info(self) -> typing.List[str]:
         """
         :type: typing.List[str]
@@ -1659,6 +1668,14 @@ class MarkersErrorReport():
         """
     @markerObservationsAttemptedFixed.setter
     def markerObservationsAttemptedFixed(self, arg0: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+        pass
+    @property
+    def markersRenamedFromTo(self) -> typing.List[typing.List[typing.Tuple[str, str]]]:
+        """
+        :type: typing.List[typing.List[typing.Tuple[str, str]]]
+        """
+    @markersRenamedFromTo.setter
+    def markersRenamedFromTo(self, arg0: typing.List[typing.List[typing.Tuple[str, str]]]) -> None:
         pass
     @property
     def warnings(self) -> typing.List[str]:

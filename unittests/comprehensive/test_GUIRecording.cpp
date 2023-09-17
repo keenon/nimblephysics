@@ -27,7 +27,7 @@ using namespace server;
 using namespace realtime;
 using namespace biomechanics;
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(REALTIME, GUI_SERVER_2)
 {
   GUIRecording recording;
@@ -42,16 +42,51 @@ TEST(REALTIME, GUI_SERVER_2)
       "dart://sample/osim/welk007/"
       "c3d_Trimmed_running_natural2_manual_scaling_ik.mot");
 
+  int startTime = 100;
+  int endTime = 500;
+  recording.setSpanWarning(
+      startTime, endTime, "warn_obj", "Suspicious marker jump for MKR2");
+  recording.setSpanWarning(
+      startTime, endTime, "warn_hand", "Suspicious marker jump for MKR2");
+
+  recording.setSpanWarning(
+      700, 702, "warn2", "Suspicious marker jump for MKR2");
+
   for (int i = 0; i < mot.poses.cols(); i++)
   {
     standard.skeleton->setPositions(mot.poses.col(i));
     recording.renderSkeleton(standard.skeleton);
+
+    if (i >= startTime && i <= endTime)
+    {
+      recording.setObjectWarning(
+          "skel_Skeleton_tibia_l_0",
+          "warn_obj",
+          "Suspicious marker jump for MKR2");
+      recording.setObjectWarning(
+          "skel_Skeleton_hand_l_21", "warn_hand", "Warning on the hands");
+    }
+    else
+    {
+      recording.deleteObjectWarning("skel_Skeleton_tibia_l_0", "warn_obj");
+      recording.deleteObjectWarning("skel_Skeleton_hand_l_21", "warn_hand");
+    }
+    if (i >= 700 && i <= 702)
+    {
+      recording.setObjectWarning(
+          "skel_Skeleton_tibia_l_0", "warn2", "Flickering warning");
+    }
+    else
+    {
+      recording.deleteObjectWarning("skel_Skeleton_tibia_l_0", "warn2");
+    }
+
     recording.saveFrame();
   }
 
-  recording.writeFramesJson("../../../javascript/src/data/test.bin");
+  recording.writeFramesJson("../../../javascript/src/data/movement2.bin");
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(RECORDING, GUI_SERVER)

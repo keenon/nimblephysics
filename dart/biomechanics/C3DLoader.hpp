@@ -45,7 +45,8 @@ public:
 
   /// This will check if markers
   /// obviously "flip" during the trajectory, and unflip them.
-  static void fixupMarkerFlips(C3D* c3d);
+  static std::vector<std::vector<std::pair<std::string, std::string>>>
+  fixupMarkerFlips(C3D* c3d);
 
   static void debugToGUI(
       C3D& file, std::shared_ptr<server::GUIWebsocketServer> server);

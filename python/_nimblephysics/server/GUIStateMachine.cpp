@@ -248,6 +248,26 @@ void GUIStateMachine(py::module& m)
           ::py::arg("key"),
           ::py::arg("tooltip"))
       .def(
+          "setObjectWarning",
+          &dart::server::GUIStateMachine::setObjectWarning,
+          ::py::arg("key"),
+          ::py::arg("warningKey"),
+          ::py::arg("warning"),
+          ::py::arg("layer"))
+      .def(
+          "deleteObjectWarning",
+          &dart::server::GUIStateMachine::deleteObjectWarning,
+          ::py::arg("key"),
+          ::py::arg("warningKey"))
+      .def(
+          "setSpanWarning",
+          &dart::server::GUIStateMachine::setSpanWarning,
+          ::py::arg("startTimestep"),
+          ::py::arg("endTimestep"),
+          ::py::arg("warningKey"),
+          ::py::arg("warning"),
+          ::py::arg("layer"))
+      .def(
           "deleteObject",
           &dart::server::GUIStateMachine::deleteObject,
           ::py::arg("key"))
