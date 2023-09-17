@@ -78,7 +78,8 @@ public:
   /// Returns the index in this trace for the specified timestep
   int getIndexForTimestep(int t);
 
-  /// Returns the label of the point at the last timestep, or an empty string if the length of the trace is 0
+  /// Returns the label of the point at the last timestep, or an empty string if
+  /// the length of the trace is 0
   std::string getLastLabel();
 
   /// Pick the best label for this trace
@@ -121,6 +122,13 @@ struct MarkersErrorReport
   std::vector<std::string> info;
   std::vector<std::map<std::string, Eigen::Vector3s>>
       markerObservationsAttemptedFixed;
+  // This is a list of all the 3D warnings for markers that were dropped
+  std::vector<
+      std::vector<std::tuple<std::string, Eigen::Vector3s, std::string>>>
+      droppedMarkerWarnings;
+  // This is a list of all the warnings for markers whose names were swapped
+  std::vector<std::vector<std::pair<std::string, std::string>>>
+      markersRenamedFromTo;
 };
 
 class RippleReductionProblem

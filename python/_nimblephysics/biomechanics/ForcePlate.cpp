@@ -66,6 +66,11 @@ void ForcePlate(py::module& m)
           &dart::biomechanics::ForcePlate::trim,
           ::py::arg("newStartTime"),
           ::py::arg("newEndTime"))
+      .def(
+          "trimToIndexes",
+          &dart::biomechanics::ForcePlate::trimToIndexes,
+          ::py::arg("start"),
+          ::py::arg("end"))
       .def_static(
           "copyForcePlate",
           &dart::biomechanics::ForcePlate::copyForcePlate,

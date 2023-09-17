@@ -84,6 +84,14 @@ std::string GUIStateMachine::getCurrentStateAsJson()
   {
     encodeSetTooltip(list, pair.second);
   }
+  for (auto pair : mObjectWarnings)
+  {
+    encodeSetObjectWarning(list, pair.second);
+  }
+  for (auto pair : mSpanWarnings)
+  {
+    encodeSetSpanWarning(list, pair.second);
+  }
   for (auto pair : mText)
   {
     encodeCreateText(list, pair.second);
@@ -1438,6 +1446,65 @@ void GUIStateMachine::deleteObjectTooltip(const std::string& key)
   });
 }
 
+/// This sets a warning on a span of timesteps - only has an effect on the
+/// replay viewer, not on a live view
+void GUIStateMachine::setSpanWarning(
+    int startTimestep,
+    int endTimestep,
+    const std::string& warningKey,
+    const std::string& warning,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  SpanWarning& w = mSpanWarnings[warningKey];
+  w.warningKey = warningKey;
+  w.warning = warning;
+  w.startTimestep = startTimestep;
+  w.endTimestep = endTimestep;
+  w.layer = layer;
+
+  queueCommand([this, warningKey](proto::CommandList& list) {
+    encodeSetSpanWarning(list, mSpanWarnings[warningKey]);
+  });
+}
+
+/// This sets a warning for the object at key.
+void GUIStateMachine::setObjectWarning(
+    const std::string& key,
+    const std::string& warningKey,
+    const std::string& warning,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  ObjectWarning& w = mObjectWarnings[warningKey];
+  w.key = key;
+  w.warningKey = warningKey;
+  w.warning = warning;
+  w.layer = layer;
+
+  queueCommand([this, warningKey](proto::CommandList& list) {
+    encodeSetObjectWarning(list, mObjectWarnings[warningKey]);
+  });
+}
+
+/// This deletes a warning for the object at key.
+void GUIStateMachine::deleteObjectWarning(
+    const std::string& key, const std::string& warningKey)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  mObjectWarnings.erase(key);
+
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object_warning()->set_key(getStringCode(key));
+    command->mutable_delete_object_warning()->set_warning_key(
+        getStringCode(warningKey));
+  });
+}
+
 /// This sets an object to allow dragging around by the mouse on the GUI
 void GUIStateMachine::setObjectDragEnabled(const std::string& key)
 {
@@ -2317,6 +2384,31 @@ void GUIStateMachine::encodeSetTooltip(
   proto::Command* command = list.add_command();
   command->mutable_set_object_tooltip()->set_key(getStringCode(tooltip.key));
   command->mutable_set_object_tooltip()->set_tooltip(tooltip.tooltip);
+}
+
+void GUIStateMachine::encodeSetObjectWarning(
+    proto::CommandList& list, ObjectWarning& warning)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_object_warning()->set_key(getStringCode(warning.key));
+  command->mutable_set_object_warning()->set_warning_key(
+      getStringCode(warning.warningKey));
+  command->mutable_set_object_warning()->set_warning(warning.warning);
+  command->mutable_set_object_warning()->set_layer(
+      getStringCode(warning.layer));
+}
+
+void GUIStateMachine::encodeSetSpanWarning(
+    proto::CommandList& list, SpanWarning& warning)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_span_warning()->set_warning_key(
+      getStringCode(warning.warningKey));
+  command->mutable_set_span_warning()->set_warning(warning.warning);
+  command->mutable_set_span_warning()->set_start_timestep(
+      warning.startTimestep);
+  command->mutable_set_span_warning()->set_end_timestep(warning.endTimestep);
+  command->mutable_set_span_warning()->set_layer(getStringCode(warning.layer));
 }
 
 void GUIStateMachine::encodeCreateTexture(

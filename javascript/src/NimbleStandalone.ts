@@ -4,6 +4,88 @@ import { CommandRecording } from "./types";
 import protobuf from 'google-protobuf';
 import {dart} from './proto/GUI';
 import { createHash } from 'sha256-uint8array';
+import playSvg from "!!raw-loader!./play.svg";
+import pauseSvg from "!!raw-loader!./pause.svg";
+import warningSvg from "!!raw-loader!./warning.svg";
+
+class WarningSpan {
+  standalone: NimbleStandalone;
+  warningKey: number;
+  start: number;
+  end: number;
+  isSpan: boolean;
+  warning: string;
+  div: HTMLDivElement;
+  description: HTMLDivElement;
+  dismissButton: HTMLButtonElement;
+
+  constructor(standalone: NimbleStandalone, warningKey: number, start: number, end: number, warning: string) {
+    this.standalone = standalone;
+    this.warningKey = warningKey;
+    this.start = start;
+    this.end = end;
+    this.isSpan = end - start > 5;
+    this.warning = warning;
+    this.div = document.createElement('div');
+    this.div.className = this.isSpan ? 'NimbleStandalone-warning-span' : 'NimbleStandalone-warning-bubble';
+    this.description = document.createElement('div');
+    this.description.className = 'NimbleStandalone-warning-description';
+    this.description.innerHTML = warning;
+    this.dismissButton = document.createElement('button');
+    this.dismissButton.innerHTML = 'Dismiss';
+    this.dismissButton.className = 'NimbleStandalone-warning-dismiss';
+    this.description.appendChild(this.dismissButton);
+
+    this.div.appendChild(this.description);
+    this.div.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Bubble clicked");
+      if (this.standalone.playing) {
+        this.standalone.togglePlay();
+      }
+      this.standalone.setFrame(this.start);
+      this.standalone.view.focusOnWarning(this.warningKey);
+    });
+    this.update();
+    this.standalone.progressBarContainer.appendChild(this.div);
+  }
+
+  updateTimestep = (currentFrame: number) => {
+    if (this.isSpan) {
+      if (currentFrame >= this.start && currentFrame <= this.end) {
+        this.div.className = 'NimbleStandalone-warning-span NimbleStandalone-warning-span-active';
+      }
+      else {
+        this.div.className = 'NimbleStandalone-warning-span';
+      }
+    }
+    else {
+      if (currentFrame >= this.start && currentFrame <= this.end) {
+        this.div.className = 'NimbleStandalone-warning-bubble NimbleStandalone-warning-bubble-active';
+      }
+      else {
+        this.div.className = 'NimbleStandalone-warning-bubble';
+      }
+    }
+  }
+
+  update = () => {
+    const startPercentage = this.start / this.standalone.estimatedTotalFrames;
+    const endPercentage = this.end / this.standalone.estimatedTotalFrames;
+    const width = (endPercentage - startPercentage) * 100;
+    const left = startPercentage * 100;
+    this.isSpan = width > 1;
+    if (this.isSpan) {
+      this.div.style.width = width+'%';
+      this.div.style.left = left+'%';
+    }
+    else {
+      this.div.style.width = null;
+      this.div.style.left = 'calc('+left+'% - 15px)';
+    }
+  }
+}
 
 class NimbleStandalone {
   view: NimbleView | null;
@@ -31,7 +113,7 @@ class NimbleStandalone {
   progressBarBackground: HTMLDivElement;
   progressBarLoaded: HTMLDivElement;
   progressBar: HTMLDivElement;
-  progressScrub: HTMLDivElement;
+  warningSpans: WarningSpan[];
 
   loadingContainerMounted: boolean;
   loadingTitle: HTMLDivElement;
@@ -60,7 +142,7 @@ class NimbleStandalone {
 
     const instructions = document.createElement("div");
     this.playPauseButton = document.createElement("button");
-    this.playPauseButton.innerHTML = "Play";
+    this.playPauseButton.innerHTML = playSvg;
     this.playPauseButton.addEventListener("click", () => {
       this.togglePlay();
     });
@@ -107,9 +189,7 @@ class NimbleStandalone {
     this.progressBarLoaded.className = "NimbleStandalone-progress-bar-loaded";
     this.progressBarContainer.appendChild(this.progressBarLoaded);
 
-    this.progressScrub = document.createElement("div");
-    this.progressScrub.className = "NimbleStandalone-progress-bar-scrub";
-    this.progressBarContainer.appendChild(this.progressScrub);
+    this.warningSpans = [];
 
     const processEvent = (e: MouseEvent | Touch) => {
       const rect = this.progressBarContainer.getBoundingClientRect();
@@ -292,47 +372,7 @@ class NimbleStandalone {
   }
 
   setProgress = (percentage: number) => {
-    this.progressBar.style.width = (1.0 - percentage) * 100 + "%";
-    this.progressScrub.style.left = percentage * 100 + "%";
-
-    const zeroRGB = [255, 184, 0];
-    const oneThirdRGB = [245, 71, 71];
-    const twoThirdRGB = [207, 50, 158];
-    const fullRGB = [141, 25, 233];
-
-    function pickHex(color1: number[], color2: number[], weight: number) {
-      var w2 = weight;
-      var w1 = 1 - w2;
-      return (
-        "rgb(" +
-        Math.round(color1[0] * w1 + color2[0] * w2) +
-        "," +
-        Math.round(color1[1] * w1 + color2[1] * w2) +
-        "," +
-        Math.round(color1[2] * w1 + color2[2] * w2) +
-        ")"
-      );
-    }
-
-    if (percentage < 0.33) {
-      this.progressScrub.style.backgroundColor = pickHex(
-        zeroRGB,
-        oneThirdRGB,
-        (percentage - 0.0) / 0.33
-      );
-    } else if (percentage < 0.66) {
-      this.progressScrub.style.backgroundColor = pickHex(
-        oneThirdRGB,
-        twoThirdRGB,
-        (percentage - 0.33) / 0.33
-      );
-    } else {
-      this.progressScrub.style.backgroundColor = pickHex(
-        twoThirdRGB,
-        fullRGB,
-        (percentage - 0.66) / 0.33
-      );
-    }
+    this.progressBar.style.width = percentage * 100 + "%";
   };
 
   /**
@@ -428,6 +468,10 @@ class NimbleStandalone {
             // value - some data. 'undefined' if the reader is canceled.
             if (value == null) {
               this.estimatedTotalFrames = this.rawFrameBytes.length;
+              // Update the spans now that we know exactly how many frames we have
+              for (const span of this.warningSpans) {
+                span.update();
+              }
               this.setLoadedProgress(1.0);
               if (!this.playing) {
                 this.togglePlay();
@@ -547,38 +591,27 @@ class NimbleStandalone {
    * This turns playback on or off.
    */
   togglePlay = () => {
-    this.playing = !this.playing;
-    if (this.playing) {
-      if (this.getRemainingLoadedMillis() < 500) {
-        // Start back at the beginning if we reached the end and we want to play anyways
-        this.lastFrame = -1;
-      }
-      this.playPauseButton.innerHTML = "Pause";
-    }
-    else {
-      this.playPauseButton.innerHTML = "Play";
-    }
-    if (this.playPausedListener != null) {
-      this.playPausedListener(this.playing);
-    }
-    if (this.playing) {
-      this.startFrame = this.lastFrame;
-      this.startedPlaying = new Date().getTime();
-      this.startAnimation();
-    }
+    this.setPlaying(!this.playing);
   };
 
   /**
    * Sets whether or not we're currently playing.
    */
   setPlaying = (playing: boolean) => {
-    if (this.rawBytes != null && playing != this.playing) {
+    if (playing != this.playing) {
       this.playing = playing;
       if (this.playing) {
-        this.playPauseButton.innerHTML = "Pause";
+        if (this.getRemainingLoadedMillis() < 500) {
+          // Start back at the beginning if we reached the end and we want to play anyways
+          this.lastFrame = -1;
+        }
+        this.playPauseButton.innerHTML = pauseSvg;
       }
       else {
-        this.playPauseButton.innerHTML = "Play";
+        this.playPauseButton.innerHTML = playSvg;
+      }
+      if (this.playPausedListener != null) {
+        this.playPausedListener(this.playing);
       }
       if (this.playing) {
         this.startFrame = this.lastFrame;
@@ -620,6 +653,10 @@ class NimbleStandalone {
 
   setFrame = (frameNumber: number) => {
     if (frameNumber != this.lastFrame) {
+      this.warningSpans.forEach((span) => {
+        span.updateTimestep(frameNumber);
+      });
+
       if (frameNumber < this.lastFrame) {
         // Reset at the beginning
         this.lastFrame = -1;
@@ -666,10 +703,18 @@ class NimbleStandalone {
       this.originalMsPerFrame = 1000.0 / command.set_frames_per_second.framesPerSecond;
       this.msPerFrame = this.originalMsPerFrame / this.playbackMultiple;
     }
+    else if (command.set_span_warning) {
+      this.addSpanWarning(command.set_span_warning.warning_key, command.set_span_warning.start_timestep, command.set_span_warning.end_timestep, command.set_span_warning.warning);
+    }
     else {
       this.view.handleCommand(command);
     }
   };
+
+  addSpanWarning = (warningKey: number, start: number, end: number, warning: string) => {
+    const warningSpan = new WarningSpan(this, warningKey, start, end, warning);
+    this.warningSpans.push(warningSpan);
+  }
 
   startAnimation = () => {
     const key = Math.floor(Math.random() * 10000000);

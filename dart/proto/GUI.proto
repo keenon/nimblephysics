@@ -25,6 +25,9 @@ message Command {
     SetObjectScale set_object_scale = 8;
     SetObjectTooltip set_object_tooltip = 32;
     DeleteObjectTooltip delete_object_tooltip = 33;
+    SetSpanWarning set_span_warning = 38;
+    SetObjectWarning set_object_warning = 37;
+    DeleteObjectWarning delete_object_warning = 39;
     EnableDrag enable_drag = 18;
     EnableEditTooltip enable_edit_tooltip = 34;
     CreateText text = 12;
@@ -162,6 +165,26 @@ message SetObjectTooltip {
 
 message DeleteObjectTooltip {
   int32 key = 1;
+}
+
+message SetSpanWarning {
+  int32 start_timestep = 1;
+  int32 end_timestep = 2;
+  int32 warning_key = 3;
+  string warning = 4;
+  int32 layer = 5;
+}
+
+message SetObjectWarning {
+  int32 key = 1;
+  string warning = 2;
+  int32 warning_key = 3;
+  int32 layer = 4;
+}
+
+message DeleteObjectWarning {
+  int32 key = 1;
+  int32 warning_key = 2;
 }
 
 message EnableDrag {

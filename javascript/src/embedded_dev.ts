@@ -79,7 +79,7 @@ const ReactTestBed = () => {
       },
       key: 'gui',
       playing: playing,
-      defaultPlaybackSpeed: 0.08,
+      defaultPlaybackSpeed: 1.0,
       onPlayPause: (play) => {
         setPlaying(play);
       },

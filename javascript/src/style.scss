@@ -10,20 +10,13 @@
 .NimbleStandalone-progress-play-pause {
   position: relative;
   z-index: 99;
-  padding: 10px;
   font-size: 14px;
-}
-
-.NimbleStandalone-progress-instructions {
   position: absolute;
-  bottom: 80px;
+  bottom: 35px;
   left: 20px;
-  height: 40px;
-  width: calc(100% - 40px);
-  text-align: left;
-  font-family: "Advent Pro", sans-serif;
-  color: #848484;
-  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  background-color: transparent;
 }
 
 .NimbleStandalone-playback-speed-container {
@@ -39,58 +32,97 @@
 .NimbleStandalone-progress-bar-container {
   position: absolute;
   bottom: 40px;
-  left: 20px;
+  left: 80px;
   height: 40px;
-  width: calc(100% - 40px);
+  width: calc(100% - 100px);
   cursor: pointer;
 }
 
 .NimbleStandalone-progress-bar-bg {
   position: absolute;
-  top: 20px;
+  top: 16px;
   left: 0;
-  height: 5px;
+  height: 8px;
   width: 100%;
-  background: rgb(255, 184, 0);
-  background: linear-gradient(90deg,
-      rgba(255, 184, 0, 1) 0%,
-      rgba(245, 71, 71, 1) 33%,
-      rgba(207, 50, 158, 1) 67%,
-      rgba(141, 25, 233, 1) 100%);
+  background: #cfcfcf;
 }
 
 .NimbleStandalone-progress-bar-loaded {
   position: absolute;
-  top: 20px;
+  top: 16px;
   left: 0;
-  height: 5px;
+  height: 8px;
   width: 100%;
-  background: rgb(55, 55, 55);
+  background: rgb(95, 95, 95);
 }
 
 .NimbleStandalone-progress-bar {
   position: absolute;
-  top: 20px;
-  right: 0;
-  height: 5px;
+  top: 16px;
+  left: 0;
+  height: 8px;
   width: 100%;
-  background-color: #999999;
+  background-color: rgb(100, 100, 100); // #0b5ed7; // #7798CE;
   user-select: none;
+  z-index: 2;
 }
 
-.NimbleStandalone-progress-bar-scrub {
+// $warning-color: #ffc107; // #ffcb88; // #ff9966; // #ffcb88
+$warning-color: #dc2a2a;
+
+.NimbleStandalone-warning-description {
+  display: none;
   position: absolute;
-  pointer-events: none;
-  user-select: none;
-  top: 20px;
-  left: 0%;
-  height: 20px;
-  width: 20px;
-  transform: translate(-10px, -7px);
-  border-radius: 20px;
-  background-color: rgba(141, 25, 233, 1);
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+  bottom: 15px;
+  left: 0px;
+  border-radius: 5px;
+  background-color: white;
+  color: $warning-color;
+  padding: 20px;
+}
+
+.NimbleStandalone-warning-span {
+  position: absolute;
+  top: 7px;
+  height: 7px;
+  border: 1px solid $warning-color;
+  background-color: $warning-color;
+  // border-top-left-radius: 5px;
+  // border-top-right-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+
+  &.NimbleStandalone-warning-span-active {
+    opacity: 1.0;
+  }
+
+  &:hover {
+    .NimbleStandalone-warning-description {
+      display: block;
+    }
+  }
+}
+
+.NimbleStandalone-warning-bubble {
+  position: absolute;
+  top: 0px;
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+  border-bottom: none;
+  border-right: 15px solid transparent;
+  border-left: 15px solid transparent;
+  border-top: 15px solid $warning-color;
+  z-index: 1;
+
+  .NimbleStandalone-warning-description {
+    left: -15px;
+  }
+
+  &:hover {
+    .NimbleStandalone-warning-description {
+      display: block;
+    }
+  }
 }
 
 .NimbleStandalone-progress-bar-container:hover .NimbleStandalone-progress-bar-scrub {
@@ -222,6 +254,36 @@ $triangle-size: 5px;
       pointer-events: all;
     }
 
+    .ObjectWarning {
+      height: auto;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+      color: $warning-color;
+      padding: 20px;
+      position: relative;
+
+      &:after {
+        content: " ";
+        position: absolute;
+        left: 5px;
+        top: -15px;
+        border-top: none;
+        border-right: 15px solid transparent;
+        border-left: 15px solid transparent;
+        border-bottom: 15px solid #fff;
+      }
+
+      button {
+        pointer-events: all;
+        margin-left: 10px;
+        padding: 5px;
+        border-radius: 10px;
+      }
+    }
+
     .DARTWindow-ui-elem {
       pointer-events: all;
 
@@ -335,7 +397,7 @@ $triangle-size: 5px;
   }
 
   .GUI_layers_container {
-    max-height: 104px;
+    // max-height: 104px;
     overflow-y: auto;
     position: absolute;
     pointer-events: all;
@@ -356,21 +418,22 @@ $triangle-size: 5px;
   }
 
   .GUI_layers thead {
-    background-color: white;
+    background-color: #dcdcdc;
     border-bottom: 1px solid #cfcfcf;
+    font-weight: bold;
   }
 
   .GUI_layers tbody {
-    background-color: #ededed;
+    background-color: white;
   }
 
   .GUI_layers tbody tr:hover {
-    background-color: #dcdcdc;
+    background-color: #ededed;
   }
 
   .GUI_layers td {
     vertical-align: middle;
     /* border: 1px solid black; */
-    padding: 5px;
+    padding: 10px;
   }
 }

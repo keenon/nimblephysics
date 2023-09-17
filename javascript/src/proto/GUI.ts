@@ -73,7 +73,7 @@ export namespace dart.proto {
         }
     }
     export class Command extends pb_1.Message {
-        #one_of_decls = [[31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
+        #one_of_decls = [[31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 38, 37, 39, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]];
         constructor(data?: any[] | ({} & (({
             set_frames_per_second?: SetFramesPerSecond;
             clear_all?: never;
@@ -92,6 +92,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -129,6 +132,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -166,6 +172,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -203,6 +212,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -240,6 +252,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -277,6 +292,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -314,6 +332,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -351,6 +372,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -388,6 +412,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -425,6 +452,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -462,6 +492,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -499,6 +532,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -536,6 +572,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -573,6 +612,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -610,6 +652,9 @@ export namespace dart.proto {
             set_object_scale?: SetObjectScale;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -647,6 +692,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: SetObjectTooltip;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -684,6 +732,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: DeleteObjectTooltip;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -721,6 +772,129 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: SetSpanWarning;
+            set_object_warning?: never;
+            delete_object_warning?: never;
+            enable_drag?: never;
+            enable_edit_tooltip?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            cone?: never;
+            cylinder?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: SetObjectWarning;
+            delete_object_warning?: never;
+            enable_drag?: never;
+            enable_edit_tooltip?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            cone?: never;
+            cylinder?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: DeleteObjectWarning;
+            enable_drag?: never;
+            enable_edit_tooltip?: never;
+            text?: never;
+            button?: never;
+            slider?: never;
+            plot?: never;
+            rich_plot?: never;
+            set_rich_plot_data?: never;
+            set_rich_plot_bounds?: never;
+            set_ui_elem_pos?: never;
+            set_ui_elem_size?: never;
+            delete_ui_elem?: never;
+            delete_object?: never;
+            set_text_contents?: never;
+            set_button_label?: never;
+            set_slider_value?: never;
+            set_slider_min?: never;
+            set_slider_max?: never;
+            set_plot_data?: never;
+        } | {
+            set_frames_per_second?: never;
+            clear_all?: never;
+            layer?: never;
+            box?: never;
+            sphere?: never;
+            cone?: never;
+            cylinder?: never;
+            capsule?: never;
+            line?: never;
+            mesh?: never;
+            texture?: never;
+            set_object_position?: never;
+            set_object_rotation?: never;
+            set_object_color?: never;
+            set_object_scale?: never;
+            set_object_tooltip?: never;
+            delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: EnableDrag;
             enable_edit_tooltip?: never;
             text?: never;
@@ -758,6 +932,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: EnableEditTooltip;
             text?: never;
@@ -795,6 +972,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: CreateText;
@@ -832,6 +1012,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -869,6 +1052,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -906,6 +1092,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -943,6 +1132,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -980,6 +1172,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1017,6 +1212,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1054,6 +1252,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1091,6 +1292,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1128,6 +1332,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1165,6 +1372,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1202,6 +1412,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1239,6 +1452,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1276,6 +1492,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1313,6 +1532,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1350,6 +1572,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1387,6 +1612,9 @@ export namespace dart.proto {
             set_object_scale?: never;
             set_object_tooltip?: never;
             delete_object_tooltip?: never;
+            set_span_warning?: never;
+            set_object_warning?: never;
+            delete_object_warning?: never;
             enable_drag?: never;
             enable_edit_tooltip?: never;
             text?: never;
@@ -1460,6 +1688,15 @@ export namespace dart.proto {
                 }
                 if ("delete_object_tooltip" in data && data.delete_object_tooltip != undefined) {
                     this.delete_object_tooltip = data.delete_object_tooltip;
+                }
+                if ("set_span_warning" in data && data.set_span_warning != undefined) {
+                    this.set_span_warning = data.set_span_warning;
+                }
+                if ("set_object_warning" in data && data.set_object_warning != undefined) {
+                    this.set_object_warning = data.set_object_warning;
+                }
+                if ("delete_object_warning" in data && data.delete_object_warning != undefined) {
+                    this.delete_object_warning = data.delete_object_warning;
                 }
                 if ("enable_drag" in data && data.enable_drag != undefined) {
                     this.enable_drag = data.enable_drag;
@@ -1622,6 +1859,24 @@ export namespace dart.proto {
         set delete_object_tooltip(value: DeleteObjectTooltip) {
             pb_1.Message.setOneofWrapperField(this, 33, this.#one_of_decls[0], value);
         }
+        get set_span_warning() {
+            return pb_1.Message.getWrapperField(this, SetSpanWarning, 38) as SetSpanWarning;
+        }
+        set set_span_warning(value: SetSpanWarning) {
+            pb_1.Message.setOneofWrapperField(this, 38, this.#one_of_decls[0], value);
+        }
+        get set_object_warning() {
+            return pb_1.Message.getWrapperField(this, SetObjectWarning, 37) as SetObjectWarning;
+        }
+        set set_object_warning(value: SetObjectWarning) {
+            pb_1.Message.setOneofWrapperField(this, 37, this.#one_of_decls[0], value);
+        }
+        get delete_object_warning() {
+            return pb_1.Message.getWrapperField(this, DeleteObjectWarning, 39) as DeleteObjectWarning;
+        }
+        set delete_object_warning(value: DeleteObjectWarning) {
+            pb_1.Message.setOneofWrapperField(this, 39, this.#one_of_decls[0], value);
+        }
         get enable_drag() {
             return pb_1.Message.getWrapperField(this, EnableDrag, 18) as EnableDrag;
         }
@@ -1738,7 +1993,7 @@ export namespace dart.proto {
         }
         get command() {
             const cases: {
-                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "cone" | "cylinder" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "set_object_tooltip" | "delete_object_tooltip" | "enable_drag" | "enable_edit_tooltip" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
+                [index: number]: "none" | "set_frames_per_second" | "clear_all" | "layer" | "box" | "sphere" | "cone" | "cylinder" | "capsule" | "line" | "mesh" | "texture" | "set_object_position" | "set_object_rotation" | "set_object_color" | "set_object_scale" | "set_object_tooltip" | "delete_object_tooltip" | "set_span_warning" | "set_object_warning" | "delete_object_warning" | "enable_drag" | "enable_edit_tooltip" | "text" | "button" | "slider" | "plot" | "rich_plot" | "set_rich_plot_data" | "set_rich_plot_bounds" | "set_ui_elem_pos" | "set_ui_elem_size" | "delete_ui_elem" | "delete_object" | "set_text_contents" | "set_button_label" | "set_slider_value" | "set_slider_min" | "set_slider_max" | "set_plot_data";
             } = {
                 0: "none",
                 31: "set_frames_per_second",
@@ -1758,6 +2013,9 @@ export namespace dart.proto {
                 8: "set_object_scale",
                 32: "set_object_tooltip",
                 33: "delete_object_tooltip",
+                38: "set_span_warning",
+                37: "set_object_warning",
+                39: "delete_object_warning",
                 18: "enable_drag",
                 34: "enable_edit_tooltip",
                 12: "text",
@@ -1778,7 +2036,7 @@ export namespace dart.proto {
                 27: "set_slider_max",
                 28: "set_plot_data"
             };
-            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
+            return cases[pb_1.Message.computeOneofCase(this, [31, 16, 1, 2, 9, 36, 35, 10, 11, 3, 4, 5, 6, 7, 8, 32, 33, 38, 37, 39, 18, 34, 12, 13, 14, 15, 29, 17, 30, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])];
         }
         static fromObject(data: {
             set_frames_per_second?: ReturnType<typeof SetFramesPerSecond.prototype.toObject>;
@@ -1798,6 +2056,9 @@ export namespace dart.proto {
             set_object_scale?: ReturnType<typeof SetObjectScale.prototype.toObject>;
             set_object_tooltip?: ReturnType<typeof SetObjectTooltip.prototype.toObject>;
             delete_object_tooltip?: ReturnType<typeof DeleteObjectTooltip.prototype.toObject>;
+            set_span_warning?: ReturnType<typeof SetSpanWarning.prototype.toObject>;
+            set_object_warning?: ReturnType<typeof SetObjectWarning.prototype.toObject>;
+            delete_object_warning?: ReturnType<typeof DeleteObjectWarning.prototype.toObject>;
             enable_drag?: ReturnType<typeof EnableDrag.prototype.toObject>;
             enable_edit_tooltip?: ReturnType<typeof EnableEditTooltip.prototype.toObject>;
             text?: ReturnType<typeof CreateText.prototype.toObject>;
@@ -1869,6 +2130,15 @@ export namespace dart.proto {
             }
             if (data.delete_object_tooltip != null) {
                 message.delete_object_tooltip = DeleteObjectTooltip.fromObject(data.delete_object_tooltip);
+            }
+            if (data.set_span_warning != null) {
+                message.set_span_warning = SetSpanWarning.fromObject(data.set_span_warning);
+            }
+            if (data.set_object_warning != null) {
+                message.set_object_warning = SetObjectWarning.fromObject(data.set_object_warning);
+            }
+            if (data.delete_object_warning != null) {
+                message.delete_object_warning = DeleteObjectWarning.fromObject(data.delete_object_warning);
             }
             if (data.enable_drag != null) {
                 message.enable_drag = EnableDrag.fromObject(data.enable_drag);
@@ -1948,6 +2218,9 @@ export namespace dart.proto {
                 set_object_scale?: ReturnType<typeof SetObjectScale.prototype.toObject>;
                 set_object_tooltip?: ReturnType<typeof SetObjectTooltip.prototype.toObject>;
                 delete_object_tooltip?: ReturnType<typeof DeleteObjectTooltip.prototype.toObject>;
+                set_span_warning?: ReturnType<typeof SetSpanWarning.prototype.toObject>;
+                set_object_warning?: ReturnType<typeof SetObjectWarning.prototype.toObject>;
+                delete_object_warning?: ReturnType<typeof DeleteObjectWarning.prototype.toObject>;
                 enable_drag?: ReturnType<typeof EnableDrag.prototype.toObject>;
                 enable_edit_tooltip?: ReturnType<typeof EnableEditTooltip.prototype.toObject>;
                 text?: ReturnType<typeof CreateText.prototype.toObject>;
@@ -2018,6 +2291,15 @@ export namespace dart.proto {
             }
             if (this.delete_object_tooltip != null) {
                 data.delete_object_tooltip = this.delete_object_tooltip.toObject();
+            }
+            if (this.set_span_warning != null) {
+                data.set_span_warning = this.set_span_warning.toObject();
+            }
+            if (this.set_object_warning != null) {
+                data.set_object_warning = this.set_object_warning.toObject();
+            }
+            if (this.delete_object_warning != null) {
+                data.delete_object_warning = this.delete_object_warning.toObject();
             }
             if (this.enable_drag != null) {
                 data.enable_drag = this.enable_drag.toObject();
@@ -2116,6 +2398,12 @@ export namespace dart.proto {
                 writer.writeMessage(32, this.set_object_tooltip, () => this.set_object_tooltip.serialize(writer));
             if (this.delete_object_tooltip !== undefined)
                 writer.writeMessage(33, this.delete_object_tooltip, () => this.delete_object_tooltip.serialize(writer));
+            if (this.set_span_warning !== undefined)
+                writer.writeMessage(38, this.set_span_warning, () => this.set_span_warning.serialize(writer));
+            if (this.set_object_warning !== undefined)
+                writer.writeMessage(37, this.set_object_warning, () => this.set_object_warning.serialize(writer));
+            if (this.delete_object_warning !== undefined)
+                writer.writeMessage(39, this.delete_object_warning, () => this.delete_object_warning.serialize(writer));
             if (this.enable_drag !== undefined)
                 writer.writeMessage(18, this.enable_drag, () => this.enable_drag.serialize(writer));
             if (this.enable_edit_tooltip !== undefined)
@@ -2213,6 +2501,15 @@ export namespace dart.proto {
                         break;
                     case 33:
                         reader.readMessage(message.delete_object_tooltip, () => message.delete_object_tooltip = DeleteObjectTooltip.deserialize(reader));
+                        break;
+                    case 38:
+                        reader.readMessage(message.set_span_warning, () => message.set_span_warning = SetSpanWarning.deserialize(reader));
+                        break;
+                    case 37:
+                        reader.readMessage(message.set_object_warning, () => message.set_object_warning = SetObjectWarning.deserialize(reader));
+                        break;
+                    case 39:
+                        reader.readMessage(message.delete_object_warning, () => message.delete_object_warning = DeleteObjectWarning.deserialize(reader));
                         break;
                     case 18:
                         reader.readMessage(message.enable_drag, () => message.enable_drag = EnableDrag.deserialize(reader));
@@ -4409,6 +4706,345 @@ export namespace dart.proto {
         }
         static deserializeBinary(bytes: Uint8Array): DeleteObjectTooltip {
             return DeleteObjectTooltip.deserialize(bytes);
+        }
+    }
+    export class SetSpanWarning extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            start_timestep?: number;
+            end_timestep?: number;
+            warning_key?: number;
+            warning?: string;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("start_timestep" in data && data.start_timestep != undefined) {
+                    this.start_timestep = data.start_timestep;
+                }
+                if ("end_timestep" in data && data.end_timestep != undefined) {
+                    this.end_timestep = data.end_timestep;
+                }
+                if ("warning_key" in data && data.warning_key != undefined) {
+                    this.warning_key = data.warning_key;
+                }
+                if ("warning" in data && data.warning != undefined) {
+                    this.warning = data.warning;
+                }
+            }
+        }
+        get start_timestep() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set start_timestep(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get end_timestep() {
+            return pb_1.Message.getField(this, 2) as number;
+        }
+        set end_timestep(value: number) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get warning_key() {
+            return pb_1.Message.getField(this, 3) as number;
+        }
+        set warning_key(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        get warning() {
+            return pb_1.Message.getField(this, 4) as string;
+        }
+        set warning(value: string) {
+            pb_1.Message.setField(this, 4, value);
+        }
+        static fromObject(data: {
+            start_timestep?: number;
+            end_timestep?: number;
+            warning_key?: number;
+            warning?: string;
+        }) {
+            const message = new SetSpanWarning({});
+            if (data.start_timestep != null) {
+                message.start_timestep = data.start_timestep;
+            }
+            if (data.end_timestep != null) {
+                message.end_timestep = data.end_timestep;
+            }
+            if (data.warning_key != null) {
+                message.warning_key = data.warning_key;
+            }
+            if (data.warning != null) {
+                message.warning = data.warning;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                start_timestep?: number;
+                end_timestep?: number;
+                warning_key?: number;
+                warning?: string;
+            } = {};
+            if (this.start_timestep != null) {
+                data.start_timestep = this.start_timestep;
+            }
+            if (this.end_timestep != null) {
+                data.end_timestep = this.end_timestep;
+            }
+            if (this.warning_key != null) {
+                data.warning_key = this.warning_key;
+            }
+            if (this.warning != null) {
+                data.warning = this.warning;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.start_timestep !== undefined)
+                writer.writeInt32(1, this.start_timestep);
+            if (this.end_timestep !== undefined)
+                writer.writeInt32(2, this.end_timestep);
+            if (this.warning_key !== undefined)
+                writer.writeInt32(3, this.warning_key);
+            if (typeof this.warning === "string" && this.warning.length)
+                writer.writeString(4, this.warning);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): SetSpanWarning {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new SetSpanWarning();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.start_timestep = reader.readInt32();
+                        break;
+                    case 2:
+                        message.end_timestep = reader.readInt32();
+                        break;
+                    case 3:
+                        message.warning_key = reader.readInt32();
+                        break;
+                    case 4:
+                        message.warning = reader.readString();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): SetSpanWarning {
+            return SetSpanWarning.deserialize(bytes);
+        }
+    }
+    export class SetObjectWarning extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+            warning?: string;
+            warning_key?: number;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+                if ("warning" in data && data.warning != undefined) {
+                    this.warning = data.warning;
+                }
+                if ("warning_key" in data && data.warning_key != undefined) {
+                    this.warning_key = data.warning_key;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get warning() {
+            return pb_1.Message.getField(this, 2) as string;
+        }
+        set warning(value: string) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get warning_key() {
+            return pb_1.Message.getField(this, 3) as number;
+        }
+        set warning_key(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        static fromObject(data: {
+            key?: number;
+            warning?: string;
+            warning_key?: number;
+        }) {
+            const message = new SetObjectWarning({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            if (data.warning != null) {
+                message.warning = data.warning;
+            }
+            if (data.warning_key != null) {
+                message.warning_key = data.warning_key;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+                warning?: string;
+                warning_key?: number;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            if (this.warning != null) {
+                data.warning = this.warning;
+            }
+            if (this.warning_key != null) {
+                data.warning_key = this.warning_key;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (typeof this.warning === "string" && this.warning.length)
+                writer.writeString(2, this.warning);
+            if (this.warning_key !== undefined)
+                writer.writeInt32(3, this.warning_key);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): SetObjectWarning {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new SetObjectWarning();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    case 2:
+                        message.warning = reader.readString();
+                        break;
+                    case 3:
+                        message.warning_key = reader.readInt32();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): SetObjectWarning {
+            return SetObjectWarning.deserialize(bytes);
+        }
+    }
+    export class DeleteObjectWarning extends pb_1.Message {
+        #one_of_decls = [];
+        constructor(data?: any[] | {
+            key?: number;
+            warning_key?: number;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("key" in data && data.key != undefined) {
+                    this.key = data.key;
+                }
+                if ("warning_key" in data && data.warning_key != undefined) {
+                    this.warning_key = data.warning_key;
+                }
+            }
+        }
+        get key() {
+            return pb_1.Message.getField(this, 1) as number;
+        }
+        set key(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get warning_key() {
+            return pb_1.Message.getField(this, 2) as number;
+        }
+        set warning_key(value: number) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        static fromObject(data: {
+            key?: number;
+            warning_key?: number;
+        }) {
+            const message = new DeleteObjectWarning({});
+            if (data.key != null) {
+                message.key = data.key;
+            }
+            if (data.warning_key != null) {
+                message.warning_key = data.warning_key;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                key?: number;
+                warning_key?: number;
+            } = {};
+            if (this.key != null) {
+                data.key = this.key;
+            }
+            if (this.warning_key != null) {
+                data.warning_key = this.warning_key;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.key !== undefined)
+                writer.writeInt32(1, this.key);
+            if (this.warning_key !== undefined)
+                writer.writeInt32(2, this.warning_key);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): DeleteObjectWarning {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new DeleteObjectWarning();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.key = reader.readInt32();
+                        break;
+                    case 2:
+                        message.warning_key = reader.readInt32();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): DeleteObjectWarning {
+            return DeleteObjectWarning.deserialize(bytes);
         }
     }
     export class EnableDrag extends pb_1.Message {

@@ -305,6 +305,26 @@ public:
   /// This removes a tooltip for the object at key.
   void deleteObjectTooltip(const std::string& key);
 
+  /// This sets a warning on a span of timesteps - only has an effect on the
+  /// replay viewer, not on a live view
+  void setSpanWarning(
+      int startTimestep,
+      int endTimestep,
+      const std::string& warningKey,
+      const std::string& warning,
+      const std::string& layer = "");
+
+  /// This sets a warning for the object at key.
+  void setObjectWarning(
+      const std::string& key,
+      const std::string& warningKey,
+      const std::string& warning,
+      const std::string& layer = "");
+
+  /// This deletes a warning for the object at key.
+  void deleteObjectWarning(
+      const std::string& key, const std::string& warningKey);
+
   /// This sets an object to allow dragging around by the mouse on the GUI
   void setObjectDragEnabled(const std::string& key);
 
@@ -546,6 +566,25 @@ protected:
   };
   std::unordered_map<std::string, Tooltip> mTooltips;
 
+  struct ObjectWarning
+  {
+    std::string key;
+    std::string warningKey;
+    std::string warning;
+    std::string layer;
+  };
+  std::unordered_map<std::string, ObjectWarning> mObjectWarnings;
+
+  struct SpanWarning
+  {
+    std::string warningKey;
+    std::string warning;
+    std::string layer;
+    int startTimestep;
+    int endTimestep;
+  };
+  std::unordered_map<std::string, SpanWarning> mSpanWarnings;
+
   struct Mesh
   {
     std::string key;
@@ -661,6 +700,8 @@ protected:
   void encodeCreateLine(proto::CommandList& list, Line& line);
   void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);
   void encodeSetTooltip(proto::CommandList& list, Tooltip& tooltip);
+  void encodeSetObjectWarning(proto::CommandList& list, ObjectWarning& tooltip);
+  void encodeSetSpanWarning(proto::CommandList& list, SpanWarning& tooltip);
   void encodeCreateTexture(proto::CommandList& list, Texture& texture);
   void encodeEnableDrag(proto::CommandList& list, const std::string& key);
   void encodeEnableEditTooltip(
