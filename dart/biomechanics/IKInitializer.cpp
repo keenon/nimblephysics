@@ -3823,7 +3823,13 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   std::vector<int> usableTimesteps;
   if (traces.size() > 0)
   {
-    for (int i = 0; i < traces[0].size(); i++)
+    int minTraceSize = traces[0].size();
+    for (auto& trace : traces) {
+      if (trace.size() < minTraceSize) {
+        minTraceSize = trace.size();
+      }
+    }
+    for (int i = 0; i < minTraceSize; i++)
     {
       usableTimesteps.push_back(i);
     }

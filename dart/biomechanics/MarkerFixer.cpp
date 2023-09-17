@@ -694,15 +694,17 @@ RippleReductionProblem::smooth(MarkersErrorReport* report)
   }
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markers;
-  for (int t = 0; t < mMarkers[mMarkerNames[0]].cols(); t++)
-  {
-    markers.emplace_back();
-    for (std::string& markerName : mMarkerNames)
+  if (mMarkerNames.size() > 0) {
+    for (int t = 0; t < mMarkers[mMarkerNames[0]].cols(); t++)
     {
-      // markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
-      if (mObserved[markerName](t) == 1)
+      markers.emplace_back();
+      for (std::string& markerName : mMarkerNames)
       {
-        markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+        // markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+        if (mObserved[markerName](t) == 1)
+        {
+          markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+        }
       }
     }
   }
