@@ -53,8 +53,8 @@ jobs:
             PYTHON_VERSION_NUMBER: "3.11"
             PYTHON: /opt/python/cp311-cp311/bin/python3.11
             PYTHON_PATH: /opt/python/cp311-cp311/bin/
-            PYTHON_INCLUDE: /opt/python/cp311-cp311/include/python3.10/
-            PYTHON_LIB: /opt/python/cp311-cp311/lib/python3.10
+            PYTHON_INCLUDE: /opt/python/cp311-cp311/include/python3.11/
+            PYTHON_LIB: /opt/python/cp311-cp311/lib/python3.11
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
