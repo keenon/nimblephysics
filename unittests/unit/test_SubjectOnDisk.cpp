@@ -12,6 +12,7 @@
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/biomechanics/SubjectOnDisk.hpp"
+#include "dart/biomechanics/enums.hpp"
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
@@ -55,25 +56,29 @@ bool testWriteSubjectToDisk(
 {
   srand(42);
 
-  std::vector<Eigen::MatrixXs> poseTrials;
-  std::vector<std::vector<ForcePlate>> forcePlateTrials;
+  std::vector<std::vector<Eigen::MatrixXs>> poseTrialPasses;
+  std::vector<std::vector<std::vector<ForcePlate>>> forcePlateTrialPasses;
   std::vector<s_t> timesteps;
-  std::vector<Eigen::MatrixXs> velTrials;
-  std::vector<Eigen::MatrixXs> accTrials;
-  std::vector<Eigen::MatrixXs> tauTrials;
-  std::vector<Eigen::MatrixXs> groundBodyWrenchTrials;
-  std::vector<Eigen::MatrixXs> groundBodyCopTorqueForceTrials;
+  std::vector<std::vector<Eigen::MatrixXs>> velTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> accTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> tauTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> groundBodyWrenchTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> groundBodyCopTorqueForceTrialPasses;
   std::vector<std::vector<bool>> probablyMissingGRFData;
   std::vector<std::vector<MissingGRFReason>> missingGRFReason;
-  std::vector<std::vector<bool>> dofPositionObserved;
-  std::vector<std::vector<bool>> dofVelocityFiniteDifferenced;
-  std::vector<std::vector<bool>> dofAccelerationFiniteDifferenced;
+  std::vector<std::vector<bool>> passDofPositionObserved;
+  std::vector<std::vector<bool>> passDofVelocityFiniteDifferenced;
+  std::vector<std::vector<bool>> passDofAccelerationFiniteDifferenced;
   std::vector<std::vector<s_t>> residualNorms;
-  std::vector<Eigen::MatrixXs> trialComPoses;
-  std::vector<Eigen::MatrixXs> trialComVelocities;
-  std::vector<Eigen::MatrixXs> trialComAccelerations;
+  std::vector<std::vector<Eigen::MatrixXs>> trialPassComPoses;
+  std::vector<std::vector<Eigen::MatrixXs>> trialPassComVelocities;
+  std::vector<std::vector<Eigen::MatrixXs>> trialPassComAccelerations;
   std::vector<std::string> customValueNames;
   std::vector<std::vector<Eigen::MatrixXs>> customValueTrials;
+  std::vector<ProcessingPassType> processingPasses;
+  processingPasses.push_back(ProcessingPassType::kinematics);
+  processingPasses.push_back(ProcessingPassType::dynamics);
+  processingPasses.push_back(ProcessingPassType::lowPassFilter);
 
   customValueNames.push_back("exo_tau");
 
@@ -82,81 +87,115 @@ bool testWriteSubjectToDisk(
   for (int i = 0; i < motFiles.size(); i++)
   {
     OpenSimMot mot = OpenSimParser::loadMot(opensimFile.skeleton, motFiles[i]);
-    poseTrials.push_back(mot.poses);
     int framesPerSecond
         = (mot.timestamps.size() / mot.timestamps[mot.timestamps.size() - 1]);
     s_t dt = 1.0 / (s_t)framesPerSecond;
     timesteps.push_back(dt);
 
+    std::vector<Eigen::MatrixXs> posePasses;
+    std::vector<std::vector<ForcePlate>> grfPasses;
     std::vector<ForcePlate> grf
         = OpenSimParser::loadGRF(grfFiles[i], mot.timestamps);
-    forcePlateTrials.push_back(grf);
+    for (int pass = 0; pass < processingPasses.size(); pass++)
+    {
+      posePasses.push_back(mot.poses);
+      grfPasses.push_back(grf);
+    }
+    poseTrialPasses.push_back(posePasses);
+    forcePlateTrialPasses.push_back(grfPasses);
   }
 
   // This code trims all the timesteps down, if we asked for that
   if (limitTrialSizes > 0 || trialStartOffset > 0)
   {
-    std::vector<Eigen::MatrixXs> trimmedPoseTrials;
-    std::vector<std::vector<ForcePlate>> trimmedForcePlateTrials;
+    std::vector<std::vector<Eigen::MatrixXs>> trimmedPoseTrialPasses;
+    std::vector<std::vector<std::vector<ForcePlate>>>
+        trimmedForcePlateTrialPasses;
 
-    for (int trial = 0; trial < poseTrials.size(); trial++)
+    for (int trial = 0; trial < poseTrialPasses.size(); trial++)
     {
-      // TODO: handle edge cases
+      trimmedPoseTrialPasses.emplace_back();
+      trimmedForcePlateTrialPasses.emplace_back();
 
-      trimmedPoseTrials.push_back(poseTrials[trial].block(
-          0, trialStartOffset, poseTrials[trial].rows(), limitTrialSizes));
-
-      std::vector<ForcePlate> trimmedPlates;
-      for (int i = 0; i < forcePlateTrials[trial].size(); i++)
+      for (int pass = 0; pass < poseTrialPasses[trial].size(); pass++)
       {
-        ForcePlate& toCopy = forcePlateTrials[trial][i];
-        ForcePlate trimmedPlate;
 
-        trimmedPlate.corners = toCopy.corners;
-        trimmedPlate.worldOrigin = toCopy.worldOrigin;
+        // TODO: handle edge cases
 
-        for (int t = trialStartOffset; t < trialStartOffset + limitTrialSizes;
-             t++)
+        trimmedPoseTrialPasses[trial].push_back(
+            poseTrialPasses[trial][pass].block(
+                0,
+                trialStartOffset,
+                poseTrialPasses[trial][pass].rows(),
+                limitTrialSizes));
+
+        std::vector<ForcePlate> trimmedPlates;
+        for (int i = 0; i < forcePlateTrialPasses[trial][pass].size(); i++)
         {
-          trimmedPlate.centersOfPressure.push_back(toCopy.centersOfPressure[t]);
-          trimmedPlate.forces.push_back(toCopy.forces[t]);
-          trimmedPlate.moments.push_back(toCopy.moments[t]);
-        }
+          ForcePlate& toCopy = forcePlateTrialPasses[trial][pass][i];
+          ForcePlate trimmedPlate;
 
-        trimmedPlates.push_back(trimmedPlate);
+          trimmedPlate.corners = toCopy.corners;
+          trimmedPlate.worldOrigin = toCopy.worldOrigin;
+
+          for (int t = trialStartOffset; t < trialStartOffset + limitTrialSizes;
+               t++)
+          {
+            trimmedPlate.centersOfPressure.push_back(
+                toCopy.centersOfPressure[t]);
+            trimmedPlate.forces.push_back(toCopy.forces[t]);
+            trimmedPlate.moments.push_back(toCopy.moments[t]);
+          }
+
+          trimmedPlates.push_back(trimmedPlate);
+        }
+        trimmedForcePlateTrialPasses[trimmedForcePlateTrialPasses.size() - 1]
+            .push_back(trimmedPlates);
       }
-      trimmedForcePlateTrials.push_back(trimmedPlates);
     }
 
-    poseTrials = trimmedPoseTrials;
-    forcePlateTrials = trimmedForcePlateTrials;
+    poseTrialPasses = trimmedPoseTrialPasses;
+    forcePlateTrialPasses = trimmedForcePlateTrialPasses;
   }
 
   std::vector<std::string> groundForceBodies;
   groundForceBodies.push_back("calcn_r");
   groundForceBodies.push_back("calcn_l");
 
-  for (int trial = 0; trial < poseTrials.size(); trial++)
+  for (int trial = 0; trial < poseTrialPasses.size(); trial++)
   {
-    velTrials.push_back(Eigen::MatrixXs::Random(
-        poseTrials[trial].rows(), poseTrials[trial].cols()));
-    accTrials.push_back(Eigen::MatrixXs::Random(
-        poseTrials[trial].rows(), poseTrials[trial].cols()));
-    tauTrials.push_back(Eigen::MatrixXs::Random(
-        poseTrials[trial].rows(), poseTrials[trial].cols()));
-    groundBodyWrenchTrials.push_back(Eigen::MatrixXs::Random(
-        6 * groundForceBodies.size(), poseTrials[trial].cols()));
-    groundBodyCopTorqueForceTrials.push_back(Eigen::MatrixXs::Random(
-        9 * groundForceBodies.size(), poseTrials[trial].cols()));
+    velTrialPasses.emplace_back();
+    accTrialPasses.emplace_back();
+    tauTrialPasses.emplace_back();
+    groundBodyWrenchTrialPasses.emplace_back();
+    groundBodyCopTorqueForceTrialPasses.emplace_back();
+    for (int pass = 0; pass < processingPasses.size(); pass++)
+    {
+      velTrialPasses[trial].push_back(Eigen::MatrixXs::Random(
+          poseTrialPasses[trial][pass].rows(),
+          poseTrialPasses[trial][pass].cols()));
+      accTrialPasses[trial].push_back(Eigen::MatrixXs::Random(
+          poseTrialPasses[trial][pass].rows(),
+          poseTrialPasses[trial][pass].cols()));
+      tauTrialPasses[trial].push_back(Eigen::MatrixXs::Random(
+          poseTrialPasses[trial][pass].rows(),
+          poseTrialPasses[trial][pass].cols()));
+      groundBodyWrenchTrialPasses[trial].push_back(Eigen::MatrixXs::Random(
+          6 * groundForceBodies.size(), poseTrialPasses[trial][pass].cols()));
+      groundBodyCopTorqueForceTrialPasses[trial].push_back(
+          Eigen::MatrixXs::Random(
+              9 * groundForceBodies.size(),
+              poseTrialPasses[trial][pass].cols()));
+    }
     std::vector<Eigen::MatrixXs> trialCustomValues;
     trialCustomValues.push_back(Eigen::MatrixXs::Random(
-        poseTrials[trial].rows(), poseTrials[trial].cols()));
+        poseTrialPasses[trial][0].rows(), poseTrialPasses[trial][0].cols()));
     customValueTrials.push_back(trialCustomValues);
 
     std::vector<bool> missingGRF;
     std::vector<MissingGRFReason> grfReason;
     std::vector<s_t> residuals;
-    for (int t = 0; t < poseTrials[trial].cols(); t++)
+    for (int t = 0; t < poseTrialPasses[trial][0].cols(); t++)
     {
       missingGRF.push_back(t % 10 == 0);
       if (t % 10 == 0)
@@ -174,29 +213,33 @@ bool testWriteSubjectToDisk(
     probablyMissingGRFData.push_back(missingGRF);
     residualNorms.push_back(residuals);
 
-    std::vector<bool> positionObserved;
-    std::vector<bool> velocityFiniteDifferenced;
-    std::vector<bool> accelerationFiniteDifferenced;
-    for (int i = 0; i < poseTrials[trial].rows(); i++)
+    for (int pass = 0; pass < processingPasses.size(); pass++)
     {
-      positionObserved.push_back(i % 2 == 0);
-      velocityFiniteDifferenced.push_back(i % 3 == 0);
-      accelerationFiniteDifferenced.push_back(i % 4 == 0);
+      std::vector<bool> positionObserved;
+      std::vector<bool> velocityFiniteDifferenced;
+      std::vector<bool> accelerationFiniteDifferenced;
+      for (int i = 0; i < poseTrialPasses[trial].rows(); i++)
+      {
+        positionObserved.push_back(i % 2 == 0);
+        velocityFiniteDifferenced.push_back(i % 3 == 0);
+        accelerationFiniteDifferenced.push_back(i % 4 == 0);
+      }
+      passDofPositionObserved.push_back(positionObserved);
+      passDofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
+      passDofAccelerationFiniteDifferenced.push_back(
+          accelerationFiniteDifferenced);
     }
-    dofPositionObserved.push_back(positionObserved);
-    dofVelocityFiniteDifferenced.push_back(velocityFiniteDifferenced);
-    dofAccelerationFiniteDifferenced.push_back(accelerationFiniteDifferenced);
 
     trialComPoses.push_back(
-        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
+        Eigen::MatrixXs::Random(3, poseTrialPasses[trial].cols()));
     trialComVelocities.push_back(
-        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
+        Eigen::MatrixXs::Random(3, poseTrialPasses[trial].cols()));
     trialComAccelerations.push_back(
-        Eigen::MatrixXs::Random(3, poseTrials[trial].cols()));
+        Eigen::MatrixXs::Random(3, poseTrialPasses[trial].cols()));
   }
 
   std::vector<std::string> trialNames;
-  for (int i = 0; i < poseTrials.size(); i++)
+  for (int i = 0; i < poseTrialPasses.size(); i++)
   {
     trialNames.push_back("trial_" + std::to_string(i));
   }
@@ -225,13 +268,13 @@ bool testWriteSubjectToDisk(
   {
     markerNames.push_back("marker_" + std::to_string(i));
   }
-  for (int trial = 0; trial < poseTrials.size(); trial++)
+  for (int trial = 0; trial < poseTrialPasses.size(); trial++)
   {
     std::vector<std::map<std::string, Eigen::Vector3s>> markerTrial;
     std::vector<std::map<std::string, Eigen::Vector3s>> accTrial;
     std::vector<std::map<std::string, Eigen::Vector3s>> gyroTrial;
     std::vector<std::map<std::string, Eigen::VectorXs>> emgTrial;
-    for (int t = 0; t < poseTrials[trial].cols(); t++)
+    for (int t = 0; t < poseTrialPasses[trial].cols(); t++)
     {
       std::map<std::string, Eigen::Vector3s> markers;
       std::map<std::string, Eigen::Vector3s> accs;
@@ -260,7 +303,7 @@ bool testWriteSubjectToDisk(
     subjectTags.push_back("subject_tag_" + std::to_string(i));
   }
   std::vector<std::vector<std::string>> trialTags;
-  for (int trial = 0; trial < poseTrials.size(); trial++)
+  for (int trial = 0; trial < poseTrialPasses.size(); trial++)
   {
     std::vector<std::string> trialTag;
     for (int i = 0; i < trial + 3; i++)
@@ -271,42 +314,51 @@ bool testWriteSubjectToDisk(
     trialTags.push_back(trialTag);
   }
 
-  SubjectOnDisk::writeSubject(
-      outputFilePath,
-      openSimFilePath,
-      timesteps,
-      poseTrials,
-      velTrials,
-      accTrials,
-      probablyMissingGRFData,
-      missingGRFReason,
-      dofPositionObserved,
-      dofVelocityFiniteDifferenced,
-      dofAccelerationFiniteDifferenced,
-      tauTrials,
-      trialComPoses,
-      trialComVelocities,
-      trialComAccelerations,
-      residualNorms,
-      groundForceBodies,
-      groundBodyWrenchTrials,
-      groundBodyCopTorqueForceTrials,
-      customValueNames,
-      customValueTrials,
-      markerObservations,
-      accObservations,
-      gyroObservations,
-      emgObservations,
-      forcePlateTrials,
-      biologicalSex,
-      heightM,
-      massKg,
-      age,
-      trialNames,
-      subjectTags,
-      trialTags,
-      originalHref,
-      originalNotes);
+  SubjectOnDiskHeader header;
+  header.setHeightM(heightM);
+  header.setMassKg(massKg);
+  header.setAgeYears(age);
+  header.addProcessingPass()
+      .setProcessingPassType(ProcessingPassType::kinematics)
+      .setOpenSimFileText(openSimFilePath);
+  SubjectOnDisk::writeB3D(outputFilePath, header);
+
+  // SubjectOnDisk::writeSubject(
+  //     outputFilePath,
+  //     openSimFilePath,
+  //     timesteps,
+  //     poseTrials,
+  //     velTrials,
+  //     accTrials,
+  //     probablyMissingGRFData,
+  //     missingGRFReason,
+  //     dofPositionObserved,
+  //     dofVelocityFiniteDifferenced,
+  //     dofAccelerationFiniteDifferenced,
+  //     tauTrials,
+  //     trialComPoses,
+  //     trialComVelocities,
+  //     trialComAccelerations,
+  //     residualNorms,
+  //     groundForceBodies,
+  //     groundBodyWrenchTrials,
+  //     groundBodyCopTorqueForceTrials,
+  //     customValueNames,
+  //     customValueTrials,
+  //     markerObservations,
+  //     accObservations,
+  //     gyroObservations,
+  //     emgObservations,
+  //     forcePlateTrials,
+  //     biologicalSex,
+  //     heightM,
+  //     massKg,
+  //     age,
+  //     trialNames,
+  //     subjectTags,
+  //     trialTags,
+  //     originalHref,
+  //     originalNotes);
 
   ////////////////////////////////////////
   // Test reading the subject back in
@@ -315,7 +367,7 @@ bool testWriteSubjectToDisk(
   SubjectOnDisk subject(outputFilePath);
 
   std::shared_ptr<dynamics::Skeleton> skel = subject.readSkel(
-      "dart://sample/osim/OpenCapTest/Subject4/Models/Geometry/");
+      0, "dart://sample/osim/OpenCapTest/Subject4/Models/Geometry/");
   if (skel == nullptr)
   {
     std::cout << "Failed to read skeleton back in!" << std::endl;
@@ -407,13 +459,18 @@ bool testWriteSubjectToDisk(
       }
     }
   }
-  for (int trial = 0; trial < velTrials.size(); trial++)
+  for (int trial = 0; trial < velTrialPasses.size(); trial++)
   {
-    std::vector<s_t> maxVels = subject.getTrialMaxJointVelocity(trial);
-    for (int t = 0; t < velTrials[trial].cols(); t++)
+    for (int pass = 0; pass < processingPasses.size(); pass++)
     {
-      EXPECT_NEAR(
-          maxVels[t], velTrials[trial].col(t).cwiseAbs().maxCoeff(), 1e-6);
+      std::vector<s_t> maxVels = subject.getTrialMaxJointVelocity(trial);
+      for (int t = 0; t < velTrialPasses[trial][pass].cols(); t++)
+      {
+        EXPECT_NEAR(
+            maxVels[t],
+            velTrialPasses[trial][pass].col(t).cwiseAbs().maxCoeff(),
+            1e-6);
+      }
     }
   }
 
@@ -551,26 +608,26 @@ bool testWriteSubjectToDisk(
         return false;
       }
 
-      Eigen::VectorXs originalPos = poseTrials[frame->trial].col(frame->t);
-      if (!equals(originalPos, frame->pos, 1e-8))
+      Eigen::VectorXs originalPos = poseTrialPasses[frame->trial].col(frame->t);
+      if (!equals(originalPos, frame->processingPasses[0].pos, 1e-8))
       {
         std::cout << "Pos not recovered" << std::endl;
         return false;
       }
       Eigen::VectorXs originalVel = velTrials[frame->trial].col(frame->t);
-      if (!equals(originalVel, frame->vel, 1e-8))
+      if (!equals(originalVel, frame->processingPasses[0].vel, 1e-8))
       {
         std::cout << "Vel not recovered" << std::endl;
         return false;
       }
       Eigen::VectorXs originalAcc = accTrials[frame->trial].col(frame->t);
-      if (!equals(originalAcc, frame->acc, 1e-8))
+      if (!equals(originalAcc, frame->processingPasses[0].acc, 1e-8))
       {
         std::cout << "Acc not recovered" << std::endl;
         return false;
       }
       Eigen::VectorXs originalTau = tauTrials[frame->trial].col(frame->t);
-      if (!equals(originalTau, frame->tau, 1e-8))
+      if (!equals(originalTau, frame->processingPasses[0].tau, 1e-8))
       {
         std::cout << "Tau not recovered" << std::endl;
         return false;
@@ -581,7 +638,8 @@ bool testWriteSubjectToDisk(
             = groundBodyWrenchTrials[frame->trial].col(frame->t).segment<6>(
                 b * 6);
         Eigen::Vector6s recoveredWrench
-            = frame->groundContactWrenches.segment<6>(b * 6);
+            = frame->processingPasses[0].groundContactWrenches.segment<6>(
+                b * 6);
         if (!equals(originalWrench, recoveredWrench, 1e-8))
         {
           std::cout << "Body wrench not recovered" << std::endl;
@@ -592,7 +650,8 @@ bool testWriteSubjectToDisk(
                   .col(frame->t)
                   .segment<3>(b * 9);
         Eigen::Vector3s recoveredCoP
-            = frame->groundContactCenterOfPressure.segment<3>(b * 3);
+            = frame->processingPasses[0]
+                  .groundContactCenterOfPressure.segment<3>(b * 3);
         if (!equals(originalCoP, recoveredCoP, 1e-8))
         {
           std::cout << "GRF CoP not recovered" << std::endl;
@@ -603,7 +662,7 @@ bool testWriteSubjectToDisk(
                   .col(frame->t)
                   .segment<3>((b * 9) + 3);
         Eigen::Vector3s recoveredTau
-            = frame->groundContactTorque.segment<3>(b * 3);
+            = frame->processingPasses[0].groundContactTorque.segment<3>(b * 3);
         if (!equals(originalTau, recoveredTau, 1e-8))
         {
           std::cout << "GRF Tau not recovered" << std::endl;
@@ -613,7 +672,7 @@ bool testWriteSubjectToDisk(
                                         .col(frame->t)
                                         .segment<3>((b * 9) + 6);
         Eigen::Vector3s recoveredF
-            = frame->groundContactForce.segment<3>(b * 3);
+            = frame->processingPasses[0].groundContactForce.segment<3>(b * 3);
         if (!equals(originalF, recoveredF, 1e-8))
         {
           std::cout << "GRF Force not recovered" << std::endl;
@@ -669,41 +728,5 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
         motFiles,
         grfFiles));
   }
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(SubjectOnDisk, HAMNER_RUNNING)
-{
-  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
-  retriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  retriever->addSchemaRetriever("dart", DartResourceRetriever::create());
-  std::string path = retriever->getFilePath(
-      "dart://sample/subjectOnDisk/HamnerRunning2013Subject01.bin");
-
-  SubjectOnDisk subject(path);
-  EXPECT_EQ(subject.getNumTrials(), 4);
-  EXPECT_GT(subject.readFrames(0, 7, 10).size(), 0);
-}
-#endif
-
-#ifdef ALL_TESTS
-TEST(SubjectOnDisk, HAMNER_RUNNING_READ_WITH_DATA_STRIDE)
-{
-  auto retriever = std::make_shared<utils::CompositeResourceRetriever>();
-  retriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  retriever->addSchemaRetriever("dart", DartResourceRetriever::create());
-  std::string path = retriever->getFilePath(
-      "dart://sample/subjectOnDisk/HamnerRunning2013Subject01.bin");
-
-  SubjectOnDisk subject(path);
-  EXPECT_EQ(subject.getNumTrials(), 4);
-  auto frames = subject.readFrames(0, 7, 10, 5);
-  EXPECT_GT(frames.size(), 2);
-  EXPECT_EQ(frames[0]->t, 7);
-  EXPECT_EQ(frames[1]->t, 7 + 5);
-  EXPECT_EQ(frames[2]->t, 7 + 10);
 }
 #endif

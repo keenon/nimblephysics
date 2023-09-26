@@ -15659,6 +15659,7 @@ void DynamicsFitter::writeCSVData(
 
 //==============================================================================
 // This writes a random-seekable binary format to disk
+/*
 void DynamicsFitter::writeSubjectOnDisk(
     std::string outputPath,
     std::string openSimFilePath,
@@ -15875,6 +15876,7 @@ void DynamicsFitter::writeSubjectOnDisk(
       href,
       notes);
 }
+*/
 
 //==============================================================================
 // This saves all the attributes on the init to the skeleton

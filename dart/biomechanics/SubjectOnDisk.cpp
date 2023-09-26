@@ -38,6 +38,41 @@ struct FileHeader
 };
 }
 
+proto::ProcessingPassType passTypeToProto(ProcessingPassType type)
+{
+  switch (type)
+  {
+    case kinematics:
+      return proto::ProcessingPassType::kinematics;
+    case dynamics:
+      return proto::ProcessingPassType::dynamics;
+    case lowPassFilter:
+      return proto::ProcessingPassType::lowPassFilter;
+  }
+  return proto::ProcessingPassType::kinematics;
+}
+
+ProcessingPassType passTypeFromProto(proto::ProcessingPassType type)
+{
+  switch (type)
+  {
+    case proto::ProcessingPassType::kinematics:
+      return kinematics;
+    case proto::ProcessingPassType::dynamics:
+      return dynamics;
+    case proto::ProcessingPassType::lowPassFilter:
+      return lowPassFilter;
+      // These are just here to keep Clang from complaining
+    case proto::ProcessingPassType_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return kinematics;
+      break;
+    case proto::ProcessingPassType_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return kinematics;
+      break;
+  }
+  return kinematics;
+}
+
 proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
 {
   switch (reason)
@@ -60,6 +95,8 @@ proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
       return proto::MissingGRFReason::missingBlip;
     case shiftGRF:
       return proto::MissingGRFReason::shiftGRF;
+    case interpolatedClippedGRF:
+      return proto::MissingGRFReason::interpolatedClippedGRF;
   }
   return proto::MissingGRFReason::notMissingGRF;
 }
@@ -86,6 +123,8 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
       return missingBlip;
     case proto::MissingGRFReason::shiftGRF:
       return shiftGRF;
+    case proto::MissingGRFReason::interpolatedClippedGRF:
+      return interpolatedClippedGRF;
       // These are just here to keep Clang from complaining
     case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
       return notMissingGRF;
@@ -146,144 +185,88 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
               << std::endl;
     throw new std::exception();
   }
-
   // 6. Get the data out of the protobuf object
-  int version = header.version();
-
-  mNumDofs = header.num_dofs();
-  mNumTrials = header.num_trials();
-  for (int i = 0; i < header.ground_contact_body_size(); i++)
-  {
-    mGroundContactBodies.push_back(header.ground_contact_body(i));
-  }
-  for (int i = 0; i < header.custom_value_name_size(); i++)
-  {
-    mCustomValues.push_back(header.custom_value_name(i));
-    mCustomValueLengths.push_back(header.custom_value_length(i));
-  }
-  for (int i = 0; i < header.trial_name_size(); i++)
-  {
-    auto& trialHeader = header.trial_header(i);
-    std::vector<bool> missingGRF;
-    std::vector<MissingGRFReason> missingGRFReason;
-    std::vector<s_t> residualNorms;
-    std::vector<s_t> maxJointVelocity;
-    for (int t = 0; t < trialHeader.missing_grf_size(); t++)
-    {
-      missingGRF.push_back(trialHeader.missing_grf(t));
-      missingGRFReason.push_back(
-          missingGRFReasonFromProto(trialHeader.missing_grf_reason(t)));
-      residualNorms.push_back(trialHeader.residual(t));
-      if (version > 1 && trialHeader.joints_max_velocity_size() > t)
-      {
-        maxJointVelocity.push_back(trialHeader.joints_max_velocity(t));
-      }
-    }
-    mProbablyMissingGRF.push_back(missingGRF);
-    mMissingGRFReason.push_back(missingGRFReason);
-    mTrialResidualNorms.push_back(residualNorms);
-    mTrialMaxJointVelocity.push_back(maxJointVelocity);
-    mTrialLength.push_back(trialHeader.trial_length());
-    mTrialTimesteps.push_back(trialHeader.trial_timestep());
-    std::vector<bool> dofPositionsObserved;
-    std::vector<bool> dofVelocitiesFiniteDifferenced;
-    std::vector<bool> dofAccelerationFiniteDifferenced;
-    for (int i = 0; i < trialHeader.dof_positions_observed_size(); i++)
-    {
-      dofPositionsObserved.push_back(trialHeader.dof_positions_observed(i));
-      dofVelocitiesFiniteDifferenced.push_back(
-          trialHeader.dof_velocities_finite_differenced(i));
-      dofAccelerationFiniteDifferenced.push_back(
-          trialHeader.dof_acceleration_finite_differenced(i));
-    }
-    mDofPositionsObserved.push_back(dofPositionsObserved);
-    mDofVelocitiesFiniteDifferenced.push_back(dofVelocitiesFiniteDifferenced);
-    mDofAccelerationFiniteDifferenced.push_back(
-        dofAccelerationFiniteDifferenced);
-    if (version > 1)
-    {
-      std::vector<std::string> trialTags;
-      for (int i = 0; i < trialHeader.trial_tag_size(); i++)
-      {
-        trialTags.push_back(trialHeader.trial_tag(i));
-      }
-      mTrialTags.push_back(trialTags);
-    }
-    int numForcePlates = trialHeader.num_force_plates();
-    mTrialNumForcePlates.push_back(numForcePlates);
-    std::vector<std::vector<Eigen::Vector3s>> forcePlateCorners;
-    for (int i = 0; i < numForcePlates; i++)
-    {
-      std::vector<Eigen::Vector3s> corners;
-      for (int corner = 0; corner < trialHeader.force_plate_corners_size() / 3;
-           corner++)
-      {
-        Eigen::Vector3s pt(
-            trialHeader.force_plate_corners(i * 3 + 0),
-            trialHeader.force_plate_corners(i * 3 + 1),
-            trialHeader.force_plate_corners(i * 3 + 2));
-        corners.push_back(pt);
-      }
-      forcePlateCorners.push_back(corners);
-    }
-    mTrialForcePlateCorners.push_back(forcePlateCorners);
-    mTrialNames.push_back(header.trial_name(i));
-  }
-
-  if (version > 1)
-  {
-    mBiologicalSex = header.biological_sex();
-    mMassKg = header.mass_kg();
-    mHeightM = header.height_m();
-    mAgeYears = header.age_years();
-    for (int i = 0; i < header.subject_tag_size(); i++)
-    {
-      mSubjectTags.push_back(header.subject_tag(i));
-    }
-    mMarkerNames.resize(header.marker_name_size());
-    for (int i = 0; i < header.marker_name_size(); i++)
-    {
-      mMarkerNames[i] = header.marker_name(i);
-    }
-    mAccNames.resize(header.acc_name_size());
-    for (int i = 0; i < header.acc_name_size(); i++)
-    {
-      mAccNames[i] = header.acc_name(i);
-    }
-    mGyroNames.resize(header.gyro_name_size());
-    for (int i = 0; i < header.gyro_name_size(); i++)
-    {
-      mGyroNames[i] = header.gyro_name(i);
-    }
-    mEmgNames.resize(header.emg_name_size());
-    for (int i = 0; i < header.emg_name_size(); i++)
-    {
-      mEmgNames[i] = header.emg_name(i);
-    }
-    mEmgDim = header.emg_dim();
-  }
-
-  // int32 num_dofs = 1;
-  // int32 num_trials = 2;
-  // repeated string ground_contact_body = 3;
-  // repeated string custom_value_name = 6;
-  // repeated int32 custom_value_length = 7;
-  // string model_osim_text = 8;
-  // repeated SubjectOnDiskTrialHeader trial_header = 9;
-  // // The trial names, if provided, or empty strings
-  // repeated string trial_name = 10;
-  // // An optional link to the web where this subject came from
-  // string href = 11;
-  // // Any text-based notes on the subject data, like citations etc
-  // string notes = 12;
-  // // The version number for this file format
-  // int32 version = 13;
-  // // This is the size of each frame in bytes. This should be constant across
-  // all frames in the file, to allow easy seeking. int32 frame_size = 14;
-  mHref = header.href();
-  mNotes = header.notes();
+  mHeader.read(header);
   mFrameSize = header.frame_size();
   mDataSectionStart = sizeof(int64_t) + headerSize;
+
+  fclose(file);
+}
+
+/// This will write a B3D file to disk
+void SubjectOnDisk::writeB3D(
+    const std::string& outputPath, SubjectOnDiskHeader& header)
+{
+  // 0. Open the file
+  FILE* file = fopen(outputPath.c_str(), "w");
+  if (file == nullptr)
+  {
+    std::cout << "SubjectOnDiskBuilder::write() failed to open output file at "
+              << outputPath << ". Do you have permissions to write that file?"
+              << std::endl;
+    return;
+  }
+
+  // Create the header proto
+
+  proto::SubjectOnDiskHeader headerProto;
+  header.write(&headerProto);
+
+  // 1.3. Continues in next section, after we know the size of the first
+  // serialized frame...
+
+  /////////////////////////////////////////////////////////////////////////////
+  // 2. Serialize and write the frames to the file
+  /////////////////////////////////////////////////////////////////////////////
+
+  bool firstTrial = true;
+  int expectedFrameSize = -1;
+  (void)expectedFrameSize;
+  for (int trial = 0; trial < header.mTrials.size(); trial++)
+  {
+    for (int t = 0; t < header.mTrials[trial].mMarkerObservations.size(); t++)
+    {
+      // 2.1. Populate the protobuf frame object in memory
+      proto::SubjectOnDiskFrame frameProto;
+      header.writeFrame(&frameProto, trial, t);
+      // 2.2. Serialize the protobuf header object
+      std::string frameSerialized = "";
+      frameProto.SerializeToString(&frameSerialized);
+
+      // 2.3. Get the length of the serialized message
+      int64_t messageSize = frameSerialized.size();
+
+      // If this is the first trial, we need to finish the header with
+      // information about the size of serialized frame objects and write the
+      // header first
+      if (firstTrial)
+      {
+        // 1.3. Continued from previous section... Write the size of the frame
+        // binaries
+        expectedFrameSize = messageSize;
+        headerProto.set_frame_size(messageSize);
+
+        // 1.4. Serialize the protobuf header object
+        std::string headerSerialized = "";
+        headerProto.SerializeToString(&headerSerialized);
+
+        // 1.5. Write the length of the message as an integer header
+        int64_t headerSize = headerSerialized.size();
+        fwrite(&headerSize, sizeof(int64_t), 1, file);
+
+        // 1.6. Write the serialized data to the file
+        fwrite(headerSerialized.c_str(), sizeof(char), headerSize, file);
+
+        firstTrial = false;
+      }
+      // We need all frames to be exactly the same size, in order to support
+      // random seeking in the file
+      assert(messageSize == expectedFrameSize);
+
+      // 2.4. Write the serialized data to the file
+      fwrite(frameSerialized.c_str(), sizeof(char), messageSize, file);
+    }
+  }
 
   fclose(file);
 }
@@ -291,7 +274,7 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
 /// This will read the skeleton from the binary, and optionally use the passed
 /// in Geometry folder.
 std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
-    std::string geometryFolder)
+    int passNumberToLoad, std::string geometryFolder)
 {
   if (geometryFolder == "")
   {
@@ -349,8 +332,17 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
     throw new std::exception();
   }
 
+  if (passNumberToLoad < 0 || passNumberToLoad >= header.passes_size())
+  {
+    std::cout << "SubjectOnDisk attempting to read an out of bounds skeleton, "
+                 "requested skeleton from processing pass "
+              << passNumberToLoad << "/" << header.passes_size() << "."
+              << std::endl;
+    throw new std::exception();
+  }
+
   tinyxml2::XMLDocument osimFile;
-  osimFile.Parse(header.model_osim_text().c_str());
+  osimFile.Parse(header.passes(passNumberToLoad).model_osim_text().c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
 
@@ -361,7 +353,7 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 
 /// This will read the raw OpenSim XML file text out of the binary, and return
 /// it as a string
-std::string SubjectOnDisk::readRawOsimFileText()
+std::string SubjectOnDisk::readRawOsimFileText(int passNumberToLoad)
 {
   // 1. Open the file
   FILE* file = fopen(mPath.c_str(), "r");
@@ -411,7 +403,16 @@ std::string SubjectOnDisk::readRawOsimFileText()
     throw new std::exception();
   }
 
-  return header.model_osim_text();
+  if (passNumberToLoad < 0 || passNumberToLoad >= header.passes_size())
+  {
+    std::cout << "SubjectOnDisk attempting to read an out of bounds skeleton, "
+                 "requested skeleton from processing pass "
+              << passNumberToLoad << "/" << header.passes_size() << "."
+              << std::endl;
+    throw new std::exception();
+  }
+
+  return header.passes(passNumberToLoad).model_osim_text();
 }
 
 /// This will read from disk and allocate a number of Frame objects,
@@ -441,11 +442,11 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
   int linearFrameStart = 0;
   for (int i = 0; i < trial; i++)
   {
-    linearFrameStart += mTrialLength[i];
+    linearFrameStart += getTrialLength(i);
   }
   linearFrameStart += startFrame;
 
-  int remainingFrames = mTrialLength[trial] - startFrame;
+  int remainingFrames = getTrialLength(trial) - startFrame;
   if (remainingFrames < numFramesToRead)
   {
     numFramesToRead = remainingFrames;
@@ -504,152 +505,8 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
 
     // 6. Copy the results out into a frame
     std::shared_ptr<Frame> frame = std::make_shared<Frame>();
-    frame->trial = trial;
-    frame->t = startFrame + (i * stride);
-    frame->residual = mTrialResidualNorms[trial][frame->t];
-    frame->probablyMissingGRF = mProbablyMissingGRF[trial][frame->t];
-    frame->missingGRFReason = mMissingGRFReason[trial][frame->t];
-    frame->pos = Eigen::VectorXd(mNumDofs);
-    frame->vel = Eigen::VectorXd(mNumDofs);
-    frame->acc = Eigen::VectorXd(mNumDofs);
-    frame->tau = Eigen::VectorXd(mNumDofs);
-    for (int i = 0; i < mNumDofs; i++)
-    {
-      frame->pos(i) = proto.pos(i);
-      frame->vel(i) = proto.vel(i);
-      frame->acc(i) = proto.acc(i);
-      frame->tau(i) = proto.tau(i);
-    }
-    // These are boolean values (0 or 1) for each contact body indicating
-    // whether or not it's in contact
-    frame->contact = Eigen::VectorXi::Zero(mGroundContactBodies.size());
-    // These are each 6-vector of contact body wrenches, all concatenated
-    // together
-    frame->groundContactWrenches
-        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 6);
-    // These are each 3-vector for each contact body, concatenated together
-    frame->groundContactCenterOfPressure
-        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
-    frame->groundContactTorque
-        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
-    frame->groundContactForce
-        = Eigen::VectorXd::Zero(mGroundContactBodies.size() * 3);
-    for (int i = 0; i < mGroundContactBodies.size(); i++)
-    {
-      for (int j = 0; j < 6; j++)
-      {
-        frame->groundContactWrenches(i * 6 + j)
-            = proto.ground_contact_wrench(i * 6 + j);
-      }
-      for (int j = 0; j < 3; j++)
-      {
-        frame->groundContactCenterOfPressure(i * 3 + j)
-            = proto.ground_contact_center_of_pressure(i * 3 + j);
-        frame->groundContactTorque(i * 3 + j)
-            = proto.ground_contact_torque(i * 3 + j);
-        frame->groundContactForce(i * 3 + j)
-            = proto.ground_contact_force(i * 3 + j);
-      }
-      s_t contactNorm = frame->groundContactForce.segment<3>(i * 3).norm();
-      if (contactNorm > contactThreshold)
-      {
-        frame->contact(i) = 1;
-      }
-    }
-
-    frame->comPos = Eigen::Vector3s::Zero();
-    frame->comVel = Eigen::Vector3s::Zero();
-    frame->comAcc = Eigen::Vector3s::Zero();
-    for (int i = 0; i < 3; i++)
-    {
-      frame->comPos(i) = proto.com_pos(i);
-      frame->comVel(i) = proto.com_vel(i);
-      frame->comAcc(i) = proto.com_acc(i);
-    }
-
-    frame->posObserved = Eigen::VectorXi::Zero(mNumDofs);
-    frame->velFiniteDifferenced = Eigen::VectorXi::Zero(mNumDofs);
-    frame->accFiniteDifferenced = Eigen::VectorXi::Zero(mNumDofs);
-    for (int i = 0; i < mNumDofs; i++)
-    {
-      frame->posObserved(i) = mDofPositionsObserved[trial][i];
-      frame->velFiniteDifferenced(i)
-          = mDofVelocitiesFiniteDifferenced[trial][i];
-      frame->accFiniteDifferenced(i)
-          = mDofAccelerationFiniteDifferenced[trial][i];
-    }
-    // 7. Read out the marker, accelerometer, and gyro info as pairs
-    for (int i = 0; i < mMarkerNames.size(); i++)
-    {
-      Eigen::Vector3s marker(
-          proto.marker_obs(i * 3 + 0),
-          proto.marker_obs(i * 3 + 1),
-          proto.marker_obs(i * 3 + 2));
-      if (!marker.hasNaN())
-      {
-        frame->markerObservations.emplace_back(mMarkerNames[i], marker);
-      }
-    }
-    for (int i = 0; i < mAccNames.size(); i++)
-    {
-      Eigen::Vector3s acc(
-          proto.acc_obs(i * 3 + 0),
-          proto.acc_obs(i * 3 + 1),
-          proto.acc_obs(i * 3 + 2));
-      if (!acc.hasNaN())
-      {
-        frame->accObservations.emplace_back(mAccNames[i], acc);
-      }
-    }
-    for (int i = 0; i < mGyroNames.size(); i++)
-    {
-      Eigen::Vector3s gyro(
-          proto.gyro_obs(i * 3 + 0),
-          proto.gyro_obs(i * 3 + 1),
-          proto.gyro_obs(i * 3 + 2));
-      if (!gyro.hasNaN())
-      {
-        frame->gyroObservations.emplace_back(mGyroNames[i], gyro);
-      }
-    }
-    for (int i = 0; i < mEmgNames.size(); i++)
-    {
-      Eigen::VectorXs emgSequence(mEmgDim);
-      for (int j = 0; j < mEmgDim; j++)
-      {
-        emgSequence(j) = proto.emg_obs(i * mEmgDim + j);
-      }
-      if (!emgSequence.hasNaN())
-      {
-        frame->emgSignals.emplace_back(mEmgNames[i], emgSequence);
-      }
-    }
-    int numForcePlates = 0;
-    if (mTrialNumForcePlates.size() > trial)
-    {
-      numForcePlates = mTrialNumForcePlates[trial];
-    }
-    for (int i = 0; i < numForcePlates; i++)
-    {
-      Eigen::Vector3s forceCop(
-          proto.raw_force_plate_cop(i * 3 + 0),
-          proto.raw_force_plate_cop(i * 3 + 1),
-          proto.raw_force_plate_cop(i * 3 + 2));
-      Eigen::Vector3s forceTorques(
-          proto.raw_force_plate_torque(i * 3 + 0),
-          proto.raw_force_plate_torque(i * 3 + 1),
-          proto.raw_force_plate_torque(i * 3 + 2));
-      Eigen::Vector3s force(
-          proto.raw_force_plate_force(i * 3 + 0),
-          proto.raw_force_plate_force(i * 3 + 1),
-          proto.raw_force_plate_force(i * 3 + 2));
-      if (!forceCop.hasNaN() && !forceTorques.hasNaN() && !force.hasNaN())
-      {
-        frame->rawForcePlateCenterOfPressures.push_back(forceCop);
-        frame->rawForcePlateTorques.push_back(forceTorques);
-        frame->rawForcePlateForces.push_back(force);
-      }
-    }
+    frame->readFromProto(
+        &proto, mHeader, trial, startFrame + (i * stride), contactThreshold);
 
     result.push_back(frame);
   }
@@ -659,623 +516,241 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
   return result;
 }
 
-/// This writes a subject out to disk in a compressed and random-seekable
-/// binary format.
-void SubjectOnDisk::writeSubject(
-    const std::string& outputPath,
-    // The OpenSim file XML gets copied into our binary bundle, along with
-    // any necessary Geometry files
-    const std::string& openSimFilePath,
-    // The per-trial motion data
-    std::vector<s_t> trialTimesteps,
-    std::vector<Eigen::MatrixXs>& trialPoses,
-    std::vector<Eigen::MatrixXs>& trialVels,
-    std::vector<Eigen::MatrixXs>& trialAccs,
-    std::vector<std::vector<bool>>& probablyMissingGRF,
-    std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
-    std::vector<std::vector<bool>>& dofPositionsObserved,
-    std::vector<std::vector<bool>>& dofVelocitiesFiniteDifferenced,
-    std::vector<std::vector<bool>>& dofAccelerationFiniteDifferenced,
-    std::vector<Eigen::MatrixXs>& trialTaus,
-    std::vector<Eigen::MatrixXs>& trialComPoses,
-    std::vector<Eigen::MatrixXs>& trialComVels,
-    std::vector<Eigen::MatrixXs>& trialComAccs,
-    std::vector<std::vector<s_t>> trialResidualNorms,
-    // These are generalized 6-dof wrenches applied to arbitrary bodies
-    // (generally by foot-ground contact, though other things too)
-    std::vector<std::string>& groundForceBodies,
-    std::vector<Eigen::MatrixXs>& trialGroundBodyWrenches,
-    std::vector<Eigen::MatrixXs>& trialGroundBodyCopTorqueForce,
-    // We include this to allow the binary format to store/load a bunch of new
-    // types of values while remaining backwards compatible.
-    std::vector<std::string>& customValueNames,
-    std::vector<std::vector<Eigen::MatrixXs>> customValues,
-    // These are the markers, gyros and accelerometers
-    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-        markerObservations,
-    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-        accObservations,
-    const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-        gyroObservations,
-    const std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>&
-        emgObservations,
-    // This is raw force plate data
-    std::vector<std::vector<ForcePlate>>& forcePlates,
-    // This is the subject info
-    const std::string& biologicalSex,
-    double heightM,
-    double massKg,
-    int ageYears,
-    // The provenance info, optional, for investigating where training data
-    // came from after its been aggregated
-    std::vector<std::string> trialNames,
-    std::vector<std::string> subjectTags,
-    std::vector<std::vector<std::string>> trialTags,
-    const std::string& sourceHref,
-    const std::string& notes)
+void Frame::readFromProto(
+    dart::proto::SubjectOnDiskFrame* proto,
+    const SubjectOnDiskHeader& header,
+    int trial,
+    int t,
+    s_t contactThreshold)
 {
-  // 0. Open the file
-  FILE* file = fopen(outputPath.c_str(), "w");
-  if (file == nullptr)
-  {
-    std::cout << "SubjectOnDisk::writeSubject() failed" << std::endl;
-    return;
-  }
+  this->trial = trial;
+  this->t = t;
 
-  /////////////////////////////////////////////////////////////////////////////
-  // 1. Serialize and write the header to the file
-  /////////////////////////////////////////////////////////////////////////////
+  this->probablyMissingGRF = header.mTrials[trial].mProbablyMissingGRF[t];
+  this->missingGRFReason = header.mTrials[trial].mMissingGRFReason[t];
 
-  // 1.1. Read the whole OpenSim file in as a string
-  auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
-  newRetriever->addSchemaRetriever(
-      "file", std::make_shared<common::LocalResourceRetriever>());
-  newRetriever->addSchemaRetriever(
-      "dart", utils::DartResourceRetriever::create());
-  const std::string openSimRawXML = newRetriever->readAll(openSimFilePath);
+  this->processingPasses.clear();
+  assert(proto->pass_size() == header.mTrials[trial].mPasses.size());
+  for (int p = 0; p < header.mTrials[trial].mPasses.size(); p++)
+  {
+    this->processingPasses.emplace_back();
+    FramePass& pass = this->processingPasses.back();
+    const proto::SubjectOnDiskProcessingPassFrame& passProto = proto->pass(p);
 
-  // 1.2. Populate the protobuf header object in memory
-  proto::SubjectOnDiskHeader header;
-  header.set_num_dofs(trialPoses.size() > 0 ? trialPoses[0].rows() : 0);
-  header.set_num_trials(trialPoses.size());
-  for (std::string& body : groundForceBodies)
-  {
-    header.add_ground_contact_body(body);
-  }
-  for (int i = 0; i < customValueNames.size(); i++)
-  {
-    header.add_custom_value_name(customValueNames[i]);
-    header.add_custom_value_length(
-        customValues.size() > 0 ? customValues[0][i].rows() : 0);
-  }
-  header.set_model_osim_text(openSimRawXML);
-  int maxNumForcePlates = 0;
-  for (int trial = 0; trial < trialNames.size(); trial++)
-  {
-    auto* trialHeader = header.add_trial_header();
-    if (probablyMissingGRF.size() > trial && missingGRFReason.size() > trial
-        && trialResidualNorms.size() > trial)
+    // std::string passName;
+    pass.passName = header.mTrials[trial].mPasses[p].mName;
+
+    // s_t markerRMS;
+    pass.markerRMS = header.mTrials[trial].mPasses[p].mMarkerRMS[t];
+    // s_t markerMax;
+    pass.markerMax = header.mTrials[trial].mPasses[p].mMarkerMax[t];
+    // s_t linearResidual;
+    pass.linearResidual = header.mTrials[trial].mPasses[p].mLinearResidual[t];
+    // s_t angularResidual;
+    pass.angularResidual = header.mTrials[trial].mPasses[p].mAngularResidual[t];
+    // Eigen::VectorXd pos;
+    // Eigen::VectorXd vel;
+    // Eigen::VectorXd acc;
+    // Eigen::VectorXd tau;
+    int numDofs = header.mNumDofs;
+    pass.pos = Eigen::VectorXd(numDofs);
+    pass.vel = Eigen::VectorXd(numDofs);
+    pass.acc = Eigen::VectorXd(numDofs);
+    pass.tau = Eigen::VectorXd(numDofs);
+    for (int i = 0; i < numDofs; i++)
     {
-      for (int t = 0; t < probablyMissingGRF[trial].size(); t++)
-      {
-        trialHeader->add_missing_grf(probablyMissingGRF[trial][t]);
-        if (missingGRFReason[trial].size() > t)
-        {
-          trialHeader->add_missing_grf_reason(
-              missingGRFReasonToProto(missingGRFReason[trial][t]));
-        }
-        else
-        {
-          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                       "missingGRFReason out-of-bounds for trial "
-                    << trial << " at time " << t
-                    << ", defaulting to notMissingGRF" << std::endl;
-          trialHeader->add_missing_grf_reason(
-              missingGRFReasonToProto(notMissingGRF));
-        }
-        if (trialResidualNorms[trial].size() > t)
-        {
-          trialHeader->add_residual(trialResidualNorms[trial][t]);
-        }
-        else
-        {
-          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                       "residual out-of-bounds for trial "
-                    << trial << " at time " << t << ", defaulting to 0"
-                    << std::endl;
-          trialHeader->add_residual(0);
-        }
-      }
-    }
-    else
-    {
-      std::cout
-          << "SubjectOnDisk::writeSubject() passed bad info: "
-             "probablyMissingGRF, missingGRFReason, or trialResidualNorms "
-             "out-of-bounds for trial "
-          << trial << std::endl;
-    }
-    trialHeader->set_trial_timestep(trialTimesteps[trial]);
-    trialHeader->set_trial_length(trialPoses[trial].cols());
-    for (int j = 0; j < dofPositionsObserved[trial].size(); j++)
-    {
-      trialHeader->add_dof_positions_observed(dofPositionsObserved[trial][j]);
-      trialHeader->add_dof_velocities_finite_differenced(
-          dofVelocitiesFiniteDifferenced[trial][j]);
-      trialHeader->add_dof_acceleration_finite_differenced(
-          dofAccelerationFiniteDifferenced[trial][j]);
-    }
-    if (trialTags.size() > trial)
-    {
-      for (std::string& tag : trialTags[trial])
-      {
-        trialHeader->add_trial_tag(tag);
-      }
-    }
-    trialHeader->set_num_force_plates(forcePlates[trial].size());
-    for (auto& trialPlates : forcePlates[trial])
-    {
-      for (Eigen::Vector3s& corner : trialPlates.corners)
-      {
-        for (int i = 0; i < 3; i++)
-        {
-          trialHeader->add_force_plate_corners(corner(i));
-        }
-      }
-    }
-    // Keep track of the largest number of force plates in any trial, because we
-    // need to pad all trials to this number with NaNs, in order to keep the
-    // frames the same size to support random disk seeks.
-    if (forcePlates[trial].size() > maxNumForcePlates)
-    {
-      maxNumForcePlates = forcePlates[trial].size();
+      pass.pos(i) = passProto.pos(i);
+      pass.vel(i) = passProto.vel(i);
+      pass.acc(i) = passProto.acc(i);
+      pass.tau(i) = passProto.tau(i);
     }
 
-    for (int t = 0; t < trialVels[trial].cols(); t++)
+    // // These are boolean values (0 or 1) for each contact body indicating
+    // whether
+    // // or not it's in contact
+    // Eigen::VectorXi contact;
+    pass.contact = Eigen::VectorXi::Zero(header.mGroundContactBodies.size());
+
+    // // These are each 6-vector of contact body wrenches, all concatenated
+    // together Eigen::VectorXd groundContactWrenches;
+    pass.groundContactWrenches
+        = Eigen::VectorXd::Zero(header.mGroundContactBodies.size() * 6);
+
+    // // These are each 3-vector for each contact body, concatenated together
+    // Eigen::VectorXd groundContactCenterOfPressure;
+    // Eigen::VectorXd groundContactTorque;
+    // Eigen::VectorXd groundContactForce;
+    pass.groundContactCenterOfPressure
+        = Eigen::VectorXd::Zero(header.mGroundContactBodies.size() * 3);
+    pass.groundContactTorque
+        = Eigen::VectorXd::Zero(header.mGroundContactBodies.size() * 3);
+    pass.groundContactForce
+        = Eigen::VectorXd::Zero(header.mGroundContactBodies.size() * 3);
+
+    for (int i = 0; i < header.mGroundContactBodies.size(); i++)
     {
-      s_t maxVel = trialVels[trial].col(t).cwiseAbs().maxCoeff();
-      trialHeader->add_joints_max_velocity(maxVel);
+      for (int j = 0; j < 6; j++)
+      {
+        pass.groundContactWrenches(i * 6 + j)
+            = passProto.ground_contact_wrench(i * 6 + j);
+      }
+      for (int j = 0; j < 3; j++)
+      {
+        pass.groundContactCenterOfPressure(i * 3 + j)
+            = passProto.ground_contact_center_of_pressure(i * 3 + j);
+        pass.groundContactTorque(i * 3 + j)
+            = passProto.ground_contact_torque(i * 3 + j);
+        pass.groundContactForce(i * 3 + j)
+            = passProto.ground_contact_force(i * 3 + j);
+      }
+      s_t contactNorm = pass.groundContactForce.segment<3>(i * 3).norm();
+      if (contactNorm > contactThreshold)
+      {
+        pass.contact(i) = 1;
+      }
     }
 
-    header.add_trial_name(trialNames[trial]);
-  }
-  header.set_href(sourceHref);
-  header.set_notes(notes);
-  header.set_version(2);
+    // // These are the center of mass kinematics
+    // Eigen::Vector3s comPos;
+    // Eigen::Vector3s comVel;
+    // Eigen::Vector3s comAcc;
+    pass.comPos = Eigen::Vector3s::Zero();
+    pass.comVel = Eigen::Vector3s::Zero();
+    pass.comAcc = Eigen::Vector3s::Zero();
+    for (int j = 0; j < 3; j++)
+    {
+      pass.comPos(j) = passProto.com_pos(j);
+      pass.comVel(j) = passProto.com_vel(j);
+      pass.comAcc(j) = passProto.com_acc(j);
+    }
 
-  header.set_biological_sex(biologicalSex);
-  header.set_mass_kg(massKg);
-  header.set_height_m(heightM);
-  header.set_age_years(ageYears);
-  for (std::string& tag : subjectTags)
-  {
-    header.add_subject_tag(tag);
-  }
-
-  std::vector<std::string> markerNames;
-  std::vector<std::string> accNames;
-  std::vector<std::string> gyroNames;
-  std::vector<std::string> emgNames;
-  for (int trial = 0; trial < markerObservations.size(); trial++)
-  {
-    for (int t = 0; t < markerObservations[trial].size(); t++)
+    // // These are masks for which DOFs are observed
+    // Eigen::VectorXi posObserved;
+    // // These are masks for which DOFs have been finite differenced (if they
+    // // haven't been finite differenced, they're from real sensors and
+    // therefore
+    // // more trustworthy)
+    // Eigen::VectorXi velFiniteDifferenced;
+    // Eigen::VectorXi accFiniteDifferenced;
+    pass.posObserved = Eigen::VectorXi::Zero(numDofs);
+    pass.velFiniteDifferenced = Eigen::VectorXi::Zero(numDofs);
+    pass.accFiniteDifferenced = Eigen::VectorXi::Zero(numDofs);
+    for (int j = 0; j < numDofs; j++)
     {
-      for (auto& pair : markerObservations[trial][t])
-      {
-        if (std::find(markerNames.begin(), markerNames.end(), pair.first)
-            == markerNames.end())
-        {
-          markerNames.push_back(pair.first);
-        }
-      }
-    }
-  }
-  for (int trial = 0; trial < accObservations.size(); trial++)
-  {
-    for (int t = 0; t < accObservations[trial].size(); t++)
-    {
-      for (auto& pair : accObservations[trial][t])
-      {
-        if (std::find(accNames.begin(), accNames.end(), pair.first)
-            == accNames.end())
-        {
-          accNames.push_back(pair.first);
-        }
-      }
-    }
-  }
-  for (int trial = 0; trial < gyroObservations.size(); trial++)
-  {
-    for (int t = 0; t < gyroObservations[trial].size(); t++)
-    {
-      for (auto& pair : gyroObservations[trial][t])
-      {
-        if (std::find(gyroNames.begin(), gyroNames.end(), pair.first)
-            == gyroNames.end())
-        {
-          gyroNames.push_back(pair.first);
-        }
-      }
-    }
-  }
-  int emgDim = 0;
-  for (int trial = 0; trial < emgObservations.size(); trial++)
-  {
-    for (int t = 0; t < emgObservations[trial].size(); t++)
-    {
-      for (auto& pair : emgObservations[trial][t])
-      {
-        if (std::find(emgNames.begin(), emgNames.end(), pair.first)
-            == emgNames.end())
-        {
-          emgNames.push_back(pair.first);
-        }
-        if (emgDim == 0)
-        {
-          emgDim = pair.second.size();
-        }
-        else if (emgDim != pair.second.size())
-        {
-          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                       "emgObservations have inconsistent dimensions for trial "
-                    << trial << " timestep " << t << " for emg " << pair.first
-                    << ". Expected " << emgDim << " but got "
-                    << pair.second.size() << std::endl;
-        }
-      }
+      pass.posObserved(j)
+          = header.mTrials[trial].mPasses[p].mDofPositionsObserved[j];
+      pass.velFiniteDifferenced(j)
+          = header.mTrials[trial].mPasses[p].mDofVelocitiesFiniteDifferenced[j];
+      pass.accFiniteDifferenced(j) = header.mTrials[trial]
+                                         .mPasses[p]
+                                         .mDofAccelerationFiniteDifferenced[j];
     }
   }
 
-  for (std::string& name : markerNames)
+  // 7. Read out the marker, accelerometer, and gyro info as pairs
+  for (int i = 0; i < header.mMarkerNames.size(); i++)
   {
-    header.add_marker_name(name);
-  }
-  for (std::string& name : accNames)
-  {
-    header.add_acc_name(name);
-  }
-  for (std::string& name : gyroNames)
-  {
-    header.add_gyro_name(name);
-  }
-  for (std::string& name : emgNames)
-  {
-    header.add_emg_name(name);
-  }
-  header.set_emg_dim(emgDim);
-
-  // 1.3. Continues in next section, after we know the size of the first
-  // serialized frame...
-
-  /////////////////////////////////////////////////////////////////////////////
-  // 2. Serialize and write the frames to the file
-  /////////////////////////////////////////////////////////////////////////////
-
-  bool firstTrial = true;
-  int expectedFrameSize = -1;
-  (void)expectedFrameSize;
-  for (int trial = 0; trial < trialPoses.size(); trial++)
-  {
-    for (int t = 0; t < trialPoses[trial].cols(); t++)
+    Eigen::Vector3s marker(
+        proto->marker_obs(i * 3 + 0),
+        proto->marker_obs(i * 3 + 1),
+        proto->marker_obs(i * 3 + 2));
+    if (!marker.hasNaN())
     {
-      // 2.1. Populate the protobuf frame object in memory
-      proto::SubjectOnDiskFrame frame;
-      if (trialPoses.size() > trial && trialPoses[trial].cols() > t
-          && trialVels.size() > trial && trialVels[trial].cols() > t
-          && trialAccs.size() > trial && trialAccs[trial].cols() > t)
-      {
-        for (int i = 0; i < trialPoses[trial].rows(); i++)
-        {
-          frame.add_pos(trialPoses[trial](i, t));
-          frame.add_vel(trialVels[trial](i, t));
-          frame.add_acc(trialAccs[trial](i, t));
-          frame.add_tau(trialTaus[trial](i, t));
-        }
-      }
-      else
-      {
-        std::cout
-            << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
-               "trialVels, or trialAccs out-of-bounds for trial "
-            << trial << " frame " << t << std::endl;
-      }
-
-      if (trialGroundBodyWrenches.size() > trial
-          && trialGroundBodyWrenches[trial].cols() > t
-          && trialGroundBodyWrenches[trial].rows()
-                 == 6 * groundForceBodies.size()
-          && trialGroundBodyCopTorqueForce.size() > trial
-          && trialGroundBodyCopTorqueForce[trial].cols() > t
-          && trialGroundBodyCopTorqueForce[trial].rows()
-                 == 9 * groundForceBodies.size())
-      {
-        for (int i = 0; i < groundForceBodies.size(); i++)
-        {
-          for (int j = 0; j < 6; j++)
-          {
-            frame.add_ground_contact_wrench(
-                trialGroundBodyWrenches[trial](i * 6 + j, t));
-          }
-          for (int j = 0; j < 3; j++)
-          {
-            frame.add_ground_contact_center_of_pressure(
-                trialGroundBodyCopTorqueForce[trial](i * 9 + j, t));
-            frame.add_ground_contact_torque(
-                trialGroundBodyCopTorqueForce[trial](i * 9 + 3 + j, t));
-            frame.add_ground_contact_force(
-                trialGroundBodyCopTorqueForce[trial](i * 9 + 6 + j, t));
-          }
-        }
-      }
-      else
-      {
-        std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                     "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce "
-                     "out-of-bounds for trial "
-                  << trial << " frame " << t << std::endl;
-      }
-      for (int i = 0; i < 3; i++)
-      {
-        if (trialComPoses.size() < trial || trialComPoses[trial].cols() < t)
-        {
-          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                       "trialComPoses out-of-bounds for trial "
-                    << trial << std::endl;
-          frame.add_com_pos(0);
-        }
-        else
-        {
-          frame.add_com_pos(trialComPoses[trial](i, t));
-        }
-        if (trialComVels.size() < trial || trialComVels[trial].cols() < t)
-        {
-          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                       "trialComVels out-of-bounds for trial "
-                    << trial << std::endl;
-          frame.add_com_vel(0);
-        }
-        else
-        {
-          frame.add_com_vel(trialComVels[trial](i, t));
-        }
-        if (trialComAccs.size() < trial || trialComAccs[trial].cols() < t)
-        {
-          frame.add_com_acc(0);
-        }
-        else
-        {
-          frame.add_com_acc(trialComAccs[trial](i, t));
-        }
-      }
-      if (customValues.size() > trial)
-      {
-        for (int i = 0; i < customValues[trial].size(); i++)
-        {
-          for (int j = 0; j < customValues[trial][i].rows(); j++)
-          {
-            frame.add_custom_values(customValues[trial][i](j, t));
-          }
-        }
-      }
-      if (markerObservations.size() > trial
-          && markerObservations[trial].size() > t)
-      {
-        for (std::string& name : markerNames)
-        {
-          if (markerObservations[trial][t].find(name)
-              != markerObservations[trial][t].end())
-          {
-            frame.add_marker_obs(markerObservations[trial][t].at(name)(0));
-            frame.add_marker_obs(markerObservations[trial][t].at(name)(1));
-            frame.add_marker_obs(markerObservations[trial][t].at(name)(2));
-          }
-          else
-          {
-            frame.add_marker_obs(nan(""));
-            frame.add_marker_obs(nan(""));
-            frame.add_marker_obs(nan(""));
-          }
-        }
-      }
-      else
-      {
-        for (int i = 0; i < markerNames.size(); i++)
-        {
-          frame.add_marker_obs(nan(""));
-          frame.add_marker_obs(nan(""));
-          frame.add_marker_obs(nan(""));
-        }
-      }
-      if (accObservations.size() > trial && accObservations[trial].size() > t)
-      {
-        for (std::string& name : accNames)
-        {
-          if (accObservations[trial][t].find(name)
-              != accObservations[trial][t].end())
-          {
-            frame.add_acc_obs(accObservations[trial][t].at(name)(0));
-            frame.add_acc_obs(accObservations[trial][t].at(name)(1));
-            frame.add_acc_obs(accObservations[trial][t].at(name)(2));
-          }
-          else
-          {
-            frame.add_acc_obs(nan(""));
-            frame.add_acc_obs(nan(""));
-            frame.add_acc_obs(nan(""));
-          }
-        }
-      }
-      else
-      {
-        for (int i = 0; i < accNames.size(); i++)
-        {
-          frame.add_acc_obs(nan(""));
-          frame.add_acc_obs(nan(""));
-          frame.add_acc_obs(nan(""));
-        }
-      }
-      if (gyroObservations.size() > trial && gyroObservations[trial].size() > t)
-      {
-        for (std::string& name : gyroNames)
-        {
-          if (gyroObservations[trial][t].find(name)
-              != gyroObservations[trial][t].end())
-          {
-            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(0));
-            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(1));
-            frame.add_gyro_obs(gyroObservations[trial][t].at(name)(2));
-          }
-          else
-          {
-            frame.add_gyro_obs(nan(""));
-            frame.add_gyro_obs(nan(""));
-            frame.add_gyro_obs(nan(""));
-          }
-        }
-      }
-      else
-      {
-        for (int i = 0; i < gyroNames.size(); i++)
-        {
-          frame.add_gyro_obs(nan(""));
-          frame.add_gyro_obs(nan(""));
-          frame.add_gyro_obs(nan(""));
-        }
-      }
-      if (emgObservations.size() > trial && emgObservations[trial].size() > t)
-      {
-        for (std::string& name : emgNames)
-        {
-          if (emgObservations[trial][t].find(name)
-              != emgObservations[trial][t].end())
-          {
-            for (int i = 0; i < emgDim; i++)
-            {
-              frame.add_emg_obs(emgObservations[trial][t].at(name)(i));
-            }
-          }
-          else
-          {
-            for (int i = 0; i < emgDim; i++)
-            {
-              frame.add_emg_obs(nan(""));
-            }
-          }
-        }
-      }
-      else
-      {
-        for (int i = 0; i < emgNames.size(); i++)
-        {
-          for (int j = 0; j < emgDim; j++)
-          {
-            frame.add_emg_obs(nan(""));
-          }
-        }
-      }
-
-      for (int forcePlateIdx = 0; forcePlateIdx < maxNumForcePlates;
-           forcePlateIdx++)
-      {
-        if (trial < forcePlates.size()
-            && forcePlateIdx < forcePlates[trial].size()
-            && forcePlates[trial][forcePlateIdx].centersOfPressure.size() > t
-            && forcePlates[trial][forcePlateIdx].forces.size() > t
-            && forcePlates[trial][forcePlateIdx].moments.size() > t)
-        {
-          for (int i = 0; i < 3; i++)
-          {
-            frame.add_raw_force_plate_cop(
-                forcePlates[trial][forcePlateIdx].centersOfPressure[t](i));
-            frame.add_raw_force_plate_torque(
-                forcePlates[trial][forcePlateIdx].moments[t](i));
-            frame.add_raw_force_plate_force(
-                forcePlates[trial][forcePlateIdx].forces[t](i));
-          }
-        }
-        else
-        {
-          for (int i = 0; i < 3; i++)
-          {
-            frame.add_raw_force_plate_cop(std::nan(""));
-            frame.add_raw_force_plate_torque(std::nan(""));
-            frame.add_raw_force_plate_force(std::nan(""));
-          }
-        }
-      }
-
-      // 2.2. Serialize the protobuf header object
-      std::string frameSerialized = "";
-      frame.SerializeToString(&frameSerialized);
-
-      // 2.3. Get the length of the serialized message
-      int64_t messageSize = frameSerialized.size();
-
-      // If this is the first trial, we need to finish the header with
-      // information about the size of serialized frame objects and write the
-      // header first
-      if (firstTrial)
-      {
-        // 1.3. Continued from previous section... Write the size of the frame
-        // binaries
-        expectedFrameSize = messageSize;
-        header.set_frame_size(messageSize);
-
-        // 1.4. Serialize the protobuf header object
-        std::string headerSerialized = "";
-        header.SerializeToString(&headerSerialized);
-
-        // 1.5. Write the length of the message as an integer header
-        int64_t headerSize = headerSerialized.size();
-        fwrite(&headerSize, sizeof(int64_t), 1, file);
-
-        // 1.6. Write the serialized data to the file
-        fwrite(headerSerialized.c_str(), sizeof(char), headerSize, file);
-
-        firstTrial = false;
-      }
-      // We need all frames to be exactly the same size, in order to support
-      // random seeking in the file
-      assert(messageSize == expectedFrameSize);
-
-      // 2.4. Write the serialized data to the file
-      fwrite(frameSerialized.c_str(), sizeof(char), messageSize, file);
+      markerObservations.emplace_back(header.mMarkerNames[i], marker);
     }
   }
-
-  fclose(file);
+  for (int i = 0; i < header.mAccNames.size(); i++)
+  {
+    Eigen::Vector3s acc(
+        proto->acc_obs(i * 3 + 0),
+        proto->acc_obs(i * 3 + 1),
+        proto->acc_obs(i * 3 + 2));
+    if (!acc.hasNaN())
+    {
+      accObservations.emplace_back(header.mAccNames[i], acc);
+    }
+  }
+  for (int i = 0; i < header.mGyroNames.size(); i++)
+  {
+    Eigen::Vector3s gyro(
+        proto->gyro_obs(i * 3 + 0),
+        proto->gyro_obs(i * 3 + 1),
+        proto->gyro_obs(i * 3 + 2));
+    if (!gyro.hasNaN())
+    {
+      gyroObservations.emplace_back(header.mGyroNames[i], gyro);
+    }
+  }
+  for (int i = 0; i < header.mEmgNames.size(); i++)
+  {
+    Eigen::VectorXs emgSequence(header.mEmgDim);
+    for (int j = 0; j < header.mEmgDim; j++)
+    {
+      emgSequence(j) = proto->emg_obs(i * header.mEmgDim + j);
+    }
+    if (!emgSequence.hasNaN())
+    {
+      emgSignals.emplace_back(header.mEmgNames[i], emgSequence);
+    }
+  }
+  int numForcePlates = 0;
+  if (header.mTrials.size() > trial)
+  {
+    numForcePlates = header.mTrials[trial].mForcePlates.size();
+  }
+  for (int i = 0; i < numForcePlates; i++)
+  {
+    Eigen::Vector3s forceCop(
+        proto->raw_force_plate_cop(i * 3 + 0),
+        proto->raw_force_plate_cop(i * 3 + 1),
+        proto->raw_force_plate_cop(i * 3 + 2));
+    Eigen::Vector3s forceTorques(
+        proto->raw_force_plate_torque(i * 3 + 0),
+        proto->raw_force_plate_torque(i * 3 + 1),
+        proto->raw_force_plate_torque(i * 3 + 2));
+    Eigen::Vector3s force(
+        proto->raw_force_plate_force(i * 3 + 0),
+        proto->raw_force_plate_force(i * 3 + 1),
+        proto->raw_force_plate_force(i * 3 + 2));
+    if (!forceCop.hasNaN() && !forceTorques.hasNaN() && !force.hasNaN())
+    {
+      rawForcePlateCenterOfPressures.push_back(forceCop);
+      rawForcePlateTorques.push_back(forceTorques);
+      rawForcePlateForces.push_back(force);
+    }
+  }
 }
 
 /// This returns the number of trials on the subject
 int SubjectOnDisk::getNumTrials()
 {
-  return mNumTrials;
+  return mHeader.mTrials.size();
 }
 
 /// This returns the length of the trial
 int SubjectOnDisk::getTrialLength(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return 0;
   }
-  return mTrialLength[trial];
+  return mHeader.mTrials[trial].mLength;
 }
 
 /// This returns the timestep size for the trial
 s_t SubjectOnDisk::getTrialTimestep(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return 0.01;
   }
-  return mTrialTimesteps[trial];
+  return mHeader.mTrials[trial].mTimestep;
 }
 
 /// This returns the number of DOFs for the model on this Subject
 int SubjectOnDisk::getNumDofs()
 {
-  return mNumDofs;
+  return mHeader.mNumDofs;
 }
 
 /// This returns the vector of booleans for whether or not each timestep is
@@ -1283,99 +758,147 @@ int SubjectOnDisk::getNumDofs()
 /// inverse dynamics cannot be trusted).
 std::vector<bool> SubjectOnDisk::getProbablyMissingGRF(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mProbablyMissingGRF[trial];
+  return mHeader.mTrials[trial].mProbablyMissingGRF;
 }
 
 /// This returns the vector of enums of type 'MissingGRFReason', which labels
 /// why each time step was identified as 'probablyMissingGRF'.
 std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRFReason(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<MissingGRFReason>();
   }
-  return mMissingGRFReason[trial];
+  return mHeader.mTrials[trial].mMissingGRFReason;
 }
 
-std::vector<bool> SubjectOnDisk::getDofPositionsObserved(int trial)
+int SubjectOnDisk::getNumProcessingPasses()
 {
-  if (trial < 0 || trial >= mNumTrials)
+  return mHeader.mPasses.size();
+}
+
+ProcessingPassType SubjectOnDisk::getProcessingPassType(int processingPass)
+{
+  return mHeader.mPasses[processingPass].mType;
+}
+
+std::vector<bool> SubjectOnDisk::getDofPositionsObserved(
+    int trial, int processingPass)
+{
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mDofPositionsObserved[trial];
+  return mHeader.mTrials[trial].mPasses[processingPass].mDofPositionsObserved;
 }
 
-std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(int trial)
+std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(
+    int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mDofVelocitiesFiniteDifferenced[trial];
+  return mHeader.mTrials[trial]
+      .mPasses[processingPass]
+      .mDofVelocitiesFiniteDifferenced;
 }
 
-std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(int trial)
+std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(
+    int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mDofAccelerationFiniteDifferenced[trial];
+  return mHeader.mTrials[trial]
+      .mPasses[processingPass]
+      .mDofAccelerationFiniteDifferenced;
 }
 
-std::vector<s_t> SubjectOnDisk::getTrialResidualNorms(int trial)
+std::vector<s_t> SubjectOnDisk::getTrialLinearResidualNorms(
+    int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mTrialResidualNorms[trial];
+  return mHeader.mTrials[trial].mPasses[processingPass].mLinearResidual;
+}
+
+std::vector<s_t> SubjectOnDisk::getTrialAngularResidualNorms(
+    int trial, int processingPass)
+{
+  if (trial < 0 || trial >= mHeader.mTrials.size())
+  {
+    return std::vector<s_t>();
+  }
+  return mHeader.mTrials[trial].mPasses[processingPass].mAngularResidual;
+}
+
+std::vector<s_t> SubjectOnDisk::getTrialMarkerRMSs(
+    int trial, int processingPass)
+{
+  if (trial < 0 || trial >= mHeader.mTrials.size())
+  {
+    return std::vector<s_t>();
+  }
+  return mHeader.mTrials[trial].mPasses[processingPass].mMarkerRMS;
+}
+
+std::vector<s_t> SubjectOnDisk::getTrialMarkerMaxs(
+    int trial, int processingPass)
+{
+  if (trial < 0 || trial >= mHeader.mTrials.size())
+  {
+    return std::vector<s_t>();
+  }
+  return mHeader.mTrials[trial].mPasses[processingPass].mMarkerMax;
 }
 
 /// This returns the maximum absolute velocity of any DOF at each timestep for a
 /// given trial
 std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mTrialMaxJointVelocity[trial];
+  return mHeader.mTrials[trial].mJointsMaxVelocity;
 }
 
 /// This returns the list of contact body names for this Subject
 std::vector<std::string> SubjectOnDisk::getGroundContactBodies()
 {
-  return mGroundContactBodies;
+  return mHeader.mGroundContactBodies;
 }
 
 /// This returns the list of custom value names stored in this subject
 std::vector<std::string> SubjectOnDisk::getCustomValues()
 {
-  return mCustomValues;
+  return mHeader.mCustomValueNames;
 }
 
 /// This returns the dimension of the custom value specified by `valueName`
 int SubjectOnDisk::getCustomValueDim(std::string valueName)
 {
-  for (int i = 0; i < mCustomValues.size(); i++)
+  for (int i = 0; i < mHeader.mCustomValueNames.size(); i++)
   {
-    if (mCustomValues[i] == valueName)
+    if (mHeader.mCustomValueNames[i] == valueName)
     {
-      return mCustomValueLengths[i];
+      return mHeader.mCustomValueLengths[i];
     }
   }
   std::cout << "WARNING: Requested getCustomValueDim() for value \""
             << valueName
             << "\", which is not in this SubjectOnDisk. Options are: [";
-  for (int i = 0; i < mCustomValues.size(); i++)
+  for (int i = 0; i < mHeader.mCustomValueNames.size(); i++)
   {
-    std::cout << " \"" << mCustomValues[i] << "\" ";
+    std::cout << " \"" << mHeader.mCustomValueNames[i] << "\" ";
   }
   std::cout << "]. Returning 0." << std::endl;
   return 0;
@@ -1384,40 +907,40 @@ int SubjectOnDisk::getCustomValueDim(std::string valueName)
 /// The name of the trial, if provided, or else an empty string
 std::string SubjectOnDisk::getTrialName(int trial)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return "";
   }
-  return mTrialNames[trial];
+  return mHeader.mTrials[trial].mName;
 }
 
 std::string SubjectOnDisk::getBiologicalSex()
 {
-  return mBiologicalSex;
+  return mHeader.mBiologicalSex;
 }
 
 double SubjectOnDisk::getHeightM()
 {
-  return mHeightM;
+  return mHeader.mHeightM;
 }
 
 double SubjectOnDisk::getMassKg()
 {
-  return mMassKg;
+  return mHeader.mMassKg;
 }
 
 /// This gets the tags associated with the subject, if there are any.
 std::vector<std::string> SubjectOnDisk::getSubjectTags()
 {
-  return mSubjectTags;
+  return mHeader.mSubjectTags;
 }
 
 /// This gets the tags associated with the trial, if there are any.
 std::vector<std::string> SubjectOnDisk::getTrialTags(int trial)
 {
-  if (trial < mTrialTags.size())
+  if (trial >= 0 && trial < mHeader.mTrials.size())
   {
-    return mTrialTags[trial];
+    return mHeader.mTrials[trial].mTrialTags;
   }
   else
   {
@@ -1427,14 +950,16 @@ std::vector<std::string> SubjectOnDisk::getTrialTags(int trial)
 
 int SubjectOnDisk::getAgeYears()
 {
-  return mAgeYears;
+  return mHeader.mAgeYears;
 }
 
 /// This returns the number of raw force plates that were used to generate the
 /// data
 int SubjectOnDisk::getNumForcePlates(int trial)
 {
-  return mTrialNumForcePlates[trial];
+  if (trial >= 0 && trial < mHeader.mTrials.size())
+    return mHeader.mTrials[trial].mForcePlates.size();
+  return 0;
 }
 
 /// This returns the corners (in 3D space) of the selected force plate, for
@@ -1442,27 +967,1121 @@ int SubjectOnDisk::getNumForcePlates(int trial)
 std::vector<Eigen::Vector3s> SubjectOnDisk::getForcePlateCorners(
     int trial, int forcePlate)
 {
-  if (trial < 0 || trial >= mNumTrials)
+  if (trial < 0 || trial >= mHeader.mTrials.size())
   {
     return std::vector<Eigen::Vector3s>();
   }
-  if (forcePlate < 0 || forcePlate >= mTrialNumForcePlates[trial])
+  if (forcePlate < 0
+      || forcePlate >= mHeader.mTrials[trial].mForcePlates.size())
   {
     return std::vector<Eigen::Vector3s>();
   }
-  return mTrialForcePlateCorners[trial][forcePlate];
+  return mHeader.mTrials[trial].mForcePlates[forcePlate].corners;
 }
 
 /// This gets the href link associated with the subject, if there is one.
 std::string SubjectOnDisk::getHref()
 {
-  return mHref;
+  return mHeader.mHref;
 }
 
 /// This gets the notes associated with the subject, if there are any.
 std::string SubjectOnDisk::getNotes()
 {
-  return mNotes;
+  return mHeader.mNotes;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Builders, to create a SubjectOnDisk from scratch
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+SubjectOnDiskTrialPass::SubjectOnDiskTrialPass()
+{
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setName(const std::string& name)
+{
+  mName = name;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setPoses(Eigen::MatrixXs poses)
+{
+  mPos = poses;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setVels(Eigen::MatrixXs vels)
+{
+  mVel = vels;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setAccs(Eigen::MatrixXs accs)
+{
+  mAcc = accs;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setTaus(Eigen::MatrixXs taus)
+{
+  mTaus = taus;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setComPoses(
+    Eigen::MatrixXs poses)
+{
+  mComPoses = poses;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setComVels(Eigen::MatrixXs vels)
+{
+  mComVels = vels;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setComAccs(Eigen::MatrixXs accs)
+{
+  mComAccs = accs;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setDofPositionsObserved(
+    std::vector<bool> dofPositionsObserved)
+{
+  mDofPositionsObserved = dofPositionsObserved;
+  return *this;
+}
+
+SubjectOnDiskTrialPass&
+SubjectOnDiskTrialPass::setDofVelocitiesFiniteDifferenced(
+    std::vector<bool> dofVelocitiesFiniteDifferenced)
+{
+  mDofVelocitiesFiniteDifferenced = dofVelocitiesFiniteDifferenced;
+  return *this;
+}
+
+SubjectOnDiskTrialPass&
+SubjectOnDiskTrialPass::setDofAccelerationFiniteDifferenced(
+    std::vector<bool> dofAccelerationFiniteDifference)
+{
+  mDofAccelerationFiniteDifferenced = dofAccelerationFiniteDifference;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setMarkerRMS(
+    std::vector<s_t> markerRMS)
+{
+  mMarkerRMS = markerRMS;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setMarkerMax(
+    std::vector<s_t> markerMax)
+{
+  mMarkerMax = markerMax;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setLinearResidual(
+    std::vector<s_t> linearResidual)
+{
+  mLinearResidual = linearResidual;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrialPass::setAngularResidual(
+    std::vector<s_t> angularResidual)
+{
+  mAngularResidual = angularResidual;
+  return *this;
+}
+
+void SubjectOnDiskTrialPass::read(
+    const proto::SubjectOnDiskTrialProcessingPassHeader& proto)
+{
+  // // This data is included in the header
+  // std::string mName;
+  mName = proto.name();
+
+  // std::vector<bool> mDofPositionsObserved;
+  mDofPositionsObserved.clear();
+  for (int i = 0; i < proto.dof_positions_observed_size(); i++)
+  {
+    mDofPositionsObserved.push_back(proto.dof_positions_observed(i));
+  }
+
+  // std::vector<bool> mDofVelocitiesFiniteDifferenced;
+  mDofVelocitiesFiniteDifferenced.clear();
+  for (int i = 0; i < proto.dof_velocities_finite_differenced_size(); i++)
+  {
+    mDofVelocitiesFiniteDifferenced.push_back(
+        proto.dof_velocities_finite_differenced(i));
+  }
+
+  // std::vector<bool> mDofAccelerationFiniteDifferenced;
+  mDofAccelerationFiniteDifferenced.clear();
+  for (int i = 0; i < proto.dof_acceleration_finite_differenced_size(); i++)
+  {
+    mDofAccelerationFiniteDifferenced.push_back(
+        proto.dof_acceleration_finite_differenced(i));
+  }
+
+  // std::vector<s_t> mMarkerRMS;
+  mMarkerRMS.clear();
+  for (int i = 0; i < proto.marker_rms_size(); i++)
+  {
+    mMarkerRMS.push_back(proto.marker_rms(i));
+  }
+
+  // std::vector<s_t> mMarkerMax;
+  mMarkerMax.clear();
+  for (int i = 0; i < proto.marker_max_size(); i++)
+  {
+    mMarkerMax.push_back(proto.marker_max(i));
+  }
+
+  // std::vector<s_t> mLinearResidual;
+  mLinearResidual.clear();
+  for (int i = 0; i < proto.linear_residual_size(); i++)
+  {
+    mLinearResidual.push_back(proto.linear_residual(i));
+  }
+
+  // std::vector<s_t> mAngularResidual;
+  mAngularResidual.clear();
+  for (int i = 0; i < proto.angular_residual_size(); i++)
+  {
+    mAngularResidual.push_back(proto.angular_residual(i));
+  }
+}
+
+void SubjectOnDiskTrialPass::write(
+    proto::SubjectOnDiskTrialProcessingPassHeader* proto)
+{
+  // // This data is included in the header
+  // std::string mName;
+  proto->set_name(mName);
+  // std::vector<bool> mDofPositionsObserved;
+  for (int i = 0; i < mDofPositionsObserved.size(); i++)
+  {
+    proto->add_dof_positions_observed(mDofPositionsObserved[i]);
+  }
+  // std::vector<bool> mDofVelocitiesFiniteDifferenced;
+  for (int i = 0; i < mDofVelocitiesFiniteDifferenced.size(); i++)
+  {
+    proto->add_dof_velocities_finite_differenced(
+        mDofVelocitiesFiniteDifferenced[i]);
+  }
+  // std::vector<bool> mDofAccelerationFiniteDifferenced;
+  for (int i = 0; i < mDofAccelerationFiniteDifferenced.size(); i++)
+  {
+    proto->add_dof_acceleration_finite_differenced(
+        mDofAccelerationFiniteDifferenced[i]);
+  }
+  // std::vector<s_t> mMarkerRMS;
+  for (int i = 0; i < mMarkerRMS.size(); i++)
+  {
+    proto->add_marker_rms(mMarkerRMS[i]);
+  }
+  // std::vector<s_t> mMarkerMax;
+  for (int i = 0; i < mMarkerMax.size(); i++)
+  {
+    proto->add_marker_max(mMarkerMax[i]);
+  }
+  // std::vector<s_t> mLinearResidual;
+  for (int i = 0; i < mLinearResidual.size(); i++)
+  {
+    proto->add_linear_residual(mLinearResidual[i]);
+  }
+  // std::vector<s_t> mAngularResidual;
+  for (int i = 0; i < mAngularResidual.size(); i++)
+  {
+    proto->add_angular_residual(mAngularResidual[i]);
+  }
+}
+
+SubjectOnDiskTrial::SubjectOnDiskTrial()
+{
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setName(const std::string& name)
+{
+  mName = name;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setTimestep(s_t timestep)
+{
+  mTimestep = timestep;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setTrialTags(
+    std::vector<std::string> trialTags)
+{
+  mTrialTags = trialTags;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setProbablyMissingGRF(
+    std::vector<bool> probablyMissingGRF)
+{
+  mProbablyMissingGRF = probablyMissingGRF;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setMissingGRFReason(
+    std::vector<MissingGRFReason> missingGRFReason)
+{
+  mMissingGRFReason = missingGRFReason;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setCustomValues(
+    std::vector<Eigen::MatrixXs> customValues)
+{
+  mCustomValues = customValues;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setMarkerNamesGuessed(
+    bool markersGuessed)
+{
+  mMarkerNamesGuessed = markersGuessed;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setMarkerObservations(
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations)
+{
+  mMarkerObservations = markerObservations;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setAccObservations(
+    std::vector<std::map<std::string, Eigen::Vector3s>> accObservations)
+{
+  mAccObservations = accObservations;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setGyroObservations(
+    std::vector<std::map<std::string, Eigen::Vector3s>> gyroObservations)
+{
+  mGyroObservations = gyroObservations;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setEmgObservations(
+    std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations)
+{
+  mEmgObservations = emgObservations;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setExoTorques(
+    std::map<std::string, Eigen::VectorXs> exoTorques)
+{
+  mExoTorques = exoTorques;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setForcePlates(
+    std::vector<ForcePlate> forcePlates)
+{
+  mForcePlates = forcePlates;
+  return *this;
+}
+
+SubjectOnDiskTrialPass& SubjectOnDiskTrial::addPass()
+{
+  mPasses.push_back(SubjectOnDiskTrialPass());
+  return mPasses.back();
+}
+
+void SubjectOnDiskTrial::read(const proto::SubjectOnDiskTrialHeader& proto)
+{
+  // std::string mName;
+  mName = proto.name();
+
+  // s_t mTimestep;
+  mTimestep = proto.trial_timestep();
+
+  // int mLength;
+  mLength = proto.trial_length();
+
+  // std::vector<std::string> mTrialTags;
+  mTrialTags.clear();
+  for (int i = 0; i < proto.trial_tag_size(); i++)
+  {
+    mTrialTags.push_back(proto.trial_tag(i));
+  }
+
+  // std::vector<SubjectOnDiskTrialPass> mPasses;
+  mPasses.clear();
+  for (int i = 0; i < proto.processing_pass_header_size(); i++)
+  {
+    SubjectOnDiskTrialPass pass;
+    pass.read(proto.processing_pass_header(i));
+    mPasses.push_back(pass);
+  }
+
+  // std::vector<bool> mProbablyMissingGRF;
+  mProbablyMissingGRF.clear();
+  for (int i = 0; i < proto.missing_grf_size(); i++)
+  {
+    mProbablyMissingGRF.push_back(proto.missing_grf(i));
+  }
+
+  // std::vector<MissingGRFReason> mMissingGRFReason;
+  mMissingGRFReason.clear();
+  for (int i = 0; i < proto.missing_grf_reason_size(); i++)
+  {
+    mMissingGRFReason.push_back(
+        missingGRFReasonFromProto(proto.missing_grf_reason(i)));
+  }
+
+  // // This is for allowing the user to pre-filter out data where joint
+  // velocities
+  // // are above a certain "unreasonable limit", like 50 rad/s or so
+  // std::vector<s_t> mJointsMaxVelocity;
+  mJointsMaxVelocity.clear();
+  for (int i = 0; i < proto.joints_max_velocity_size(); i++)
+  {
+    mJointsMaxVelocity.push_back(proto.joints_max_velocity(i));
+  }
+
+  // ///////////////////////////////////////////////////////////////////////////
+  // // Raw sensor observations, which are shared across processing passes
+  // ///////////////////////////////////////////////////////////////////////////
+
+  mMarkerNamesGuessed = proto.marker_names_guessed();
+  mNumForcePlates = proto.num_force_plates();
+  mForcePlateCorners.clear();
+  for (int i = 0; i < mNumForcePlates; i++)
+  {
+    std::vector<Eigen::Vector3s> corners;
+    for (int c = 0; c < 4; c++)
+    {
+      Eigen::Vector3s corner;
+      corner(0) = proto.force_plate_corners(i * 12 + c * 3 + 0);
+      corner(1) = proto.force_plate_corners(i * 12 + c * 3 + 1);
+      corner(2) = proto.force_plate_corners(i * 12 + c * 3 + 2);
+      corners.push_back(corner);
+    }
+    mForcePlateCorners.push_back(corners);
+  }
+}
+
+void SubjectOnDiskTrial::write(proto::SubjectOnDiskTrialHeader* proto)
+{
+  // std::string mName;
+  proto->set_name(mName);
+  // s_t mTimestep;
+  proto->set_trial_timestep(mTimestep);
+  // std::vector<std::string> mTrialTags;
+  for (int i = 0; i < mTrialTags.size(); i++)
+  {
+    proto->add_trial_tag(mTrialTags[i]);
+  }
+  // std::vector<SubjectOnDiskTrialPassBuilder> mPasses;
+  for (int i = 0; i < mPasses.size(); i++)
+  {
+    proto::SubjectOnDiskTrialProcessingPassHeader* passProto
+        = proto->add_processing_pass_header();
+    mPasses[i].write(passProto);
+  }
+  // std::vector<bool> mProbablyMissingGRF;
+  for (int i = 0; i < mProbablyMissingGRF.size(); i++)
+  {
+    proto->add_missing_grf(mProbablyMissingGRF[i]);
+  }
+  // std::vector<MissingGRFReason> mMissingGRFReason;
+  for (int i = 0; i < mMissingGRFReason.size(); i++)
+  {
+    proto->add_missing_grf_reason(
+        missingGRFReasonToProto(mMissingGRFReason[i]));
+  }
+
+  // ///////////////////////////////////////////////////////////////////////////
+  // // Raw sensor observations, which are shared across processing passes
+  // ///////////////////////////////////////////////////////////////////////////
+
+  // std::vector<Eigen::MatrixXs> mCustomValues;
+  // // This is true if we guessed the marker names, and false if we got them
+  // from
+  // // the uploaded user's file, which implies that they got them from human
+  // // observations.
+  // bool mMarkerNamesGuessed;
+  proto->set_marker_names_guessed(mMarkerNamesGuessed);
+  // // These are the markers, gyros, accelerometers
+  // std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  // std::vector<std::map<std::string, Eigen::Vector3s>> mAccObservations;
+  // std::vector<std::map<std::string, Eigen::Vector3s>> mGyroObservations;
+  // // These are EMG observations, with potentially many samples per frame
+  // std::vector<std::map<std::string, Eigen::VectorXs>> mEmgObservations;
+  // // These are the torques applied by an exoskeleton, if any, per DOF they
+  // are
+  // // applied to
+  // std::map<std::string, Eigen::VectorXs> mExoTorques;
+  // // This is raw force plate data
+  // std::vector<std::vector<ForcePlate>> mForcePlates;
+}
+
+SubjectOnDiskPassHeader::SubjectOnDiskPassHeader()
+{
+  // Do nothing
+}
+
+SubjectOnDiskPassHeader& SubjectOnDiskPassHeader::setProcessingPassType(
+    ProcessingPassType type)
+{
+  mType = type;
+  return *this;
+}
+
+SubjectOnDiskPassHeader& SubjectOnDiskPassHeader::setOpenSimFileText(
+    const std::string& openSimFileText)
+{
+  mOpenSimFileText = openSimFileText;
+  return *this;
+}
+
+void SubjectOnDiskPassHeader::write(dart::proto::SubjectOnDiskPass* proto)
+{
+  proto->set_pass_type(passTypeToProto(mType));
+  proto->set_model_osim_text(mOpenSimFileText);
+}
+
+void SubjectOnDiskPassHeader::read(const dart::proto::SubjectOnDiskPass& proto)
+{
+  mType = passTypeFromProto(proto.pass_type());
+  mOpenSimFileText = proto.model_osim_text();
+}
+
+SubjectOnDiskHeader::SubjectOnDiskHeader()
+{
+  // Do nothing
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setGroundForceBodies(
+    std::vector<std::string> groundForceBodies)
+{
+  mGroundContactBodies = groundForceBodies;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setCustomValueNames(
+    std::vector<std::string> customValueNames)
+{
+  mCustomValueNames = customValueNames;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setBiologicalSex(
+    const std::string& biologicalSex)
+{
+  mBiologicalSex = biologicalSex;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setHeightM(double heightM)
+{
+  mHeightM = heightM;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setMassKg(double massKg)
+{
+  mMassKg = massKg;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setAgeYears(int ageYears)
+{
+  mAgeYears = ageYears;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setSubjectTags(
+    std::vector<std::string> subjectTags)
+{
+  mSubjectTags = subjectTags;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setHref(const std::string& href)
+{
+  mHref = href;
+  return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setNotes(const std::string& notes)
+{
+  mNotes = notes;
+  return *this;
+}
+
+SubjectOnDiskPassHeader& SubjectOnDiskHeader::addProcessingPass()
+{
+  mPasses.push_back(SubjectOnDiskPassHeader());
+  return mPasses.back();
+}
+
+SubjectOnDiskTrial& SubjectOnDiskHeader::addTrial()
+{
+  mTrials.push_back(SubjectOnDiskTrial());
+  return mTrials.back();
+}
+
+void SubjectOnDiskHeader::recomputeColumnNames()
+{
+  mMarkerNames.clear();
+  mAccNames.clear();
+  mGyroNames.clear();
+  mEmgNames.clear();
+  mExoDofNames.clear();
+  for (int trial = 0; trial < mTrials.size(); trial++)
+  {
+    for (int t = 0; t < mTrials[trial].mMarkerObservations.size(); t++)
+    {
+      for (auto& pair : mTrials[trial].mMarkerObservations[t])
+      {
+        if (std::find(mMarkerNames.begin(), mMarkerNames.end(), pair.first)
+            == mMarkerNames.end())
+        {
+          mMarkerNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  for (int trial = 0; trial < mTrials.size(); trial++)
+  {
+    for (int t = 0; t < mTrials[trial].mAccObservations.size(); t++)
+    {
+      for (auto& pair : mTrials[trial].mAccObservations[t])
+      {
+        if (std::find(mAccNames.begin(), mAccNames.end(), pair.first)
+            == mAccNames.end())
+        {
+          mAccNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  for (int trial = 0; trial < mTrials.size(); trial++)
+  {
+    for (int t = 0; t < mTrials[trial].mGyroObservations.size(); t++)
+    {
+      for (auto& pair : mTrials[trial].mGyroObservations[t])
+      {
+        if (std::find(mGyroNames.begin(), mGyroNames.end(), pair.first)
+            == mGyroNames.end())
+        {
+          mGyroNames.push_back(pair.first);
+        }
+      }
+    }
+  }
+  for (int trial = 0; trial < mTrials.size(); trial++)
+  {
+    for (auto& pair : mTrials[trial].mExoTorques)
+    {
+      if (std::find(mExoDofNames.begin(), mExoDofNames.end(), pair.first)
+          == mExoDofNames.end())
+      {
+        mExoDofNames.push_back(pair.first);
+      }
+    }
+  }
+  mEmgDim = 0;
+  for (int trial = 0; trial < mTrials.size(); trial++)
+  {
+    for (int t = 0; t < mTrials[trial].mEmgObservations.size(); t++)
+    {
+      for (auto& pair : mTrials[trial].mEmgObservations[t])
+      {
+        if (std::find(mEmgNames.begin(), mEmgNames.end(), pair.first)
+            == mEmgNames.end())
+        {
+          mEmgNames.push_back(pair.first);
+        }
+        if (mEmgDim == 0)
+        {
+          mEmgDim = pair.second.size();
+        }
+        else if (mEmgDim != pair.second.size())
+        {
+          std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                       "emgObservations have inconsistent dimensions for trial "
+                    << mTrials[trial].mName << " timestep " << t << " for emg "
+                    << pair.first << ". Expected " << mEmgDim << " but got "
+                    << pair.second.size() << std::endl;
+        }
+      }
+    }
+  }
+}
+
+void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
+{
+  // // How many DOFs are in the skeleton
+  // int mNumDofs;
+  header->set_num_dofs(mNumDofs);
+  // // The passes we applied to this data, along with the result skeletons that
+  // // were generated by each pass.
+  // std::vector<SubjectOnDiskPassHeader> mPasses;
+  for (SubjectOnDiskPassHeader& pass : mPasses)
+  {
+    proto::SubjectOnDiskPass* passProto = header->add_passes();
+    pass.write(passProto);
+  }
+  // // These are generalized 6-dof wrenches applied to arbitrary bodies
+  // // (generally by foot-ground contact, though other things too)
+  // std::vector<std::string> mGroundContactBodies;
+  for (std::string& body : mGroundContactBodies)
+  {
+    header->add_ground_contact_body(body);
+  }
+  // // We include this to allow the binary format to store/load a bunch of new
+  // // types of values while remaining backwards compatible.
+  // std::vector<std::string> mCustomValueNames;
+  for (int i = 0; i < mCustomValueNames.size(); i++)
+  {
+    header->add_custom_value_name(mCustomValueNames[i]);
+    header->add_custom_value_length(
+        mTrials.size() > 0 && mTrials[0].mCustomValues.size() > 0
+            ? mTrials[0].mCustomValues[0].rows()
+            : 0);
+  }
+  // // This is the subject info
+  // std::string mBiologicalSex;
+  header->set_biological_sex(mBiologicalSex);
+  // double mHeightM;
+  header->set_height_m(mHeightM);
+  // double mMassKg;
+  header->set_mass_kg(mMassKg);
+  // int mAgeYears;
+  header->set_age_years(mAgeYears);
+  // // The provenance info, optional, for investigating where training data
+  // // came from after its been aggregated
+  // std::vector<std::string> mSubjectTags;
+  for (std::string& tag : mSubjectTags)
+  {
+    header->add_subject_tag(tag);
+  }
+  // std::string mHref = "";
+  header->set_href(mHref);
+  // std::string notes = "";
+  header->set_notes(mNotes);
+  header->set_version(3);
+
+  // // These are the trials, which contain the actual data
+  // std::vector<SubjectOnDiskTrialBuilder> mTrials;
+  for (auto& trial : mTrials)
+  {
+    proto::SubjectOnDiskTrialHeader* trialHeader = header->add_trial_header();
+    trial.write(trialHeader);
+  }
+
+  recomputeColumnNames();
+  for (std::string& name : mMarkerNames)
+  {
+    header->add_marker_name(name);
+  }
+  for (std::string& name : mAccNames)
+  {
+    header->add_acc_name(name);
+  }
+  for (std::string& name : mGyroNames)
+  {
+    header->add_gyro_name(name);
+  }
+  for (std::string& name : mEmgNames)
+  {
+    header->add_emg_name(name);
+  }
+  header->set_emg_dim(mEmgDim);
+  for (std::string& name : mExoDofNames)
+  {
+    header->add_exo_dof_name(name);
+  }
+}
+
+void SubjectOnDiskHeader::read(const dart::proto::SubjectOnDiskHeader& proto)
+{
+  // // How many DOFs are in the skeleton
+  // int mNumDofs;
+  mNumDofs = proto.num_dofs();
+
+  // // The passes we applied to this data, along with the result skeletons that
+  // // were generated by each pass.
+  // std::vector<SubjectOnDiskPassHeader> mPasses;
+  mPasses.clear();
+  for (int i = 0; i < proto.passes_size(); i++)
+  {
+    SubjectOnDiskPassHeader pass;
+    pass.read(proto.passes(i));
+    mPasses.push_back(pass);
+  }
+
+  // // These are generalized 6-dof wrenches applied to arbitrary bodies
+  // // (generally by foot-ground contact, though other things too)
+  // std::vector<std::string> mGroundContactBodies;
+  mGroundContactBodies.clear();
+  for (int i = 0; i < proto.ground_contact_body_size(); i++)
+  {
+    mGroundContactBodies.push_back(proto.ground_contact_body(i));
+  }
+
+  // // We include this to allow the binary format to store/load a bunch of new
+  // // types of values while remaining backwards compatible.
+  // std::vector<std::string> mCustomValueNames;
+  mCustomValueNames.clear();
+  for (int i = 0; i < proto.custom_value_name_size(); i++)
+  {
+    mCustomValueNames.push_back(proto.custom_value_name(i));
+  }
+
+  // std::vector<int> mCustomValueLengths;
+  mCustomValueLengths.clear();
+  for (int i = 0; i < proto.custom_value_length_size(); i++)
+  {
+    mCustomValueLengths.push_back(proto.custom_value_length(i));
+  }
+
+  assert(mCustomValueNames.size() == mCustomValueLengths.size());
+
+  // // This is the subject info
+  // std::string mBiologicalSex;
+  mBiologicalSex = proto.biological_sex();
+
+  // double mHeightM;
+  mHeightM = proto.height_m();
+
+  // double mMassKg;
+  mMassKg = proto.mass_kg();
+
+  // int mAgeYears;
+  mAgeYears = proto.age_years();
+
+  // // The provenance info, optional, for investigating where training data
+  // // came from after its been aggregated
+  // std::vector<std::string> mSubjectTags;
+  mSubjectTags.clear();
+  for (int i = 0; i < proto.subject_tag_size(); i++)
+  {
+    mSubjectTags.push_back(proto.subject_tag(i));
+  }
+
+  // std::string mHref = "";
+  mHref = proto.href();
+
+  // std::string mNotes = "";
+  mNotes = proto.notes();
+
+  // // These are the trials, which contain the actual data
+  // std::vector<SubjectOnDiskTrial> mTrials;
+  mTrials.clear();
+  for (int i = 0; i < proto.trial_header_size(); i++)
+  {
+    SubjectOnDiskTrial trial;
+    trial.read(proto.trial_header(i));
+    mTrials.push_back(trial);
+  }
+
+  // // These are the marker, accelerometer and gyroscope names
+  // std::vector<std::string> mMarkerNames;
+  mMarkerNames.clear();
+  for (int i = 0; i < proto.marker_name_size(); i++)
+  {
+    mMarkerNames.push_back(proto.marker_name(i));
+  }
+
+  // std::vector<std::string> mAccNames;
+  mAccNames.clear();
+  for (int i = 0; i < proto.acc_name_size(); i++)
+  {
+    mAccNames.push_back(proto.acc_name(i));
+  }
+
+  // std::vector<std::string> mGyroNames;
+  mGyroNames.clear();
+  for (int i = 0; i < proto.gyro_name_size(); i++)
+  {
+    mGyroNames.push_back(proto.gyro_name(i));
+  }
+
+  // // This is EMG data
+  // std::vector<std::string> mEmgNames;
+  mEmgNames.clear();
+  for (int i = 0; i < proto.emg_name_size(); i++)
+  {
+    mEmgNames.push_back(proto.emg_name(i));
+  }
+
+  // int mEmgDim;
+  mEmgDim = proto.emg_dim();
+
+  // // This is exoskeleton data
+  // std::vector<std::string> mExoDofNames;
+  mExoDofNames.clear();
+  for (int i = 0; i < proto.exo_dof_name_size(); i++)
+  {
+    mExoDofNames.push_back(proto.exo_dof_name(i));
+  }
+}
+
+void SubjectOnDiskHeader::writeFrame(
+    dart::proto::SubjectOnDiskFrame* proto, int trial, int t)
+{
+  (void)proto;
+  (void)trial;
+  (void)t;
+  /*
+  if (trialPoses.size() > trial && trialPoses[trial].cols() > t
+      && trialVels.size() > trial && trialVels[trial].cols() > t
+      && trialAccs.size() > trial && trialAccs[trial].cols() > t)
+  {
+    for (int i = 0; i < trialPoses[trial].rows(); i++)
+    {
+      frame.add_pos(trialPoses[trial](i, t));
+      frame.add_vel(trialVels[trial](i, t));
+      frame.add_acc(trialAccs[trial](i, t));
+      frame.add_tau(trialTaus[trial](i, t));
+    }
+  }
+  else
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
+                 "trialVels, or trialAccs out-of-bounds for trial "
+              << trial << " frame " << t << std::endl;
+  }
+
+  if (trialGroundBodyWrenches.size() > trial
+      && trialGroundBodyWrenches[trial].cols() > t
+      && trialGroundBodyWrenches[trial].rows() == 6 * groundForceBodies.size()
+      && trialGroundBodyCopTorqueForce.size() > trial
+      && trialGroundBodyCopTorqueForce[trial].cols() > t
+      && trialGroundBodyCopTorqueForce[trial].rows()
+             == 9 * groundForceBodies.size())
+  {
+    for (int i = 0; i < groundForceBodies.size(); i++)
+    {
+      for (int j = 0; j < 6; j++)
+      {
+        frame.add_ground_contact_wrench(
+            trialGroundBodyWrenches[trial](i * 6 + j, t));
+      }
+      for (int j = 0; j < 3; j++)
+      {
+        frame.add_ground_contact_center_of_pressure(
+            trialGroundBodyCopTorqueForce[trial](i * 9 + j, t));
+        frame.add_ground_contact_torque(
+            trialGroundBodyCopTorqueForce[trial](i * 9 + 3 + j, t));
+        frame.add_ground_contact_force(
+            trialGroundBodyCopTorqueForce[trial](i * 9 + 6 + j, t));
+      }
+    }
+  }
+  else
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                 "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce "
+                 "out-of-bounds for trial "
+              << trial << " frame " << t << std::endl;
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    if (trialComPoses.size() < trial || trialComPoses[trial].cols() < t)
+    {
+      std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                   "trialComPoses out-of-bounds for trial "
+                << trial << std::endl;
+      frame.add_com_pos(0);
+    }
+    else
+    {
+      frame.add_com_pos(trialComPoses[trial](i, t));
+    }
+    if (trialComVels.size() < trial || trialComVels[trial].cols() < t)
+    {
+      std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                   "trialComVels out-of-bounds for trial "
+                << trial << std::endl;
+      frame.add_com_vel(0);
+    }
+    else
+    {
+      frame.add_com_vel(trialComVels[trial](i, t));
+    }
+    if (trialComAccs.size() < trial || trialComAccs[trial].cols() < t)
+    {
+      frame.add_com_acc(0);
+    }
+    else
+    {
+      frame.add_com_acc(trialComAccs[trial](i, t));
+    }
+  }
+  if (customValues.size() > trial)
+  {
+    for (int i = 0; i < customValues[trial].size(); i++)
+    {
+      for (int j = 0; j < customValues[trial][i].rows(); j++)
+      {
+        frame.add_custom_values(customValues[trial][i](j, t));
+      }
+    }
+  }
+  if (markerObservations.size() > trial && markerObservations[trial].size() > t)
+  {
+    for (std::string& name : markerNames)
+    {
+      if (markerObservations[trial][t].find(name)
+          != markerObservations[trial][t].end())
+      {
+        frame.add_marker_obs(markerObservations[trial][t].at(name)(0));
+        frame.add_marker_obs(markerObservations[trial][t].at(name)(1));
+        frame.add_marker_obs(markerObservations[trial][t].at(name)(2));
+      }
+      else
+      {
+        frame.add_marker_obs(nan(""));
+        frame.add_marker_obs(nan(""));
+        frame.add_marker_obs(nan(""));
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < markerNames.size(); i++)
+    {
+      frame.add_marker_obs(nan(""));
+      frame.add_marker_obs(nan(""));
+      frame.add_marker_obs(nan(""));
+    }
+  }
+  if (accObservations.size() > trial && accObservations[trial].size() > t)
+  {
+    for (std::string& name : accNames)
+    {
+      if (accObservations[trial][t].find(name)
+          != accObservations[trial][t].end())
+      {
+        frame.add_acc_obs(accObservations[trial][t].at(name)(0));
+        frame.add_acc_obs(accObservations[trial][t].at(name)(1));
+        frame.add_acc_obs(accObservations[trial][t].at(name)(2));
+      }
+      else
+      {
+        frame.add_acc_obs(nan(""));
+        frame.add_acc_obs(nan(""));
+        frame.add_acc_obs(nan(""));
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < accNames.size(); i++)
+    {
+      frame.add_acc_obs(nan(""));
+      frame.add_acc_obs(nan(""));
+      frame.add_acc_obs(nan(""));
+    }
+  }
+  if (gyroObservations.size() > trial && gyroObservations[trial].size() > t)
+  {
+    for (std::string& name : gyroNames)
+    {
+      if (gyroObservations[trial][t].find(name)
+          != gyroObservations[trial][t].end())
+      {
+        frame.add_gyro_obs(gyroObservations[trial][t].at(name)(0));
+        frame.add_gyro_obs(gyroObservations[trial][t].at(name)(1));
+        frame.add_gyro_obs(gyroObservations[trial][t].at(name)(2));
+      }
+      else
+      {
+        frame.add_gyro_obs(nan(""));
+        frame.add_gyro_obs(nan(""));
+        frame.add_gyro_obs(nan(""));
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < gyroNames.size(); i++)
+    {
+      frame.add_gyro_obs(nan(""));
+      frame.add_gyro_obs(nan(""));
+      frame.add_gyro_obs(nan(""));
+    }
+  }
+  if (emgObservations.size() > trial && emgObservations[trial].size() > t)
+  {
+    for (std::string& name : emgNames)
+    {
+      if (emgObservations[trial][t].find(name)
+          != emgObservations[trial][t].end())
+      {
+        for (int i = 0; i < emgDim; i++)
+        {
+          frame.add_emg_obs(emgObservations[trial][t].at(name)(i));
+        }
+      }
+      else
+      {
+        for (int i = 0; i < emgDim; i++)
+        {
+          frame.add_emg_obs(nan(""));
+        }
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < emgNames.size(); i++)
+    {
+      for (int j = 0; j < emgDim; j++)
+      {
+        frame.add_emg_obs(nan(""));
+      }
+    }
+  }
+
+  for (int forcePlateIdx = 0; forcePlateIdx < maxNumForcePlates;
+       forcePlateIdx++)
+  {
+    if (trial < forcePlates.size() && forcePlateIdx < forcePlates[trial].size()
+        && forcePlates[trial][forcePlateIdx].centersOfPressure.size() > t
+        && forcePlates[trial][forcePlateIdx].forces.size() > t
+        && forcePlates[trial][forcePlateIdx].moments.size() > t)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        frame.add_raw_force_plate_cop(
+            forcePlates[trial][forcePlateIdx].centersOfPressure[t](i));
+        frame.add_raw_force_plate_torque(
+            forcePlates[trial][forcePlateIdx].moments[t](i));
+        frame.add_raw_force_plate_force(
+            forcePlates[trial][forcePlateIdx].forces[t](i));
+      }
+    }
+    else
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        frame.add_raw_force_plate_cop(std::nan(""));
+        frame.add_raw_force_plate_torque(std::nan(""));
+        frame.add_raw_force_plate_force(std::nan(""));
+      }
+    }
+  }
+  */
 }
 
 } // namespace biomechanics

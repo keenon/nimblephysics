@@ -11,18 +11,20 @@
 #include "dart/biomechanics/enums.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/MathTypes.hpp"
+#include "dart/proto/SubjectOnDisk.pb.h"
 
 namespace dart {
 namespace biomechanics {
 
-struct Frame
-{
-  int trial;
-  int t;
-  s_t residual;
-  bool probablyMissingGRF;
-  MissingGRFReason missingGRFReason;
+class SubjectOnDiskHeader;
 
+struct FramePass
+{
+  std::string passName;
+  s_t markerRMS;
+  s_t markerMax;
+  s_t linearResidual;
+  s_t angularResidual;
   Eigen::VectorXd pos;
   Eigen::VectorXd vel;
   Eigen::VectorXd acc;
@@ -47,6 +49,22 @@ struct Frame
   // more trustworthy)
   Eigen::VectorXi velFiniteDifferenced;
   Eigen::VectorXi accFiniteDifferenced;
+};
+
+struct Frame
+{
+  int trial;
+  int t;
+  bool probablyMissingGRF;
+  MissingGRFReason missingGRFReason;
+  // Each processing pass has its own set of kinematics and dynamics, as the
+  // model and trajectories are adjusted
+  std::vector<FramePass> processingPasses;
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Raw sensor data
+  ///////////////////////////////////////////////////////////////////////////
+
   // We include this to allow the binary format to store/load a bunch of new
   // types of values while remaining backwards compatible.
   std::vector<std::pair<std::string, Eigen::VectorXd>> customValues;
@@ -65,7 +83,227 @@ struct Frame
   // can vary in length depending on how much faster the EMG sampling was than
   // the motion capture sampling.
   std::vector<std::pair<std::string, Eigen::VectorXs>> emgSignals;
+
+  void readFromProto(
+      dart::proto::SubjectOnDiskFrame* proto,
+      const SubjectOnDiskHeader& header,
+      int trial,
+      int t,
+      s_t contactThreshold);
 };
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Builders, to create a SubjectOnDisk from scratch
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+class SubjectOnDiskTrialPass
+{
+public:
+  SubjectOnDiskTrialPass();
+  SubjectOnDiskTrialPass& setName(const std::string& name);
+  SubjectOnDiskTrialPass& setDofPositionsObserved(
+      std::vector<bool> dofPositionsObserved);
+  SubjectOnDiskTrialPass& setDofVelocitiesFiniteDifferenced(
+      std::vector<bool> dofVelocitiesFiniteDifferenced);
+  SubjectOnDiskTrialPass& setDofAccelerationFiniteDifferenced(
+      std::vector<bool> dofAccelerationFiniteDifference);
+  SubjectOnDiskTrialPass& setMarkerRMS(std::vector<s_t> markerRMS);
+  SubjectOnDiskTrialPass& setMarkerMax(std::vector<s_t> markerMax);
+  SubjectOnDiskTrialPass& setLinearResidual(std::vector<s_t> linearResidual);
+  SubjectOnDiskTrialPass& setAngularResidual(std::vector<s_t> angularResidual);
+  SubjectOnDiskTrialPass& setPoses(Eigen::MatrixXs poses);
+  SubjectOnDiskTrialPass& setVels(Eigen::MatrixXs vels);
+  SubjectOnDiskTrialPass& setAccs(Eigen::MatrixXs accs);
+  SubjectOnDiskTrialPass& setTaus(Eigen::MatrixXs taus);
+  SubjectOnDiskTrialPass& setComPoses(Eigen::MatrixXs poses);
+  SubjectOnDiskTrialPass& setComVels(Eigen::MatrixXs vels);
+  SubjectOnDiskTrialPass& setComAccs(Eigen::MatrixXs accs);
+  void read(const proto::SubjectOnDiskTrialProcessingPassHeader& proto);
+  void write(proto::SubjectOnDiskTrialProcessingPassHeader* proto);
+
+protected:
+  // This data is included in the header
+  std::string mName;
+  std::vector<bool> mDofPositionsObserved;
+  std::vector<bool> mDofVelocitiesFiniteDifferenced;
+  std::vector<bool> mDofAccelerationFiniteDifferenced;
+  std::vector<s_t> mMarkerRMS;
+  std::vector<s_t> mMarkerMax;
+  std::vector<s_t> mLinearResidual;
+  std::vector<s_t> mAngularResidual;
+  // This data is in each separate Frame, and so won't be loaded from the proto
+  Eigen::MatrixXs mPos;
+  Eigen::MatrixXs mVel;
+  Eigen::MatrixXs mAcc;
+  Eigen::MatrixXs mTaus;
+  Eigen::MatrixXs mComPoses;
+  Eigen::MatrixXs mComVels;
+  Eigen::MatrixXs mComAccs;
+  Eigen::MatrixXs mTrialGroundBodyWrenches;
+  Eigen::MatrixXs mTrialGroundBodyCopTorqueForce;
+
+  friend struct Frame;
+  friend class SubjectOnDisk;
+};
+
+class SubjectOnDiskTrial
+{
+public:
+  SubjectOnDiskTrial();
+  SubjectOnDiskTrial& setName(const std::string& name);
+  SubjectOnDiskTrial& setTimestep(s_t timestep);
+  SubjectOnDiskTrial& setTrialTags(std::vector<std::string> trialTags);
+  SubjectOnDiskTrial& setProbablyMissingGRF(
+      std::vector<bool> probablyMissingGRF);
+  SubjectOnDiskTrial& setMissingGRFReason(
+      std::vector<MissingGRFReason> missingGRFReason);
+  SubjectOnDiskTrial& setCustomValues(
+      std::vector<Eigen::MatrixXs> customValues);
+  SubjectOnDiskTrial& setMarkerNamesGuessed(bool markersGuessed);
+  SubjectOnDiskTrial& setMarkerObservations(
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
+  SubjectOnDiskTrial& setAccObservations(
+      std::vector<std::map<std::string, Eigen::Vector3s>> accObservations);
+  SubjectOnDiskTrial& setGyroObservations(
+      std::vector<std::map<std::string, Eigen::Vector3s>> gyroObservations);
+  SubjectOnDiskTrial& setEmgObservations(
+      std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations);
+  SubjectOnDiskTrial& setExoTorques(
+      std::map<std::string, Eigen::VectorXs> exoTorques);
+  SubjectOnDiskTrial& setForcePlates(std::vector<ForcePlate> forcePlates);
+  SubjectOnDiskTrialPass& addPass();
+  void read(const proto::SubjectOnDiskTrialHeader& proto);
+  void write(proto::SubjectOnDiskTrialHeader* proto);
+
+protected:
+  std::string mName;
+  s_t mTimestep;
+  int mLength;
+  std::vector<std::string> mTrialTags;
+  std::vector<SubjectOnDiskTrialPass> mPasses;
+  std::vector<bool> mProbablyMissingGRF;
+  std::vector<MissingGRFReason> mMissingGRFReason;
+  // This is for allowing the user to pre-filter out data where joint velocities
+  // are above a certain "unreasonable limit", like 50 rad/s or so
+  std::vector<s_t> mJointsMaxVelocity;
+  // This is true if we guessed the marker names, and false if we got them from
+  // the uploaded user's file, which implies that they got them from human
+  // observations.
+  bool mMarkerNamesGuessed;
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Recovered proto summaries, for incremental loading of Frames
+  ///////////////////////////////////////////////////////////////////////////
+
+  int mNumForcePlates;
+  std::vector<std::vector<Eigen::Vector3s>> mForcePlateCorners;
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Raw sensor observations to write out frame by frame
+  ///////////////////////////////////////////////////////////////////////////
+
+  std::vector<Eigen::MatrixXs> mCustomValues;
+  // These are the markers, gyros, accelerometers
+  std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerObservations;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mAccObservations;
+  std::vector<std::map<std::string, Eigen::Vector3s>> mGyroObservations;
+  // These are EMG observations, with potentially many samples per frame
+  std::vector<std::map<std::string, Eigen::VectorXs>> mEmgObservations;
+  // These are the torques applied by an exoskeleton, if any, per DOF they are
+  // applied to
+  std::map<std::string, Eigen::VectorXs> mExoTorques;
+  // This is raw force plate data
+  std::vector<ForcePlate> mForcePlates;
+
+  friend class SubjectOnDiskHeader;
+  friend class SubjectOnDisk;
+  friend struct Frame;
+};
+
+class SubjectOnDiskPassHeader
+{
+public:
+  SubjectOnDiskPassHeader();
+  SubjectOnDiskPassHeader& setProcessingPassType(ProcessingPassType type);
+  SubjectOnDiskPassHeader& setOpenSimFileText(
+      const std::string& openSimFileText);
+  void write(dart::proto::SubjectOnDiskPass* proto);
+  void read(const dart::proto::SubjectOnDiskPass& proto);
+
+protected:
+  ProcessingPassType mType;
+  // The OpenSim file XML gets copied into our binary bundle, along with
+  // any necessary Geometry files
+  std::string mOpenSimFileText;
+
+  friend class SubjectOnDisk;
+};
+
+class SubjectOnDiskHeader
+{
+public:
+  SubjectOnDiskHeader();
+  SubjectOnDiskHeader& setGroundForceBodies(
+      std::vector<std::string> groundForceBodies);
+  SubjectOnDiskHeader& setCustomValueNames(
+      std::vector<std::string> customValueNames);
+  SubjectOnDiskHeader& setBiologicalSex(const std::string& biologicalSex);
+  SubjectOnDiskHeader& setHeightM(double heightM);
+  SubjectOnDiskHeader& setMassKg(double massKg);
+  SubjectOnDiskHeader& setAgeYears(int ageYears);
+  SubjectOnDiskHeader& setSubjectTags(std::vector<std::string> subjectTags);
+  SubjectOnDiskHeader& setHref(const std::string& sourceHref);
+  SubjectOnDiskHeader& setNotes(const std::string& notes);
+  SubjectOnDiskPassHeader& addProcessingPass();
+  SubjectOnDiskTrial& addTrial();
+  void recomputeColumnNames();
+  void write(dart::proto::SubjectOnDiskHeader* proto);
+  void read(const dart::proto::SubjectOnDiskHeader& proto);
+  void writeFrame(dart::proto::SubjectOnDiskFrame* proto, int trial, int t);
+
+protected:
+  // How many DOFs are in the skeleton
+  int mNumDofs;
+  // The passes we applied to this data, along with the result skeletons that
+  // were generated by each pass.
+  std::vector<SubjectOnDiskPassHeader> mPasses;
+  // These are generalized 6-dof wrenches applied to arbitrary bodies
+  // (generally by foot-ground contact, though other things too)
+  std::vector<std::string> mGroundContactBodies;
+  // We include this to allow the binary format to store/load a bunch of new
+  // types of values while remaining backwards compatible.
+  std::vector<std::string> mCustomValueNames;
+  std::vector<int> mCustomValueLengths;
+  // This is the subject info
+  std::string mBiologicalSex;
+  double mHeightM;
+  double mMassKg;
+  int mAgeYears;
+  // The provenance info, optional, for investigating where training data
+  // came from after its been aggregated
+  std::vector<std::string> mSubjectTags;
+  std::string mHref = "";
+  std::string mNotes = "";
+  // These are the trials, which contain the actual data
+  std::vector<SubjectOnDiskTrial> mTrials;
+
+  // These are the marker, accelerometer and gyroscope names
+  std::vector<std::string> mMarkerNames;
+  std::vector<std::string> mAccNames;
+  std::vector<std::string> mGyroNames;
+  // This is EMG data
+  std::vector<std::string> mEmgNames;
+  int mEmgDim;
+  // This is exoskeleton data
+  std::vector<std::string> mExoDofNames;
+
+  friend class SubjectOnDisk;
+  friend struct Frame;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// This is the SubjectOnDisk object
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * This is for doing ML and large-scale data analysis. The idea here is to
@@ -78,13 +316,17 @@ class SubjectOnDisk
 public:
   SubjectOnDisk(const std::string& path);
 
+  /// This will write a B3D file to disk
+  static void writeB3D(const std::string& path, SubjectOnDiskHeader& header);
+
   /// This will read the skeleton from the binary, and optionally use the passed
   /// in Geometry folder.
-  std::shared_ptr<dynamics::Skeleton> readSkel(std::string geometryFolder = "");
+  std::shared_ptr<dynamics::Skeleton> readSkel(
+      int processingPass, std::string geometryFolder = "");
 
   /// This will read the raw OpenSim XML file text out of the binary, and return
   /// it as a string
-  std::string readRawOsimFileText();
+  std::string readRawOsimFileText(int processingPass);
 
   /// This will read from disk and allocate a number of Frame objects.
   /// These Frame objects are assumed to be
@@ -97,61 +339,6 @@ public:
       int numFramesToRead = 1,
       int stride = 1,
       s_t contactThreshold = 1.0);
-
-  /// This writes a subject out to disk in a compressed and random-seekable
-  /// binary format.
-  static void writeSubject(
-      const std::string& outputPath,
-      // The OpenSim file XML gets copied into our binary bundle, along with
-      // any necessary Geometry files
-      const std::string& openSimFilePath,
-      // The per-trial motion data
-      std::vector<s_t> trialTimesteps,
-      std::vector<Eigen::MatrixXs>& trialPoses,
-      std::vector<Eigen::MatrixXs>& trialVels,
-      std::vector<Eigen::MatrixXs>& trialAccs,
-      std::vector<std::vector<bool>>& probablyMissingGRF,
-      std::vector<std::vector<MissingGRFReason>>& missingGRFReason,
-      std::vector<std::vector<bool>>& dofPositionsObserved,
-      std::vector<std::vector<bool>>& dofVelocitiesFiniteDifferenced,
-      std::vector<std::vector<bool>>& dofAccelerationFiniteDifferenced,
-      std::vector<Eigen::MatrixXs>& trialTaus,
-      std::vector<Eigen::MatrixXs>& trialComPoses,
-      std::vector<Eigen::MatrixXs>& trialComVels,
-      std::vector<Eigen::MatrixXs>& trialComAccs,
-      std::vector<std::vector<s_t>> trialResidualNorms,
-      // These are generalized 6-dof wrenches applied to arbitrary bodies
-      // (generally by foot-ground contact, though other things too)
-      std::vector<std::string>& groundForceBodies,
-      std::vector<Eigen::MatrixXs>& trialGroundBodyWrenches,
-      std::vector<Eigen::MatrixXs>& trialGroundBodyCopTorqueForce,
-      // We include this to allow the binary format to store/load a bunch of new
-      // types of values while remaining backwards compatible.
-      std::vector<std::string>& customValueNames,
-      std::vector<std::vector<Eigen::MatrixXs>> customValues,
-      // These are the markers, gyros and accelerometers
-      const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-          markerObservations,
-      const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-          accObservations,
-      const std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>&
-          gyroObservations,
-      const std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>&
-          emgObservations,
-      // This is raw force plate data
-      std::vector<std::vector<ForcePlate>>& forcePlates,
-      // This is the subject info
-      const std::string& biologicalSex,
-      double heightM,
-      double massKg,
-      int ageYears,
-      // The provenance info, optional, for investigating where training data
-      // came from after its been aggregated
-      std::vector<std::string> trialNames,
-      std::vector<std::string> subjectTags,
-      std::vector<std::vector<std::string>> trialTags,
-      const std::string& sourceHref = "",
-      const std::string& notes = "");
 
   /// This returns the number of trials on the subject
   int getNumTrials();
@@ -174,13 +361,22 @@ public:
   /// why each time step was identified as 'probablyMissingGRF'.
   std::vector<MissingGRFReason> getMissingGRFReason(int trial);
 
-  std::vector<bool> getDofPositionsObserved(int trial);
+  int getNumProcessingPasses();
 
-  std::vector<bool> getDofVelocitiesFiniteDifferenced(int trial);
+  ProcessingPassType getProcessingPassType(int processingPass);
 
-  std::vector<bool> getDofAccelerationsFiniteDifferenced(int trial);
+  std::vector<bool> getDofPositionsObserved(int trial, int processingPass);
 
-  std::vector<s_t> getTrialResidualNorms(int trial);
+  std::vector<bool> getDofVelocitiesFiniteDifferenced(
+      int trial, int processingPass);
+
+  std::vector<bool> getDofAccelerationsFiniteDifferenced(
+      int trial, int processingPass);
+
+  std::vector<s_t> getTrialLinearResidualNorms(int trial, int processingPass);
+  std::vector<s_t> getTrialAngularResidualNorms(int trial, int processingPass);
+  std::vector<s_t> getTrialMarkerRMSs(int trial, int processingPass);
+  std::vector<s_t> getTrialMarkerMaxs(int trial, int processingPass);
 
   /// This returns the maximum absolute velocity of any DOF at each timestep for
   /// a given trial
@@ -230,62 +426,10 @@ protected:
   std::string mPath;
   // We cache some very basic data about the accessible bounds of on-disk data,
   // so we don't have to look that up every time.
-  int mNumDofs;
-  int mNumTrials;
-  std::vector<std::string> mGroundContactBodies;
-  std::vector<int> mTrialLength;
-  std::vector<s_t> mTrialTimesteps;
-  std::vector<std::string> mCustomValues;
-  std::vector<int> mCustomValueLengths;
-  std::vector<int> mTrialNumForcePlates;
-  std::vector<std::vector<std::vector<Eigen::Vector3s>>>
-      mTrialForcePlateCorners;
   int mDataSectionStart;
   int mFrameSize;
-  // If we're projecting a lower-body-only dataset onto a full-body model, then
-  // there will be DOFs that we don't get to observe. Downstream applications
-  // will want to ignore these DOFs.
-  std::vector<std::vector<bool>> mDofPositionsObserved;
-  // If we didn't use gyros to measure rotational velocity directly, then the
-  // velocity on this joint is likely to be noisy. If that's true, downstream
-  // applications won't want to try to predict the velocity on these DOFs
-  // directly.
-  std::vector<std::vector<bool>> mDofVelocitiesFiniteDifferenced;
-  // If we didn't use accelerometers to measure acceleration directly, then the
-  // acceleration on this joint is likely to be noisy. If that's true,
-  // downstream applications won't want to try to predict the acceleration on
-  // these DOFs directly.
-  std::vector<std::vector<bool>> mDofAccelerationFiniteDifferenced;
-  // These are the norms of the residuals on each frame, for each trial
-  std::vector<std::vector<s_t>> mTrialResidualNorms;
-  // These are the maximum absolute DOF velocity on each frame, for each trial
-  std::vector<std::vector<s_t>> mTrialMaxJointVelocity;
 
-  // This is the only array that has the potential to be somewhat large in
-  // memory, but we really want to know this information when randomly picking
-  // frames from the subject to sample.
-  std::vector<std::vector<bool>> mProbablyMissingGRF;
-  std::vector<std::vector<MissingGRFReason>> mMissingGRFReason;
-  // The trial names, if provided, or empty strings
-  std::vector<std::string> mTrialNames;
-  // An optional link to the web where this subject came from
-  std::string mHref;
-  // Any text-based notes on the subject data, like citations etc
-  std::string mNotes;
-  // These are details about the subject's input parameters
-  std::string mBiologicalSex;
-  double mHeightM;
-  double mMassKg;
-  int mAgeYears;
-  std::vector<std::string> mSubjectTags;
-  std::vector<std::vector<std::string>> mTrialTags;
-  // These are the marker, accelerometer and gyroscope names
-  std::vector<std::string> mMarkerNames;
-  std::vector<std::string> mAccNames;
-  std::vector<std::string> mGyroNames;
-  // This is EMG data
-  std::vector<std::string> mEmgNames;
-  int mEmgDim;
+  SubjectOnDiskHeader mHeader;
 };
 
 } // namespace biomechanics

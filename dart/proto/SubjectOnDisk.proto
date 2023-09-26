@@ -11,62 +11,94 @@ enum MissingGRFReason { notMissingGRF = 0;
                         missingImpact = 6;
                         missingBlip = 7;
                         shiftGRF = 8;
+                        interpolatedClippedGRF = 9;
                       };
 
-message SubjectOnDiskTrialHeader {
-  // This is the only array that has the potential to be somewhat large in
-  // memory, but we really want to know this information when randomly picking
-  // frames from the subject to sample.
-  repeated bool missing_GRF = 1;
-  repeated MissingGRFReason missing_GRF_reason = 2;
-  // This is how many frames are in this trial
-  int32 trial_length = 3;
-  // This is the timestep used in this trial (assumed constant throughout the trial)
-  double trial_timestep = 4;
+enum ProcessingPassType {
+  kinematics = 0;
+  dynamics = 1;
+  lowPassFilter = 2;
+};
+
+// Many of the ML tasks we want to support from SubjectOnDisk data include 
+// effectively predicting the results of a downstream processing task from 
+// an upstream processing task. Trivially, that's predicting physics from
+// raw motion. Hopefully soon, that may also include things like predicting
+// IMU joint accelerations from raw kinematics.
+message SubjectOnDiskTrialProcessingPassHeader {
+  // This is the name of the processing pass that generated this data
+  string name = 1;
   // If we're projecting a lower-body-only dataset onto a full-body model, then
   // there will be DOFs that we don't get to observe. Downstream applications
   // will want to ignore these DOFs.
-  repeated bool dof_positions_observed = 5;
+  repeated bool dof_positions_observed = 2;
   // If we didn't use gyros to measure rotational velocity directly, then the
   // velocity on this joint is likely to be noisy. If that's true, downstream
   // applications won't want to try to predict the velocity on these DOFs
   // directly.
-  repeated bool dof_velocities_finite_differenced = 6;
+  repeated bool dof_velocities_finite_differenced = 3;
   // If we didn't use accelerometers to measure acceleration directly, then the
   // acceleration on this joint is likely to be noisy. If that's true,
   // downstream applications won't want to try to predict the acceleration on
   // these DOFs directly.
-  repeated bool dof_acceleration_finite_differenced = 7;
+  repeated bool dof_acceleration_finite_differenced = 4;
+  // This records the marker error for each frame in this trial.
+  repeated float marker_rms = 5;
+  repeated float marker_max = 6;
   // This records the residual of the inverse dynamics solution for each frame in this trial.
-  repeated float residual = 8;
+  repeated float linear_residual = 7;
+  // This records the residual of the inverse dynamics solution for each frame in this trial.
+  repeated float angular_residual = 8;
+}
+
+message SubjectOnDiskTrialHeader {
+  string name = 1;
+  // This is the only array that has the potential to be somewhat large in
+  // memory, but we really want to know this information when randomly picking
+  // frames from the subject to sample.
+  repeated bool missing_GRF = 2;
+  repeated MissingGRFReason missing_GRF_reason = 3;
+  // This is how many frames are in this trial
+  int32 trial_length = 4;
+  // This is the timestep used in this trial (assumed constant throughout the trial)
+  double trial_timestep = 5;
+  // These are the processing passes that were applied to this trial
+  repeated SubjectOnDiskTrialProcessingPassHeader processing_pass_header = 6;
   // This records the tags this trial was assigned with on the AddBiomechanics platform
-  repeated string trial_tag = 9;
+  repeated string trial_tag = 7;
   // This is the number of force plates present on this trial
-  int32 num_force_plates = 10;
+  int32 num_force_plates = 8;
   // If there are force plates, we can optionally include each force plate's corners here, concatenated as 4 3-vectors per plate
-  repeated double force_plate_corners = 11;
+  repeated double force_plate_corners = 9;
   // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
-  repeated float joints_max_velocity = 12;
+  repeated float joints_max_velocity = 10;
+  // This is true if we guessed the marker names without any ground truth from the user.
+  bool marker_names_guessed = 11;
+}
+
+message SubjectOnDiskPass {
+  ProcessingPassType pass_type = 1;
+  string model_osim_text = 2;
 }
 
 message SubjectOnDiskHeader {
   int32 num_dofs = 1;
   int32 num_trials = 2;
-  repeated string ground_contact_body = 3;
+  // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
+  int32 frame_size = 3;
+  // This has all the global information about each pass
+  repeated SubjectOnDiskPass passes = 4;
+  // This is the global configuration of the skeleton
+  repeated string ground_contact_body = 5;
   repeated string custom_value_name = 6;
   repeated int32 custom_value_length = 7;
-  string model_osim_text = 8;
   repeated SubjectOnDiskTrialHeader trial_header = 9;
-  // The trial names, if provided, or empty strings
-  repeated string trial_name = 10;
+  // The version number for this file format
+  int32 version = 10;
   // An optional link to the web where this subject came from
   string href = 11;
   // Any text-based notes on the subject data, like citations etc
   string notes = 12;
-  // The version number for this file format
-  int32 version = 13;
-  // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
-  int32 frame_size = 14;
   // Subject details
   string biological_sex = 15;
   double height_m = 16;
@@ -78,14 +110,16 @@ message SubjectOnDiskHeader {
   repeated string acc_name = 20;
   repeated string gyro_name = 21;
   // Details about the EMG data as it will appear on each frame
-  repeated string emg_name = 23;
+  repeated string emg_name = 22;
   // This is how many samples of each EMG we get per timestep (the multiple of the mocap sampling frequency for our EMG data, usually ~10)
-  int32 emg_dim = 24;
+  int32 emg_dim = 23;
+  // Details about the exo DOF data as it will appear on each frame
+  repeated string exo_dof_name = 24;
   // Details about the subject tags provided on the AddBiomechanics platform
-  repeated string subject_tag = 22;
+  repeated string subject_tag = 25;
 }
 
-message SubjectOnDiskFrame {
+message SubjectOnDiskProcessingPassFrame {
   // The values for all the DOFs
   repeated double pos = 1;
   repeated double vel = 2;
@@ -101,18 +135,32 @@ message SubjectOnDiskFrame {
   repeated double com_pos = 9;
   repeated double com_vel = 10;
   repeated double com_acc = 11;
+}
+
+message SubjectOnDiskFrame {
+  /////////////////////////////////////////////////////////////
+  // Processed data
+  /////////////////////////////////////////////////////////////
+  // Each frame will have data from potentially several separate passes of processing.
+  repeated SubjectOnDiskProcessingPassFrame pass = 1;
+
+  /////////////////////////////////////////////////////////////
+  // Raw data
+  /////////////////////////////////////////////////////////////
   // We include this to allow the binary format to store/load a bunch of new
   // types of values while remaining backwards compatible.
-  repeated double custom_values = 12;
+  repeated double custom_values = 2;
   // These are marker observations on this frame, with all NaNs indicating that that marker was not observed on this frame
-  repeated double marker_obs = 13;
+  repeated double marker_obs = 3;
   // These are IMU observations on this frame, with all NaNs indicating that that imu was not observed on this frame
-  repeated double acc_obs = 14;
-  repeated double gyro_obs = 15;
+  repeated double acc_obs = 4;
+  repeated double gyro_obs = 5;
   // These are the EMG observations on this frame
-  repeated double emg_obs = 19;
+  repeated double emg_obs = 6;
+  // These are the exo observations on this frame
+  repeated double exo_obs = 7;
   // These are the raw force plate readings, per force plate, without any assignment to feet or any post-processing
-  repeated double raw_force_plate_cop = 16;
-  repeated double raw_force_plate_torque = 17;
-  repeated double raw_force_plate_force = 18;
+  repeated double raw_force_plate_cop = 8;
+  repeated double raw_force_plate_torque = 9;
+  repeated double raw_force_plate_force = 10;
 }
