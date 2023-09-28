@@ -630,6 +630,18 @@ Note that these are specified in the local body frame, acting on the body at its
             //       int stride = 1,
             //       s_t contactThreshold = 1.0);
             .def(
+                "getLowpassCutoffFrequency",
+                &dart::biomechanics::SubjectOnDisk::getLowpassCutoffFrequency,
+                ::py::arg("processingPass"),
+                "If we're doing a lowpass filter on this pass, then what was "
+                "the cutoff frequency of that (Butterworth) filter?")
+            .def(
+                "getLowpassFilterOrder",
+                &dart::biomechanics::SubjectOnDisk::getLowpassFilterOrder,
+                ::py::arg("processingPass"),
+                "If we're doing a lowpass filter on this pass, then what was "
+                "the order of that (Butterworth) filter?")
+            .def(
                 "readFrames",
                 &dart::biomechanics::SubjectOnDisk::readFrames,
                 ::py::arg("trial"),

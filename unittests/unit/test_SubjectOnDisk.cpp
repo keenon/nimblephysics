@@ -61,6 +61,8 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
 
   // 1.1. Header data
   std::vector<ProcessingPassType> processingPasses;
+  std::vector<s_t> processingPassCutoffs;
+  std::vector<int> processingPassOrders;
   std::vector<std::string> openSimFileTexts;
   std::vector<std::string> customValueNames;
   std::vector<std::string> groundForceBodies;
@@ -122,8 +124,14 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
 
   // 2.1. Header data
   processingPasses.push_back(ProcessingPassType::kinematics);
+  processingPassCutoffs.push_back(-1);
+  processingPassOrders.push_back(-1);
   processingPasses.push_back(ProcessingPassType::dynamics);
+  processingPassCutoffs.push_back(-1);
+  processingPassOrders.push_back(-1);
   processingPasses.push_back(ProcessingPassType::lowPassFilter);
+  processingPassCutoffs.push_back(25);
+  processingPassOrders.push_back(3);
 
   openSimFileTexts.push_back("Kinematics_test");
   openSimFileTexts.push_back("Dynamics_test");
@@ -337,6 +345,8 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   {
     header.addProcessingPass()
         .setProcessingPassType(processingPasses[i])
+        .setLowpassCutoffFrequency(processingPassCutoffs[i])
+        .setLowpassFilterOrder(processingPassOrders[i])
         .setOpenSimFileText(openSimFileTexts[i]);
   }
   header.setNumDofs(dofs);
@@ -441,6 +451,22 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     if (type != processingPasses[i])
     {
       std::cout << "Failed to recover correct processing pass type!"
+                << std::endl;
+      return false;
+    }
+
+    s_t frequency = subject.getLowpassCutoffFrequency(i);
+    if (frequency != processingPassCutoffs[i])
+    {
+      std::cout << "Failed to recover correct lowpass cutoff frequency!"
+                << std::endl;
+      return false;
+    }
+
+    int order = subject.getLowpassFilterOrder(i);
+    if (order != processingPassOrders[i])
+    {
+      std::cout << "Failed to recover correct lowpass filter order!"
                 << std::endl;
       return false;
     }

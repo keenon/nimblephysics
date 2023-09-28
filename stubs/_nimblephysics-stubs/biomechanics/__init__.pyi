@@ -2119,6 +2119,14 @@ class SubjectOnDisk():
         """
         The AddBiomechanics link for this subject's data.
         """
+    def getLowpassCutoffFrequency(self, processingPass: int) -> float: 
+        """
+        If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that (Butterworth) filter?
+        """
+    def getLowpassFilterOrder(self, processingPass: int) -> int: 
+        """
+        If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
+        """
     def getMassKg(self) -> float: 
         """
         This returns the mass in kilograms, or 0.0 if unknown.

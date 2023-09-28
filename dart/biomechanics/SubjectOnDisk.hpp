@@ -238,6 +238,8 @@ public:
   SubjectOnDiskPassHeader& setProcessingPassType(ProcessingPassType type);
   SubjectOnDiskPassHeader& setOpenSimFileText(
       const std::string& openSimFileText);
+  SubjectOnDiskPassHeader& setLowpassCutoffFrequency(s_t cutoff);
+  SubjectOnDiskPassHeader& setLowpassFilterOrder(int order);
   void write(dart::proto::SubjectOnDiskPass* proto);
   void read(const dart::proto::SubjectOnDiskPass& proto);
 
@@ -246,6 +248,12 @@ protected:
   // The OpenSim file XML gets copied into our binary bundle, along with
   // any necessary Geometry files
   std::string mOpenSimFileText;
+  // If we're doing a lowpass filter on this pass, then what was the cutoff
+  // frequency of that filter?
+  s_t mLowpassCutoffFrequency;
+  // If we're doing a lowpass filter on this pass, then what was the order of
+  // that (Butterworth) filter?
+  int mLowpassFilterOrder;
 
   friend class SubjectOnDisk;
   friend struct FramePass;
@@ -350,6 +358,14 @@ public:
   /// This will read the raw OpenSim XML file text out of the binary, and return
   /// it as a string
   std::string getOpensimFileText(int processingPass);
+
+  // If we're doing a lowpass filter on this pass, then what was the cutoff
+  // frequency of that filter?
+  s_t getLowpassCutoffFrequency(int processingPass);
+
+  // If we're doing a lowpass filter on this pass, then what was the order of
+  // that (Butterworth) filter?
+  int getLowpassFilterOrder(int processingPass);
 
   /// This will read from disk and allocate a number of Frame objects.
   /// These Frame objects are assumed to be

@@ -330,69 +330,10 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
                          .getFilesystemPath();
   }
 
-  // 1. Open the file
-  FILE* file = fopen(mPath.c_str(), "r");
-  if (file == nullptr)
-  {
-    std::cout << "SubjectOnDisk attempting to open file that deos not exist: "
-              << mPath << std::endl;
-    throw new std::exception();
-  }
-  // 2. Read the length of the message from the integer header
-  int64_t headerSize = -1;
-  int64_t elementsRead = fread(&headerSize, sizeof(int64_t), 1, file);
-  if (elementsRead != 1)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath
-              << ": was unable to read header size, probably because the file "
-                 "is length 0?"
-              << std::endl;
-    throw new std::exception();
-  }
-  // 3. Allocate a buffer to hold the serialized data
-  std::vector<char> serializedHeader(headerSize);
-
-  // 4. Read the serialized data from the file
-  int64_t bytesRead
-      = fread(serializedHeader.data(), sizeof(char), headerSize, file);
-
-  if (bytesRead != headerSize)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath << ": was unable to read full requested header size "
-              << headerSize << ", instead only got " << bytesRead << " bytes."
-              << std::endl;
-    throw new std::exception();
-  }
-
-  // 5. Deserialize the data into a Protobuf object
-  proto::SubjectOnDiskHeader header;
-  bool parseSuccess
-      = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
-  if (!parseSuccess)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath << ": got an error parsing the protobuf file header."
-              << std::endl;
-    throw new std::exception();
-  }
-
-  if (passNumberToLoad < 0 || passNumberToLoad >= header.passes_size())
-  {
-    std::cout << "SubjectOnDisk attempting to read an out of bounds skeleton, "
-                 "requested skeleton from processing pass "
-              << passNumberToLoad << "/" << header.passes_size() << "."
-              << std::endl;
-    throw new std::exception();
-  }
-
   tinyxml2::XMLDocument osimFile;
-  osimFile.Parse(header.passes(passNumberToLoad).model_osim_text().c_str());
+  osimFile.Parse(mHeader.mPasses[passNumberToLoad].mOpenSimFileText.c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
-
-  fclose(file);
 
   return osimParsed.skeleton;
 }
@@ -401,64 +342,21 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 /// it as a string
 std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 {
-  // 1. Open the file
-  FILE* file = fopen(mPath.c_str(), "r");
-  if (file == nullptr)
-  {
-    std::cout << "SubjectOnDisk attempting to open file that deos not exist: "
-              << mPath << std::endl;
-    throw new std::exception();
-  }
-  // 2. Read the length of the message from the integer header
-  int64_t headerSize = -1;
-  int64_t elementsRead = fread(&headerSize, sizeof(int64_t), 1, file);
-  if (elementsRead != 1)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath
-              << ": was unable to read header size, probably because the file "
-                 "is length 0?"
-              << std::endl;
-    throw new std::exception();
-  }
-  // 3. Allocate a buffer to hold the serialized data
-  std::vector<char> serializedHeader(headerSize);
+  return mHeader.mPasses[passNumberToLoad].mOpenSimFileText;
+}
 
-  // 4. Read the serialized data from the file
-  int64_t bytesRead
-      = fread(serializedHeader.data(), sizeof(char), headerSize, file);
+// If we're doing a lowpass filter on this pass, then what was the cutoff
+// frequency of that filter?
+s_t SubjectOnDisk::getLowpassCutoffFrequency(int processingPass)
+{
+  return mHeader.mPasses[processingPass].mLowpassCutoffFrequency;
+}
 
-  if (bytesRead != headerSize)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath << ": was unable to read full requested header size "
-              << headerSize << ", instead only got " << bytesRead << " bytes."
-              << std::endl;
-    throw new std::exception();
-  }
-
-  // 5. Deserialize the data into a Protobuf object
-  proto::SubjectOnDiskHeader header;
-  bool parseSuccess
-      = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
-  if (!parseSuccess)
-  {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << mPath << ": got an error parsing the protobuf file header."
-              << std::endl;
-    throw new std::exception();
-  }
-
-  if (passNumberToLoad < 0 || passNumberToLoad >= header.passes_size())
-  {
-    std::cout << "SubjectOnDisk attempting to read an out of bounds skeleton, "
-                 "requested skeleton from processing pass "
-              << passNumberToLoad << "/" << header.passes_size() << "."
-              << std::endl;
-    throw new std::exception();
-  }
-
-  return header.passes(passNumberToLoad).model_osim_text();
+// If we're doing a lowpass filter on this pass, then what was the order of
+// that (Butterworth) filter?
+int SubjectOnDisk::getLowpassFilterOrder(int processingPass)
+{
+  return mHeader.mPasses[processingPass].mLowpassFilterOrder;
 }
 
 /// This will read from disk and allocate a number of Frame objects,
@@ -1614,16 +1512,34 @@ SubjectOnDiskPassHeader& SubjectOnDiskPassHeader::setOpenSimFileText(
   return *this;
 }
 
+SubjectOnDiskPassHeader& SubjectOnDiskPassHeader::setLowpassCutoffFrequency(
+    s_t cutoff)
+{
+  mLowpassCutoffFrequency = cutoff;
+  return *this;
+}
+
+SubjectOnDiskPassHeader& SubjectOnDiskPassHeader::setLowpassFilterOrder(
+    int order)
+{
+  mLowpassFilterOrder = order;
+  return *this;
+}
+
 void SubjectOnDiskPassHeader::write(dart::proto::SubjectOnDiskPass* proto)
 {
   proto->set_pass_type(passTypeToProto(mType));
   proto->set_model_osim_text(mOpenSimFileText);
+  proto->set_lowpass_cutoff_frequency(mLowpassCutoffFrequency);
+  proto->set_lowpass_filter_order(mLowpassFilterOrder);
 }
 
 void SubjectOnDiskPassHeader::read(const dart::proto::SubjectOnDiskPass& proto)
 {
   mType = passTypeFromProto(proto.pass_type());
   mOpenSimFileText = proto.model_osim_text();
+  mLowpassCutoffFrequency = proto.lowpass_cutoff_frequency();
+  mLowpassFilterOrder = proto.lowpass_filter_order();
 }
 
 SubjectOnDiskHeader::SubjectOnDiskHeader()

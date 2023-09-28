@@ -78,6 +78,10 @@ message SubjectOnDiskTrialHeader {
 message SubjectOnDiskPass {
   ProcessingPassType pass_type = 1;
   string model_osim_text = 2;
+  // If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that filter?
+  float lowpass_cutoff_frequency = 3;
+  // If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
+  int32 lowpass_filter_order = 4;
 }
 
 message SubjectOnDiskHeader {
