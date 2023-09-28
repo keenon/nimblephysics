@@ -20,7 +20,7 @@ class SubjectOnDiskHeader;
 
 struct FramePass
 {
-  std::string passName;
+  ProcessingPassType type;
   s_t markerRMS;
   s_t markerMax;
   s_t linearResidual;
@@ -49,6 +49,14 @@ struct FramePass
   // more trustworthy)
   Eigen::VectorXi velFiniteDifferenced;
   Eigen::VectorXi accFiniteDifferenced;
+
+  void readFromProto(
+      dart::proto::SubjectOnDiskProcessingPassFrame* proto,
+      const SubjectOnDiskHeader& header,
+      int trial,
+      int t,
+      int pass,
+      s_t contactThreshold);
 };
 
 struct Frame
@@ -83,13 +91,15 @@ struct Frame
   // can vary in length depending on how much faster the EMG sampling was than
   // the motion capture sampling.
   std::vector<std::pair<std::string, Eigen::VectorXs>> emgSignals;
+  // These are the torques from the exo, along with the index of the DOFs
+  // they are applied to
+  std::vector<std::pair<int, s_t>> exoTorques;
 
-  void readFromProto(
-      dart::proto::SubjectOnDiskFrame* proto,
+  void readSensorsFromProto(
+      dart::proto::SubjectOnDiskSensorFrame* proto,
       const SubjectOnDiskHeader& header,
       int trial,
-      int t,
-      s_t contactThreshold);
+      int t);
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,7 +110,7 @@ class SubjectOnDiskTrialPass
 {
 public:
   SubjectOnDiskTrialPass();
-  SubjectOnDiskTrialPass& setName(const std::string& name);
+  SubjectOnDiskTrialPass& setType(ProcessingPassType type);
   SubjectOnDiskTrialPass& setDofPositionsObserved(
       std::vector<bool> dofPositionsObserved);
   SubjectOnDiskTrialPass& setDofVelocitiesFiniteDifferenced(
@@ -115,6 +125,9 @@ public:
   SubjectOnDiskTrialPass& setVels(Eigen::MatrixXs vels);
   SubjectOnDiskTrialPass& setAccs(Eigen::MatrixXs accs);
   SubjectOnDiskTrialPass& setTaus(Eigen::MatrixXs taus);
+  SubjectOnDiskTrialPass& setGroundBodyWrenches(Eigen::MatrixXs wrenches);
+  SubjectOnDiskTrialPass& setGroundBodyCopTorqueForce(
+      Eigen::MatrixXs copTorqueForces);
   SubjectOnDiskTrialPass& setComPoses(Eigen::MatrixXs poses);
   SubjectOnDiskTrialPass& setComVels(Eigen::MatrixXs vels);
   SubjectOnDiskTrialPass& setComAccs(Eigen::MatrixXs accs);
@@ -123,7 +136,7 @@ public:
 
 protected:
   // This data is included in the header
-  std::string mName;
+  ProcessingPassType mType;
   std::vector<bool> mDofPositionsObserved;
   std::vector<bool> mDofVelocitiesFiniteDifferenced;
   std::vector<bool> mDofAccelerationFiniteDifferenced;
@@ -136,14 +149,19 @@ protected:
   Eigen::MatrixXs mVel;
   Eigen::MatrixXs mAcc;
   Eigen::MatrixXs mTaus;
+  Eigen::MatrixXs mGroundBodyWrenches;
+  Eigen::MatrixXs mGroundBodyCopTorqueForce;
   Eigen::MatrixXs mComPoses;
   Eigen::MatrixXs mComVels;
   Eigen::MatrixXs mComAccs;
-  Eigen::MatrixXs mTrialGroundBodyWrenches;
-  Eigen::MatrixXs mTrialGroundBodyCopTorqueForce;
+  // This is for allowing the user to pre-filter out data where joint velocities
+  // are above a certain "unreasonable limit", like 50 rad/s or so
+  std::vector<s_t> mJointsMaxVelocity;
 
   friend struct Frame;
+  friend struct FramePass;
   friend class SubjectOnDisk;
+  friend class SubjectOnDiskHeader;
 };
 
 class SubjectOnDiskTrial
@@ -168,8 +186,7 @@ public:
       std::vector<std::map<std::string, Eigen::Vector3s>> gyroObservations);
   SubjectOnDiskTrial& setEmgObservations(
       std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations);
-  SubjectOnDiskTrial& setExoTorques(
-      std::map<std::string, Eigen::VectorXs> exoTorques);
+  SubjectOnDiskTrial& setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
   SubjectOnDiskTrial& setForcePlates(std::vector<ForcePlate> forcePlates);
   SubjectOnDiskTrialPass& addPass();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
@@ -180,12 +197,8 @@ protected:
   s_t mTimestep;
   int mLength;
   std::vector<std::string> mTrialTags;
-  std::vector<SubjectOnDiskTrialPass> mPasses;
-  std::vector<bool> mProbablyMissingGRF;
+  std::vector<SubjectOnDiskTrialPass> mTrialPasses;
   std::vector<MissingGRFReason> mMissingGRFReason;
-  // This is for allowing the user to pre-filter out data where joint velocities
-  // are above a certain "unreasonable limit", like 50 rad/s or so
-  std::vector<s_t> mJointsMaxVelocity;
   // This is true if we guessed the marker names, and false if we got them from
   // the uploaded user's file, which implies that they got them from human
   // observations.
@@ -211,13 +224,14 @@ protected:
   std::vector<std::map<std::string, Eigen::VectorXs>> mEmgObservations;
   // These are the torques applied by an exoskeleton, if any, per DOF they are
   // applied to
-  std::map<std::string, Eigen::VectorXs> mExoTorques;
+  std::map<int, Eigen::VectorXs> mExoTorques;
   // This is raw force plate data
   std::vector<ForcePlate> mForcePlates;
 
   friend class SubjectOnDiskHeader;
   friend class SubjectOnDisk;
   friend struct Frame;
+  friend struct FramePass;
 };
 
 class SubjectOnDiskPassHeader
@@ -237,12 +251,14 @@ protected:
   std::string mOpenSimFileText;
 
   friend class SubjectOnDisk;
+  friend struct FramePass;
 };
 
 class SubjectOnDiskHeader
 {
 public:
   SubjectOnDiskHeader();
+  SubjectOnDiskHeader& setNumDofs(int dofs);
   SubjectOnDiskHeader& setGroundForceBodies(
       std::vector<std::string> groundForceBodies);
   SubjectOnDiskHeader& setCustomValueNames(
@@ -259,7 +275,16 @@ public:
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
   void read(const dart::proto::SubjectOnDiskHeader& proto);
-  void writeFrame(dart::proto::SubjectOnDiskFrame* proto, int trial, int t);
+  void writeSensorsFrame(
+      dart::proto::SubjectOnDiskSensorFrame* proto,
+      int trial,
+      int t,
+      int maxNumForcePlates);
+  void writeProcessingPassFrame(
+      dart::proto::SubjectOnDiskProcessingPassFrame* proto,
+      int trial,
+      int t,
+      int pass);
 
 protected:
   // How many DOFs are in the skeleton
@@ -295,10 +320,11 @@ protected:
   std::vector<std::string> mEmgNames;
   int mEmgDim;
   // This is exoskeleton data
-  std::vector<std::string> mExoDofNames;
+  std::vector<int> mExoDofIndices;
 
   friend class SubjectOnDisk;
   friend struct Frame;
+  friend struct FramePass;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -326,7 +352,7 @@ public:
 
   /// This will read the raw OpenSim XML file text out of the binary, and return
   /// it as a string
-  std::string readRawOsimFileText(int processingPass);
+  std::string getOpensimFileText(int processingPass);
 
   /// This will read from disk and allocate a number of Frame objects.
   /// These Frame objects are assumed to be
@@ -337,6 +363,8 @@ public:
       int trial,
       int startFrame,
       int numFramesToRead = 1,
+      bool includeSensorData = true,
+      bool includeProcessingPasses = true,
       int stride = 1,
       s_t contactThreshold = 1.0);
 
@@ -345,6 +373,9 @@ public:
 
   /// This returns the length of the trial
   int getTrialLength(int trial);
+
+  /// This returns the number of processing passes in the trial
+  int getTrialNumProcessingPasses(int trial);
 
   /// This returns the timestep size for the trial
   s_t getTrialTimestep(int trial);
@@ -380,10 +411,10 @@ public:
 
   /// This returns the maximum absolute velocity of any DOF at each timestep for
   /// a given trial
-  std::vector<s_t> getTrialMaxJointVelocity(int trial);
+  std::vector<s_t> getTrialMaxJointVelocity(int trial, int processingPass);
 
   /// This returns the list of contact body names for this Subject
-  std::vector<std::string> getGroundContactBodies();
+  std::vector<std::string> getGroundForceBodies();
 
   /// This returns the list of custom value names stored in this subject
   std::vector<std::string> getCustomValues();
@@ -427,7 +458,8 @@ protected:
   // We cache some very basic data about the accessible bounds of on-disk data,
   // so we don't have to look that up every time.
   int mDataSectionStart;
-  int mFrameSize;
+  int mSensorFrameSize;
+  int mProcessingPassFrameSize;
 
   SubjectOnDiskHeader mHeader;
 };

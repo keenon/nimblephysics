@@ -26,8 +26,8 @@ enum ProcessingPassType {
 // raw motion. Hopefully soon, that may also include things like predicting
 // IMU joint accelerations from raw kinematics.
 message SubjectOnDiskTrialProcessingPassHeader {
-  // This is the name of the processing pass that generated this data
-  string name = 1;
+  // This is the type of the processing pass that generated this data
+  ProcessingPassType type = 1;
   // If we're projecting a lower-body-only dataset onto a full-body model, then
   // there will be DOFs that we don't get to observe. Downstream applications
   // will want to ignore these DOFs.
@@ -49,6 +49,8 @@ message SubjectOnDiskTrialProcessingPassHeader {
   repeated float linear_residual = 7;
   // This records the residual of the inverse dynamics solution for each frame in this trial.
   repeated float angular_residual = 8;
+  // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
+  repeated float joints_max_velocity = 9;
 }
 
 message SubjectOnDiskTrialHeader {
@@ -56,7 +58,6 @@ message SubjectOnDiskTrialHeader {
   // This is the only array that has the potential to be somewhat large in
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.
-  repeated bool missing_GRF = 2;
   repeated MissingGRFReason missing_GRF_reason = 3;
   // This is how many frames are in this trial
   int32 trial_length = 4;
@@ -70,8 +71,6 @@ message SubjectOnDiskTrialHeader {
   int32 num_force_plates = 8;
   // If there are force plates, we can optionally include each force plate's corners here, concatenated as 4 3-vectors per plate
   repeated double force_plate_corners = 9;
-  // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
-  repeated float joints_max_velocity = 10;
   // This is true if we guessed the marker names without any ground truth from the user.
   bool marker_names_guessed = 11;
 }
@@ -85,13 +84,14 @@ message SubjectOnDiskHeader {
   int32 num_dofs = 1;
   int32 num_trials = 2;
   // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
-  int32 frame_size = 3;
+  int32 raw_sensor_frame_size = 3;
+  int32 processing_pass_frame_size = 4;
   // This has all the global information about each pass
-  repeated SubjectOnDiskPass passes = 4;
+  repeated SubjectOnDiskPass passes = 5;
   // This is the global configuration of the skeleton
-  repeated string ground_contact_body = 5;
-  repeated string custom_value_name = 6;
-  repeated int32 custom_value_length = 7;
+  repeated string ground_contact_body = 6;
+  repeated string custom_value_name = 7;
+  repeated int32 custom_value_length = 8;
   repeated SubjectOnDiskTrialHeader trial_header = 9;
   // The version number for this file format
   int32 version = 10;
@@ -114,7 +114,7 @@ message SubjectOnDiskHeader {
   // This is how many samples of each EMG we get per timestep (the multiple of the mocap sampling frequency for our EMG data, usually ~10)
   int32 emg_dim = 23;
   // Details about the exo DOF data as it will appear on each frame
-  repeated string exo_dof_name = 24;
+  repeated int32 exo_dof_index = 24;
   // Details about the subject tags provided on the AddBiomechanics platform
   repeated string subject_tag = 25;
 }
@@ -137,30 +137,21 @@ message SubjectOnDiskProcessingPassFrame {
   repeated double com_acc = 11;
 }
 
-message SubjectOnDiskFrame {
-  /////////////////////////////////////////////////////////////
-  // Processed data
-  /////////////////////////////////////////////////////////////
-  // Each frame will have data from potentially several separate passes of processing.
-  repeated SubjectOnDiskProcessingPassFrame pass = 1;
-
-  /////////////////////////////////////////////////////////////
-  // Raw data
-  /////////////////////////////////////////////////////////////
+message SubjectOnDiskSensorFrame {
   // We include this to allow the binary format to store/load a bunch of new
   // types of values while remaining backwards compatible.
-  repeated double custom_values = 2;
+  repeated double custom_values = 1;
   // These are marker observations on this frame, with all NaNs indicating that that marker was not observed on this frame
-  repeated double marker_obs = 3;
+  repeated double marker_obs = 2;
   // These are IMU observations on this frame, with all NaNs indicating that that imu was not observed on this frame
-  repeated double acc_obs = 4;
-  repeated double gyro_obs = 5;
+  repeated double acc_obs = 3;
+  repeated double gyro_obs = 4;
   // These are the EMG observations on this frame
-  repeated double emg_obs = 6;
+  repeated double emg_obs = 5;
   // These are the exo observations on this frame
-  repeated double exo_obs = 7;
+  repeated double exo_obs = 6;
   // These are the raw force plate readings, per force plate, without any assignment to feet or any post-processing
-  repeated double raw_force_plate_cop = 8;
-  repeated double raw_force_plate_torque = 9;
-  repeated double raw_force_plate_force = 10;
+  repeated double raw_force_plate_cop = 7;
+  repeated double raw_force_plate_torque = 8;
+  repeated double raw_force_plate_force = 9;
 }
