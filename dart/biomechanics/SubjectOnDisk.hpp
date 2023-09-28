@@ -63,7 +63,6 @@ struct Frame
 {
   int trial;
   int t;
-  bool probablyMissingGRF;
   MissingGRFReason missingGRFReason;
   // Each processing pass has its own set of kinematics and dynamics, as the
   // model and trajectories are adjusted
@@ -171,8 +170,6 @@ public:
   SubjectOnDiskTrial& setName(const std::string& name);
   SubjectOnDiskTrial& setTimestep(s_t timestep);
   SubjectOnDiskTrial& setTrialTags(std::vector<std::string> trialTags);
-  SubjectOnDiskTrial& setProbablyMissingGRF(
-      std::vector<bool> probablyMissingGRF);
   SubjectOnDiskTrial& setMissingGRFReason(
       std::vector<MissingGRFReason> missingGRFReason);
   SubjectOnDiskTrial& setCustomValues(
@@ -383,14 +380,9 @@ public:
   /// This returns the number of DOFs for the model on this Subject
   int getNumDofs();
 
-  /// This returns the vector of booleans for whether or not each timestep is
-  /// heuristically detected to be missing external forces (which means that the
-  /// inverse dynamics cannot be trusted).
-  std::vector<bool> getProbablyMissingGRF(int trial);
-
-  /// This returns the vector of enums of type 'MissingGRFReason', which labels
-  /// why each time step was identified as 'probablyMissingGRF'.
-  std::vector<MissingGRFReason> getMissingGRFReason(int trial);
+  /// This returns the vector of enums of type 'MissingGRFReason', which can
+  /// include `notMissingGRF`.
+  std::vector<MissingGRFReason> getMissingGRF(int trial);
 
   int getNumProcessingPasses();
 

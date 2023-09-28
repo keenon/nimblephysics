@@ -9,7 +9,6 @@
 #include <vector>
 
 #include <stdio.h>
-#include <sys/_types/_int64_t.h>
 #include <tinyxml2.h>
 
 #include "dart/biomechanics/OpenSimParser.hpp"
@@ -926,9 +925,9 @@ int SubjectOnDisk::getNumDofs()
   return mHeader.mNumDofs;
 }
 
-/// This returns the vector of enums of type 'MissingGRFReason', which labels
-/// why each time step was identified as 'probablyMissingGRF'.
-std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRFReason(int trial)
+/// This returns the vector of enums of type 'MissingGRFReason', which can
+/// include `notMissingGRF`.
+std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRF(int trial)
 {
   if (trial < 0 || trial >= mHeader.mTrials.size())
   {

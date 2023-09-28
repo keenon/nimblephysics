@@ -814,24 +814,6 @@ protected:
           ::py::arg("useAdjustedGRFs") = false,
           ::py::arg("timestamps") = ::py::list())
       .def(
-          "writeSubjectOnDisk",
-          &dart::biomechanics::DynamicsFitter::writeSubjectOnDisk,
-          ::py::arg("outputPath"),
-          ::py::arg("openSimFilePath"),
-          ::py::arg("init"),
-          ::py::arg("biologicalSex"),
-          ::py::arg("massKg"),
-          ::py::arg("heightM"),
-          ::py::arg("ageYears"),
-          ::py::arg("useAdjustedGRFs") = false,
-          ::py::arg("trialNames") = std::vector<std::string>(),
-          ::py::arg("subjectTags") = std::vector<std::string>(),
-          ::py::arg("trialTags") = std::vector<std::vector<std::string>>(),
-          ::py::arg("href") = "",
-          ::py::arg("notes") = "",
-          ::py::arg("emgObservationTrials")
-          = std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>())
-      .def(
           "setTolerance",
           &dart::biomechanics::DynamicsFitter::setTolerance,
           ::py::arg("value"))
