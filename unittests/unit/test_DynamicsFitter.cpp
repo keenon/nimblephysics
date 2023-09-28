@@ -3124,20 +3124,10 @@ std::shared_ptr<DynamicsInitialization> runEngine(
     std::cout << "Saving trajectory..." << std::endl;
     std::cout << "FPS: " << 1.0 / init->trialTimesteps[trajectoryIndex]
               << std::endl;
-    fitter.writeSubjectOnDisk(
-        "../../../testBinary.bin",
-        modelPath,
-        init,
-        "unknown",
-        68.0,
-        1.8,
-        30,
-        false,
-        trialNames,
-        std::vector<std::string>(),
-        std::vector<std::vector<std::string>>(),
-        "http://test.demo",
-        "Generated in test_DynamicsFitter");
+
+    // TODO: do we want to recreate the saving of a B3D file here?
+    (void)modelPath;
+    (void)trialNames;
 
     fitter.writeCSVData(
         "../../../javascript/src/data/movement2.csv",
