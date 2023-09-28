@@ -72,7 +72,11 @@ message SubjectOnDiskTrialHeader {
   // If there are force plates, we can optionally include each force plate's corners here, concatenated as 4 3-vectors per plate
   repeated double force_plate_corners = 9;
   // This is true if we guessed the marker names without any ground truth from the user.
-  bool marker_names_guessed = 11;
+  bool marker_names_guessed = 10;
+  // This is the original name of the source trial, before we (probably) split it into pieces during processing
+  string original_name = 11;
+  // This is the split index within the original trial -- 0 if we didn't split or if we're the first split
+  int32 split_index = 12;
 }
 
 message SubjectOnDiskPass {

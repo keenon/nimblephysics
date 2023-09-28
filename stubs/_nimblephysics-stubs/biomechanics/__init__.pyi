@@ -2209,6 +2209,14 @@ class SubjectOnDisk():
         """
         This returns the number of processing passes that successfully completed on this trial
         """
+    def getTrialOriginalName(self, trial: int) -> str: 
+        """
+        This returns the original name of the trial before it was (potentially) split into multiple pieces
+        """
+    def getTrialSplitIndex(self, trial: int) -> int: 
+        """
+        This returns the index of the split, if this trial was the result of splitting an original trial into multiple pieces
+        """
     def getTrialTags(self, trial: int) -> typing.List[str]: 
         """
         This returns the list of tags attached to a given trial index, which are arbitrary strings from the AddBiomechanics platform.
@@ -2265,6 +2273,8 @@ class SubjectOnDiskTrial():
     def setMarkerObservations(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> SubjectOnDiskTrial: ...
     def setMissingGRFReason(self, missingGRFReason: typing.List[MissingGRFReason]) -> SubjectOnDiskTrial: ...
     def setName(self, name: str) -> SubjectOnDiskTrial: ...
+    def setOriginalTrialName(self, name: str) -> SubjectOnDiskTrial: ...
+    def setSplitIndex(self, split: int) -> SubjectOnDiskTrial: ...
     def setTimestep(self, timestep: float) -> SubjectOnDiskTrial: ...
     def setTrialTags(self, trialTags: typing.List[str]) -> SubjectOnDiskTrial: ...
     pass

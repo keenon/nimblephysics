@@ -170,6 +170,8 @@ public:
   SubjectOnDiskTrial& setName(const std::string& name);
   SubjectOnDiskTrial& setTimestep(s_t timestep);
   SubjectOnDiskTrial& setTrialTags(std::vector<std::string> trialTags);
+  SubjectOnDiskTrial& setOriginalTrialName(const std::string& name);
+  SubjectOnDiskTrial& setSplitIndex(int split);
   SubjectOnDiskTrial& setMissingGRFReason(
       std::vector<MissingGRFReason> missingGRFReason);
   SubjectOnDiskTrial& setCustomValues(
@@ -200,6 +202,8 @@ protected:
   // the uploaded user's file, which implies that they got them from human
   // observations.
   bool mMarkerNamesGuessed;
+  std::string mOriginalTrialName;
+  int mSplitIndex;
 
   ///////////////////////////////////////////////////////////////////////////
   // Recovered proto summaries, for incremental loading of Frames
@@ -386,6 +390,14 @@ public:
 
   /// This returns the length of the trial
   int getTrialLength(int trial);
+
+  /// This returns the original name of the trial before it was (potentially)
+  /// split into multiple pieces
+  std::string getTrialOriginalName(int trial);
+
+  /// This returns the index of the split, if this trial was the result of
+  /// splitting an original trial into multiple pieces
+  int getTrialSplitIndex(int trial);
 
   /// This returns the number of processing passes in the trial
   int getTrialNumProcessingPasses(int trial);

@@ -797,6 +797,20 @@ int SubjectOnDisk::getTrialLength(int trial)
   return mHeader.mTrials[trial].mLength;
 }
 
+/// This returns the original name of the trial before it was (potentially)
+/// split into multiple pieces
+std::string SubjectOnDisk::getTrialOriginalName(int trial)
+{
+  return mHeader.mTrials[trial].mOriginalTrialName;
+}
+
+/// This returns the index of the split, if this trial was the result of
+/// splitting an original trial into multiple pieces
+int SubjectOnDisk::getTrialSplitIndex(int trial)
+{
+  return mHeader.mTrials[trial].mSplitIndex;
+}
+
 /// This returns the number of processing passes in the trial
 int SubjectOnDisk::getTrialNumProcessingPasses(int trial)
 {
@@ -1314,6 +1328,19 @@ SubjectOnDiskTrial& SubjectOnDiskTrial::setTrialTags(
   return *this;
 }
 
+SubjectOnDiskTrial& SubjectOnDiskTrial::setOriginalTrialName(
+    const std::string& name)
+{
+  mOriginalTrialName = name;
+  return *this;
+}
+
+SubjectOnDiskTrial& SubjectOnDiskTrial::setSplitIndex(int split)
+{
+  mSplitIndex = split;
+  return *this;
+}
+
 SubjectOnDiskTrial& SubjectOnDiskTrial::setMissingGRFReason(
     std::vector<MissingGRFReason> missingGRFReason)
 {
@@ -1401,6 +1428,10 @@ void SubjectOnDiskTrial::read(const proto::SubjectOnDiskTrialHeader& proto)
     mTrialTags.push_back(proto.trial_tag(i));
   }
 
+  mOriginalTrialName = proto.original_name();
+
+  mSplitIndex = proto.split_index();
+
   mTrialPasses.clear();
   for (int i = 0; i < proto.processing_pass_header_size(); i++)
   {
@@ -1448,6 +1479,10 @@ void SubjectOnDiskTrial::write(proto::SubjectOnDiskTrialHeader* proto)
   // Set the length of the trial to whatever the length of our marker
   // observations is
   proto->set_trial_length(mMarkerObservations.size());
+
+  proto->set_original_name(mOriginalTrialName);
+  proto->set_split_index(mSplitIndex);
+
   // std::vector<std::string> mTrialTags;
   for (int i = 0; i < mTrialTags.size(); i++)
   {

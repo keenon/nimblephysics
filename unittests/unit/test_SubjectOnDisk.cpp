@@ -82,6 +82,8 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   std::vector<s_t> trialTimesteps;
   std::vector<int> trialLengths;
   std::vector<std::string> trialNames;
+  std::vector<std::string> trialOriginalNames;
+  std::vector<int> trialSplitIndex;
   std::vector<int> trialNumPasses;
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       markerObservations;
@@ -157,6 +159,9 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   for (int trial = 0; trial < numTrials; trial++)
   {
     trialNames.push_back("trial_" + std::to_string(trial));
+    trialOriginalNames.push_back(
+        "trial_" + std::to_string(trial) + "_original");
+    trialSplitIndex.push_back(trial % 2);
     trialLengths.push_back(10 + (rand() % 5));
     trialTimesteps.push_back(0.01);
     trialNumPasses.push_back((trial % (processingPasses.size() - 1)) + 1);
@@ -366,6 +371,8 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     auto& trialData = header.addTrial();
     trialData.setTimestep(trialTimesteps[trial]);
     trialData.setName(trialNames[trial]);
+    trialData.setOriginalTrialName(trialOriginalNames[trial]);
+    trialData.setSplitIndex(trialSplitIndex[trial]);
     trialData.setMarkerObservations(markerObservations[trial]);
     if (accObservations.size() > trial)
     {
@@ -554,6 +561,16 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     if (subject.getTrialName(trial) != trialNames[trial])
     {
       std::cout << "Failed to recover trial name!" << std::endl;
+      return false;
+    }
+    if (subject.getTrialOriginalName(trial) != trialOriginalNames[trial])
+    {
+      std::cout << "Failed to recover pre-split name!" << std::endl;
+      return false;
+    }
+    if (subject.getTrialSplitIndex(trial) != trialSplitIndex[trial])
+    {
+      std::cout << "Failed to recover split index!" << std::endl;
       return false;
     }
     if (subject.getNumForcePlates(trial) != forcePlateTrials[trial].size())

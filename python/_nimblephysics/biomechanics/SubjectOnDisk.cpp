@@ -459,6 +459,14 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setTrialTags,
                 ::py::arg("trialTags"))
             .def(
+                "setOriginalTrialName",
+                &dart::biomechanics::SubjectOnDiskTrial::setOriginalTrialName,
+                ::py::arg("name"))
+            .def(
+                "setSplitIndex",
+                &dart::biomechanics::SubjectOnDiskTrial::setSplitIndex,
+                ::py::arg("split"))
+            .def(
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,
                 ::py::arg("missingGRFReason"))
@@ -672,6 +680,18 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::getTrialLength,
                 ::py::arg("trial"),
                 "This returns the length of the trial requested")
+            .def(
+                "getTrialOriginalName",
+                &dart::biomechanics::SubjectOnDisk::getTrialOriginalName,
+                ::py::arg("trial"),
+                "This returns the original name of the trial before it was "
+                "(potentially) split into multiple pieces")
+            .def(
+                "getTrialSplitIndex",
+                &dart::biomechanics::SubjectOnDisk::getTrialSplitIndex,
+                ::py::arg("trial"),
+                "This returns the index of the split, if this trial was the "
+                "result of splitting an original trial into multiple pieces")
             //   /// This returns the number of processing passes in the trial
             //   int getTrialNumProcessingPasses(int trial);
             .def(
