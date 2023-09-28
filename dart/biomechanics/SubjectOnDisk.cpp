@@ -1763,7 +1763,7 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
   header->set_href(mHref);
   // std::string notes = "";
   header->set_notes(mNotes);
-  header->set_version(3);
+  header->set_version(4);
 
   // // These are the trials, which contain the actual data
   // std::vector<SubjectOnDiskTrialBuilder> mTrials;
@@ -1799,6 +1799,14 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
 
 void SubjectOnDiskHeader::read(const dart::proto::SubjectOnDiskHeader& proto)
 {
+  if (proto.version() > 4)
+  {
+    throw std::runtime_error(
+        "SubjectOnDiskHeader::read() can't read file version "
+        + std::to_string(proto.version())
+        + ". Please upgrade your nimblephysics version to the latest version.");
+  }
+
   // // How many DOFs are in the skeleton
   // int mNumDofs;
   mNumDofs = proto.num_dofs();
