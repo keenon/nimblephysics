@@ -180,10 +180,20 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
       = header.ParseFromArray(serializedHeader.data(), serializedHeader.size());
   if (!parseSuccess)
   {
-    std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
-              << path << ": got an error parsing the protobuf file header."
-              << std::endl;
-    throw new std::exception();
+      std::cout << "SubjectOnDisk attempting to read a corrupted binary file at "
+                << path << ": got an error parsing the protobuf file header. Size = " << serializedHeader.size()
+                << "\nParsed Partial Message: " << header.DebugString() // Print the partially parsed message
+                << std::endl;
+      throw std::exception();
+  }
+
+  // Check if all required fields in the message are set
+  if (!header.IsInitialized())
+  {
+      std::cout << "SubjectOnDisk protobuf message is missing required fields at "
+                << path << ": " << header.InitializationErrorString() // Indicate which required fields are missing
+                << std::endl;
+      throw std::exception();
   }
   // 6. Get the data out of the protobuf object
   mHeader.read(header);
@@ -199,7 +209,7 @@ void SubjectOnDisk::writeB3D(
     const std::string& outputPath, SubjectOnDiskHeader& header)
 {
   // 0. Open the file
-  FILE* file = fopen(outputPath.c_str(), "w");
+  FILE* file = fopen(outputPath.c_str(), "wb");
   if (file == nullptr)
   {
     std::cout << "SubjectOnDiskBuilder::write() failed to open output file at "
@@ -278,10 +288,21 @@ void SubjectOnDisk::writeB3D(
         // binaries
         headerProto.set_raw_sensor_frame_size(sensorFrameSize);
         headerProto.set_processing_pass_frame_size(passFrameSize);
+        if (!headerProto.IsInitialized()) {
+            std::cerr << "All required fields are not set:\n"
+                      << headerProto.InitializationErrorString() << std::endl;
+            fclose(file);
+            return;
+        }
 
         // 1.4. Serialize the protobuf header object
         std::string headerSerialized = "";
-        headerProto.SerializeToString(&headerSerialized);
+        bool success = headerProto.SerializeToString(&headerSerialized);
+        if (!success) {
+            std::cerr << "Failed to serialize the protobuf message." << std::endl;
+            fclose(file);
+            return;
+        }
 
         // 1.5. Write the length of the message as an integer header
         int64_t headerSize = headerSerialized.size();
@@ -294,17 +315,11 @@ void SubjectOnDisk::writeB3D(
       }
 
       // 2.4. Write the serialized data to the file
-      std::cout << "Writing the sensor frame for trial " << trial << " and t "
-                << t << " of size " << sensorFrameSize << " at bytes "
-                << ftell(file) << std::endl;
       fwrite(
           sensorFrameSerialized.c_str(), sizeof(char), sensorFrameSize, file);
       for (int pass = 0; pass < header.mTrials[trial].mTrialPasses.size();
            pass++)
       {
-        std::cout << "Writing the pass " << pass << " frame for trial " << trial
-                  << " and t " << t << " of size " << sensorFrameSize
-                  << " at bytes " << ftell(file) << std::endl;
         fwrite(
             passFramesSerialized[pass].c_str(),
             sizeof(char),
@@ -422,10 +437,6 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     std::shared_ptr<Frame> frame = std::make_shared<Frame>();
     if (includeSensorData)
     {
-      std::cout << "Reading sensor frame " << i << " of " << numFramesToRead
-                << " for trial " << trial << " at offset " << offsetBytes
-                << std::endl;
-
       fseek(file, offsetBytes, SEEK_SET);
 
       // 3. Allocate a buffer to hold the serialized data
@@ -468,9 +479,6 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     }
     if (includeProcessingPasses)
     {
-      std::cout << "Reading passes for frame " << i << " of " << numFramesToRead
-                << " for trial " << trial << " at offset " << offsetBytes
-                << std::endl;
       fseek(file, offsetBytes + mSensorFrameSize, SEEK_SET);
 
       // 3. Allocate a buffer to hold the serialized data
@@ -1303,9 +1311,21 @@ void SubjectOnDiskTrialPass::write(
   {
     proto->add_joints_max_velocity(mVel.col(i).cwiseAbs().maxCoeff());
   }
+
+  if (!proto->IsInitialized()) {
+      std::cerr << "WARNING: All required fields are not set on SubjectOnDiskTrialProcessingPassHeader proto:\n"
+                << proto->InitializationErrorString() << std::endl;
+  }
 }
 
-SubjectOnDiskTrial::SubjectOnDiskTrial()
+SubjectOnDiskTrial::SubjectOnDiskTrial():
+  mName(""),
+  mTimestep(0.01),
+  mLength(0),
+  mMarkerNamesGuessed(false),
+  mOriginalTrialName(""),
+  mSplitIndex(0),
+  mNumForcePlates(0)
 {
 }
 
@@ -1526,6 +1546,11 @@ void SubjectOnDiskTrial::write(proto::SubjectOnDiskTrialHeader* proto)
       }
     }
   }
+
+  if (!proto->IsInitialized()) {
+      std::cerr << "WARNING: All required fields are not set on SubjectOnDiskTrialHeader proto:\n"
+                << proto->InitializationErrorString() << std::endl;
+  }
 }
 
 SubjectOnDiskPassHeader::SubjectOnDiskPassHeader()
@@ -1567,6 +1592,11 @@ void SubjectOnDiskPassHeader::write(dart::proto::SubjectOnDiskPass* proto)
   proto->set_model_osim_text(mOpenSimFileText);
   proto->set_lowpass_cutoff_frequency(mLowpassCutoffFrequency);
   proto->set_lowpass_filter_order(mLowpassFilterOrder);
+
+  if (!proto->IsInitialized()) {
+      std::cerr << "WARNING: All required fields are not set on SubjectOnDiskPass proto:\n"
+                << proto->InitializationErrorString() << std::endl;
+  }
 }
 
 void SubjectOnDiskPassHeader::read(const dart::proto::SubjectOnDiskPass& proto)
@@ -1577,7 +1607,14 @@ void SubjectOnDiskPassHeader::read(const dart::proto::SubjectOnDiskPass& proto)
   mLowpassFilterOrder = proto.lowpass_filter_order();
 }
 
-SubjectOnDiskHeader::SubjectOnDiskHeader()
+SubjectOnDiskHeader::SubjectOnDiskHeader(): 
+  mNumDofs(0),
+  mBiologicalSex("unknown"),
+  mHeightM(0),
+  mMassKg(0),
+  mAgeYears(-1),
+  mHref(""),
+  mNotes("")
 {
   // Do nothing
 }
@@ -1829,6 +1866,11 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
   for (int index : mExoDofIndices)
   {
     header->add_exo_dof_index(index);
+  }
+
+  if (!header->IsInitialized()) {
+      std::cerr << "WARNING: All required fields are not set on SubjectOnDiskHeader proto:\n"
+                << header->InitializationErrorString() << std::endl;
   }
 }
 

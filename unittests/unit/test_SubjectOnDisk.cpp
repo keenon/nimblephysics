@@ -162,7 +162,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     trialOriginalNames.push_back(
         "trial_" + std::to_string(trial) + "_original");
     trialSplitIndex.push_back(trial % 2);
-    trialLengths.push_back(10 + (rand() % 5));
+    trialLengths.push_back(100 + (rand() % 50));
     trialTimesteps.push_back(0.01);
     trialNumPasses.push_back((trial % (processingPasses.size() - 1)) + 1);
 
@@ -1014,6 +1014,8 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
 {
   std::string path = "./testSubject.bin";
 
+  srand(42);
+
   for (int i = 0; i < 10; i++)
   {
     bool success = testWriteSubjectToDisk(path);
@@ -1024,5 +1026,51 @@ TEST(SubjectOnDisk, WRITE_THEN_READ)
       return;
     }
   }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(SubjectOnDisk, MINIMAL_WRITE_READ)
+{
+  srand(42);
+
+  std::vector<std::string> markerNames;
+  for (int i = 0; i < 1; i++)
+  {
+    markerNames.push_back("marker_" + std::to_string(i));
+  }
+
+  std::string path = "./testSubject.bin";
+  SubjectOnDiskHeader header;
+  header.setAgeYears(30);
+  for (int trial = 0; trial < 2; trial++)
+  {
+    auto& trialData = header.addTrial();
+    // trialData.setName("test");
+
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerTrial;
+    for (int t = 0; t < 2; t++)
+    {
+      std::map<std::string, Eigen::Vector3s> markers;
+      for (int j = 0; j < markerNames.size(); j++)
+      {
+        markers[markerNames[j]] = Eigen::Vector3s::Random();
+      }
+      markerTrial.push_back(markers);
+    }
+    trialData.setMarkerObservations(markerTrial);
+
+    // for (int pass = 0; pass < 2; pass++)
+    // {
+    //   auto& passData = trialData.addPass();
+    //   passData.setPoses(Eigen::MatrixXs::Random(3, 3));
+    //   passData.setVels(Eigen::MatrixXs::Random(3, 3));
+    //   passData.setAccs(Eigen::MatrixXs::Random(3, 3));
+    // }
+  }
+  // Write
+  SubjectOnDisk::writeB3D(path, header);
+  // Read
+  SubjectOnDisk subject(path);
 }
 #endif
