@@ -109,27 +109,50 @@ class SubjectOnDiskTrialPass
 {
 public:
   SubjectOnDiskTrialPass();
-  SubjectOnDiskTrialPass& setType(ProcessingPassType type);
-  SubjectOnDiskTrialPass& setDofPositionsObserved(
-      std::vector<bool> dofPositionsObserved);
-  SubjectOnDiskTrialPass& setDofVelocitiesFiniteDifferenced(
+  void setType(ProcessingPassType type);
+  void setDofPositionsObserved(std::vector<bool> dofPositionsObserved);
+  void setDofVelocitiesFiniteDifferenced(
       std::vector<bool> dofVelocitiesFiniteDifferenced);
-  SubjectOnDiskTrialPass& setDofAccelerationFiniteDifferenced(
+  void setDofAccelerationFiniteDifferenced(
       std::vector<bool> dofAccelerationFiniteDifference);
-  SubjectOnDiskTrialPass& setMarkerRMS(std::vector<s_t> markerRMS);
-  SubjectOnDiskTrialPass& setMarkerMax(std::vector<s_t> markerMax);
-  SubjectOnDiskTrialPass& setLinearResidual(std::vector<s_t> linearResidual);
-  SubjectOnDiskTrialPass& setAngularResidual(std::vector<s_t> angularResidual);
-  SubjectOnDiskTrialPass& setPoses(Eigen::MatrixXs poses);
-  SubjectOnDiskTrialPass& setVels(Eigen::MatrixXs vels);
-  SubjectOnDiskTrialPass& setAccs(Eigen::MatrixXs accs);
-  SubjectOnDiskTrialPass& setTaus(Eigen::MatrixXs taus);
-  SubjectOnDiskTrialPass& setGroundBodyWrenches(Eigen::MatrixXs wrenches);
-  SubjectOnDiskTrialPass& setGroundBodyCopTorqueForce(
-      Eigen::MatrixXs copTorqueForces);
-  SubjectOnDiskTrialPass& setComPoses(Eigen::MatrixXs poses);
-  SubjectOnDiskTrialPass& setComVels(Eigen::MatrixXs vels);
-  SubjectOnDiskTrialPass& setComAccs(Eigen::MatrixXs accs);
+  void setMarkerRMS(std::vector<s_t> markerRMS);
+  void setMarkerMax(std::vector<s_t> markerMax);
+
+  // This is for allowing the user to set all the values of a pass at once,
+  // without having to manually compute them in Python, which turns out to be
+  // slow and difficult to test.
+  void computeValues(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      s_t timestep,
+      Eigen::MatrixXs poses,
+      std::vector<std::string> footBodies,
+      // If we've already assigned the force plates to feet
+      Eigen::MatrixXs forces,
+      Eigen::MatrixXs moments,
+      Eigen::MatrixXs cops);
+
+  // This is for allowing the user to set all the values of a pass at once,
+  // without having to manually compute them in Python, which turns out to be
+  // slow and difficult to test.
+  void computeValuesFromForcePlates(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      s_t timestep,
+      Eigen::MatrixXs poses,
+      std::vector<std::string> footBodies,
+      std::vector<ForcePlate> forcePlates);
+
+  // Manual setters that compete with computeValues()
+  void setLinearResidual(std::vector<s_t> linearResidual);
+  void setAngularResidual(std::vector<s_t> angularResidual);
+  void setPoses(Eigen::MatrixXs poses);
+  void setVels(Eigen::MatrixXs vels);
+  void setAccs(Eigen::MatrixXs accs);
+  void setTaus(Eigen::MatrixXs taus);
+  void setGroundBodyWrenches(Eigen::MatrixXs wrenches);
+  void setGroundBodyCopTorqueForce(Eigen::MatrixXs copTorqueForces);
+  void setComPoses(Eigen::MatrixXs poses);
+  void setComVels(Eigen::MatrixXs vels);
+  void setComAccs(Eigen::MatrixXs accs);
   void read(const proto::SubjectOnDiskTrialProcessingPassHeader& proto);
   void write(proto::SubjectOnDiskTrialProcessingPassHeader* proto);
 
@@ -167,27 +190,25 @@ class SubjectOnDiskTrial
 {
 public:
   SubjectOnDiskTrial();
-  SubjectOnDiskTrial& setName(const std::string& name);
-  SubjectOnDiskTrial& setTimestep(s_t timestep);
-  SubjectOnDiskTrial& setTrialTags(std::vector<std::string> trialTags);
-  SubjectOnDiskTrial& setOriginalTrialName(const std::string& name);
-  SubjectOnDiskTrial& setSplitIndex(int split);
-  SubjectOnDiskTrial& setMissingGRFReason(
-      std::vector<MissingGRFReason> missingGRFReason);
-  SubjectOnDiskTrial& setCustomValues(
-      std::vector<Eigen::MatrixXs> customValues);
-  SubjectOnDiskTrial& setMarkerNamesGuessed(bool markersGuessed);
-  SubjectOnDiskTrial& setMarkerObservations(
+  void setName(const std::string& name);
+  void setTimestep(s_t timestep);
+  void setTrialTags(std::vector<std::string> trialTags);
+  void setOriginalTrialName(const std::string& name);
+  void setSplitIndex(int split);
+  void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
+  void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
+  void setMarkerNamesGuessed(bool markersGuessed);
+  void setMarkerObservations(
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
-  SubjectOnDiskTrial& setAccObservations(
+  void setAccObservations(
       std::vector<std::map<std::string, Eigen::Vector3s>> accObservations);
-  SubjectOnDiskTrial& setGyroObservations(
+  void setGyroObservations(
       std::vector<std::map<std::string, Eigen::Vector3s>> gyroObservations);
-  SubjectOnDiskTrial& setEmgObservations(
+  void setEmgObservations(
       std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations);
-  SubjectOnDiskTrial& setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
-  SubjectOnDiskTrial& setForcePlates(std::vector<ForcePlate> forcePlates);
-  SubjectOnDiskTrialPass& addPass();
+  void setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
+  void setForcePlates(std::vector<ForcePlate> forcePlates);
+  std::shared_ptr<SubjectOnDiskTrialPass> addPass();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
   void write(proto::SubjectOnDiskTrialHeader* proto);
 
@@ -196,7 +217,7 @@ protected:
   s_t mTimestep;
   int mLength;
   std::vector<std::string> mTrialTags;
-  std::vector<SubjectOnDiskTrialPass> mTrialPasses;
+  std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> mTrialPasses;
   std::vector<MissingGRFReason> mMissingGRFReason;
   // This is true if we guessed the marker names, and false if we got them from
   // the uploaded user's file, which implies that they got them from human
@@ -239,11 +260,10 @@ class SubjectOnDiskPassHeader
 {
 public:
   SubjectOnDiskPassHeader();
-  SubjectOnDiskPassHeader& setProcessingPassType(ProcessingPassType type);
-  SubjectOnDiskPassHeader& setOpenSimFileText(
-      const std::string& openSimFileText);
-  SubjectOnDiskPassHeader& setLowpassCutoffFrequency(s_t cutoff);
-  SubjectOnDiskPassHeader& setLowpassFilterOrder(int order);
+  void setProcessingPassType(ProcessingPassType type);
+  void setOpenSimFileText(const std::string& openSimFileText);
+  void setLowpassCutoffFrequency(s_t cutoff);
+  void setLowpassFilterOrder(int order);
   void write(dart::proto::SubjectOnDiskPass* proto);
   void read(const dart::proto::SubjectOnDiskPass& proto);
 
@@ -279,8 +299,8 @@ public:
   SubjectOnDiskHeader& setSubjectTags(std::vector<std::string> subjectTags);
   SubjectOnDiskHeader& setHref(const std::string& sourceHref);
   SubjectOnDiskHeader& setNotes(const std::string& notes);
-  SubjectOnDiskPassHeader& addProcessingPass();
-  SubjectOnDiskTrial& addTrial();
+  std::shared_ptr<SubjectOnDiskPassHeader> addProcessingPass();
+  std::shared_ptr<SubjectOnDiskTrial> addTrial();
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
   void read(const dart::proto::SubjectOnDiskHeader& proto);
@@ -300,7 +320,7 @@ protected:
   int mNumDofs;
   // The passes we applied to this data, along with the result skeletons that
   // were generated by each pass.
-  std::vector<SubjectOnDiskPassHeader> mPasses;
+  std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> mPasses;
   // These are generalized 6-dof wrenches applied to arbitrary bodies
   // (generally by foot-ground contact, though other things too)
   std::vector<std::string> mGroundContactBodies;
@@ -319,7 +339,7 @@ protected:
   std::string mHref = "";
   std::string mNotes = "";
   // These are the trials, which contain the actual data
-  std::vector<SubjectOnDiskTrial> mTrials;
+  std::vector<std::shared_ptr<SubjectOnDiskTrial>> mTrials;
 
   // These are the marker, accelerometer and gyroscope names
   std::vector<std::string> mMarkerNames;

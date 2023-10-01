@@ -7,6 +7,7 @@
 #include <dart/dynamics/MeshShape.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/simulation/World.hpp>
+#include <pybind11/detail/common.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -365,7 +366,9 @@ Note that these are specified in the local body frame, acting on the body at its
       )doc";
 
   auto subjectOnDiskTrialPass
-      = ::py::class_<dart::biomechanics::SubjectOnDiskTrialPass>(
+      = ::py::class_<
+            dart::biomechanics::SubjectOnDiskTrialPass,
+            std::shared_ptr<dart::biomechanics::SubjectOnDiskTrialPass>>(
             m, "SubjectOnDiskTrialPass")
             .def(::py::init<>())
             .def(
@@ -395,6 +398,25 @@ Note that these are specified in the local body frame, acting on the body at its
                 "setMarkerMax",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerMax,
                 ::py::arg("markerMax"))
+            .def(
+                "computeValues",
+                &dart::biomechanics::SubjectOnDiskTrialPass::computeValues,
+                ::py::arg("skel"),
+                ::py::arg("timestep"),
+                ::py::arg("poses"),
+                ::py::arg("footBodyNames"),
+                ::py::arg("forces"),
+                ::py::arg("moments"),
+                ::py::arg("cops"))
+            .def(
+                "computeValuesFromForcePlates",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    computeValuesFromForcePlates,
+                ::py::arg("skel"),
+                ::py::arg("timestep"),
+                ::py::arg("poses"),
+                ::py::arg("footBodyNames"),
+                ::py::arg("forcePlates"))
             .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
@@ -443,7 +465,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("accs"));
 
   auto subjectOnDiskTrial
-      = ::py::class_<dart::biomechanics::SubjectOnDiskTrial>(
+      = ::py::class_<
+            dart::biomechanics::SubjectOnDiskTrial,
+            std::shared_ptr<dart::biomechanics::SubjectOnDiskTrial>>(
             m, "SubjectOnDiskTrial")
             .def(::py::init<>())
             .def(
@@ -511,7 +535,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 "pipeline.");
 
   auto subjectOnDiskPassHead
-      = ::py::class_<dart::biomechanics::SubjectOnDiskPassHeader>(
+      = ::py::class_<
+            dart::biomechanics::SubjectOnDiskPassHeader,
+            std::shared_ptr<dart::biomechanics::SubjectOnDiskPassHeader>>(
             m, "SubjectOnDiskPassHeader")
             .def(::py::init<>())
             //   SubjectOnDiskPassHeader&

@@ -40,7 +40,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -348,11 +348,11 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   SubjectOnDiskHeader header;
   for (int i = 0; i < processingPasses.size(); i++)
   {
-    header.addProcessingPass()
-        .setProcessingPassType(processingPasses[i])
-        .setLowpassCutoffFrequency(processingPassCutoffs[i])
-        .setLowpassFilterOrder(processingPassOrders[i])
-        .setOpenSimFileText(openSimFileTexts[i]);
+    auto pass = header.addProcessingPass();
+    pass->setProcessingPassType(processingPasses[i]);
+    pass->setLowpassCutoffFrequency(processingPassCutoffs[i]);
+    pass->setLowpassFilterOrder(processingPassOrders[i]);
+    pass->setOpenSimFileText(openSimFileTexts[i]);
   }
   header.setNumDofs(dofs);
   header.setCustomValueNames(customValueNames);
@@ -368,71 +368,71 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   // 3.2. Per trial data
   for (int trial = 0; trial < numTrials; trial++)
   {
-    auto& trialData = header.addTrial();
-    trialData.setTimestep(trialTimesteps[trial]);
-    trialData.setName(trialNames[trial]);
-    trialData.setOriginalTrialName(trialOriginalNames[trial]);
-    trialData.setSplitIndex(trialSplitIndex[trial]);
-    trialData.setMarkerObservations(markerObservations[trial]);
+    auto trialData = header.addTrial();
+    trialData->setTimestep(trialTimesteps[trial]);
+    trialData->setName(trialNames[trial]);
+    trialData->setOriginalTrialName(trialOriginalNames[trial]);
+    trialData->setSplitIndex(trialSplitIndex[trial]);
+    trialData->setMarkerObservations(markerObservations[trial]);
     if (accObservations.size() > trial)
     {
-      trialData.setAccObservations(accObservations[trial]);
+      trialData->setAccObservations(accObservations[trial]);
     }
     if (gyroObservations.size() > trial)
     {
-      trialData.setGyroObservations(gyroObservations[trial]);
+      trialData->setGyroObservations(gyroObservations[trial]);
     }
     if (emgObservations.size() > trial)
     {
-      trialData.setEmgObservations(emgObservations[trial]);
+      trialData->setEmgObservations(emgObservations[trial]);
     }
     if (exoObservations.size() > trial)
     {
-      trialData.setExoTorques(exoObservations[trial]);
+      trialData->setExoTorques(exoObservations[trial]);
     }
-    trialData.setMissingGRFReason(missingGRFReasonTrials[trial]);
+    trialData->setMissingGRFReason(missingGRFReasonTrials[trial]);
     if (customValueTrials.size() > trial)
     {
-      trialData.setCustomValues(customValueTrials[trial]);
+      trialData->setCustomValues(customValueTrials[trial]);
     }
     if (trialTags.size() > trial)
     {
-      trialData.setTrialTags(trialTags[trial]);
+      trialData->setTrialTags(trialTags[trial]);
     }
     if (forcePlateTrials.size() > trial)
     {
-      trialData.setForcePlates(forcePlateTrials[trial]);
+      trialData->setForcePlates(forcePlateTrials[trial]);
     }
 
     for (int pass = 0; pass < trialNumPasses[trial]; pass++)
     {
-      auto& passData = trialData.addPass();
+      auto passData = trialData->addPass();
 
       // 3.3. Per pass header data
-      passData.setDofPositionsObserved(
+      passData->setDofPositionsObserved(
           dofPositionObservedTrialPasses[trial][pass]);
-      passData.setDofVelocitiesFiniteDifferenced(
+      passData->setDofVelocitiesFiniteDifferenced(
           dofVelocityFiniteDifferencedTrialPasses[trial][pass]);
-      passData.setDofAccelerationFiniteDifferenced(
+      passData->setDofAccelerationFiniteDifferenced(
           dofAccelerationFiniteDifferencedTrialPasses[trial][pass]);
 
       // 3.4. Per pass frame data
-      passData.setPoses(poseTrialPasses[trial][pass]);
-      passData.setVels(velTrialPasses[trial][pass]);
-      passData.setAccs(accTrialPasses[trial][pass]);
-      passData.setTaus(tauTrialPasses[trial][pass]);
-      passData.setGroundBodyWrenches(groundBodyWrenchTrialPasses[trial][pass]);
-      passData.setGroundBodyCopTorqueForce(
+      passData->setPoses(poseTrialPasses[trial][pass]);
+      passData->setVels(velTrialPasses[trial][pass]);
+      passData->setAccs(accTrialPasses[trial][pass]);
+      passData->setTaus(tauTrialPasses[trial][pass]);
+      passData->setGroundBodyWrenches(groundBodyWrenchTrialPasses[trial][pass]);
+      passData->setGroundBodyCopTorqueForce(
           groundBodyCopTorqueForceTrialPasses[trial][pass]);
-      passData.setComPoses(comPosesTrialPasses[trial][pass]);
-      passData.setComVels(comVelsTrialPasses[trial][pass]);
-      passData.setComAccs(comAccsTrialPasses[trial][pass]);
+      passData->setComPoses(comPosesTrialPasses[trial][pass]);
+      passData->setComVels(comVelsTrialPasses[trial][pass]);
+      passData->setComAccs(comAccsTrialPasses[trial][pass]);
 
       // 3.5. Per pass results data
-      passData.setLinearResidual(linearResidualTrialPasses[trial][pass]);
-      passData.setAngularResidual(angularResidualTrialPasses[trial][pass]);
-      passData.setMarkerRMS(markerRMSTrialPasses[trial][pass]);
-      passData.setMarkerMax(markerMaxTrialPasses[trial][pass]);
+      passData->setLinearResidual(linearResidualTrialPasses[trial][pass]);
+      passData->setAngularResidual(angularResidualTrialPasses[trial][pass]);
+      passData->setMarkerRMS(markerRMSTrialPasses[trial][pass]);
+      passData->setMarkerMax(markerMaxTrialPasses[trial][pass]);
     }
   }
 
@@ -1045,7 +1045,7 @@ TEST(SubjectOnDisk, MINIMAL_WRITE_READ)
   header.setAgeYears(30);
   for (int trial = 0; trial < 2; trial++)
   {
-    auto& trialData = header.addTrial();
+    auto trialData = header.addTrial();
     // trialData.setName("test");
 
     std::vector<std::map<std::string, Eigen::Vector3s>> markerTrial;
@@ -1058,7 +1058,7 @@ TEST(SubjectOnDisk, MINIMAL_WRITE_READ)
       }
       markerTrial.push_back(markers);
     }
-    trialData.setMarkerObservations(markerTrial);
+    trialData->setMarkerObservations(markerTrial);
 
     // for (int pass = 0; pass < 2; pass++)
     // {
@@ -1074,3 +1074,61 @@ TEST(SubjectOnDisk, MINIMAL_WRITE_READ)
   SubjectOnDisk subject(path);
 }
 #endif
+
+double computeMean(const std::vector<double>& values)
+{
+  double sum = 0.0;
+  for (double val : values)
+  {
+    sum += val;
+  }
+  return sum / values.size();
+}
+
+// #ifdef ALL_TESTS
+TEST(SubjectOnDisk, READ_BACK_DATA)
+{
+  auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
+  newRetriever->addSchemaRetriever(
+      "dart", utils::DartResourceRetriever::create());
+  std::string path = newRetriever->getFilePath("dart://sample/b3d/results.b3d");
+
+  std::cout << "Opening path: " << path << std::endl;
+
+  // Read
+
+  std::cout << "B3D Summary Statistics:" << std::endl;
+
+  SubjectOnDisk read_back(path);
+
+  std::cout << "  Num Trials: " << read_back.getNumTrials() << std::endl;
+  std::cout << "  Num Processing Passes: " << read_back.getNumProcessingPasses()
+            << std::endl;
+  std::cout << "  Num Dofs: " << read_back.getNumDofs() << std::endl;
+
+  for (int t = 0; t < read_back.getNumTrials(); t++)
+  {
+    std::cout << "  Trial " << t << ":" << std::endl;
+    std::cout << "    Name: " << read_back.getTrialName(t) << std::endl;
+
+    for (int p = 0; p < read_back.getTrialNumProcessingPasses(t); p++)
+    {
+      std::cout << "    Processing pass " << p << ":" << std::endl;
+
+      // Since std::mean doesn't exist, you might need to compute the mean
+      // yourself or use an alternative function. For the sake of this example,
+      // I'll assume you have a utility function called computeMean.
+      std::cout << "      Marker RMS: "
+                << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
+      std::cout << "      Marker Max: "
+                << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
+      std::cout << "      Linear Residual: "
+                << computeMean(read_back.getTrialLinearResidualNorms(t, p))
+                << std::endl;
+      std::cout << "      Angular Residual: "
+                << computeMean(read_back.getTrialLinearResidualNorms(t, p))
+                << std::endl;
+    }
+  }
+}
+// #endif

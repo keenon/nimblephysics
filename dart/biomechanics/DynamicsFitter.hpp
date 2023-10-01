@@ -1514,6 +1514,16 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel,
       int trial);
 
+  // This utility recomputes the GRF world wrenches, in case we changed the data
+  static void recomputeGRFs(
+      std::vector<ForcePlate> forcePlates,
+      const Eigen::MatrixXs& poses,
+      const std::vector<dynamics::BodyNode*>& grfBodyNodes,
+      const std::vector<int>& overrideForcePlateToGRFNodeAssignment,
+      std::vector<std::vector<int>>& forcePlatesAssignedToContactBody,
+      Eigen::MatrixXs& grfTrials,
+      std::shared_ptr<dynamics::Skeleton> skel);
+
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
   void centerAngularResiduals(std::shared_ptr<DynamicsInitialization> init);

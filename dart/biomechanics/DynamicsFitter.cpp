@@ -13210,9 +13210,30 @@ void DynamicsFitter::recomputeGRFs(
 {
   std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
 
-  Eigen::MatrixXs& poses = init->poseTrials[trial];
+  recomputeGRFs(
+      forcePlates,
+      init->poseTrials[trial],
+      init->grfBodyNodes,
+      init->overrideForcePlateToGRFNodeAssignment.size() > trial
+          ? init->overrideForcePlateToGRFNodeAssignment[trial]
+          : std::vector<int>(),
+      init->forcePlatesAssignedToContactBody[trial],
+      init->grfTrials[trial],
+      skel);
+}
 
-  init->grfTrials[trial].setZero();
+//==============================================================================
+// This utility recomputes the GRF world wrenches, in case we changed the data
+void DynamicsFitter::recomputeGRFs(
+    std::vector<ForcePlate> forcePlates,
+    const Eigen::MatrixXs& poses,
+    const std::vector<dynamics::BodyNode*>& grfBodyNodes,
+    const std::vector<int>& overrideForcePlateToGRFNodeAssignment,
+    std::vector<std::vector<int>>& forcePlatesAssignedToContactBody,
+    Eigen::MatrixXs& grfTrial,
+    std::shared_ptr<dynamics::Skeleton> skel)
+{
+  grfTrial.setZero();
 
   // 1. Precompute the foot locations over time
   std::vector<std::vector<Eigen::Vector3s>> footLocations;
@@ -13220,12 +13241,11 @@ void DynamicsFitter::recomputeGRFs(
   {
     skel->setPositions(poses.col(t));
     std::vector<Eigen::Vector3s> footLocationsThisTimestep;
-    for (int i = 0; i < init->grfBodyNodes.size(); i++)
+    for (int i = 0; i < grfBodyNodes.size(); i++)
     {
-      Eigen::Vector3s footLoc
-          = skel->getBodyNode(init->grfBodyNodes[i]->getName())
-                ->getWorldTransform()
-                .translation();
+      Eigen::Vector3s footLoc = skel->getBodyNode(grfBodyNodes[i]->getName())
+                                    ->getWorldTransform()
+                                    .translation();
       footLocationsThisTimestep.push_back(footLoc);
     }
     footLocations.push_back(footLocationsThisTimestep);
@@ -13236,14 +13256,13 @@ void DynamicsFitter::recomputeGRFs(
   {
     // 2.0. If there is a manual override on force plate assignment, respect
     // that above all else
-    if (init->overrideForcePlateToGRFNodeAssignment.size() > trial
-        && init->overrideForcePlateToGRFNodeAssignment[trial].size() > i
-        && init->overrideForcePlateToGRFNodeAssignment[trial][i] != -1)
+    if (overrideForcePlateToGRFNodeAssignment.size() > i
+        && overrideForcePlateToGRFNodeAssignment[i] != -1)
     {
       for (int t = 0; t < poses.cols(); t++)
       {
-        init->forcePlatesAssignedToContactBody[trial][i][t]
-            = init->overrideForcePlateToGRFNodeAssignment[trial][i];
+        forcePlatesAssignedToContactBody[i][t]
+            = overrideForcePlateToGRFNodeAssignment[i];
       }
     }
     else
@@ -13252,11 +13271,11 @@ void DynamicsFitter::recomputeGRFs(
       // throughout time.
       for (int t = 0; t < poses.cols(); t++)
       {
-        init->forcePlatesAssignedToContactBody[trial][i][t] = -1;
+        forcePlatesAssignedToContactBody[i][t] = -1;
       }
       int lastStartedTrack = -1;
       Eigen::VectorXs sumSquaredDistances
-          = Eigen::VectorXs::Zero(init->grfBodyNodes.size());
+          = Eigen::VectorXs::Zero(grfBodyNodes.size());
       for (int t = 0; t < poses.cols(); t++)
       {
         Eigen::Vector3s force = forcePlates[i].forces[t];
@@ -13285,9 +13304,8 @@ void DynamicsFitter::recomputeGRFs(
             // over the whole track
             for (int assignT = lastStartedTrack; assignT < t; assignT++)
             {
-              // This is a map of [trial][forcePlate][timestep]
-              init->forcePlatesAssignedToContactBody[trial][i][assignT]
-                  = closestFoot;
+              // This is a map of [forcePlate][timestep]
+              forcePlatesAssignedToContactBody[i][assignT] = closestFoot;
             }
           }
           lastStartedTrack = -1;
@@ -13297,7 +13315,7 @@ void DynamicsFitter::recomputeGRFs(
 
         if (lastStartedTrack == -1)
           lastStartedTrack = t;
-        for (int b = 0; b < init->grfBodyNodes.size(); b++)
+        for (int b = 0; b < grfBodyNodes.size(); b++)
         {
           sumSquaredDistances(b) += (footLocations[t][b] - cop).squaredNorm();
         }
@@ -13320,8 +13338,7 @@ void DynamicsFitter::recomputeGRFs(
         for (int assignT = lastStartedTrack; assignT < poses.cols(); assignT++)
         {
           // This is a map of [trial][forcePlate][timestep]
-          init->forcePlatesAssignedToContactBody[trial][i][assignT]
-              = closestFoot;
+          forcePlatesAssignedToContactBody[i][assignT] = closestFoot;
         }
       }
 
@@ -13330,7 +13347,7 @@ void DynamicsFitter::recomputeGRFs(
       std::vector<int> assignedToFeet;
       for (int t = 0; t < poses.cols(); t++)
       {
-        int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
+        int closestFoot = forcePlatesAssignedToContactBody[i][t];
         if (closestFoot != -1)
         {
           // If closestFoot is not already in the list, add it to the list
@@ -13346,8 +13363,7 @@ void DynamicsFitter::recomputeGRFs(
       if (assignedToFeet.size() == 0)
       {
         // This force plate is never assigned to a foot, so we can't do anything
-        std::cout << "NOTE: Assigning force plate " << i
-                  << " to no feet during trial " << trial
+        std::cout << "NOTE: Assigning force plate " << i << " to no feet "
                   << ", because there was never sufficient measured force on "
                      "the plate"
                   << std::endl;
@@ -13355,20 +13371,19 @@ void DynamicsFitter::recomputeGRFs(
       else if (assignedToFeet.size() == 1)
       {
         std::cout << "Assigning force plate " << i << " to foot "
-                  << assignedToFeet[0] << " on trial " << trial << std::endl;
+                  << assignedToFeet[0] << std::endl;
         // This force plate is only ever assigned to a single foot, so we can
         // assign all timesteps to that foot
         for (int t = 0; t < poses.cols(); t++)
         {
-          // This is a map of [trial][forcePlate][timestep]
-          init->forcePlatesAssignedToContactBody[trial][i][t]
-              = assignedToFeet[0];
+          // This is a map of [forcePlate][timestep]
+          forcePlatesAssignedToContactBody[i][t] = assignedToFeet[0];
         }
       }
       else
       {
-        std::cout << "NOTE: Assigning force plate " << i
-                  << " to multiple feet during trial " << trial << std::endl;
+        std::cout << "NOTE: Assigning force plate " << i << " to multiple feet"
+                  << std::endl;
         // This force plate is assigned to multiple feet over time. This can
         // often happen with foot-crossing. We won't issue a warning, but we can
         // go through and try to fill in the gaps between feet assignments that
@@ -13376,23 +13391,19 @@ void DynamicsFitter::recomputeGRFs(
         int lastContactIndex = -1;
         for (int t = 0; t < poses.cols(); t++)
         {
-          int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
+          int closestFoot = forcePlatesAssignedToContactBody[i][t];
           if (closestFoot != -1)
           {
             // If we find a gap (filled with -1's) where the contact foot on
             // both ends is the same, then we can fill it in
             if (lastContactIndex != -1
-                && init->forcePlatesAssignedToContactBody[trial][i]
-                                                         [lastContactIndex]
+                && forcePlatesAssignedToContactBody[i][lastContactIndex]
                        == closestFoot)
             {
               for (int fillT = lastContactIndex + 1; fillT < t; fillT++)
               {
-                assert(
-                    init->forcePlatesAssignedToContactBody[trial][i][fillT]
-                    == -1);
-                init->forcePlatesAssignedToContactBody[trial][i][fillT]
-                    = closestFoot;
+                assert(forcePlatesAssignedToContactBody[i][fillT] == -1);
+                forcePlatesAssignedToContactBody[i][fillT] = closestFoot;
               }
             }
             lastContactIndex = t;
@@ -13405,7 +13416,7 @@ void DynamicsFitter::recomputeGRFs(
     for (int t = 0; t < poses.cols(); t++)
     {
       // This is a map of [trial][forcePlate][timestep]
-      int closestFoot = init->forcePlatesAssignedToContactBody[trial][i][t];
+      int closestFoot = forcePlatesAssignedToContactBody[i][t];
 
       if (closestFoot != -1)
       {
@@ -13422,7 +13433,7 @@ void DynamicsFitter::recomputeGRFs(
 
         // If multiple force plates assign to the same foot, sum up the
         // forces
-        init->grfTrials[trial].block<6, 1>(closestFoot * 6, t) += worldWrench;
+        grfTrial.block<6, 1>(closestFoot * 6, t) += worldWrench;
       }
     }
   }
