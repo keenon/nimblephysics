@@ -160,7 +160,7 @@ class MarkerFixer
 {
 public:
   static std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
-      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+      std::vector<std::map<std::string, Eigen::Vector3s>>
           markerObservations,
       s_t dt,
       bool dropProlongedStillness = false);

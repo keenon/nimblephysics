@@ -820,7 +820,7 @@ void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
-    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+    std::vector<std::map<std::string, Eigen::Vector3s>>
         immutableMarkerObservations,
     s_t dt,
     bool dropProlongedStillness)

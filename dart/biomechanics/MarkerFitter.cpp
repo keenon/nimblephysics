@@ -1091,8 +1091,7 @@ bool MarkerFitter::checkForEnoughMarkers(
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFitter::generateDataErrorsReport(
-    const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        immutableMarkerObservations,
+    std::vector<std::map<std::string, Eigen::Vector3s>> immutableMarkerObservations,
     s_t dt)
 {
   std::shared_ptr<MarkersErrorReport> report
