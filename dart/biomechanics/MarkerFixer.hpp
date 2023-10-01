@@ -129,6 +129,11 @@ struct MarkersErrorReport
   // This is a list of all the warnings for markers whose names were swapped
   std::vector<std::vector<std::pair<std::string, std::string>>>
       markersRenamedFromTo;
+  
+  int getNumTimesteps();
+  std::map<std::string, Eigen::Vector3s> getMarkerMapOnTimestep(int t);
+  std::vector<std::string> getMarkerNamesOnTimestep(int t);
+  Eigen::Vector3s getMarkerPositionOnTimestep(int t, std::string);
 };
 
 class RippleReductionProblem

@@ -62,7 +62,23 @@ void MarkerFixer(py::module& m)
           &dart::biomechanics::MarkersErrorReport::droppedMarkerWarnings)
       .def_readwrite(
           "markersRenamedFromTo",
-          &dart::biomechanics::MarkersErrorReport::markersRenamedFromTo);
+          &dart::biomechanics::MarkersErrorReport::markersRenamedFromTo)
+      .def(
+          "getNumTimesteps",
+          &dart::biomechanics::MarkersErrorReport::getNumTimesteps)
+      .def(
+          "getMarkerMapOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerMapOnTimestep,
+          ::py::arg("t"))
+      .def(
+          "getMarkerNamesOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerNamesOnTimestep,
+          ::py::arg("t"))
+      .def(
+          "getMarkerPositionOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerPositionOnTimestep,
+          ::py::arg("t"),
+          ::py::arg("marker"));
 
   ::py::class_<dart::biomechanics::MarkerFixer>(m, "MarkerFixer")
       .def_static(
