@@ -943,10 +943,28 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
                   + std::to_string((double)traces[j].mVelNorm[index])
                   + " m/s^2)");
         }
-        else
+        else if (index >= 0 && index < traces[j].mPoints.size())
         {
           Eigen::Vector3s point = traces[j].mPoints[index];
+          if (abs(point(0)) > 1e+6 || abs(point(1)) > 1e+6 || abs(point(2)) > 1e+6) {
+            report->warnings.push_back(
+                "Marker " + traceLabels[j] + " dropped for being too far away ("
+                + std::to_string((double)point.norm())
+                + " m) on frame " + std::to_string(t));
+            droppedMarkerWarningsFrame.emplace_back(
+                traces[j].mMarkerLabels[index],
+                traces[j].mPoints[index],
+                "being too far away ("
+                    + std::to_string((double)point.norm())
+                    + " m)");
+            continue;
+          }
+
           frame[traceLabels[j]] = point;
+        }
+        else {
+          std::cout << "ERROR(MarkerFixed): index " << index << " into traces[j].mPoints out of bounds "
+                    << traces[j].mPoints.size() << std::endl;
         }
       }
     }
@@ -956,9 +974,9 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
 
   // 2.1. Count the number of observations of each marker name
   std::map<std::string, int> observationCount;
-  for (auto& obs : correctedObservations)
+  for (const auto& obs : correctedObservations)
   {
-    for (auto& pair : obs)
+    for (const auto& pair : obs)
     {
       if (observationCount.count(pair.first) == 0)
       {
@@ -990,13 +1008,13 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     {
       if (obs.count(drop) > 0)
       {
-        obs.erase(drop);
         report->droppedMarkerWarnings[t].emplace_back(
             drop,
-            obs[drop],
+            obs.at(drop),
             "dropped for appearing only on "
                 + std::to_string(markerDropPercentage[drop] * 100)
                 + " percent of frames");
+        obs.erase(drop);
       }
     }
   }
