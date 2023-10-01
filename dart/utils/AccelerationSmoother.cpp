@@ -116,21 +116,43 @@ Eigen::MatrixXs AccelerationSmoother::smooth(Eigen::MatrixXs series)
     {
       if (mUseSparse)
       {
-        Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<s_t>> solver;
-        solver.compute(mB_sparse);
-        solver.setTolerance(1e-12);
-        solver.setMaxIterations(mIterations);
-        smoothed.row(row) = solver.solveWithGuess(c, series.row(row))
-                            * (1.0 / mRegularizationWeight);
+        int iterations = mIterations;
+        for (int i = 0; i < 6; i++) {
+          Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<s_t>> solver;
+          solver.compute(mB_sparse);
+          solver.setTolerance(1e-10);
+          solver.setMaxIterations(iterations);
+          smoothed.row(row) = solver.solveWithGuess(c, series.row(row))
+                              * (1.0 / mRegularizationWeight);
+          // Check convergence
+          if (solver.info() == Eigen::Success) {
+            // Converged
+            break;
+          } else {
+            std::cout << "LeastSquaresConjugateGradient did not converge in " << iterations << ", with error " << solver.error() << " so doubling iteration count and trying again." << std::endl;
+            iterations *= 2;
+          }
+        }
       }
       else
       {
-        Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> cg;
-        cg.compute(mB);
-        cg.setTolerance(1e-12);
-        cg.setMaxIterations(mIterations);
-        smoothed.row(row) = cg.solveWithGuess(c, series.row(row))
-                            * (1.0 / mRegularizationWeight);
+        int iterations = mIterations;
+        for (int i = 0; i < 6; i++) {
+          Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> cg;
+          cg.compute(mB);
+          cg.setTolerance(1e-10);
+          cg.setMaxIterations(iterations);
+          smoothed.row(row) = cg.solveWithGuess(c, series.row(row))
+                              * (1.0 / mRegularizationWeight);
+          // Check convergence
+          if (cg.info() == Eigen::Success) {
+            // Converged
+            break;
+          } else {
+            std::cout << "LeastSquaresConjugateGradient did not converge in " << iterations << ", with error " << cg.error() << " so doubling iteration count and trying again." << std::endl;
+            iterations *= 2;
+          }
+        }
       }
     }
     else
