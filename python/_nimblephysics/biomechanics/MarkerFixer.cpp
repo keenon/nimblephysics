@@ -70,7 +70,11 @@ void MarkerFixer(py::module& m)
           &dart::biomechanics::MarkerFixer::generateDataErrorsReport,
           ::py::arg("immutableMarkerObservations"),
           ::py::arg("dt"),
-          ::py::arg("dropProlongedStillness") = false);
+          ::py::arg("dropProlongedStillness") = false,
+          ::py::arg("rippleReduce") = true,
+          ::py::arg("rippleReduceUseSparse") = true,
+          ::py::arg("rippleReduceUseIterativeSolver") = true,
+          ::py::arg("rippleReduceSolverIterations") = 1e5);
 }
 
 } // namespace python

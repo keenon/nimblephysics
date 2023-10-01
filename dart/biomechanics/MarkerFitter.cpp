@@ -1092,10 +1092,14 @@ bool MarkerFitter::checkForEnoughMarkers(
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFitter::generateDataErrorsReport(
     std::vector<std::map<std::string, Eigen::Vector3s>> immutableMarkerObservations,
-    s_t dt)
+    s_t dt,
+    bool rippleReduce,
+    bool rippleReduceUseSparse,
+    bool rippleReduceUseIterativeSolver, 
+    int rippleReduceSolverIterations)
 {
   std::shared_ptr<MarkersErrorReport> report
-      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations, dt);
+      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations, dt, rippleReduce, rippleReduceUseSparse, rippleReduceUseIterativeSolver, rippleReduceSolverIterations);
 
   // 1. Generate a list of the markers we observe in this clip
 

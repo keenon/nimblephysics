@@ -143,7 +143,7 @@ public:
   void interpolateMissingPoints();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> smooth(
-      MarkersErrorReport* report = nullptr);
+      MarkersErrorReport* report = nullptr, bool useSparse = true, bool useIterativeSolver = true, int solverIterations = 1e5);
 
   void saveToGUI(std::string markerName, std::string path);
 
@@ -163,7 +163,11 @@ public:
       std::vector<std::map<std::string, Eigen::Vector3s>>
           markerObservations,
       s_t dt,
-      bool dropProlongedStillness = false);
+      bool dropProlongedStillness = false,
+      bool rippleReduce = true,
+      bool rippleReduceUseSparse = true,
+      bool rippleReduceUseIterativeSolver = true,
+      int rippleReduceSolverIterations = 1e5);
 };
 
 } // namespace biomechanics

@@ -659,7 +659,7 @@ void RippleReductionProblem::interpolateMissingPoints()
 
 //==============================================================================
 std::vector<std::map<std::string, Eigen::Vector3s>>
-RippleReductionProblem::smooth(MarkersErrorReport* report)
+RippleReductionProblem::smooth(MarkersErrorReport* report, bool useSparse, bool useIterativeSolver, int solverIterations)
 {
   dropSuspiciousPoints(report);
   interpolateMissingPoints();
@@ -688,7 +688,8 @@ RippleReductionProblem::smooth(MarkersErrorReport* report)
 
     // Smooth only the window during which we observed the marker (don't smooth
     // to the 0's on frames where we weren't observing the marker)
-    AccelerationSmoother smoother(duration, 0.3, 1.0);
+    AccelerationSmoother smoother(duration, 0.3, 1.0, useSparse, useIterativeSolver);
+    smoother.setIterations(solverIterations);
     mMarkers[markerName].block(0, firstObserved, 3, duration) = smoother.smooth(
         mMarkers[markerName].block(0, firstObserved, 3, duration));
   }
@@ -821,21 +822,23 @@ void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     std::vector<std::map<std::string, Eigen::Vector3s>>
-        immutableMarkerObservations,
+        markerObservations,
     s_t dt,
-    bool dropProlongedStillness)
+    bool dropProlongedStillness,
+    bool rippleReduce,
+    bool rippleReduceUseSparse,
+    bool rippleReduceUseIterativeSolver, 
+    int rippleReduceSolverIterations)
 {
   std::shared_ptr<MarkersErrorReport> report
       = std::make_shared<MarkersErrorReport>();
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
-      = immutableMarkerObservations;
 
   // 1. Attempt to detect marker flips that occur partway through the trajectory
 
   // 1.1. Collect markers into continuous traces. Break marker traces that imply
   // a velocity greater than 20 m/s
   std::vector<LabeledMarkerTrace> traces = LabeledMarkerTrace::createRawTraces(
-      immutableMarkerObservations, dt * 20.0);
+      markerObservations, dt * 20.0);
 
   // 1.2. Label the traces based on their majority label during the trace
   std::vector<std::string> traceLabels;
@@ -861,7 +864,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   // 2. Emit the corrected marker observations
 
   std::vector<std::map<std::string, Eigen::Vector3s>> correctedObservations;
-  for (int t = 0; t < immutableMarkerObservations.size(); t++)
+  for (int t = 0; t < markerObservations.size(); t++)
   {
     std::vector<std::tuple<std::string, Eigen::Vector3s, std::string>>
         droppedMarkerWarningsFrame;
@@ -933,7 +936,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   std::map<std::string, s_t> markerDropPercentage;
   for (auto& pair : observationCount)
   {
-    s_t percentage = (s_t)pair.second / (s_t)immutableMarkerObservations.size();
+    s_t percentage = (s_t)pair.second / (s_t)markerObservations.size();
     if (percentage < 0.1)
     {
       report->warnings.push_back(
@@ -961,8 +964,10 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     }
   }
 
-  RippleReductionProblem rippleReduction(correctedObservations, dt);
-  correctedObservations = rippleReduction.smooth(report.get());
+  if (rippleReduce) {
+    RippleReductionProblem rippleReduction(correctedObservations, dt);
+    correctedObservations = rippleReduction.smooth(report.get(), rippleReduceUseSparse, rippleReduceUseIterativeSolver, rippleReduceSolverIterations);
+  }
 
   // 3. Emit warnings based on any traces that include markers that are not
   // labelled correctly during part of the trace
