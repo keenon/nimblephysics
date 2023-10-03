@@ -11,6 +11,8 @@ endif()
 # set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
 project(dart)
 
+add_definitions(-UNDEBUG)
+
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 
 # Use MACOSX_RPATH by default on OS X. This was added in CMake 2.8.12 and

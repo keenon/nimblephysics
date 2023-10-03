@@ -5514,7 +5514,9 @@ s_t DynamicsFitProblem::computeLossParallel(
   }
 
   std::vector<std::future<void>> futures;
-  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  for (int threadIdx = 0;
+       threadIdx < std::min((int)mBlocks.size(), mConfig.mNumThreads);
+       threadIdx++)
   {
     futures.push_back(std::async([&threadLossExplanations,
                                   this,
@@ -5540,7 +5542,6 @@ s_t DynamicsFitProblem::computeLossParallel(
         {
           int realT = block.start + t;
 
-          mSkeleton->setPositions(block.pos.col(t));
           mThreadSkeletons[threadIdx]->setPositions(block.pos.col(t));
 
           // Add force residual RMS errors to all the middle timesteps
