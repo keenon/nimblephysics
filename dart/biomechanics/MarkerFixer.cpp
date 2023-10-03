@@ -493,6 +493,37 @@ std::vector<LabeledMarkerTrace> LabeledMarkerTrace::createRawTraces(
 }
 
 //==============================================================================
+int MarkersErrorReport::getNumTimesteps()
+{
+  return markerObservationsAttemptedFixed.size();
+}
+
+//==============================================================================
+std::map<std::string, Eigen::Vector3s>
+MarkersErrorReport::getMarkerMapOnTimestep(int t)
+{
+  return markerObservationsAttemptedFixed[t];
+}
+
+//==============================================================================
+std::vector<std::string> MarkersErrorReport::getMarkerNamesOnTimestep(int t)
+{
+  std::vector<std::string> keys;
+  for (auto& pair : markerObservationsAttemptedFixed[t])
+  {
+    keys.push_back(pair.first);
+  }
+  return keys;
+}
+
+//==============================================================================
+Eigen::Vector3s MarkersErrorReport::getMarkerPositionOnTimestep(
+    int t, std::string marker)
+{
+  return markerObservationsAttemptedFixed[t][marker];
+}
+
+//==============================================================================
 RippleReductionProblem::RippleReductionProblem(
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
     s_t dt)
@@ -659,7 +690,11 @@ void RippleReductionProblem::interpolateMissingPoints()
 
 //==============================================================================
 std::vector<std::map<std::string, Eigen::Vector3s>>
-RippleReductionProblem::smooth(MarkersErrorReport* report)
+RippleReductionProblem::smooth(
+    MarkersErrorReport* report,
+    bool useSparse,
+    bool useIterativeSolver,
+    int solverIterations)
 {
   dropSuspiciousPoints(report);
   interpolateMissingPoints();
@@ -688,19 +723,23 @@ RippleReductionProblem::smooth(MarkersErrorReport* report)
 
     // Smooth only the window during which we observed the marker (don't smooth
     // to the 0's on frames where we weren't observing the marker)
-    AccelerationSmoother smoother(duration, 0.3, 1.0);
+    AccelerationSmoother smoother(
+        duration, 0.3, 1.0, useSparse, useIterativeSolver);
+    smoother.setIterations(solverIterations);
     mMarkers[markerName].block(0, firstObserved, 3, duration) = smoother.smooth(
         mMarkers[markerName].block(0, firstObserved, 3, duration));
   }
 
   std::vector<std::map<std::string, Eigen::Vector3s>> markers;
-  if (mMarkerNames.size() > 0) {
+  if (mMarkerNames.size() > 0)
+  {
     for (int t = 0; t < mMarkers[mMarkerNames[0]].cols(); t++)
     {
       markers.emplace_back();
       for (std::string& markerName : mMarkerNames)
       {
-        // markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
+        // markers[markers.size() - 1][markerName] =
+        // mMarkers[markerName].col(t);
         if (mObserved[markerName](t) == 1)
         {
           markers[markers.size() - 1][markerName] = mMarkers[markerName].col(t);
@@ -820,22 +859,23 @@ void RippleReductionProblem::saveToGUI(std::string markerName, std::string path)
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
-    const std::vector<std::map<std::string, Eigen::Vector3s>>&
-        immutableMarkerObservations,
+    std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
     s_t dt,
-    bool dropProlongedStillness)
+    bool dropProlongedStillness,
+    bool rippleReduce,
+    bool rippleReduceUseSparse,
+    bool rippleReduceUseIterativeSolver,
+    int rippleReduceSolverIterations)
 {
   std::shared_ptr<MarkersErrorReport> report
       = std::make_shared<MarkersErrorReport>();
-  std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations
-      = immutableMarkerObservations;
 
   // 1. Attempt to detect marker flips that occur partway through the trajectory
 
   // 1.1. Collect markers into continuous traces. Break marker traces that imply
   // a velocity greater than 20 m/s
-  std::vector<LabeledMarkerTrace> traces = LabeledMarkerTrace::createRawTraces(
-      immutableMarkerObservations, dt * 20.0);
+  std::vector<LabeledMarkerTrace> traces
+      = LabeledMarkerTrace::createRawTraces(markerObservations, dt * 20.0);
 
   // 1.2. Label the traces based on their majority label during the trace
   std::vector<std::string> traceLabels;
@@ -861,7 +901,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   // 2. Emit the corrected marker observations
 
   std::vector<std::map<std::string, Eigen::Vector3s>> correctedObservations;
-  for (int t = 0; t < immutableMarkerObservations.size(); t++)
+  for (int t = 0; t < markerObservations.size(); t++)
   {
     std::vector<std::tuple<std::string, Eigen::Vector3s, std::string>>
         droppedMarkerWarningsFrame;
@@ -903,10 +943,28 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
                   + std::to_string((double)traces[j].mVelNorm[index])
                   + " m/s^2)");
         }
-        else
+        else if (index >= 0 && index < traces[j].mPoints.size())
         {
           Eigen::Vector3s point = traces[j].mPoints[index];
+          if (abs(point(0)) > 1e+6 || abs(point(1)) > 1e+6 || abs(point(2)) > 1e+6) {
+            report->warnings.push_back(
+                "Marker " + traceLabels[j] + " dropped for being too far away ("
+                + std::to_string((double)point.norm())
+                + " m) on frame " + std::to_string(t));
+            droppedMarkerWarningsFrame.emplace_back(
+                traces[j].mMarkerLabels[index],
+                traces[j].mPoints[index],
+                "being too far away ("
+                    + std::to_string((double)point.norm())
+                    + " m)");
+            continue;
+          }
+
           frame[traceLabels[j]] = point;
+        }
+        else {
+          std::cout << "ERROR(MarkerFixed): index " << index << " into traces[j].mPoints out of bounds "
+                    << traces[j].mPoints.size() << std::endl;
         }
       }
     }
@@ -916,9 +974,9 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
 
   // 2.1. Count the number of observations of each marker name
   std::map<std::string, int> observationCount;
-  for (auto& obs : correctedObservations)
+  for (const auto& obs : correctedObservations)
   {
-    for (auto& pair : obs)
+    for (const auto& pair : obs)
     {
       if (observationCount.count(pair.first) == 0)
       {
@@ -933,7 +991,7 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   std::map<std::string, s_t> markerDropPercentage;
   for (auto& pair : observationCount)
   {
-    s_t percentage = (s_t)pair.second / (s_t)immutableMarkerObservations.size();
+    s_t percentage = (s_t)pair.second / (s_t)markerObservations.size();
     if (percentage < 0.1)
     {
       report->warnings.push_back(
@@ -950,19 +1008,26 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
     {
       if (obs.count(drop) > 0)
       {
-        obs.erase(drop);
         report->droppedMarkerWarnings[t].emplace_back(
             drop,
-            obs[drop],
+            obs.at(drop),
             "dropped for appearing only on "
                 + std::to_string(markerDropPercentage[drop] * 100)
                 + " percent of frames");
+        obs.erase(drop);
       }
     }
   }
 
-  RippleReductionProblem rippleReduction(correctedObservations, dt);
-  correctedObservations = rippleReduction.smooth(report.get());
+  if (rippleReduce)
+  {
+    RippleReductionProblem rippleReduction(correctedObservations, dt);
+    correctedObservations = rippleReduction.smooth(
+        report.get(),
+        rippleReduceUseSparse,
+        rippleReduceUseIterativeSolver,
+        rippleReduceSolverIterations);
+  }
 
   // 3. Emit warnings based on any traces that include markers that are not
   // labelled correctly during part of the trace
@@ -1083,6 +1148,27 @@ std::shared_ptr<MarkersErrorReport> MarkerFixer::generateDataErrorsReport(
   }
 
   report->markerObservationsAttemptedFixed = correctedObservations;
+
+  // 4. Go through and check for NaNs and out-of-bounds values
+  for (int t = 0; t < report->markerObservationsAttemptedFixed.size(); t++)
+  {
+    for (auto& pair : report->markerObservationsAttemptedFixed[t])
+    {
+      if (pair.second.hasNaN())
+      {
+        std::cout << "ERROR(MarkerFixer): Marker " << pair.first
+                  << " has NaN on frame " << t << std::endl;
+      }
+      if (abs(pair.second(0)) > 1e+6 || abs(pair.second(1)) > 1e+6
+          || abs(pair.second(2)) > 1e+6)
+      {
+        std::cout << "ERROR(MarkerFixer): Marker " << pair.first
+                  << " has suspiciously large value on frame " << t
+                  << std::endl;
+      }
+    }
+  }
+
   return report;
 }
 

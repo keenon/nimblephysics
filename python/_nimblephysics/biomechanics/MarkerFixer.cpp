@@ -62,7 +62,23 @@ void MarkerFixer(py::module& m)
           &dart::biomechanics::MarkersErrorReport::droppedMarkerWarnings)
       .def_readwrite(
           "markersRenamedFromTo",
-          &dart::biomechanics::MarkersErrorReport::markersRenamedFromTo);
+          &dart::biomechanics::MarkersErrorReport::markersRenamedFromTo)
+      .def(
+          "getNumTimesteps",
+          &dart::biomechanics::MarkersErrorReport::getNumTimesteps)
+      .def(
+          "getMarkerMapOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerMapOnTimestep,
+          ::py::arg("t"))
+      .def(
+          "getMarkerNamesOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerNamesOnTimestep,
+          ::py::arg("t"))
+      .def(
+          "getMarkerPositionOnTimestep",
+          &dart::biomechanics::MarkersErrorReport::getMarkerPositionOnTimestep,
+          ::py::arg("t"),
+          ::py::arg("marker"));
 
   ::py::class_<dart::biomechanics::MarkerFixer>(m, "MarkerFixer")
       .def_static(
@@ -70,7 +86,11 @@ void MarkerFixer(py::module& m)
           &dart::biomechanics::MarkerFixer::generateDataErrorsReport,
           ::py::arg("immutableMarkerObservations"),
           ::py::arg("dt"),
-          ::py::arg("dropProlongedStillness") = false);
+          ::py::arg("dropProlongedStillness") = false,
+          ::py::arg("rippleReduce") = true,
+          ::py::arg("rippleReduceUseSparse") = true,
+          ::py::arg("rippleReduceUseIterativeSolver") = true,
+          ::py::arg("rippleReduceSolverIterations") = 1e5);
 }
 
 } // namespace python

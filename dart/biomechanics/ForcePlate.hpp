@@ -49,7 +49,7 @@ struct ForcePlate
       moments.erase(moments.begin() + end, moments.end());
       forces.erase(forces.begin() + end, forces.end());
     }
-    else
+    else if (end > timestamps.size())
     {
       std::cout << "Warning: trimToIndexes() called with end index " << end
                 << " larger than the size of the data (" << timestamps.size()

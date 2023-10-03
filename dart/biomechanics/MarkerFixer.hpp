@@ -129,6 +129,11 @@ struct MarkersErrorReport
   // This is a list of all the warnings for markers whose names were swapped
   std::vector<std::vector<std::pair<std::string, std::string>>>
       markersRenamedFromTo;
+  
+  int getNumTimesteps();
+  std::map<std::string, Eigen::Vector3s> getMarkerMapOnTimestep(int t);
+  std::vector<std::string> getMarkerNamesOnTimestep(int t);
+  Eigen::Vector3s getMarkerPositionOnTimestep(int t, std::string);
 };
 
 class RippleReductionProblem
@@ -143,7 +148,7 @@ public:
   void interpolateMissingPoints();
 
   std::vector<std::map<std::string, Eigen::Vector3s>> smooth(
-      MarkersErrorReport* report = nullptr);
+      MarkersErrorReport* report = nullptr, bool useSparse = true, bool useIterativeSolver = true, int solverIterations = 1e5);
 
   void saveToGUI(std::string markerName, std::string path);
 
@@ -160,10 +165,14 @@ class MarkerFixer
 {
 public:
   static std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
-      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+      std::vector<std::map<std::string, Eigen::Vector3s>>
           markerObservations,
       s_t dt,
-      bool dropProlongedStillness = false);
+      bool dropProlongedStillness = false,
+      bool rippleReduce = true,
+      bool rippleReduceUseSparse = true,
+      bool rippleReduceUseIterativeSolver = true,
+      int rippleReduceSolverIterations = 1e5);
 };
 
 } // namespace biomechanics

@@ -398,7 +398,11 @@ void MarkerFitter(py::module& m)
           "generateDataErrorsReport",
           &dart::biomechanics::MarkerFitter::generateDataErrorsReport,
           ::py::arg("markerObservations"),
-          ::py::arg("dt"))
+          ::py::arg("dt"),
+          ::py::arg("rippleReduce") = true,
+          ::py::arg("rippleReduceUseSparse") = true,
+          ::py::arg("rippleReduceUseIterativeSolver") = true,
+          ::py::arg("rippleReduceSolverIterations") = 1e5)
       .def(
           "checkForFlippedMarkers",
           &dart::biomechanics::MarkerFitter::checkForFlippedMarkers,

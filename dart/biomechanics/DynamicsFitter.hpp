@@ -1514,6 +1514,16 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel,
       int trial);
 
+  // This utility recomputes the GRF world wrenches, in case we changed the data
+  static void recomputeGRFs(
+      std::vector<ForcePlate> forcePlates,
+      const Eigen::MatrixXs& poses,
+      const std::vector<dynamics::BodyNode*>& grfBodyNodes,
+      const std::vector<int>& overrideForcePlateToGRFNodeAssignment,
+      std::vector<std::vector<int>>& forcePlatesAssignedToContactBody,
+      Eigen::MatrixXs& grfTrials,
+      std::shared_ptr<dynamics::Skeleton> skel);
+
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual
   void centerAngularResiduals(std::shared_ptr<DynamicsInitialization> init);
@@ -1603,25 +1613,26 @@ public:
       bool useAdjustedGRFs = false,
       std::vector<double> timestamps = {});
 
-  // This writes a random-seekable binary format to disk
-  void writeSubjectOnDisk(
-      std::string path,
-      std::string openSimFilePath,
-      std::shared_ptr<DynamicsInitialization> init,
-      std::string biologicalSex,
-      s_t massKg,
-      s_t heightM,
-      int ageYears,
-      bool useAdjustedGRFs = false,
-      std::vector<std::string> trialNames = std::vector<std::string>(),
-      std::vector<std::string> subjectTags = std::vector<std::string>(),
-      std::vector<std::vector<std::string>> trialTags
-      = std::vector<std::vector<std::string>>(),
-      std::string href = "",
-      std::string notes = "",
-      std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>
-          emgObservationTrials
-      = std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>());
+  //   // This writes a random-seekable binary format to disk
+  //   void writeSubjectOnDisk(
+  //       std::string path,
+  //       std::string openSimFilePath,
+  //       std::shared_ptr<DynamicsInitialization> init,
+  //       std::string biologicalSex,
+  //       s_t massKg,
+  //       s_t heightM,
+  //       int ageYears,
+  //       bool useAdjustedGRFs = false,
+  //       std::vector<std::string> trialNames = std::vector<std::string>(),
+  //       std::vector<std::string> subjectTags = std::vector<std::string>(),
+  //       std::vector<std::vector<std::string>> trialTags
+  //       = std::vector<std::vector<std::string>>(),
+  //       std::string href = "",
+  //       std::string notes = "",
+  //       std::vector<std::vector<std::map<std::string, Eigen::VectorXs>>>
+  //           emgObservationTrials
+  //       = std::vector<std::vector<std::map<std::string,
+  //       Eigen::VectorXs>>>());
 
   // This saves all the attributes on the init to the skeleton
   void applyInitToSkeleton(

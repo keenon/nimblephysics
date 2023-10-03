@@ -605,9 +605,13 @@ public:
   /// anomalies, generate warnings to help the user fix their own issues, and
   /// produce fixes where possible.
   std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
-      const std::vector<std::map<std::string, Eigen::Vector3s>>&
+      std::vector<std::map<std::string, Eigen::Vector3s>>
           markerObservations,
-      s_t dt);
+      s_t dt, 
+      bool rippleReduce = true,
+      bool rippleReduceUseSparse = true,
+      bool rippleReduceUseIterativeSolver = true, 
+      int rippleReduceSolverIterations = 1e5);
 
   /// After we've finished our initialization, it may become clear that markers
   /// in some of the files should be reversed. This method will do that check,

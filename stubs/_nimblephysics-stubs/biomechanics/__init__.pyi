@@ -21,6 +21,7 @@ __all__ = [
     "DynamicsInitialization",
     "ForcePlate",
     "Frame",
+    "FramePass",
     "IKErrorReport",
     "IMUFineTuneProblem",
     "InitialMarkerFitParams",
@@ -42,9 +43,14 @@ __all__ = [
     "OpenSimParser",
     "OpenSimScaleAndMarkerOffsets",
     "OpenSimTRC",
+    "ProcessingPassType",
     "ResidualForceHelper",
     "SkeletonConverter",
     "SubjectOnDisk",
+    "SubjectOnDiskHeader",
+    "SubjectOnDiskPassHeader",
+    "SubjectOnDiskTrial",
+    "SubjectOnDiskTrialPass",
     "forceDiscrepancy",
     "measuredGrfZeroWhenAccelerationNonZero",
     "missingBlip",
@@ -336,7 +342,6 @@ class DynamicsFitter():
     def timeSyncAndInitializePipeline(self, init: DynamicsInitialization, useReactionWheels: bool = False, shiftGRF: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, maxTrialsToSolveMassOver: int = 4, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 100, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15, reoptimizeAnatomicalMarkers: bool = False, reoptimizeTrackingMarkers: bool = True) -> bool: ...
     def timeSyncTrialGRF(self, init: DynamicsInitialization, trial: int, useReactionWheels: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, weightLinear: float = 1.0, weightAngular: float = 1.0, regularizeLinearResiduals: float = 0.5, regularizeAngularResiduals: float = 0.5, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 20) -> bool: ...
     def writeCSVData(self, path: str, init: DynamicsInitialization, trialIndex: int, useAdjustedGRFs: bool = False, timestamps: typing.List[float] = []) -> None: ...
-    def writeSubjectOnDisk(self, outputPath: str, openSimFilePath: str, init: DynamicsInitialization, biologicalSex: str, massKg: float, heightM: float, ageYears: int, useAdjustedGRFs: bool = False, trialNames: typing.List[str] = [], subjectTags: typing.List[str] = [], trialTags: typing.List[typing.List[str]] = [], href: str = '', notes: str = '', emgObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]] = []) -> None: ...
     def zeroLinearResidualsAndOptimizeAngular(self, init: DynamicsInitialization, trial: int, targetPoses: numpy.ndarray[numpy.float64, _Shape[m, n]], previousTotalResidual: float, iteration: int, useReactionWheels: bool = False, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 40, maxLeastSquaresIters: int = 200, commitCopDriftCompensation: bool = False, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15) -> typing.Tuple[bool, float]: ...
     def zeroLinearResidualsOnCOMTrajectory(self, init: DynamicsInitialization, maxTrialsToSolveMassOver: int = 4, detectExternalForce: bool = True, driftCorrectionBlurRadius: int = 250, driftCorrectionBlurInterval: int = 250) -> bool: ...
     pass
@@ -746,6 +751,176 @@ class Frame():
     This is for doing ML and large-scale data analysis. This is a single frame of data, returned in a list by :code:`SubjectOnDisk.readFrames()`, which contains everything needed to reconstruct all the dynamics of a snapshot in time.
     """
     @property
+    def accObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the accelerometers observations at this frame. Accelerometers that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the accelerometer set, load the model from the :code:`SubjectOnDisk`
+
+        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        """
+    @accObservations.setter
+    def accObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the accelerometers observations at this frame. Accelerometers that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the accelerometer set, load the model from the :code:`SubjectOnDisk`
+        """
+    @property
+    def customValues(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
+
+        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]
+        """
+    @customValues.setter
+    def customValues(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
+        """
+    @property
+    def emgSignals(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the EMG signals at this frame. EMG signals are generally preserved at a higher sampling frequency than the motion capture, so the `np.ndarray` vector will be a number of samples that were captured during this single motion capture frame. For example, if EMG is at 1000Hz and mocap is at 100Hz, the `np.ndarray` vector will be of length 10.
+
+        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]
+        """
+    @emgSignals.setter
+    def emgSignals(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the EMG signals at this frame. EMG signals are generally preserved at a higher sampling frequency than the motion capture, so the `np.ndarray` vector will be a number of samples that were captured during this single motion capture frame. For example, if EMG is at 1000Hz and mocap is at 100Hz, the `np.ndarray` vector will be of length 10.
+        """
+    @property
+    def exoTorques(self) -> typing.List[typing.Tuple[int, float]]:
+        """
+        This is list of :code:`Pair[int, np.ndarray]` of the DOF indices that are actuated by exoskeletons, and the torques on those DOFs.
+
+        :type: typing.List[typing.Tuple[int, float]]
+        """
+    @exoTorques.setter
+    def exoTorques(self, arg0: typing.List[typing.Tuple[int, float]]) -> None:
+        """
+        This is list of :code:`Pair[int, np.ndarray]` of the DOF indices that are actuated by exoskeletons, and the torques on those DOFs.
+        """
+    @property
+    def gyroObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the gyroscope observations at this frame. Gyroscopes that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the gyroscope set, load the model from the :code:`SubjectOnDisk`
+
+        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        """
+    @gyroObservations.setter
+    def gyroObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the gyroscope observations at this frame. Gyroscopes that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the gyroscope set, load the model from the :code:`SubjectOnDisk`
+        """
+    @property
+    def markerObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the marker observations at this frame. Markers that were not observed will not be present in this list. For the full specification of the markerset, load the model from the :code:`SubjectOnDisk`
+
+        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        """
+    @markerObservations.setter
+    def markerObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+        """
+        This is list of :code:`Pair[str, np.ndarray]` of the marker observations at this frame. Markers that were not observed will not be present in this list. For the full specification of the markerset, load the model from the :code:`SubjectOnDisk`
+        """
+    @property
+    def missingGRFReason(self) -> MissingGRFReason:
+        """
+                    This is the reason that this frame is missing GRF, or else is the flag notMissingGRF to indicate that this frame has physics.
+
+                    WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
+                  
+
+        :type: MissingGRFReason
+        """
+    @missingGRFReason.setter
+    def missingGRFReason(self, arg0: MissingGRFReason) -> None:
+        """
+        This is the reason that this frame is missing GRF, or else is the flag notMissingGRF to indicate that this frame has physics.
+
+        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
+        """
+    @property
+    def processingPasses(self) -> typing.List[FramePass]:
+        """
+                    The processing passes that were done on this Frame. For example, if we solved for kinematics, then dynamics, 
+                    then low pass filtered, this will have 3 entries.
+                        
+
+        :type: typing.List[FramePass]
+        """
+    @processingPasses.setter
+    def processingPasses(self, arg0: typing.List[FramePass]) -> None:
+        """
+        The processing passes that were done on this Frame. For example, if we solved for kinematics, then dynamics, 
+        then low pass filtered, this will have 3 entries.
+            
+        """
+    @property
+    def rawForcePlateCenterOfPressures(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        This is list of :code:`np.ndarray` of the original center of pressure readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @rawForcePlateCenterOfPressures.setter
+    def rawForcePlateCenterOfPressures(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        """
+        This is list of :code:`np.ndarray` of the original center of pressure readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+        """
+    @property
+    def rawForcePlateForces(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        This is list of :code:`np.ndarray` of the original force readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @rawForcePlateForces.setter
+    def rawForcePlateForces(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        """
+        This is list of :code:`np.ndarray` of the original force readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+        """
+    @property
+    def rawForcePlateTorques(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        This is list of :code:`np.ndarray` of the original torque readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @rawForcePlateTorques.setter
+    def rawForcePlateTorques(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        """
+        This is list of :code:`np.ndarray` of the original torque readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
+        """
+    @property
+    def t(self) -> int:
+        """
+        The frame number in this trial.
+
+        :type: int
+        """
+    @t.setter
+    def t(self, arg0: int) -> None:
+        """
+        The frame number in this trial.
+        """
+    @property
+    def trial(self) -> int:
+        """
+        The index of the trial in the containing SubjectOnDisk.
+
+        :type: int
+        """
+    @trial.setter
+    def trial(self, arg0: int) -> None:
+        """
+        The index of the trial in the containing SubjectOnDisk.
+        """
+    pass
+class FramePass():
+    """
+    This is for doing ML and large-scale data analysis. This is a single processing pass on a single frame of data, returned from a list within a :code:`nimblephysics.biomechanics.Frame` (which can be got with :code:`SubjectOnDisk.readFrames()`), which contains the full reconstruction of your subject at this instant created by this processing pass. Earlier processing passes are likely to have more discrepancies with the original data, bet later processing passes require more types of sensor signals that may not always be available.
+    """
+    @property
     def acc(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
         The joint accelerations on this frame.
@@ -770,16 +945,16 @@ class Frame():
         A boolean mask of [0,1]s for each DOF, with a 1 indicating that this DOF got its acceleration through finite differencing, and therefore may be somewhat unreliable
         """
     @property
-    def accObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+    def angularResidual(self) -> float:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the accelerometers observations at this frame. Accelerometers that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the accelerometer set, load the model from the :code:`SubjectOnDisk`
+        A scalar giving how much angular torque, in Newton-meters, would need to be applied at the root of the skeleton in order to enable the skeleton's observed accelerations (given positions and velocities) on this frame.
 
-        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        :type: float
         """
-    @accObservations.setter
-    def accObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+    @angularResidual.setter
+    def angularResidual(self, arg0: float) -> None:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the accelerometers observations at this frame. Accelerometers that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the accelerometer set, load the model from the :code:`SubjectOnDisk`
+        A scalar giving how much angular torque, in Newton-meters, would need to be applied at the root of the skeleton in order to enable the skeleton's observed accelerations (given positions and velocities) on this frame.
         """
     @property
     def comAcc(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
@@ -828,30 +1003,6 @@ class Frame():
     def contact(self, arg0: numpy.ndarray[numpy.int32, _Shape[m, 1]]) -> None:
         """
         A vector of [0,1] booleans for if a body is in contact with the ground.
-        """
-    @property
-    def customValues(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]:
-        """
-        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
-
-        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]
-        """
-    @customValues.setter
-    def customValues(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None:
-        """
-        This is list of :code:`Pair[str, np.ndarray]` of unspecified values. The idea here is to allow the format to be easily extensible with unusual data (for example, exoskeleton torques) without bloating ordinary training files.
-        """
-    @property
-    def emgSignals(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]:
-        """
-        This is list of :code:`Pair[str, np.ndarray]` of the EMG signals at this frame. EMG signals are generally preserved at a higher sampling frequency than the motion capture, so the `np.ndarray` vector will be a number of samples that were captured during this single motion capture frame. For example, if EMG is at 1000Hz and mocap is at 100Hz, the `np.ndarray` vector will be of length 10.
-
-        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]
-        """
-    @emgSignals.setter
-    def emgSignals(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None:
-        """
-        This is list of :code:`Pair[str, np.ndarray]` of the EMG signals at this frame. EMG signals are generally preserved at a higher sampling frequency than the motion capture, so the `np.ndarray` vector will be a number of samples that were captured during this single motion capture frame. For example, if EMG is at 1000Hz and mocap is at 100Hz, the `np.ndarray` vector will be of length 10.
         """
     @property
     def groundContactCenterOfPressure(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -937,28 +1088,40 @@ class Frame():
         Note that these are specified in the local body frame, acting on the body at its origin, so transforming them to the world frame requires a transformation!
         """
     @property
-    def gyroObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+    def linearResidual(self) -> float:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the gyroscope observations at this frame. Gyroscopes that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the gyroscope set, load the model from the :code:`SubjectOnDisk`
+        A scalar giving how much linear force, in Newtons, would need to be applied at the root of the skeleton in order to enable the skeleton's observed accelerations (given positions and velocities) on this frame.
 
-        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        :type: float
         """
-    @gyroObservations.setter
-    def gyroObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+    @linearResidual.setter
+    def linearResidual(self, arg0: float) -> None:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the gyroscope observations at this frame. Gyroscopes that were not observed (perhaps due to time offsets in uploaded data) will not be present in this list. For the full specification of the gyroscope set, load the model from the :code:`SubjectOnDisk`
+        A scalar giving how much linear force, in Newtons, would need to be applied at the root of the skeleton in order to enable the skeleton's observed accelerations (given positions and velocities) on this frame.
         """
     @property
-    def markerObservations(self) -> typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
+    def markerMax(self) -> float:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the marker observations at this frame. Markers that were not observed will not be present in this list. For the full specification of the markerset, load the model from the :code:`SubjectOnDisk`
+        A scalar indicating the maximum marker error (discrepancy between the model and the experimentally observed marker locations) on this frame, in meters, with these joint positions.
 
-        :type: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]
+        :type: float
         """
-    @markerObservations.setter
-    def markerObservations(self, arg0: typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
+    @markerMax.setter
+    def markerMax(self, arg0: float) -> None:
         """
-        This is list of :code:`Pair[str, np.ndarray]` of the marker observations at this frame. Markers that were not observed will not be present in this list. For the full specification of the markerset, load the model from the :code:`SubjectOnDisk`
+        A scalar indicating the maximum marker error (discrepancy between the model and the experimentally observed marker locations) on this frame, in meters, with these joint positions.
+        """
+    @property
+    def markerRMS(self) -> float:
+        """
+        A scalar indicating the RMS marker error (discrepancy between the model and the experimentally observed marker locations) on this frame, in meters, with these joint positions.
+
+        :type: float
+        """
+    @markerRMS.setter
+    def markerRMS(self, arg0: float) -> None:
+        """
+        A scalar indicating the RMS marker error (discrepancy between the model and the experimentally observed marker locations) on this frame, in meters, with these joint positions.
         """
     @property
     def pos(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -985,85 +1148,6 @@ class Frame():
         A boolean mask of [0,1]s for each DOF, with a 1 indicating that this DOF was observed on this frame
         """
     @property
-    def probablyMissingGRF(self) -> bool:
-        """
-                    This is true if this frame probably has unmeasured forces acting on the body. For example, if a subject
-                    steps off of the available force plates during this frame, this will probably be true.
-
-                    WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
-                  
-
-        :type: bool
-        """
-    @probablyMissingGRF.setter
-    def probablyMissingGRF(self, arg0: bool) -> None:
-        """
-        This is true if this frame probably has unmeasured forces acting on the body. For example, if a subject
-        steps off of the available force plates during this frame, this will probably be true.
-
-        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on this frame!!
-        """
-    @property
-    def rawForcePlateCenterOfPressures(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
-        """
-        This is list of :code:`np.ndarray` of the original center of pressure readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-
-        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
-        """
-    @rawForcePlateCenterOfPressures.setter
-    def rawForcePlateCenterOfPressures(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
-        """
-        This is list of :code:`np.ndarray` of the original center of pressure readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-        """
-    @property
-    def rawForcePlateForces(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
-        """
-        This is list of :code:`np.ndarray` of the original force readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-
-        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
-        """
-    @rawForcePlateForces.setter
-    def rawForcePlateForces(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
-        """
-        This is list of :code:`np.ndarray` of the original force readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-        """
-    @property
-    def rawForcePlateTorques(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
-        """
-        This is list of :code:`np.ndarray` of the original torque readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-
-        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]
-        """
-    @rawForcePlateTorques.setter
-    def rawForcePlateTorques(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
-        """
-        This is list of :code:`np.ndarray` of the original torque readings on each force plate, without any processing by AddBiomechanics. These are the original inputs that were used to create this SubjectOnDisk.
-        """
-    @property
-    def residual(self) -> float:
-        """
-        The norm of the root residual force on this trial.
-
-        :type: float
-        """
-    @residual.setter
-    def residual(self, arg0: float) -> None:
-        """
-        The norm of the root residual force on this trial.
-        """
-    @property
-    def t(self) -> int:
-        """
-        The frame number in this trial.
-
-        :type: int
-        """
-    @t.setter
-    def t(self, arg0: int) -> None:
-        """
-        The frame number in this trial.
-        """
-    @property
     def tau(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
         The joint control forces on this frame.
@@ -1076,16 +1160,16 @@ class Frame():
         The joint control forces on this frame.
         """
     @property
-    def trial(self) -> int:
+    def type(self) -> ProcessingPassType:
         """
-        The index of the trial in the containing SubjectOnDisk.
+        The type of processing pass that this data came from. Options include KINEMATICS (for movement only), DYNAMICS (for movement and physics), and LOW_PASS_FILTER (to apply a simple Butterworth to the observed data from the previous pass).
 
-        :type: int
+        :type: ProcessingPassType
         """
-    @trial.setter
-    def trial(self, arg0: int) -> None:
+    @type.setter
+    def type(self, arg0: ProcessingPassType) -> None:
         """
-        The index of the trial in the containing SubjectOnDisk.
+        The type of processing pass that this data came from. Options include KINEMATICS (for movement only), DYNAMICS (for movement and physics), and LOW_PASS_FILTER (to apply a simple Butterworth to the observed data from the previous pass).
         """
     @property
     def vel(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -1335,7 +1419,7 @@ class MarkerFitter():
     def debugTrajectoryAndMarkersToGUI(self, server: nimblephysics_libs._nimblephysics.server.GUIWebsocketServer, init: MarkerInitialization, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], forcePlates: typing.List[ForcePlate] = None, goldOsim: OpenSimFile = None, goldPoses: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64)) -> None: ...
     def findJointCenters(self, initializations: MarkerInitialization, newClip: typing.List[bool], markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     def fineTuneWithIMU(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], gyroObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], newClip: typing.List[bool], init: MarkerInitialization, dt: float, weightAccs: float = 1.0, weightGyros: float = 1.0, weightMarkers: float = 100.0, regularizePoses: float = 1.0, useIPOPT: bool = True, iterations: int = 300, lbfgsMemory: int = 100) -> MarkerInitialization: ...
-    def generateDataErrorsReport(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], dt: float) -> MarkersErrorReport: ...
+    def generateDataErrorsReport(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], dt: float, rippleReduce: bool = True, rippleReduceUseSparse: bool = True, rippleReduceUseIterativeSolver: bool = True, rippleReduceSolverIterations: int = 100000.0) -> MarkersErrorReport: ...
     def getIMUFineTuneProblem(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], gyroObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], init: MarkerInitialization, dt: float, start: int, end: int) -> IMUFineTuneProblem: ...
     def getImuList(self) -> typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]: ...
     def getImuMap(self) -> typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, nimblephysics_libs._nimblephysics.math.Isometry3]]: ...
@@ -1534,7 +1618,7 @@ class MarkerFitterState():
     pass
 class MarkerFixer():
     @staticmethod
-    def generateDataErrorsReport(immutableMarkerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], dt: float, dropProlongedStillness: bool = False) -> MarkersErrorReport: ...
+    def generateDataErrorsReport(immutableMarkerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], dt: float, dropProlongedStillness: bool = False, rippleReduce: bool = True, rippleReduceUseSparse: bool = True, rippleReduceUseIterativeSolver: bool = True, rippleReduceSolverIterations: int = 100000.0) -> MarkersErrorReport: ...
     pass
 class MarkerInitialization():
     @property
@@ -1645,6 +1729,10 @@ class MarkerTrace():
         """
     pass
 class MarkersErrorReport():
+    def getMarkerMapOnTimestep(self, t: int) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
+    def getMarkerNamesOnTimestep(self, t: int) -> typing.List[str]: ...
+    def getMarkerPositionOnTimestep(self, t: int, marker: str) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: ...
+    def getNumTimesteps(self) -> int: ...
     @property
     def droppedMarkerWarnings(self) -> typing.List[typing.List[typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]], str]]]:
         """
@@ -1928,6 +2016,40 @@ class OpenSimTRC():
     def timestamps(self, arg0: typing.List[float]) -> None:
         pass
     pass
+class ProcessingPassType():
+    """
+    Members:
+
+      KINEMATICS : This is the pass where we solve for kinematics.
+
+      DYNAMICS : This is the pass where we solve for dynamics.
+
+      LOW_PASS_FILTER : This is the pass where we apply a low-pass filter to the kinematics and dynamics.
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    DYNAMICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.DYNAMICS: 1>
+    KINEMATICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.KINEMATICS: 0>
+    LOW_PASS_FILTER: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.LOW_PASS_FILTER: 2>
+    __members__: dict # value = {'KINEMATICS': <ProcessingPassType.KINEMATICS: 0>, 'DYNAMICS': <ProcessingPassType.DYNAMICS: 1>, 'LOW_PASS_FILTER': <ProcessingPassType.LOW_PASS_FILTER: 2>}
+    pass
 class ResidualForceHelper():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, forceBodies: typing.List[int]) -> None: ...
     def calculateResidual(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]: ...
@@ -1965,10 +2087,6 @@ class SubjectOnDisk():
         """
         This returns a string, one of "male", "female", or "unknown".
         """
-    def getContactBodies(self) -> typing.List[str]: 
-        """
-        A list of the :code:`body_name`'s for each body that was assumed to be able to take ground-reaction-force from force plates.
-        """
     def getCustomValueDim(self, valueName: str) -> int: 
         """
         This returns the dimension of the custom value specified by :code:`valueName`
@@ -1977,21 +2095,25 @@ class SubjectOnDisk():
         """
         A list of all the different types of custom values that this SubjectOnDisk contains. These are unspecified, and are intended to allow an easy extension of the format to unusual types of data (like exoskeleton torques or unusual physical sensors) that may be present on some subjects but not others.
         """
-    def getDofAccelerationsFiniteDifferenced(self, trial: int) -> typing.List[bool]: 
+    def getDofAccelerationsFiniteDifferenced(self, trial: int, processingPass: int) -> typing.List[bool]: 
         """
         This returns the vector of booleans indicating which DOFs have their accelerations from finite-differencing during this trial (as opposed to observed directly through a accelerometer or IMU)
         """
-    def getDofPositionsObserved(self, trial: int) -> typing.List[bool]: 
+    def getDofPositionsObserved(self, trial: int, processingPass: int) -> typing.List[bool]: 
         """
         This returns the vector of booleans indicating which DOFs have their positions observed during this trial
         """
-    def getDofVelocitiesFiniteDifferenced(self, trial: int) -> typing.List[bool]: 
+    def getDofVelocitiesFiniteDifferenced(self, trial: int, processingPass: int) -> typing.List[bool]: 
         """
         This returns the vector of booleans indicating which DOFs have their velocities from finite-differencing during this trial (as opposed to observed directly through a gyroscope or IMU)
         """
     def getForcePlateCorners(self, trial: int, forcePlate: int) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
         """
         Get an array of force plate corners (as 3D vectors) for the given force plate in the given trial. Empty array on out-of-bounds access.
+        """
+    def getGroundForceBodies(self) -> typing.List[str]: 
+        """
+        A list of the :code:`body_name`'s for each body that was assumed to be able to take ground-reaction-force from force plates.
         """
     def getHeightM(self) -> float: 
         """
@@ -2001,14 +2123,31 @@ class SubjectOnDisk():
         """
         The AddBiomechanics link for this subject's data.
         """
+    def getLowpassCutoffFrequency(self, processingPass: int) -> float: 
+        """
+        If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that (Butterworth) filter?
+        """
+    def getLowpassFilterOrder(self, processingPass: int) -> int: 
+        """
+        If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
+        """
     def getMassKg(self) -> float: 
         """
         This returns the mass in kilograms, or 0.0 if unknown.
         """
-    def getMissingGRFReason(self, trial: int) -> typing.List[MissingGRFReason]: 
+    def getMissingGRF(self, trial: int) -> typing.List[MissingGRFReason]: 
         """
         This returns an array of enum values, one per frame in the specified trial,
-        each corresponding to the reason why a frame was marked as `probablyMissingGRF`.
+        each describing whether physics data can be trusted for the corresponding frame of that trial.
+
+        Each frame is either `MissingGRFReason.notMissingGRF`, in which case the physics data is probably trustworthy, or
+        some other value indicating why the processing system heuristics believe that there is likely to be unmeasured 
+        external force acting on the body at this time.
+
+        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on the corresponding frame!!
+
+        This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
+        the more expensive :code:`loadFrames()` and examine frames individually.
         """
     def getNotes(self) -> str: 
         """
@@ -2022,30 +2161,47 @@ class SubjectOnDisk():
         """
         The number of force plates in the source data.
         """
+    def getNumProcessingPasses(self) -> int: 
+        """
+        This returns the number of processing passes that were successfully completed on this subject. IMPORTANT: Just because a processing pass was done for the subject does not mean that every trial will have successfully completed that processing pass. For example, some trials may lack force plate data, and thus will not have a dynamics pass that requires force plate data.
+        """
     def getNumTrials(self) -> int: 
         """
         This returns the number of trials that are in this file.
         """
-    def getProbablyMissingGRF(self, trial: int) -> typing.List[bool]: 
+    def getOpensimFileText(self, processingPass: int) -> str: 
         """
-        This returns an array of boolean values, one per frame in the specified trial.
-        Each frame is :code:`True` if this frame probably has unmeasured forces acting on the body. For example, if a subject
-        steps off of the available force plates during this frame, this will probably be true.
-
-        WARNING: If this is true, you can't trust the :code:`tau` or :code:`acc` values on the corresponding frame!!
-
-        This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
-        the more expensive :code:`loadFrames()`
+        This will read the raw OpenSim file XML out of the SubjectOnDisk, and return it as a string.
+        """
+    def getProcessingPassType(self, processingPass: int) -> ProcessingPassType: 
+        """
+        This returns the type of processing pass at a given index, up to the number of processing passes that were done
         """
     def getSubjectTags(self) -> typing.List[str]: 
         """
         This returns the list of tags attached to this subject, which are arbitrary strings from the AddBiomechanics platform.
         """
+    def getTrialAngularResidualNorms(self, trial: int, processingPass: int) -> typing.List[float]: 
+        """
+        This returns the vector of scalars indicating the norm of the root residual torques on each timestep of a given trial
+        """
     def getTrialLength(self, trial: int) -> int: 
         """
         This returns the length of the trial requested
         """
-    def getTrialMaxJointVelocity(self, trial: int) -> typing.List[float]: 
+    def getTrialLinearResidualNorms(self, trial: int, processingPass: int) -> typing.List[float]: 
+        """
+        This returns the vector of scalars indicating the norm of the root residual forces on each timestep of a given trial
+        """
+    def getTrialMarkerMaxs(self, trial: int, processingPass: int) -> typing.List[float]: 
+        """
+        This returns the vector of scalars indicating the max marker error on each timestep of a given trial
+        """
+    def getTrialMarkerRMSs(self, trial: int, processingPass: int) -> typing.List[float]: 
+        """
+        This returns the vector of scalars indicating the RMS marker error on each timestep of a given trial
+        """
+    def getTrialMaxJointVelocity(self, trial: int, processingPass: int) -> typing.List[float]: 
         """
         This returns the vector of scalars indicating the maximum absolute velocity of all DOFs on each timestep of a given trial
         """
@@ -2053,9 +2209,17 @@ class SubjectOnDisk():
         """
         This returns the human readable name of the specified trial, given by the person who uploaded the data to AddBiomechanics. This isn't necessary for training, but may be useful for analyzing the data.
         """
-    def getTrialResidualNorms(self, trial: int) -> typing.List[float]: 
+    def getTrialNumProcessingPasses(self, trial: int) -> int: 
         """
-        This returns the vector of scalars indicating the norm of the root residual forces + torques on each timestep of a given trial
+        This returns the number of processing passes that successfully completed on this trial
+        """
+    def getTrialOriginalName(self, trial: int) -> str: 
+        """
+        This returns the original name of the trial before it was (potentially) split into multiple pieces
+        """
+    def getTrialSplitIndex(self, trial: int) -> int: 
+        """
+        This returns the index of the split, if this trial was the result of splitting an original trial into multiple pieces
         """
     def getTrialTags(self, trial: int) -> typing.List[str]: 
         """
@@ -2065,23 +2229,80 @@ class SubjectOnDisk():
         """
         This returns the timestep size for the trial requested, in seconds per frame
         """
-    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, stride: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
+    def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, includeSensorData: bool = True, includeProcessingPasses: bool = True, stride: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
         """
         This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
         """
-    def readRawOsimFileText(self) -> str: 
-        """
-        This will read the raw OpenSim file XML out of the SubjectOnDisk, and return it as a string.
-        """
-    def readSkel(self, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: 
+    def readSkel(self, processingPass: int, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: 
         """
         This will read the skeleton from the binary, and optionally use the passed in :code:`geometryFolder` to load meshes. We do not bundle meshes with :code:`SubjectOnDisk` files, to save space. If you do not pass in :code:`geometryFolder`, expect to get warnings about being unable to load meshes, and expect that your skeleton will not display if you attempt to visualize it.
         """
     @staticmethod
-    def writeSubject(outputPath: str, openSimFilePath: str, trialTimesteps: typing.List[float], trialPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], probablyMissingGRF: typing.List[typing.List[bool]], missingGRFReason: typing.List[typing.List[MissingGRFReason]], dofPositionsObserved: typing.List[typing.List[bool]], dofVelocitiesFiniteDifferenced: typing.List[typing.List[bool]], dofAccelerationsFiniteDifferenced: typing.List[typing.List[bool]], trialTaus: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialComPoses: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialComVels: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialComAccs: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialResidualNorms: typing.List[typing.List[float]], groundForceBodies: typing.List[str], trialGroundBodyWrenches: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], trialGroundBodyCopTorqueForce: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], customValueNames: typing.List[str], customValues: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], markerObservations: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], accObservations: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], gyroObservations: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], emgObservations: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]], forcePlates: typing.List[typing.List[ForcePlate]], biologicalSex: str, heightM: float, massKg: float, ageYears: int, trialNames: typing.List[str] = [], subjectTags: typing.List[str] = [], trialTags: typing.List[typing.List[str]] = [], sourceHref: str = '', notes: str = '') -> None: 
+    def writeB3D(path: str, header: SubjectOnDiskHeader) -> None: ...
+    pass
+class SubjectOnDiskHeader():
+    def __init__(self) -> None: ...
+    def addProcessingPass(self) -> SubjectOnDiskPassHeader: ...
+    def addTrial(self) -> SubjectOnDiskTrial: ...
+    def recomputeColumnNames(self) -> None: ...
+    def setAgeYears(self, ageYears: int) -> SubjectOnDiskHeader: ...
+    def setBiologicalSex(self, biologicalSex: str) -> SubjectOnDiskHeader: ...
+    def setCustomValueNames(self, customValueNames: typing.List[str]) -> SubjectOnDiskHeader: ...
+    def setGroundForceBodies(self, groundForceBodies: typing.List[str]) -> SubjectOnDiskHeader: ...
+    def setHeightM(self, heightM: float) -> SubjectOnDiskHeader: ...
+    def setHref(self, sourceHref: str) -> SubjectOnDiskHeader: ...
+    def setMassKg(self, massKg: float) -> SubjectOnDiskHeader: ...
+    def setNotes(self, notes: str) -> SubjectOnDiskHeader: ...
+    def setNumDofs(self, dofs: int) -> SubjectOnDiskHeader: ...
+    def setSubjectTags(self, subjectTags: typing.List[str]) -> SubjectOnDiskHeader: ...
+    pass
+class SubjectOnDiskPassHeader():
+    def __init__(self) -> None: ...
+    def setOpenSimFileText(self, openSimFileText: str) -> None: ...
+    def setProcessingPassType(self, type: ProcessingPassType) -> None: ...
+    pass
+class SubjectOnDiskTrial():
+    def __init__(self) -> None: ...
+    def addPass(self) -> SubjectOnDiskTrialPass: 
         """
-        This writes a subject out to disk in a compressed and random-seekable binary format.
+        This creates a new :code:`SubjectOnDiskTrialPass` for this trial, and returns it. That object can store results from IK and ID, as well as other results from the processing pipeline.
         """
+    def setAccObservations(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def setCustomValues(self, customValues: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None: ...
+    def setEmgObservations(self, emgObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None: ...
+    def setExoTorques(self, exoTorques: typing.Dict[int, numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None: ...
+    def setForcePlates(self, forcePlates: typing.List[ForcePlate]) -> None: ...
+    def setGyroObservations(self, gyroObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def setMarkerNamesGuessed(self, markersGuessed: bool) -> None: ...
+    def setMarkerObservations(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def setMissingGRFReason(self, missingGRFReason: typing.List[MissingGRFReason]) -> None: ...
+    def setName(self, name: str) -> None: ...
+    def setOriginalTrialName(self, name: str) -> None: ...
+    def setSplitIndex(self, split: int) -> None: ...
+    def setTimestep(self, timestep: float) -> None: ...
+    def setTrialTags(self, trialTags: typing.List[str]) -> None: ...
+    pass
+class SubjectOnDiskTrialPass():
+    def __init__(self) -> None: ...
+    def computeValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forces: numpy.ndarray[numpy.float64, _Shape[m, n]], moments: numpy.ndarray[numpy.float64, _Shape[m, n]], cops: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def computeValuesFromForcePlates(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forcePlates: typing.List[ForcePlate]) -> None: ...
+    def setAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setAngularResidual(self, angularResidual: typing.List[float]) -> None: ...
+    def setComAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setComPoses(self, poses: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setComVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setDofAccelerationFiniteDifferenced(self, dofAccelerationFiniteDifference: typing.List[bool]) -> None: ...
+    def setDofPositionsObserved(self, dofPositionsObserved: typing.List[bool]) -> None: ...
+    def setDofVelocitiesFiniteDifferenced(self, dofVelocitiesFiniteDifferenced: typing.List[bool]) -> None: ...
+    def setGroundBodyCopTorqueForce(self, copTorqueForces: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setGroundBodyWrenches(self, wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setLinearResidual(self, linearResidual: typing.List[float]) -> None: ...
+    def setMarkerMax(self, markerMax: typing.List[float]) -> None: ...
+    def setMarkerRMS(self, markerRMS: typing.List[float]) -> None: ...
+    def setPoses(self, poses: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setTaus(self, taus: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setType(self, type: ProcessingPassType) -> None: ...
+    def setVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     pass
 forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 4>
 measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>

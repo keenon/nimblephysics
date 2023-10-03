@@ -1,5 +1,6 @@
 #include "dart/biomechanics/MarkerFitter.hpp"
 
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <limits>
@@ -8,7 +9,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <fstream>
 
 #include <coin/IpIpoptApplication.hpp>
 #include <coin/IpSolveStatistics.hpp>
@@ -1091,12 +1091,23 @@ bool MarkerFitter::checkForEnoughMarkers(
 /// anomalies, generate warnings to help the user fix their own issues, and
 /// produce fixes where possible.
 std::shared_ptr<MarkersErrorReport> MarkerFitter::generateDataErrorsReport(
-    const std::vector<std::map<std::string, Eigen::Vector3s>>&
+    std::vector<std::map<std::string, Eigen::Vector3s>>
         immutableMarkerObservations,
-    s_t dt)
+    s_t dt,
+    bool rippleReduce,
+    bool rippleReduceUseSparse,
+    bool rippleReduceUseIterativeSolver,
+    int rippleReduceSolverIterations)
 {
   std::shared_ptr<MarkersErrorReport> report
-      = MarkerFixer::generateDataErrorsReport(immutableMarkerObservations, dt);
+      = MarkerFixer::generateDataErrorsReport(
+          immutableMarkerObservations,
+          dt,
+          false,
+          rippleReduce,
+          rippleReduceUseSparse,
+          rippleReduceUseIterativeSolver,
+          rippleReduceSolverIterations);
 
   // 1. Generate a list of the markers we observe in this clip
 
@@ -1699,7 +1710,11 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
 
   // 1. Find the initial scaling + IK
   MarkerInitialization init = getInitialization(
-      markerObservations, newClip, InitialMarkerFitParams(params).setDontRescaleBodies(true).setDontMoveMarkers(true));
+      markerObservations,
+      newClip,
+      InitialMarkerFitParams(params)
+          .setDontRescaleBodies(true)
+          .setDontMoveMarkers(true));
   mSkeleton->setGroupScales(init.groupScales);
 
   // 2. Find the joint centers
@@ -1723,7 +1738,7 @@ MarkerInitialization MarkerFitter::runPrescaledPipeline(
           .setInitPoses(init.poses)
           .setDontRescaleBodies(true)
           .setDontMoveMarkers(true));
-  
+
   return reinit;
 }
 
@@ -4233,6 +4248,43 @@ MarkerInitialization MarkerFitter::getInitialization(
   }
   std::cout << "Size of observed joints: " << result.observedJoints.size()
             << std::endl;
+  if (result.observedJoints.size() == 0)
+  {
+    std::cout << "ERROR: No joints are observed in the data." << std::endl;
+    std::vector<std::string> inputDataMarkers;
+    for (int t = 0; t < markerObservations.size(); t++)
+    {
+      for (auto& pair : markerObservations[t])
+      {
+        if (std::find(
+                inputDataMarkers.begin(), inputDataMarkers.end(), pair.first)
+            == inputDataMarkers.end())
+        {
+          inputDataMarkers.push_back(pair.first);
+        }
+      }
+    }
+    std::cout << "The markers that are visible in the input data are: "
+              << std::endl;
+    for (std::string marker : inputDataMarkers)
+    {
+      std::cout << "  " << marker << std::endl;
+    }
+
+    std::cout << "The markers that are on the skeleton are: " << std::endl;
+    for (auto& pair : mMarkerMap)
+    {
+      std::cout << "  " << pair.first << std::endl;
+    }
+
+    std::cout << "The markers that are visible in the input data _and_ on the "
+                 "skeleton are: "
+              << std::endl;
+    for (std::string marker : result.observedMarkers)
+    {
+      std::cout << "  " << marker << std::endl;
+    }
+  }
   std::cout << "Size of unobserved joints: " << result.unobservedJoints.size()
             << std::endl;
   assert(
@@ -6723,8 +6775,9 @@ void MarkerFitter::findJointCenters(
   }
   */
 
-  NIMBLE_THROW_IF(initialization.poses.hasNaN(),
-                  "IK initialization in findJointCenters() NaNs.");
+  NIMBLE_THROW_IF(
+      initialization.poses.hasNaN(),
+      "IK initialization in findJointCenters() NaNs.");
 
   // 2. Actually compute the joint centers (multi threaded)
   std::vector<std::future<std::shared_ptr<SphereFitJointCenterProblem>>>
@@ -7702,7 +7755,7 @@ void MarkerFitter::removeZeroConstraint(std::string name)
 
 //==============================================================================
 /// This writes a unified CSV with columns describing the results for the trial
-  /// associated with this MarkerInitialization.
+/// associated with this MarkerInitialization.
 void MarkerFitter::writeCSVData(
     std::string path,
     const MarkerInitialization& init,
@@ -7712,7 +7765,8 @@ void MarkerFitter::writeCSVData(
 {
   // Convenience function.
   auto writeVectorToCSV = [](std::ofstream& csvFile, Eigen::VectorXs& vec) {
-    for (int i = 0; i < vec.size(); i++) {
+    for (int i = 0; i < vec.size(); i++)
+    {
       csvFile << "," << vec(i);
     }
   };
@@ -7751,7 +7805,8 @@ void MarkerFitter::writeCSVData(
     {
       dq = (init.poses.col(t) - init.poses.col(t - 1)) / dt;
       ddq = (init.poses.col(t + 1) - 2 * init.poses.col(t)
-             + init.poses.col(t - 1)) / (dt * dt);
+             + init.poses.col(t - 1))
+            / (dt * dt);
     }
 
     writeVectorToCSV(csvFile, q);
