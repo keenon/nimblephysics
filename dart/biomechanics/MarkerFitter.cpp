@@ -5420,7 +5420,8 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
           assert(
               jac.rows()
               == (markerVector.size() * 3)
-                     + (jointsForSkeletonBallJoints.size() * 3));
+                     + (jointsForSkeletonBallJoints.size() * 3)
+                     + virtualSpringDofs.size());
           jac.setZero();
           jac.block(
               0, 0, markerVector.size() * 3, skeletonBallJoints->getNumDofs())

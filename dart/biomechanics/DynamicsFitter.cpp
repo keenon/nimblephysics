@@ -4684,6 +4684,13 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
 
   int includedTrials = 0;
 
+  std::cout << "Creating multiple shooting blocks..." << std::endl;
+  std::cout << "Trials to create blocks from: " << init->poseTrials.size() << std::endl;
+  std::cout << "Maximum block size: " << blockSize << std::endl;
+  std::cout << "Maximum number of trials to use: " << maxNumTrials << std::endl;
+  std::cout << "Only one trial: " << onlyOneTrial << std::endl;
+  std::cout << "Max blocks per trial: " << maxBlocksPerTrial << std::endl;
+
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     if (onlyOneTrial > -1 && trial != onlyOneTrial)
@@ -4696,6 +4703,7 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
       }
       if (!init->includeTrialsInDynamicsFit[trial])
       {
+        std::cout << "Skipping creating blocks for trial " << trial << " because it's not included in the dynamics fit." << std::endl;
         continue;
       }
       includedTrials++;
@@ -5497,8 +5505,10 @@ s_t DynamicsFitProblem::computeLossParallel(
     }
   }
 
+  int numThreads = std::min((int)mBlocks.size(), mConfig.mNumThreads);
+
   std::vector<struct LossExplanation> threadLossExplanations;
-  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
     threadLossExplanations.emplace_back();
     struct LossExplanation& threadLoss = threadLossExplanations[threadIdx];
@@ -5515,7 +5525,7 @@ s_t DynamicsFitProblem::computeLossParallel(
 
   std::vector<std::future<void>> futures;
   for (int threadIdx = 0;
-       threadIdx < std::min((int)mBlocks.size(), mConfig.mNumThreads);
+       threadIdx < numThreads;
        threadIdx++)
   {
     futures.push_back(std::async([&threadLossExplanations,
@@ -5664,7 +5674,7 @@ s_t DynamicsFitProblem::computeLossParallel(
       }
     }));
   }
-  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
     (void)futures[threadIdx].get();
   }
@@ -5678,7 +5688,7 @@ s_t DynamicsFitProblem::computeLossParallel(
   s_t jointRMS = 0.0;
   s_t axisRMS = 0.0;
   int markerCount = 0;
-  for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
+  for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
     linearNewtonError += threadLossExplanations[threadIdx].linearNewtonError;
     residualRMS += threadLossExplanations[threadIdx].residualRMS;

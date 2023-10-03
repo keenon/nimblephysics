@@ -11,7 +11,8 @@ endif()
 # set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
 project(dart)
 
-add_definitions(-UNDEBUG)
+# Add this to enable asserts in Release mode
+# add_definitions(-UNDEBUG)
 
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 
