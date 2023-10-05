@@ -106,10 +106,23 @@ void MarkerFitter(py::module& m)
 
   ::py::class_<dart::biomechanics::MarkerInitialization>(
       m, "MarkerInitialization")
+      .def(::py::init<>())
       .def_readwrite("poses", &dart::biomechanics::MarkerInitialization::poses)
       .def_readwrite(
           "jointCenters",
           &dart::biomechanics::MarkerInitialization::jointCenters)
+      .def_readwrite(
+          "jointAxis",
+          &dart::biomechanics::MarkerInitialization::jointAxis)
+      .def_readwrite(
+          "jointsAdjacentMarkers",
+          &dart::biomechanics::MarkerInitialization::jointsAdjacentMarkers)
+      .def_readwrite(
+          "jointWeights",
+          &dart::biomechanics::MarkerInitialization::jointWeights)
+      .def_readwrite(
+          "axisWeights",
+          &dart::biomechanics::MarkerInitialization::axisWeights)
       .def_readwrite(
           "joints", &dart::biomechanics::MarkerInitialization::joints)
       .def_readwrite(

@@ -1223,6 +1223,8 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 {
   Eigen::MatrixXs grfTrial
       = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrial
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
 
   // 1. We need to assign the force plates to feet, and compute the total
   // wrenches applied to each foot
@@ -1305,6 +1307,32 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
         skel->setAccelerations(ddq);
         comAccs.col(t) = skel->getCOMLinearAcceleration();
+  
+        // Estimate ground height from recorded CoPs, for later CoP calculations
+        // TODO: this assumes that all contacts on this frame are at the same height
+        s_t groundHeight = 0.0;
+        if (forcePlates.size() > 0) {
+          for (int i = 0; i < forcePlates.size(); i++)
+          {
+            if (forcePlates.at(i).centersOfPressure.size() > t &&
+               !forcePlates.at(i).centersOfPressure.at(t).hasNaN() &&
+               forcePlates.at(i).forces.size() > t &&
+               forcePlates.at(i).forces.at(t).norm() > 1e-8) {
+              groundHeight = forcePlates.at(i).centersOfPressure.at(t)(1);
+            }
+          }
+        }
+
+        for (int i = 0; i < footIndices.size(); i++)
+        {
+          Eigen::Vector6s localWrench = grfTrial.block<6, 1>(i * 6, t);
+          Eigen::Vector6s worldWrench = math::dAdInvT(
+              skel->getBodyNode(footIndices.at(i))->getWorldTransform(),
+              localWrench);
+          Eigen::Vector9s copWrench
+              = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+          copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
+        }
       }
     }
     linearResiduals.push_back(linearResidual);
@@ -1321,12 +1349,7 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   setComPoses(comPoses);
   setComVels(comVels);
   setComAccs(comAccs);
-
-  // TODO: convert wrenches to cop-torque-force format
-  // SubjectOnDiskTrialPass& setGroundBodyCopTorqueForce(
-  //     Eigen::MatrixXs copTorqueForces);
-  setGroundBodyCopTorqueForce(
-      Eigen::MatrixXs::Zero(footBodyNames.size() * 9, poses.cols()));
+  setGroundBodyCopTorqueForce(copTorqueForceTrial);
 }
 
 // Manual setters that compete with computeValues()

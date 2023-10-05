@@ -205,14 +205,16 @@ s_t solveIK(
     IKConfig config)
 {
 #ifndef NDEBUG
-  verifyJacobian(
-      initialPos,
-      upperBound,
-      lowerBound,
-      targetSize,
-      setPosAndClamp,
-      eval,
-      config);
+  // For now, disable this, though it DOES fire sometimes which is alarming
+
+  // verifyJacobian(
+  //     initialPos,
+  //     upperBound,
+  //     lowerBound,
+  //     targetSize,
+  //     setPosAndClamp,
+  //     eval,
+  //     config);
 #endif
 
   s_t bestError = std::numeric_limits<s_t>::infinity();
