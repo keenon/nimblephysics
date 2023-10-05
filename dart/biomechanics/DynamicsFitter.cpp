@@ -5649,7 +5649,6 @@ s_t DynamicsFitProblem::computeLossParallel(
   }
 
   int numThreads = std::min((int)mBlocks.size(), mConfig.mNumThreads);
-  std::cout << "Computing loss with " << numThreads << " threads" << std::endl;
 
   std::vector<struct LossExplanation> threadLossExplanations;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
