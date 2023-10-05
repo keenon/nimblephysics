@@ -4693,6 +4693,16 @@ DynamicsFitProblem::DynamicsFitProblem(
         threadJoints.at(threadJoints.size() - 1).push_back(skelClone->getJoint(j->getName()));
       }
     }
+    for (int trial = 0; trial < mInit->joints.size(); trial++) {
+      if (threadJoints.at(trial).size() != mInit->joints.at(trial).size()) {
+        std::cout << "INTERNAL ERROR" << std::endl;
+        std::cout << "threadJoints.at(trial).size() = "
+                  << threadJoints.at(trial).size() << std::endl;
+        std::cout << "mInit->joints.at(trial).size() = "
+                  << mInit->joints.at(trial).size() << std::endl;
+        throw std::runtime_error("threadJoints.at(trial).size() != mInit->joints.at(trial).size()");
+      }
+    }
     mThreadJoints.push_back(threadJoints);
 
     mThreadResidualHelpers.push_back(std::make_shared<ResidualForceHelper>(
@@ -5378,7 +5388,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
                    .squaredNorm()
                * mInit->jointWeights.at(block.trial)(i);
       }
-      for (int i = 0; i < mInit->axisWeights.size(); i++)
+      for (int i = 0; i < mInit->axisWeights.at(block.trial).size(); i++)
       {
         Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
         Eigen::Vector3s axisDir = jointAxis.segment<3>(i * 6 + 3).normalized();
@@ -5834,19 +5844,21 @@ s_t DynamicsFitProblem::computeLossParallel(
             throw std::runtime_error("!mThreadSkeletons[threadIdx]->hasBodyNode(pair.first)");
           }
         }
-        if (mInit->jointWeights.size() != mThreadJoints.at(threadIdx).at(block.trial).size()) {
+        if (mInit->jointWeights.at(threadIdx).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
           std::cout << "INTERNAL ERROR" << std::endl;
-          std::cout << "mInit->jointWeights.size() = "
-                    << mInit->jointWeights.size() << std::endl;
-          std::cout << "mInit->joints.size() = "
+          std::cout << "mInit->jointWeights.at(threadIdx).size() = "
+                    << mInit->jointWeights.at(threadIdx).size() << std::endl;
+          std::cout << "mInit->joints.at(threadIdx).size() = "
                     << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
+          throw std::runtime_error("mInit->jointWeights.at(threadIdx).size() > mInit->joints.at(threadIdx).size()");
         }
-        if (mInit->axisWeights.size() != mThreadJoints.at(threadIdx).at(block.trial).size()) {
+        if (mInit->axisWeights.at(threadIdx).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
           std::cout << "INTERNAL ERROR" << std::endl;
-          std::cout << "mInit->axisWeights.size() = "
-                    << mInit->axisWeights.size() << std::endl;
-          std::cout << "mInit->joints.size() = "
+          std::cout << "mInit->axisWeights.at(threadIdx).size() = "
+                    << mInit->axisWeights.at(threadIdx).size() << std::endl;
+          std::cout << "mInit->joints.at(threadIdx).size() = "
                     << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
+          throw std::runtime_error("mInit->axisWeights.at(threadIdx).size() > mInit->joints.at(threadIdx).size()");
         }
         if (mInit->jointCenters.at(block.trial).cols() < block.start + block.len) {
           std::cout << "INTERNAL ERROR" << std::endl;
@@ -5894,8 +5906,8 @@ s_t DynamicsFitProblem::computeLossParallel(
             mInit->jointAxis.at(block.trial).cols() >= block.start + block.len &&
             mInit->regularizePosesTo.size() > block.trial &&
             mInit->regularizePosesTo.at(block.trial).cols() >= block.start + block.len &&
-            mInit->jointWeights.size() == mThreadJoints.at(threadIdx).at(block.trial).size() &&
-            mInit->axisWeights.size() == mThreadJoints.at(threadIdx).at(block.trial).size() && 
+            mInit->jointWeights.at(threadIdx).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() &&
+            mInit->axisWeights.at(threadIdx).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() && 
             mInit->jointCenters.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 3 &&
             mInit->jointAxis.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 6) {
           for (int t = 0; t < block.len; t++)
@@ -5986,14 +5998,14 @@ s_t DynamicsFitProblem::computeLossParallel(
             }
 
             // Add joints
-            if (mThreadJoints.at(threadIdx).at(block.trial).size() > 0) {
+            // if (mThreadJoints.at(threadIdx).at(block.trial).size() > 0) {
               Eigen::VectorXs jointPoses
                   = mThreadSkeletons.at(threadIdx)->getJointWorldPositions(
                       mThreadJoints.at(threadIdx).at(block.trial));
               Eigen::VectorXs jointCenters
                   = mInit->jointCenters.at(block.trial).col(realT);
               Eigen::VectorXs jointDiff = jointPoses - jointCenters;
-              for (int i = 0; i < mInit->jointWeights.size(); i++)
+              for (int i = 0; i < mInit->jointWeights.at(block.trial).size(); i++)
               {
                 threadLoss.jointRMS += (jointPoses.segment<3>(i * 3)
                                         - jointCenters.segment<3>(i * 3))
@@ -6001,7 +6013,7 @@ s_t DynamicsFitProblem::computeLossParallel(
                                       * mInit->jointWeights.at(block.trial)(i);
               }
               Eigen::VectorXs jointAxis = mInit->jointAxis.at(block.trial).col(realT);
-              for (int i = 0; i < mInit->axisWeights.size(); i++)
+              for (int i = 0; i < mInit->axisWeights.at(block.trial).size(); i++)
               {
                 Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
                 Eigen::Vector3s axisDir
@@ -6013,10 +6025,9 @@ s_t DynamicsFitProblem::computeLossParallel(
                 threadLoss.axisRMS
                     += jointDiff.squaredNorm() * mInit->axisWeights.at(block.trial)(i);
               }
-            }
+            // }
 
             // Add regularization
-            std::cout << "Computing pose regularization" << std::endl;
             threadLoss.poseRegularization
                 += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
                   * (block.pos.col(t)
@@ -6046,16 +6057,25 @@ s_t DynamicsFitProblem::computeLossParallel(
   int markerCount = 0;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    linearNewtonError += threadLossExplanations.at(threadIdx).linearNewtonError;
-    residualRMS += threadLossExplanations.at(threadIdx).residualRMS;
-    markerRMS += threadLossExplanations.at(threadIdx).markerRMS;
-    poseRegularization += threadLossExplanations.at(threadIdx).poseRegularization;
-    accRegularization += threadLossExplanations.at(threadIdx).accRegularization;
-    jointAccRegularization
-        += threadLossExplanations.at(threadIdx).jointAccRegularization;
-    jointRMS += threadLossExplanations.at(threadIdx).jointRMS;
-    axisRMS += threadLossExplanations.at(threadIdx).axisRMS;
-    markerCount += threadLossExplanations.at(threadIdx).markerCount;
+    if (threadIdx < threadLossExplanations.size()) {
+      linearNewtonError += threadLossExplanations.at(threadIdx).linearNewtonError;
+      residualRMS += threadLossExplanations.at(threadIdx).residualRMS;
+      markerRMS += threadLossExplanations.at(threadIdx).markerRMS;
+      poseRegularization += threadLossExplanations.at(threadIdx).poseRegularization;
+      accRegularization += threadLossExplanations.at(threadIdx).accRegularization;
+      jointAccRegularization
+          += threadLossExplanations.at(threadIdx).jointAccRegularization;
+      jointRMS += threadLossExplanations.at(threadIdx).jointRMS;
+      axisRMS += threadLossExplanations.at(threadIdx).axisRMS;
+      markerCount += threadLossExplanations.at(threadIdx).markerCount;
+    }
+    else {
+      std::cout << "INTERNAL ERROR" << std::endl;
+      std::cout << "threadIdx = " << threadIdx << std::endl;
+      std::cout << "threadLossExplanations.size() = "
+                << threadLossExplanations.size() << std::endl;
+      throw std::runtime_error("threadIdx >= threadLossExplanations.size()");
+    }
   }
 
   sum += linearNewtonError;
@@ -6312,13 +6332,13 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       }
 
       Eigen::VectorXs jointGrad
-          = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
+          = Eigen::VectorXs::Zero(mInit->joints.at(block.trial).size() * 3);
       Eigen::VectorXs worldJoints
           = mSkeleton->getJointWorldPositions(mInit->joints.at(block.trial));
       Eigen::VectorXs targetJoints
           = mInit->jointCenters[block.trial].col(realT);
       Eigen::VectorXs targetAxis = mInit->jointAxis[block.trial].col(realT);
-      for (int i = 0; i < mInit->joints.size(); i++)
+      for (int i = 0; i < mInit->joints.at(block.trial).size(); i++)
       {
         Eigen::Vector3s worldDiff
             = worldJoints.segment<3>(i * 3) - targetJoints.segment<3>(i * 3);
@@ -7012,7 +7032,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
           }
 
           Eigen::VectorXs jointGrad
-              = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
+              = Eigen::VectorXs::Zero(mInit->joints.at(block.trial).size() * 3);
           Eigen::VectorXs worldJoints
               = mThreadSkeletons.at(threadIdx)->getJointWorldPositions(
                   mThreadJoints.at(threadIdx).at(block.trial));
@@ -7245,7 +7265,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
 
               // Record joint gradients
               threadGrad.segment(cursor, dim)
-                  += mThreadSkeletons[threadIdx]
+                  += mThreadSkeletons.at(threadIdx)
                          ->getJointWorldPositionsJacobianWrtGroupScales(
                              mThreadJoints.at(threadIdx).at(block.trial))
                          .transpose()
@@ -7376,8 +7396,8 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
 
               // Record marker gradients
               posGrad += MarkerFitter::getMarkerLossGradientWrtJoints(
-                  mThreadSkeletons[threadIdx],
-                  mThreadMarkers[threadIdx],
+                  mThreadSkeletons.at(threadIdx),
+                  mThreadMarkers.at(threadIdx),
                   lossGradWrtMarkerError);
 
               // Record regularization
@@ -7386,7 +7406,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
                             - mInit->regularizePosesTo[block.trial].col(realT));
 
               // Record joint gradients
-              posGrad += mThreadSkeletons[threadIdx]
+              posGrad += mThreadSkeletons.at(threadIdx)
                              ->getJointWorldPositionsJacobianWrtJointPositions(
                                  mThreadJoints.at(threadIdx).at(block.trial))
                              .transpose()
@@ -7436,16 +7456,16 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
             }
             if (mConfig.mIncludeBodyScales)
             {
-              int dim = mThreadSkeletons[threadIdx]->getGroupScaleDim();
+              int dim = mThreadSkeletons.at(threadIdx)->getGroupScaleDim();
               // Record marker gradients
               threadGrad.segment(cursor, dim)
                   += MarkerFitter::getMarkerLossGradientWrtGroupScales(
-                      mThreadSkeletons[threadIdx],
-                      mThreadMarkers[threadIdx],
+                      mThreadSkeletons.at(threadIdx),
+                      mThreadMarkers.at(threadIdx),
                       lossGradWrtMarkerError);
               // Record joint gradients
               threadGrad.segment(cursor, dim)
-                  += mThreadSkeletons[threadIdx]
+                  += mThreadSkeletons.at(threadIdx)
                          ->getJointWorldPositionsJacobianWrtGroupScales(
                              mThreadJoints.at(threadIdx).at(block.trial))
                          .transpose()
@@ -9477,7 +9497,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   init->joints.clear();
   for (int trial = 0; trial < kinematicInit.size(); trial++) {
     init->joints.emplace_back();
-    for (int i = 0; i < kinematicInit[0].joints.size(); i++)
+    for (int i = 0; i < kinematicInit.at(trial).joints.size(); i++)
     {
       init->joints.at(init->joints.size() - 1).push_back(
           skel->getJoint(kinematicInit.at(trial).joints.at(i)->getName()));
@@ -11559,9 +11579,9 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
   {
     totalTimesteps += init->poseTrials[trial].cols();
     int trialNumMissing = 0;
-    for (int i = 0; i < init->probablyMissingGRF[trial].size(); i++)
+    for (int i = 0; i < init->probablyMissingGRF.at(trial).size(); i++)
     {
-      if (init->probablyMissingGRF[trial][i])
+      if (init->probablyMissingGRF.at(trial).at(i))
       {
         trialNumMissing++;
       }
@@ -11594,28 +11614,28 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
   int regularizationCursor = totalTimesteps * 3;
   for (int trial : solveOverTrials)
   {
-    s_t dt = init->trialTimesteps[trial];
+    s_t dt = init->trialTimesteps.at(trial);
     mSkeleton->setTimeStep(dt);
     std::vector<Eigen::Vector3s> originalCOMs = comPositions(init, trial);
-    Eigen::MatrixXs q = init->poseTrials[trial];
+    Eigen::MatrixXs q = init->poseTrials.at(trial);
     Eigen::MatrixXs dq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
     Eigen::MatrixXs ddq = Eigen::MatrixXs::Zero(q.rows(), q.cols());
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    for (int t = 0; t < init->poseTrials.at(trial).cols(); t++)
     {
       // Compute the offset from the difference between a finite-difference's
       // COM acceleration and an analytical one
-      if (t > 0 && t < init->poseTrials[trial].cols() - 1)
+      if (t > 0 && t < init->poseTrials.at(trial).cols() - 1)
       {
         dq.col(t) = mSkeleton->getPositionDifferences(
-                        init->poseTrials[trial].col(t),
-                        init->poseTrials[trial].col(t - 1))
+                        init->poseTrials.at(trial).col(t),
+                        init->poseTrials.at(trial).col(t - 1))
                     / dt;
         ddq.col(t) = (mSkeleton->getPositionDifferences(
-                          init->poseTrials[trial].col(t + 1),
-                          init->poseTrials[trial].col(t))
+                          init->poseTrials.at(trial).col(t + 1),
+                          init->poseTrials.at(trial).col(t))
                       - mSkeleton->getPositionDifferences(
-                          init->poseTrials[trial].col(t),
-                          init->poseTrials[trial].col(t - 1)))
+                          init->poseTrials.at(trial).col(t),
+                          init->poseTrials.at(trial).col(t - 1)))
                      / (dt * dt);
       }
     }
@@ -11629,8 +11649,8 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
             q,
             dq,
             ddq,
-            init->grfTrials[trial],
-            init->probablyMissingGRF[trial],
+            init->grfTrials.at(trial),
+            init->probablyMissingGRF.at(trial),
             maxBucketSize);
 
     int trialOutputDims = linearSystem.first.rows();
@@ -11647,14 +11667,20 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     // Copy output offsets raw
     b.segment(rowCursor, trialOutputDims) = linearSystem.second;
     // Copy over the target - original root positions
-    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    for (int t = 0; t < init->poseTrials.at(trial).cols(); t++)
     {
       target.segment<3>(rowCursor + (t * 3))
           = init->poseTrials[trial].col(t).segment<3>(3);
     }
     // Add regularization for the residuals
     int trialResidualDims = trialInputDimsWithoutMass - 6;
-    assert(trialMissingTimesteps[trial] * 3 == trialResidualDims);
+    // if (trialMissingTimesteps.at(trial) * 3 != trialResidualDims) {
+    //   std::cout << "Trial missing timesteps: " << trialMissingTimesteps.at(trial)
+    //             << std::endl;
+    //   std::cout << "Trial residual dims: " << trialResidualDims << std::endl;
+    //   std::cout << "trialInputDimsWithoutMass: " << trialInputDimsWithoutMass << std::endl;
+    // }
+    // assert(trialMissingTimesteps.at(trial) * 3 == trialResidualDims);
     A.block(
         regularizationCursor,
         colCursor + 6,
