@@ -4,6 +4,7 @@
 #include <future>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -1223,7 +1224,7 @@ bool MarkerFitter::checkForFlippedMarkers(
   std::map<std::string, int> observedMarkersMap;
   for (int i = 0; i < markerObservations.size(); i++)
   {
-    for (auto& pair : markerObservations[i])
+    for (auto& pair : markerObservations.at(i))
     {
       observedMarkersMap[pair.first] = 1;
     }
@@ -1243,11 +1244,18 @@ bool MarkerFitter::checkForFlippedMarkers(
   Eigen::VectorXs originalScales = mSkeleton->getGroupScales();
   std::map<std::string, std::map<std::string, s_t>> totalDistances;
   std::map<std::string, std::map<std::string, int>> totalObservations;
-  for (std::string& marker : mMarkerNames)
+  for (std::string& marker : observedMarkers)
   {
+    totalDistances[marker] = std::map<std::string, s_t>();
+    totalObservations[marker] = std::map<std::string, int>();
     for (std::string& innerMarker : observedMarkers)
     {
-      totalDistances[marker][innerMarker] = 0.0;
+      if (!totalDistances.count(marker)) {
+        std::cout << "init: totalDistances doesn'contain "
+                  << marker << std::endl;
+      }
+      totalDistances.at(marker)[innerMarker] = 0.0;
+      totalObservations.at(marker)[innerMarker] = 0;
     }
   }
 
@@ -1257,34 +1265,95 @@ bool MarkerFitter::checkForFlippedMarkers(
     mSkeleton->setPositions(init.poses.col(i));
     std::map<std::string, Eigen::Vector3s> markerPos
         = mSkeleton->getMarkerMapWorldPositions(init.updatedMarkerMap);
-    for (auto& pair : markerPos)
-    {
-      for (auto& innerPair : markerObservations[i])
+    if (markerObservations.size() > i) {
+      for (auto& pair : markerPos)
       {
-        totalDistances[pair.first][innerPair.first]
-            += (pair.second - innerPair.second).norm();
-        totalObservations[pair.first][innerPair.first]++;
+        if (std::find(observedMarkers.begin(), observedMarkers.end(), pair.first)
+            == observedMarkers.end())
+        {
+          // Skip any markers that are not in the `observedMarkers` list
+          continue;
+        }
+        for (auto& innerPair : markerObservations.at(i))
+        {
+          if (!totalDistances.count(pair.first)) {
+            std::cout << "counting: totalDistances doesn't contain " << pair.first
+                      << std::endl;
+          }
+          else if (!totalDistances.at(pair.first).count(innerPair.first)) {
+            std::cout << "counting: totalDistances[" << pair.first << "] doesn'contain " << innerPair.first
+                      << std::endl;
+          }
+          totalDistances.at(pair.first).at(innerPair.first)
+              += (pair.second - innerPair.second).norm();
+
+          if (!totalObservations.count(pair.first)) {
+            std::cout << "counting: totalObservations doesn'contain " << pair.first
+                      << std::endl;
+          }
+          else if (!totalObservations.at(pair.first).count(innerPair.first)) {
+            std::cout << "counting: totalObservations[" << pair.first << "] doesn'contain " << innerPair.first
+                      << std::endl;
+          }
+          totalObservations.at(pair.first).at(innerPair.first)++;
+        }
       }
+    }
+    else {
+      std::cout << "i = " << i << ", markerObservations.size() = " << markerObservations.size() << std::endl;
     }
   }
   mSkeleton->setPositions(originalPose);
   mSkeleton->setGroupScales(originalScales);
 
   std::map<std::string, std::string> closestMarkers;
-  for (std::string& marker : mMarkerNames)
+  for (std::string& marker : observedMarkers)
   {
     std::string closestMarker = marker;
-    s_t closestMarkerDistance = totalDistances[marker][marker]
-                                / (totalObservations[marker][marker] > 0
-                                       ? totalObservations[marker][marker]
+    if (!totalDistances.count(marker)) {
+      std::cout << "pre-averaging: totalDistances doesn'contain " << marker
+                << std::endl;
+    }
+    else if (!totalDistances.at(marker).count(marker)) {
+      std::cout << "pre-averaging: totalDistances[" << marker << "] doesn'contain " << marker
+                << std::endl;
+    }
+    if (!totalObservations.count(marker)) {
+      std::cout << "pre-averaging: totalObservations doesn'contain " << marker
+                << std::endl;
+    }
+    else if (!totalObservations.at(marker).count(marker)) {
+      std::cout << "pre-averaging: totalObservations[" << marker << "] doesn'contain " << marker
+                << std::endl;
+    }
+    s_t closestMarkerDistance = totalDistances.at(marker).at(marker)
+                                / (totalObservations.at(marker).at(marker) > 0
+                                       ? totalObservations.at(marker).at(marker)
                                        : 1.0);
 
     for (std::string& innerMarker : observedMarkers)
     {
-      int observed = totalObservations[marker][innerMarker];
+      if (!totalObservations.count(marker)) {
+        std::cout << "averaging: totalObservations doesn'contain " << marker
+                  << std::endl;
+      }
+      else if (!totalObservations.at(marker).count(innerMarker)) {
+        std::cout << "averaging: totalObservations[" << marker << "] doesn'contain " << innerMarker
+                  << std::endl;
+      }
+
+      int observed = totalObservations.at(marker).at(innerMarker);
       if (observed > 0)
       {
-        s_t avgDist = totalDistances[marker][innerMarker] / observed;
+        if (!totalDistances.count(marker)) {
+          std::cout << "averaging: totalDistances doesn'contain " << marker
+                    << std::endl;
+        }
+        else if (!totalDistances.at(marker).count(innerMarker)) {
+          std::cout << "averaging: totalDistances[" << marker << "] doesn'contain " << innerMarker
+                    << std::endl;
+        }
+        s_t avgDist = totalDistances.at(marker).at(innerMarker) / observed;
         if (avgDist < closestMarkerDistance)
         {
           closestMarker = innerMarker;
@@ -1299,46 +1368,51 @@ bool MarkerFitter::checkForFlippedMarkers(
   std::map<std::string, std::string> swapped;
   bool anySwapped = false;
 
-  for (std::string& marker : mMarkerNames)
+  for (std::string& marker : observedMarkers)
   {
+    if (!closestMarkers.count(marker)) {
+      std::cout << "swapping: closestMarkers doesn'contain " << marker << std::endl;
+    }
+    const std::string closetToMarker = closestMarkers.at(marker);
+    if (!closestMarkers.count(closetToMarker)) {
+      std::cout << "swapping: closestMarkers doesn'contain " << closestMarkers.at(marker) << std::endl;
+    }
+    const std::string closetToClosest = closestMarkers.at(closetToMarker);
+
     // If we're not closest to ourselves, and the thing we're closest to is
     // closest to us, then this is a good indication that we've found a marker
     // that shouldn't have been swapped! We also check that it hasn't already
     // been swapped with us, cause we don't want to double-swap and end up
     // swapping back.
-    if (closestMarkers[marker] != marker
-        && closestMarkers[closestMarkers[marker]] == marker
-        && swapped.count(closestMarkers[marker]) == 0)
+    if (closetToMarker != marker
+        && closetToClosest == marker
+        && swapped.count(closetToMarker) == 0)
     {
       report->warnings.push_back(
           "Marker \"" + marker + "\" seems it was swapped with \""
-          + closestMarkers[marker] + "\" for the whole clip.");
-      swapped[marker] = closestMarkers[marker];
-      swapped[closestMarkers[marker]] = marker;
+          + closetToMarker + "\" for the whole clip.");
+      swapped[marker] = closetToMarker;
+      swapped[closetToMarker] = marker;
       anySwapped = true;
 
       for (int i = 0; i < markerObservations.size(); i++)
       {
-        if (markerObservations[i].count(marker) > 0
-            && markerObservations[i].count(closestMarkers[marker]))
+        std::map<std::string, Eigen::Vector3s>& obs = markerObservations.at(i);
+        if (obs.count(marker) && obs.count(closetToMarker))
         {
-          Eigen::Vector3s tmp
-              = markerObservations[i].at(closestMarkers[marker]);
-          markerObservations[i][closestMarkers[marker]]
-              = markerObservations[i].at(marker);
-          markerObservations[i][marker] = tmp;
+          Eigen::Vector3s tmp = obs.at(closetToMarker);
+          obs[closetToMarker] = obs.at(marker);
+          obs[marker] = tmp;
         }
-        else if (markerObservations[i].count(marker) > 0)
+        else if (obs.count(marker))
         {
-          markerObservations[i][closestMarkers[marker]]
-              = markerObservations[i].at(marker);
-          markerObservations[i].erase(marker);
+          obs[closetToMarker] = obs.at(marker);
+          obs.erase(marker);
         }
-        else if (markerObservations[i].count(closestMarkers[marker]) > 0)
+        else if (obs.count(closetToMarker))
         {
-          markerObservations[i][marker]
-              = markerObservations[i].at(closestMarkers[marker]);
-          markerObservations[i].erase(closestMarkers[marker]);
+          obs[marker] = obs.at(closetToMarker);
+          obs.erase(closetToMarker);
         }
       }
     }
@@ -1372,7 +1446,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     int numTimesteps = 0;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      numTimesteps += markerObservationTrials[i].size();
+      numTimesteps += markerObservationTrials.at(i).size();
     }
     if (numTimesteps > params.maxTimestepsToUseForMultiTrialScaling)
     {
@@ -1394,7 +1468,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       std::cout << "Running joint init pipeline for trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
       markerVariabilities.push_back(
-          computeMarkerDistanceMatrixVariability(markerObservationTrials[i]));
+          computeMarkerDistanceMatrixVariability(markerObservationTrials.at(i)));
     }
 
     // 3.2. Sort the trials by the amount of joint variability in each one
@@ -1408,13 +1482,13 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
         orderedByJointVariability.end(),
         [&](int a, int b) {
           // Sort by joint marker variability
-          return markerVariabilities[a] > markerVariabilities[b];
+          return markerVariabilities.at(a) > markerVariabilities.at(b);
         });
     std::vector<int> inverseOrderedByJointVariability;
     inverseOrderedByJointVariability.resize(orderedByJointVariability.size());
     for (int i = 0; i < orderedByJointVariability.size(); i++)
     {
-      inverseOrderedByJointVariability[orderedByJointVariability[i]] = i;
+      inverseOrderedByJointVariability[orderedByJointVariability.at(i)] = i;
     }
 
     // 3.3. Debug the sorted trials variability
@@ -1422,9 +1496,9 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
               << std::endl;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      std::cout << std::to_string(i) << ": " << orderedByJointVariability[i]
+      std::cout << std::to_string(i) << ": " << orderedByJointVariability.at(i)
                 << " marker variability norm = "
-                << markerVariabilities[orderedByJointVariability[i]]
+                << markerVariabilities.at(orderedByJointVariability.at(i))
                 << std::endl;
     }
 
@@ -1450,11 +1524,11 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
               << markerObservationTrials.size() << std::endl;
     for (int i = 0; i < numTrialsToSample; i++)
     {
-      std::cout << "Trial " << orderedByJointVariability[i] << " length "
-                << markerObservationTrials[orderedByJointVariability[i]].size()
+      std::cout << "Trial " << orderedByJointVariability.at(i) << " length "
+                << markerObservationTrials.at(orderedByJointVariability.at(i)).size()
                 << std::endl;
-      trialSampledAtIndex[orderedByJointVariability[i]] = cursor;
-      cursor += markerObservationTrials[orderedByJointVariability[i]].size();
+      trialSampledAtIndex.at(orderedByJointVariability.at(i)) = cursor;
+      cursor += markerObservationTrials.at(orderedByJointVariability.at(i)).size();
     }
     std::cout << "Total timesteps to use for scaling: " << cursor << std::endl;
 
@@ -1464,11 +1538,11 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     for (int i = 0; i < numTrialsToSample; i++)
     {
       for (int j = 0;
-           j < markerObservationTrials[orderedByJointVariability[i]].size();
+           j < markerObservationTrials.at(orderedByJointVariability.at(i)).size();
            j++)
       {
         markerObservations.emplace_back(
-            markerObservationTrials[orderedByJointVariability[i]][j]);
+            markerObservationTrials.at(orderedByJointVariability.at(i)).at(j));
         newClip.push_back(j == 0);
       }
     }
@@ -1488,10 +1562,10 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       std::cout << "## IK on trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
 
-      if (trialSampledAtIndex[i] != -1)
+      if (trialSampledAtIndex.at(i) != -1)
       {
-        int cursor = trialSampledAtIndex[i];
-        int size = markerObservationTrials[i].size();
+        int cursor = trialSampledAtIndex.at(i);
+        int size = markerObservationTrials.at(i).size();
 
         MarkerInitialization result;
         result.groupScales = overallInit.groupScales;
@@ -1516,7 +1590,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       else
       {
         separateInits.push_back(runPrescaledPipeline(
-            markerObservationTrials[i],
+            markerObservationTrials.at(i),
             InitialMarkerFitParams(params)
                 .setGroupScales(overallInit.groupScales)
                 .setMarkerOffsets(overallInit.markerOffsets)));
@@ -1537,9 +1611,9 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     std::vector<bool> newClip;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      for (int j = 0; j < markerObservationTrials[i].size(); j++)
+      for (int j = 0; j < markerObservationTrials.at(i).size(); j++)
       {
-        markerObservations.emplace_back(markerObservationTrials[i][j]);
+        markerObservations.emplace_back(markerObservationTrials.at(i).at(j));
         newClip.push_back(j == 0);
       }
     }
@@ -1554,31 +1628,31 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     int cursor = 0;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      int size = markerObservationTrials[i].size();
+      int size = markerObservationTrials.at(i).size();
       separateInits.emplace_back();
 
-      separateInits[i].poses
+      separateInits.at(i).poses
           = overallInit.poses.block(0, cursor, overallInit.poses.rows(), size);
-      separateInits[i].poseScores
+      separateInits.at(i).poseScores
           = overallInit.poseScores.segment(cursor, size);
-      separateInits[i].groupScales = overallInit.groupScales;
-      separateInits[i].markerOffsets = overallInit.markerOffsets;
-      separateInits[i].updatedMarkerMap = overallInit.updatedMarkerMap;
+      separateInits.at(i).groupScales = overallInit.groupScales;
+      separateInits.at(i).markerOffsets = overallInit.markerOffsets;
+      separateInits.at(i).updatedMarkerMap = overallInit.updatedMarkerMap;
 
-      separateInits[i].joints = overallInit.joints;
-      separateInits[i].observedJoints = overallInit.observedJoints;
-      separateInits[i].unobservedJoints = overallInit.unobservedJoints;
-      separateInits[i].jointMarkerVariability
+      separateInits.at(i).joints = overallInit.joints;
+      separateInits.at(i).observedJoints = overallInit.observedJoints;
+      separateInits.at(i).unobservedJoints = overallInit.unobservedJoints;
+      separateInits.at(i).jointMarkerVariability
           = overallInit.jointMarkerVariability;
-      separateInits[i].jointsAdjacentMarkers
+      separateInits.at(i).jointsAdjacentMarkers
           = overallInit.jointsAdjacentMarkers;
-      separateInits[i].jointLoss = overallInit.jointLoss;
-      separateInits[i].jointWeights = overallInit.jointWeights;
-      separateInits[i].jointCenters = overallInit.jointCenters.block(
+      separateInits.at(i).jointLoss = overallInit.jointLoss;
+      separateInits.at(i).jointWeights = overallInit.jointWeights;
+      separateInits.at(i).jointCenters = overallInit.jointCenters.block(
           0, cursor, overallInit.jointCenters.rows(), size);
-      separateInits[i].axisWeights = overallInit.axisWeights;
-      separateInits[i].axisLoss = overallInit.axisLoss;
-      separateInits[i].jointAxis = overallInit.jointAxis.block(
+      separateInits.at(i).axisWeights = overallInit.axisWeights;
+      separateInits.at(i).axisLoss = overallInit.axisLoss;
+      separateInits.at(i).jointAxis = overallInit.jointAxis.block(
           0, cursor, overallInit.jointAxis.rows(), size);
 
       /*
@@ -6787,14 +6861,14 @@ void MarkerFitter::findJointCenters(
   {
     std::cout << "Computing joint center for " << i << "/"
               << initialization.joints.size() << ": \""
-              << initialization.joints[i]->getName() << "\"" << std::endl;
+              << initialization.joints.at(i)->getName() << "\"" << std::endl;
 
     std::shared_ptr<SphereFitJointCenterProblem> problemPtr
         = std::make_shared<SphereFitJointCenterProblem>(
             this,
             markerObservations,
             initialization.poses,
-            initialization.joints[i],
+            initialization.joints.at(i),
             newClip,
             initialization.jointCenters.block(
                 i * 3, 0, 3, markerObservations.size()));
@@ -6805,11 +6879,11 @@ void MarkerFitter::findJointCenters(
   }
   for (int i = 0; i < futures.size(); i++)
   {
-    s_t loss = futures[i].get()->saveSolutionBackToInitialization();
+    s_t loss = futures.at(i).get()->saveSolutionBackToInitialization();
     initialization.jointLoss(i) = loss / markerObservations.size();
     std::cout << "Finished computing joint center for " << i << "/"
               << initialization.joints.size() << ": \""
-              << initialization.joints[i]->getName() << "\"" << std::endl;
+              << initialization.joints.at(i)->getName() << "\"" << std::endl;
   }
   std::cout << "Finished computing all joint centers!" << std::endl;
 }

@@ -5861,6 +5861,12 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
   Eigen::VectorXs sourcePositions = Eigen::VectorXs::Zero(joints.size() * 3);
   for (int i = 0; i < joints.size(); i++)
   {
+    #ifndef NDEBUG
+    if (joints[i]->getChildBodyNode() == nullptr) {
+      std::cout << "ERROR in getJointWorldPositions(): Joint " << joints[i]->getName() << " has no child body node" << std::endl;
+      continue;
+    }
+    #endif
     sourcePositions.segment<3>(i * 3)
         = (joints[i]->getChildBodyNode()->getWorldTransform()
            * joints[i]->getTransformFromChildBodyNode())

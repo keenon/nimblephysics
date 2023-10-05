@@ -7,6 +7,7 @@
 #include <memory>
 #include <ostream>
 #include <queue>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -4221,6 +4222,16 @@ Eigen::VectorXs ResidualForceHelper::getMultiMassLinearSystemTestOutput(
   return linPoses;
 }
 
+int ResidualForceHelper::getNumForceBodies()
+{
+  return mForceBodies.size();
+}
+
+int ResidualForceHelper::getExpectedForcesDim()
+{
+  return mForceBodies.size() * 6;
+}
+
 //==============================================================================
 SpatialNewtonHelper::SpatialNewtonHelper(
     std::shared_ptr<dynamics::Skeleton> skeleton)
@@ -4576,6 +4587,22 @@ DynamicsFitProblem::DynamicsFitProblem(
     }
   }
 
+  if (mMarkerNames.size() != mMarkers.size()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mMarkerNames.size() = "
+              << mMarkerNames.size() << std::endl;
+    std::cout << "mMarkers.size() = " << mMarkers.size() << std::endl;
+    throw std::runtime_error("mMarkerNames.size() != mMarkers.size()");
+  }
+  if (mMarkerNames.size() != mMarkerIsTracking.size()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mMarkerNames.size() = "
+              << mMarkerNames.size() << std::endl;
+    std::cout << "mMarkerIsTracking.size() = " << mMarkerIsTracking.size()
+              << std::endl;
+    throw std::runtime_error("mMarkerNames.size() != mMarkerIsTracking.size()");
+  }
+
   // 2. Set up the q, dq, ddq, and GRF
 
   int dofs = skeleton->getNumDofs();
@@ -4585,30 +4612,44 @@ DynamicsFitProblem::DynamicsFitProblem(
     block.vel = Eigen::MatrixXs::Zero(dofs, block.len);
     block.acc = Eigen::MatrixXs::Zero(dofs, block.len);
     block.grf
-        = Eigen::MatrixXs::Zero(init->grfTrials[block.trial].rows(), block.len);
+        = Eigen::MatrixXs::Zero(init->grfTrials.at(block.trial).rows(), block.len);
 
-    block.dt = init->trialTimesteps[block.trial];
+    block.dt = init->trialTimesteps.at(block.trial);
 
     for (int t = 0; t < block.len; t++)
     {
       int realT = block.start + t;
-      block.pos.col(t) = init->poseTrials[block.trial].col(realT);
-      block.grf.col(t) = init->grfTrials[block.trial].col(realT);
+      if (realT >= init->poseTrials.at(block.trial).cols())
+      {
+        std::cout << "INTERNAL ERROR: block " << block.trial << " timestep " << t
+                  << " is out of bounds of poseTrials with width "
+                  << init->poseTrials.at(block.trial).cols() << std::endl;
+        break;
+      }
+      block.pos.col(t) = init->poseTrials.at(block.trial).col(realT);
+      if (realT >= init->grfTrials.at(block.trial).cols())
+      {
+        std::cout << "INTERNAL ERROR: block " << block.trial << " timestep " << t
+                  << " is out of bounds of grfTrials with width "
+                  << init->grfTrials.at(block.trial).cols() << std::endl;
+        break;
+      }
+      block.grf.col(t) = init->grfTrials.at(block.trial).col(realT);
       if (realT > 0)
       {
         block.vel.col(t) = mSkeleton->getPositionDifferences(
-                               init->poseTrials[block.trial].col(realT),
-                               init->poseTrials[block.trial].col(realT - 1))
+                               init->poseTrials.at(block.trial).col(realT),
+                               init->poseTrials.at(block.trial).col(realT - 1))
                            / block.dt;
       }
-      if (realT > 0 && realT < init->poseTrials[block.trial].cols() - 1)
+      if (realT > 0 && realT < init->poseTrials.at(block.trial).cols() - 1)
       {
         block.acc.col(t) = (mSkeleton->getPositionDifferences(
-                                init->poseTrials[block.trial].col(realT + 1),
-                                init->poseTrials[block.trial].col(realT))
+                                init->poseTrials.at(block.trial).col(realT + 1),
+                                init->poseTrials.at(block.trial).col(realT))
                             - mSkeleton->getPositionDifferences(
-                                init->poseTrials[block.trial].col(realT),
-                                init->poseTrials[block.trial].col(realT - 1)))
+                                init->poseTrials.at(block.trial).col(realT),
+                                init->poseTrials.at(block.trial).col(realT - 1)))
                            / (block.dt * block.dt);
       }
     }
@@ -4644,10 +4685,13 @@ DynamicsFitProblem::DynamicsFitProblem(
     }
     mThreadMarkers.push_back(threadMarkers);
 
-    std::vector<dynamics::Joint*> threadJoints;
-    for (dynamics::Joint* j : mInit->joints)
-    {
-      threadJoints.push_back(skelClone->getJoint(j->getName()));
+    std::vector<std::vector<dynamics::Joint*>> threadJoints;
+    for (int trial = 0; trial < mInit->joints.size(); trial++) {
+      threadJoints.emplace_back();
+      for (dynamics::Joint* j : mInit->joints.at(trial))
+      {
+        threadJoints.at(threadJoints.size() - 1).push_back(skelClone->getJoint(j->getName()));
+      }
     }
     mThreadJoints.push_back(threadJoints);
 
@@ -4658,6 +4702,11 @@ DynamicsFitProblem::DynamicsFitProblem(
   }
 
   mInitX = flatten();
+  if (mInitX.size() != getProblemSize()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "Got initial X size: " << mInitX.size() << std::endl;
+    std::cout << "Expected initial X size: " << getProblemSize() << std::endl;
+  }
   // Set all the thread copies to the same values
   unflatten(mInitX);
 
@@ -4701,7 +4750,7 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
       {
         continue;
       }
-      if (!init->includeTrialsInDynamicsFit[trial])
+      if (!init->includeTrialsInDynamicsFit.at(trial))
       {
         std::cout << "Skipping creating blocks for trial " << trial << " because it's not included in the dynamics fit." << std::endl;
         continue;
@@ -4711,27 +4760,27 @@ std::vector<struct DynamicsFitProblemBlock> DynamicsFitProblem::createBlocks(
 
     int cursor = 0;
     int blockIndex = 0;
-    while (cursor < init->poseTrials[trial].cols())
+    while (cursor < init->poseTrials.at(trial).cols())
     {
       if (maxBlocksPerTrial > -1 && blockIndex >= maxBlocksPerTrial)
       {
         if (blocks.size() > 0)
         {
-          struct DynamicsFitProblemBlock& lastBlock = blocks[blocks.size() - 1];
+          struct DynamicsFitProblemBlock& lastBlock = blocks.at(blocks.size() - 1);
           lastBlock.constrainToNextBlock = false;
           break;
         }
       }
       int len = blockSize;
       bool isLastBlock = false;
-      if (cursor + len >= init->poseTrials[trial].cols())
+      if (cursor + len >= init->poseTrials.at(trial).cols())
       {
-        len = init->poseTrials[trial].cols() - cursor;
+        len = init->poseTrials.at(trial).cols() - cursor;
         isLastBlock = true;
       }
 
       blocks.emplace_back();
-      struct DynamicsFitProblemBlock& newBlock = blocks[blocks.size() - 1];
+      struct DynamicsFitProblemBlock& newBlock = blocks.at(blocks.size() - 1);
 
       newBlock.trial = trial;
       newBlock.len = len;
@@ -4831,7 +4880,7 @@ Eigen::VectorXs DynamicsFitProblem::flatten()
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
-      flat.segment(cursor, 3) = mMarkers[i].second;
+      flat.segment(cursor, 3) = mMarkers.at(i).second;
       cursor += 3;
     }
   }
@@ -5026,7 +5075,7 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
     mSkeleton->setGroupMasses(x.segment(cursor, dim));
     for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
     {
-      mThreadSkeletons[threadIdx]->setGroupMasses(x.segment(cursor, dim));
+      mThreadSkeletons.at(threadIdx)->setGroupMasses(x.segment(cursor, dim));
     }
     cursor += dim;
   }
@@ -5036,7 +5085,7 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
     mSkeleton->setGroupCOMs(x.segment(cursor, dim));
     for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
     {
-      mThreadSkeletons[threadIdx]->setGroupCOMs(x.segment(cursor, dim));
+      mThreadSkeletons.at(threadIdx)->setGroupCOMs(x.segment(cursor, dim));
     }
     cursor += dim;
   }
@@ -5046,7 +5095,7 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
     mSkeleton->setGroupInertias(x.segment(cursor, dim));
     for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
     {
-      mThreadSkeletons[threadIdx]->setGroupInertias(x.segment(cursor, dim));
+      mThreadSkeletons.at(threadIdx)->setGroupInertias(x.segment(cursor, dim));
     }
     cursor += dim;
   }
@@ -5056,7 +5105,7 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
     mSkeleton->setGroupScales(x.segment(cursor, dim));
     for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
     {
-      mThreadSkeletons[threadIdx]->setGroupScales(x.segment(cursor, dim));
+      mThreadSkeletons.at(threadIdx)->setGroupScales(x.segment(cursor, dim));
     }
     cursor += dim;
   }
@@ -5064,10 +5113,10 @@ void DynamicsFitProblem::unflatten(Eigen::VectorXs x)
   {
     for (int i = 0; i < mMarkers.size(); i++)
     {
-      mMarkers[i].second = x.segment(cursor, 3);
+      mMarkers.at(i).second = x.segment(cursor, 3);
       for (int threadIdx = 0; threadIdx < mConfig.mNumThreads; threadIdx++)
       {
-        mThreadMarkers[threadIdx][i].second = x.segment(cursor, 3);
+        mThreadMarkers.at(threadIdx).at(i).second = x.segment(cursor, 3);
       }
       cursor += 3;
     }
@@ -5173,7 +5222,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
     if (mInit->regularizeMarkerOffsetsTo.count(mMarkerNames.at(i)))
     {
       markerRegularization
-          += (mMarkerIsTracking[i] ? mConfig.mRegularizeTrackingMarkerOffsets
+          += (mMarkerIsTracking.at(i) ? mConfig.mRegularizeTrackingMarkerOffsets
                                    : mConfig.mRegularizeAnatomicalMarkerOffsets)
              * (1.0 / mMarkerNames.size())
              * (mMarkers[i].second
@@ -5317,17 +5366,17 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
 
       // Add joints
       Eigen::VectorXs jointPoses
-          = mSkeleton->getJointWorldPositions(mInit->joints);
+          = mSkeleton->getJointWorldPositions(mInit->joints.at(block.trial));
       Eigen::VectorXs jointCenters
           = mInit->jointCenters[block.trial].col(realT);
       Eigen::VectorXs jointAxis = mInit->jointAxis[block.trial].col(realT);
       Eigen::VectorXs jointDiff = jointPoses - jointCenters;
-      for (int i = 0; i < mInit->jointWeights.size(); i++)
+      for (int i = 0; i < mInit->jointWeights.at(block.trial).size(); i++)
       {
         jointRMS
             += (jointPoses.segment<3>(i * 3) - jointCenters.segment<3>(i * 3))
                    .squaredNorm()
-               * mInit->jointWeights(i);
+               * mInit->jointWeights.at(block.trial)(i);
       }
       for (int i = 0; i < mInit->axisWeights.size(); i++)
       {
@@ -5337,7 +5386,7 @@ s_t DynamicsFitProblem::computeLoss(Eigen::VectorXs x, bool logExplanation)
         // Subtract out any component parallel to the axis
         Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
         jointDiff -= jointDiff.dot(axisDir) * axisDir;
-        axisRMS += jointDiff.squaredNorm() * mInit->axisWeights(i);
+        axisRMS += jointDiff.squaredNorm() * mInit->axisWeights.at(block.trial)(i);
       }
 
       // Add regularization
@@ -5428,28 +5477,72 @@ s_t DynamicsFitProblem::computeLossParallel(
       "You must call DynamicsFitter::estimateFootGroundContacts() with this "
       "init object before calling DynamicsFitProblem::computeLossParallel().");
 
-  s_t massRegularization
-      = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
-        * (mSkeleton->getGroupMasses() - mInit->regularizeGroupMassesTo)
-              .squaredNorm();
+  s_t massRegularization = 0.0;
+  if (mInit->regularizeGroupMassesTo.size() != mSkeleton->getGroupMasses().size())
+  {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mInit->regularizeGroupMassesTo.size() = "
+              << mInit->regularizeGroupMassesTo.size() << std::endl;
+    std::cout << "mSkeleton->getGroupMasses().size() = "
+              << mSkeleton->getGroupMasses().size() << std::endl;
+    throw std::runtime_error("mInit->regularizeGroupMassesTo.size() != mSkeleton->getGroupMasses().size()");
+  }
+  else {
+    massRegularization
+        = mConfig.mRegularizeMasses * (1.0 / mSkeleton->getNumScaleGroups())
+          * (mSkeleton->getGroupMasses() - mInit->regularizeGroupMassesTo)
+                .squaredNorm();
+  }
   sum += massRegularization;
   assert(!isnan(sum));
-  s_t comRegularization
-      = mConfig.mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
-        * (mSkeleton->getGroupCOMs() - mInit->regularizeGroupCOMsTo)
-              .squaredNorm();
+  s_t comRegularization = 0.0;
+  if (mInit->regularizeGroupCOMsTo.size() != mSkeleton->getGroupCOMs().size()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mInit->regularizeGroupCOMsTo.size() = "
+              << mInit->regularizeGroupCOMsTo.size() << std::endl;
+    std::cout << "mSkeleton->getGroupCOMs().size() = "
+              << mSkeleton->getGroupCOMs().size() << std::endl;
+    throw std::runtime_error("mInit->regularizeGroupCOMsTo.size() != mSkeleton->getGroupCOMs().size()");
+  }
+  else {
+    comRegularization = mConfig.mRegularizeCOMs * (1.0 / mSkeleton->getNumScaleGroups())
+          * (mSkeleton->getGroupCOMs() - mInit->regularizeGroupCOMsTo)
+                .squaredNorm();
+  }
   sum += comRegularization;
   assert(!isnan(sum));
-  s_t inertiaRegularization
-      = mConfig.mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
-        * (mSkeleton->getGroupInertias() - mInit->regularizeGroupInertiasTo)
-              .squaredNorm();
+  s_t inertiaRegularization = 0.0;
+  if (mInit->regularizeGroupInertiasTo.size() != mSkeleton->getGroupInertias().size()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mInit->regularizeGroupInertiasTo.size() = "
+              << mInit->regularizeGroupInertiasTo.size() << std::endl;
+    std::cout << "mSkeleton->getGroupInertias().size() = "
+              << mSkeleton->getGroupInertias().size() << std::endl;
+    throw std::runtime_error("mInit->regularizeGroupInertiasTo.size() != mSkeleton->getGroupInertias().size()");
+  }
+  else {
+    inertiaRegularization
+        = mConfig.mRegularizeInertias * (1.0 / mSkeleton->getNumScaleGroups())
+          * (mSkeleton->getGroupInertias() - mInit->regularizeGroupInertiasTo)
+                .squaredNorm();
+  }
   sum += inertiaRegularization;
   assert(!isnan(sum));
-  s_t scaleRegularization
-      = mConfig.mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
-        * (mSkeleton->getGroupScales() - mInit->regularizeGroupScalesTo)
-              .squaredNorm();
+  s_t scaleRegularization = 0.0;
+  if (mInit->regularizeGroupScalesTo.size() != mSkeleton->getGroupScales().size()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "mInit->regularizeGroupScalesTo.size() = "
+              << mInit->regularizeGroupScalesTo.size() << std::endl;
+    std::cout << "mSkeleton->getGroupScales().size() = "
+              << mSkeleton->getGroupScales().size() << std::endl;
+    throw std::runtime_error("mInit->regularizeGroupScalesTo.size() != mSkeleton->getGroupScales().size()");
+  }
+  else {
+    scaleRegularization
+        = mConfig.mRegularizeBodyScales * (1.0 / mSkeleton->getNumScaleGroups())
+          * (mSkeleton->getGroupScales() - mInit->regularizeGroupScalesTo)
+                .squaredNorm();
+  }
   sum += scaleRegularization;
   assert(!isnan(sum));
   s_t markerRegularization = 0.0;
@@ -5457,13 +5550,23 @@ s_t DynamicsFitProblem::computeLossParallel(
   {
     if (mInit->regularizeMarkerOffsetsTo.count(mMarkerNames.at(i)))
     {
-      markerRegularization
-          += (mMarkerIsTracking[i] ? mConfig.mRegularizeTrackingMarkerOffsets
-                                   : mConfig.mRegularizeAnatomicalMarkerOffsets)
-             * (1.0 / mMarkerNames.size())
-             * (mMarkers[i].second
-                - mInit->regularizeMarkerOffsetsTo.at(mMarkerNames.at(i)))
-                   .squaredNorm();
+      if (mInit->regularizeMarkerOffsetsTo.at(mMarkerNames.at(i)).size() != mMarkers[i].second.size()) {
+        std::cout << "INTERNAL ERROR" << std::endl;
+        std::cout << "mInit->regularizeMarkerOffsetsTo.at(\"" << mMarkerNames.at(i) << "\").size() = "
+                  << mInit->regularizeMarkerOffsetsTo.at(mMarkerNames.at(i)).size() << std::endl;
+        std::cout << "mMarkers[i].second.size() = "
+                  << mMarkers.at(i).second.size() << std::endl;
+        throw std::runtime_error("mInit->regularizeMarkerOffsetsTo.at(mMarkerNames.at(i)).size() != mMarkers[i].second.size()");
+      }
+      else {
+        markerRegularization
+            += (mMarkerIsTracking.at(i) ? mConfig.mRegularizeTrackingMarkerOffsets
+                                    : mConfig.mRegularizeAnatomicalMarkerOffsets)
+              * (1.0 / mMarkerNames.size())
+              * (mMarkers.at(i).second
+                  - mInit->regularizeMarkerOffsetsTo.at(mMarkerNames.at(i)))
+                    .squaredNorm();
+      }
     }
     assert(!isnan(markerRegularization));
   }
@@ -5472,14 +5575,34 @@ s_t DynamicsFitProblem::computeLossParallel(
   s_t densityRegularization = 0.0;
   Eigen::VectorXs masses = mSkeleton->getGroupMasses();
   Eigen::VectorXs inertias = mSkeleton->getGroupInertias();
-  for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
-  {
-    s_t mass = masses(i);
-    Eigen::Vector3s dims = inertias.segment<3>(i * 6);
-    s_t volume = dims(0) * dims(1) * dims(2);
-    s_t density = mass / volume;
-    s_t error = HUMAN_DENSITY_KG_M3 - density;
-    densityRegularization += mConfig.mRegularizeImpliedDensity * error * error;
+  if (masses.size() != mSkeleton->getNumScaleGroups()) {
+    std::cout << "INTERNAL ERROR" << std::endl;
+    std::cout << "masses.size() = "
+              << masses.size() << std::endl;
+    std::cout << "mSkeleton->getNumScaleGroups() = "
+              << mSkeleton->getNumScaleGroups() << std::endl;
+    throw std::runtime_error("masses.size() != mSkeleton->getNumScaleGroups()");
+  }
+  else {
+    if (inertias.size() != mSkeleton->getNumScaleGroups() * 6) {
+      std::cout << "INTERNAL ERROR" << std::endl;
+      std::cout << "inertias.size() = "
+                << inertias.size() << std::endl;
+      std::cout << "mSkeleton->getNumScaleGroups() * 6 = "
+                << mSkeleton->getNumScaleGroups() * 6 << std::endl;
+      throw std::runtime_error("inertias.size() != mSkeleton->getNumScaleGroups() * 6");
+    }
+    else {
+      for (int i = 0; i < mSkeleton->getNumScaleGroups(); i++)
+      {
+        s_t mass = masses(i);
+        Eigen::Vector3s dims = inertias.segment<3>(i * 6);
+        s_t volume = dims(0) * dims(1) * dims(2);
+        s_t density = mass / volume;
+        s_t error = HUMAN_DENSITY_KG_M3 - density;
+        densityRegularization += mConfig.mRegularizeImpliedDensity * error * error;
+      }
+    }
   }
   sum += densityRegularization;
 
@@ -5496,22 +5619,33 @@ s_t DynamicsFitProblem::computeLossParallel(
       int realT = block.start + t;
       if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1)
       {
-        // Add force residual RMS errors to all the middle timesteps
-        if (!mInit->probablyMissingGRF[block.trial][realT])
-        {
-          totalAccTimesteps++;
+        if (mInit->probablyMissingGRF.at(block.trial).size() <= realT) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->probablyMissingGRF[block.trial].size() = "
+                    << mInit->probablyMissingGRF[block.trial].size() << std::endl;
+          std::cout << "realT = "
+                    << realT << std::endl;
+          throw std::runtime_error("mInit->probablyMissingGRF.at(block.trial).size() < realT");
+        }
+        else {
+          // Add force residual RMS errors to all the middle timesteps
+          if (!mInit->probablyMissingGRF.at(block.trial).at(realT))
+          {
+            totalAccTimesteps++;
+          }
         }
       }
     }
   }
 
   int numThreads = std::min((int)mBlocks.size(), mConfig.mNumThreads);
+  std::cout << "Computing loss with " << numThreads << " threads" << std::endl;
 
   std::vector<struct LossExplanation> threadLossExplanations;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
     threadLossExplanations.emplace_back();
-    struct LossExplanation& threadLoss = threadLossExplanations[threadIdx];
+    struct LossExplanation& threadLoss = threadLossExplanations.at(threadIdx);
     threadLoss.linearNewtonError = 0.0;
     threadLoss.residualRMS = 0.0;
     threadLoss.markerRMS = 0.0;
@@ -5533,8 +5667,23 @@ s_t DynamicsFitProblem::computeLossParallel(
                                   threadIdx,
                                   totalAccTimesteps,
                                   totalTimesteps] {
-      struct LossExplanation& threadLoss = threadLossExplanations[threadIdx];
-      mThreadSkeletons[threadIdx]->clearExternalForces();
+      if (threadLossExplanations.size() <= threadIdx) {
+        std::cout << "INTERNAL ERROR" << std::endl;
+        std::cout << "threadLossExplanations.size() = "
+                  << threadLossExplanations.size() << std::endl;
+        std::cout << "threadIdx = " << threadIdx << std::endl;
+        throw std::runtime_error("threadLossExplanations.size() <= threadIdx");
+      }
+      struct LossExplanation& threadLoss = threadLossExplanations.at(threadIdx);
+
+      if (mThreadSkeletons.size() <= threadIdx) {
+        std::cout << "INTERNAL ERROR" << std::endl;
+        std::cout << "mThreadSkeletons.size() = "
+                  << mThreadSkeletons.size() << std::endl;
+        std::cout << "threadIdx = " << threadIdx << std::endl;
+        throw std::runtime_error("mThreadSkeletons.size() <= threadIdx");
+      }
+      mThreadSkeletons.at(threadIdx)->clearExternalForces();
 
       for (int blockIdx = 0; blockIdx < mBlocks.size(); blockIdx++)
       {
@@ -5545,138 +5694,345 @@ s_t DynamicsFitProblem::computeLossParallel(
 
         auto& block = mBlocks[blockIdx];
 
-        mThreadSkeletons[threadIdx]->setTimeStep(
-            mInit->trialTimesteps[block.trial]);
+        if (block.trial >= mInit->trialTimesteps.size()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.trial = "
+                    << block.trial << std::endl;
+          std::cout << "mInit->trialTimesteps.size() = "
+                    << mInit->trialTimesteps.size() << std::endl;
+          throw std::runtime_error("block.trial >= mInit->trialTimesteps.size()");
+        }
+        else {
+          mThreadSkeletons.at(threadIdx)->setTimeStep(
+              mInit->trialTimesteps.at(block.trial));
+        }
 
-        for (int t = 0; t < block.len; t++)
-        {
-          int realT = block.start + t;
-
-          mThreadSkeletons[threadIdx]->setPositions(block.pos.col(t));
-
-          // Add force residual RMS errors to all the middle timesteps
-          if (realT > 0 && realT < mInit->poseTrials[block.trial].cols() - 1
-              && !mInit->probablyMissingGRF[block.trial][realT])
-          {
-            if (mConfig.mLinearNewtonWeight > 0)
-            {
-              s_t cost = mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
-                         * mThreadSpatialNewtonHelpers[threadIdx]
-                               ->calculateLinearForceGapNorm(
-                                   block.pos.col(t),
-                                   block.vel.col(t),
-                                   block.acc.col(t),
-                                   block.grf.col(t),
-                                   mConfig.mLinearNewtonUseL1);
-              threadLoss.linearNewtonError += cost;
-              assert(!isnan(threadLoss.linearNewtonError));
-            }
-            if (mConfig.mResidualWeight > 0)
-            {
-              s_t cost
-                  = mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
-                    * mThreadResidualHelpers[threadIdx]->calculateResidualNorm(
-                        block.pos.col(t),
-                        block.vel.col(t),
-                        block.acc.col(t),
-                        block.grf.col(t),
-                        mConfig.mResidualTorqueMultiple,
-                        mConfig.mResidualUseL1);
-              threadLoss.residualRMS += cost;
-              assert(!isnan(threadLoss.residualRMS));
-            }
-            if (mConfig.mRegularizeAcc > 0)
-            {
-              s_t cost = mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
-                         * mThreadSpatialNewtonHelpers[threadIdx]
-                               ->calculateAccelerationNorm(
-                                   block.pos.col(t),
-                                   block.vel.col(t),
-                                   block.acc.col(t),
-                                   mConfig.mRegularizeAccBodyWeights,
-                                   mConfig.mRegularizeAccUseL1);
-              threadLoss.accRegularization += cost;
-              assert(!isnan(threadLoss.accRegularization));
-            }
-            if (mConfig.mRegularizeJointAcc > 0)
-            {
-              threadLoss.jointAccRegularization
-                  += mConfig.mRegularizeJointAcc * (1.0 / totalAccTimesteps)
-                     * block.acc.col(t).squaredNorm();
-              assert(!isnan(threadLoss.jointAccRegularization));
-            }
+        if (block.pos.cols() != block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.pos.cols() = "
+                    << block.pos.cols() << std::endl;
+          std::cout << "block.len = " << block.len << std::endl;
+          throw std::runtime_error("block.pos.cols() != block.len");
+        }
+        if (block.pos.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.pos.rows() = "
+                    << block.pos.rows() << std::endl;
+          std::cout << "mThreadSkeletons.at(threadIdx)->getNumDofs() = " << mThreadSkeletons.at(threadIdx)->getNumDofs() << std::endl;
+          throw std::runtime_error("block.pos.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()");
+        }
+        if (block.vel.cols() != block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.vel.cols() = "
+                    << block.vel.cols() << std::endl;
+          std::cout << "block.len = " << block.len << std::endl;
+          throw std::runtime_error("block.vel.cols() != block.len");
+        }
+        if (block.vel.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.vel.rows() = "
+                    << block.vel.rows() << std::endl;
+          std::cout << "mThreadSkeletons.at(threadIdx)->getNumDofs() = " << mThreadSkeletons.at(threadIdx)->getNumDofs() << std::endl;
+          throw std::runtime_error("block.vel.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()");
+        }
+        if (block.acc.cols() != block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.acc.cols() = "
+                    << block.acc.cols() << std::endl;
+          std::cout << "block.len = " << block.len << std::endl;
+          throw std::runtime_error("block.acc.cols() != block.len");
+        }
+        if (block.acc.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.acc.rows() = "
+                    << block.acc.rows() << std::endl;
+          std::cout << "mThreadSkeletons.at(threadIdx)->getNumDofs() = " << mThreadSkeletons.at(threadIdx)->getNumDofs() << std::endl;
+          throw std::runtime_error("block.acc.rows() != mThreadSkeletons.at(threadIdx)->getNumDofs()");
+        }
+        if (block.grf.cols() != block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.grf.cols() = "
+                    << block.grf.cols() << std::endl;
+          std::cout << "block.len = " << block.len << std::endl;
+          throw std::runtime_error("block.grf.cols() != block.len");
+        }
+        if (block.grf.rows() != mThreadResidualHelpers.at(threadIdx)->getExpectedForcesDim()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "block.grf.rows() = "
+                    << block.grf.rows() << std::endl;
+          std::cout << "mThreadResidualHelpers.at(threadIdx)->getExpectedForcesDim() = " << mThreadResidualHelpers.at(threadIdx)->getExpectedForcesDim() << std::endl;
+          throw std::runtime_error("block.grf.rows() != mThreadResidualHelpers.at(threadIdx)->getExpectedForcesDim()");
+        }
+        if (mInit->markerObservationTrials.at(block.trial).size() < block.start + block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->markerObservationTrials[block.trial = " << block.trial << "].size() = "
+                    << mInit->markerObservationTrials[block.trial].size() << std::endl;
+          std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+          throw std::runtime_error("mInit->markerObservationTrials.at(block.trial).size() < block.start + block.len");
+        }
+        if (mInit->jointCenters.size() <= block.trial) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointCenters.size() = "
+                    << mInit->jointCenters.size() << std::endl;
+          std::cout << "block.trial = " << block.trial << std::endl;
+          throw std::runtime_error("mInit->jointCenters.size() <= block.trial");
+        }
+        else {
+          if (mInit->jointCenters.at(block.trial).cols() < block.start + block.len) {
+            std::cout << "INTERNAL ERROR" << std::endl;
+            std::cout << "mInit->jointCenters[block.trial = " << block.trial << "].cols() = "
+                      << mInit->jointCenters.at(block.trial).cols() << std::endl;
+            std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+            throw std::runtime_error("mInit->jointCenters.at(block.trial).cols() < block.start + block.len");
           }
+        }
+        if (mInit->jointAxis.size() <= block.trial) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointAxis.size() = "
+                    << mInit->jointAxis.size() << std::endl;
+          std::cout << "block.trial = " << block.trial << std::endl;
+          throw std::runtime_error("mInit->jointAxis.size() <= block.trial");
+        }
+        else {
+          if (mInit->jointAxis.at(block.trial).cols() < block.start + block.len) {
+            std::cout << "INTERNAL ERROR" << std::endl;
+            std::cout << "mInit->jointAxis[block.trial = " << block.trial << "].cols() = "
+                      << mInit->jointAxis.at(block.trial).cols() << std::endl;
+            std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+            throw std::runtime_error("mInit->jointAxis.at(block.trial).cols() < block.start + block.len");
+          }
+        }
+        if (mInit->regularizePosesTo.size() <= block.trial) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->regularizePosesTo.size() = "
+                    << mInit->regularizePosesTo.size() << std::endl;
+          std::cout << "block.trial = " << block.trial << std::endl;
+          throw std::runtime_error("mInit->regularizePosesTo.size() <= block.trial");
+        }
+        else {
+          if (mInit->regularizePosesTo.at(block.trial).cols() < block.start + block.len) {
+            std::cout << "INTERNAL ERROR" << std::endl;
+            std::cout << "mInit->regularizePosesTo[block.trial = " << block.trial << "].cols() = "
+                      << mInit->regularizePosesTo.at(block.trial).cols() << std::endl;
+            std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+            throw std::runtime_error("mInit->regularizePosesTo.at(block.trial).cols() < block.start + block.len");
+          }
+        }
+        for (auto* joint : mThreadJoints.at(threadIdx).at(block.trial)) {
+          if (!mThreadSkeletons[threadIdx]->hasJoint(joint)) {
+            std::cout << "INTERNAL ERROR" << std::endl;
+            std::cout << "mThreadSkeletons[threadIdx]->hasJoint(joint) = "
+                      << mThreadSkeletons[threadIdx]->hasJoint(joint) << std::endl;
+            throw std::runtime_error("!mThreadSkeletons[threadIdx]->hasJoint(joint)");
+          }
+        }
+        for (auto& pair : mThreadMarkers.at(threadIdx)) {
+          if (!mThreadSkeletons[threadIdx]->hasBodyNode(pair.first)) {
+            std::cout << "INTERNAL ERROR" << std::endl;
+            std::cout << "mThreadSkeletons[threadIdx]->hasBodyNode(pair.first) = "
+                      << mThreadSkeletons[threadIdx]->hasBodyNode(pair.first) << std::endl;
+            throw std::runtime_error("!mThreadSkeletons[threadIdx]->hasBodyNode(pair.first)");
+          }
+        }
+        if (mInit->jointWeights.size() != mThreadJoints.at(threadIdx).at(block.trial).size()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointWeights.size() = "
+                    << mInit->jointWeights.size() << std::endl;
+          std::cout << "mInit->joints.size() = "
+                    << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
+        }
+        if (mInit->axisWeights.size() != mThreadJoints.at(threadIdx).at(block.trial).size()) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->axisWeights.size() = "
+                    << mInit->axisWeights.size() << std::endl;
+          std::cout << "mInit->joints.size() = "
+                    << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
+        }
+        if (mInit->jointCenters.at(block.trial).cols() < block.start + block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointCenters.at(block.trial).cols() = "
+                    << mInit->jointCenters.at(block.trial).cols() << std::endl;
+          std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+          throw std::runtime_error("mInit->jointCenters.at(block.trial).cols() < block.start + block.len");
+        }
+        if (mInit->jointCenters.at(block.trial).rows() != mThreadJoints.at(threadIdx).at(block.trial).size() * 3) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointCenters.at(block.trial).rows() = "
+                    << mInit->jointCenters.at(block.trial).rows() << std::endl;
+          std::cout << "mThreadJoints(threadIdx).size() * 3 = "
+                    << mThreadJoints.at(threadIdx).at(block.trial).size() * 3 << std::endl;
+          throw std::runtime_error("mInit->jointCenters.at(block.trial).rows() != mThreadJoints(threadIdx).size() * 3");
+        }
+        if (mInit->jointAxis.at(block.trial).cols() < block.start + block.len) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointAxis.at(block.trial).cols() = "
+                    << mInit->jointAxis.at(block.trial).cols() << std::endl;
+          std::cout << "block.start + block.len = " << block.start + block.len << std::endl;
+          throw std::runtime_error("mInit->jointAxis.at(block.trial).cols() < block.start + block.len");
+        }
+        if (mInit->jointAxis.at(block.trial).rows() != mThreadJoints.at(threadIdx).at(block.trial).size() * 6) {
+          std::cout << "INTERNAL ERROR" << std::endl;
+          std::cout << "mInit->jointAxis.at(block.trial).rows() = "
+                    << mInit->jointAxis.at(block.trial).rows() << std::endl;
+          std::cout << "mThreadJoints(threadIdx).size() * 6 = "
+                    << mThreadJoints.at(threadIdx).at(block.trial).size() * 6 << std::endl;
+          throw std::runtime_error("mInit->jointAxis.at(block.trial).rows() != mThreadJoints(threadIdx).size() * 6");
+        }
 
-          // Add marker RMS errors to every timestep
-          auto markerPoses
-              = mThreadSkeletons[threadIdx]->getMarkerWorldPositions(
-                  mThreadMarkers[threadIdx]);
-          auto observedMarkerPoses
-              = mInit->markerObservationTrials[block.trial][realT];
-          for (int i = 0; i < mMarkerNames.size(); i++)
+        if (block.pos.cols() == block.len && 
+            block.pos.rows() == mThreadSkeletons.at(threadIdx)->getNumDofs() &&
+            block.vel.cols() == block.len && 
+            block.vel.rows() == mThreadSkeletons.at(threadIdx)->getNumDofs() &&
+            block.acc.cols() == block.len && 
+            block.acc.rows() == mThreadSkeletons.at(threadIdx)->getNumDofs() &&
+            block.grf.cols() == block.len && 
+            block.grf.rows() == mThreadResidualHelpers.at(threadIdx)->getExpectedForcesDim() &&
+            mInit->markerObservationTrials.at(block.trial).size() >= block.start + block.len && 
+            mInit->jointCenters.size() > block.trial &&
+            mInit->jointCenters.at(block.trial).cols() >= block.start + block.len &&
+            mInit->jointAxis.size() > block.trial &&
+            mInit->jointAxis.at(block.trial).cols() >= block.start + block.len &&
+            mInit->regularizePosesTo.size() > block.trial &&
+            mInit->regularizePosesTo.at(block.trial).cols() >= block.start + block.len &&
+            mInit->jointWeights.size() == mThreadJoints.at(threadIdx).at(block.trial).size() &&
+            mInit->axisWeights.size() == mThreadJoints.at(threadIdx).at(block.trial).size() && 
+            mInit->jointCenters.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 3 &&
+            mInit->jointAxis.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 6) {
+          for (int t = 0; t < block.len; t++)
           {
-            Eigen::Vector3s marker = markerPoses.segment<3>(i * 3);
-            if (observedMarkerPoses.count(mMarkerNames[i]))
+            int realT = block.start + t;
+
+            mThreadSkeletons.at(threadIdx)->setPositions(block.pos.col(t));
+
+            // Add force residual RMS errors to all the middle timesteps
+            if (realT > 0 && realT < mInit->poseTrials.at(block.trial).cols() - 1
+                && !mInit->probablyMissingGRF.at(block.trial).at(realT))
             {
-              Eigen::Vector3s diff
-                  = observedMarkerPoses.at(mMarkerNames[i]) - marker;
-              s_t thisMarkerCost;
-              if (mConfig.mMarkerUseL1)
+              if (mConfig.mLinearNewtonWeight > 0)
               {
-                thisMarkerCost = diff.norm();
+                s_t cost = mConfig.mLinearNewtonWeight * (1.0 / totalAccTimesteps)
+                          * mThreadSpatialNewtonHelpers.at(threadIdx)
+                                ->calculateLinearForceGapNorm(
+                                    block.pos.col(t),
+                                    block.vel.col(t),
+                                    block.acc.col(t),
+                                    block.grf.col(t),
+                                    mConfig.mLinearNewtonUseL1);
+                threadLoss.linearNewtonError += cost;
+                assert(!isnan(threadLoss.linearNewtonError));
               }
-              else
+              if (mConfig.mResidualWeight > 0)
               {
-                thisMarkerCost = diff.squaredNorm();
+                s_t cost
+                    = mConfig.mResidualWeight * (1.0 / totalAccTimesteps)
+                      * mThreadResidualHelpers.at(threadIdx)->calculateResidualNorm(
+                          block.pos.col(t),
+                          block.vel.col(t),
+                          block.acc.col(t),
+                          block.grf.col(t),
+                          mConfig.mResidualTorqueMultiple,
+                          mConfig.mResidualUseL1);
+                threadLoss.residualRMS += cost;
+                assert(!isnan(threadLoss.residualRMS));
               }
-              threadLoss.markerRMS += thisMarkerCost;
-              threadLoss.markerCount++;
-              assert(!isnan(threadLoss.markerRMS));
+              if (mConfig.mRegularizeAcc > 0)
+              {
+                s_t cost = mConfig.mRegularizeAcc * (1.0 / totalAccTimesteps)
+                          * mThreadSpatialNewtonHelpers.at(threadIdx)
+                                ->calculateAccelerationNorm(
+                                    block.pos.col(t),
+                                    block.vel.col(t),
+                                    block.acc.col(t),
+                                    mConfig.mRegularizeAccBodyWeights,
+                                    mConfig.mRegularizeAccUseL1);
+                threadLoss.accRegularization += cost;
+                assert(!isnan(threadLoss.accRegularization));
+              }
+              if (mConfig.mRegularizeJointAcc > 0)
+              {
+                threadLoss.jointAccRegularization
+                    += mConfig.mRegularizeJointAcc * (1.0 / totalAccTimesteps)
+                      * block.acc.col(t).squaredNorm();
+                assert(!isnan(threadLoss.jointAccRegularization));
+              }
             }
-          }
 
-          // Add joints
-          Eigen::VectorXs jointPoses
-              = mThreadSkeletons[threadIdx]->getJointWorldPositions(
-                  mThreadJoints[threadIdx]);
-          Eigen::VectorXs jointCenters
-              = mInit->jointCenters[block.trial].col(realT);
-          Eigen::VectorXs jointAxis = mInit->jointAxis[block.trial].col(realT);
-          Eigen::VectorXs jointDiff = jointPoses - jointCenters;
-          for (int i = 0; i < mInit->jointWeights.size(); i++)
-          {
-            threadLoss.jointRMS += (jointPoses.segment<3>(i * 3)
-                                    - jointCenters.segment<3>(i * 3))
-                                       .squaredNorm()
-                                   * mInit->jointWeights(i);
-          }
-          for (int i = 0; i < mInit->axisWeights.size(); i++)
-          {
-            Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
-            Eigen::Vector3s axisDir
-                = jointAxis.segment<3>(i * 6 + 3).normalized();
-            Eigen::Vector3s actualJointPos = jointPoses.segment<3>(i * 3);
-            // Subtract out any component parallel to the axis
-            Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
-            jointDiff -= jointDiff.dot(axisDir) * axisDir;
-            threadLoss.axisRMS
-                += jointDiff.squaredNorm() * mInit->axisWeights(i);
-          }
+            // Add marker RMS errors to every timestep
+            auto markerPoses
+                = mThreadSkeletons.at(threadIdx)->getMarkerWorldPositions(
+                    mThreadMarkers.at(threadIdx));
+            auto observedMarkerPoses
+                = mInit->markerObservationTrials.at(block.trial).at(realT);
+            for (int i = 0; i < mMarkerNames.size(); i++)
+            {
+              Eigen::Vector3s marker = markerPoses.segment<3>(i * 3);
+              if (observedMarkerPoses.count(mMarkerNames.at(i)))
+              {
+                Eigen::Vector3s diff
+                    = observedMarkerPoses.at(mMarkerNames.at(i)) - marker;
+                s_t thisMarkerCost;
+                if (mConfig.mMarkerUseL1)
+                {
+                  thisMarkerCost = diff.norm();
+                }
+                else
+                {
+                  thisMarkerCost = diff.squaredNorm();
+                }
+                threadLoss.markerRMS += thisMarkerCost;
+                threadLoss.markerCount++;
+                assert(!isnan(threadLoss.markerRMS));
+              }
+            }
 
-          // Add regularization
-          threadLoss.poseRegularization
-              += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
-                 * (block.pos.col(t)
-                    - mInit->regularizePosesTo[block.trial].col(realT))
-                       .squaredNorm();
-          assert(!isnan(threadLoss.poseRegularization));
+            // Add joints
+            if (mThreadJoints.at(threadIdx).at(block.trial).size() > 0) {
+              Eigen::VectorXs jointPoses
+                  = mThreadSkeletons.at(threadIdx)->getJointWorldPositions(
+                      mThreadJoints.at(threadIdx).at(block.trial));
+              Eigen::VectorXs jointCenters
+                  = mInit->jointCenters.at(block.trial).col(realT);
+              Eigen::VectorXs jointDiff = jointPoses - jointCenters;
+              for (int i = 0; i < mInit->jointWeights.size(); i++)
+              {
+                threadLoss.jointRMS += (jointPoses.segment<3>(i * 3)
+                                        - jointCenters.segment<3>(i * 3))
+                                          .squaredNorm()
+                                      * mInit->jointWeights.at(block.trial)(i);
+              }
+              Eigen::VectorXs jointAxis = mInit->jointAxis.at(block.trial).col(realT);
+              for (int i = 0; i < mInit->axisWeights.size(); i++)
+              {
+                Eigen::Vector3s axisCenter = jointAxis.segment<3>(i * 6);
+                Eigen::Vector3s axisDir
+                    = jointAxis.segment<3>(i * 6 + 3).normalized();
+                Eigen::Vector3s actualJointPos = jointPoses.segment<3>(i * 3);
+                // Subtract out any component parallel to the axis
+                Eigen::Vector3s jointDiff = actualJointPos - axisCenter;
+                jointDiff -= jointDiff.dot(axisDir) * axisDir;
+                threadLoss.axisRMS
+                    += jointDiff.squaredNorm() * mInit->axisWeights.at(block.trial)(i);
+              }
+            }
+
+            // Add regularization
+            std::cout << "Computing pose regularization" << std::endl;
+            threadLoss.poseRegularization
+                += mConfig.mRegularizePoses * (1.0 / totalTimesteps)
+                  * (block.pos.col(t)
+                      - mInit->regularizePosesTo.at(block.trial).col(realT))
+                        .squaredNorm();
+            assert(!isnan(threadLoss.poseRegularization));
+          }
+          std::cout << "Finished block" << std::endl;
         }
       }
     }));
   }
+
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    (void)futures[threadIdx].get();
+    (void)futures.at(threadIdx).get();
   }
 
   s_t linearNewtonError = 0.0;
@@ -5690,16 +6046,16 @@ s_t DynamicsFitProblem::computeLossParallel(
   int markerCount = 0;
   for (int threadIdx = 0; threadIdx < numThreads; threadIdx++)
   {
-    linearNewtonError += threadLossExplanations[threadIdx].linearNewtonError;
-    residualRMS += threadLossExplanations[threadIdx].residualRMS;
-    markerRMS += threadLossExplanations[threadIdx].markerRMS;
-    poseRegularization += threadLossExplanations[threadIdx].poseRegularization;
-    accRegularization += threadLossExplanations[threadIdx].accRegularization;
+    linearNewtonError += threadLossExplanations.at(threadIdx).linearNewtonError;
+    residualRMS += threadLossExplanations.at(threadIdx).residualRMS;
+    markerRMS += threadLossExplanations.at(threadIdx).markerRMS;
+    poseRegularization += threadLossExplanations.at(threadIdx).poseRegularization;
+    accRegularization += threadLossExplanations.at(threadIdx).accRegularization;
     jointAccRegularization
-        += threadLossExplanations[threadIdx].jointAccRegularization;
-    jointRMS += threadLossExplanations[threadIdx].jointRMS;
-    axisRMS += threadLossExplanations[threadIdx].axisRMS;
-    markerCount += threadLossExplanations[threadIdx].markerCount;
+        += threadLossExplanations.at(threadIdx).jointAccRegularization;
+    jointRMS += threadLossExplanations.at(threadIdx).jointRMS;
+    axisRMS += threadLossExplanations.at(threadIdx).axisRMS;
+    markerCount += threadLossExplanations.at(threadIdx).markerCount;
   }
 
   sum += linearNewtonError;
@@ -5958,7 +6314,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       Eigen::VectorXs jointGrad
           = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
       Eigen::VectorXs worldJoints
-          = mSkeleton->getJointWorldPositions(mInit->joints);
+          = mSkeleton->getJointWorldPositions(mInit->joints.at(block.trial));
       Eigen::VectorXs targetJoints
           = mInit->jointCenters[block.trial].col(realT);
       Eigen::VectorXs targetAxis = mInit->jointAxis[block.trial].col(realT);
@@ -5966,13 +6322,13 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
       {
         Eigen::Vector3s worldDiff
             = worldJoints.segment<3>(i * 3) - targetJoints.segment<3>(i * 3);
-        jointGrad.segment<3>(i * 3) += 2 * worldDiff * mInit->jointWeights(i);
+        jointGrad.segment<3>(i * 3) += 2 * worldDiff * mInit->jointWeights.at(block.trial)(i);
 
         Eigen::Vector3s axisDiff
             = worldJoints.segment<3>(i * 3) - targetAxis.segment<3>(i * 6);
         Eigen::Vector3s axis = targetAxis.segment<3>(i * 6 + 3).normalized();
         axisDiff -= axisDiff.dot(axis) * axis;
-        jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights(i);
+        jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights.at(block.trial)(i);
       }
       jointGrad *= mConfig.mJointWeight;
 
@@ -6180,7 +6536,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           grad.segment(cursor, dim)
               += mSkeleton
                      ->getJointWorldPositionsJacobianWrtGroupScales(
-                         mInit->joints)
+                         mInit->joints.at(block.trial))
                      .transpose()
                  * jointGrad;
 
@@ -6311,7 +6667,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record joint gradients
           posGrad += mSkeleton
                          ->getJointWorldPositionsJacobianWrtJointPositions(
-                             mInit->joints)
+                             mInit->joints.at(block.trial))
                          .transpose()
                      * jointGrad;
 
@@ -6364,7 +6720,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           grad.segment(cursor, dim)
               += mSkeleton
                      ->getJointWorldPositionsJacobianWrtGroupScales(
-                         mInit->joints)
+                         mInit->joints.at(block.trial))
                      .transpose()
                  * jointGrad;
 
@@ -6391,7 +6747,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradient(Eigen::VectorXs x)
           // Record joint gradients
           posGrad += mSkeleton
                          ->getJointWorldPositionsJacobianWrtJointPositions(
-                             mInit->joints)
+                             mInit->joints.at(block.trial))
                          .transpose()
                      * jointGrad;
 
@@ -6658,24 +7014,24 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
           Eigen::VectorXs jointGrad
               = Eigen::VectorXs::Zero(mInit->joints.size() * 3);
           Eigen::VectorXs worldJoints
-              = mThreadSkeletons[threadIdx]->getJointWorldPositions(
-                  mThreadJoints[threadIdx]);
+              = mThreadSkeletons.at(threadIdx)->getJointWorldPositions(
+                  mThreadJoints.at(threadIdx).at(block.trial));
           Eigen::VectorXs targetJoints
               = mInit->jointCenters[block.trial].col(realT);
           Eigen::VectorXs targetAxis = mInit->jointAxis[block.trial].col(realT);
-          for (int i = 0; i < mInit->joints.size(); i++)
+          for (int i = 0; i < mInit->joints.at(block.trial).size(); i++)
           {
             Eigen::Vector3s worldDiff = worldJoints.segment<3>(i * 3)
                                         - targetJoints.segment<3>(i * 3);
             jointGrad.segment<3>(i * 3)
-                += 2 * worldDiff * mInit->jointWeights(i);
+                += 2 * worldDiff * mInit->jointWeights.at(block.trial)(i);
 
             Eigen::Vector3s axisDiff
                 = worldJoints.segment<3>(i * 3) - targetAxis.segment<3>(i * 6);
             Eigen::Vector3s axis
                 = targetAxis.segment<3>(i * 6 + 3).normalized();
             axisDiff -= axisDiff.dot(axis) * axis;
-            jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights(i);
+            jointGrad.segment<3>(i * 3) += 2 * axisDiff * mInit->axisWeights.at(block.trial)(i);
           }
           jointGrad *= mConfig.mJointWeight;
 
@@ -6891,7 +7247,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               threadGrad.segment(cursor, dim)
                   += mThreadSkeletons[threadIdx]
                          ->getJointWorldPositionsJacobianWrtGroupScales(
-                             mThreadJoints[threadIdx])
+                             mThreadJoints.at(threadIdx).at(block.trial))
                          .transpose()
                      * jointGrad;
 
@@ -7032,7 +7388,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               // Record joint gradients
               posGrad += mThreadSkeletons[threadIdx]
                              ->getJointWorldPositionsJacobianWrtJointPositions(
-                                 mThreadJoints[threadIdx])
+                                 mThreadJoints.at(threadIdx).at(block.trial))
                              .transpose()
                          * jointGrad;
 
@@ -7091,7 +7447,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               threadGrad.segment(cursor, dim)
                   += mThreadSkeletons[threadIdx]
                          ->getJointWorldPositionsJacobianWrtGroupScales(
-                             mThreadJoints[threadIdx])
+                             mThreadJoints.at(threadIdx).at(block.trial))
                          .transpose()
                      * jointGrad;
 
@@ -7122,7 +7478,7 @@ Eigen::VectorXs DynamicsFitProblem::computeGradientParallel(Eigen::VectorXs x)
               // Record joint gradients
               posGrad += mThreadSkeletons[threadIdx]
                              ->getJointWorldPositionsJacobianWrtJointPositions(
-                                 mThreadJoints[threadIdx])
+                                 mThreadJoints.at(threadIdx).at(block.trial))
                              .transpose()
                          * jointGrad;
 
@@ -9119,19 +9475,22 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   // Copy over the joint data
   init->joints.clear();
-  for (int i = 0; i < kinematicInit[0].joints.size(); i++)
-  {
-    init->joints.push_back(
-        skel->getJoint(kinematicInit[0].joints[i]->getName()));
+  for (int trial = 0; trial < kinematicInit.size(); trial++) {
+    init->joints.emplace_back();
+    for (int i = 0; i < kinematicInit[0].joints.size(); i++)
+    {
+      init->joints.at(init->joints.size() - 1).push_back(
+          skel->getJoint(kinematicInit.at(trial).joints.at(i)->getName()));
+    }
+    init->jointsAdjacentMarkers.push_back(kinematicInit.at(trial).jointsAdjacentMarkers);
+    init->jointWeights.push_back(kinematicInit.at(trial).jointWeights);
+    init->axisWeights.push_back(kinematicInit.at(trial).axisWeights);
   }
-  init->jointsAdjacentMarkers = kinematicInit[0].jointsAdjacentMarkers;
-  init->jointWeights = kinematicInit[0].jointWeights;
-  init->axisWeights = kinematicInit[0].axisWeights;
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    init->jointCenters.push_back(kinematicInit[trial].jointCenters);
-    init->jointAxis.push_back(kinematicInit[trial].jointAxis);
+    init->jointCenters.push_back(kinematicInit.at(trial).jointCenters);
+    init->jointAxis.push_back(kinematicInit.at(trial).jointAxis);
   }
 
   return init;
@@ -9149,10 +9508,13 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::retargetInitialization(
   retargeted->probablyMissingGRF = init->probablyMissingGRF;
   retargeted->missingGRFReason = init->missingGRFReason;
 
-  for (int i = 0; i < init->joints.size(); i++)
-  {
-    retargeted->joints.push_back(
-        simplifiedSkel->getJoint(init->joints[i]->getName()));
+  for (int trial = 0; trial < init->joints.size(); trial++) {
+    retargeted->joints.emplace_back();
+    for (int i = 0; i < init->joints.at(trial).size(); i++)
+    {
+      retargeted->joints.at(retargeted->joints.size() - 1).push_back(
+          simplifiedSkel->getJoint(init->joints.at(trial).at(i)->getName()));
+    }
   }
   for (int i = 0; i < init->grfBodyNodes.size(); i++)
   {
@@ -17103,36 +17465,36 @@ void DynamicsFitter::saveDynamicsToGUI(
   originalSkeleton->setGroupInertias(init->regularizeGroupInertiasTo);
 
   // Render the joints, if we have them
-  int numJoints = init->jointCenters[trialIndex].rows() / 3;
+  int numJoints = init->jointCenters.at(trialIndex).rows() / 3;
   server.createLayer(
       functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
   for (int i = 0; i < numJoints; i++)
   {
-    if (init->jointWeights(i) > 0)
+    if (init->jointWeights.at(trialIndex)(i) > 0)
     {
       server.setObjectTooltip(
           "joint_center_" + std::to_string(i),
-          "Joint center: " + init->joints[i]->getName());
+          "Joint center: " + init->joints.at(trialIndex).at(i)->getName());
       server.createSphere(
           "joint_center_" + std::to_string(i),
-          0.01 * min(3.0, (1.0 / init->jointWeights(i))),
+          0.01 * min(3.0, (1.0 / init->jointWeights.at(trialIndex)(i))),
           Eigen::Vector3s::Zero(),
           Eigen::Vector4s(
               functionalJointCenterLayerColor(0),
               functionalJointCenterLayerColor(1),
               functionalJointCenterLayerColor(2),
-              init->jointWeights(i)),
+              init->jointWeights.at(trialIndex)(i)),
           functionalJointCenterLayerName);
     }
   }
   int numAxis = init->jointAxis[trialIndex].rows() / 6;
   for (int i = 0; i < numAxis; i++)
   {
-    if (init->axisWeights(i) > 0)
+    if (init->axisWeights.at(trialIndex)(i) > 0)
     {
       server.createCapsule(
           "joint_axis_" + std::to_string(i),
-          0.003 * min(3.0, (1.0 / init->axisWeights(i))),
+          0.003 * min(3.0, (1.0 / init->axisWeights.at(trialIndex)(i))),
           0.1,
           Eigen::Vector3s::Zero(),
           Eigen::Vector3s::Zero(),
@@ -17140,7 +17502,7 @@ void DynamicsFitter::saveDynamicsToGUI(
               functionalJointCenterLayerColor(0),
               functionalJointCenterLayerColor(1),
               functionalJointCenterLayerColor(2),
-              init->axisWeights(i)),
+              init->axisWeights.at(trialIndex)(i)),
           functionalJointCenterLayerName);
     }
   }
@@ -17399,15 +17761,15 @@ void DynamicsFitter::saveDynamicsToGUI(
     // Render virtual joints
     for (int i = 0; i < numJoints; i++)
     {
-      if (init->jointWeights(i) > 0)
+      if (init->jointWeights.at(trialIndex)(i) > 0)
       {
         Eigen::Vector3s inferredJointCenter
             = init->jointCenters[trialIndex].block<3, 1>(i * 3, timestep);
         server.setObjectPosition(
             "joint_center_" + std::to_string(i), inferredJointCenter);
-        if (i < init->jointsAdjacentMarkers.size())
+        if (i < init->jointsAdjacentMarkers.at(trialIndex).size())
         {
-          for (std::string marker : init->jointsAdjacentMarkers[i])
+          for (std::string marker : init->jointsAdjacentMarkers.at(trialIndex).at(i))
           {
             if (init->markerObservationTrials[trialIndex][timestep].count(
                     marker))
@@ -17428,7 +17790,7 @@ void DynamicsFitter::saveDynamicsToGUI(
     }
     for (int i = 0; i < numAxis; i++)
     {
-      if (init->axisWeights(i) > 0)
+      if (init->axisWeights.at(trialIndex)(i) > 0)
       {
         // Render an axis capsule
         server.setObjectPosition(
