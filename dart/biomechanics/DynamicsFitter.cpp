@@ -5844,21 +5844,21 @@ s_t DynamicsFitProblem::computeLossParallel(
             throw std::runtime_error("!mThreadSkeletons[threadIdx]->hasBodyNode(pair.first)");
           }
         }
-        if (mInit->jointWeights.at(threadIdx).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
+        if (mInit->jointWeights.at(block.trial).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
           std::cout << "INTERNAL ERROR" << std::endl;
-          std::cout << "mInit->jointWeights.at(threadIdx).size() = "
-                    << mInit->jointWeights.at(threadIdx).size() << std::endl;
+          std::cout << "mInit->jointWeights.at(block.trial).size() = "
+                    << mInit->jointWeights.at(block.trial).size() << std::endl;
           std::cout << "mInit->joints.at(threadIdx).size() = "
                     << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
-          throw std::runtime_error("mInit->jointWeights.at(threadIdx).size() > mInit->joints.at(threadIdx).size()");
+          throw std::runtime_error("mInit->jointWeights.at(block.trial).size() > mInit->joints.at(threadIdx).size()");
         }
-        if (mInit->axisWeights.at(threadIdx).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
+        if (mInit->axisWeights.at(block.trial).size() > mThreadJoints.at(threadIdx).at(block.trial).size()) {
           std::cout << "INTERNAL ERROR" << std::endl;
-          std::cout << "mInit->axisWeights.at(threadIdx).size() = "
-                    << mInit->axisWeights.at(threadIdx).size() << std::endl;
+          std::cout << "mInit->axisWeights.at(block.trial).size() = "
+                    << mInit->axisWeights.at(block.trial).size() << std::endl;
           std::cout << "mInit->joints.at(threadIdx).size() = "
                     << mThreadJoints.at(threadIdx).at(block.trial).size() << std::endl;
-          throw std::runtime_error("mInit->axisWeights.at(threadIdx).size() > mInit->joints.at(threadIdx).size()");
+          throw std::runtime_error("mInit->axisWeights.at(block.trial).size() > mInit->joints.at(threadIdx).size()");
         }
         if (mInit->jointCenters.at(block.trial).cols() < block.start + block.len) {
           std::cout << "INTERNAL ERROR" << std::endl;
@@ -5906,8 +5906,8 @@ s_t DynamicsFitProblem::computeLossParallel(
             mInit->jointAxis.at(block.trial).cols() >= block.start + block.len &&
             mInit->regularizePosesTo.size() > block.trial &&
             mInit->regularizePosesTo.at(block.trial).cols() >= block.start + block.len &&
-            mInit->jointWeights.at(threadIdx).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() &&
-            mInit->axisWeights.at(threadIdx).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() && 
+            mInit->jointWeights.at(block.trial).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() &&
+            mInit->axisWeights.at(block.trial).size() <= mThreadJoints.at(threadIdx).at(block.trial).size() && 
             mInit->jointCenters.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 3 &&
             mInit->jointAxis.at(block.trial).rows() == mThreadJoints.at(threadIdx).at(block.trial).size() * 6) {
           for (int t = 0; t < block.len; t++)
@@ -6035,7 +6035,6 @@ s_t DynamicsFitProblem::computeLossParallel(
                         .squaredNorm();
             assert(!isnan(threadLoss.poseRegularization));
           }
-          std::cout << "Finished block" << std::endl;
         }
       }
     }));
