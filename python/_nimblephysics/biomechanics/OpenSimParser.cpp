@@ -117,10 +117,11 @@ void OpenSimParser(py::module& m)
   auto sm = m.def_submodule("OpenSimParser");
   sm.def(
       "parseOsim",
-      +[](const std::string& path) {
-        return dart::biomechanics::OpenSimParser::parseOsim(path);
+      +[](const std::string& path, const std::string geometryFolder) {
+        return dart::biomechanics::OpenSimParser::parseOsim(path, geometryFolder);
       },
-      ::py::arg("path"));
+      ::py::arg("path"),
+      ::py::arg("geometryFolder") = "");
 
   sm.def(
       "saveOsimScalingXMLFile",

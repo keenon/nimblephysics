@@ -96,6 +96,7 @@ public:
   /// Read Skeleton from *.osim file
   static OpenSimFile parseOsim(
       const common::Uri& uri,
+      const std::string geometryFolder = "",
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// Read Skeleton from *.osim file
