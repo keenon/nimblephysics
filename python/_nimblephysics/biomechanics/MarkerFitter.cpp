@@ -428,6 +428,12 @@ void MarkerFitter(py::module& m)
           ::py::arg("markerTrials"),
           ::py::arg("params"),
           ::py::arg("numSamples") = 50)
+      .def_static(
+          "getMarkerLossGradientWrtJoints",
+          &dart::biomechanics::MarkerFitter::getMarkerLossGradientWrtJoints,
+          ::py::arg("skeleton"),
+          ::py::arg("markers"),
+          ::py::arg("lossGradWrtMarkerError"))
       .def(
           "runKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,

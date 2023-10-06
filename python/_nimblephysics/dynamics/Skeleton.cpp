@@ -1160,6 +1160,14 @@ These are a set of bodies, and offsets in local body space where accs are mounte
 This returns the Jacobian relating changes in the `wrt` quantity to changes in acc readings.
     )docs")
       .def(
+          "getBodyLocalVelocities",
+          &dart::dynamics::Skeleton::getBodyLocalVelocities
+          )
+      .def(
+          "getBodyLocalAccelerations",
+          &dart::dynamics::Skeleton::getBodyLocalAccelerations
+          )
+      .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
             self->setVelocityUpperLimits(limits);
