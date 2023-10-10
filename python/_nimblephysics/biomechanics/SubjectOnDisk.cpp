@@ -399,6 +399,21 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerMax,
                 ::py::arg("markerMax"))
             .def(
+                "setLowpassCutoffFrequency",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setLowpassCutoffFrequency,
+                ::py::arg("freq"))
+            .def(
+                "setLowpassFilterOrder",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setLowpassFilterOrder,
+                ::py::arg("order"))
+            .def(
+                "setForcePlateCutoffs",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setForcePlateCutoffs,
+                ::py::arg("cutoffs"))
+            .def(
                 "computeValues",
                 &dart::biomechanics::SubjectOnDiskTrialPass::computeValues,
                 ::py::arg("skel"),
@@ -666,15 +681,24 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getLowpassCutoffFrequency",
                 &dart::biomechanics::SubjectOnDisk::getLowpassCutoffFrequency,
+                ::py::arg("trial"),
                 ::py::arg("processingPass"),
                 "If we're doing a lowpass filter on this pass, then what was "
                 "the cutoff frequency of that (Butterworth) filter?")
             .def(
                 "getLowpassFilterOrder",
                 &dart::biomechanics::SubjectOnDisk::getLowpassFilterOrder,
+                ::py::arg("trial"),
                 ::py::arg("processingPass"),
                 "If we're doing a lowpass filter on this pass, then what was "
                 "the order of that (Butterworth) filter?")
+            .def(
+                "getForceplateCutoffs",
+                &dart::biomechanics::SubjectOnDisk::getForceplateCutoffs,
+                ::py::arg("trial"),
+                ::py::arg("processingPass"),
+                "If we reprocessed the force plates with a cutoff, then these "
+                "are the cutoff values we used.")
             .def(
                 "readFrames",
                 &dart::biomechanics::SubjectOnDisk::readFrames,

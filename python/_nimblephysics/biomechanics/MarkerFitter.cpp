@@ -112,8 +112,7 @@ void MarkerFitter(py::module& m)
           "jointCenters",
           &dart::biomechanics::MarkerInitialization::jointCenters)
       .def_readwrite(
-          "jointAxis",
-          &dart::biomechanics::MarkerInitialization::jointAxis)
+          "jointAxis", &dart::biomechanics::MarkerInitialization::jointAxis)
       .def_readwrite(
           "jointsAdjacentMarkers",
           &dart::biomechanics::MarkerInitialization::jointsAdjacentMarkers)
@@ -121,8 +120,7 @@ void MarkerFitter(py::module& m)
           "jointWeights",
           &dart::biomechanics::MarkerInitialization::jointWeights)
       .def_readwrite(
-          "axisWeights",
-          &dart::biomechanics::MarkerInitialization::axisWeights)
+          "axisWeights", &dart::biomechanics::MarkerInitialization::axisWeights)
       .def_readwrite(
           "joints", &dart::biomechanics::MarkerInitialization::joints)
       .def_readwrite(
@@ -132,7 +130,10 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerInitialization::updatedMarkerMap)
       .def_readwrite(
           "markerOffsets",
-          &dart::biomechanics::MarkerInitialization::markerOffsets);
+          &dart::biomechanics::MarkerInitialization::markerOffsets)
+      .def_readwrite("error", &dart::biomechanics::MarkerInitialization::error)
+      .def_readwrite(
+          "errorMsg", &dart::biomechanics::MarkerInitialization::errorMsg);
 
   ::py::class_<
       dart::biomechanics::IMUFineTuneProblem,
