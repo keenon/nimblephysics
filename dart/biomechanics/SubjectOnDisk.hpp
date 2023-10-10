@@ -117,6 +117,15 @@ public:
       std::vector<bool> dofAccelerationFiniteDifference);
   void setMarkerRMS(std::vector<s_t> markerRMS);
   void setMarkerMax(std::vector<s_t> markerMax);
+  // If we're doing a lowpass filter on this pass, then what was the cutoff
+  // frequency of that filter?
+  void setLowpassCutoffFrequency(s_t freq);
+  // If we're doing a lowpass filter on this pass, then what was the order of
+  // that (Butterworth) filter?
+  void setLowpassFilterOrder(int order);
+  // If we filtered the force plates, then what was the cutoff frequency of that
+  // filtering?
+  void setForcePlateCutoffs(std::vector<s_t> cutoffs);
 
   // This is for allowing the user to set all the values of a pass at once,
   // without having to manually compute them in Python, which turns out to be
@@ -164,6 +173,15 @@ protected:
   std::vector<bool> mDofAccelerationFiniteDifferenced;
   std::vector<s_t> mMarkerRMS;
   std::vector<s_t> mMarkerMax;
+  // If we're doing a lowpass filter on this pass, then what was the cutoff
+  // frequency of that filter?
+  s_t mLowpassCutoffFrequency;
+  // If we're doing a lowpass filter on this pass, then what was the order of
+  // that (Butterworth) filter?
+  int mLowpassFilterOrder;
+  // If we filtered the force plates, then what was the cutoff frequency of that
+  // filtering?
+  std::vector<s_t> mForcePlateCutoffs;
   std::vector<s_t> mLinearResidual;
   std::vector<s_t> mAngularResidual;
   // This data is in each separate Frame, and so won't be loaded from the proto
@@ -262,8 +280,6 @@ public:
   SubjectOnDiskPassHeader();
   void setProcessingPassType(ProcessingPassType type);
   void setOpenSimFileText(const std::string& openSimFileText);
-  void setLowpassCutoffFrequency(s_t cutoff);
-  void setLowpassFilterOrder(int order);
   void write(dart::proto::SubjectOnDiskPass* proto);
   void read(const dart::proto::SubjectOnDiskPass& proto);
 
@@ -272,12 +288,6 @@ protected:
   // The OpenSim file XML gets copied into our binary bundle, along with
   // any necessary Geometry files
   std::string mOpenSimFileText;
-  // If we're doing a lowpass filter on this pass, then what was the cutoff
-  // frequency of that filter?
-  s_t mLowpassCutoffFrequency;
-  // If we're doing a lowpass filter on this pass, then what was the order of
-  // that (Butterworth) filter?
-  int mLowpassFilterOrder;
 
   friend class SubjectOnDisk;
   friend struct FramePass;
@@ -385,11 +395,15 @@ public:
 
   // If we're doing a lowpass filter on this pass, then what was the cutoff
   // frequency of that filter?
-  s_t getLowpassCutoffFrequency(int processingPass);
+  s_t getLowpassCutoffFrequency(int trial, int processingPass);
 
   // If we're doing a lowpass filter on this pass, then what was the order of
   // that (Butterworth) filter?
-  int getLowpassFilterOrder(int processingPass);
+  int getLowpassFilterOrder(int trial, int processingPass);
+
+  // If we reprocessed the force plates with a cutoff, then these are the cutoff
+  // values we used.
+  std::vector<s_t> getForceplateCutoffs(int trial, int processingPass);
 
   /// This will read from disk and allocate a number of Frame objects.
   /// These Frame objects are assumed to be

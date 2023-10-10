@@ -388,16 +388,30 @@ std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 
 // If we're doing a lowpass filter on this pass, then what was the cutoff
 // frequency of that filter?
-s_t SubjectOnDisk::getLowpassCutoffFrequency(int processingPass)
+s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 {
-  return mHeader.mPasses[processingPass]->mLowpassCutoffFrequency;
+  return mHeader.mTrials[trial]
+      ->mTrialPasses[processingPass]
+      ->mLowpassCutoffFrequency;
 }
 
 // If we're doing a lowpass filter on this pass, then what was the order of
 // that (Butterworth) filter?
-int SubjectOnDisk::getLowpassFilterOrder(int processingPass)
+int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 {
-  return mHeader.mPasses[processingPass]->mLowpassFilterOrder;
+  return mHeader.mTrials[trial]
+      ->mTrialPasses[processingPass]
+      ->mLowpassFilterOrder;
+}
+
+// If we reprocessed the force plates with a cutoff, then these are the cutoff
+// values we used.
+std::vector<s_t> SubjectOnDisk::getForceplateCutoffs(
+    int trial, int processingPass)
+{
+  return mHeader.mTrials[trial]
+      ->mTrialPasses[processingPass]
+      ->mForcePlateCutoffs;
 }
 
 /// This will read from disk and allocate a number of Frame objects,
@@ -1307,17 +1321,20 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
         skel->setAccelerations(ddq);
         comAccs.col(t) = skel->getCOMLinearAcceleration();
-  
+
         // Estimate ground height from recorded CoPs, for later CoP calculations
-        // TODO: this assumes that all contacts on this frame are at the same height
+        // TODO: this assumes that all contacts on this frame are at the same
+        // height
         s_t groundHeight = 0.0;
-        if (forcePlates.size() > 0) {
+        if (forcePlates.size() > 0)
+        {
           for (int i = 0; i < forcePlates.size(); i++)
           {
-            if (forcePlates.at(i).centersOfPressure.size() > t &&
-               !forcePlates.at(i).centersOfPressure.at(t).hasNaN() &&
-               forcePlates.at(i).forces.size() > t &&
-               forcePlates.at(i).forces.at(t).norm() > 1e-8) {
+            if (forcePlates.at(i).centersOfPressure.size() > t
+                && !forcePlates.at(i).centersOfPressure.at(t).hasNaN()
+                && forcePlates.at(i).forces.size() > t
+                && forcePlates.at(i).forces.at(t).norm() > 1e-8)
+            {
               groundHeight = forcePlates.at(i).centersOfPressure.at(t)(1);
             }
           }
@@ -1361,6 +1378,27 @@ void SubjectOnDiskTrialPass::setMarkerRMS(std::vector<s_t> markerRMS)
 void SubjectOnDiskTrialPass::setMarkerMax(std::vector<s_t> markerMax)
 {
   mMarkerMax = markerMax;
+}
+
+// If we're doing a lowpass filter on this pass, then what was the cutoff
+// frequency of that filter?
+void SubjectOnDiskTrialPass::setLowpassCutoffFrequency(s_t freq)
+{
+  mLowpassCutoffFrequency = freq;
+}
+
+// If we're doing a lowpass filter on this pass, then what was the order of
+// that (Butterworth) filter?
+void SubjectOnDiskTrialPass::setLowpassFilterOrder(int order)
+{
+  mLowpassFilterOrder = order;
+}
+
+// If we filtered the force plates, then what was the cutoff frequency of that
+// filtering?
+void SubjectOnDiskTrialPass::setForcePlateCutoffs(std::vector<s_t> cutoffs)
+{
+  mForcePlateCutoffs = cutoffs;
 }
 
 void SubjectOnDiskTrialPass::setLinearResidual(std::vector<s_t> linearResidual)
@@ -1441,6 +1479,14 @@ void SubjectOnDiskTrialPass::read(
   {
     mJointsMaxVelocity.push_back(proto.joints_max_velocity(i));
   }
+
+  mLowpassCutoffFrequency = proto.lowpass_cutoff_frequency();
+  mLowpassFilterOrder = proto.lowpass_filter_order();
+  mForcePlateCutoffs.clear();
+  for (int i = 0; i < proto.force_plate_cutoff_size(); i++)
+  {
+    mForcePlateCutoffs.push_back(proto.force_plate_cutoff(i));
+  }
 }
 
 void SubjectOnDiskTrialPass::write(
@@ -1489,6 +1535,13 @@ void SubjectOnDiskTrialPass::write(
   for (int i = 0; i < mVel.cols(); i++)
   {
     proto->add_joints_max_velocity(mVel.col(i).cwiseAbs().maxCoeff());
+  }
+
+  proto->set_lowpass_cutoff_frequency(mLowpassCutoffFrequency);
+  proto->set_lowpass_filter_order(mLowpassFilterOrder);
+  for (int i = 0; i < mForcePlateCutoffs.size(); i++)
+  {
+    proto->add_force_plate_cutoff(mForcePlateCutoffs[i]);
   }
 
   if (!proto->IsInitialized())
@@ -1760,22 +1813,10 @@ void SubjectOnDiskPassHeader::setOpenSimFileText(
   mOpenSimFileText = openSimFileText;
 }
 
-void SubjectOnDiskPassHeader::setLowpassCutoffFrequency(s_t cutoff)
-{
-  mLowpassCutoffFrequency = cutoff;
-}
-
-void SubjectOnDiskPassHeader::setLowpassFilterOrder(int order)
-{
-  mLowpassFilterOrder = order;
-}
-
 void SubjectOnDiskPassHeader::write(dart::proto::SubjectOnDiskPass* proto)
 {
   proto->set_pass_type(passTypeToProto(mType));
   proto->set_model_osim_text(mOpenSimFileText);
-  proto->set_lowpass_cutoff_frequency(mLowpassCutoffFrequency);
-  proto->set_lowpass_filter_order(mLowpassFilterOrder);
 
   if (!proto->IsInitialized())
   {
@@ -1789,8 +1830,6 @@ void SubjectOnDiskPassHeader::read(const dart::proto::SubjectOnDiskPass& proto)
 {
   mType = passTypeFromProto(proto.pass_type());
   mOpenSimFileText = proto.model_osim_text();
-  mLowpassCutoffFrequency = proto.lowpass_cutoff_frequency();
-  mLowpassFilterOrder = proto.lowpass_filter_order();
 }
 
 SubjectOnDiskHeader::SubjectOnDiskHeader()
