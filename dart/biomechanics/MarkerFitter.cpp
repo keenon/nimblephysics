@@ -1250,9 +1250,10 @@ bool MarkerFitter::checkForFlippedMarkers(
     totalObservations[marker] = std::map<std::string, int>();
     for (std::string& innerMarker : observedMarkers)
     {
-      if (!totalDistances.count(marker)) {
-        std::cout << "init: totalDistances doesn'contain "
-                  << marker << std::endl;
+      if (!totalDistances.count(marker))
+      {
+        std::cout << "init: totalDistances doesn'contain " << marker
+                  << std::endl;
       }
       totalDistances.at(marker)[innerMarker] = 0.0;
       totalObservations.at(marker)[innerMarker] = 0;
@@ -1265,10 +1266,12 @@ bool MarkerFitter::checkForFlippedMarkers(
     mSkeleton->setPositions(init.poses.col(i));
     std::map<std::string, Eigen::Vector3s> markerPos
         = mSkeleton->getMarkerMapWorldPositions(init.updatedMarkerMap);
-    if (markerObservations.size() > i) {
+    if (markerObservations.size() > i)
+    {
       for (auto& pair : markerPos)
       {
-        if (std::find(observedMarkers.begin(), observedMarkers.end(), pair.first)
+        if (std::find(
+                observedMarkers.begin(), observedMarkers.end(), pair.first)
             == observedMarkers.end())
         {
           // Skip any markers that are not in the `observedMarkers` list
@@ -1276,31 +1279,38 @@ bool MarkerFitter::checkForFlippedMarkers(
         }
         for (auto& innerPair : markerObservations.at(i))
         {
-          if (!totalDistances.count(pair.first)) {
-            std::cout << "counting: totalDistances doesn't contain " << pair.first
-                      << std::endl;
+          if (!totalDistances.count(pair.first))
+          {
+            std::cout << "counting: totalDistances doesn't contain "
+                      << pair.first << std::endl;
           }
-          else if (!totalDistances.at(pair.first).count(innerPair.first)) {
-            std::cout << "counting: totalDistances[" << pair.first << "] doesn'contain " << innerPair.first
-                      << std::endl;
+          else if (!totalDistances.at(pair.first).count(innerPair.first))
+          {
+            std::cout << "counting: totalDistances[" << pair.first
+                      << "] doesn'contain " << innerPair.first << std::endl;
           }
           totalDistances.at(pair.first).at(innerPair.first)
               += (pair.second - innerPair.second).norm();
 
-          if (!totalObservations.count(pair.first)) {
-            std::cout << "counting: totalObservations doesn'contain " << pair.first
-                      << std::endl;
+          if (!totalObservations.count(pair.first))
+          {
+            std::cout << "counting: totalObservations doesn'contain "
+                      << pair.first << std::endl;
           }
-          else if (!totalObservations.at(pair.first).count(innerPair.first)) {
-            std::cout << "counting: totalObservations[" << pair.first << "] doesn'contain " << innerPair.first
-                      << std::endl;
+          else if (!totalObservations.at(pair.first).count(innerPair.first))
+          {
+            std::cout << "counting: totalObservations[" << pair.first
+                      << "] doesn'contain " << innerPair.first << std::endl;
           }
           totalObservations.at(pair.first).at(innerPair.first)++;
         }
       }
     }
-    else {
-      std::cout << "i = " << i << ", markerObservations.size() = " << markerObservations.size() << std::endl;
+    else
+    {
+      std::cout << "i = " << i
+                << ", markerObservations.size() = " << markerObservations.size()
+                << std::endl;
     }
   }
   mSkeleton->setPositions(originalPose);
@@ -1310,21 +1320,25 @@ bool MarkerFitter::checkForFlippedMarkers(
   for (std::string& marker : observedMarkers)
   {
     std::string closestMarker = marker;
-    if (!totalDistances.count(marker)) {
+    if (!totalDistances.count(marker))
+    {
       std::cout << "pre-averaging: totalDistances doesn'contain " << marker
                 << std::endl;
     }
-    else if (!totalDistances.at(marker).count(marker)) {
-      std::cout << "pre-averaging: totalDistances[" << marker << "] doesn'contain " << marker
-                << std::endl;
+    else if (!totalDistances.at(marker).count(marker))
+    {
+      std::cout << "pre-averaging: totalDistances[" << marker
+                << "] doesn'contain " << marker << std::endl;
     }
-    if (!totalObservations.count(marker)) {
+    if (!totalObservations.count(marker))
+    {
       std::cout << "pre-averaging: totalObservations doesn'contain " << marker
                 << std::endl;
     }
-    else if (!totalObservations.at(marker).count(marker)) {
-      std::cout << "pre-averaging: totalObservations[" << marker << "] doesn'contain " << marker
-                << std::endl;
+    else if (!totalObservations.at(marker).count(marker))
+    {
+      std::cout << "pre-averaging: totalObservations[" << marker
+                << "] doesn'contain " << marker << std::endl;
     }
     s_t closestMarkerDistance = totalDistances.at(marker).at(marker)
                                 / (totalObservations.at(marker).at(marker) > 0
@@ -1333,25 +1347,29 @@ bool MarkerFitter::checkForFlippedMarkers(
 
     for (std::string& innerMarker : observedMarkers)
     {
-      if (!totalObservations.count(marker)) {
+      if (!totalObservations.count(marker))
+      {
         std::cout << "averaging: totalObservations doesn'contain " << marker
                   << std::endl;
       }
-      else if (!totalObservations.at(marker).count(innerMarker)) {
-        std::cout << "averaging: totalObservations[" << marker << "] doesn'contain " << innerMarker
-                  << std::endl;
+      else if (!totalObservations.at(marker).count(innerMarker))
+      {
+        std::cout << "averaging: totalObservations[" << marker
+                  << "] doesn'contain " << innerMarker << std::endl;
       }
 
       int observed = totalObservations.at(marker).at(innerMarker);
       if (observed > 0)
       {
-        if (!totalDistances.count(marker)) {
+        if (!totalDistances.count(marker))
+        {
           std::cout << "averaging: totalDistances doesn'contain " << marker
                     << std::endl;
         }
-        else if (!totalDistances.at(marker).count(innerMarker)) {
-          std::cout << "averaging: totalDistances[" << marker << "] doesn'contain " << innerMarker
-                    << std::endl;
+        else if (!totalDistances.at(marker).count(innerMarker))
+        {
+          std::cout << "averaging: totalDistances[" << marker
+                    << "] doesn'contain " << innerMarker << std::endl;
         }
         s_t avgDist = totalDistances.at(marker).at(innerMarker) / observed;
         if (avgDist < closestMarkerDistance)
@@ -1370,12 +1388,16 @@ bool MarkerFitter::checkForFlippedMarkers(
 
   for (std::string& marker : observedMarkers)
   {
-    if (!closestMarkers.count(marker)) {
-      std::cout << "swapping: closestMarkers doesn'contain " << marker << std::endl;
+    if (!closestMarkers.count(marker))
+    {
+      std::cout << "swapping: closestMarkers doesn'contain " << marker
+                << std::endl;
     }
     const std::string closetToMarker = closestMarkers.at(marker);
-    if (!closestMarkers.count(closetToMarker)) {
-      std::cout << "swapping: closestMarkers doesn'contain " << closestMarkers.at(marker) << std::endl;
+    if (!closestMarkers.count(closetToMarker))
+    {
+      std::cout << "swapping: closestMarkers doesn'contain "
+                << closestMarkers.at(marker) << std::endl;
     }
     const std::string closetToClosest = closestMarkers.at(closetToMarker);
 
@@ -1384,8 +1406,7 @@ bool MarkerFitter::checkForFlippedMarkers(
     // that shouldn't have been swapped! We also check that it hasn't already
     // been swapped with us, cause we don't want to double-swap and end up
     // swapping back.
-    if (closetToMarker != marker
-        && closetToClosest == marker
+    if (closetToMarker != marker && closetToClosest == marker
         && swapped.count(closetToMarker) == 0)
     {
       report->warnings.push_back(
@@ -1467,8 +1488,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     {
       std::cout << "Running joint init pipeline for trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
-      markerVariabilities.push_back(
-          computeMarkerDistanceMatrixVariability(markerObservationTrials.at(i)));
+      markerVariabilities.push_back(computeMarkerDistanceMatrixVariability(
+          markerObservationTrials.at(i)));
     }
 
     // 3.2. Sort the trials by the amount of joint variability in each one
@@ -1524,11 +1545,13 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
               << markerObservationTrials.size() << std::endl;
     for (int i = 0; i < numTrialsToSample; i++)
     {
-      std::cout << "Trial " << orderedByJointVariability.at(i) << " length "
-                << markerObservationTrials.at(orderedByJointVariability.at(i)).size()
-                << std::endl;
+      std::cout
+          << "Trial " << orderedByJointVariability.at(i) << " length "
+          << markerObservationTrials.at(orderedByJointVariability.at(i)).size()
+          << std::endl;
       trialSampledAtIndex.at(orderedByJointVariability.at(i)) = cursor;
-      cursor += markerObservationTrials.at(orderedByJointVariability.at(i)).size();
+      cursor
+          += markerObservationTrials.at(orderedByJointVariability.at(i)).size();
     }
     std::cout << "Total timesteps to use for scaling: " << cursor << std::endl;
 
@@ -1538,7 +1561,8 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     for (int i = 0; i < numTrialsToSample; i++)
     {
       for (int j = 0;
-           j < markerObservationTrials.at(orderedByJointVariability.at(i)).size();
+           j
+           < markerObservationTrials.at(orderedByJointVariability.at(i)).size();
            j++)
       {
         markerObservations.emplace_back(
@@ -1589,11 +1613,26 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       }
       else
       {
-        separateInits.push_back(runPrescaledPipeline(
-            markerObservationTrials.at(i),
-            InitialMarkerFitParams(params)
-                .setGroupScales(overallInit.groupScales)
-                .setMarkerOffsets(overallInit.markerOffsets)));
+        try
+        {
+          separateInits.push_back(runPrescaledPipeline(
+              markerObservationTrials.at(i),
+              InitialMarkerFitParams(params)
+                  .setGroupScales(overallInit.groupScales)
+                  .setMarkerOffsets(overallInit.markerOffsets)));
+        }
+        catch (std::exception& e)
+        {
+          std::cout << "Failed to run IK on trial " << i << "/"
+                    << markerObservationTrials.size() << std::endl;
+          std::string message = e.what();
+          std::cout << "Exception: " << message << std::endl;
+          std::cout << "Continuing..." << std::endl;
+          separateInits.emplace_back();
+          MarkerInitialization& result = separateInits.back();
+          result.error = true;
+          result.errorMsg = message;
+        }
         // separateInits.push_back(fineTuneIK(
         //     markerObservationTrials[i],
         //     params.numBlocks,

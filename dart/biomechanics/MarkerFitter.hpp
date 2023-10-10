@@ -137,6 +137,9 @@ struct MarkerInitialization
   Eigen::VectorXs axisLoss;
   Eigen::MatrixXs jointAxis;
 
+  bool error;
+  std::string errorMsg;
+
   std::vector<std::string> observedMarkers;
   std::vector<dynamics::Joint*> observedJoints;
   std::vector<dynamics::Joint*> unobservedJoints;
@@ -605,12 +608,11 @@ public:
   /// anomalies, generate warnings to help the user fix their own issues, and
   /// produce fixes where possible.
   std::shared_ptr<MarkersErrorReport> generateDataErrorsReport(
-      std::vector<std::map<std::string, Eigen::Vector3s>>
-          markerObservations,
-      s_t dt, 
+      std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      s_t dt,
       bool rippleReduce = true,
       bool rippleReduceUseSparse = true,
-      bool rippleReduceUseIterativeSolver = true, 
+      bool rippleReduceUseIterativeSolver = true,
       int rippleReduceSolverIterations = 1e5);
 
   /// After we've finished our initialization, it may become clear that markers
