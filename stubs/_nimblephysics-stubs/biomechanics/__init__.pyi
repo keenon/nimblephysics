@@ -347,12 +347,12 @@ class DynamicsFitter():
     pass
 class DynamicsInitialization():
     @property
-    def axisWeights(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+    def axisWeights(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]:
         """
-        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]
         """
     @axisWeights.setter
-    def axisWeights(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+    def axisWeights(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None:
         pass
     @property
     def bodyCom(self) -> numpy.ndarray[numpy.float64, _Shape[3, n]]:
@@ -555,28 +555,28 @@ class DynamicsInitialization():
     def jointCenters(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None:
         pass
     @property
-    def jointWeights(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+    def jointWeights(self) -> typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]:
         """
-        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        :type: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]
         """
     @jointWeights.setter
-    def jointWeights(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+    def jointWeights(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None:
         pass
     @property
-    def joints(self) -> typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]:
+    def joints(self) -> typing.List[typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]]:
         """
-        :type: typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]
+        :type: typing.List[typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]]
         """
     @joints.setter
-    def joints(self, arg0: typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]) -> None:
+    def joints(self, arg0: typing.List[typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]]) -> None:
         pass
     @property
-    def jointsAdjacentMarkers(self) -> typing.List[typing.List[str]]:
+    def jointsAdjacentMarkers(self) -> typing.List[typing.List[typing.List[str]]]:
         """
-        :type: typing.List[typing.List[str]]
+        :type: typing.List[typing.List[typing.List[str]]]
         """
     @jointsAdjacentMarkers.setter
-    def jointsAdjacentMarkers(self, arg0: typing.List[typing.List[str]]) -> None:
+    def jointsAdjacentMarkers(self, arg0: typing.List[typing.List[typing.List[str]]]) -> None:
         pass
     @property
     def markerObservationTrials(self) -> typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]]:
@@ -1426,6 +1426,8 @@ class MarkerFitter():
     def getImuNames(self) -> typing.List[str]: ...
     def getInitialization(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], newClip: typing.List[bool], params: InitialMarkerFitParams = InitialMarkerFitParams(numBlocks=12)) -> MarkerInitialization: ...
     def getMarkerIsTracking(self, marker: str) -> bool: ...
+    @staticmethod
+    def getMarkerLossGradientWrtJoints(skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], lossGradWrtMarkerError: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def getNumMarkers(self) -> int: ...
     def measureAccelerometerRMS(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], newClip: typing.List[bool], init: MarkerInitialization, dt: float) -> float: ...
     def measureGyroRMS(self, gyroObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], newClip: typing.List[bool], init: MarkerInitialization, dt: float) -> float: ...
@@ -1621,6 +1623,15 @@ class MarkerFixer():
     def generateDataErrorsReport(immutableMarkerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], dt: float, dropProlongedStillness: bool = False, rippleReduce: bool = True, rippleReduceUseSparse: bool = True, rippleReduceUseIterativeSolver: bool = True, rippleReduceSolverIterations: int = 100000.0) -> MarkersErrorReport: ...
     pass
 class MarkerInitialization():
+    def __init__(self) -> None: ...
+    @property
+    def axisWeights(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @axisWeights.setter
+    def axisWeights(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
     @property
     def groupScales(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
@@ -1628,6 +1639,14 @@ class MarkerInitialization():
         """
     @groupScales.setter
     def groupScales(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def jointAxis(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
+    @jointAxis.setter
+    def jointAxis(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
         pass
     @property
     def jointCenters(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
@@ -1638,12 +1657,28 @@ class MarkerInitialization():
     def jointCenters(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
         pass
     @property
+    def jointWeights(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @jointWeights.setter
+    def jointWeights(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
     def joints(self) -> typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]:
         """
         :type: typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]
         """
     @joints.setter
     def joints(self, arg0: typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]) -> None:
+        pass
+    @property
+    def jointsAdjacentMarkers(self) -> typing.List[typing.List[str]]:
+        """
+        :type: typing.List[typing.List[str]]
+        """
+    @jointsAdjacentMarkers.setter
+    def jointsAdjacentMarkers(self, arg0: typing.List[typing.List[str]]) -> None:
         pass
     @property
     def markerOffsets(self) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]:

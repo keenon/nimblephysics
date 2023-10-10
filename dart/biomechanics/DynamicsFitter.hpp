@@ -677,6 +677,10 @@ public:
       std::vector<bool> probablyMissingGRF,
       int maxBuckets = 16);
 
+  int getNumForceBodies();
+
+  int getExpectedForcesDim();
+
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkel;
   std::vector<int> mForceBodies;
@@ -848,11 +852,13 @@ struct DynamicsInitialization
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   std::vector<std::string> trackingMarkers;
 
-  std::vector<dynamics::Joint*> joints;
-  std::vector<std::vector<std::string>> jointsAdjacentMarkers;
-  Eigen::VectorXs jointWeights;
+  // These are per-trial, because different trials can have different numbers of 
+  // observed markers and joints
+  std::vector<std::vector<dynamics::Joint*>> joints;
+  std::vector<std::vector<std::vector<std::string>>> jointsAdjacentMarkers;
+  std::vector<Eigen::VectorXs> jointWeights;
   std::vector<Eigen::MatrixXs> jointCenters;
-  Eigen::VectorXs axisWeights;
+  std::vector<Eigen::VectorXs> axisWeights;
   std::vector<Eigen::MatrixXs> jointAxis;
 
   ///////////////////////////////////////////
@@ -1231,7 +1237,7 @@ public:
   std::vector<std::shared_ptr<dynamics::Skeleton>> mThreadSkeletons;
   std::vector<std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>
       mThreadMarkers;
-  std::vector<std::vector<dynamics::Joint*>> mThreadJoints;
+  std::vector<std::vector<std::vector<dynamics::Joint*>>> mThreadJoints;
   std::vector<std::shared_ptr<ResidualForceHelper>> mThreadResidualHelpers;
   std::vector<std::shared_ptr<SpatialNewtonHelper>> mThreadSpatialNewtonHelpers;
 

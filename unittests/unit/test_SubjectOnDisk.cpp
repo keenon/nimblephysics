@@ -63,6 +63,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   std::vector<ProcessingPassType> processingPasses;
   std::vector<s_t> processingPassCutoffs;
   std::vector<int> processingPassOrders;
+  std::vector<s_t> forcePlateCutoffs;
   std::vector<std::string> openSimFileTexts;
   std::vector<std::string> customValueNames;
   std::vector<std::string> groundForceBodies;
@@ -134,6 +135,9 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   processingPasses.push_back(ProcessingPassType::lowPassFilter);
   processingPassCutoffs.push_back(25);
   processingPassOrders.push_back(3);
+
+  forcePlateCutoffs.push_back(1.0);
+  forcePlateCutoffs.push_back(2.0);
 
   openSimFileTexts.push_back("Kinematics_test");
   openSimFileTexts.push_back("Dynamics_test");
@@ -350,8 +354,6 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   {
     auto pass = header.addProcessingPass();
     pass->setProcessingPassType(processingPasses[i]);
-    pass->setLowpassCutoffFrequency(processingPassCutoffs[i]);
-    pass->setLowpassFilterOrder(processingPassOrders[i]);
     pass->setOpenSimFileText(openSimFileTexts[i]);
   }
   header.setNumDofs(dofs);
@@ -433,6 +435,10 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
       passData->setAngularResidual(angularResidualTrialPasses[trial][pass]);
       passData->setMarkerRMS(markerRMSTrialPasses[trial][pass]);
       passData->setMarkerMax(markerMaxTrialPasses[trial][pass]);
+
+      passData->setLowpassCutoffFrequency(processingPassCutoffs[pass]);
+      passData->setLowpassFilterOrder(processingPassOrders[pass]);
+      passData->setForcePlateCutoffs(forcePlateCutoffs);
     }
   }
 
@@ -458,22 +464,6 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     if (type != processingPasses[i])
     {
       std::cout << "Failed to recover correct processing pass type!"
-                << std::endl;
-      return false;
-    }
-
-    s_t frequency = subject.getLowpassCutoffFrequency(i);
-    if (frequency != processingPassCutoffs[i])
-    {
-      std::cout << "Failed to recover correct lowpass cutoff frequency!"
-                << std::endl;
-      return false;
-    }
-
-    int order = subject.getLowpassFilterOrder(i);
-    if (order != processingPassOrders[i])
-    {
-      std::cout << "Failed to recover correct lowpass filter order!"
                 << std::endl;
       return false;
     }
@@ -779,6 +769,22 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
             maxVels[t],
             velTrialPasses[trial][pass].col(t).cwiseAbs().maxCoeff(),
             1e-6);
+      }
+
+      s_t frequency = subject.getLowpassCutoffFrequency(trial, pass);
+      if (frequency != processingPassCutoffs[pass])
+      {
+        std::cout << "Failed to recover correct lowpass cutoff frequency!"
+                  << std::endl;
+        return false;
+      }
+
+      int order = subject.getLowpassFilterOrder(trial, pass);
+      if (order != processingPassOrders[pass])
+      {
+        std::cout << "Failed to recover correct lowpass filter order!"
+                  << std::endl;
+        return false;
       }
     }
   }

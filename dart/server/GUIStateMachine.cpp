@@ -946,7 +946,17 @@ void GUIStateMachine::createLine(
   line.points = points;
   line.color = color;
   line.layer = layer;
-  line.width = width;
+  for (int i = 0; i < points.size(); i++)
+  {
+    if (i < width.size())
+    {
+      line.width.push_back(width[i]);
+    }
+    else
+    {
+      line.width.push_back(1.0);
+    }
+  }
 
   queueCommand([this, key](proto::CommandList& list) {
     encodeCreateLine(list, mLines[key]);

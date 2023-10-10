@@ -51,6 +51,12 @@ message SubjectOnDiskTrialProcessingPassHeader {
   repeated float angular_residual = 8;
   // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
   repeated float joints_max_velocity = 9;
+  // If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that filter?
+  float lowpass_cutoff_frequency = 10;
+  // If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
+  int32 lowpass_filter_order = 11;
+  // If we clipped background noise on the force plates this pass, then this is the cutoff we used for each plate
+  repeated float force_plate_cutoff = 12;
 }
 
 message SubjectOnDiskTrialHeader {
@@ -82,10 +88,6 @@ message SubjectOnDiskTrialHeader {
 message SubjectOnDiskPass {
   ProcessingPassType pass_type = 1;
   string model_osim_text = 2;
-  // If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that filter?
-  float lowpass_cutoff_frequency = 3;
-  // If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
-  int32 lowpass_filter_order = 4;
 }
 
 message SubjectOnDiskHeader {

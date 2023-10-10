@@ -294,7 +294,7 @@ Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
 
 //==============================================================================
 OpenSimFile OpenSimParser::parseOsim(
-    const common::Uri& uri, const common::ResourceRetrieverPtr& nullOrRetriever)
+    const common::Uri& uri, std::string geometryFolder, const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
       = ensureRetriever(nullOrRetriever);
@@ -318,7 +318,7 @@ OpenSimFile OpenSimParser::parseOsim(
 
   common::Uri geometryURI
       = common::Uri::createFromRelativeUri(uri.toString(), "./Geometry/");
-  return parseOsim(osimFile, uri.toString(), geometryURI.toString(), retriever);
+  return parseOsim(osimFile, uri.toString(), geometryFolder == "" ? geometryURI.toString() : geometryFolder, retriever);
 }
 
 //==============================================================================
