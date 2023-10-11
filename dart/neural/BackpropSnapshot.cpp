@@ -1773,7 +1773,7 @@ void BackpropSnapshot::equalsOrCrash(
     std::cout << "Got an LCP result that couldn't be standardized!"
               << std::endl;
     printReplicationInstructions(world);
-    exit(1);
+    throw std::runtime_error("Got an LCP result that couldn't be standardized");
   }
   Eigen::MatrixXs diff = (analytical - bruteForce).cwiseAbs();
   // TODO: this should be 1e-8, diverges slightly in KR5Trajectory
@@ -1787,7 +1787,7 @@ void BackpropSnapshot::equalsOrCrash(
     std::cout << "Diff:" << std::endl << diff << std::endl;
     diagnoseSubJacobianErrors(world, WithRespectTo::POSITION);
     printReplicationInstructions(world);
-    exit(1);
+    throw std::runtime_error("Found invalid matrix!");
   }
 }
 

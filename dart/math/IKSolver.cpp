@@ -186,7 +186,9 @@ void verifyJacobian(
         }
       }
     }
-    exit(1);
+    throw std::runtime_error(
+        "Error! IK analytical Jacobians do not match finite differenced "
+        "version!");
   }
 }
 

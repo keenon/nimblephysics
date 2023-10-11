@@ -2586,15 +2586,13 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
   {
     std::cout << "ERROR: getHeight() computed a height of 0. Exiting..."
               << std::endl;
-    assert(height >= 0);
-    exit(1);
+    throw std::runtime_error("getHeight() computed a height of 0");
   }
   else if (height < 0)
   {
     std::cout << "WARNING: getHeight() computed a negative height of " << height
               << ". Exiting..." << std::endl;
-    assert(height >= 0);
-    exit(1);
+    throw std::runtime_error("getHeight() computed a negative height");
   }
   else
   {
@@ -5861,12 +5859,15 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
   Eigen::VectorXs sourcePositions = Eigen::VectorXs::Zero(joints.size() * 3);
   for (int i = 0; i < joints.size(); i++)
   {
-    #ifndef NDEBUG
-    if (joints[i]->getChildBodyNode() == nullptr) {
-      std::cout << "ERROR in getJointWorldPositions(): Joint " << joints[i]->getName() << " has no child body node" << std::endl;
+#ifndef NDEBUG
+    if (joints[i]->getChildBodyNode() == nullptr)
+    {
+      std::cout << "ERROR in getJointWorldPositions(): Joint "
+                << joints[i]->getName() << " has no child body node"
+                << std::endl;
       continue;
     }
-    #endif
+#endif
     sourcePositions.segment<3>(i * 3)
         = (joints[i]->getChildBodyNode()->getWorldTransform()
            * joints[i]->getTransformFromChildBodyNode())
@@ -10395,21 +10396,27 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as cops"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as cops");
   }
   if (contactBodies.size() != forces.size())
   {
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as forces"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as forces");
   }
   if (contactBodies.size() != moments.size())
   {
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as moments"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as moments");
   }
 
   // Get the current stocks of energy in each body
