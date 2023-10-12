@@ -10434,6 +10434,53 @@ void DynamicsFitter::fillInMissingGRFBlips(
 {
   for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
   {
+    int firstMissing = -1;
+    int lastMissing = -1;
+    for (int t = 0; t < init->probablyMissingGRF.at(trial).size(); t++)
+    {
+      if (init->probablyMissingGRF.at(trial).at(t))
+      {
+        if (firstMissing == -1)
+        {
+          firstMissing = t;
+        }
+        if (t > lastMissing)
+        {
+          lastMissing = t;
+        }
+      }
+    }
+
+    // If our first missing frame is within 100 frames of the start of the clip,
+    // then fill in with blip missing
+    if (firstMissing < 100)
+    {
+      for (int t = 0; t < firstMissing; t++)
+      {
+        if (!init->probablyMissingGRF.at(trial).at(t))
+        {
+          init->probablyMissingGRF.at(trial).at(t) = true;
+          init->missingGRFReason.at(trial).at(t)
+              = MissingGRFReason::missingBlip;
+        }
+      }
+    }
+    // Symmetrically for the last missing frame being within 100 frames of the
+    // end, then fill in
+    if (init->probablyMissingGRF.at(trial).size() - lastMissing < 100)
+    {
+      for (int t = lastMissing; t < init->probablyMissingGRF.at(trial).size();
+           t++)
+      {
+        if (!init->probablyMissingGRF.at(trial).at(t))
+        {
+          init->probablyMissingGRF.at(trial).at(t) = true;
+          init->missingGRFReason.at(trial).at(t)
+              = MissingGRFReason::missingBlip;
+        }
+      }
+    }
+
     // Smooth out any GRF contact blips that are shorter than `blipFilterLen`
     for (int t = 1; t < init->probablyMissingGRF[trial].size(); t++)
     {
@@ -10605,7 +10652,8 @@ void DynamicsFitter::smoothAccelerations(
         timesteps > 1000,
         true);
 
-    init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
+    // TODO: RESTORE
+    // init->poseTrials[trial] = smoother.smooth(init->poseTrials[trial]);
 
 #ifndef NDEBUG
     // Warn if we're over a bound after acceleration smoothing
@@ -10735,8 +10783,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
       {
         if (estimatedForce.norm() > maxGRF * 0.2)
         {
-          std::cout << "Missing GRF on trial " << trial << " at time " << t
-                    << std::endl;
+          std::cout << "No measured GRF on trial " << trial << " at time " << t
+                    << ", yet unexplained COM acceleration" << std::endl;
           filteredTimesteps.push_back(t + 1);
           init->probablyMissingGRF[trial][t + 1] = true;
           init->missingGRFReason[trial][t + 1]
@@ -11630,22 +11678,115 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         = mSkeleton->getRootJoint()->getDof(3)->getIndexInSkeleton();
     bool anyTrialChangedTooMuch = false;
     std::vector<int> trialsChangedTooMuch;
+    std::cout << "Checking " << numTrials << " trials for too much COM change"
+              << std::endl;
     for (int trial = 0; trial < numTrials; trial++)
     {
       s_t totalChange = 0.0;
       std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
+      std::vector<s_t> comChanges;
       // In this case, we can just read the answer right off the unified
       // matrix
       for (int t = 0; t < originalCOMs.size(); t++)
       {
         Eigen::Vector3s change
             = finalCOMTrajectory[trial].segment<3>(t * 3) - originalCOMs[t];
-        totalChange += change.norm();
+        const s_t dist = change.norm();
+        comChanges.push_back(dist);
+        totalChange += dist;
       }
+
+      bool clippedPeaks = false;
+      int numBuckets = 20;
+      s_t maxDist = 0.05;
+      int clipBuckets = 8;
+      Eigen::VectorXi histograms = Eigen::VectorXi::Zero(numBuckets);
+      for (int t = 0; t < comChanges.size(); t++)
+      {
+        int bucket = min(
+            (int)std::round((comChanges[t] / maxDist) * numBuckets),
+            numBuckets - 1);
+        histograms(bucket)++;
+      }
+      std::cout << "Histogram: " << histograms.transpose() << std::endl;
+      // If the top half of the histogram is less than 20% of the data, then we
+      // should probably just mark all those sections as missing GRF
+      if (histograms.tail(clipBuckets).sum() < originalCOMs.size() / 5
+          && histograms.tail(clipBuckets).sum() > 0)
+      {
+        std::cout << "Marking timesteps in the last " << clipBuckets
+                  << " buckets of the histogram "
+                     "as missing GRF"
+                  << std::endl;
+        s_t clippingThreshold
+            = (maxDist / numBuckets) * (numBuckets - clipBuckets);
+        std::cout << "Cutting at threshold " << clippingThreshold << "m"
+                  << std::endl;
+
+        s_t normalThreshold = 0.01;
+        int cumulativeSum = 0;
+        for (int i = 0; i < numBuckets; i++)
+        {
+          cumulativeSum += histograms(i);
+          s_t percentage = (s_t)cumulativeSum / originalCOMs.size();
+          if (percentage > 0.50)
+          {
+            normalThreshold = (i * maxDist) / numBuckets;
+            break;
+          }
+        }
+        std::cout << "Setting threshold for 'normal' at the 50% mark of the "
+                     "histogram: "
+                  << normalThreshold << "m" << std::endl;
+
+        for (int t = 0; t < comChanges.size(); t++)
+        {
+          if (comChanges.at(t) > clippingThreshold
+              && !init->probablyMissingGRF.at(trial).at(t))
+          {
+            clippedPeaks = true;
+            std::cout << "Detected peak at " << t << " with change "
+                      << comChanges.at(t) << "m" << std::endl;
+            init->probablyMissingGRF.at(trial).at(t) = true;
+            init->missingGRFReason.at(trial).at(t)
+                = MissingGRFReason::unmeasuredExternalForceDetected;
+
+            // Now we need to search forwards and backwards for timesteps that
+            // are beneath a threshold for acceptable distance
+            for (int i = t - 1; i >= 0; i--)
+            {
+              if (comChanges.at(i) < normalThreshold)
+              {
+                break;
+              }
+              std::cout << "Marking " << i
+                        << " as missing GRF because it is a neighbor of a peak"
+                        << std::endl;
+              init->probablyMissingGRF.at(trial).at(i) = true;
+              init->missingGRFReason.at(trial).at(i)
+                  = MissingGRFReason::unmeasuredExternalForceDetected;
+            }
+            for (int i = t + 1; i < comChanges.size(); i++)
+            {
+              if (comChanges.at(i) < normalThreshold)
+              {
+                break;
+              }
+              std::cout << "Marking " << i
+                        << " as missing GRF because it is a neighbor of a peak"
+                        << std::endl;
+              init->probablyMissingGRF.at(trial).at(i) = true;
+              init->missingGRFReason.at(trial).at(i)
+                  = MissingGRFReason::unmeasuredExternalForceDetected;
+            }
+          }
+        }
+      }
+
       std::cout << "Trial " << trial << " moved COM by an average of "
                 << (totalChange / originalCOMs.size())
                 << "m to achieve linear physical consistency." << std::endl;
-      if ((totalChange / originalCOMs.size()) > 0.045)
+      if ((totalChange / originalCOMs.size()) > 0.045 || clippedPeaks)
       {
         std::cout << "Trial " << trial << " changed too much!" << std::endl;
         anyTrialChangedTooMuch = true;
@@ -11691,7 +11832,7 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     }
 
     std::cout << "Finished zeroing linear residuals." << std::endl;
-    return true;
+    return sampledTrials.size() > 0;
   }
 
   std::cout << "Threshold for detecting unmeasured external forces fell too "
@@ -12132,9 +12273,9 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 {
   ResidualForceHelper helper(mSkeleton, init->grfBodyIndices);
 
-  // If we're using reaction wheels, the offset numbers tend to get pretty big,
-  // since we usually have decent residuals, or we wouldn't be resorting to
-  // wheels in the first place.
+  // If we're using reaction wheels, the offset numbers tend to get pretty
+  // big, since we usually have decent residuals, or we wouldn't be resorting
+  // to wheels in the first place.
   if (useReactionWheels)
   {
     weightAngular *= 0.001;
@@ -12614,8 +12755,8 @@ bool DynamicsFitter::timeSyncTrialGRF(
   s_t bestShiftGRFScore = std::numeric_limits<s_t>::infinity();
   Eigen::MatrixXs bestShiftGRFTrial = originalGRFTrial;
   Eigen::MatrixXs bestShiftPoseTrial = originalPoseTrial;
-  // Start with the smallest shifts away from zero first, so if we abort early,
-  // we know it's not because we shifted too far to start with.
+  // Start with the smallest shifts away from zero first, so if we abort
+  // early, we know it's not because we shifted too far to start with.
   std::vector<int> shifts;
   shifts.push_back(0);
   for (int i = 1; i <= maxShiftGRF; ++i)
@@ -12834,7 +12975,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     s_t avgPositionChangeThreshold,
     s_t avgAngularChangeThreshold,
     bool reoptimizeAnatomicalMarkers,
-    bool reoptimizeTrackingMarkers)
+    bool reoptimizeTrackingMarkers,
+    bool tuneLinkMasses)
 {
   std::vector<Eigen::MatrixXs> originalPoseTrials;
   for (int i = 0; i < init->poseTrials.size(); i++)
@@ -12852,11 +12994,14 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
             << std::endl;
 
   // Now reset positions and re-run with multi-mass
-  for (int i = 0; i < init->poseTrials.size(); i++)
+  if (tuneLinkMasses)
   {
-    init->poseTrials[i] = originalPoseTrials[i];
+    for (int i = 0; i < init->poseTrials.size(); i++)
+    {
+      init->poseTrials[i] = originalPoseTrials[i];
+    }
+    multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
   }
-  multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
 
   // Attempt to time sync the GRFs relative to the coordinate data.
   if (shiftGRF)
@@ -12870,12 +13015,25 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
         return false;
     }
     // Reset the pose trials now that we've found the GRF data, and start again
-    for (int trial = 0; trial < init->poseTrials.size(); trial++)
+    if (tuneLinkMasses)
     {
-      init->poseTrials[trial] = originalPoseTrials[trial];
+      for (int trial = 0; trial < init->poseTrials.size(); trial++)
+      {
+        init->poseTrials[trial] = originalPoseTrials[trial];
+      }
+      // Re-find the link masses, with updated GRF offsets
+      multimassZeroLinearResidualsOnCOMTrajectory(
+          init, maxTrialsToSolveMassOver);
     }
-    // Re-find the link masses, with updated GRF offsets
-    multimassZeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+    else
+    {
+      bool success
+          = zeroLinearResidualsOnCOMTrajectory(init, maxTrialsToSolveMassOver);
+      if (!success)
+      {
+        return false;
+      }
+    }
   }
 
   init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
@@ -12974,18 +13132,19 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
 
     if (residualMinimizationSuccess)
     {
-      // Adjust the regularization target to match our newly solved trajectory,
-      // so we're not trying to pull the root away from the solved trajectory
+      // Adjust the regularization target to match our newly solved
+      // trajectory, so we're not trying to pull the root away from the solved
+      // trajectory
       init->regularizePosesTo[trial] = init->poseTrials[trial];
       recalibrateForcePlatesOffset(init, trial);
     }
     else
     {
       // If this trial failed, restore original values.
-      std::cout
-          << "Residual moment minimization failed. Restoring results for trial "
-          << trial << " to "
-          << "linear center-of-mass trajectory fit." << std::endl;
+      std::cout << "Residual moment minimization failed. Restoring results "
+                   "for trial "
+                << trial << " to "
+                << "linear center-of-mass trajectory fit." << std::endl;
       init->reactionWheels[trial] = originalReactionWheels[trial];
       init->forcePlateTrials[trial] = originalForcePlateTrials[trial];
       init->poseTrials[trial] = originalPoseTrials[trial];
@@ -13833,8 +13992,8 @@ void DynamicsFitter::recomputeGRFs(
     }
     else
     {
-      // 2.1. Go through all the timesteps, and assign the force plate to a foot
-      // throughout time.
+      // 2.1. Go through all the timesteps, and assign the force plate to a
+      // foot throughout time.
       for (int t = 0; t < poses.cols(); t++)
       {
         forcePlatesAssignedToContactBody[i][t] = -1;
@@ -13866,8 +14025,8 @@ void DynamicsFitter::recomputeGRFs(
             //           "
             //           << sumSquaredDistances.transpose() << std::endl;
 
-            // Now assign everything in that track to the foot that was closest
-            // over the whole track
+            // Now assign everything in that track to the foot that was
+            // closest over the whole track
             for (int assignT = lastStartedTrack; assignT < t; assignT++)
             {
               // This is a map of [forcePlate][timestep]
@@ -13896,7 +14055,8 @@ void DynamicsFitter::recomputeGRFs(
         // std::cout << "Force Plate " << i << " time range [" <<
         // lastStartedTrack
         //           << "," << (poses.cols() - 1)
-        //           << "] Closest foot: " << closestFoot << " with distances "
+        //           << "] Closest foot: " << closestFoot << " with distances
+        //           "
         //           << sumSquaredDistances.transpose() << std::endl;
 
         // Now assign everything in that track to the foot that was closest
@@ -13928,7 +14088,8 @@ void DynamicsFitter::recomputeGRFs(
 
       if (assignedToFeet.size() == 0)
       {
-        // This force plate is never assigned to a foot, so we can't do anything
+        // This force plate is never assigned to a foot, so we can't do
+        // anything
         std::cout << "NOTE: Assigning force plate " << i << " to no feet "
                   << ", because there was never sufficient measured force on "
                      "the plate"
@@ -13951,9 +14112,9 @@ void DynamicsFitter::recomputeGRFs(
         std::cout << "NOTE: Assigning force plate " << i << " to multiple feet"
                   << std::endl;
         // This force plate is assigned to multiple feet over time. This can
-        // often happen with foot-crossing. We won't issue a warning, but we can
-        // go through and try to fill in the gaps between feet assignments that
-        // are the same.
+        // often happen with foot-crossing. We won't issue a warning, but we
+        // can go through and try to fill in the gaps between feet assignments
+        // that are the same.
         int lastContactIndex = -1;
         for (int t = 0; t < poses.cols(); t++)
         {
@@ -14206,6 +14367,16 @@ void DynamicsFitter::optimizeRootTrajectory(
                  "Please enable some variables, for example with "
                  "config.setIncludePoses(true)"
               << std::endl;
+    return;
+  }
+  if (problem.mBlocks.size() == 0)
+  {
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
     return;
   }
 
@@ -15057,6 +15228,16 @@ void DynamicsFitter::runUnconstrainedSGDOptimization(
               << std::endl;
     return;
   }
+  if (problem.mBlocks.size() == 0)
+  {
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
+    return;
+  }
 
   // Guarantee that even if we aren't including the poses in our optimization,
   // the velocities and accelerations are still exactly consistent with the
@@ -15178,6 +15359,16 @@ void DynamicsFitter::runConstrainedSGDOptimization(
                  "Please enable some variables, for example with "
                  "config.setIncludePoses(true)"
               << std::endl;
+    return;
+  }
+  if (problem.mBlocks.size() == 0)
+  {
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
     return;
   }
 
@@ -15316,6 +15507,16 @@ void DynamicsFitter::runNewtonsMethod(
                  "Please enable some variables, for example with "
                  "config.setIncludePoses(true)"
               << std::endl;
+    return;
+  }
+  if (problem.mBlocks.size() == 0)
+  {
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
     return;
   }
 
@@ -15490,6 +15691,16 @@ void DynamicsFitter::runConstantNewtonsMethod(
                  "Please enable some variables, for example with "
                  "config.setIncludePoses(true)"
               << std::endl;
+    return;
+  }
+  if (problem.mBlocks.size() == 0)
+  {
+    std::cout
+        << "WARNING: Optimization problem had no timesteps to optimize over! "
+           "This usually means all of your trials were marked as having GRF "
+           "data that was sufficiently hard to match with the markers that "
+           "we couldn't find a solution."
+        << std::endl;
     return;
   }
 
@@ -16328,8 +16539,8 @@ void DynamicsFitter::writeSubjectOnDisk(
       Eigen::VectorXs tau = useAdjustedGRFs
                                 ? init->perfectTorques[trial].col(t)
                                 : helper.calculateInverseDynamics(
-                                    q, dq, ddq, init->grfTrials[trial].col(t));
-      taus.col(t - 1) = tau;
+                                    q, dq, ddq,
+init->grfTrials[trial].col(t)); taus.col(t - 1) = tau;
 
       s_t rootNorm = tau.size() > 6
                          ? tau.head<6>().norm()
@@ -16353,7 +16564,8 @@ void DynamicsFitter::writeSubjectOnDisk(
           Eigen::Vector3s cop
               = init->forcePlateTrials[trial][i].centersOfPressure[t];
           Eigen::Vector3s force = init->forcePlateTrials[trial][i].forces[t];
-          Eigen::Vector3s moments = init->forcePlateTrials[trial][i].moments[t];
+          Eigen::Vector3s moments =
+init->forcePlateTrials[trial][i].moments[t];
           // Ignore timesteps where the force plate has a 0 force, those don't
           // need to be assigned to anything
           if (force.norm() == 0 || force.hasNaN() || cop.hasNaN()
@@ -17703,16 +17915,8 @@ void DynamicsFitter::saveDynamicsToGUI(
   for (int timestep = 0; timestep < poses.cols(); timestep++)
   {
     mSkeleton->setPositions(poses.col(timestep));
-    Eigen::Vector4s color = Eigen::Vector4s::Ones() * -1;
-    if (init->probablyMissingGRF[trialIndex][timestep])
-    {
-      color = Eigen::Vector4s(1.0, 0.0, 0.0, 1);
-    }
-    else
-    {
-      color = Eigen::Vector4s(0.5, 0.5, 0.5, 1);
-    }
-    server.renderSkeleton(mSkeleton, "skel", color, skeletonLayerName);
+    server.renderSkeleton(
+        mSkeleton, "skel", Eigen::Vector4s::Ones() * -1, skeletonLayerName);
     server.renderSkeletonInertiaCubes(
         mSkeleton,
         "skel_inertia",

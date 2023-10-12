@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-#define JACOBIAN_TESTS
+// #define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -6881,3 +6881,78 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_MARILYN_BUG)
       true);
 }
 #endif
+
+#ifdef ALL_TESTS
+TEST(DynamicsFitter, STAIRS_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("StairUp_1_segment_1");
+
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    motFiles.push_back(
+        "dart://sample/grf/StairsExample/IK/" + name + "_ik.mot");
+    trcFiles.push_back(
+        "dart://sample/grf/StairsExample/MarkerData/" + name + ".trc");
+    grfFiles.push_back(
+        "dart://sample/grf/StairsExample/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEngine(
+      "dart://sample/grf/StairsExample/Models/"
+      "match_markers_but_ignore_physics.osim",
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      false,
+      true);
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_STAIRS_TEST)
+{
+  std::vector<std::string> trialNames;
+  trialNames.push_back("StairUp_1_segment_1");
+
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  for (std::string& name : trialNames)
+  {
+    trcFiles.push_back(
+        "dart://sample/grf/StairsExample/MarkerData/" + name + ".trc");
+    grfFiles.push_back(
+        "dart://sample/grf/StairsExample/ID/" + name + "_grf.mot");
+  }
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  runEndToEnd(
+      "dart://sample/grf/StairsExample/Models/"
+      "match_markers_but_ignore_physics.osim",
+      footNames,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1,
+      0,
+      true);
+}
+// #endif

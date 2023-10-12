@@ -671,7 +671,8 @@ protected:
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15,
           ::py::arg("reoptimizeAnatomicalMarkers") = false,
-          ::py::arg("reoptimizeTrackingMarkers") = true)
+          ::py::arg("reoptimizeTrackingMarkers") = true,
+          ::py::arg("tuneLinkMasses") = false)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::

@@ -852,7 +852,7 @@ struct DynamicsInitialization
   std::map<std::string, Eigen::Vector3s> markerOffsets;
   std::vector<std::string> trackingMarkers;
 
-  // These are per-trial, because different trials can have different numbers of 
+  // These are per-trial, because different trials can have different numbers of
   // observed markers and joints
   std::vector<std::vector<dynamics::Joint*>> joints;
   std::vector<std::vector<std::vector<std::string>>> jointsAdjacentMarkers;
@@ -1361,7 +1361,7 @@ public:
   // attempt to drop them from subsequent optimization steps that tune model
   // parameters.
   void excludeTrialsWithTooManyMissingGRFs(
-      std::shared_ptr<DynamicsInitialization> init, int threshold = 75);
+      std::shared_ptr<DynamicsInitialization> init, int threshold = 200);
 
   // 0. Push the initialization away from hard bounds
   void boundPush(
@@ -1481,7 +1481,8 @@ public:
       s_t avgPositionChangeThreshold = 0.20,
       s_t avgAngularChangeThreshold = 0.20,
       bool reoptimizeAnatomicalMarkers = false,
-      bool reoptimizeTrackingMarkers = true);
+      bool reoptimizeTrackingMarkers = true,
+      bool tuneLinkMasses = false);
 
   // 1.1. Attempt to shift the COM trajectory around to try to get the
   // residual-free trajectory. This can fail, when we've got unmeasured external
