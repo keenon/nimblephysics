@@ -13,13 +13,6 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
-          - python-version: "3.6"
-            PYTHON_VERSION_CODE: cp36-cp36m
-            PYTHON_VERSION_NUMBER: "3.6"
-            PYTHON: /opt/python/cp36-cp36m/bin/python3.6
-            PYTHON_PATH: /opt/python/cp36-cp36m/bin/
-            PYTHON_INCLUDE: /opt/python/cp36-cp36m/include/python3.6m/
-            PYTHON_LIB: /opt/python/cp36-cp36m/lib/python3.6
           - python-version: "3.7"
             PYTHON_VERSION_CODE: cp37-cp37m
             PYTHON_VERSION_NUMBER: "3.7"
