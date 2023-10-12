@@ -1728,6 +1728,10 @@ public:
   void setTolerance(double tol);
   void setIterationLimit(int limit);
   void setLBFGSHistoryLength(int len);
+  void setCOMHistogramBuckets(int buckets);
+  void setCOMHistogramMaxMovement(s_t maxMovement);
+  void setCOMHistogramClipBuckets(int clipBuckets);
+  void setFillInEndFramesGrfGaps(int fillInFrames);
   void setCheckDerivatives(bool check);
   void setPrintFrequency(int freq);
   void setSilenceOutput(bool silent);
@@ -1741,6 +1745,10 @@ protected:
   double mTolerance;
   int mIterationLimit;
   int mLBFGSHistoryLength;
+  int mCOMHistogramBuckets;
+  s_t mCOMHistogramMaxMovement;
+  int mCOMHistogramClipBuckets;
+  int mFillInEndFramesGrfGaps;
   bool mCheckDerivatives;
   int mPrintFrequency;
   bool mSilenceOutput;

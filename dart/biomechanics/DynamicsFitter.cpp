@@ -9289,6 +9289,10 @@ DynamicsFitter::DynamicsFitter(
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
+    mCOMHistogramBuckets(20),
+    mCOMHistogramMaxMovement(0.05),
+    mCOMHistogramClipBuckets(2),
+    mFillInEndFramesGrfGaps(50),
     mCheckDerivatives(false),
     mPrintFrequency(1),
     mSilenceOutput(false),
@@ -10451,9 +10455,9 @@ void DynamicsFitter::fillInMissingGRFBlips(
       }
     }
 
-    // If our first missing frame is within 100 frames of the start of the clip,
-    // then fill in with blip missing
-    if (firstMissing < 100)
+    // If our first missing frame is within `mFillInEndFramesGrfGaps` frames of
+    // the start of the clip, then fill in with blip missing
+    if (firstMissing != -1 && firstMissing < mFillInEndFramesGrfGaps)
     {
       for (int t = 0; t < firstMissing; t++)
       {
@@ -10465,9 +10469,11 @@ void DynamicsFitter::fillInMissingGRFBlips(
         }
       }
     }
-    // Symmetrically for the last missing frame being within 100 frames of the
-    // end, then fill in
-    if (init->probablyMissingGRF.at(trial).size() - lastMissing < 100)
+    // Symmetrically for the last missing frame being within
+    // `mFillInEndFramesGrfGaps` frames of the end, then fill in
+    if (lastMissing != -1
+        && init->probablyMissingGRF.at(trial).size() - lastMissing
+               < mFillInEndFramesGrfGaps)
     {
       for (int t = lastMissing; t < init->probablyMissingGRF.at(trial).size();
            t++)
@@ -11697,41 +11703,44 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
       }
 
       bool clippedPeaks = false;
-      int numBuckets = 20;
-      s_t maxDist = 0.05;
-      int clipBuckets = 8;
-      Eigen::VectorXi histograms = Eigen::VectorXi::Zero(numBuckets);
+      Eigen::VectorXi histograms = Eigen::VectorXi::Zero(mCOMHistogramBuckets);
       for (int t = 0; t < comChanges.size(); t++)
       {
         int bucket = min(
-            (int)std::round((comChanges[t] / maxDist) * numBuckets),
-            numBuckets - 1);
+            (int)std::round(
+                (comChanges[t] / mCOMHistogramMaxMovement)
+                * mCOMHistogramBuckets),
+            mCOMHistogramBuckets - 1);
         histograms(bucket)++;
       }
       std::cout << "Histogram: " << histograms.transpose() << std::endl;
       // If the top half of the histogram is less than 20% of the data, then we
       // should probably just mark all those sections as missing GRF
-      if (histograms.tail(clipBuckets).sum() < originalCOMs.size() / 5
-          && histograms.tail(clipBuckets).sum() > 0)
+      if (histograms.tail(mCOMHistogramClipBuckets).sum()
+              < originalCOMs.size() / 5
+          && histograms.tail(mCOMHistogramClipBuckets).sum() > 0)
       {
-        std::cout << "Marking timesteps in the last " << clipBuckets
+        std::cout << "Marking timesteps in the last "
+                  << mCOMHistogramClipBuckets
                   << " buckets of the histogram "
                      "as missing GRF"
                   << std::endl;
         s_t clippingThreshold
-            = (maxDist / numBuckets) * (numBuckets - clipBuckets);
+            = (mCOMHistogramMaxMovement / mCOMHistogramBuckets)
+              * (mCOMHistogramBuckets - mCOMHistogramClipBuckets);
         std::cout << "Cutting at threshold " << clippingThreshold << "m"
                   << std::endl;
 
         s_t normalThreshold = 0.01;
         int cumulativeSum = 0;
-        for (int i = 0; i < numBuckets; i++)
+        for (int i = 0; i < mCOMHistogramBuckets; i++)
         {
           cumulativeSum += histograms(i);
           s_t percentage = (s_t)cumulativeSum / originalCOMs.size();
           if (percentage > 0.50)
           {
-            normalThreshold = (i * maxDist) / numBuckets;
+            normalThreshold
+                = (i * mCOMHistogramMaxMovement) / mCOMHistogramBuckets;
             break;
           }
         }
@@ -18251,6 +18260,30 @@ void DynamicsFitter::setIterationLimit(int limit)
 void DynamicsFitter::setLBFGSHistoryLength(int len)
 {
   mLBFGSHistoryLength = len;
+}
+
+//==============================================================================
+void DynamicsFitter::setCOMHistogramBuckets(int buckets)
+{
+  mCOMHistogramBuckets = buckets;
+}
+
+//==============================================================================
+void DynamicsFitter::setCOMHistogramMaxMovement(s_t maxMovement)
+{
+  mCOMHistogramMaxMovement = maxMovement;
+}
+
+//==============================================================================
+void DynamicsFitter::setCOMHistogramClipBuckets(int clipBuckets)
+{
+  mCOMHistogramClipBuckets = clipBuckets;
+}
+
+//==============================================================================
+void DynamicsFitter::setFillInEndFramesGrfGaps(int fillInFrames)
+{
+  mFillInEndFramesGrfGaps = fillInFrames;
 }
 
 //==============================================================================

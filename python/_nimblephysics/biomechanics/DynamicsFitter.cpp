@@ -827,6 +827,22 @@ protected:
           &dart::biomechanics::DynamicsFitter::setLBFGSHistoryLength,
           ::py::arg("value"))
       .def(
+          "setCOMHistogramBuckets",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramBuckets,
+          ::py::arg("buckets"))
+      .def(
+          "setCOMHistogramMaxMovement",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramMaxMovement,
+          ::py::arg("maxMovement"))
+      .def(
+          "setCOMHistogramClipBuckets",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramClipBuckets,
+          ::py::arg("clipBuckets"))
+      .def(
+          "setFillInEndFramesGrfGaps",
+          &dart::biomechanics::DynamicsFitter::setFillInEndFramesGrfGaps,
+          ::py::arg("fillInFrames"))
+      .def(
           "setCheckDerivatives",
           &dart::biomechanics::DynamicsFitter::setCheckDerivatives,
           ::py::arg("value"))
