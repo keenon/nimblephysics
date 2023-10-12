@@ -39,7 +39,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define JACOBIAN_TESTS
+#define JACOBIAN_TESTS
 // #define ALL_TESTS
 
 using namespace dart;
@@ -6922,7 +6922,7 @@ TEST(DynamicsFitter, STAIRS_TEST)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_STAIRS_TEST)
 {
   std::vector<std::string> trialNames;
@@ -6955,4 +6955,4 @@ TEST(DynamicsFitter, MARKERS_TO_DYNAMICS_STAIRS_TEST)
       0,
       true);
 }
-// #endif
+#endif
