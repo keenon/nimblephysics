@@ -1933,6 +1933,14 @@ public:
 
   Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& accelerations);
 
+  /// This computes the joint torques on the skeleton, given predicted wrenches
+  /// on each contact body, and optionally a predicted root residual.
+  Eigen::VectorXs getInverseDynamicsFromPredictions(
+      Eigen::VectorXs accelerations,
+      std::vector<dynamics::BodyNode*> contactBodies,
+      std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+      Eigen::Vector6s rootResiduals = Eigen::Vector6s::Zero());
+
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired
   /// next velocity. This includes arbitrary forces and moments at the

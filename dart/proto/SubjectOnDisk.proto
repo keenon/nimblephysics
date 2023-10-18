@@ -92,6 +92,7 @@ message SubjectOnDiskPass {
 
 message SubjectOnDiskHeader {
   int32 num_dofs = 1;
+  int32 num_joints = 24;
   int32 num_trials = 2;
   // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
   int32 raw_sensor_frame_size = 3;
@@ -145,6 +146,15 @@ message SubjectOnDiskProcessingPassFrame {
   repeated double com_pos = 9;
   repeated double com_vel = 10;
   repeated double com_acc = 11;
+  repeated double root_frame_com_acc = 17;
+  // Relevant physical data transformed into the root (probably pelvis) frame
+  repeated double root_frame_residual = 12;
+  // These are 6-vec's per contact body, so each length N*6
+  repeated double root_frame_ground_contact_wrench = 14;
+  // One 3-vec per joint
+  repeated double root_frame_joint_centers = 15;
+  // One 3-vec per joint
+  repeated double world_frame_joint_centers = 16;
 }
 
 message SubjectOnDiskSensorFrame {

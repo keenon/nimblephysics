@@ -17,6 +17,7 @@
 #include "dart/biomechanics/enums.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/proto/SubjectOnDisk.pb.h"
 #include "dart/utils/CompositeResourceRetriever.hpp"
@@ -798,6 +799,57 @@ void FramePass::readFromProto(
   comAcc(1) = proto->com_acc(1);
   comAcc(2) = proto->com_acc(2);
 
+  // Eigen::Vector3s comAccInRootFrame;
+  comAccInRootFrame(0) = proto->root_frame_com_acc(0);
+  comAccInRootFrame(1) = proto->root_frame_com_acc(1);
+  comAccInRootFrame(2) = proto->root_frame_com_acc(2);
+
+  // // These are each 6-vectors of the contact wrench of each body, but
+  // expressed
+  // // in the world frame, all concatenated together
+  // Eigen::VectorXd groundContactWrenchesInRootFrame;
+  if (proto->root_frame_ground_contact_wrench_size() == numContactBodies * 6)
+  {
+    groundContactWrenchesInRootFrame
+        = Eigen::VectorXs::Zero(numContactBodies * 6);
+    for (int i = 0; i < groundContactWrenchesInRootFrame.size(); i++)
+    {
+      groundContactWrenchesInRootFrame(i)
+          = proto->root_frame_ground_contact_wrench(i);
+    }
+  }
+
+  // // This is the residual, expressed as a wrench in the root body (probably
+  // the
+  // // pelvis) frame
+  // Eigen::Vector6d residualWrenchInRootFrame;
+  residualWrenchInRootFrame = Eigen::Vector6s::Zero();
+  if (proto->root_frame_residual_size() == 6)
+  {
+    for (int i = 0; i < 6; i++)
+    {
+      residualWrenchInRootFrame(i) = proto->root_frame_residual(i);
+    }
+  }
+
+  // // These are the joint centers, expressed in the world frame
+  // Eigen::VectorXd jointCenters;
+  jointCenters = Eigen::VectorXd::Zero(proto->world_frame_joint_centers_size());
+  for (int i = 0; i < proto->world_frame_joint_centers_size(); i++)
+  {
+    jointCenters(i) = proto->world_frame_joint_centers(i);
+  }
+
+  // // These are the joint centers, expressed in the root body (probably the
+  // // pelvis) frame
+  // Eigen::VectorXd jointCentersInRootFrame;
+  jointCentersInRootFrame
+      = Eigen::VectorXd::Zero(proto->root_frame_joint_centers_size());
+  for (int i = 0; i < proto->root_frame_joint_centers_size(); i++)
+  {
+    jointCentersInRootFrame(i) = proto->root_frame_joint_centers(i);
+  }
+
   // // These are masks for which DOFs are observed
 
   // Eigen::VectorXi posObserved;
@@ -884,6 +936,12 @@ s_t SubjectOnDisk::getTrialTimestep(int trial)
 int SubjectOnDisk::getNumDofs()
 {
   return mHeader.mNumDofs;
+}
+
+/// This returns the number of joints for the model on this Subject
+int SubjectOnDisk::getNumJoints()
+{
+  return mHeader.mNumJoints;
 }
 
 /// This returns the vector of enums of type 'MissingGRFReason', which can
@@ -1175,6 +1233,33 @@ void SubjectOnDiskTrialPass::setComAccs(Eigen::MatrixXs accs)
   mComAccs = accs;
 }
 
+void SubjectOnDiskTrialPass::setComAccsInRootFrame(Eigen::MatrixXs accs)
+{
+  mComAccsInRootFrame = accs;
+}
+
+void SubjectOnDiskTrialPass::setResidualWrenchInRootFrame(
+    Eigen::MatrixXs wrenches)
+{
+  mResidualWrenchInRootFrame = wrenches;
+}
+
+void SubjectOnDiskTrialPass::setGroundBodyWrenchesInRootFrame(
+    Eigen::MatrixXs wrenches)
+{
+  mGroundBodyWrenchesInRootFrame = wrenches;
+}
+
+void SubjectOnDiskTrialPass::setJointCenters(Eigen::MatrixXs centers)
+{
+  mJointCenters = centers;
+}
+
+void SubjectOnDiskTrialPass::setJointCentersInRootFrame(Eigen::MatrixXs centers)
+{
+  mJointCentersInRootFrame = centers;
+}
+
 void SubjectOnDiskTrialPass::setDofPositionsObserved(
     std::vector<bool> dofPositionsObserved)
 {
@@ -1285,12 +1370,33 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   Eigen::MatrixXs comPoses = Eigen::MatrixXs::Zero(3, poses.cols());
   Eigen::MatrixXs comVels = Eigen::MatrixXs::Zero(3, poses.cols());
   Eigen::MatrixXs comAccs = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs comAccsInRootFrame = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs residualWrenchInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs groundBodyWrenchesInRootFrame
+      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs jointCenters
+      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
+  Eigen::MatrixXs jointCentersInRootFrame
+      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
 
   ResidualForceHelper helper(skel, footIndices);
   s_t dt = timestep;
   for (int t = 0; t < poses.cols(); t++)
   {
     Eigen::VectorXs q = poses.col(t);
+    skel->setPositions(q);
+    comPoses.col(t) = skel->getCOM();
+    Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
+
+    Eigen::VectorXs worldCenters
+        = skel->getJointWorldPositions(skel->getJoints());
+    jointCenters.col(t) = worldCenters;
+    for (int j = 0; j < skel->getNumJoints(); j++)
+    {
+      jointCentersInRootFrame.block<3, 1>(j * 3, t)
+          = T_wr.inverse() * worldCenters.segment<3>(j * 3);
+    }
 
     s_t linearResidual = 0.0;
     s_t angularResidual = 0.0;
@@ -1299,9 +1405,7 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
       Eigen::VectorXs dq
           = skel->getPositionDifferences(poses.col(t), poses.col(t - 1)) / dt;
       vels.col(t) = dq;
-      skel->setPositions(q);
       skel->setVelocities(dq);
-      comPoses.col(t) = skel->getCOM();
       comVels.col(t) = skel->getCOMLinearVelocity();
 
       if (t < poses.cols() - 1)
@@ -1321,6 +1425,20 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
         skel->setAccelerations(ddq);
         comAccs.col(t) = skel->getCOMLinearAcceleration();
+        comAccsInRootFrame.col(t)
+            = T_wr.linear().transpose() * skel->getCOMLinearAcceleration();
+
+        if (skel->getRootJoint()->getNumDofs() == 6)
+        {
+          Eigen::Matrix6s rootJacobianTransposeInverse
+              = skel->getRootJoint()
+                    ->getRelativeJacobian()
+                    .transpose()
+                    .completeOrthogonalDecomposition()
+                    .pseudoInverse();
+          residualWrenchInRootFrame.col(t)
+              = rootJacobianTransposeInverse * residual;
+        }
 
         // Estimate ground height from recorded CoPs, for later CoP calculations
         // TODO: this assumes that all contacts on this frame are at the same
@@ -1349,6 +1467,9 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           Eigen::Vector9s copWrench
               = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
           copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
+          Eigen::Vector6s rootWrench
+              = math::dAdInvT(T_wr.inverse(), worldWrench);
+          groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
         }
       }
     }
@@ -1366,7 +1487,12 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   setComPoses(comPoses);
   setComVels(comVels);
   setComAccs(comAccs);
+  setComAccsInRootFrame(comAccsInRootFrame);
+  setResidualWrenchInRootFrame(residualWrenchInRootFrame);
+  setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
   setGroundBodyCopTorqueForce(copTorqueForceTrial);
+  setJointCenters(jointCenters);
+  setJointCentersInRootFrame(jointCentersInRootFrame);
 }
 
 // Manual setters that compete with computeValues()
@@ -1850,6 +1976,12 @@ SubjectOnDiskHeader& SubjectOnDiskHeader::setNumDofs(int dofs)
   return *this;
 }
 
+SubjectOnDiskHeader& SubjectOnDiskHeader::setNumJoints(int joints)
+{
+  mNumJoints = joints;
+  return *this;
+}
+
 SubjectOnDiskHeader& SubjectOnDiskHeader::setGroundForceBodies(
     std::vector<std::string> groundForceBodies)
 {
@@ -2015,6 +2147,8 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
   // // How many DOFs are in the skeleton
   // int mNumDofs;
   header->set_num_dofs(mNumDofs);
+  // int mNumJoints;
+  header->set_num_joints(mNumJoints);
   // // The passes we applied to this data, along with the result skeletons that
   // // were generated by each pass.
   // std::vector<SubjectOnDiskPassHeader> mPasses;
@@ -2115,6 +2249,9 @@ void SubjectOnDiskHeader::read(const dart::proto::SubjectOnDiskHeader& proto)
   // // How many DOFs are in the skeleton
   // int mNumDofs;
   mNumDofs = proto.num_dofs();
+
+  // How many joints are in the skeleton
+  mNumJoints = proto.num_joints();
 
   // // The passes we applied to this data, along with the result skeletons that
   // // were generated by each pass.
@@ -2483,17 +2620,37 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyWrenches.cols() > t
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyWrenches.rows()
              == 6 * mGroundContactBodies.size()
+      && mTrials[trial]
+                 ->mTrialPasses[pass]
+                 ->mGroundBodyWrenchesInRootFrame.cols()
+             > t
+      && mTrials[trial]
+                 ->mTrialPasses[pass]
+                 ->mGroundBodyWrenchesInRootFrame.rows()
+             == 6 * mGroundContactBodies.size()
+      && mTrials[trial]->mTrialPasses[pass]->mResidualWrenchInRootFrame.cols()
+             > t
+      && mTrials[trial]->mTrialPasses[pass]->mResidualWrenchInRootFrame.rows()
+             == 6
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyCopTorqueForce.cols()
              > t
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyCopTorqueForce.rows()
              == 9 * mGroundContactBodies.size())
   {
+    for (int j = 0; j < 6; j++)
+    {
+      proto->add_root_frame_residual(
+          mTrials[trial]->mTrialPasses[pass]->mResidualWrenchInRootFrame(j, t));
+    }
     for (int i = 0; i < mGroundContactBodies.size(); i++)
     {
       for (int j = 0; j < 6; j++)
       {
         proto->add_ground_contact_wrench(
             mTrials[trial]->mTrialPasses[pass]->mGroundBodyWrenches(
+                i * 6 + j, t));
+        proto->add_root_frame_ground_contact_wrench(
+            mTrials[trial]->mTrialPasses[pass]->mGroundBodyWrenchesInRootFrame(
                 i * 6 + j, t));
       }
       for (int j = 0; j < 3; j++)
@@ -2513,7 +2670,8 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
   else
   {
     std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
-                 "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce "
+                 "trialGroundBodyWrenches or trialGroundBodyCopTorqueForce or "
+                 "mResidualWrenchInRootFrame or mGroundBodyCopTorqueForce "
                  "out-of-bounds for trial "
               << trial << " frame " << t << std::endl;
   }
@@ -2522,6 +2680,7 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
   // repeated double com_pos = 9;
   // repeated double com_vel = 10;
   // repeated double com_acc = 11;
+  // repeated double root_frame_com_acc = 17;
   for (int i = 0; i < 3; i++)
   {
     if (trial < mTrials.size() && pass < mTrials[trial]->mTrialPasses.size()
@@ -2560,6 +2719,52 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
                 << trial << std::endl;
       proto->add_com_acc(std::nan(""));
     }
+    if (trial < mTrials.size() && pass < mTrials[trial]->mTrialPasses.size()
+        && t < mTrials[trial]->mTrialPasses[pass]->mComAccsInRootFrame.cols())
+    {
+      proto->add_root_frame_com_acc(
+          mTrials[trial]->mTrialPasses[pass]->mComAccsInRootFrame(i, t));
+    }
+    else
+    {
+      std::cout << "SubjectOnDisk::writeSubject() passed bad info: "
+                   "mComAccsInRootFrame out-of-bounds for trial "
+                << trial << std::endl;
+      proto->add_com_pos(std::nan(""));
+    }
+  }
+
+  // // One 3-vec per joint
+  // repeated double root_frame_joint_centers = 15;
+  // // One 3-vec per joint
+  // repeated double world_frame_joint_centers = 16;
+  if (mTrials.size() > trial && mTrials[trial]->mTrialPasses.size() > pass
+      && mTrials[trial]->mTrialPasses[pass]->mJointCenters.cols() > t
+      && mTrials[trial]->mTrialPasses[pass]->mJointCentersInRootFrame.size()
+             > t)
+  {
+    for (int i = 0;
+         i < mTrials[trial]->mTrialPasses[pass]->mJointCenters.rows();
+         i++)
+    {
+      proto->add_world_frame_joint_centers(
+          mTrials[trial]->mTrialPasses[pass]->mJointCenters(i, t));
+    }
+    for (int i = 0;
+         i
+         < mTrials[trial]->mTrialPasses[pass]->mJointCentersInRootFrame.rows();
+         i++)
+    {
+      proto->add_root_frame_joint_centers(
+          mTrials[trial]->mTrialPasses[pass]->mJointCentersInRootFrame(i, t));
+    }
+  }
+  else
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
+                 "joint centers, or joint centers in root frame out-of-bounds "
+                 "for trial "
+              << trial << " frame " << t << std::endl;
   }
 }
 

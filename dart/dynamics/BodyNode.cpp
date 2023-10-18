@@ -2076,7 +2076,8 @@ void BodyNode::updateBiasForce(const Eigen::Vector3s& _gravity, s_t _timeStep)
 
   // Set bias force
   const Eigen::Vector6s& V = getSpatialVelocity();
-  mBiasForce = -math::dad(V, mI * V) - mAspectState.mFext - mFgravity;
+  const Eigen::Vector6s& F = mAspectState.mFext;
+  mBiasForce = -math::dad(V, mI * V) - F - mFgravity;
 
   // Verification
   assert(!math::isNan(mBiasForce));

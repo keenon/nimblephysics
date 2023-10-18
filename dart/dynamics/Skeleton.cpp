@@ -9448,6 +9448,38 @@ Eigen::VectorXs Skeleton::getInverseDynamics(
 }
 
 //==============================================================================
+/// This computes the joint torques on the skeleton, given predicted wrenches on
+/// each contact body, and optionally a predicted root residual.
+Eigen::VectorXs Skeleton::getInverseDynamicsFromPredictions(
+    Eigen::VectorXs accelerations,
+    std::vector<dynamics::BodyNode*> contactBodies,
+    std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+    Eigen::Vector6s rootResiduals)
+{
+  dynamics::BodyNode* rootBody = getRootBodyNode();
+  const Eigen::Isometry3s T_wr = rootBody->getWorldTransform();
+  const Eigen::VectorXs rootResidualTorques
+      = getJacobian(rootBody).transpose() * rootResiduals;
+  const Eigen::VectorXs massTorques
+      = multiplyByImplicitMassMatrix(accelerations);
+  const Eigen::VectorXs coriolisAndGravity
+      = getCoriolisAndGravityForces() - getExternalForces() + getDampingForce()
+        + getSpringForce();
+  Eigen::VectorXs totalTorques
+      = massTorques + coriolisAndGravity - rootResidualTorques;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    const Eigen::Vector6s rootFrameWrench = rootFrameNormalizedContactWrench[i];
+    const Eigen::Isometry3s T_wb = contactBodies[i]->getWorldTransform();
+    const Eigen::Vector6s worldWrench = math::dAdInvT(T_wr, rootFrameWrench);
+    const Eigen::Vector6s bodyWrench
+        = math::dAdInvT(T_wb.inverse(), worldWrench);
+    totalTorques -= getJacobian(contactBodies[i]).transpose() * bodyWrench;
+  }
+  return totalTorques;
+}
+
+//==============================================================================
 /// This solves the inverse dynamics problem to figure out what forces we
 /// would need to apply (in our _current state_) in order to get the desired
 /// next velocity. This includes arbitrary forces and moments at the

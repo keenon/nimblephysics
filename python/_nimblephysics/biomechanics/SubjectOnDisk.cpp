@@ -211,7 +211,58 @@ Note that these are specified in the local body frame, acting on the body at its
                 py::return_value_policy::reference_internal,
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF got its acceleration through finite "
-                "differencing, and therefore may be somewhat unreliable");
+                "differencing, and therefore may be somewhat unreliable")
+            // Eigen::Vector3s comAccInRootFrame;
+            .def_readwrite(
+                "comAccInRootFrame",
+                &dart::biomechanics::FramePass::comAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the acceleration of the center of mass of the "
+                "subject, expressed in the root body frame (which probably "
+                "means expressed in pelvis coordinates, though some skeletons "
+                "may use a different body as the root, for instance the "
+                "torso).")
+            // Eigen::VectorXd groundContactWrenchesInRootFrame;
+            .def_readwrite(
+                "groundContactWrenchesInRootFrame",
+                &dart::biomechanics::FramePass::
+                    groundContactWrenchesInRootFrame,
+                py::return_value_policy::reference_internal,
+                "These are the wrenches (each vectors of length 6, composed of "
+                "first 3 = "
+                "torque, last 3 = force) expressed in the root body frame, and "
+                "concatenated together. The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.")
+            // Eigen::VectorXd groundContactWrenchesInRootFrame;
+            .def_readwrite(
+                "residualWrenchInRootFrame",
+                &dart::biomechanics::FramePass::residualWrenchInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the 'residual' force wrench (or 'modelling error' "
+                "force, the "
+                "force necessary to make Newton's laws match up with our "
+                "model, even though it's imaginary) expressed in the root body "
+                "frame. This is a wrench (vector of length 6, composed of "
+                "first 3 = "
+                "torque, last 3 = force). The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.")
+            .def_readwrite(
+                "jointCenters",
+                &dart::biomechanics::FramePass::jointCenters,
+                py::return_value_policy::reference_internal,
+                "These are the joint center locations, concatenated together, "
+                "given in the world frame.")
+            .def_readwrite(
+                "jointCentersInRootFrame",
+                &dart::biomechanics::FramePass::jointCenters,
+                py::return_value_policy::reference_internal,
+                "These are the joint center locations, concatenated together, "
+                "given in the root frame. The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.");
+
   framePass.doc() = R"doc(
         This is for doing ML and large-scale data analysis. This is a single processing pass on a single frame of data, returned from a list within a :code:`nimblephysics.biomechanics.Frame` (which can be got with :code:`SubjectOnDisk.readFrames()`), which contains the full reconstruction of your subject at this instant created by this processing pass. Earlier processing passes are likely to have more discrepancies with the original data, bet later processing passes require more types of sensor signals that may not always be available.
       )doc";
@@ -477,7 +528,31 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "setComAccs",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComAccs,
-                ::py::arg("accs"));
+                ::py::arg("accs"))
+            .def(
+                "setComAccsInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setComAccsInRootFrame,
+                ::py::arg("accs"))
+            .def(
+                "setResidualWrenchInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setResidualWrenchInRootFrame,
+                ::py::arg("wrenches"))
+            .def(
+                "setGroundBodyWrenchesInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setGroundBodyWrenchesInRootFrame,
+                ::py::arg("wrenches"))
+            .def(
+                "setJointCenters",
+                &dart::biomechanics::SubjectOnDiskTrialPass::setJointCenters,
+                ::py::arg("centers"))
+            .def(
+                "setJointCentersInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setJointCentersInRootFrame,
+                ::py::arg("centers"));
 
   auto subjectOnDiskTrial
       = ::py::class_<
@@ -578,6 +653,10 @@ Note that these are specified in the local body frame, acting on the body at its
                 "setNumDofs",
                 &dart::biomechanics::SubjectOnDiskHeader::setNumDofs,
                 ::py::arg("dofs"))
+            .def(
+                "setNumJoints",
+                &dart::biomechanics::SubjectOnDiskHeader::setNumJoints,
+                ::py::arg("joints"))
             .def(
                 "setGroundForceBodies",
                 &dart::biomechanics::SubjectOnDiskHeader::setGroundForceBodies,
@@ -764,6 +843,11 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getNumDofs",
                 &dart::biomechanics::SubjectOnDisk::getNumDofs,
                 "This returns the number of DOFs for the model on this Subject")
+            .def(
+                "getNumJoints",
+                &dart::biomechanics::SubjectOnDisk::getNumJoints,
+                "This returns the number of joints for the model on this "
+                "Subject")
             //   /// This returns the vector of enums of type
             //   'MissingGRFReason', which labels
             //   /// why each time step was identified as 'probablyMissingGRF'.
