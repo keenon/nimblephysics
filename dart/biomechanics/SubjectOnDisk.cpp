@@ -204,7 +204,8 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
     throw std::exception();
   }
   // 6. Get the data out of the protobuf object
-  mHeader.read(header);
+  mHeader = std::make_shared<SubjectOnDiskHeader>();
+  mHeader->read(header);
   mSensorFrameSize = header.raw_sensor_frame_size();
   mProcessingPassFrameSize = header.processing_pass_frame_size();
   mDataSectionStart = sizeof(int64_t) + headerSize;
@@ -214,7 +215,7 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
 
 /// This will write a B3D file to disk
 void SubjectOnDisk::writeB3D(
-    const std::string& outputPath, SubjectOnDiskHeader& header)
+    const std::string& outputPath, std::shared_ptr<SubjectOnDiskHeader> header)
 {
   // 0. Open the file
   FILE* file = fopen(outputPath.c_str(), "wb");
@@ -230,7 +231,7 @@ void SubjectOnDisk::writeB3D(
   // Create the header proto
 
   proto::SubjectOnDiskHeader headerProto;
-  header.write(&headerProto);
+  header->write(&headerProto);
 
   // 1.3. Continues in next section, after we know the size of the first
   // serialized frame...
@@ -240,11 +241,11 @@ void SubjectOnDisk::writeB3D(
   /////////////////////////////////////////////////////////////////////////////
 
   int maxNumForcePlates = 0;
-  for (int trial = 0; trial < header.mTrials.size(); trial++)
+  for (int trial = 0; trial < header->mTrials.size(); trial++)
   {
-    if (header.mTrials[trial]->mForcePlates.size() > maxNumForcePlates)
+    if (header->mTrials[trial]->mForcePlates.size() > maxNumForcePlates)
     {
-      maxNumForcePlates = header.mTrials[trial]->mForcePlates.size();
+      maxNumForcePlates = header->mTrials[trial]->mForcePlates.size();
     }
   }
 
@@ -252,13 +253,14 @@ void SubjectOnDisk::writeB3D(
   int64_t sensorFrameSize = 0;
   int64_t passFrameSize = 0;
 
-  for (int trial = 0; trial < header.mTrials.size(); trial++)
+  for (int trial = 0; trial < header->mTrials.size(); trial++)
   {
-    for (int t = 0; t < header.mTrials[trial]->mMarkerObservations.size(); t++)
+    for (int t = 0; t < header->mTrials[trial]->mMarkerObservations.size(); t++)
     {
       // 2.1. Populate the protobuf frame object in memory
       proto::SubjectOnDiskSensorFrame sensorsFrameProto;
-      header.writeSensorsFrame(&sensorsFrameProto, trial, t, maxNumForcePlates);
+      header->writeSensorsFrame(
+          &sensorsFrameProto, trial, t, maxNumForcePlates);
       // 2.2. Serialize the protobuf header object
       std::string sensorFrameSerialized = "";
       sensorsFrameProto.SerializeToString(&sensorFrameSerialized);
@@ -273,11 +275,11 @@ void SubjectOnDisk::writeB3D(
       // 2.4. Serialize the processing passes
       std::vector<std::string> passFramesSerialized;
 
-      for (int pass = 0; pass < header.mTrials[trial]->mTrialPasses.size();
+      for (int pass = 0; pass < header->mTrials[trial]->mTrialPasses.size();
            pass++)
       {
         proto::SubjectOnDiskProcessingPassFrame passFrameProto;
-        header.writeProcessingPassFrame(&passFrameProto, trial, t, pass);
+        header->writeProcessingPassFrame(&passFrameProto, trial, t, pass);
         std::string passFrameSerialized = "";
         passFrameProto.SerializeToString(&passFrameSerialized);
         if (passFrameSize != 0)
@@ -328,7 +330,7 @@ void SubjectOnDisk::writeB3D(
       // 2.4. Write the serialized data to the file
       fwrite(
           sensorFrameSerialized.c_str(), sizeof(char), sensorFrameSize, file);
-      for (int pass = 0; pass < header.mTrials[trial]->mTrialPasses.size();
+      for (int pass = 0; pass < header->mTrials[trial]->mTrialPasses.size();
            pass++)
       {
         fwrite(
@@ -346,17 +348,171 @@ void SubjectOnDisk::writeB3D(
                  "of data."
               << std::endl;
     std::cout << "Debug info: " << std::endl;
-    std::cout << "header.mTrials.size(): " << header.mTrials.size()
+    std::cout << "header.mTrials.size(): " << header->mTrials.size()
               << std::endl;
-    for (int i = 0; i < header.mTrials.size(); i++)
+    for (int i = 0; i < header->mTrials.size(); i++)
     {
       std::cout << "header.mTrials[" << i << "].mMarkerObservations.size(): "
-                << header.mTrials[i]->mMarkerObservations.size() << std::endl;
+                << header->mTrials[i]->mMarkerObservations.size() << std::endl;
     }
     return;
   }
 
   fclose(file);
+}
+
+/// This loads all the frames of data, and fills in the processing pass data
+/// matrices in the proto header classes.
+void SubjectOnDisk::loadAllFrames()
+{
+  const int dofs = getNumDofs();
+  const int joints = getNumJoints();
+  const int numContactBodies = getGroundForceBodies().size();
+
+  for (int trial = 0; trial < getNumTrials(); trial++)
+  {
+    const int len = getTrialLength(trial);
+    std::vector<std::shared_ptr<Frame>> frames
+        = readFrames(trial, 0, len, true, true, 1, 0.0);
+
+    for (int t = 0; t < frames.size(); t++)
+    {
+      std::map<std::string, Eigen::Vector3s> markerMap;
+      for (auto& pair : frames[t]->markerObservations)
+      {
+        markerMap[pair.first] = pair.second;
+      }
+      mHeader->mTrials[trial]->mMarkerObservations.push_back(markerMap);
+    }
+
+    for (int pass = 0; pass < getTrialNumProcessingPasses(trial); pass++)
+    {
+      std::shared_ptr<SubjectOnDiskTrialPass> passProto
+          = mHeader->mTrials[trial]->mTrialPasses[pass];
+
+      passProto->mMarkerRMS.resize(len);
+      passProto->mMarkerMax.resize(len);
+      passProto->mLinearResidual.resize(len);
+      passProto->mAngularResidual.resize(len);
+      passProto->mPos = Eigen::MatrixXs::Zero(dofs, len);
+      passProto->mVel = Eigen::MatrixXs::Zero(dofs, len);
+      passProto->mAcc = Eigen::MatrixXs::Zero(dofs, len);
+      passProto->mTaus = Eigen::MatrixXs::Zero(dofs, len);
+      passProto->mGroundBodyWrenches
+          = Eigen::MatrixXs::Zero(numContactBodies * 6, len);
+      passProto->mGroundBodyCopTorqueForce
+          = Eigen::MatrixXs::Zero(numContactBodies * 9, len);
+      passProto->mComPoses = Eigen::MatrixXs::Zero(3, len);
+      passProto->mComVels = Eigen::MatrixXs::Zero(3, len);
+      passProto->mComAccs = Eigen::MatrixXs::Zero(3, len);
+      passProto->mComAccsInRootFrame = Eigen::MatrixXs::Zero(3, len);
+      passProto->mResidualWrenchInRootFrame = Eigen::MatrixXs::Zero(6, len);
+      passProto->mGroundBodyWrenchesInRootFrame
+          = Eigen::MatrixXs::Zero(numContactBodies * 6, len);
+      passProto->mGroundBodyCopTorqueForceInRootFrame
+          = Eigen::MatrixXs::Zero(numContactBodies * 9, len);
+      passProto->mJointCenters = Eigen::MatrixXs::Zero(joints * 3, len);
+      passProto->mJointCentersInRootFrame
+          = Eigen::MatrixXs::Zero(joints * 3, len);
+
+      for (int t = 0; t < frames.size(); t++)
+      {
+        passProto->mPos.col(t) = frames[t]->processingPasses[pass].pos;
+        passProto->mVel.col(t) = frames[t]->processingPasses[pass].vel;
+        passProto->mAcc.col(t) = frames[t]->processingPasses[pass].acc;
+        passProto->mTaus.col(t) = frames[t]->processingPasses[pass].tau;
+        passProto->mGroundBodyWrenches.col(t)
+            = frames[t]->processingPasses[pass].groundContactWrenches;
+        passProto->mComPoses.col(t) = frames[t]->processingPasses[pass].comPos;
+        passProto->mComVels.col(t) = frames[t]->processingPasses[pass].comVel;
+        passProto->mComAccs.col(t) = frames[t]->processingPasses[pass].comAcc;
+        passProto->mComAccsInRootFrame.col(t)
+            = frames[t]->processingPasses[pass].comAccInRootFrame;
+        passProto->mResidualWrenchInRootFrame.col(t)
+            = frames[t]->processingPasses[pass].residualWrenchInRootFrame;
+        passProto->mGroundBodyWrenchesInRootFrame.col(t)
+            = frames[t]
+                  ->processingPasses[pass]
+                  .groundContactWrenchesInRootFrame;
+
+        for (int body = 0; body < numContactBodies; body++)
+        {
+          passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9, t)
+              = frames[t]
+                    ->processingPasses[pass]
+                    .groundContactCenterOfPressure.segment<3>(body * 3);
+          passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9 + 3, t)
+              = frames[t]
+                    ->processingPasses[pass]
+                    .groundContactTorque.segment<3>(body * 3);
+          passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9 + 6, t)
+              = frames[t]->processingPasses[pass].groundContactForce.segment<3>(
+                  body * 3);
+
+          passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
+              body * 9, t)
+              = frames[t]
+                    ->processingPasses[pass]
+                    .groundContactCenterOfPressureInRootFrame.segment<3>(
+                        body * 3);
+          passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
+              body * 9 + 3, t)
+              = frames[t]
+                    ->processingPasses[pass]
+                    .groundContactTorqueInRootFrame.segment<3>(body * 3);
+          passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
+              body * 9 + 6, t)
+              = frames[t]
+                    ->processingPasses[pass]
+                    .groundContactForceInRootFrame.segment<3>(body * 3);
+        }
+
+        passProto->mJointCenters.col(t)
+            = frames[t]->processingPasses[pass].jointCenters;
+        passProto->mJointCentersInRootFrame.col(t)
+            = frames[t]->processingPasses[pass].jointCentersInRootFrame;
+      }
+    }
+  }
+}
+
+/// This returns the raw proto header for this subject, which can be used to
+/// write out a new B3D file
+std::shared_ptr<SubjectOnDiskHeader> SubjectOnDisk::getHeaderProto()
+{
+  return mHeader;
+}
+
+/// This reads all the raw sensor data for this trial, and constructs
+/// force plates.
+std::vector<ForcePlate> SubjectOnDisk::readForcePlates(int trial)
+{
+  std::vector<ForcePlate> plates;
+
+  const int len = getTrialLength(trial);
+  const int numPlates = getNumForcePlates(trial);
+  for (int plate = 0; plate < numPlates; plate++)
+  {
+    plates.push_back(ForcePlate());
+    plates[plate].corners = getForcePlateCorners(trial, plate);
+  }
+
+  std::vector<std::shared_ptr<Frame>> frames
+      = readFrames(trial, 0, len, true, false, 1, 0.0);
+  for (int t = 0; t < frames.size(); t++)
+  {
+    for (int plate = 0; plate < numPlates; plate++)
+    {
+      plates[plate].centersOfPressure.push_back(
+          frames[t]->rawForcePlateCenterOfPressures[plate]);
+      plates[plate].forces.push_back(frames[t]->rawForcePlateForces[plate]);
+      plates[plate].moments.push_back(frames[t]->rawForcePlateTorques[plate]);
+      plates[plate].timestamps.push_back(
+          frames[t]->t * getTrialTimestep(trial));
+    }
+  }
+
+  return plates;
 }
 
 /// This will read the skeleton from the binary, and optionally use the passed
@@ -373,7 +529,7 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
   }
 
   tinyxml2::XMLDocument osimFile;
-  osimFile.Parse(mHeader.mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
+  osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
 
@@ -384,14 +540,14 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 /// it as a string
 std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 {
-  return mHeader.mPasses[passNumberToLoad]->mOpenSimFileText;
+  return mHeader->mPasses[passNumberToLoad]->mOpenSimFileText;
 }
 
 // If we're doing a lowpass filter on this pass, then what was the cutoff
 // frequency of that filter?
 s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 {
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mLowpassCutoffFrequency;
 }
@@ -400,7 +556,7 @@ s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 // that (Butterworth) filter?
 int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 {
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mLowpassFilterOrder;
 }
@@ -410,7 +566,7 @@ int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 std::vector<s_t> SubjectOnDisk::getForceplateCutoffs(
     int trial, int processingPass)
 {
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mForcePlateCutoffs;
 }
@@ -516,7 +672,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
 
       // 6. Copy the results out into a frame
       frame->readSensorsFromProto(
-          &proto, mHeader, trial, startFrame + (i * stride));
+          &proto, *mHeader.get(), trial, startFrame + (i * stride));
     }
     if (includeProcessingPasses)
     {
@@ -569,7 +725,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
         frame->processingPasses.emplace_back();
         frame->processingPasses[pass].readFromProto(
             &proto,
-            mHeader,
+            *mHeader.get(),
             trial,
             startFrame + (i * stride),
             pass,
@@ -800,22 +956,61 @@ void FramePass::readFromProto(
   comAcc(2) = proto->com_acc(2);
 
   // Eigen::Vector3s comAccInRootFrame;
-  comAccInRootFrame(0) = proto->root_frame_com_acc(0);
-  comAccInRootFrame(1) = proto->root_frame_com_acc(1);
-  comAccInRootFrame(2) = proto->root_frame_com_acc(2);
+  if (proto->root_frame_com_acc_size() == 3)
+  {
+    comAccInRootFrame(0) = proto->root_frame_com_acc(0);
+    comAccInRootFrame(1) = proto->root_frame_com_acc(1);
+    comAccInRootFrame(2) = proto->root_frame_com_acc(2);
+  }
 
   // // These are each 6-vectors of the contact wrench of each body, but
   // expressed
   // // in the world frame, all concatenated together
   // Eigen::VectorXd groundContactWrenchesInRootFrame;
+  groundContactWrenchesInRootFrame
+      = Eigen::VectorXs::Zero(numContactBodies * 6);
   if (proto->root_frame_ground_contact_wrench_size() == numContactBodies * 6)
   {
-    groundContactWrenchesInRootFrame
-        = Eigen::VectorXs::Zero(numContactBodies * 6);
     for (int i = 0; i < groundContactWrenchesInRootFrame.size(); i++)
     {
       groundContactWrenchesInRootFrame(i)
           = proto->root_frame_ground_contact_wrench(i);
+    }
+  }
+
+  // // These are each 3-vector for each contact body, concatenated together
+  // Eigen::VectorXd groundContactCenterOfPressure;
+  groundContactCenterOfPressureInRootFrame
+      = Eigen::VectorXs::Zero(numContactBodies * 3);
+  if (proto->root_frame_ground_contact_center_of_pressure_size()
+      == numContactBodies * 3)
+  {
+    for (int i = 0; i < groundContactCenterOfPressureInRootFrame.size(); i++)
+    {
+      groundContactCenterOfPressureInRootFrame(i)
+          = proto->root_frame_ground_contact_center_of_pressure(i);
+    }
+  }
+
+  // Eigen::VectorXd groundContactTorque;
+  groundContactTorqueInRootFrame = Eigen::VectorXs::Zero(numContactBodies * 3);
+  if (proto->root_frame_ground_contact_torques_size() == numContactBodies * 3)
+  {
+    for (int i = 0; i < groundContactTorqueInRootFrame.size(); i++)
+    {
+      groundContactTorqueInRootFrame(i)
+          = proto->root_frame_ground_contact_torques(i);
+    }
+  }
+
+  // Eigen::VectorXd groundContactForce;
+  groundContactForceInRootFrame = Eigen::VectorXs::Zero(numContactBodies * 3);
+  if (proto->root_frame_ground_contact_force_size() == numContactBodies * 3)
+  {
+    for (int i = 0; i < groundContactForceInRootFrame.size(); i++)
+    {
+      groundContactForceInRootFrame(i)
+          = proto->root_frame_ground_contact_force(i);
     }
   }
 
@@ -885,94 +1080,94 @@ void FramePass::readFromProto(
 /// This returns the number of trials on the subject
 int SubjectOnDisk::getNumTrials()
 {
-  return mHeader.mTrials.size();
+  return mHeader->mTrials.size();
 }
 
 /// This returns the length of the trial
 int SubjectOnDisk::getTrialLength(int trial)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return 0;
   }
-  return mHeader.mTrials[trial]->mLength;
+  return mHeader->mTrials[trial]->mLength;
 }
 
 /// This returns the original name of the trial before it was (potentially)
 /// split into multiple pieces
 std::string SubjectOnDisk::getTrialOriginalName(int trial)
 {
-  return mHeader.mTrials[trial]->mOriginalTrialName;
+  return mHeader->mTrials[trial]->mOriginalTrialName;
 }
 
 /// This returns the index of the split, if this trial was the result of
 /// splitting an original trial into multiple pieces
 int SubjectOnDisk::getTrialSplitIndex(int trial)
 {
-  return mHeader.mTrials[trial]->mSplitIndex;
+  return mHeader->mTrials[trial]->mSplitIndex;
 }
 
 /// This returns the number of processing passes in the trial
 int SubjectOnDisk::getTrialNumProcessingPasses(int trial)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return 0;
   }
-  return mHeader.mTrials[trial]->mTrialPasses.size();
+  return mHeader->mTrials[trial]->mTrialPasses.size();
 }
 
 /// This returns the timestep size for the trial
 s_t SubjectOnDisk::getTrialTimestep(int trial)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return 0.01;
   }
-  return mHeader.mTrials[trial]->mTimestep;
+  return mHeader->mTrials[trial]->mTimestep;
 }
 
 /// This returns the number of DOFs for the model on this Subject
 int SubjectOnDisk::getNumDofs()
 {
-  return mHeader.mNumDofs;
+  return mHeader->mNumDofs;
 }
 
 /// This returns the number of joints for the model on this Subject
 int SubjectOnDisk::getNumJoints()
 {
-  return mHeader.mNumJoints;
+  return mHeader->mNumJoints;
 }
 
 /// This returns the vector of enums of type 'MissingGRFReason', which can
 /// include `notMissingGRF`.
 std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRF(int trial)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<MissingGRFReason>();
   }
-  return mHeader.mTrials[trial]->mMissingGRFReason;
+  return mHeader->mTrials[trial]->mMissingGRFReason;
 }
 
 int SubjectOnDisk::getNumProcessingPasses()
 {
-  return mHeader.mPasses.size();
+  return mHeader->mPasses.size();
 }
 
 ProcessingPassType SubjectOnDisk::getProcessingPassType(int processingPass)
 {
-  return mHeader.mPasses[processingPass]->mType;
+  return mHeader->mPasses[processingPass]->mType;
 }
 
 std::vector<bool> SubjectOnDisk::getDofPositionsObserved(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mDofPositionsObserved;
 }
@@ -980,11 +1175,11 @@ std::vector<bool> SubjectOnDisk::getDofPositionsObserved(
 std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mDofVelocitiesFiniteDifferenced;
 }
@@ -992,11 +1187,11 @@ std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(
 std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<bool>();
   }
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mDofAccelerationFiniteDifferenced;
 }
@@ -1004,41 +1199,43 @@ std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(
 std::vector<s_t> SubjectOnDisk::getTrialLinearResidualNorms(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mHeader.mTrials[trial]->mTrialPasses[processingPass]->mLinearResidual;
+  return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mLinearResidual;
 }
 
 std::vector<s_t> SubjectOnDisk::getTrialAngularResidualNorms(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mHeader.mTrials[trial]->mTrialPasses[processingPass]->mAngularResidual;
+  return mHeader->mTrials[trial]
+      ->mTrialPasses[processingPass]
+      ->mAngularResidual;
 }
 
 std::vector<s_t> SubjectOnDisk::getTrialMarkerRMSs(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mHeader.mTrials[trial]->mTrialPasses[processingPass]->mMarkerRMS;
+  return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mMarkerRMS;
 }
 
 std::vector<s_t> SubjectOnDisk::getTrialMarkerMaxs(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mHeader.mTrials[trial]->mTrialPasses[processingPass]->mMarkerMax;
+  return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mMarkerMax;
 }
 
 /// This returns the maximum absolute velocity of any DOF at each timestep for a
@@ -1046,11 +1243,11 @@ std::vector<s_t> SubjectOnDisk::getTrialMarkerMaxs(
 std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(
     int trial, int processingPass)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
   }
-  return mHeader.mTrials[trial]
+  return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mJointsMaxVelocity;
 }
@@ -1058,31 +1255,31 @@ std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(
 /// This returns the list of contact body names for this Subject
 std::vector<std::string> SubjectOnDisk::getGroundForceBodies()
 {
-  return mHeader.mGroundContactBodies;
+  return mHeader->mGroundContactBodies;
 }
 
 /// This returns the list of custom value names stored in this subject
 std::vector<std::string> SubjectOnDisk::getCustomValues()
 {
-  return mHeader.mCustomValueNames;
+  return mHeader->mCustomValueNames;
 }
 
 /// This returns the dimension of the custom value specified by `valueName`
 int SubjectOnDisk::getCustomValueDim(std::string valueName)
 {
-  for (int i = 0; i < mHeader.mCustomValueNames.size(); i++)
+  for (int i = 0; i < mHeader->mCustomValueNames.size(); i++)
   {
-    if (mHeader.mCustomValueNames[i] == valueName)
+    if (mHeader->mCustomValueNames[i] == valueName)
     {
-      return mHeader.mCustomValueLengths[i];
+      return mHeader->mCustomValueLengths[i];
     }
   }
   std::cout << "WARNING: Requested getCustomValueDim() for value \""
             << valueName
             << "\", which is not in this SubjectOnDisk. Options are: [";
-  for (int i = 0; i < mHeader.mCustomValueNames.size(); i++)
+  for (int i = 0; i < mHeader->mCustomValueNames.size(); i++)
   {
-    std::cout << " \"" << mHeader.mCustomValueNames[i] << "\" ";
+    std::cout << " \"" << mHeader->mCustomValueNames[i] << "\" ";
   }
   std::cout << "]. Returning 0." << std::endl;
   return 0;
@@ -1091,40 +1288,40 @@ int SubjectOnDisk::getCustomValueDim(std::string valueName)
 /// The name of the trial, if provided, or else an empty string
 std::string SubjectOnDisk::getTrialName(int trial)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return "";
   }
-  return mHeader.mTrials[trial]->mName;
+  return mHeader->mTrials[trial]->mName;
 }
 
 std::string SubjectOnDisk::getBiologicalSex()
 {
-  return mHeader.mBiologicalSex;
+  return mHeader->mBiologicalSex;
 }
 
 double SubjectOnDisk::getHeightM()
 {
-  return mHeader.mHeightM;
+  return mHeader->mHeightM;
 }
 
 double SubjectOnDisk::getMassKg()
 {
-  return mHeader.mMassKg;
+  return mHeader->mMassKg;
 }
 
 /// This gets the tags associated with the subject, if there are any.
 std::vector<std::string> SubjectOnDisk::getSubjectTags()
 {
-  return mHeader.mSubjectTags;
+  return mHeader->mSubjectTags;
 }
 
 /// This gets the tags associated with the trial, if there are any.
 std::vector<std::string> SubjectOnDisk::getTrialTags(int trial)
 {
-  if (trial >= 0 && trial < mHeader.mTrials.size())
+  if (trial >= 0 && trial < mHeader->mTrials.size())
   {
-    return mHeader.mTrials[trial]->mTrialTags;
+    return mHeader->mTrials[trial]->mTrialTags;
   }
   else
   {
@@ -1134,15 +1331,15 @@ std::vector<std::string> SubjectOnDisk::getTrialTags(int trial)
 
 int SubjectOnDisk::getAgeYears()
 {
-  return mHeader.mAgeYears;
+  return mHeader->mAgeYears;
 }
 
 /// This returns the number of raw force plates that were used to generate the
 /// data
 int SubjectOnDisk::getNumForcePlates(int trial)
 {
-  if (trial >= 0 && trial < mHeader.mTrials.size())
-    return mHeader.mTrials[trial]->mNumForcePlates;
+  if (trial >= 0 && trial < mHeader->mTrials.size())
+    return mHeader->mTrials[trial]->mNumForcePlates;
   return 0;
 }
 
@@ -1151,27 +1348,27 @@ int SubjectOnDisk::getNumForcePlates(int trial)
 std::vector<Eigen::Vector3s> SubjectOnDisk::getForcePlateCorners(
     int trial, int forcePlate)
 {
-  if (trial < 0 || trial >= mHeader.mTrials.size())
+  if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<Eigen::Vector3s>();
   }
-  if (forcePlate < 0 || forcePlate >= mHeader.mTrials[trial]->mNumForcePlates)
+  if (forcePlate < 0 || forcePlate >= mHeader->mTrials[trial]->mNumForcePlates)
   {
     return std::vector<Eigen::Vector3s>();
   }
-  return mHeader.mTrials[trial]->mForcePlateCorners[forcePlate];
+  return mHeader->mTrials[trial]->mForcePlateCorners[forcePlate];
 }
 
 /// This gets the href link associated with the subject, if there is one.
 std::string SubjectOnDisk::getHref()
 {
-  return mHeader.mHref;
+  return mHeader->mHref;
 }
 
 /// This gets the notes associated with the subject, if there are any.
 std::string SubjectOnDisk::getNotes()
 {
-  return mHeader.mNotes;
+  return mHeader->mNotes;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1192,9 +1389,19 @@ void SubjectOnDiskTrialPass::setPoses(Eigen::MatrixXs poses)
   mPos = poses;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getPoses()
+{
+  return mPos;
+}
+
 void SubjectOnDiskTrialPass::setVels(Eigen::MatrixXs vels)
 {
   mVel = vels;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getVels()
+{
+  return mVel;
 }
 
 void SubjectOnDiskTrialPass::setAccs(Eigen::MatrixXs accs)
@@ -1202,14 +1409,29 @@ void SubjectOnDiskTrialPass::setAccs(Eigen::MatrixXs accs)
   mAcc = accs;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getAccs()
+{
+  return mAcc;
+}
+
 void SubjectOnDiskTrialPass::setTaus(Eigen::MatrixXs taus)
 {
   mTaus = taus;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getTaus()
+{
+  return mTaus;
+}
+
 void SubjectOnDiskTrialPass::setGroundBodyWrenches(Eigen::MatrixXs wrenches)
 {
   mGroundBodyWrenches = wrenches;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getGroundBodyWrenches()
+{
+  return mGroundBodyWrenches;
 }
 
 void SubjectOnDiskTrialPass::setGroundBodyCopTorqueForce(
@@ -1218,9 +1440,19 @@ void SubjectOnDiskTrialPass::setGroundBodyCopTorqueForce(
   mGroundBodyCopTorqueForce = copTorqueForces;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getGroundBodyCopTorqueForce()
+{
+  return mGroundBodyCopTorqueForce;
+}
+
 void SubjectOnDiskTrialPass::setComPoses(Eigen::MatrixXs poses)
 {
   mComPoses = poses;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getComPoses()
+{
+  return mComPoses;
 }
 
 void SubjectOnDiskTrialPass::setComVels(Eigen::MatrixXs vels)
@@ -1228,14 +1460,29 @@ void SubjectOnDiskTrialPass::setComVels(Eigen::MatrixXs vels)
   mComVels = vels;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getComVels()
+{
+  return mComVels;
+}
+
 void SubjectOnDiskTrialPass::setComAccs(Eigen::MatrixXs accs)
 {
   mComAccs = accs;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getComAccs()
+{
+  return mComAccs;
+}
+
 void SubjectOnDiskTrialPass::setComAccsInRootFrame(Eigen::MatrixXs accs)
 {
   mComAccsInRootFrame = accs;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getComAccsInRootFrame()
+{
+  return mComAccsInRootFrame;
 }
 
 void SubjectOnDiskTrialPass::setResidualWrenchInRootFrame(
@@ -1244,10 +1491,31 @@ void SubjectOnDiskTrialPass::setResidualWrenchInRootFrame(
   mResidualWrenchInRootFrame = wrenches;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getResidualWrenchInRootFrame()
+{
+  return mResidualWrenchInRootFrame;
+}
+
 void SubjectOnDiskTrialPass::setGroundBodyWrenchesInRootFrame(
     Eigen::MatrixXs wrenches)
 {
   mGroundBodyWrenchesInRootFrame = wrenches;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getGroundBodyWrenchesInRootFrame()
+{
+  return mGroundBodyWrenchesInRootFrame;
+}
+
+void SubjectOnDiskTrialPass::setGroundBodyCopTorqueForceInRootFrame(
+    Eigen::MatrixXs copTorqueForces)
+{
+  mGroundBodyCopTorqueForceInRootFrame = copTorqueForces;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getGroundBodyCopTorqueForceInRootFrame()
+{
+  return mGroundBodyCopTorqueForceInRootFrame;
 }
 
 void SubjectOnDiskTrialPass::setJointCenters(Eigen::MatrixXs centers)
@@ -1255,9 +1523,296 @@ void SubjectOnDiskTrialPass::setJointCenters(Eigen::MatrixXs centers)
   mJointCenters = centers;
 }
 
+Eigen::MatrixXs SubjectOnDiskTrialPass::getJointCenters()
+{
+  return mJointCenters;
+}
+
 void SubjectOnDiskTrialPass::setJointCentersInRootFrame(Eigen::MatrixXs centers)
 {
   mJointCentersInRootFrame = centers;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getJointCentersInRootFrame()
+{
+  return mJointCentersInRootFrame;
+}
+
+// This will return a matrix where every one of our properties with setters is
+// stacked together vertically. Each column represents time, and each row is a
+// different property of interest. The point here is not to introspect into
+// the individual rows, but to have a convenient object that we can resample
+// to a new timestep length, and possibly lowpass filter.
+Eigen::MatrixXs SubjectOnDiskTrialPass::getResamplingMatrix()
+{
+  int rows = 4 + mPos.rows() + mVel.rows() + mAcc.rows() + mTaus.rows()
+             + mGroundBodyWrenches.rows() + mGroundBodyCopTorqueForce.rows()
+             + mComPoses.rows() + mComVels.rows() + mComAccs.rows()
+             + mComAccsInRootFrame.rows() + mResidualWrenchInRootFrame.rows()
+             + mGroundBodyWrenchesInRootFrame.rows()
+             + mGroundBodyCopTorqueForceInRootFrame.rows()
+             + mJointCenters.rows() + mJointCentersInRootFrame.rows();
+  int timesteps = mPos.cols();
+  if (mMarkerRMS.size() != timesteps)
+  {
+    std::cout << "ERROR: mMarkerRMS.size() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mMarkerMax.size() != timesteps)
+  {
+    std::cout << "ERROR: mMarkerMax.size() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mLinearResidual.size() != timesteps)
+  {
+    std::cout << "ERROR: mLinearResidual.size() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mAngularResidual.size() != timesteps)
+  {
+    std::cout << "ERROR: mAngularResidual.size() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mVel.cols() != timesteps)
+  {
+    std::cout << "ERROR: mVel.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mAcc.cols() != timesteps)
+  {
+    std::cout << "ERROR: mAcc.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mTaus.cols() != timesteps)
+  {
+    std::cout << "ERROR: mTaus.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mGroundBodyWrenches.cols() != timesteps)
+  {
+    std::cout << "ERROR: mGroundBodyWrenches.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mGroundBodyCopTorqueForce.cols() != timesteps)
+  {
+    std::cout << "ERROR: mGroundBodyCopTorqueForce.cols() != timesteps"
+              << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mComPoses.cols() != timesteps)
+  {
+    std::cout << "ERROR: mComPoses.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mComVels.cols() != timesteps)
+  {
+    std::cout << "ERROR: mComVels.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mComAccs.cols() != timesteps)
+  {
+    std::cout << "ERROR: mComAccs.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mComAccsInRootFrame.cols() != timesteps)
+  {
+    std::cout << "ERROR: mComAccsInRootFrame.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mResidualWrenchInRootFrame.cols() != timesteps)
+  {
+    std::cout << "ERROR: mResidualWrenchInRootFrame.cols() != timesteps"
+              << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mGroundBodyWrenchesInRootFrame.cols() != timesteps)
+  {
+    std::cout << "ERROR: mGroundBodyWrenchesInRootFrame.cols() != timesteps"
+              << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mGroundBodyCopTorqueForceInRootFrame.cols() != timesteps)
+  {
+    std::cout << "ERROR: mGroundBodyCopTorqueForceInRootFrame.cols() != "
+                 "timesteps"
+              << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mJointCenters.cols() != timesteps)
+  {
+    std::cout << "ERROR: mJointCenters.cols() != timesteps" << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  if (mJointCentersInRootFrame.cols() != timesteps)
+  {
+    std::cout << "ERROR: mJointCentersInRootFrame.cols() != timesteps"
+              << std::endl;
+    return Eigen::MatrixXs::Zero(0, 0);
+  }
+  Eigen::MatrixXs resamplingMatrix = Eigen::MatrixXs::Zero(rows, timesteps);
+  int cursor = 0;
+  for (int t = 0; t < mMarkerRMS.size(); t++)
+  {
+    resamplingMatrix(cursor, t) = mMarkerRMS[t];
+  }
+  cursor++;
+  for (int t = 0; t < mMarkerMax.size(); t++)
+  {
+    resamplingMatrix(cursor, t) = mMarkerMax[t];
+  }
+  cursor++;
+  for (int t = 0; t < mLinearResidual.size(); t++)
+  {
+    resamplingMatrix(cursor, t) = mLinearResidual[t];
+  }
+  cursor++;
+  for (int t = 0; t < mAngularResidual.size(); t++)
+  {
+    resamplingMatrix(cursor, t) = mAngularResidual[t];
+  }
+  cursor++;
+  resamplingMatrix.block(cursor, 0, mPos.rows(), timesteps) = mPos;
+  cursor += mPos.rows();
+  resamplingMatrix.block(cursor, 0, mVel.rows(), timesteps) = mVel;
+  cursor += mVel.rows();
+  resamplingMatrix.block(cursor, 0, mAcc.rows(), timesteps) = mAcc;
+  cursor += mAcc.rows();
+  resamplingMatrix.block(cursor, 0, mTaus.rows(), timesteps) = mTaus;
+  cursor += mTaus.rows();
+  resamplingMatrix.block(cursor, 0, mGroundBodyWrenches.rows(), timesteps)
+      = mGroundBodyWrenches;
+  cursor += mGroundBodyWrenches.rows();
+  resamplingMatrix.block(cursor, 0, mGroundBodyCopTorqueForce.rows(), timesteps)
+      = mGroundBodyCopTorqueForce;
+  cursor += mGroundBodyCopTorqueForce.rows();
+  resamplingMatrix.block(cursor, 0, mComPoses.rows(), timesteps) = mComPoses;
+  cursor += mComPoses.rows();
+  resamplingMatrix.block(cursor, 0, mComVels.rows(), timesteps) = mComVels;
+  cursor += mComVels.rows();
+  resamplingMatrix.block(cursor, 0, mComAccs.rows(), timesteps) = mComAccs;
+  cursor += mComAccs.rows();
+  resamplingMatrix.block(cursor, 0, mComAccsInRootFrame.rows(), timesteps)
+      = mComAccsInRootFrame;
+  cursor += mComAccsInRootFrame.rows();
+  resamplingMatrix.block(
+      cursor, 0, mResidualWrenchInRootFrame.rows(), timesteps)
+      = mResidualWrenchInRootFrame;
+  cursor += mResidualWrenchInRootFrame.rows();
+  resamplingMatrix.block(
+      cursor, 0, mGroundBodyWrenchesInRootFrame.rows(), timesteps)
+      = mGroundBodyWrenchesInRootFrame;
+  cursor += mGroundBodyWrenchesInRootFrame.rows();
+  resamplingMatrix.block(
+      cursor, 0, mGroundBodyCopTorqueForceInRootFrame.rows(), timesteps)
+      = mGroundBodyCopTorqueForceInRootFrame;
+  cursor += mGroundBodyCopTorqueForceInRootFrame.rows();
+  resamplingMatrix.block(cursor, 0, mJointCenters.rows(), timesteps)
+      = mJointCenters;
+  cursor += mJointCenters.rows();
+  resamplingMatrix.block(cursor, 0, mJointCentersInRootFrame.rows(), timesteps)
+      = mJointCentersInRootFrame;
+  cursor += mJointCentersInRootFrame.rows();
+  return resamplingMatrix;
+}
+
+// This is the setter for the matrix you get from `getResamplingMatrix()`,
+// after you've finished modifying it.
+void SubjectOnDiskTrialPass::setResamplingMatrix(Eigen::MatrixXs matrix)
+{
+  int rows = 4 + mPos.rows() + mVel.rows() + mAcc.rows() + mTaus.rows()
+             + mGroundBodyWrenches.rows() + mGroundBodyCopTorqueForce.rows()
+             + mComPoses.rows() + mComVels.rows() + mComAccs.rows()
+             + mComAccsInRootFrame.rows() + mResidualWrenchInRootFrame.rows()
+             + mGroundBodyWrenchesInRootFrame.rows()
+             + mGroundBodyCopTorqueForceInRootFrame.rows()
+             + mJointCenters.rows() + mJointCentersInRootFrame.rows();
+  if (matrix.rows() != rows)
+  {
+    std::cout << "ERROR: matrix.rows() != expected number of rows" << std::endl;
+    return;
+  }
+
+  int cursor = 0;
+
+  mMarkerRMS.resize(matrix.cols());
+  for (int t = 0; t < mMarkerRMS.size(); t++)
+  {
+    mMarkerRMS[t] = matrix(cursor, t);
+  }
+  cursor++;
+
+  mMarkerMax.resize(matrix.cols());
+  for (int t = 0; t < mMarkerMax.size(); t++)
+  {
+    mMarkerMax[t] = matrix(cursor, t);
+  }
+  cursor++;
+
+  mLinearResidual.resize(matrix.cols());
+  for (int t = 0; t < mLinearResidual.size(); t++)
+  {
+    mLinearResidual[t] = matrix(cursor, t);
+  }
+  cursor++;
+
+  mAngularResidual.resize(matrix.cols());
+  for (int t = 0; t < mAngularResidual.size(); t++)
+  {
+    mAngularResidual[t] = matrix(cursor, t);
+  }
+  cursor++;
+
+  mPos = matrix.block(cursor, 0, mPos.rows(), matrix.cols());
+  cursor += mPos.rows();
+
+  mVel = matrix.block(cursor, 0, mVel.rows(), matrix.cols());
+  cursor += mVel.rows();
+
+  mAcc = matrix.block(cursor, 0, mAcc.rows(), matrix.cols());
+  cursor += mAcc.rows();
+
+  mTaus = matrix.block(cursor, 0, mTaus.rows(), matrix.cols());
+  cursor += mTaus.rows();
+
+  mGroundBodyWrenches
+      = matrix.block(cursor, 0, mGroundBodyWrenches.rows(), matrix.cols());
+  cursor += mGroundBodyWrenches.rows();
+
+  mGroundBodyCopTorqueForce = matrix.block(
+      cursor, 0, mGroundBodyCopTorqueForce.rows(), matrix.cols());
+  cursor += mGroundBodyCopTorqueForce.rows();
+
+  mComPoses = matrix.block(cursor, 0, mComPoses.rows(), matrix.cols());
+  cursor += mComPoses.rows();
+
+  mComVels = matrix.block(cursor, 0, mComVels.rows(), matrix.cols());
+  cursor += mComVels.rows();
+
+  mComAccs = matrix.block(cursor, 0, mComAccs.rows(), matrix.cols());
+  cursor += mComAccs.rows();
+
+  mComAccsInRootFrame
+      = matrix.block(cursor, 0, mComAccsInRootFrame.rows(), matrix.cols());
+  cursor += mComAccsInRootFrame.rows();
+
+  mResidualWrenchInRootFrame = matrix.block(
+      cursor, 0, mResidualWrenchInRootFrame.rows(), matrix.cols());
+  cursor += mResidualWrenchInRootFrame.rows();
+
+  mGroundBodyWrenchesInRootFrame = matrix.block(
+      cursor, 0, mGroundBodyWrenchesInRootFrame.rows(), matrix.cols());
+  cursor += mGroundBodyWrenchesInRootFrame.rows();
+
+  mGroundBodyCopTorqueForceInRootFrame = matrix.block(
+      cursor, 0, mGroundBodyCopTorqueForceInRootFrame.rows(), matrix.cols());
+  cursor += mGroundBodyCopTorqueForceInRootFrame.rows();
+
+  mJointCenters = matrix.block(cursor, 0, mJointCenters.rows(), matrix.cols());
+  cursor += mJointCenters.rows();
+
+  mJointCentersInRootFrame
+      = matrix.block(cursor, 0, mJointCentersInRootFrame.rows(), matrix.cols());
+  cursor += mJointCentersInRootFrame.rows();
 }
 
 void SubjectOnDiskTrialPass::setDofPositionsObserved(
@@ -1424,9 +1979,8 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
         taus.col(t) = tau;
 
         skel->setAccelerations(ddq);
-        comAccs.col(t) = skel->getCOMLinearAcceleration();
-        comAccsInRootFrame.col(t)
-            = T_wr.linear().transpose() * skel->getCOMLinearAcceleration();
+        comAccs.col(t) = skel->getCOMLinearAcceleration() - skel->getGravity();
+        comAccsInRootFrame.col(t) = T_wr.linear().transpose() * comAccs.col(t);
 
         if (skel->getRootJoint()->getNumDofs() == 6)
         {
@@ -1460,10 +2014,7 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
         for (int i = 0; i < footIndices.size(); i++)
         {
-          Eigen::Vector6s localWrench = grfTrial.block<6, 1>(i * 6, t);
-          Eigen::Vector6s worldWrench = math::dAdInvT(
-              skel->getBodyNode(footIndices.at(i))->getWorldTransform(),
-              localWrench);
+          Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
           Eigen::Vector9s copWrench
               = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
           copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
@@ -1471,6 +2022,34 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
               = math::dAdInvT(T_wr.inverse(), worldWrench);
           groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
         }
+
+#ifndef NDEBUG
+        // Check that inverse dynamics given these inputs produces the expected
+        // joint torques
+
+        std::vector<Eigen::Vector6s> rootFrameContactWrenches;
+        for (int b = 0; b < footBodies.size(); b++)
+        {
+          rootFrameContactWrenches.push_back(
+              groundBodyWrenchesInRootFrame.block<6, 1>(b * 6, t));
+        }
+        Eigen::VectorXs recoveredTau = skel->getInverseDynamicsFromPredictions(
+            ddq,
+            footBodies,
+            rootFrameContactWrenches,
+            residualWrenchInRootFrame.col(t));
+        tau.head<6>().setZero();
+        if ((recoveredTau - tau).norm() > 1e-8)
+        {
+          std::cout << "Inverse dynamics failed to recover the expected torques"
+                    << std::endl;
+          std::cout << "Expected: " << tau.transpose() << std::endl;
+          std::cout << "Recovered: " << recoveredTau.transpose() << std::endl;
+          std::cout << "Difference: " << (recoveredTau - tau).transpose()
+                    << std::endl;
+          assert(false);
+        }
+#endif
       }
     }
     linearResiduals.push_back(linearResidual);
@@ -1501,9 +2080,19 @@ void SubjectOnDiskTrialPass::setMarkerRMS(std::vector<s_t> markerRMS)
   mMarkerRMS = markerRMS;
 }
 
+std::vector<s_t> SubjectOnDiskTrialPass::getMarkerRMS()
+{
+  return mMarkerRMS;
+}
+
 void SubjectOnDiskTrialPass::setMarkerMax(std::vector<s_t> markerMax)
 {
   mMarkerMax = markerMax;
+}
+
+std::vector<s_t> SubjectOnDiskTrialPass::getMarkerMax()
+{
+  return mMarkerMax;
 }
 
 // If we're doing a lowpass filter on this pass, then what was the cutoff
@@ -1532,10 +2121,20 @@ void SubjectOnDiskTrialPass::setLinearResidual(std::vector<s_t> linearResidual)
   mLinearResidual = linearResidual;
 }
 
+std::vector<s_t> SubjectOnDiskTrialPass::getLinearResidual()
+{
+  return mLinearResidual;
+}
+
 void SubjectOnDiskTrialPass::setAngularResidual(
     std::vector<s_t> angularResidual)
 {
   mAngularResidual = angularResidual;
+}
+
+std::vector<s_t> SubjectOnDiskTrialPass::getAngularResidual()
+{
+  return mAngularResidual;
 }
 
 void SubjectOnDiskTrialPass::read(
@@ -1772,6 +2371,12 @@ std::shared_ptr<SubjectOnDiskTrialPass> SubjectOnDiskTrial::addPass()
 {
   mTrialPasses.push_back(std::make_shared<SubjectOnDiskTrialPass>());
   return mTrialPasses.back();
+}
+
+std::vector<std::shared_ptr<SubjectOnDiskTrialPass>>
+SubjectOnDiskTrial::getPasses()
+{
+  return mTrialPasses;
 }
 
 void SubjectOnDiskTrial::read(const proto::SubjectOnDiskTrialHeader& proto)
@@ -2047,10 +2652,22 @@ SubjectOnDiskHeader::addProcessingPass()
   return mPasses.back();
 }
 
+std::vector<std::shared_ptr<SubjectOnDiskPassHeader>>
+SubjectOnDiskHeader::getProcessingPasses()
+{
+  return mPasses;
+}
+
 std::shared_ptr<SubjectOnDiskTrial> SubjectOnDiskHeader::addTrial()
 {
   mTrials.push_back(std::make_shared<SubjectOnDiskTrial>());
   return mTrials.back();
+}
+
+std::vector<std::shared_ptr<SubjectOnDiskTrial>>
+SubjectOnDiskHeader::getTrials()
+{
+  return mTrials;
 }
 
 void SubjectOnDiskHeader::recomputeColumnNames()
@@ -2635,6 +3252,14 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyCopTorqueForce.cols()
              > t
       && mTrials[trial]->mTrialPasses[pass]->mGroundBodyCopTorqueForce.rows()
+             == 9 * mGroundContactBodies.size()
+      && mTrials[trial]
+                 ->mTrialPasses[pass]
+                 ->mGroundBodyCopTorqueForceInRootFrame.cols()
+             > t
+      && mTrials[trial]
+                 ->mTrialPasses[pass]
+                 ->mGroundBodyCopTorqueForceInRootFrame.rows()
              == 9 * mGroundContactBodies.size())
   {
     for (int j = 0; j < 6; j++)
@@ -2664,6 +3289,19 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
         proto->add_ground_contact_force(
             mTrials[trial]->mTrialPasses[pass]->mGroundBodyCopTorqueForce(
                 i * 9 + 6 + j, t));
+
+        proto->add_root_frame_ground_contact_center_of_pressure(
+            mTrials[trial]
+                ->mTrialPasses[pass]
+                ->mGroundBodyCopTorqueForceInRootFrame(i * 9 + j, t));
+        proto->add_root_frame_ground_contact_torques(
+            mTrials[trial]
+                ->mTrialPasses[pass]
+                ->mGroundBodyCopTorqueForceInRootFrame(i * 9 + 3 + j, t));
+        proto->add_root_frame_ground_contact_force(
+            mTrials[trial]
+                ->mTrialPasses[pass]
+                ->mGroundBodyCopTorqueForceInRootFrame(i * 9 + 6 + j, t));
       }
     }
   }

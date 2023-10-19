@@ -151,6 +151,10 @@ message SubjectOnDiskProcessingPassFrame {
   repeated double root_frame_residual = 12;
   // These are 6-vec's per contact body, so each length N*6
   repeated double root_frame_ground_contact_wrench = 14;
+  // These are 3-vec's per contact body, so each length N*3
+  repeated double root_frame_ground_contact_center_of_pressure = 18;
+  repeated double root_frame_ground_contact_torques = 19;
+  repeated double root_frame_ground_contact_force = 20;
   // One 3-vec per joint
   repeated double root_frame_joint_centers = 15;
   // One 3-vec per joint

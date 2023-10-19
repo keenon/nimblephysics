@@ -87,6 +87,16 @@ Eigen::VectorXs ResidualForceHelper::calculateInverseDynamics(
   {
     Eigen::VectorXs fTaus
         = mForces[i].computeTau(forcesConcat.segment<6>(i * 6));
+#ifndef NDEBUG
+    const dynamics::BodyNode* body = mSkel->getBodyNode(mForceBodies[i]);
+    const Eigen::Isometry3s T_wb = body->getWorldTransform();
+    const Eigen::Vector6s worldWrench = forcesConcat.segment<6>(i * 6);
+    const Eigen::Vector6s bodyWrench
+        = math::dAdInvT(T_wb.inverse(), worldWrench);
+    Eigen::VectorXs fJacobian
+        = mSkel->getJacobian(body).transpose() * bodyWrench;
+    assert(fTaus.isApprox(fJacobian, 1e-6));
+#endif
     Fs += fTaus;
   }
   Eigen::VectorXs manualTau = M * ddq + C - Fs;

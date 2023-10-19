@@ -53,6 +53,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
 
   // Global config for the test
   int dofs = 24;
+  int joints = 8;
   int numTrials = 4;
 
   ///////////////////////////////////////////////////////////////
@@ -115,6 +116,15 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   std::vector<std::vector<Eigen::MatrixXs>> comPosesTrialPasses;
   std::vector<std::vector<Eigen::MatrixXs>> comVelsTrialPasses;
   std::vector<std::vector<Eigen::MatrixXs>> comAccsTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> comAccsInRootFrameTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>>
+      residualWrenchInRootFrameTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>>
+      groundBodyWrenchInRootFrameTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>>
+      groundBodyCopTorqueForceInRootFrameTrialPasses;
+  std::vector<std::vector<Eigen::MatrixXs>> jointCentersTrials;
+  std::vector<std::vector<Eigen::MatrixXs>> jointCentersInRootFrameTrials;
   // 1.5. Per pass results data
   std::vector<std::vector<std::vector<s_t>>> linearResidualTrialPasses;
   std::vector<std::vector<std::vector<s_t>>> angularResidualTrialPasses;
@@ -256,6 +266,12 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
     comPosesTrialPasses.emplace_back();
     comVelsTrialPasses.emplace_back();
     comAccsTrialPasses.emplace_back();
+    comAccsInRootFrameTrialPasses.emplace_back();
+    residualWrenchInRootFrameTrialPasses.emplace_back();
+    groundBodyWrenchInRootFrameTrialPasses.emplace_back();
+    groundBodyCopTorqueForceInRootFrameTrialPasses.emplace_back();
+    jointCentersTrials.emplace_back();
+    jointCentersInRootFrameTrials.emplace_back();
     linearResidualTrialPasses.emplace_back();
     angularResidualTrialPasses.emplace_back();
     markerRMSTrialPasses.emplace_back();
@@ -302,6 +318,20 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
           Eigen::MatrixXs::Random(3, trialLengths[trial]));
       comAccsTrialPasses[trial].push_back(
           Eigen::MatrixXs::Random(3, trialLengths[trial]));
+      comAccsInRootFrameTrialPasses[trial].push_back(
+          Eigen::MatrixXs::Random(3, trialLengths[trial]));
+      residualWrenchInRootFrameTrialPasses[trial].push_back(
+          Eigen::MatrixXs::Random(6, trialLengths[trial]));
+      groundBodyWrenchInRootFrameTrialPasses[trial].push_back(
+          Eigen::MatrixXs::Random(
+              6 * groundForceBodies.size(), trialLengths[trial]));
+      groundBodyCopTorqueForceInRootFrameTrialPasses[trial].push_back(
+          Eigen::MatrixXs::Random(
+              9 * groundForceBodies.size(), trialLengths[trial]));
+      jointCentersTrials[trial].push_back(
+          Eigen::MatrixXs::Random(3 * joints, trialLengths[trial]));
+      jointCentersInRootFrameTrials[trial].push_back(
+          Eigen::MatrixXs::Random(3 * joints, trialLengths[trial]));
 
       // 2.5. Per pass results data
       std::vector<s_t> linearResiduals;
@@ -349,28 +379,30 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
   ///////////////////////////////////////////////////////////////
 
   // 3.1. Header data
-  SubjectOnDiskHeader header;
+  std::shared_ptr<SubjectOnDiskHeader> header
+      = std::make_shared<SubjectOnDiskHeader>();
   for (int i = 0; i < processingPasses.size(); i++)
   {
-    auto pass = header.addProcessingPass();
+    auto pass = header->addProcessingPass();
     pass->setProcessingPassType(processingPasses[i]);
     pass->setOpenSimFileText(openSimFileTexts[i]);
   }
-  header.setNumDofs(dofs);
-  header.setCustomValueNames(customValueNames);
-  header.setGroundForceBodies(groundForceBodies);
-  header.setHref(originalHref);
-  header.setNotes(originalNotes);
-  header.setBiologicalSex(biologicalSex);
-  header.setHeightM(heightM);
-  header.setMassKg(massKg);
-  header.setAgeYears(age);
-  header.setSubjectTags(subjectTags);
+  header->setNumDofs(dofs);
+  header->setNumJoints(joints);
+  header->setCustomValueNames(customValueNames);
+  header->setGroundForceBodies(groundForceBodies);
+  header->setHref(originalHref);
+  header->setNotes(originalNotes);
+  header->setBiologicalSex(biologicalSex);
+  header->setHeightM(heightM);
+  header->setMassKg(massKg);
+  header->setAgeYears(age);
+  header->setSubjectTags(subjectTags);
 
   // 3.2. Per trial data
   for (int trial = 0; trial < numTrials; trial++)
   {
-    auto trialData = header.addTrial();
+    auto trialData = header->addTrial();
     trialData->setTimestep(trialTimesteps[trial]);
     trialData->setName(trialNames[trial]);
     trialData->setOriginalTrialName(trialOriginalNames[trial]);
@@ -429,6 +461,17 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
       passData->setComPoses(comPosesTrialPasses[trial][pass]);
       passData->setComVels(comVelsTrialPasses[trial][pass]);
       passData->setComAccs(comAccsTrialPasses[trial][pass]);
+      passData->setComAccsInRootFrame(
+          comAccsInRootFrameTrialPasses[trial][pass]);
+      passData->setResidualWrenchInRootFrame(
+          residualWrenchInRootFrameTrialPasses[trial][pass]);
+      passData->setGroundBodyWrenchesInRootFrame(
+          groundBodyWrenchInRootFrameTrialPasses[trial][pass]);
+      passData->setGroundBodyCopTorqueForceInRootFrame(
+          groundBodyCopTorqueForceTrialPasses[trial][pass]);
+      passData->setJointCenters(jointCentersTrials[trial][pass]);
+      passData->setJointCentersInRootFrame(
+          jointCentersInRootFrameTrials[trial][pass]);
 
       // 3.5. Per pass results data
       passData->setLinearResidual(linearResidualTrialPasses[trial][pass]);
@@ -1047,11 +1090,12 @@ TEST(SubjectOnDisk, MINIMAL_WRITE_READ)
   }
 
   std::string path = "./testSubject.bin";
-  SubjectOnDiskHeader header;
-  header.setAgeYears(30);
+  std::shared_ptr<SubjectOnDiskHeader> header
+      = std::make_shared<SubjectOnDiskHeader>();
+  header->setAgeYears(30);
   for (int trial = 0; trial < 2; trial++)
   {
-    auto trialData = header.addTrial();
+    auto trialData = header->addTrial();
     // trialData.setName("test");
 
     std::vector<std::map<std::string, Eigen::Vector3s>> markerTrial;
@@ -1091,7 +1135,7 @@ double computeMean(const std::vector<double>& values)
   return sum / values.size();
 }
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(SubjectOnDisk, READ_BACK_DATA)
 {
   auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
@@ -1127,13 +1171,85 @@ TEST(SubjectOnDisk, READ_BACK_DATA)
       std::cout << "      Marker RMS: "
                 << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
       std::cout << "      Marker Max: "
-                << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
+                << computeMean(read_back.getTrialMarkerMaxs(t, p)) << std::endl;
       std::cout << "      Linear Residual: "
                 << computeMean(read_back.getTrialLinearResidualNorms(t, p))
                 << std::endl;
       std::cout << "      Angular Residual: "
+                << computeMean(read_back.getTrialAngularResidualNorms(t, p))
+                << std::endl;
+    }
+  }
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
+{
+  auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
+  newRetriever->addSchemaRetriever(
+      "dart", utils::DartResourceRetriever::create());
+  std::string path
+      = newRetriever->getFilePath("dart://sample/b3d/subject10.b3d");
+  SubjectOnDisk read_back(path);
+  std::cout << "  Num Trials: " << read_back.getNumTrials() << std::endl;
+  std::cout << "  Num Processing Passes: " << read_back.getNumProcessingPasses()
+            << std::endl;
+  std::cout << "  Num Dofs: " << read_back.getNumDofs() << std::endl;
+
+  for (int t = 0; t < read_back.getNumTrials(); t++)
+  {
+    std::cout << "  Trial " << t << ":" << std::endl;
+    std::cout << "    Name: " << read_back.getTrialName(t) << std::endl;
+
+    for (int p = 0; p < read_back.getTrialNumProcessingPasses(t); p++)
+    {
+      std::cout << "    Processing pass " << p << ":" << std::endl;
+
+      // Since std::mean doesn't exist, you might need to compute the mean
+      // yourself or use an alternative function. For the sake of this example,
+      // I'll assume you have a utility function called computeMean.
+      std::cout << "      Marker RMS: "
+                << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
+      std::cout << "      Marker Max: "
+                << computeMean(read_back.getTrialMarkerMaxs(t, p)) << std::endl;
+      std::cout << "      Linear Residual: "
                 << computeMean(read_back.getTrialLinearResidualNorms(t, p))
                 << std::endl;
+      std::cout << "      Angular Residual: "
+                << computeMean(read_back.getTrialAngularResidualNorms(t, p))
+                << std::endl;
+    }
+  }
+
+  read_back.loadAllFrames();
+
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skeletons;
+  for (int pass = 0; pass < read_back.getNumProcessingPasses(); pass++)
+  {
+    skeletons.push_back(read_back.readSkel(pass));
+  }
+  std::vector<std::string> footBodies = read_back.getGroundForceBodies();
+
+  for (int trial = 0; trial < read_back.getNumTrials(); trial++)
+  {
+    std::vector<ForcePlate> forcePlates = read_back.readForcePlates(trial);
+    s_t timestep = read_back.getTrialTimestep(trial);
+    for (int pass = 0; pass < read_back.getTrialNumProcessingPasses(trial);
+         pass++)
+    {
+      read_back.getHeaderProto()
+          ->getTrials()[trial]
+          ->getPasses()[pass]
+          ->computeValuesFromForcePlates(
+              skeletons[pass],
+              timestep,
+              read_back.getHeaderProto()
+                  ->getTrials()[trial]
+                  ->getPasses()[pass]
+                  ->getPoses(),
+              footBodies,
+              forcePlates);
     }
   }
 }

@@ -9463,8 +9463,7 @@ Eigen::VectorXs Skeleton::getInverseDynamicsFromPredictions(
   const Eigen::VectorXs massTorques
       = multiplyByImplicitMassMatrix(accelerations);
   const Eigen::VectorXs coriolisAndGravity
-      = getCoriolisAndGravityForces() - getExternalForces() + getDampingForce()
-        + getSpringForce();
+      = getCoriolisAndGravityForces() + getDampingForce() + getSpringForce();
   Eigen::VectorXs totalTorques
       = massTorques + coriolisAndGravity - rootResidualTorques;
   for (int i = 0; i < contactBodies.size(); i++)

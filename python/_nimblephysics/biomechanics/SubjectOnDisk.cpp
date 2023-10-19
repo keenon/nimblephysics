@@ -446,9 +446,15 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerRMS,
                 ::py::arg("markerRMS"))
             .def(
+                "getMarkerRMS",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getMarkerRMS)
+            .def(
                 "setMarkerMax",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerMax,
                 ::py::arg("markerMax"))
+            .def(
+                "getMarkerMax",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getMarkerMax)
             .def(
                 "setLowpassCutoffFrequency",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
@@ -488,71 +494,140 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
                 ::py::arg("linearResidual"))
             .def(
+                "getLinearResidual",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getLinearResidual)
+            .def(
                 "setAngularResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setAngularResidual,
                 ::py::arg("angularResidual"))
+            .def(
+                "getAngularResidual",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getAngularResidual)
             .def(
                 "setPoses",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setPoses,
                 ::py::arg("poses"))
             .def(
+                "getPoses",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getPoses)
+            .def(
                 "setVels",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setVels,
                 ::py::arg("vels"))
+            .def(
+                "getVels", &dart::biomechanics::SubjectOnDiskTrialPass::getVels)
             .def(
                 "setAccs",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setAccs,
                 ::py::arg("accs"))
             .def(
+                "getAccs", &dart::biomechanics::SubjectOnDiskTrialPass::getAccs)
+            .def(
                 "setTaus",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setTaus,
                 ::py::arg("taus"))
+            .def(
+                "getTaus", &dart::biomechanics::SubjectOnDiskTrialPass::getTaus)
             .def(
                 "setGroundBodyWrenches",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setGroundBodyWrenches,
                 ::py::arg("wrenches"))
             .def(
+                "getGroundBodyWrenches",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyWrenches)
+            .def(
                 "setGroundBodyCopTorqueForce",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setGroundBodyCopTorqueForce,
                 ::py::arg("copTorqueForces"))
             .def(
+                "getGroundBodyCopTorqueForce",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyCopTorqueForce)
+            .def(
                 "setComPoses",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComPoses,
                 ::py::arg("poses"))
+            .def(
+                "getComPoses",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComPoses)
             .def(
                 "setComVels",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComVels,
                 ::py::arg("vels"))
             .def(
+                "getComVels",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComVels)
+            .def(
                 "setComAccs",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComAccs,
                 ::py::arg("accs"))
+            .def(
+                "getComAccs",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComAccs)
             .def(
                 "setComAccsInRootFrame",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setComAccsInRootFrame,
                 ::py::arg("accs"))
             .def(
+                "getComAccsInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getComAccsInRootFrame)
+            .def(
                 "setResidualWrenchInRootFrame",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setResidualWrenchInRootFrame,
                 ::py::arg("wrenches"))
+            .def(
+                "getResidualWrenchInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getResidualWrenchInRootFrame)
             .def(
                 "setGroundBodyWrenchesInRootFrame",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setGroundBodyWrenchesInRootFrame,
                 ::py::arg("wrenches"))
             .def(
+                "getGroundBodyWrenchesInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyWrenchesInRootFrame)
+            .def(
+                "setGroundBodyCopTorqueForceInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setGroundBodyCopTorqueForceInRootFrame,
+                ::py::arg("copTorqueForces"))
+            .def(
+                "getGroundBodyCopTorqueForceInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyCopTorqueForceInRootFrame)
+            .def(
                 "setJointCenters",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setJointCenters,
                 ::py::arg("centers"))
             .def(
+                "getJointCenters",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getJointCenters)
+            .def(
                 "setJointCentersInRootFrame",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setJointCentersInRootFrame,
-                ::py::arg("centers"));
+                ::py::arg("centers"))
+            .def(
+                "getJointCentersInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getJointCentersInRootFrame)
+            .def(
+                "setResamplingMatrix",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setResamplingMatrix,
+                ::py::arg("resamplingMatrix"))
+            .def(
+                "getResamplingMatrix",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getResamplingMatrix);
 
   auto subjectOnDiskTrial
       = ::py::class_<
@@ -622,7 +697,10 @@ Note that these are specified in the local body frame, acting on the body at its
                 "This creates a new :code:`SubjectOnDiskTrialPass` for this "
                 "trial, and returns it. That object can store results from IK "
                 "and ID, as well as other results from the processing "
-                "pipeline.");
+                "pipeline.")
+            .def(
+                "getPasses",
+                &dart::biomechanics::SubjectOnDiskTrial::getPasses);
 
   auto subjectOnDiskPassHead
       = ::py::class_<
@@ -646,7 +724,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("openSimFileText"));
 
   auto subjectOnDiskHeader
-      = ::py::class_<dart::biomechanics::SubjectOnDiskHeader>(
+      = ::py::class_<
+            dart::biomechanics::SubjectOnDiskHeader,
+            std::shared_ptr<dart::biomechanics::SubjectOnDiskHeader>>(
             m, "SubjectOnDiskHeader")
             .def(::py::init<>())
             .def(
@@ -696,7 +776,13 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "addProcessingPass",
                 &dart::biomechanics::SubjectOnDiskHeader::addProcessingPass)
+            .def(
+                "getProcessingPasses",
+                &dart::biomechanics::SubjectOnDiskHeader::getProcessingPasses)
             .def("addTrial", &dart::biomechanics::SubjectOnDiskHeader::addTrial)
+            .def(
+                "getTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::getTrials)
             .def(
                 "recomputeColumnNames",
                 &dart::biomechanics::SubjectOnDiskHeader::recomputeColumnNames);
@@ -721,6 +807,21 @@ Note that these are specified in the local body frame, acting on the body at its
             //   /// in Geometry folder.
             //   std::shared_ptr<dynamics::Skeleton> readSkel(
             //       int processingPass, std::string geometryFolder = "");
+            .def(
+                "loadAllFrames",
+                &dart::biomechanics::SubjectOnDisk::loadAllFrames,
+                "This loads all the frames of data, and fills in the "
+                "processing pass data matrices in the proto header classes.")
+            .def(
+                "getHeaderProto",
+                &dart::biomechanics::SubjectOnDisk::getHeaderProto,
+                "This returns the raw proto header for this subject, which can "
+                "be used to write out a new B3D file")
+            .def(
+                "readForcePlates",
+                &dart::biomechanics::SubjectOnDisk::readForcePlates,
+                "This reads all the raw sensor data for this trial, and "
+                "constructs force plates.")
             .def(
                 "readSkel",
                 &dart::biomechanics::SubjectOnDisk::readSkel,
