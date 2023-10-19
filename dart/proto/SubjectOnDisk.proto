@@ -159,6 +159,11 @@ message SubjectOnDiskProcessingPassFrame {
   repeated double root_frame_joint_centers = 15;
   // One 3-vec per joint
   repeated double world_frame_joint_centers = 16;
+  // The recent history of root transformations, expressed in the current root frame
+  repeated double root_frame_spatial_velocity = 21;
+  repeated double root_frame_spatial_acceleration = 22;
+  repeated double root_frame_root_pos_history = 23;
+  repeated double root_frame_root_euler_history = 24;
 }
 
 message SubjectOnDiskSensorFrame {

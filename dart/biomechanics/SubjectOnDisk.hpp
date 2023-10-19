@@ -66,6 +66,13 @@ struct FramePass
   Eigen::VectorXi velFiniteDifferenced;
   Eigen::VectorXi accFiniteDifferenced;
 
+  Eigen::Vector3s rootLinearVelInRootFrame;
+  Eigen::Vector3s rootAngularVelInRootFrame;
+  Eigen::Vector3s rootLinearAccInRootFrame;
+  Eigen::Vector3s rootAngularAccInRootFrame;
+  Eigen::VectorXs rootPosHistoryInRootFrame;
+  Eigen::VectorXs rootEulerHistoryInRootFrame;
+
   void readFromProto(
       dart::proto::SubjectOnDiskProcessingPassFrame* proto,
       const SubjectOnDiskHeader& header,
@@ -156,7 +163,10 @@ public:
       // If we've already assigned the force plates to feet
       Eigen::MatrixXs forces,
       Eigen::MatrixXs moments,
-      Eigen::MatrixXs cops);
+      Eigen::MatrixXs cops,
+      // How much history to use for the root position and orientation
+      int rootHistoryLen = 5,
+      int rootHistoryStride = 1);
 
   // This is for allowing the user to set all the values of a pass at once,
   // without having to manually compute them in Python, which turns out to be
@@ -166,7 +176,10 @@ public:
       s_t timestep,
       Eigen::MatrixXs poses,
       std::vector<std::string> footBodies,
-      std::vector<ForcePlate> forcePlates);
+      std::vector<ForcePlate> forcePlates,
+      // How much history to use for the root position and orientation
+      int rootHistoryLen = 5,
+      int rootHistoryStride = 1);
 
   // Manual setters (and getters) that compete with computeValues()
   void setLinearResidual(std::vector<s_t> linearResidual);
@@ -203,6 +216,14 @@ public:
   Eigen::MatrixXs getJointCenters();
   void setJointCentersInRootFrame(Eigen::MatrixXs centers);
   Eigen::MatrixXs getJointCentersInRootFrame();
+  void setRootSpatialVelInRootFrame(Eigen::MatrixXs spatialVel);
+  Eigen::MatrixXs getRootSpatialVelInRootFrame();
+  void setRootSpatialAccInRootFrame(Eigen::MatrixXs spatialAcc);
+  Eigen::MatrixXs getRootSpatialAccInRootFrame();
+  void setRootPosHistoryInRootFrame(Eigen::MatrixXs rootHistory);
+  Eigen::MatrixXs getRootPosHistoryInRootFrame();
+  void setRootEulerHistoryInRootFrame(Eigen::MatrixXs rootHistory);
+  Eigen::MatrixXs getRootEulerHistoryInRootFrame();
 
   // This will return a matrix where every one of our properties with setters is
   // stacked together vertically. Each column represents time, and each row is a
@@ -252,6 +273,10 @@ protected:
   Eigen::MatrixXs mGroundBodyCopTorqueForceInRootFrame;
   Eigen::MatrixXs mJointCenters;
   Eigen::MatrixXs mJointCentersInRootFrame;
+  Eigen::MatrixXs mRootSpatialVelInRootFrame;
+  Eigen::MatrixXs mRootSpatialAccInRootFrame;
+  Eigen::MatrixXs mRootPosHistoryInRootFrame;
+  Eigen::MatrixXs mRootEulerHistoryInRootFrame;
   // This is for allowing the user to pre-filter out data where joint velocities
   // are above a certain "unreasonable limit", like 50 rad/s or so
   std::vector<s_t> mJointsMaxVelocity;

@@ -164,6 +164,35 @@ Note that these are specified in the local body frame, acting on the body at its
             This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
+            //   // These are each 3-vector for each contact body, concatenated
+            //   together Eigen::VectorXd groundContactCenterOfPressure;
+            .def_readwrite(
+                "groundContactCenterOfPressureInRootFrame",
+                &dart::biomechanics::FramePass::
+                    groundContactCenterOfPressureInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis).
+        )doc")
+            //   Eigen::VectorXd groundContactTorque;
+            .def_readwrite(
+                "groundContactTorqueInRootFrame",
+                &dart::biomechanics::FramePass::groundContactTorqueInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+          )doc")
+            //   Eigen::VectorXd groundContactForce;
+            .def_readwrite(
+                "groundContactForceInRootFrame",
+                &dart::biomechanics::FramePass::groundContactForceInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+          )doc")
             //   // These are the center of mass kinematics
             //   Eigen::Vector3s comPos;
             .def_readwrite(
@@ -212,6 +241,60 @@ Note that these are specified in the local body frame, acting on the body at its
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF got its acceleration through finite "
                 "differencing, and therefore may be somewhat unreliable")
+            //   Eigen::Vector3s rootLinearVelInRootFrame;
+            .def_readwrite(
+                "rootLinearVelInRootFrame",
+                &dart::biomechanics::FramePass::rootLinearVelInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the linear velocity, in meters per second, of the "
+                "root body of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
+            //   Eigen::Vector3s rootAngularVelInRootFrame;
+            .def_readwrite(
+                "rootAngularVelInRootFrame",
+                &dart::biomechanics::FramePass::rootAngularVelInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the angular velocity, in an angle-axis representation "
+                "where the norm of this 3-vector is given in radians per "
+                "second, of the root body of the skeleton (probably the "
+                "pelvis) expressed in its own coordinate frame.")
+            //   Eigen::Vector3s rootLinearAccInRootFrame;
+            .def_readwrite(
+                "rootLinearAccInRootFrame",
+                &dart::biomechanics::FramePass::rootLinearAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the linear acceleration, in meters per second "
+                "squared, of the "
+                "root body of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
+            //   Eigen::Vector3s rootAngularAccInRootFrame;
+            .def_readwrite(
+                "rootAngularAccInRootFrame",
+                &dart::biomechanics::FramePass::rootAngularAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the angular velocity, in an angle-axis representation "
+                "where the norm of this 3-vector is given in radians per "
+                "second squared, of the root body of the skeleton (probably "
+                "the pelvis) expressed in its own coordinate frame.")
+            //   Eigen::VectorXs rootPosHistoryInRootFrame;
+            .def_readwrite(
+                "rootPosHistoryInRootFrame",
+                &dart::biomechanics::FramePass::rootPosHistoryInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the recent history of the positions of the root body"
+                " of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame. These are concatenated 3-vectors. "
+                "The [0:3] of the vector is the most recent, and they get "
+                "older from there. Vectors  ")
+            //   Eigen::VectorXs rootEulerHistoryInRootFrame;
+            .def_readwrite(
+                "rootEulerHistoryInRootFrame",
+                &dart::biomechanics::FramePass::rootEulerHistoryInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the recent history of the angles (expressed as euler "
+                "angles) of the root body"
+                " of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
             // Eigen::Vector3s comAccInRootFrame;
             .def_readwrite(
                 "comAccInRootFrame",
@@ -256,7 +339,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "given in the world frame.")
             .def_readwrite(
                 "jointCentersInRootFrame",
-                &dart::biomechanics::FramePass::jointCenters,
+                &dart::biomechanics::FramePass::jointCentersInRootFrame,
                 py::return_value_policy::reference_internal,
                 "These are the joint center locations, concatenated together, "
                 "given in the root frame. The "
@@ -479,7 +562,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("footBodyNames"),
                 ::py::arg("forces"),
                 ::py::arg("moments"),
-                ::py::arg("cops"))
+                ::py::arg("cops"),
+                ::py::arg("rootHistoryLen") = 5,
+                ::py::arg("rootHistoryStride") = 1)
             .def(
                 "computeValuesFromForcePlates",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
@@ -488,7 +573,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("timestep"),
                 ::py::arg("poses"),
                 ::py::arg("footBodyNames"),
-                ::py::arg("forcePlates"))
+                ::py::arg("forcePlates"),
+                ::py::arg("rootHistoryLen") = 5,
+                ::py::arg("rootHistoryStride") = 1)
             .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,

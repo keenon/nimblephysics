@@ -532,6 +532,7 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
+  osimParsed.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   return osimParsed.skeleton;
 }
@@ -1025,6 +1026,43 @@ void FramePass::readFromProto(
     {
       residualWrenchInRootFrame(i) = proto->root_frame_residual(i);
     }
+  }
+
+  rootLinearVelInRootFrame = Eigen::Vector3s::Zero();
+  rootAngularVelInRootFrame = Eigen::Vector3s::Zero();
+  if (proto->root_frame_spatial_velocity_size() == 6)
+  {
+    rootAngularVelInRootFrame(0) = proto->root_frame_spatial_velocity(0);
+    rootAngularVelInRootFrame(1) = proto->root_frame_spatial_velocity(1);
+    rootAngularVelInRootFrame(2) = proto->root_frame_spatial_velocity(2);
+    rootLinearVelInRootFrame(0) = proto->root_frame_spatial_velocity(3);
+    rootLinearVelInRootFrame(1) = proto->root_frame_spatial_velocity(4);
+    rootLinearVelInRootFrame(2) = proto->root_frame_spatial_velocity(5);
+  }
+
+  rootLinearAccInRootFrame = Eigen::Vector3s::Zero();
+  rootAngularAccInRootFrame = Eigen::Vector3s::Zero();
+  if (proto->root_frame_spatial_acceleration_size() == 6)
+  {
+    rootAngularAccInRootFrame(0) = proto->root_frame_spatial_acceleration(0);
+    rootAngularAccInRootFrame(1) = proto->root_frame_spatial_acceleration(1);
+    rootAngularAccInRootFrame(2) = proto->root_frame_spatial_acceleration(2);
+    rootLinearAccInRootFrame(0) = proto->root_frame_spatial_acceleration(3);
+    rootLinearAccInRootFrame(1) = proto->root_frame_spatial_acceleration(4);
+    rootLinearAccInRootFrame(2) = proto->root_frame_spatial_acceleration(5);
+  }
+
+  rootPosHistoryInRootFrame
+      = Eigen::VectorXs::Zero(proto->root_frame_root_pos_history_size());
+  for (int i = 0; i < proto->root_frame_root_pos_history_size(); i++)
+  {
+    rootPosHistoryInRootFrame(i) = proto->root_frame_root_pos_history(i);
+  }
+  rootEulerHistoryInRootFrame
+      = Eigen::VectorXs::Zero(proto->root_frame_root_euler_history_size());
+  for (int i = 0; i < proto->root_frame_root_euler_history_size(); i++)
+  {
+    rootEulerHistoryInRootFrame(i) = proto->root_frame_root_euler_history(i);
   }
 
   // // These are the joint centers, expressed in the world frame
@@ -1538,6 +1576,50 @@ Eigen::MatrixXs SubjectOnDiskTrialPass::getJointCentersInRootFrame()
   return mJointCentersInRootFrame;
 }
 
+void SubjectOnDiskTrialPass::setRootSpatialVelInRootFrame(
+    Eigen::MatrixXs spatialVel)
+{
+  mRootSpatialVelInRootFrame = spatialVel;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getRootSpatialVelInRootFrame()
+{
+  return mRootSpatialVelInRootFrame;
+}
+
+void SubjectOnDiskTrialPass::setRootSpatialAccInRootFrame(
+    Eigen::MatrixXs spatialAcc)
+{
+  mRootSpatialAccInRootFrame = spatialAcc;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getRootSpatialAccInRootFrame()
+{
+  return mRootSpatialAccInRootFrame;
+}
+
+void SubjectOnDiskTrialPass::setRootPosHistoryInRootFrame(
+    Eigen::MatrixXs rootHistory)
+{
+  mRootPosHistoryInRootFrame = rootHistory;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getRootPosHistoryInRootFrame()
+{
+  return mRootPosHistoryInRootFrame;
+}
+
+void SubjectOnDiskTrialPass::setRootEulerHistoryInRootFrame(
+    Eigen::MatrixXs rootHistory)
+{
+  mRootEulerHistoryInRootFrame = rootHistory;
+}
+
+Eigen::MatrixXs SubjectOnDiskTrialPass::getRootEulerHistoryInRootFrame()
+{
+  return mRootEulerHistoryInRootFrame;
+}
+
 // This will return a matrix where every one of our properties with setters is
 // stacked together vertically. Each column represents time, and each row is a
 // different property of interest. The point here is not to introspect into
@@ -1843,7 +1925,9 @@ void SubjectOnDiskTrialPass::computeValues(
     std::vector<std::string> footBodyNames,
     Eigen::MatrixXs forces,
     Eigen::MatrixXs moments,
-    Eigen::MatrixXs cops)
+    Eigen::MatrixXs cops,
+    int rootHistoryLen,
+    int rootHistoryStride)
 {
   std::vector<ForcePlate> forcePlates;
   int numForcePlates = forces.rows() / 3;
@@ -1862,7 +1946,13 @@ void SubjectOnDiskTrialPass::computeValues(
   }
 
   computeValuesFromForcePlates(
-      skel, timestep, poses, footBodyNames, forcePlates);
+      skel,
+      timestep,
+      poses,
+      footBodyNames,
+      forcePlates,
+      rootHistoryLen,
+      rootHistoryStride);
 }
 
 // This is for allowing the user to set all the values of a pass at once,
@@ -1873,11 +1963,15 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     s_t timestep,
     Eigen::MatrixXs poses,
     std::vector<std::string> footBodyNames,
-    std::vector<ForcePlate> forcePlates)
+    std::vector<ForcePlate> forcePlates,
+    int rootHistoryLen,
+    int rootHistoryStride)
 {
   Eigen::MatrixXs grfTrial
       = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
   Eigen::MatrixXs copTorqueForceTrial
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrialInRootFrame
       = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
 
   // 1. We need to assign the force plates to feet, and compute the total
@@ -1934,15 +2028,25 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
       = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
   Eigen::MatrixXs jointCentersInRootFrame
       = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
+  Eigen::MatrixXs rootSpatialVelInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs rootSpatialAccInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs rootPosHistoryInRootFrame
+      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
+  Eigen::MatrixXs rootEulerHistoryInRootFrame
+      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
 
   ResidualForceHelper helper(skel, footIndices);
   s_t dt = timestep;
+  std::vector<Eigen::Isometry3s> rootTransforms;
   for (int t = 0; t < poses.cols(); t++)
   {
     Eigen::VectorXs q = poses.col(t);
     skel->setPositions(q);
     comPoses.col(t) = skel->getCOM();
     Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
+    rootTransforms.push_back(T_wr);
 
     Eigen::VectorXs worldCenters
         = skel->getJointWorldPositions(skel->getJoints());
@@ -1962,6 +2066,16 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
       vels.col(t) = dq;
       skel->setVelocities(dq);
       comVels.col(t) = skel->getCOMLinearVelocity();
+      if (skel->getRootJoint() != nullptr
+          && skel->getRootJoint()->getNumDofs() == 6)
+      {
+        const Eigen::Vector6s rootSpatialVel
+            = skel->getRootJoint()->getRelativeJacobian() * dq.head<6>();
+        const Eigen::Vector3s rootAngVel = rootSpatialVel.head<3>();
+        rootSpatialVelInRootFrame.col(t).head<3>() = rootAngVel;
+        const Eigen::Vector3s rootLinVel = rootSpatialVel.tail<3>();
+        rootSpatialVelInRootFrame.col(t).tail<3>() = rootLinVel;
+      }
 
       if (t < poses.cols() - 1)
       {
@@ -1984,6 +2098,15 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
         if (skel->getRootJoint()->getNumDofs() == 6)
         {
+          const Eigen::MatrixXs rootJac
+              = skel->getRootJoint()->getRelativeJacobian();
+          const Eigen::Vector6s rootSpatialAcc = rootJac * ddq.head<6>();
+          const Eigen::Vector3s rootAngAcc = rootSpatialAcc.head<3>();
+          rootSpatialAccInRootFrame.col(t).head<3>() = rootAngAcc;
+          const Eigen::Vector3s rootLinAcc
+              = rootSpatialAcc.tail<3>()
+                - (T_wr.linear().transpose() * skel->getGravity());
+          rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
           Eigen::Matrix6s rootJacobianTransposeInverse
               = skel->getRootJoint()
                     ->getRelativeJacobian()
@@ -2021,6 +2144,16 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           Eigen::Vector6s rootWrench
               = math::dAdInvT(T_wr.inverse(), worldWrench);
           groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
+
+          Eigen::Vector3s copWorld = copWrench.head<3>();
+          Eigen::Vector3s torqueWorld = copWrench.segment<3>(3);
+          Eigen::Vector3s forceWorld = copWrench.tail<3>();
+          Eigen::Vector3s copRoot = T_wr.inverse() * copWorld;
+          Eigen::Vector3s torqueRoot = T_wr.linear().transpose() * torqueWorld;
+          Eigen::Vector3s forceRoot = T_wr.linear().transpose() * forceWorld;
+          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9, t) = copRoot;
+          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 3, t) = torqueRoot;
+          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 6, t) = forceRoot;
         }
 
 #ifndef NDEBUG
@@ -2056,6 +2189,27 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     angularResiduals.push_back(angularResidual);
   }
 
+  assert(poses.cols() == rootTransforms.size());
+  for (int t = 0; t < rootTransforms.size(); t++)
+  {
+    Eigen::Isometry3s T_wr = rootTransforms[t];
+
+    for (int reachBack = 0; reachBack < rootHistoryLen; reachBack++)
+    {
+      int reachBackToT = t - rootHistoryStride * reachBack;
+      if (reachBackToT >= 0)
+      {
+        Eigen::Isometry3s T_wb = rootTransforms[reachBackToT];
+
+        Eigen::Isometry3s T_rb = T_wr.inverse() * T_wb;
+        Eigen::Vector3s rootPos = T_rb.translation();
+        Eigen::Vector3s rootEuler = math::matrixToEulerXYZ(T_rb.linear());
+        rootPosHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootPos;
+        rootEulerHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootEuler;
+      }
+    }
+  }
+
   setLinearResidual(linearResiduals);
   setAngularResidual(angularResiduals);
   setPoses(poses);
@@ -2070,8 +2224,13 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   setResidualWrenchInRootFrame(residualWrenchInRootFrame);
   setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
   setGroundBodyCopTorqueForce(copTorqueForceTrial);
+  setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
   setJointCenters(jointCenters);
   setJointCentersInRootFrame(jointCentersInRootFrame);
+  setRootSpatialVelInRootFrame(rootSpatialVelInRootFrame);
+  setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
+  setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
+  setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
 }
 
 // Manual setters that compete with computeValues()
@@ -3401,6 +3560,76 @@ void SubjectOnDiskHeader::writeProcessingPassFrame(
   {
     std::cout << "SubjectOnDisk::writeSubject() passed bad info: trialPoses, "
                  "joint centers, or joint centers in root frame out-of-bounds "
+                 "for trial "
+              << trial << " frame " << t << std::endl;
+  }
+
+  if (mTrials.size() > trial && mTrials[trial]->mTrialPasses.size() > pass
+      && mTrials[trial]->mTrialPasses[pass]->mRootSpatialVelInRootFrame.cols()
+             > t
+      && mTrials[trial]->mTrialPasses[pass]->mRootSpatialVelInRootFrame.rows()
+             == 6
+      && mTrials[trial]->mTrialPasses[pass]->mRootSpatialAccInRootFrame.cols()
+             > t
+      && mTrials[trial]->mTrialPasses[pass]->mRootSpatialAccInRootFrame.rows()
+             == 6)
+  {
+    for (int row = 0; row < 6; row++)
+    {
+      proto->add_root_frame_spatial_velocity(
+          mTrials[trial]->mTrialPasses[pass]->mRootSpatialVelInRootFrame(
+              row, t));
+    }
+    for (int row = 0; row < 6; row++)
+    {
+      proto->add_root_frame_spatial_acceleration(
+          mTrials[trial]->mTrialPasses[pass]->mRootSpatialAccInRootFrame(
+              row, t));
+    }
+  }
+  else
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: root spatial "
+                 "vel or root spatial acc out-of-bounds "
+                 "for trial "
+              << trial << " frame " << t << std::endl;
+  }
+
+  if (mTrials.size() > trial && mTrials[trial]->mTrialPasses.size() > pass
+      && mTrials[trial]->mTrialPasses[pass]->mRootPosHistoryInRootFrame.cols()
+             > t
+      && mTrials[trial]->mTrialPasses[pass]->mRootPosHistoryInRootFrame.rows()
+                 % 3
+             == 0
+      && mTrials[trial]->mTrialPasses[pass]->mRootEulerHistoryInRootFrame.cols()
+             > t
+      && mTrials[trial]->mTrialPasses[pass]->mRootEulerHistoryInRootFrame.rows()
+                 % 3
+             == 0)
+  {
+    for (int row = 0; row < mTrials[trial]
+                                ->mTrialPasses[pass]
+                                ->mRootPosHistoryInRootFrame.rows();
+         row++)
+    {
+      proto->add_root_frame_root_pos_history(
+          mTrials[trial]->mTrialPasses[pass]->mRootPosHistoryInRootFrame(
+              row, t));
+    }
+    for (int row = 0; row < mTrials[trial]
+                                ->mTrialPasses[pass]
+                                ->mRootEulerHistoryInRootFrame.rows();
+         row++)
+    {
+      proto->add_root_frame_root_euler_history(
+          mTrials[trial]->mTrialPasses[pass]->mRootEulerHistoryInRootFrame(
+              row, t));
+    }
+  }
+  else
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: root spatial "
+                 "vel or root spatial acc out-of-bounds "
                  "for trial "
               << trial << " frame " << t << std::endl;
   }
