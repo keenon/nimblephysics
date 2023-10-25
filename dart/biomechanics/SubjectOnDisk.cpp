@@ -651,7 +651,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
   // 1. Open the file
   FILE* file = fopen(mPath.c_str(), "r");
 
-  int linearFrameStart = 0;
+  long linearFrameStart = 0;
   for (int i = 0; i < trial; i++)
   {
     const int pastTrialNumPasses = getTrialNumProcessingPasses(i);
@@ -660,7 +660,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
     linearFrameStart += getTrialLength(i) * pastTrialFrameSize;
   }
   const int numPasses = getTrialNumProcessingPasses(trial);
-  const int frameSize
+  const long frameSize
       = (mSensorFrameSize + (numPasses * mProcessingPassFrameSize));
   linearFrameStart += startFrame * frameSize;
 
@@ -680,7 +680,7 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
   for (int i = 0; i < numFramesToRead; i++)
   {
     // 2. Seek to the right place in the file to read this frame
-    int offsetBytes
+    long offsetBytes
         = mDataSectionStart + (linearFrameStart + (i * stride * frameSize));
 
     std::shared_ptr<Frame> frame = std::make_shared<Frame>();

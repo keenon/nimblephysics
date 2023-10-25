@@ -626,9 +626,9 @@ protected:
   std::string mPath;
   // We cache some very basic data about the accessible bounds of on-disk data,
   // so we don't have to look that up every time.
-  int mDataSectionStart;
-  int mSensorFrameSize;
-  int mProcessingPassFrameSize;
+  long mDataSectionStart;
+  long mSensorFrameSize;
+  long mProcessingPassFrameSize;
 
   std::shared_ptr<SubjectOnDiskHeader> mHeader;
 };

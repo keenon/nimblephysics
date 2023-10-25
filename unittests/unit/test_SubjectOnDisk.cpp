@@ -40,7 +40,7 @@
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
 
-// #define ALL_TESTS
+#define ALL_TESTS
 
 using namespace dart;
 using namespace biomechanics;
@@ -1255,10 +1255,13 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
 }
 #endif
 
+/*
 // #ifdef ALL_TESTS
-TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
+TEST(SubjectOnDisk, READ_LOCAL_TRIAL)
 {
-  SubjectOnDisk read_back("/Users/keenonwerling/Desktop/dev/InferBiomechanics/data/train/Tan2022_Formatted_No_Arm_08.b3d");
+  SubjectOnDisk read_back(
+      "/Users/keenonwerling/Desktop/dev/InferBiomechanics/data/train/"
+      "Moore2015_Formatted_No_Arm_subject8.b3d");
   std::cout << "  Num Trials: " << read_back.getNumTrials() << std::endl;
   std::cout << "  Num Processing Passes: " << read_back.getNumProcessingPasses()
             << std::endl;
@@ -1297,9 +1300,11 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
     skeletons.push_back(read_back.readSkel(pass));
   }
   // Be robust to not filling in skeletons for low-pass-filtered data
-  for (int i = 0; i < skeletons.size(); i++) {
-    if (skeletons[i] == nullptr && i > 0) {
-      skeletons[i] = skeletons[i-1];
+  for (int i = 0; i < skeletons.size(); i++)
+  {
+    if (skeletons[i] == nullptr && i > 0)
+    {
+      skeletons[i] = skeletons[i - 1];
     }
   }
   std::vector<std::string> footBodies = read_back.getGroundForceBodies();
@@ -1327,3 +1332,4 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
   }
 }
 // #endif
+*/
