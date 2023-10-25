@@ -10483,19 +10483,8 @@ void DynamicsFitter::smoothAccelerations(
     // jumping around on wrapping.
     for (int t = 1; t < init->poseTrials[trial].cols(); t++)
     {
-      Eigen::VectorXs pos = init->poseTrials[trial].col(t);
-      for (int j = 0; j < mSkeleton->getNumJoints(); j++)
-      {
-        auto* joint = mSkeleton->getJoint(j);
-        if (joint->getType() == dynamics::EulerJoint::getStaticType())
-        {
-          int start = joint->getDof(0)->getIndexInSkeleton();
-          init->poseTrials[trial].col(t).segment<3>(start)
-              = math::roundEulerAnglesToNearest(
-                  init->poseTrials[trial].col(t).segment<3>(start),
-                  init->poseTrials[trial].col(t - 1).segment<3>(start));
-        }
-      }
+      init->poseTrials[trial].col(t) = mSkeleton->unwrapPositionToNearest(
+          init->poseTrials[trial].col(t), init->poseTrials[trial].col(t - 1));
     }
     int timesteps = init->poseTrials[trial].cols();
     AccelerationSmoother smoother(

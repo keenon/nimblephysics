@@ -1218,6 +1218,11 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
           ::py::arg("dq2"),
           ::py::arg("dq1"))
       .def(
+          "unwrapPositionToNearest",
+          &dart::dynamics::Skeleton::unwrapPositionToNearest,
+          ::py::arg("thisPos"),
+          ::py::arg("lastPos"))
+      .def(
           "getInverseDynamics",
           &dart::dynamics::Skeleton::getInverseDynamics,
           ::py::arg("accelerations"))

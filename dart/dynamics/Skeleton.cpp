@@ -9395,6 +9395,31 @@ Eigen::VectorXs Skeleton::getVelocityDifferences(
 }
 
 //==============================================================================
+/// For rotational joints (euler joints and ball joints), it is possible for
+/// your position to suddenly jump by 360 degrees to an equivalent positions
+/// at a different value for the joint angles. This wreaks havok with
+/// smoothing and lowpass filtering, and so we would like sometimes to be able
+/// to prevent the wrapping, and just pick the representation for our current
+/// joint rotatinos that is as close as possible to our previous joint
+/// positions, without large jumps.
+Eigen::VectorXs Skeleton::unwrapPositionToNearest(
+    Eigen::VectorXs thisPos, Eigen::VectorXs lastPos) const
+{
+  Eigen::VectorXs unwrapped = thisPos;
+  for (int j = 0; j < getNumJoints(); j++)
+  {
+    auto* joint = getJoint(j);
+    if (joint->getType() == dynamics::EulerJoint::getStaticType())
+    {
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start), lastPos.segment<3>(start));
+    }
+  }
+  return unwrapped;
+}
+
+//==============================================================================
 /// This quantifies how much error the inverse dynamics result ended up with.
 s_t Skeleton::ContactInverseDynamicsResult::sumError()
 {

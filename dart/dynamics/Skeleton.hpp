@@ -1910,6 +1910,16 @@ public:
   Eigen::VectorXs getVelocityDifferences(
       const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
+  /// For rotational joints (euler joints and ball joints), it is possible for
+  /// your position to suddenly jump by 360 degrees to an equivalent positions
+  /// at a different value for the joint angles. This wreaks havok with
+  /// smoothing and lowpass filtering, and so we would like sometimes to be able
+  /// to prevent the wrapping, and just pick the representation for our current
+  /// joint rotatinos that is as close as possible to our previous joint
+  /// positions, without large jumps.
+  Eigen::VectorXs unwrapPositionToNearest(
+      Eigen::VectorXs lastPos, Eigen::VectorXs thisPos) const;
+
   //----------------------------------------------------------------------------
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
