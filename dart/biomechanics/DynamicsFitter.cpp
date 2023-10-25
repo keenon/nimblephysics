@@ -9343,170 +9343,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
     {
       ForcePlate& plate = init->forcePlateTrials[trial][i];
-
-      // Try to figure out the coordinate system of the moments data on this
-      // force plate
-
-      int numParallelMoments = 0;
-      int numVerticalMoments = 0;
-      int numWorldMoments = 0;
-      int numOffsetMoments = 0;
-      std::vector<Eigen::Vector3s> copOffsets;
-      for (int t = 0; t < plate.forces.size(); t++)
-      {
-        Eigen::Vector3s f = plate.forces[t];
-        Eigen::Vector3s m = plate.moments[t];
-        Eigen::Vector3s cop = plate.centersOfPressure[t];
-        // Check for the section of the moment that is not parallel with force
-        Eigen::Vector3s parallelComponent
-            = f.normalized().dot(m) * f.normalized();
-        Eigen::Vector3s antiParallelComponent = m - parallelComponent;
-        s_t percentageAntiparallel
-            = antiParallelComponent.norm() / parallelComponent.norm();
-        // Check for the "moment is in world space" interpretation
-        Eigen::Vector3s tau = cop.cross(f);
-        Eigen::Vector3s worldM = m - tau;
-        if (f.norm() < 3 || cop.isZero())
-        {
-          // Zero out this data
-          // plate.forces[t].setZero();
-          // plate.moments[t].setZero();
-        }
-        else if (percentageAntiparallel < 0.1)
-        {
-          // This is parallel GRF data
-          numParallelMoments++;
-        }
-        else if (abs(m(0)) < 1e-5 && abs(m(2)) < 1e-5)
-        {
-          // This is vertical GRF data
-          numVerticalMoments++;
-        }
-        else if (
-            worldM.norm() < m.norm() * 0.3
-            || (worldM.norm() < 15 && worldM.norm() < m.norm()))
-        {
-          // This is parallel GRF data if the moment is interpreted as a world
-          // frame moment
-          numWorldMoments++;
-        }
-        else
-        {
-          numOffsetMoments++;
-
-          Eigen::Vector3s recoveredCop
-              = Eigen::Vector3s(m(2) / f(1), 0, -m(0) / f(1));
-          Eigen::Vector3s copDiff = recoveredCop - cop;
-          copOffsets.push_back(copDiff);
-        }
-      }
-
-      // Now we try to decide how to interpret this force plate
-      if (numParallelMoments >= numOffsetMoments
-          && numParallelMoments >= numVerticalMoments
-          && numParallelMoments >= numWorldMoments)
-      {
-        std::cout << "Interpreting force plate " << i << " in trial " << trial
-                  << " as having centers-of-pressure that are calculated so "
-                     "that remaining moment is PARALLEL to forces."
-                  << std::endl;
-      }
-      else if (
-          numVerticalMoments >= numOffsetMoments
-          && numVerticalMoments >= numParallelMoments
-          && numVerticalMoments >= numWorldMoments)
-      {
-        std::cout << "Interpreting force plate " << i << " in trial " << trial
-                  << " as having centers-of-pressure that are calculated so "
-                     "that remaining moment is VERTICAL."
-                  << std::endl;
-      }
-      else if (
-          numWorldMoments >= numOffsetMoments
-          && numWorldMoments >= numParallelMoments
-          && numWorldMoments >= numVerticalMoments)
-      {
-        std::cout
-            << "Interpreting force plate " << i << " in trial " << trial
-            << " as having moments expressed in WORLD SPACE. We will recompute "
-               "the moments to be expressed at the center of pressure."
-            << std::endl;
-        for (int t = 0; t < plate.forces.size(); t++)
-        {
-          Eigen::Vector3s f = plate.forces[t];
-          Eigen::Vector3s m = plate.moments[t];
-          Eigen::Vector3s cop = plate.centersOfPressure[t];
-          Eigen::Vector3s tau = cop.cross(f);
-          Eigen::Vector3s worldM = m - tau;
-          if (f.norm() < 3 || cop.isZero())
-            continue;
-          plate.moments[t] = worldM;
-        }
-      }
-      else if (
-          numOffsetMoments >= numWorldMoments
-          && numOffsetMoments >= numParallelMoments
-          && numOffsetMoments >= numVerticalMoments)
-      {
-        // Before we pronouce a judgement, we need to compute some statistics
-        // about the CoP offset. If it's consistent around a particular offset,
-        // then we can be confident that's where the force plate is supposed to
-        // offset to. If not, then this is an error case and needs to get zero'd
-        // out.
-        Eigen::Vector3s averageOffset = Eigen::Vector3s::Zero();
-        for (Eigen::Vector3s& v : copOffsets)
-        {
-          averageOffset += v;
-        }
-        averageOffset /= copOffsets.size();
-
-        Eigen::Vector3s offsetVariance = Eigen::Vector3s::Zero();
-        for (Eigen::Vector3s& v : copOffsets)
-        {
-          offsetVariance += (v - averageOffset).cwiseProduct(v - averageOffset);
-        }
-        offsetVariance /= copOffsets.size();
-
-        if (offsetVariance.norm() < 0.2)
-        {
-          std::cout
-              << "Interpreting force plate " << i << " in trial " << trial
-              << " as having moments expressed in OFFSET WORLD SPACE (offset = "
-              << averageOffset(0) << "," << averageOffset(1) << ","
-              << averageOffset(2) << "; variance = " << offsetVariance.norm()
-              << "). We will recompute the "
-                 "moments to be expressed at the center of pressure."
-              << std::endl;
-
-          for (int t = 0; t < plate.forces.size(); t++)
-          {
-            Eigen::Vector3s f = plate.forces[t];
-            Eigen::Vector3s m = plate.moments[t];
-            Eigen::Vector3s cop = plate.centersOfPressure[t];
-            cop += averageOffset;
-            Eigen::Vector3s tau = cop.cross(f);
-            Eigen::Vector3s worldM = m - tau;
-            if (f.norm() < 3 || cop.isZero())
-              continue;
-            plate.moments[t] = worldM;
-          }
-        }
-        else
-        {
-          std::cout
-              << "BAD INPUT DATA DETECTED!! Could not find an interpretation "
-                 "for "
-                 "force plate "
-              << i << " in trial " << trial
-              << " where the moments, forces, and centers of pressure are "
-                 "consistent. Continuing anyways, but EXPECT BAD RESULTS!"
-              << std::endl;
-        }
-      }
-      else
-      {
-        assert(false && "this should be impossible to reach");
-      }
+      plate.detectAndFixCopMomentConvention(trial, i);
     }
   }
   if (anyAntiparallel)
@@ -14018,6 +13855,7 @@ void DynamicsFitter::recomputeGRFs(
         forcePlatesAssignedToContactBody[i][t] = -1;
       }
       int lastStartedTrack = -1;
+      int sumCount = 0;
       Eigen::VectorXs sumSquaredDistances
           = Eigen::VectorXs::Zero(grfBodyNodes.size());
       for (int t = 0; t < poses.cols(); t++)
@@ -14036,12 +13874,12 @@ void DynamicsFitter::recomputeGRFs(
           {
             Eigen::Index closestFoot;
             sumSquaredDistances.minCoeff(&closestFoot);
+            sumSquaredDistances /= sumCount;
 
             // std::cout << "Force Plate " << i << " time range ["
             //           << lastStartedTrack << "," << (t - 1)
             //           << "] Closest foot: " << closestFoot << " with
-            //           distances
-            //           "
+            //           distances "
             //           << sumSquaredDistances.transpose() << std::endl;
 
             // Now assign everything in that track to the foot that was
@@ -14052,6 +13890,7 @@ void DynamicsFitter::recomputeGRFs(
               forcePlatesAssignedToContactBody[i][assignT] = closestFoot;
             }
           }
+          sumCount = 0;
           lastStartedTrack = -1;
           sumSquaredDistances.setZero();
           continue;
@@ -14061,7 +13900,16 @@ void DynamicsFitter::recomputeGRFs(
           lastStartedTrack = t;
         for (int b = 0; b < grfBodyNodes.size(); b++)
         {
-          sumSquaredDistances(b) += (footLocations[t][b] - cop).squaredNorm();
+          // if (i == 0)
+          // {
+          //   std::cout << "Force Plate " << i << " timestep " << t << " foot "
+          //             << b << " location " <<
+          //             (footLocations[t][b]).transpose()
+          //             << " vs cop " << cop.transpose() << " vs f "
+          //             << forcePlates[i].forces[t].transpose() << std::endl;
+          // }
+          sumSquaredDistances(b) += (footLocations[t][b] - cop).norm();
+          sumCount++;
         }
       }
 
@@ -14074,8 +13922,7 @@ void DynamicsFitter::recomputeGRFs(
         // std::cout << "Force Plate " << i << " time range [" <<
         // lastStartedTrack
         //           << "," << (poses.cols() - 1)
-        //           << "] Closest foot: " << closestFoot << " with distances
-        //           "
+        //           << "] Closest foot: " << closestFoot << " with distances "
         //           << sumSquaredDistances.transpose() << std::endl;
 
         // Now assign everything in that track to the foot that was closest
@@ -14116,8 +13963,10 @@ void DynamicsFitter::recomputeGRFs(
       }
       else if (assignedToFeet.size() == 1)
       {
+        // #ifndef NDEBUG
         std::cout << "Assigning force plate " << i << " to foot "
                   << assignedToFeet[0] << std::endl;
+        // #endif
         // This force plate is only ever assigned to a single foot, so we can
         // assign all timesteps to that foot
         for (int t = 0; t < poses.cols(); t++)

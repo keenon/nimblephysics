@@ -62,6 +62,16 @@ void ForcePlate(py::module& m)
       .def_readwrite("moments", &dart::biomechanics::ForcePlate::moments)
       .def_readwrite("forces", &dart::biomechanics::ForcePlate::forces)
       .def(
+          "detectAndFixCopMomentConvention",
+          &dart::biomechanics::ForcePlate::detectAndFixCopMomentConvention,
+          ::py::arg("trial") = -1,
+          ::py::arg("i") = -1)
+      .def(
+          "autodetectNoiseThresholdAndClip",
+          &dart::biomechanics::ForcePlate::autodetectNoiseThresholdAndClip,
+          ::py::arg("percentOfMaxToDetectThumb") = 0.25,
+          ::py::arg("percentOfMaxToCheckThumbRightEdge") = 0.35)
+      .def(
           "trim",
           &dart::biomechanics::ForcePlate::trim,
           ::py::arg("newStartTime"),

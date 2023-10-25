@@ -366,7 +366,6 @@ void SubjectOnDisk::writeB3D(
 void SubjectOnDisk::loadAllFrames()
 {
   const int dofs = getNumDofs();
-  const int joints = getNumJoints();
   const int numContactBodies = getGroundForceBodies().size();
 
   for (int trial = 0; trial < getNumTrials(); trial++)
@@ -383,6 +382,40 @@ void SubjectOnDisk::loadAllFrames()
         markerMap[pair.first] = pair.second;
       }
       mHeader->mTrials[trial]->mMarkerObservations.push_back(markerMap);
+    }
+
+    const int numPlates = getNumForcePlates(trial);
+    for (int plate = 0; plate < numPlates; plate++)
+    {
+      mHeader->mTrials[trial]->mForcePlates.push_back(ForcePlate());
+      mHeader->mTrials[trial]->mForcePlates[plate].corners
+          = getForcePlateCorners(trial, plate);
+    }
+
+    for (int t = 0; t < frames.size(); t++)
+    {
+      for (int plate = 0; plate < numPlates; plate++)
+      {
+        mHeader->mTrials[trial]
+            ->mForcePlates[plate]
+            .centersOfPressure.push_back(
+                frames[t]->rawForcePlateCenterOfPressures[plate]);
+        mHeader->mTrials[trial]->mForcePlates[plate].forces.push_back(
+            frames[t]->rawForcePlateForces[plate]);
+        mHeader->mTrials[trial]->mForcePlates[plate].moments.push_back(
+            frames[t]->rawForcePlateTorques[plate]);
+        mHeader->mTrials[trial]->mForcePlates[plate].timestamps.push_back(
+            frames[t]->t * getTrialTimestep(trial));
+      }
+    }
+    for (int plate = 0; plate < numPlates; plate++)
+    {
+      mHeader->mTrials[trial]
+          ->mForcePlates[plate]
+          .autodetectNoiseThresholdAndClip();
+      mHeader->mTrials[trial]
+          ->mForcePlates[plate]
+          .detectAndFixCopMomentConvention(trial, plate);
     }
 
     for (int pass = 0; pass < getTrialNumProcessingPasses(trial); pass++)
@@ -411,9 +444,15 @@ void SubjectOnDisk::loadAllFrames()
           = Eigen::MatrixXs::Zero(numContactBodies * 6, len);
       passProto->mGroundBodyCopTorqueForceInRootFrame
           = Eigen::MatrixXs::Zero(numContactBodies * 9, len);
-      passProto->mJointCenters = Eigen::MatrixXs::Zero(joints * 3, len);
+      const int jointCenterDim
+          = frames.size() > 0
+                ? frames[0]->processingPasses.size() > 0
+                      ? frames[0]->processingPasses[0].jointCenters.size()
+                      : 0
+                : 0;
+      passProto->mJointCenters = Eigen::MatrixXs::Zero(jointCenterDim, len);
       passProto->mJointCentersInRootFrame
-          = Eigen::MatrixXs::Zero(joints * 3, len);
+          = Eigen::MatrixXs::Zero(jointCenterDim, len);
 
       for (int t = 0; t < frames.size(); t++)
       {
@@ -511,6 +550,11 @@ std::vector<ForcePlate> SubjectOnDisk::readForcePlates(int trial)
           frames[t]->t * getTrialTimestep(trial));
     }
   }
+  for (int plate = 0; plate < numPlates; plate++)
+  {
+    plates[plate].autodetectNoiseThresholdAndClip();
+    plates[plate].detectAndFixCopMomentConvention(trial, plate);
+  }
 
   return plates;
 }
@@ -532,6 +576,13 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
   OpenSimFile osimParsed
       = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
+  if (!(osimParsed.skeleton))
+  {
+    std::cout << "Failed to parse Osim XML: \""
+              << mHeader->mPasses[passNumberToLoad]->mOpenSimFileText << "\""
+              << std::endl;
+    return nullptr;
+  }
   osimParsed.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
 
   return osimParsed.skeleton;
@@ -1965,7 +2016,9 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     std::vector<std::string> footBodyNames,
     std::vector<ForcePlate> forcePlates,
     int rootHistoryLen,
-    int rootHistoryStride)
+    int rootHistoryStride,
+    Eigen::MatrixXs explicitVels,
+    Eigen::MatrixXs explicitAccs)
 {
   Eigen::MatrixXs grfTrial
       = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
@@ -2012,8 +2065,18 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   std::vector<s_t> angularResiduals;
   Eigen::MatrixXs vels
       = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  if (explicitVels.cols() == poses.cols()
+      && explicitVels.rows() == poses.rows())
+  {
+    vels = explicitVels;
+  }
   Eigen::MatrixXs accs
       = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  if (explicitAccs.cols() == poses.cols()
+      && explicitAccs.rows() == poses.rows())
+  {
+    accs = explicitAccs;
+  }
   Eigen::MatrixXs taus
       = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
   Eigen::MatrixXs comPoses = Eigen::MatrixXs::Zero(3, poses.cols());
@@ -2061,9 +2124,17 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     s_t angularResidual = 0.0;
     if (t > 0)
     {
-      Eigen::VectorXs dq
-          = skel->getPositionDifferences(poses.col(t), poses.col(t - 1)) / dt;
-      vels.col(t) = dq;
+      if (explicitVels.cols() == poses.cols()
+          && explicitVels.rows() == poses.rows())
+      {
+        // Do nothing
+      }
+      else
+      {
+        vels.col(t)
+            = skel->getPositionDifferences(poses.col(t), poses.col(t - 1)) / dt;
+      }
+      Eigen::VectorXs dq = vels.col(t);
       skel->setVelocities(dq);
       comVels.col(t) = skel->getCOMLinearVelocity();
       if (skel->getRootJoint() != nullptr
@@ -2079,15 +2150,23 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
       if (t < poses.cols() - 1)
       {
-        Eigen::VectorXs ddq
-            = (skel->getPositionDifferences(poses.col(t + 1), poses.col(t))
-               - skel->getPositionDifferences(poses.col(t), poses.col(t - 1)))
-              / (dt * dt);
+        Eigen::VectorXs ddq;
+        if (explicitAccs.cols() == poses.cols()
+            && explicitAccs.rows() == poses.rows())
+        {
+          ddq = explicitAccs.col(t);
+        }
+        else
+        {
+          ddq = (skel->getPositionDifferences(poses.col(t + 1), poses.col(t))
+                 - skel->getPositionDifferences(poses.col(t), poses.col(t - 1)))
+                / (dt * dt);
+        }
         Eigen::VectorXs tau
             = helper.calculateInverseDynamics(q, dq, ddq, grfTrial.col(t));
         Eigen::Vector6s residual = tau.head<6>();
-        linearResidual = residual.head<3>().norm();
-        angularResidual = residual.tail<3>().norm();
+        angularResidual = residual.head<3>().norm();
+        linearResidual = residual.tail<3>().norm();
 
         accs.col(t) = ddq;
         taus.col(t) = tau;
@@ -2436,6 +2515,43 @@ void SubjectOnDiskTrialPass::write(
   }
 }
 
+void SubjectOnDiskTrialPass::copyValuesFrom(
+    std::shared_ptr<SubjectOnDiskTrialPass> other)
+{
+  mType = other->mType;
+  mDofPositionsObserved = other->mDofPositionsObserved;
+  mDofVelocitiesFiniteDifferenced = other->mDofVelocitiesFiniteDifferenced;
+  mDofAccelerationFiniteDifferenced = other->mDofAccelerationFiniteDifferenced;
+  mMarkerRMS = other->mMarkerRMS;
+  mMarkerMax = other->mMarkerMax;
+  mLowpassCutoffFrequency = other->mLowpassCutoffFrequency;
+  mLowpassFilterOrder = other->mLowpassFilterOrder;
+  mForcePlateCutoffs = other->mForcePlateCutoffs;
+  mLinearResidual = other->mLinearResidual;
+  mAngularResidual = other->mAngularResidual;
+  mPos = other->mPos;
+  mVel = other->mVel;
+  mAcc = other->mAcc;
+  mTaus = other->mTaus;
+  mGroundBodyWrenches = other->mGroundBodyWrenches;
+  mGroundBodyCopTorqueForce = other->mGroundBodyCopTorqueForce;
+  mComPoses = other->mComPoses;
+  mComVels = other->mComVels;
+  mComAccs = other->mComAccs;
+  mComAccsInRootFrame = other->mComAccsInRootFrame;
+  mResidualWrenchInRootFrame = other->mResidualWrenchInRootFrame;
+  mGroundBodyWrenchesInRootFrame = other->mGroundBodyWrenchesInRootFrame;
+  mGroundBodyCopTorqueForceInRootFrame
+      = other->mGroundBodyCopTorqueForceInRootFrame;
+  mJointCenters = other->mJointCenters;
+  mJointCentersInRootFrame = other->mJointCentersInRootFrame;
+  mRootSpatialVelInRootFrame = other->mRootSpatialVelInRootFrame;
+  mRootSpatialAccInRootFrame = other->mRootSpatialAccInRootFrame;
+  mRootPosHistoryInRootFrame = other->mRootPosHistoryInRootFrame;
+  mRootEulerHistoryInRootFrame = other->mRootEulerHistoryInRootFrame;
+  mJointsMaxVelocity = other->mJointsMaxVelocity;
+}
+
 SubjectOnDiskTrial::SubjectOnDiskTrial()
   : mName(""),
     mTimestep(0.01),
@@ -2457,6 +2573,11 @@ void SubjectOnDiskTrial::setTimestep(s_t timestep)
   mTimestep = timestep;
 }
 
+s_t SubjectOnDiskTrial::getTimestep()
+{
+  return mTimestep;
+}
+
 void SubjectOnDiskTrial::setTrialTags(std::vector<std::string> trialTags)
 {
   mTrialTags = trialTags;
@@ -2470,6 +2591,11 @@ void SubjectOnDiskTrial::setOriginalTrialName(const std::string& name)
 void SubjectOnDiskTrial::setSplitIndex(int split)
 {
   mSplitIndex = split;
+}
+
+std::vector<MissingGRFReason> SubjectOnDiskTrial::getMissingGRFReason()
+{
+  return mMissingGRFReason;
 }
 
 void SubjectOnDiskTrial::setMissingGRFReason(
@@ -2492,8 +2618,6 @@ void SubjectOnDiskTrial::setMarkerNamesGuessed(bool markersGuessed)
 void SubjectOnDiskTrial::setMarkerObservations(
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations)
 {
-  std::cout << "setMarkerObservations to length: " << markerObservations.size()
-            << std::endl;
   mMarkerObservations = markerObservations;
 }
 
@@ -2524,6 +2648,11 @@ void SubjectOnDiskTrial::setExoTorques(
 void SubjectOnDiskTrial::setForcePlates(std::vector<ForcePlate> forcePlates)
 {
   mForcePlates = forcePlates;
+}
+
+std::vector<ForcePlate> SubjectOnDiskTrial::getForcePlates()
+{
+  return mForcePlates;
 }
 
 std::shared_ptr<SubjectOnDiskTrialPass> SubjectOnDiskTrial::addPass()
@@ -2697,10 +2826,20 @@ void SubjectOnDiskPassHeader::setProcessingPassType(ProcessingPassType type)
   mType = type;
 }
 
+ProcessingPassType SubjectOnDiskPassHeader::getProcessingPassType()
+{
+  return mType;
+}
+
 void SubjectOnDiskPassHeader::setOpenSimFileText(
     const std::string& openSimFileText)
 {
   mOpenSimFileText = openSimFileText;
+}
+
+std::string SubjectOnDiskPassHeader::getOpenSimFileText()
+{
+  return mOpenSimFileText;
 }
 
 void SubjectOnDiskPassHeader::write(dart::proto::SubjectOnDiskPass* proto)
@@ -2827,6 +2966,12 @@ std::vector<std::shared_ptr<SubjectOnDiskTrial>>
 SubjectOnDiskHeader::getTrials()
 {
   return mTrials;
+}
+
+void SubjectOnDiskHeader::setTrials(
+    std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials)
+{
+  mTrials = trials;
 }
 
 void SubjectOnDiskHeader::recomputeColumnNames()

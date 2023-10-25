@@ -506,6 +506,10 @@ Note that these are specified in the local body frame, acting on the body at its
             m, "SubjectOnDiskTrialPass")
             .def(::py::init<>())
             .def(
+                "copyValuesFrom",
+                &dart::biomechanics::SubjectOnDiskTrialPass::copyValuesFrom,
+                ::py::arg("other"))
+            .def(
                 "setType",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setType,
                 ::py::arg("type"))
@@ -575,7 +579,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("footBodyNames"),
                 ::py::arg("forcePlates"),
                 ::py::arg("rootHistoryLen") = 5,
-                ::py::arg("rootHistoryStride") = 1)
+                ::py::arg("rootHistoryStride") = 1,
+                ::py::arg("explicitVels") = Eigen::MatrixXs::Zero(0, 0),
+                ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0))
             .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
@@ -731,6 +737,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setTimestep,
                 ::py::arg("timestep"))
             .def(
+                "getTimestep",
+                &dart::biomechanics::SubjectOnDiskTrial::getTimestep)
+            .def(
                 "setTrialTags",
                 &dart::biomechanics::SubjectOnDiskTrial::setTrialTags,
                 ::py::arg("trialTags"))
@@ -746,6 +755,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,
                 ::py::arg("missingGRFReason"))
+            .def(
+                "getMissingGRFReason",
+                &dart::biomechanics::SubjectOnDiskTrial::getMissingGRFReason)
             .def(
                 "setCustomValues",
                 &dart::biomechanics::SubjectOnDiskTrial::setCustomValues,
@@ -779,6 +791,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setForcePlates,
                 ::py::arg("forcePlates"))
             .def(
+                "getForcePlates",
+                &dart::biomechanics::SubjectOnDiskTrial::getForcePlates)
+            .def(
                 "addPass",
                 &dart::biomechanics::SubjectOnDiskTrial::addPass,
                 "This creates a new :code:`SubjectOnDiskTrialPass` for this "
@@ -802,13 +817,21 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskPassHeader::
                     setProcessingPassType,
                 ::py::arg("type"))
+            .def(
+                "getProcessingPassType",
+                &dart::biomechanics::SubjectOnDiskPassHeader::
+                    getProcessingPassType)
             //   SubjectOnDiskPassHeader& setOpenSimFileText(
             //       const std::string& openSimFileText);
             .def(
                 "setOpenSimFileText",
                 &dart::biomechanics::SubjectOnDiskPassHeader::
                     setOpenSimFileText,
-                ::py::arg("openSimFileText"));
+                ::py::arg("openSimFileText"))
+            .def(
+                "getOpenSimFileText",
+                &dart::biomechanics::SubjectOnDiskPassHeader::
+                    getOpenSimFileText);
 
   auto subjectOnDiskHeader
       = ::py::class_<
@@ -870,6 +893,10 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::getTrials)
+            .def(
+                "setTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::setTrials,
+                ::py::arg("trials"))
             .def(
                 "recomputeColumnNames",
                 &dart::biomechanics::SubjectOnDiskHeader::recomputeColumnNames);

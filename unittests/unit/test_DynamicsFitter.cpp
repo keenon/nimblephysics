@@ -5815,6 +5815,93 @@ TEST(DynamicsFitter, TEST_MULTIMASS_ZERO_RESIDUALS)
 }
 #endif
 
+/*
+#ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, PROCESS_GRFS_CHECK)
+{
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/Moore/unscaled_generic.osim");
+  standard.skeleton->autogroupSymmetricSuffixes();
+  standard.skeleton->autodetectScaleGroupAxisFlips(2);
+  std::shared_ptr<dynamics::Skeleton> skel = standard.skeleton;
+
+  std::vector<ForcePlate> forcePlates
+      = OpenSimParser::loadGRF("dart://sample/grf/Moore/grf.mot");
+  Eigen::MatrixXs poses
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), forcePlates[0].forces.size());
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  std::vector<int> footIndices;
+  std::vector<dynamics::BodyNode*> footBodies;
+  for (std::string footName : footNames)
+  {
+    dynamics::BodyNode* footBody = skel->getBodyNode(footName);
+    footBodies.push_back(footBody);
+    footIndices.push_back(footBody->getIndexInSkeleton());
+  }
+  std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    forcePlates[i].autodetectNoiseThresholdAndClip();
+    forcePlates[i].detectAndFixCopMomentConvention();
+    forcePlatesAssignedToContactBody.emplace_back();
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      forcePlatesAssignedToContactBody
+          [forcePlatesAssignedToContactBody.size() - 1]
+              .push_back(0);
+    }
+  }
+  Eigen::MatrixXs grfTrial
+      = Eigen::MatrixXs::Zero(footBodies.size() * 6, poses.cols());
+
+  DynamicsFitter::recomputeGRFs(
+      forcePlates,
+      poses,
+      footBodies,
+      std::vector<int>(),
+      forcePlatesAssignedToContactBody,
+      grfTrial,
+      skel);
+
+  s_t groundHeight = 0.0;
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    for (int i = 0; i < footIndices.size(); i++)
+    {
+      Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
+      Eigen::Vector9s copWrench
+          = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+      Eigen::Vector3s cop = copWrench.head<3>();
+
+      s_t closestDistance = 1e9;
+      int closestPlate = 0;
+      for (int p = 0; p < forcePlates.size(); p++)
+      {
+        s_t dist = (forcePlates[p].centersOfPressure[t] - cop).norm();
+        if (dist < closestDistance)
+        {
+          closestDistance = dist;
+          closestPlate = p;
+        }
+      }
+      if (closestDistance > 0.10)
+      {
+        std::cout << "Warning: cop " << cop.transpose() << " is "
+                  << closestDistance << "m away from cop on original plate "
+                  << closestPlate << std::endl;
+        EXPECT_TRUE(closestDistance <= 0.10);
+        return;
+      }
+    }
+  }
+}
+#endif
+*/
+
 #ifdef ALL_TESTS
 TEST(DynamicsFitter, WRENCH_ASSIGNMENT)
 {

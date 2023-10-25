@@ -1183,7 +1183,7 @@ TEST(SubjectOnDisk, READ_BACK_DATA)
 }
 #endif
 
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
 {
   auto newRetriever = std::make_shared<utils::CompositeResourceRetriever>();
@@ -1228,6 +1228,79 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
   for (int pass = 0; pass < read_back.getNumProcessingPasses(); pass++)
   {
     skeletons.push_back(read_back.readSkel(pass));
+  }
+  std::vector<std::string> footBodies = read_back.getGroundForceBodies();
+
+  for (int trial = 0; trial < read_back.getNumTrials(); trial++)
+  {
+    std::vector<ForcePlate> forcePlates = read_back.readForcePlates(trial);
+    s_t timestep = read_back.getTrialTimestep(trial);
+    for (int pass = 0; pass < read_back.getTrialNumProcessingPasses(trial);
+         pass++)
+    {
+      read_back.getHeaderProto()
+          ->getTrials()[trial]
+          ->getPasses()[pass]
+          ->computeValuesFromForcePlates(
+              skeletons[pass],
+              timestep,
+              read_back.getHeaderProto()
+                  ->getTrials()[trial]
+                  ->getPasses()[pass]
+                  ->getPoses(),
+              footBodies,
+              forcePlates);
+    }
+  }
+}
+#endif
+
+// #ifdef ALL_TESTS
+TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
+{
+  SubjectOnDisk read_back("/Users/keenonwerling/Desktop/dev/InferBiomechanics/data/train/Tan2022_Formatted_No_Arm_08.b3d");
+  std::cout << "  Num Trials: " << read_back.getNumTrials() << std::endl;
+  std::cout << "  Num Processing Passes: " << read_back.getNumProcessingPasses()
+            << std::endl;
+  std::cout << "  Num Dofs: " << read_back.getNumDofs() << std::endl;
+
+  for (int t = 0; t < read_back.getNumTrials(); t++)
+  {
+    std::cout << "  Trial " << t << ":" << std::endl;
+    std::cout << "    Name: " << read_back.getTrialName(t) << std::endl;
+
+    for (int p = 0; p < read_back.getTrialNumProcessingPasses(t); p++)
+    {
+      std::cout << "    Processing pass " << p << ":" << std::endl;
+
+      // Since std::mean doesn't exist, you might need to compute the mean
+      // yourself or use an alternative function. For the sake of this example,
+      // I'll assume you have a utility function called computeMean.
+      std::cout << "      Marker RMS: "
+                << computeMean(read_back.getTrialMarkerRMSs(t, p)) << std::endl;
+      std::cout << "      Marker Max: "
+                << computeMean(read_back.getTrialMarkerMaxs(t, p)) << std::endl;
+      std::cout << "      Linear Residual: "
+                << computeMean(read_back.getTrialLinearResidualNorms(t, p))
+                << std::endl;
+      std::cout << "      Angular Residual: "
+                << computeMean(read_back.getTrialAngularResidualNorms(t, p))
+                << std::endl;
+    }
+  }
+
+  read_back.loadAllFrames();
+
+  std::vector<std::shared_ptr<dynamics::Skeleton>> skeletons;
+  for (int pass = 0; pass < read_back.getNumProcessingPasses(); pass++)
+  {
+    skeletons.push_back(read_back.readSkel(pass));
+  }
+  // Be robust to not filling in skeletons for low-pass-filtered data
+  for (int i = 0; i < skeletons.size(); i++) {
+    if (skeletons[i] == nullptr && i > 0) {
+      skeletons[i] = skeletons[i-1];
+    }
   }
   std::vector<std::string> footBodies = read_back.getGroundForceBodies();
 

@@ -179,7 +179,9 @@ public:
       std::vector<ForcePlate> forcePlates,
       // How much history to use for the root position and orientation
       int rootHistoryLen = 5,
-      int rootHistoryStride = 1);
+      int rootHistoryStride = 1,
+      Eigen::MatrixXs explicitVels = Eigen::MatrixXs::Zero(0, 0),
+      Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0));
 
   // Manual setters (and getters) that compete with computeValues()
   void setLinearResidual(std::vector<s_t> linearResidual);
@@ -238,6 +240,8 @@ public:
   void read(const proto::SubjectOnDiskTrialProcessingPassHeader& proto);
   void write(proto::SubjectOnDiskTrialProcessingPassHeader* proto);
 
+  void copyValuesFrom(std::shared_ptr<SubjectOnDiskTrialPass> other);
+
 protected:
   // This data is included in the header
   ProcessingPassType mType;
@@ -293,9 +297,11 @@ public:
   SubjectOnDiskTrial();
   void setName(const std::string& name);
   void setTimestep(s_t timestep);
+  s_t getTimestep();
   void setTrialTags(std::vector<std::string> trialTags);
   void setOriginalTrialName(const std::string& name);
   void setSplitIndex(int split);
+  std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
   void setMarkerNamesGuessed(bool markersGuessed);
@@ -309,6 +315,7 @@ public:
       std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations);
   void setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
   void setForcePlates(std::vector<ForcePlate> forcePlates);
+  std::vector<ForcePlate> getForcePlates();
   std::shared_ptr<SubjectOnDiskTrialPass> addPass();
   std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> getPasses();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
@@ -363,7 +370,9 @@ class SubjectOnDiskPassHeader
 public:
   SubjectOnDiskPassHeader();
   void setProcessingPassType(ProcessingPassType type);
+  ProcessingPassType getProcessingPassType();
   void setOpenSimFileText(const std::string& openSimFileText);
+  std::string getOpenSimFileText();
   void write(dart::proto::SubjectOnDiskPass* proto);
   void read(const dart::proto::SubjectOnDiskPass& proto);
 
@@ -398,6 +407,7 @@ public:
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
   std::vector<std::shared_ptr<SubjectOnDiskTrial>> getTrials();
+  void setTrials(std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials);
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
   void read(const dart::proto::SubjectOnDiskHeader& proto);
