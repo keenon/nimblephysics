@@ -140,7 +140,8 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
   return notMissingGRF;
 }
 
-SubjectOnDisk::SubjectOnDisk(const std::string& path) : mPath(path)
+SubjectOnDisk::SubjectOnDisk(const std::string& path)
+  : mPath(path), mLoadedAllFrames(false)
 {
   // 1. Open the file
   FILE* file = fopen(path.c_str(), "r");
@@ -363,8 +364,14 @@ void SubjectOnDisk::writeB3D(
 
 /// This loads all the frames of data, and fills in the processing pass data
 /// matrices in the proto header classes.
-void SubjectOnDisk::loadAllFrames()
+void SubjectOnDisk::loadAllFrames(bool doNotStandardizeForcePlateData)
 {
+  if (mLoadedAllFrames)
+  {
+    return;
+  }
+  mLoadedAllFrames = true;
+
   const int dofs = getNumDofs();
   const int numContactBodies = getGroundForceBodies().size();
 
@@ -408,14 +415,17 @@ void SubjectOnDisk::loadAllFrames()
             frames[t]->t * getTrialTimestep(trial));
       }
     }
-    for (int plate = 0; plate < numPlates; plate++)
+    if (!doNotStandardizeForcePlateData)
     {
-      mHeader->mTrials[trial]
-          ->mForcePlates[plate]
-          .autodetectNoiseThresholdAndClip();
-      mHeader->mTrials[trial]
-          ->mForcePlates[plate]
-          .detectAndFixCopMomentConvention(trial, plate);
+      for (int plate = 0; plate < numPlates; plate++)
+      {
+        mHeader->mTrials[trial]
+            ->mForcePlates[plate]
+            .autodetectNoiseThresholdAndClip();
+        mHeader->mTrials[trial]
+            ->mForcePlates[plate]
+            .detectAndFixCopMomentConvention(trial, plate);
+      }
     }
 
     for (int pass = 0; pass < getTrialNumProcessingPasses(trial); pass++)
@@ -453,6 +463,19 @@ void SubjectOnDisk::loadAllFrames()
       passProto->mJointCenters = Eigen::MatrixXs::Zero(jointCenterDim, len);
       passProto->mJointCentersInRootFrame
           = Eigen::MatrixXs::Zero(jointCenterDim, len);
+      passProto->mRootSpatialVelInRootFrame = Eigen::MatrixXs::Zero(6, len);
+      passProto->mRootSpatialAccInRootFrame = Eigen::MatrixXs::Zero(6, len);
+      int historyDim = frames.size() > 0
+                           ? frames[0]->processingPasses.size() > 0
+                                 ? frames[0]
+                                       ->processingPasses[0]
+                                       .rootEulerHistoryInRootFrame.size()
+                                 : 0
+                           : 0;
+      passProto->mRootPosHistoryInRootFrame
+          = Eigen::MatrixXs::Zero(historyDim, len);
+      passProto->mRootEulerHistoryInRootFrame
+          = Eigen::MatrixXs::Zero(historyDim, len);
 
       for (int t = 0; t < frames.size(); t++)
       {
@@ -510,6 +533,18 @@ void SubjectOnDisk::loadAllFrames()
             = frames[t]->processingPasses[pass].jointCenters;
         passProto->mJointCentersInRootFrame.col(t)
             = frames[t]->processingPasses[pass].jointCentersInRootFrame;
+        passProto->mRootSpatialVelInRootFrame.col(t).head<3>()
+            = frames[t]->processingPasses[pass].rootAngularVelInRootFrame;
+        passProto->mRootSpatialVelInRootFrame.col(t).tail<3>()
+            = frames[t]->processingPasses[pass].rootLinearVelInRootFrame;
+        passProto->mRootSpatialAccInRootFrame.col(t).head<3>()
+            = frames[t]->processingPasses[pass].rootAngularAccInRootFrame;
+        passProto->mRootSpatialAccInRootFrame.col(t).tail<3>()
+            = frames[t]->processingPasses[pass].rootLinearAccInRootFrame;
+        passProto->mRootPosHistoryInRootFrame.col(t)
+            = frames[t]->processingPasses[pass].rootPosHistoryInRootFrame;
+        passProto->mRootEulerHistoryInRootFrame.col(t)
+            = frames[t]->processingPasses[pass].rootEulerHistoryInRootFrame;
       }
     }
   }

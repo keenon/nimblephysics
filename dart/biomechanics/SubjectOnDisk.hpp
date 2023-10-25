@@ -486,7 +486,7 @@ public:
 
   /// This loads all the frames of data, and fills in the processing pass data
   /// matrices in the proto header classes.
-  void loadAllFrames();
+  void loadAllFrames(bool doNotStandardizeForcePlateData = false);
 
   /// This returns the raw proto header for this subject, which can be used to
   /// write out a new B3D file
@@ -629,6 +629,7 @@ protected:
   long mDataSectionStart;
   long mSensorFrameSize;
   long mProcessingPassFrameSize;
+  bool mLoadedAllFrames;
 
   std::shared_ptr<SubjectOnDiskHeader> mHeader;
 };

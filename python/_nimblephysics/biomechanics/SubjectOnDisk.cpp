@@ -713,6 +713,42 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     getJointCentersInRootFrame)
             .def(
+                "setRootSpatialVelInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootSpatialVelInRootFrame,
+                ::py::arg("spatialVel"))
+            .def(
+                "getRootSpatialVelInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootSpatialVelInRootFrame)
+            .def(
+                "setRootSpatialAccInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootSpatialAccInRootFrame,
+                ::py::arg("spatialAcc"))
+            .def(
+                "getRootSpatialAccInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootSpatialAccInRootFrame)
+            .def(
+                "setRootPosHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootPosHistoryInRootFrame,
+                ::py::arg("rootHistory"))
+            .def(
+                "getRootPosHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootPosHistoryInRootFrame)
+            .def(
+                "setRootEulerHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootEulerHistoryInRootFrame,
+                ::py::arg("rootHistory"))
+            .def(
+                "getRootEulerHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootEulerHistoryInRootFrame)
+            .def(
                 "setResamplingMatrix",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setResamplingMatrix,
@@ -924,6 +960,7 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "loadAllFrames",
                 &dart::biomechanics::SubjectOnDisk::loadAllFrames,
+                ::py::arg("doNotStandardizeForcePlateData") = false,
                 "This loads all the frames of data, and fills in the "
                 "processing pass data matrices in the proto header classes.")
             .def(
