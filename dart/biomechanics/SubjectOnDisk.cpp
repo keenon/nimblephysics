@@ -902,12 +902,8 @@ void Frame::readSensorsFromProto(
     }
     customValues.emplace_back(header.mCustomValueNames[i], customValue);
   }
-  int numForcePlates = 0;
-  if (header.mTrials.size() > trial)
-  {
-    numForcePlates = header.mTrials[trial]->mNumForcePlates;
-  }
-  for (int i = 0; i < numForcePlates; i++)
+  int maxNumForcePlates = proto->raw_force_plate_cop_size() / 3;
+  for (int i = 0; i < maxNumForcePlates; i++)
   {
     Eigen::Vector3s forceCop(
         proto->raw_force_plate_cop(i * 3 + 0),
@@ -923,9 +919,9 @@ void Frame::readSensorsFromProto(
         proto->raw_force_plate_force(i * 3 + 2));
     if (!forceCop.hasNaN() && !forceTorques.hasNaN() && !force.hasNaN())
     {
-      rawForcePlateCenterOfPressures.push_back(forceCop);
-      rawForcePlateTorques.push_back(forceTorques);
-      rawForcePlateForces.push_back(force);
+      this->rawForcePlateCenterOfPressures.push_back(forceCop);
+      this->rawForcePlateTorques.push_back(forceTorques);
+      this->rawForcePlateForces.push_back(force);
     }
   }
 }
@@ -2231,26 +2227,28 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
               = rootJacobianTransposeInverse * residual;
         }
 
-        // Estimate ground height from recorded CoPs, for later CoP calculations
-        // TODO: this assumes that all contacts on this frame are at the same
-        // height
-        s_t groundHeight = 0.0;
-        if (forcePlates.size() > 0)
-        {
-          for (int i = 0; i < forcePlates.size(); i++)
-          {
-            if (forcePlates.at(i).centersOfPressure.size() > t
-                && !forcePlates.at(i).centersOfPressure.at(t).hasNaN()
-                && forcePlates.at(i).forces.size() > t
-                && forcePlates.at(i).forces.at(t).norm() > 1e-8)
-            {
-              groundHeight = forcePlates.at(i).centersOfPressure.at(t)(1);
-            }
-          }
-        }
-
         for (int i = 0; i < footIndices.size(); i++)
         {
+          // Estimate ground height from recorded CoPs, for later CoP
+          // calculations
+          s_t groundHeight = 0.0;
+          if (forcePlates.size() > 0)
+          {
+            for (int f = 0; f < forcePlates.size(); f++)
+            {
+              if (forcePlates.at(f).centersOfPressure.size() > t
+                  && !forcePlates.at(f).centersOfPressure.at(t).hasNaN()
+                  && forcePlates.at(f).forces.size() > t
+                  && forcePlates.at(f).forces.at(t).norm() > 1e-8
+                  // We want this force plate to be assigned to this body at
+                  // this frame, or else it doesn't count
+                  && forcePlatesAssignedToContactBody.at(f).at(t) == i)
+              {
+                groundHeight = forcePlates.at(f).centersOfPressure.at(t)(1);
+              }
+            }
+          }
+
           Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
           Eigen::Vector9s copWrench
               = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
