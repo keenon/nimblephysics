@@ -11,6 +11,7 @@ type NimbleStandaloneReactProps = {
   onPlayPause?: (playing: boolean) => void;
   frame?: number;
   onFrameChange?: (frame: number) => void;
+  backgroundColor?: string;
 }
 
 const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.ReactElement) = (props: NimbleStandaloneReactProps) => {
@@ -79,6 +80,16 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
       }
     }
   }, [props.frame]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.backgroundColor != null && pr.backgroundColor != gui.view.getBackgroundColor()) {
+        gui.view.setBackgroundColor(pr.backgroundColor);
+      }
+    }
+  }, [props.backgroundColor]);
 
   return React.createElement(
     "div",

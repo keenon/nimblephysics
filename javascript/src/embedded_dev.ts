@@ -19,6 +19,7 @@ const ReactTestBed = () => {
   const [loadingProgress, setLoadingProgress] = useState(0.0);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState(false);
 
   let children = [];
   children.push(React.createElement("button", {
@@ -57,6 +58,12 @@ const ReactTestBed = () => {
       },
       key: 'loaded'
     }, loaded ? "Set Not Loaded" : "Set Loaded"));
+    children.push(React.createElement("button", {
+      onClick: () => {
+        setBackgroundColor(!backgroundColor);
+      },
+      key: 'bg'
+    }, backgroundColor ? "Set Not BG" : "Set BG"));
     if (loading) {
       children.push(React.createElement("input", {
         type: 'range',
@@ -86,7 +93,8 @@ const ReactTestBed = () => {
       frame: frame,
       onFrameChange: (frame) => {
         setFrame(frame);
-      }
+      },
+      backgroundColor: backgroundColor ? 'red' : 'white',
     }));
   }
 
