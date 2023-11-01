@@ -42,6 +42,7 @@ class WarningSpan {
       e.stopPropagation();
       console.log("Bubble clicked");
       if (this.standalone.playing) {
+        this.standalone.everPaused = true;
         this.standalone.togglePlay();
       }
       this.standalone.setFrame(this.start);
@@ -148,6 +149,9 @@ class NimbleStandalone {
     this.playPauseButton = document.createElement("button");
     this.playPauseButton.innerHTML = playSvg;
     this.playPauseButton.addEventListener("click", () => {
+      if (this.playing) {
+        this.everPaused = true;
+      }
       this.togglePlay();
     });
     this.playPauseButton.className =
@@ -336,6 +340,9 @@ class NimbleStandalone {
     if (e.key.toString() == " ") {
       e.preventDefault();
       e.stopPropagation();
+      if (this.playing) {
+        this.everPaused = true;
+      }
       this.togglePlay();
     }
   };
@@ -614,7 +621,6 @@ class NimbleStandalone {
       }
       else {
         this.playPauseButton.innerHTML = playSvg;
-        this.everPaused = true;
       }
       if (this.playPausedListener != null) {
         this.playPausedListener(this.playing);
