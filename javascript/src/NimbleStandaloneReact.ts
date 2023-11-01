@@ -36,6 +36,7 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
       }
       // Create the standalone GUI
       if (node != null) {
+        console.log("Creating a NimbleStandalone");
         let newStandalone = new NimbleStandalone(node);
         setLoadingPropsOnStandalone(newStandalone, props);
         // This doesn't cause a re-render
@@ -66,10 +67,17 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
       if (pr.playing != null && pr.playing != gui.getPlaying()) {
         gui.setPlaying(pr.playing);
       }
+    }
+  }, [props.playing]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
       gui.registerPlayPauseListener(pr.onPlayPause);
       gui.registerFrameChangeListener(pr.onFrameChange);
     }
-  }, [props.playing, props.onPlayPause, props.onFrameChange]);
+  }, [props.onPlayPause, props.onFrameChange]);
 
   useEffect(() => {
     const pr = props;

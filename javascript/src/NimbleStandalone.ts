@@ -95,6 +95,7 @@ class NimbleStandalone {
   estimatedTotalFrames: number;
 
   playing: boolean;
+  everPaused: boolean;
   scrubbing: boolean;
   startedPlaying: number;
   originalMsPerFrame: number;
@@ -134,6 +135,9 @@ class NimbleStandalone {
     this.frameChangedListener = null;
     this.playPausedListener = null;
     this.cancelDownload = null;
+
+    this.playing = false;
+    this.everPaused = false;
 
     this.viewContainer = document.createElement("div");
     this.viewContainer.className = "NimbleStandalone-container";
@@ -331,6 +335,7 @@ class NimbleStandalone {
   keyboardListener = (e: KeyboardEvent) => {
     if (e.key.toString() == " ") {
       e.preventDefault();
+      e.stopPropagation();
       this.togglePlay();
     }
   };
@@ -364,7 +369,7 @@ class NimbleStandalone {
     this.progressBarLoaded.style.left = percentage * 100 + "%";
 
     // As we're buffering, if we buffer up enough for 1s of playback, start playing
-    if (!this.playing) {
+    if (!this.playing && !this.everPaused) {
       if (this.getRemainingLoadedMillis() > 1000) {
         this.togglePlay();
       }
@@ -609,6 +614,7 @@ class NimbleStandalone {
       }
       else {
         this.playPauseButton.innerHTML = playSvg;
+        this.everPaused = true;
       }
       if (this.playPausedListener != null) {
         this.playPausedListener(this.playing);
