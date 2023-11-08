@@ -359,6 +359,9 @@ Note that these are specified in the local body frame, acting on the body at its
         This is for doing ML and large-scale data analysis. This is a single processing pass on a single frame of data, returned from a list within a :code:`nimblephysics.biomechanics.Frame` (which can be got with :code:`SubjectOnDisk.readFrames()`), which contains the full reconstruction of your subject at this instant created by this processing pass. Earlier processing passes are likely to have more discrepancies with the original data, bet later processing passes require more types of sensor signals that may not always be available.
       )doc";
 
+  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::FramePass>>>(
+      m, "FramePassList");
+
   auto frame
       = ::py::class_<
             dart::biomechanics::Frame,
@@ -507,6 +510,9 @@ Note that these are specified in the local body frame, acting on the body at its
   frame.doc() = R"doc(
         This is for doing ML and large-scale data analysis. This is a single frame of data, returned in a list by :code:`SubjectOnDisk.readFrames()`, which contains everything needed to reconstruct all the dynamics of a snapshot in time.
       )doc";
+
+  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::Frame>>>(
+      m, "FrameList");
 
   auto subjectOnDiskTrialPass
       = ::py::class_<
@@ -1341,12 +1347,6 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::getNotes,
                 "The notes (if any) added by the person who uploaded this data "
                 "to AddBiomechanics.");
-
-  // later in binding code:
-  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::Frame>>>(
-      m, "FrameList");
-  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::FramePass>>>(
-      m, "FramePassList");
 
   subjectOnDisk.doc() = R"doc(
         This is for doing ML and large-scale data analysis. The idea here is to
