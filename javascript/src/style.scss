@@ -404,6 +404,7 @@ $triangle-size: 5px;
     cursor: pointer;
     left: 10px;
     top: 80px;
+    max-height: calc(100% - 200px);
     /* font-family: "Advent Pro", sans-serif; */
     color: #848484;
     /* font-weight: bold; */

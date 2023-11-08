@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: nimblephysics
-Version: 0.9.28
+Version: 0.10.19
 Summary: A differentiable fully featured physics engine
 Author: Keenon Werling
 Author-email: keenonwerling@gmail.com
@@ -41,9 +41,14 @@ Nimble started life as a fork of the popular DART physics engine, with analytica
 
 Check out our [website](http://www.nimblephysics.org) for more information.
 
-### Installing on Arm64 Macs
+### Installing on Arm64 Macs (M1, M2, etc)
 
-We don't yet publish Arm64 binaries to PyPI from our CI system, so you may not be able to `pip3 install nimblephysics` from a new Arm64 Mac. We will endeavor to manually push binaries occassionally, but until GitHub Actions supports using Arm64 Mac runners, the solution is to clone this repo, then run
+We don't yet publish Arm64 binaries to PyPI from our CI system, so you may not be able to `pip3 install nimblephysics` from a new Arm64 Mac.
+We will endeavor to manually push binaries occassionally, but until GitHub Actions supports using Arm64 Mac runners, that may run a bit behind.
+
+Currently, the pre-built Arm64 binaries are ONLY AVAILABLE ON PYTHON 3.9. So if you create a virtual environment with Python 3.9, and then `pip3 install nimblephysics`, that should work.
+
+If you really need another Python version for some reason, the solution is to clone this repo, then run
 - `ci/mac/install_dependencies.sh`
 - `ci/mac/manually_build_arm64_wheels.sh`
 That will install the dependencies you need, and then build and install the Python package. Please create Issues if you run into problems, and we'll do our best to fix them.

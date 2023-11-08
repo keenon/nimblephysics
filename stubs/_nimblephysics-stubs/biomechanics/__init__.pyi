@@ -331,15 +331,19 @@ class DynamicsFitter():
     def runUnconstrainedSGDOptimization(self, init: DynamicsInitialization, config: DynamicsFitProblemConfig) -> None: ...
     def saveDynamicsToGUI(self, path: str, init: DynamicsInitialization, trialIndex: int, framesPerSecond: int) -> None: ...
     def scaleLinkMassesFromGravity(self, init: DynamicsInitialization) -> None: ...
+    def setCOMHistogramBuckets(self, buckets: int) -> None: ...
+    def setCOMHistogramClipBuckets(self, clipBuckets: int) -> None: ...
+    def setCOMHistogramMaxMovement(self, maxMovement: float) -> None: ...
     def setCheckDerivatives(self, value: bool) -> None: ...
     def setDisableLinesearch(self, value: bool) -> None: ...
+    def setFillInEndFramesGrfGaps(self, fillInFrames: int) -> None: ...
     def setIterationLimit(self, value: int) -> None: ...
     def setLBFGSHistoryLength(self, value: int) -> None: ...
     def setPrintFrequency(self, value: int) -> None: ...
     def setSilenceOutput(self, value: bool) -> None: ...
     def setTolerance(self, value: float) -> None: ...
     def smoothAccelerations(self, init: DynamicsInitialization, smoothingWeight: float = 10.0, regularizationWeight: float = 0.001) -> None: ...
-    def timeSyncAndInitializePipeline(self, init: DynamicsInitialization, useReactionWheels: bool = False, shiftGRF: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, maxTrialsToSolveMassOver: int = 4, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 100, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15, reoptimizeAnatomicalMarkers: bool = False, reoptimizeTrackingMarkers: bool = True) -> bool: ...
+    def timeSyncAndInitializePipeline(self, init: DynamicsInitialization, useReactionWheels: bool = False, shiftGRF: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, maxTrialsToSolveMassOver: int = 4, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 100, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15, reoptimizeAnatomicalMarkers: bool = False, reoptimizeTrackingMarkers: bool = True, tuneLinkMasses: bool = False) -> bool: ...
     def timeSyncTrialGRF(self, init: DynamicsInitialization, trial: int, useReactionWheels: bool = False, maxShiftGRF: int = 4, iterationsPerShift: int = 20, weightLinear: float = 1.0, weightAngular: float = 1.0, regularizeLinearResiduals: float = 0.5, regularizeAngularResiduals: float = 0.5, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 20) -> bool: ...
     def writeCSVData(self, path: str, init: DynamicsInitialization, trialIndex: int, useAdjustedGRFs: bool = False, timestamps: typing.List[float] = []) -> None: ...
     def zeroLinearResidualsAndOptimizeAngular(self, init: DynamicsInitialization, trial: int, targetPoses: numpy.ndarray[numpy.float64, _Shape[m, n]], previousTotalResidual: float, iteration: int, useReactionWheels: bool = False, weightLinear: float = 1.0, weightAngular: float = 0.5, regularizeLinearResiduals: float = 0.1, regularizeAngularResiduals: float = 0.1, regularizeCopDriftCompensation: float = 1.0, maxBuckets: int = 40, maxLeastSquaresIters: int = 200, commitCopDriftCompensation: bool = False, detectUnmeasuredTorque: bool = True, avgPositionChangeThreshold: float = 0.08, avgAngularChangeThreshold: float = 0.15) -> typing.Tuple[bool, float]: ...
@@ -695,6 +699,7 @@ class ForcePlate():
     def __init__(self) -> None: ...
     @staticmethod
     def copyForcePlate(plate: ForcePlate) -> ForcePlate: ...
+    def detectAndFixCopMomentConvention(self, trial: int = -1, i: int = -1) -> None: ...
     def trim(self, newStartTime: float, newEndTime: float) -> None: ...
     def trimToIndexes(self, start: int, end: int) -> None: ...
     @property
@@ -969,6 +974,18 @@ class FramePass():
         The acceleration of the COM, in world space
         """
     @property
+    def comAccInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        This is the acceleration of the center of mass of the subject, expressed in the root body frame (which probably means expressed in pelvis coordinates, though some skeletons may use a different body as the root, for instance the torso).
+
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @comAccInRootFrame.setter
+    def comAccInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        """
+        This is the acceleration of the center of mass of the subject, expressed in the root body frame (which probably means expressed in pelvis coordinates, though some skeletons may use a different body as the root, for instance the torso).
+        """
+    @property
     def comPos(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
         """
         The position of the COM, in world space
@@ -1020,6 +1037,21 @@ class FramePass():
         expressed in the world frame.
         """
     @property
+    def groundContactCenterOfPressureInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+                    This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+                    expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis).
+                
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @groundContactCenterOfPressureInRootFrame.setter
+    def groundContactCenterOfPressureInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+        expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis).
+        """
+    @property
     def groundContactForce(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
                     This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
@@ -1035,6 +1067,21 @@ class FramePass():
         expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
         """
     @property
+    def groundContactForceInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+                    This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+                    expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+                  
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @groundContactForceInRootFrame.setter
+    def groundContactForceInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+        expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+        """
+    @property
     def groundContactTorque(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
         """
                     This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
@@ -1048,6 +1095,21 @@ class FramePass():
         """
         This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
         expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+        """
+    @property
+    def groundContactTorqueInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+                    This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+                    expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+                  
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @groundContactTorqueInRootFrame.setter
+    def groundContactTorqueInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+        expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
         """
     @property
     def groundContactWrenches(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -1086,6 +1148,42 @@ class FramePass():
                 force_world = R_wb @ force_local
 
         Note that these are specified in the local body frame, acting on the body at its origin, so transforming them to the world frame requires a transformation!
+        """
+    @property
+    def groundContactWrenchesInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        These are the wrenches (each vectors of length 6, composed of first 3 = torque, last 3 = force) expressed in the root body frame, and concatenated together. The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @groundContactWrenchesInRootFrame.setter
+    def groundContactWrenchesInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        These are the wrenches (each vectors of length 6, composed of first 3 = torque, last 3 = force) expressed in the root body frame, and concatenated together. The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
+        """
+    @property
+    def jointCenters(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        These are the joint center locations, concatenated together, given in the world frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @jointCenters.setter
+    def jointCenters(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        These are the joint center locations, concatenated together, given in the world frame.
+        """
+    @property
+    def jointCentersInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        These are the joint center locations, concatenated together, given in the root frame. The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @jointCentersInRootFrame.setter
+    def jointCentersInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        These are the joint center locations, concatenated together, given in the root frame. The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
         """
     @property
     def linearResidual(self) -> float:
@@ -1146,6 +1244,90 @@ class FramePass():
     def posObserved(self, arg0: numpy.ndarray[numpy.int32, _Shape[m, 1]]) -> None:
         """
         A boolean mask of [0,1]s for each DOF, with a 1 indicating that this DOF was observed on this frame
+        """
+    @property
+    def residualWrenchInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
+        """
+        This is the 'residual' force wrench (or 'modelling error' force, the force necessary to make Newton's laws match up with our model, even though it's imaginary) expressed in the root body frame. This is a wrench (vector of length 6, composed of first 3 = torque, last 3 = force). The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[6, 1]]
+        """
+    @residualWrenchInRootFrame.setter
+    def residualWrenchInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> None:
+        """
+        This is the 'residual' force wrench (or 'modelling error' force, the force necessary to make Newton's laws match up with our model, even though it's imaginary) expressed in the root body frame. This is a wrench (vector of length 6, composed of first 3 = torque, last 3 = force). The root body is probably the pelvis, but for some skeletons they may use another body as the root, like the torso.
+        """
+    @property
+    def rootAngularAccInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        This is the angular velocity, in an angle-axis representation where the norm of this 3-vector is given in radians per second squared, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @rootAngularAccInRootFrame.setter
+    def rootAngularAccInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        """
+        This is the angular velocity, in an angle-axis representation where the norm of this 3-vector is given in radians per second squared, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+        """
+    @property
+    def rootAngularVelInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        This is the angular velocity, in an angle-axis representation where the norm of this 3-vector is given in radians per second, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @rootAngularVelInRootFrame.setter
+    def rootAngularVelInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        """
+        This is the angular velocity, in an angle-axis representation where the norm of this 3-vector is given in radians per second, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+        """
+    @property
+    def rootEulerHistoryInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        This is the recent history of the angles (expressed as euler angles) of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @rootEulerHistoryInRootFrame.setter
+    def rootEulerHistoryInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        This is the recent history of the angles (expressed as euler angles) of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+        """
+    @property
+    def rootLinearAccInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        This is the linear acceleration, in meters per second squared, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @rootLinearAccInRootFrame.setter
+    def rootLinearAccInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        """
+        This is the linear acceleration, in meters per second squared, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+        """
+    @property
+    def rootLinearVelInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        This is the linear velocity, in meters per second, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @rootLinearVelInRootFrame.setter
+    def rootLinearVelInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None:
+        """
+        This is the linear velocity, in meters per second, of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame.
+        """
+    @property
+    def rootPosHistoryInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        This is the recent history of the positions of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame. These are concatenated 3-vectors. The [0:3] of the vector is the most recent, and they get older from there. Vectors  
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @rootPosHistoryInRootFrame.setter
+    def rootPosHistoryInRootFrame(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        """
+        This is the recent history of the positions of the root body of the skeleton (probably the pelvis) expressed in its own coordinate frame. These are concatenated 3-vectors. The [0:3] of the vector is the most recent, and they get older from there. Vectors  
         """
     @property
     def tau(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -1631,6 +1813,22 @@ class MarkerInitialization():
         """
     @axisWeights.setter
     def axisWeights(self, arg0: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None:
+        pass
+    @property
+    def error(self) -> bool:
+        """
+        :type: bool
+        """
+    @error.setter
+    def error(self, arg0: bool) -> None:
+        pass
+    @property
+    def errorMsg(self) -> str:
+        """
+        :type: str
+        """
+    @errorMsg.setter
+    def errorMsg(self, arg0: str) -> None:
         pass
     @property
     def groupScales(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -2146,9 +2344,17 @@ class SubjectOnDisk():
         """
         Get an array of force plate corners (as 3D vectors) for the given force plate in the given trial. Empty array on out-of-bounds access.
         """
+    def getForceplateCutoffs(self, trial: int, processingPass: int) -> typing.List[float]: 
+        """
+        If we reprocessed the force plates with a cutoff, then these are the cutoff values we used.
+        """
     def getGroundForceBodies(self) -> typing.List[str]: 
         """
         A list of the :code:`body_name`'s for each body that was assumed to be able to take ground-reaction-force from force plates.
+        """
+    def getHeaderProto(self) -> SubjectOnDiskHeader: 
+        """
+        This returns the raw proto header for this subject, which can be used to write out a new B3D file
         """
     def getHeightM(self) -> float: 
         """
@@ -2158,11 +2364,11 @@ class SubjectOnDisk():
         """
         The AddBiomechanics link for this subject's data.
         """
-    def getLowpassCutoffFrequency(self, processingPass: int) -> float: 
+    def getLowpassCutoffFrequency(self, trial: int, processingPass: int) -> float: 
         """
         If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that (Butterworth) filter?
         """
-    def getLowpassFilterOrder(self, processingPass: int) -> int: 
+    def getLowpassFilterOrder(self, trial: int, processingPass: int) -> int: 
         """
         If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
         """
@@ -2195,6 +2401,10 @@ class SubjectOnDisk():
     def getNumForcePlates(self, trial: int) -> int: 
         """
         The number of force plates in the source data.
+        """
+    def getNumJoints(self) -> int: 
+        """
+        This returns the number of joints for the model on this Subject
         """
     def getNumProcessingPasses(self) -> int: 
         """
@@ -2264,6 +2474,14 @@ class SubjectOnDisk():
         """
         This returns the timestep size for the trial requested, in seconds per frame
         """
+    def loadAllFrames(self) -> None: 
+        """
+        This loads all the frames of data, and fills in the processing pass data matrices in the proto header classes.
+        """
+    def readForcePlates(self, arg0: int) -> typing.List[ForcePlate]: 
+        """
+        This reads all the raw sensor data for this trial, and constructs force plates.
+        """
     def readFrames(self, trial: int, startFrame: int, numFramesToRead: int = 1, includeSensorData: bool = True, includeProcessingPasses: bool = True, stride: int = 1, contactThreshold: float = 1.0) -> typing.List[Frame]: 
         """
         This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
@@ -2279,6 +2497,8 @@ class SubjectOnDiskHeader():
     def __init__(self) -> None: ...
     def addProcessingPass(self) -> SubjectOnDiskPassHeader: ...
     def addTrial(self) -> SubjectOnDiskTrial: ...
+    def getProcessingPasses(self) -> typing.List[SubjectOnDiskPassHeader]: ...
+    def getTrials(self) -> typing.List[SubjectOnDiskTrial]: ...
     def recomputeColumnNames(self) -> None: ...
     def setAgeYears(self, ageYears: int) -> SubjectOnDiskHeader: ...
     def setBiologicalSex(self, biologicalSex: str) -> SubjectOnDiskHeader: ...
@@ -2289,10 +2509,14 @@ class SubjectOnDiskHeader():
     def setMassKg(self, massKg: float) -> SubjectOnDiskHeader: ...
     def setNotes(self, notes: str) -> SubjectOnDiskHeader: ...
     def setNumDofs(self, dofs: int) -> SubjectOnDiskHeader: ...
+    def setNumJoints(self, joints: int) -> SubjectOnDiskHeader: ...
     def setSubjectTags(self, subjectTags: typing.List[str]) -> SubjectOnDiskHeader: ...
+    def setTrials(self, trials: typing.List[SubjectOnDiskTrial]) -> None: ...
     pass
 class SubjectOnDiskPassHeader():
     def __init__(self) -> None: ...
+    def getOpenSimFileText(self) -> str: ...
+    def getProcessingPassType(self) -> ProcessingPassType: ...
     def setOpenSimFileText(self, openSimFileText: str) -> None: ...
     def setProcessingPassType(self, type: ProcessingPassType) -> None: ...
     pass
@@ -2302,6 +2526,10 @@ class SubjectOnDiskTrial():
         """
         This creates a new :code:`SubjectOnDiskTrialPass` for this trial, and returns it. That object can store results from IK and ID, as well as other results from the processing pipeline.
         """
+    def getForcePlates(self) -> typing.List[ForcePlate]: ...
+    def getMissingGRFReason(self) -> typing.List[MissingGRFReason]: ...
+    def getPasses(self) -> typing.List[SubjectOnDiskTrialPass]: ...
+    def getTimestep(self) -> float: ...
     def setAccObservations(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     def setCustomValues(self, customValues: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None: ...
     def setEmgObservations(self, emgObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None: ...
@@ -2319,22 +2547,53 @@ class SubjectOnDiskTrial():
     pass
 class SubjectOnDiskTrialPass():
     def __init__(self) -> None: ...
-    def computeValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forces: numpy.ndarray[numpy.float64, _Shape[m, n]], moments: numpy.ndarray[numpy.float64, _Shape[m, n]], cops: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
-    def computeValuesFromForcePlates(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forcePlates: typing.List[ForcePlate]) -> None: ...
+    def computeValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forces: numpy.ndarray[numpy.float64, _Shape[m, n]], moments: numpy.ndarray[numpy.float64, _Shape[m, n]], cops: numpy.ndarray[numpy.float64, _Shape[m, n]], rootHistoryLen: int = 5, rootHistoryStride: int = 1) -> None: ...
+    def computeValuesFromForcePlates(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forcePlates: typing.List[ForcePlate], rootHistoryLen: int = 5, rootHistoryStride: int = 1, explicitVels: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), explicitAccs: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64)) -> None: ...
+    def copyValuesFrom(self, other: SubjectOnDiskTrialPass) -> None: ...
+    def getAccs(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getAngularResidual(self) -> typing.List[float]: ...
+    def getComAccs(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getComAccsInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getComPoses(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getComVels(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getGroundBodyCopTorqueForce(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getGroundBodyCopTorqueForceInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getGroundBodyWrenches(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getGroundBodyWrenchesInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getJointCenters(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getJointCentersInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getLinearResidual(self) -> typing.List[float]: ...
+    def getMarkerMax(self) -> typing.List[float]: ...
+    def getMarkerRMS(self) -> typing.List[float]: ...
+    def getPoses(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getResamplingMatrix(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getResidualWrenchInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getTaus(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getVels(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def setAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setAngularResidual(self, angularResidual: typing.List[float]) -> None: ...
     def setComAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setComAccsInRootFrame(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setComPoses(self, poses: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setComVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setDofAccelerationFiniteDifferenced(self, dofAccelerationFiniteDifference: typing.List[bool]) -> None: ...
     def setDofPositionsObserved(self, dofPositionsObserved: typing.List[bool]) -> None: ...
     def setDofVelocitiesFiniteDifferenced(self, dofVelocitiesFiniteDifferenced: typing.List[bool]) -> None: ...
+    def setForcePlateCutoffs(self, cutoffs: typing.List[float]) -> None: ...
     def setGroundBodyCopTorqueForce(self, copTorqueForces: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setGroundBodyCopTorqueForceInRootFrame(self, copTorqueForces: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setGroundBodyWrenches(self, wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setGroundBodyWrenchesInRootFrame(self, wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setJointCenters(self, centers: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setJointCentersInRootFrame(self, centers: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setLinearResidual(self, linearResidual: typing.List[float]) -> None: ...
+    def setLowpassCutoffFrequency(self, freq: float) -> None: ...
+    def setLowpassFilterOrder(self, order: int) -> None: ...
     def setMarkerMax(self, markerMax: typing.List[float]) -> None: ...
     def setMarkerRMS(self, markerRMS: typing.List[float]) -> None: ...
     def setPoses(self, poses: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setResamplingMatrix(self, resamplingMatrix: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
+    def setResidualWrenchInRootFrame(self, wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setTaus(self, taus: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setType(self, type: ProcessingPassType) -> None: ...
     def setVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...

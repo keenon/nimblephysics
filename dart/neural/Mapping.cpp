@@ -115,7 +115,7 @@ void Mapping::equalsOrCrash(
     std::cout << "world->setCachedLCPSolution(brokenLCPCache);" << std::endl;
 
     std::cout << "--------------------" << std::endl;
-    exit(1);
+    throw std::runtime_error("Mapping Jacobian disagrees on " + name);
   }
 }
 

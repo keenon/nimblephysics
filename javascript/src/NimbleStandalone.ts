@@ -42,6 +42,8 @@ class WarningSpan {
       e.stopPropagation();
       console.log("Bubble clicked");
       if (this.standalone.playing) {
+        console.log("Warning bubble marking everPaused");
+        this.standalone.everPaused = true;
         this.standalone.togglePlay();
       }
       this.standalone.setFrame(this.start);
@@ -95,6 +97,7 @@ class NimbleStandalone {
   estimatedTotalFrames: number;
 
   playing: boolean;
+  everPaused: boolean;
   scrubbing: boolean;
   startedPlaying: number;
   originalMsPerFrame: number;
@@ -135,6 +138,9 @@ class NimbleStandalone {
     this.playPausedListener = null;
     this.cancelDownload = null;
 
+    this.playing = false;
+    this.everPaused = false;
+
     this.viewContainer = document.createElement("div");
     this.viewContainer.className = "NimbleStandalone-container";
     container.appendChild(this.viewContainer);
@@ -144,6 +150,10 @@ class NimbleStandalone {
     this.playPauseButton = document.createElement("button");
     this.playPauseButton.innerHTML = playSvg;
     this.playPauseButton.addEventListener("click", () => {
+      if (this.playing) {
+        console.log("Play/pause button marking everPaused");
+        this.everPaused = true;
+      }
       this.togglePlay();
     });
     this.playPauseButton.className =
@@ -197,7 +207,11 @@ class NimbleStandalone {
       let percentage = x / rect.width;
       if (percentage < 0) percentage = 0;
       if (percentage > 1) percentage = 1;
-      if (this.playing) this.togglePlay();
+      if (this.playing) {
+        console.log("Scrub bar marking everPaused");
+        this.everPaused = true;
+        this.togglePlay();
+      }
       this.scrubFrame = Math.round(this.estimatedTotalFrames * percentage); 
       this.setProgress(percentage);
     };
@@ -331,6 +345,9 @@ class NimbleStandalone {
   keyboardListener = (e: KeyboardEvent) => {
     if (e.key.toString() == " ") {
       e.preventDefault();
+      e.stopPropagation();
+      console.log("Space bar key marking everPaused");
+      this.everPaused = true;
       this.togglePlay();
     }
   };
@@ -364,7 +381,7 @@ class NimbleStandalone {
     this.progressBarLoaded.style.left = percentage * 100 + "%";
 
     // As we're buffering, if we buffer up enough for 1s of playback, start playing
-    if (!this.playing) {
+    if (!this.playing && !this.everPaused) {
       if (this.getRemainingLoadedMillis() > 1000) {
         this.togglePlay();
       }
@@ -473,7 +490,7 @@ class NimbleStandalone {
                 span.update();
               }
               this.setLoadedProgress(1.0);
-              if (!this.playing) {
+              if (!this.playing && !this.everPaused) {
                 this.togglePlay();
               }
               return;
@@ -591,6 +608,7 @@ class NimbleStandalone {
    * This turns playback on or off.
    */
   togglePlay = () => {
+    console.log("Pausing. everPaused "+this.everPaused);
     this.setPlaying(!this.playing);
   };
 
@@ -608,6 +626,8 @@ class NimbleStandalone {
         this.playPauseButton.innerHTML = pauseSvg;
       }
       else {
+        console.log("setPlaying(false) marking everPaused");
+        this.everPaused = true;
         this.playPauseButton.innerHTML = playSvg;
       }
       if (this.playPausedListener != null) {
@@ -745,6 +765,8 @@ class NimbleStandalone {
     }
     if (this.scrubbing) {
       if (this.scrubFrame !== this.lastFrame) {
+        console.log("scrubbing marking everPaused");
+        this.everPaused = true;
         this.setFrame(this.scrubFrame);
         // Always call this _after_ updating this.lastFrame, to avoid loops
         if (this.frameChangedListener != null) {

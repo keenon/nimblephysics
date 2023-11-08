@@ -1049,7 +1049,7 @@ std::shared_ptr<dynamics::Skeleton> MarkerFitter::getSkeleton()
 
 //==============================================================================
 MarkerInitialization::MarkerInitialization()
-  : staticPoseRoot(Eigen::Vector6s::Zero())
+  : staticPoseRoot(Eigen::Vector6s::Zero()), error(false), errorMsg("")
 {
 }
 

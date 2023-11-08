@@ -1910,6 +1910,16 @@ public:
   Eigen::VectorXs getVelocityDifferences(
       const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
+  /// For rotational joints (euler joints and ball joints), it is possible for
+  /// your position to suddenly jump by 360 degrees to an equivalent positions
+  /// at a different value for the joint angles. This wreaks havok with
+  /// smoothing and lowpass filtering, and so we would like sometimes to be able
+  /// to prevent the wrapping, and just pick the representation for our current
+  /// joint rotatinos that is as close as possible to our previous joint
+  /// positions, without large jumps.
+  Eigen::VectorXs unwrapPositionToNearest(
+      Eigen::VectorXs lastPos, Eigen::VectorXs thisPos) const;
+
   //----------------------------------------------------------------------------
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
@@ -1932,6 +1942,14 @@ public:
   };
 
   Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& accelerations);
+
+  /// This computes the joint torques on the skeleton, given predicted wrenches
+  /// on each contact body, and optionally a predicted root residual.
+  Eigen::VectorXs getInverseDynamicsFromPredictions(
+      Eigen::VectorXs accelerations,
+      std::vector<dynamics::BodyNode*> contactBodies,
+      std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+      Eigen::Vector6s rootResiduals = Eigen::Vector6s::Zero());
 
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired

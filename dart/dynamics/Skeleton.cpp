@@ -2586,15 +2586,13 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
   {
     std::cout << "ERROR: getHeight() computed a height of 0. Exiting..."
               << std::endl;
-    assert(height >= 0);
-    exit(1);
+    throw std::runtime_error("getHeight() computed a height of 0");
   }
   else if (height < 0)
   {
     std::cout << "WARNING: getHeight() computed a negative height of " << height
               << ". Exiting..." << std::endl;
-    assert(height >= 0);
-    exit(1);
+    throw std::runtime_error("getHeight() computed a negative height");
   }
   else
   {
@@ -5861,12 +5859,15 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
   Eigen::VectorXs sourcePositions = Eigen::VectorXs::Zero(joints.size() * 3);
   for (int i = 0; i < joints.size(); i++)
   {
-    #ifndef NDEBUG
-    if (joints[i]->getChildBodyNode() == nullptr) {
-      std::cout << "ERROR in getJointWorldPositions(): Joint " << joints[i]->getName() << " has no child body node" << std::endl;
+#ifndef NDEBUG
+    if (joints[i]->getChildBodyNode() == nullptr)
+    {
+      std::cout << "ERROR in getJointWorldPositions(): Joint "
+                << joints[i]->getName() << " has no child body node"
+                << std::endl;
       continue;
     }
-    #endif
+#endif
     sourcePositions.segment<3>(i * 3)
         = (joints[i]->getChildBodyNode()->getWorldTransform()
            * joints[i]->getTransformFromChildBodyNode())
@@ -9394,6 +9395,31 @@ Eigen::VectorXs Skeleton::getVelocityDifferences(
 }
 
 //==============================================================================
+/// For rotational joints (euler joints and ball joints), it is possible for
+/// your position to suddenly jump by 360 degrees to an equivalent positions
+/// at a different value for the joint angles. This wreaks havok with
+/// smoothing and lowpass filtering, and so we would like sometimes to be able
+/// to prevent the wrapping, and just pick the representation for our current
+/// joint rotatinos that is as close as possible to our previous joint
+/// positions, without large jumps.
+Eigen::VectorXs Skeleton::unwrapPositionToNearest(
+    Eigen::VectorXs thisPos, Eigen::VectorXs lastPos) const
+{
+  Eigen::VectorXs unwrapped = thisPos;
+  for (int j = 0; j < getNumJoints(); j++)
+  {
+    auto* joint = getJoint(j);
+    if (joint->getType() == dynamics::EulerJoint::getStaticType())
+    {
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start), lastPos.segment<3>(start));
+    }
+  }
+  return unwrapped;
+}
+
+//==============================================================================
 /// This quantifies how much error the inverse dynamics result ended up with.
 s_t Skeleton::ContactInverseDynamicsResult::sumError()
 {
@@ -9444,6 +9470,37 @@ Eigen::VectorXs Skeleton::getInverseDynamics(
                                        - getExternalForces() + getDampingForce()
                                        + getSpringForce();
   return massTorques + coriolisAndGravity;
+}
+
+//==============================================================================
+/// This computes the joint torques on the skeleton, given predicted wrenches on
+/// each contact body, and optionally a predicted root residual.
+Eigen::VectorXs Skeleton::getInverseDynamicsFromPredictions(
+    Eigen::VectorXs accelerations,
+    std::vector<dynamics::BodyNode*> contactBodies,
+    std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+    Eigen::Vector6s rootResiduals)
+{
+  dynamics::BodyNode* rootBody = getRootBodyNode();
+  const Eigen::Isometry3s T_wr = rootBody->getWorldTransform();
+  const Eigen::VectorXs rootResidualTorques
+      = getJacobian(rootBody).transpose() * rootResiduals;
+  const Eigen::VectorXs massTorques
+      = multiplyByImplicitMassMatrix(accelerations);
+  const Eigen::VectorXs coriolisAndGravity
+      = getCoriolisAndGravityForces() + getDampingForce() + getSpringForce();
+  Eigen::VectorXs totalTorques
+      = massTorques + coriolisAndGravity - rootResidualTorques;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    const Eigen::Vector6s rootFrameWrench = rootFrameNormalizedContactWrench[i];
+    const Eigen::Isometry3s T_wb = contactBodies[i]->getWorldTransform();
+    const Eigen::Vector6s worldWrench = math::dAdInvT(T_wr, rootFrameWrench);
+    const Eigen::Vector6s bodyWrench
+        = math::dAdInvT(T_wb.inverse(), worldWrench);
+    totalTorques -= getJacobian(contactBodies[i]).transpose() * bodyWrench;
+  }
+  return totalTorques;
 }
 
 //==============================================================================
@@ -10395,21 +10452,27 @@ Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as cops"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as cops");
   }
   if (contactBodies.size() != forces.size())
   {
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as forces"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as forces");
   }
   if (contactBodies.size() != moments.size())
   {
     std::cout << "Invalid input to getEnergyAccounting! Need the same number "
                  "of contactBodies as moments"
               << std::endl;
-    exit(1);
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as moments");
   }
 
   // Get the current stocks of energy in each body

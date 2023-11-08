@@ -215,6 +215,8 @@ class DARTView {
   hovering: number[];
   editingTooltip: boolean = false;
 
+  backgroundColor: string = '#ffffff';
+
   constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
     this.container = container;
@@ -250,7 +252,7 @@ class DARTView {
 
     this.scene = new THREE.Scene();
     // this.scene.background = new THREE.Color(0xf8f8f8);
-    this.scene.background = new THREE.Color(0xffffff);
+    this.scene.background = new THREE.Color(this.backgroundColor);
 
     const light = new THREE.DirectionalLight();
     light.castShadow = true;
@@ -405,6 +407,16 @@ class DARTView {
     this.cylinderGeometry = new THREE.CylinderBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
   }
 
+  setBackgroundColor = (color: string) => {
+    this.backgroundColor = color;
+    this.scene.background = new THREE.Color(color);
+    this.render();
+  };
+
+  getBackgroundColor = () => {
+    return this.backgroundColor;
+  };
+
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
     if (e.key === " ") {
       e.preventDefault();
@@ -505,7 +517,7 @@ class DARTView {
   }
 
   isWarningDismissed = (key: number) => {
-    if (this.dismissedWarnings.has(key) && this.dismissedWarnings.get(key)) {
+    if (this.dismissedWarnings.has(key)) {
       return true;
     }
     return false;

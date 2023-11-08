@@ -1161,12 +1161,10 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
     )docs")
       .def(
           "getBodyLocalVelocities",
-          &dart::dynamics::Skeleton::getBodyLocalVelocities
-          )
+          &dart::dynamics::Skeleton::getBodyLocalVelocities)
       .def(
           "getBodyLocalAccelerations",
-          &dart::dynamics::Skeleton::getBodyLocalAccelerations
-          )
+          &dart::dynamics::Skeleton::getBodyLocalAccelerations)
       .def(
           "setVelocityUpperLimits",
           +[](dart::dynamics::Skeleton* self, Eigen::VectorXs limits) -> void {
@@ -1220,9 +1218,21 @@ This returns the Jacobian relating changes in the `wrt` quantity to changes in a
           ::py::arg("dq2"),
           ::py::arg("dq1"))
       .def(
+          "unwrapPositionToNearest",
+          &dart::dynamics::Skeleton::unwrapPositionToNearest,
+          ::py::arg("thisPos"),
+          ::py::arg("lastPos"))
+      .def(
           "getInverseDynamics",
           &dart::dynamics::Skeleton::getInverseDynamics,
           ::py::arg("accelerations"))
+      .def(
+          "getInverseDynamicsFromPredictions",
+          &dart::dynamics::Skeleton::getInverseDynamicsFromPredictions,
+          ::py::arg("accelerations"),
+          ::py::arg("contactBodies"),
+          ::py::arg("rootFrameContactWrench"),
+          ::py::arg("rootResiduals"))
       .def(
           "getContactInverseDynamics",
           &dart::dynamics::Skeleton::getContactInverseDynamics,

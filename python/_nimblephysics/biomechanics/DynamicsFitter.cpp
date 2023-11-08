@@ -671,7 +671,8 @@ protected:
           ::py::arg("avgPositionChangeThreshold") = 0.08,
           ::py::arg("avgAngularChangeThreshold") = 0.15,
           ::py::arg("reoptimizeAnatomicalMarkers") = false,
-          ::py::arg("reoptimizeTrackingMarkers") = true)
+          ::py::arg("reoptimizeTrackingMarkers") = true,
+          ::py::arg("tuneLinkMasses") = false)
       .def(
           "optimizeSpatialResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::
@@ -825,6 +826,22 @@ protected:
           "setLBFGSHistoryLength",
           &dart::biomechanics::DynamicsFitter::setLBFGSHistoryLength,
           ::py::arg("value"))
+      .def(
+          "setCOMHistogramBuckets",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramBuckets,
+          ::py::arg("buckets"))
+      .def(
+          "setCOMHistogramMaxMovement",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramMaxMovement,
+          ::py::arg("maxMovement"))
+      .def(
+          "setCOMHistogramClipBuckets",
+          &dart::biomechanics::DynamicsFitter::setCOMHistogramClipBuckets,
+          ::py::arg("clipBuckets"))
+      .def(
+          "setFillInEndFramesGrfGaps",
+          &dart::biomechanics::DynamicsFitter::setFillInEndFramesGrfGaps,
+          ::py::arg("fillInFrames"))
       .def(
           "setCheckDerivatives",
           &dart::biomechanics::DynamicsFitter::setCheckDerivatives,

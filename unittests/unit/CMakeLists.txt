@@ -161,6 +161,10 @@ if(TARGET dart-utils-urdf)
   target_link_libraries(test_DynamicsFitter dart-utils)
   target_link_libraries(test_DynamicsFitter dart-utils-urdf)
 
+  dart_add_test("unit" test_InverseDynamics)
+  target_link_libraries(test_InverseDynamics dart-utils)
+  target_link_libraries(test_InverseDynamics dart-utils-urdf)
+
   dart_add_test("unit" test_SubjectOnDisk)
   target_link_libraries(test_SubjectOnDisk dart-utils)
   target_link_libraries(test_SubjectOnDisk dart-utils-urdf)

@@ -164,6 +164,35 @@ Note that these are specified in the local body frame, acting on the body at its
             This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
+            //   // These are each 3-vector for each contact body, concatenated
+            //   together Eigen::VectorXd groundContactCenterOfPressure;
+            .def_readwrite(
+                "groundContactCenterOfPressureInRootFrame",
+                &dart::biomechanics::FramePass::
+                    groundContactCenterOfPressureInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`CoP` values for each contact body, where :code:`CoP` is a 3 vector representing the center of pressure for a contact measured on the force plate. :code:`CoP` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis).
+        )doc")
+            //   Eigen::VectorXd groundContactTorque;
+            .def_readwrite(
+                "groundContactTorqueInRootFrame",
+                &dart::biomechanics::FramePass::groundContactTorqueInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`tau` values for each contact body, where :code:`tau` is a 3 vector representing the ground-reaction torque from a contact, measured on the force plate. :code:`tau` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+          )doc")
+            //   Eigen::VectorXd groundContactForce;
+            .def_readwrite(
+                "groundContactForceInRootFrame",
+                &dart::biomechanics::FramePass::groundContactForceInRootFrame,
+                py::return_value_policy::reference_internal,
+                R"doc(
+            This is a vector of all the concatenated :code:`f` values for each contact body, where :code:`f` is a 3 vector representing the ground-reaction force from a contact, measured on the force plate. :code:`f` is 
+            expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
+          )doc")
             //   // These are the center of mass kinematics
             //   Eigen::Vector3s comPos;
             .def_readwrite(
@@ -211,7 +240,112 @@ Note that these are specified in the local body frame, acting on the body at its
                 py::return_value_policy::reference_internal,
                 "A boolean mask of [0,1]s for each DOF, with a 1 indicating "
                 "that this DOF got its acceleration through finite "
-                "differencing, and therefore may be somewhat unreliable");
+                "differencing, and therefore may be somewhat unreliable")
+            //   Eigen::Vector3s rootLinearVelInRootFrame;
+            .def_readwrite(
+                "rootLinearVelInRootFrame",
+                &dart::biomechanics::FramePass::rootLinearVelInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the linear velocity, in meters per second, of the "
+                "root body of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
+            //   Eigen::Vector3s rootAngularVelInRootFrame;
+            .def_readwrite(
+                "rootAngularVelInRootFrame",
+                &dart::biomechanics::FramePass::rootAngularVelInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the angular velocity, in an angle-axis representation "
+                "where the norm of this 3-vector is given in radians per "
+                "second, of the root body of the skeleton (probably the "
+                "pelvis) expressed in its own coordinate frame.")
+            //   Eigen::Vector3s rootLinearAccInRootFrame;
+            .def_readwrite(
+                "rootLinearAccInRootFrame",
+                &dart::biomechanics::FramePass::rootLinearAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the linear acceleration, in meters per second "
+                "squared, of the "
+                "root body of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
+            //   Eigen::Vector3s rootAngularAccInRootFrame;
+            .def_readwrite(
+                "rootAngularAccInRootFrame",
+                &dart::biomechanics::FramePass::rootAngularAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the angular velocity, in an angle-axis representation "
+                "where the norm of this 3-vector is given in radians per "
+                "second squared, of the root body of the skeleton (probably "
+                "the pelvis) expressed in its own coordinate frame.")
+            //   Eigen::VectorXs rootPosHistoryInRootFrame;
+            .def_readwrite(
+                "rootPosHistoryInRootFrame",
+                &dart::biomechanics::FramePass::rootPosHistoryInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the recent history of the positions of the root body"
+                " of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame. These are concatenated 3-vectors. "
+                "The [0:3] of the vector is the most recent, and they get "
+                "older from there. Vectors  ")
+            //   Eigen::VectorXs rootEulerHistoryInRootFrame;
+            .def_readwrite(
+                "rootEulerHistoryInRootFrame",
+                &dart::biomechanics::FramePass::rootEulerHistoryInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the recent history of the angles (expressed as euler "
+                "angles) of the root body"
+                " of the skeleton (probably the pelvis) expressed in "
+                "its own coordinate frame.")
+            // Eigen::Vector3s comAccInRootFrame;
+            .def_readwrite(
+                "comAccInRootFrame",
+                &dart::biomechanics::FramePass::comAccInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the acceleration of the center of mass of the "
+                "subject, expressed in the root body frame (which probably "
+                "means expressed in pelvis coordinates, though some skeletons "
+                "may use a different body as the root, for instance the "
+                "torso).")
+            // Eigen::VectorXd groundContactWrenchesInRootFrame;
+            .def_readwrite(
+                "groundContactWrenchesInRootFrame",
+                &dart::biomechanics::FramePass::
+                    groundContactWrenchesInRootFrame,
+                py::return_value_policy::reference_internal,
+                "These are the wrenches (each vectors of length 6, composed of "
+                "first 3 = "
+                "torque, last 3 = force) expressed in the root body frame, and "
+                "concatenated together. The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.")
+            // Eigen::VectorXd groundContactWrenchesInRootFrame;
+            .def_readwrite(
+                "residualWrenchInRootFrame",
+                &dart::biomechanics::FramePass::residualWrenchInRootFrame,
+                py::return_value_policy::reference_internal,
+                "This is the 'residual' force wrench (or 'modelling error' "
+                "force, the "
+                "force necessary to make Newton's laws match up with our "
+                "model, even though it's imaginary) expressed in the root body "
+                "frame. This is a wrench (vector of length 6, composed of "
+                "first 3 = "
+                "torque, last 3 = force). The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.")
+            .def_readwrite(
+                "jointCenters",
+                &dart::biomechanics::FramePass::jointCenters,
+                py::return_value_policy::reference_internal,
+                "These are the joint center locations, concatenated together, "
+                "given in the world frame.")
+            .def_readwrite(
+                "jointCentersInRootFrame",
+                &dart::biomechanics::FramePass::jointCentersInRootFrame,
+                py::return_value_policy::reference_internal,
+                "These are the joint center locations, concatenated together, "
+                "given in the root frame. The "
+                "root body is probably the pelvis, but for some skeletons they "
+                "may use another body as the root, like the torso.");
+
   framePass.doc() = R"doc(
         This is for doing ML and large-scale data analysis. This is a single processing pass on a single frame of data, returned from a list within a :code:`nimblephysics.biomechanics.Frame` (which can be got with :code:`SubjectOnDisk.readFrames()`), which contains the full reconstruction of your subject at this instant created by this processing pass. Earlier processing passes are likely to have more discrepancies with the original data, bet later processing passes require more types of sensor signals that may not always be available.
       )doc";
@@ -372,6 +506,10 @@ Note that these are specified in the local body frame, acting on the body at its
             m, "SubjectOnDiskTrialPass")
             .def(::py::init<>())
             .def(
+                "copyValuesFrom",
+                &dart::biomechanics::SubjectOnDiskTrialPass::copyValuesFrom,
+                ::py::arg("other"))
+            .def(
                 "setType",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setType,
                 ::py::arg("type"))
@@ -395,9 +533,15 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerRMS,
                 ::py::arg("markerRMS"))
             .def(
+                "getMarkerRMS",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getMarkerRMS)
+            .def(
                 "setMarkerMax",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setMarkerMax,
                 ::py::arg("markerMax"))
+            .def(
+                "getMarkerMax",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getMarkerMax)
             .def(
                 "setLowpassCutoffFrequency",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
@@ -422,7 +566,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("footBodyNames"),
                 ::py::arg("forces"),
                 ::py::arg("moments"),
-                ::py::arg("cops"))
+                ::py::arg("cops"),
+                ::py::arg("rootHistoryLen") = 5,
+                ::py::arg("rootHistoryStride") = 1)
             .def(
                 "computeValuesFromForcePlates",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
@@ -431,53 +577,186 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("timestep"),
                 ::py::arg("poses"),
                 ::py::arg("footBodyNames"),
-                ::py::arg("forcePlates"))
+                ::py::arg("forcePlates"),
+                ::py::arg("rootHistoryLen") = 5,
+                ::py::arg("rootHistoryStride") = 1,
+                ::py::arg("explicitVels") = Eigen::MatrixXs::Zero(0, 0),
+                ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0))
             .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
                 ::py::arg("linearResidual"))
             .def(
+                "getLinearResidual",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getLinearResidual)
+            .def(
                 "setAngularResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setAngularResidual,
                 ::py::arg("angularResidual"))
+            .def(
+                "getAngularResidual",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getAngularResidual)
             .def(
                 "setPoses",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setPoses,
                 ::py::arg("poses"))
             .def(
+                "getPoses",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getPoses)
+            .def(
                 "setVels",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setVels,
                 ::py::arg("vels"))
+            .def(
+                "getVels", &dart::biomechanics::SubjectOnDiskTrialPass::getVels)
             .def(
                 "setAccs",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setAccs,
                 ::py::arg("accs"))
             .def(
+                "getAccs", &dart::biomechanics::SubjectOnDiskTrialPass::getAccs)
+            .def(
                 "setTaus",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setTaus,
                 ::py::arg("taus"))
+            .def(
+                "getTaus", &dart::biomechanics::SubjectOnDiskTrialPass::getTaus)
             .def(
                 "setGroundBodyWrenches",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setGroundBodyWrenches,
                 ::py::arg("wrenches"))
             .def(
+                "getGroundBodyWrenches",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyWrenches)
+            .def(
                 "setGroundBodyCopTorqueForce",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setGroundBodyCopTorqueForce,
                 ::py::arg("copTorqueForces"))
             .def(
+                "getGroundBodyCopTorqueForce",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyCopTorqueForce)
+            .def(
                 "setComPoses",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComPoses,
                 ::py::arg("poses"))
+            .def(
+                "getComPoses",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComPoses)
             .def(
                 "setComVels",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComVels,
                 ::py::arg("vels"))
             .def(
+                "getComVels",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComVels)
+            .def(
                 "setComAccs",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setComAccs,
-                ::py::arg("accs"));
+                ::py::arg("accs"))
+            .def(
+                "getComAccs",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getComAccs)
+            .def(
+                "setComAccsInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setComAccsInRootFrame,
+                ::py::arg("accs"))
+            .def(
+                "getComAccsInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getComAccsInRootFrame)
+            .def(
+                "setResidualWrenchInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setResidualWrenchInRootFrame,
+                ::py::arg("wrenches"))
+            .def(
+                "getResidualWrenchInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getResidualWrenchInRootFrame)
+            .def(
+                "setGroundBodyWrenchesInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setGroundBodyWrenchesInRootFrame,
+                ::py::arg("wrenches"))
+            .def(
+                "getGroundBodyWrenchesInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyWrenchesInRootFrame)
+            .def(
+                "setGroundBodyCopTorqueForceInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setGroundBodyCopTorqueForceInRootFrame,
+                ::py::arg("copTorqueForces"))
+            .def(
+                "getGroundBodyCopTorqueForceInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getGroundBodyCopTorqueForceInRootFrame)
+            .def(
+                "setJointCenters",
+                &dart::biomechanics::SubjectOnDiskTrialPass::setJointCenters,
+                ::py::arg("centers"))
+            .def(
+                "getJointCenters",
+                &dart::biomechanics::SubjectOnDiskTrialPass::getJointCenters)
+            .def(
+                "setJointCentersInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setJointCentersInRootFrame,
+                ::py::arg("centers"))
+            .def(
+                "getJointCentersInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getJointCentersInRootFrame)
+            .def(
+                "setRootSpatialVelInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootSpatialVelInRootFrame,
+                ::py::arg("spatialVel"))
+            .def(
+                "getRootSpatialVelInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootSpatialVelInRootFrame)
+            .def(
+                "setRootSpatialAccInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootSpatialAccInRootFrame,
+                ::py::arg("spatialAcc"))
+            .def(
+                "getRootSpatialAccInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootSpatialAccInRootFrame)
+            .def(
+                "setRootPosHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootPosHistoryInRootFrame,
+                ::py::arg("rootHistory"))
+            .def(
+                "getRootPosHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootPosHistoryInRootFrame)
+            .def(
+                "setRootEulerHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setRootEulerHistoryInRootFrame,
+                ::py::arg("rootHistory"))
+            .def(
+                "getRootEulerHistoryInRootFrame",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getRootEulerHistoryInRootFrame)
+            .def(
+                "setResamplingMatrix",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setResamplingMatrix,
+                ::py::arg("resamplingMatrix"))
+            .def(
+                "getResamplingMatrix",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getResamplingMatrix);
 
   auto subjectOnDiskTrial
       = ::py::class_<
@@ -494,6 +773,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setTimestep,
                 ::py::arg("timestep"))
             .def(
+                "getTimestep",
+                &dart::biomechanics::SubjectOnDiskTrial::getTimestep)
+            .def(
                 "setTrialTags",
                 &dart::biomechanics::SubjectOnDiskTrial::setTrialTags,
                 ::py::arg("trialTags"))
@@ -509,6 +791,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,
                 ::py::arg("missingGRFReason"))
+            .def(
+                "getMissingGRFReason",
+                &dart::biomechanics::SubjectOnDiskTrial::getMissingGRFReason)
             .def(
                 "setCustomValues",
                 &dart::biomechanics::SubjectOnDiskTrial::setCustomValues,
@@ -542,12 +827,18 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setForcePlates,
                 ::py::arg("forcePlates"))
             .def(
+                "getForcePlates",
+                &dart::biomechanics::SubjectOnDiskTrial::getForcePlates)
+            .def(
                 "addPass",
                 &dart::biomechanics::SubjectOnDiskTrial::addPass,
                 "This creates a new :code:`SubjectOnDiskTrialPass` for this "
                 "trial, and returns it. That object can store results from IK "
                 "and ID, as well as other results from the processing "
-                "pipeline.");
+                "pipeline.")
+            .def(
+                "getPasses",
+                &dart::biomechanics::SubjectOnDiskTrial::getPasses);
 
   auto subjectOnDiskPassHead
       = ::py::class_<
@@ -562,22 +853,36 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskPassHeader::
                     setProcessingPassType,
                 ::py::arg("type"))
+            .def(
+                "getProcessingPassType",
+                &dart::biomechanics::SubjectOnDiskPassHeader::
+                    getProcessingPassType)
             //   SubjectOnDiskPassHeader& setOpenSimFileText(
             //       const std::string& openSimFileText);
             .def(
                 "setOpenSimFileText",
                 &dart::biomechanics::SubjectOnDiskPassHeader::
                     setOpenSimFileText,
-                ::py::arg("openSimFileText"));
+                ::py::arg("openSimFileText"))
+            .def(
+                "getOpenSimFileText",
+                &dart::biomechanics::SubjectOnDiskPassHeader::
+                    getOpenSimFileText);
 
   auto subjectOnDiskHeader
-      = ::py::class_<dart::biomechanics::SubjectOnDiskHeader>(
+      = ::py::class_<
+            dart::biomechanics::SubjectOnDiskHeader,
+            std::shared_ptr<dart::biomechanics::SubjectOnDiskHeader>>(
             m, "SubjectOnDiskHeader")
             .def(::py::init<>())
             .def(
                 "setNumDofs",
                 &dart::biomechanics::SubjectOnDiskHeader::setNumDofs,
                 ::py::arg("dofs"))
+            .def(
+                "setNumJoints",
+                &dart::biomechanics::SubjectOnDiskHeader::setNumJoints,
+                ::py::arg("joints"))
             .def(
                 "setGroundForceBodies",
                 &dart::biomechanics::SubjectOnDiskHeader::setGroundForceBodies,
@@ -617,7 +922,17 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "addProcessingPass",
                 &dart::biomechanics::SubjectOnDiskHeader::addProcessingPass)
+            .def(
+                "getProcessingPasses",
+                &dart::biomechanics::SubjectOnDiskHeader::getProcessingPasses)
             .def("addTrial", &dart::biomechanics::SubjectOnDiskHeader::addTrial)
+            .def(
+                "getTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::getTrials)
+            .def(
+                "setTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::setTrials,
+                ::py::arg("trials"))
             .def(
                 "recomputeColumnNames",
                 &dart::biomechanics::SubjectOnDiskHeader::recomputeColumnNames);
@@ -642,6 +957,22 @@ Note that these are specified in the local body frame, acting on the body at its
             //   /// in Geometry folder.
             //   std::shared_ptr<dynamics::Skeleton> readSkel(
             //       int processingPass, std::string geometryFolder = "");
+            .def(
+                "loadAllFrames",
+                &dart::biomechanics::SubjectOnDisk::loadAllFrames,
+                ::py::arg("doNotStandardizeForcePlateData") = false,
+                "This loads all the frames of data, and fills in the "
+                "processing pass data matrices in the proto header classes.")
+            .def(
+                "getHeaderProto",
+                &dart::biomechanics::SubjectOnDisk::getHeaderProto,
+                "This returns the raw proto header for this subject, which can "
+                "be used to write out a new B3D file")
+            .def(
+                "readForcePlates",
+                &dart::biomechanics::SubjectOnDisk::readForcePlates,
+                "This reads all the raw sensor data for this trial, and "
+                "constructs force plates.")
             .def(
                 "readSkel",
                 &dart::biomechanics::SubjectOnDisk::readSkel,
@@ -764,6 +1095,11 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getNumDofs",
                 &dart::biomechanics::SubjectOnDisk::getNumDofs,
                 "This returns the number of DOFs for the model on this Subject")
+            .def(
+                "getNumJoints",
+                &dart::biomechanics::SubjectOnDisk::getNumJoints,
+                "This returns the number of joints for the model on this "
+                "Subject")
             //   /// This returns the vector of enums of type
             //   'MissingGRFReason', which labels
             //   /// why each time step was identified as 'probablyMissingGRF'.

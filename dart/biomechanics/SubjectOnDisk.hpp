@@ -42,6 +42,22 @@ struct FramePass
   Eigen::Vector3s comPos;
   Eigen::Vector3s comVel;
   Eigen::Vector3s comAcc;
+  Eigen::Vector3s comAccInRootFrame;
+  // These are each 6-vectors of the contact wrench of each body, but expressed
+  // in the world frame, all concatenated together
+  Eigen::VectorXd groundContactWrenchesInRootFrame;
+  // These are each 3-vector for each contact body, concatenated together
+  Eigen::VectorXd groundContactCenterOfPressureInRootFrame;
+  Eigen::VectorXd groundContactTorqueInRootFrame;
+  Eigen::VectorXd groundContactForceInRootFrame;
+  // This is the residual, expressed as a wrench in the root body (probably the
+  // pelvis) frame
+  Eigen::Vector6d residualWrenchInRootFrame;
+  // These are the joint centers, expressed in the world frame
+  Eigen::VectorXd jointCenters;
+  // These are the joint centers, expressed in the root body (probably the
+  // pelvis) frame
+  Eigen::VectorXd jointCentersInRootFrame;
   // These are masks for which DOFs are observed
   Eigen::VectorXi posObserved;
   // These are masks for which DOFs have been finite differenced (if they
@@ -49,6 +65,13 @@ struct FramePass
   // more trustworthy)
   Eigen::VectorXi velFiniteDifferenced;
   Eigen::VectorXi accFiniteDifferenced;
+
+  Eigen::Vector3s rootLinearVelInRootFrame;
+  Eigen::Vector3s rootAngularVelInRootFrame;
+  Eigen::Vector3s rootLinearAccInRootFrame;
+  Eigen::Vector3s rootAngularAccInRootFrame;
+  Eigen::VectorXs rootPosHistoryInRootFrame;
+  Eigen::VectorXs rootEulerHistoryInRootFrame;
 
   void readFromProto(
       dart::proto::SubjectOnDiskProcessingPassFrame* proto,
@@ -116,7 +139,9 @@ public:
   void setDofAccelerationFiniteDifferenced(
       std::vector<bool> dofAccelerationFiniteDifference);
   void setMarkerRMS(std::vector<s_t> markerRMS);
+  std::vector<s_t> getMarkerRMS();
   void setMarkerMax(std::vector<s_t> markerMax);
+  std::vector<s_t> getMarkerMax();
   // If we're doing a lowpass filter on this pass, then what was the cutoff
   // frequency of that filter?
   void setLowpassCutoffFrequency(s_t freq);
@@ -138,7 +163,10 @@ public:
       // If we've already assigned the force plates to feet
       Eigen::MatrixXs forces,
       Eigen::MatrixXs moments,
-      Eigen::MatrixXs cops);
+      Eigen::MatrixXs cops,
+      // How much history to use for the root position and orientation
+      int rootHistoryLen = 5,
+      int rootHistoryStride = 1);
 
   // This is for allowing the user to set all the values of a pass at once,
   // without having to manually compute them in Python, which turns out to be
@@ -148,22 +176,71 @@ public:
       s_t timestep,
       Eigen::MatrixXs poses,
       std::vector<std::string> footBodies,
-      std::vector<ForcePlate> forcePlates);
+      std::vector<ForcePlate> forcePlates,
+      // How much history to use for the root position and orientation
+      int rootHistoryLen = 5,
+      int rootHistoryStride = 1,
+      Eigen::MatrixXs explicitVels = Eigen::MatrixXs::Zero(0, 0),
+      Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0));
 
-  // Manual setters that compete with computeValues()
+  // Manual setters (and getters) that compete with computeValues()
   void setLinearResidual(std::vector<s_t> linearResidual);
+  std::vector<s_t> getLinearResidual();
   void setAngularResidual(std::vector<s_t> angularResidual);
+  std::vector<s_t> getAngularResidual();
   void setPoses(Eigen::MatrixXs poses);
+  Eigen::MatrixXs getPoses();
   void setVels(Eigen::MatrixXs vels);
+  Eigen::MatrixXs getVels();
   void setAccs(Eigen::MatrixXs accs);
+  Eigen::MatrixXs getAccs();
   void setTaus(Eigen::MatrixXs taus);
+  Eigen::MatrixXs getTaus();
   void setGroundBodyWrenches(Eigen::MatrixXs wrenches);
+  Eigen::MatrixXs getGroundBodyWrenches();
   void setGroundBodyCopTorqueForce(Eigen::MatrixXs copTorqueForces);
+  Eigen::MatrixXs getGroundBodyCopTorqueForce();
   void setComPoses(Eigen::MatrixXs poses);
+  Eigen::MatrixXs getComPoses();
   void setComVels(Eigen::MatrixXs vels);
+  Eigen::MatrixXs getComVels();
   void setComAccs(Eigen::MatrixXs accs);
+  Eigen::MatrixXs getComAccs();
+  void setComAccsInRootFrame(Eigen::MatrixXs accs);
+  Eigen::MatrixXs getComAccsInRootFrame();
+  void setResidualWrenchInRootFrame(Eigen::MatrixXs wrenches);
+  Eigen::MatrixXs getResidualWrenchInRootFrame();
+  void setGroundBodyWrenchesInRootFrame(Eigen::MatrixXs wrenches);
+  Eigen::MatrixXs getGroundBodyWrenchesInRootFrame();
+  void setGroundBodyCopTorqueForceInRootFrame(Eigen::MatrixXs copTorqueForces);
+  Eigen::MatrixXs getGroundBodyCopTorqueForceInRootFrame();
+  void setJointCenters(Eigen::MatrixXs centers);
+  Eigen::MatrixXs getJointCenters();
+  void setJointCentersInRootFrame(Eigen::MatrixXs centers);
+  Eigen::MatrixXs getJointCentersInRootFrame();
+  void setRootSpatialVelInRootFrame(Eigen::MatrixXs spatialVel);
+  Eigen::MatrixXs getRootSpatialVelInRootFrame();
+  void setRootSpatialAccInRootFrame(Eigen::MatrixXs spatialAcc);
+  Eigen::MatrixXs getRootSpatialAccInRootFrame();
+  void setRootPosHistoryInRootFrame(Eigen::MatrixXs rootHistory);
+  Eigen::MatrixXs getRootPosHistoryInRootFrame();
+  void setRootEulerHistoryInRootFrame(Eigen::MatrixXs rootHistory);
+  Eigen::MatrixXs getRootEulerHistoryInRootFrame();
+
+  // This will return a matrix where every one of our properties with setters is
+  // stacked together vertically. Each column represents time, and each row is a
+  // different property of interest. The point here is not to introspect into
+  // the individual rows, but to have a convenient object that we can resample
+  // to a new timestep length, and possibly lowpass filter.
+  Eigen::MatrixXs getResamplingMatrix();
+  // This is the setter for the matrix you get from `getResamplingMatrix()`,
+  // after you've finished modifying it.
+  void setResamplingMatrix(Eigen::MatrixXs matrix);
+
   void read(const proto::SubjectOnDiskTrialProcessingPassHeader& proto);
   void write(proto::SubjectOnDiskTrialProcessingPassHeader* proto);
+
+  void copyValuesFrom(std::shared_ptr<SubjectOnDiskTrialPass> other);
 
 protected:
   // This data is included in the header
@@ -194,6 +271,16 @@ protected:
   Eigen::MatrixXs mComPoses;
   Eigen::MatrixXs mComVels;
   Eigen::MatrixXs mComAccs;
+  Eigen::MatrixXs mComAccsInRootFrame;
+  Eigen::MatrixXs mResidualWrenchInRootFrame;
+  Eigen::MatrixXs mGroundBodyWrenchesInRootFrame;
+  Eigen::MatrixXs mGroundBodyCopTorqueForceInRootFrame;
+  Eigen::MatrixXs mJointCenters;
+  Eigen::MatrixXs mJointCentersInRootFrame;
+  Eigen::MatrixXs mRootSpatialVelInRootFrame;
+  Eigen::MatrixXs mRootSpatialAccInRootFrame;
+  Eigen::MatrixXs mRootPosHistoryInRootFrame;
+  Eigen::MatrixXs mRootEulerHistoryInRootFrame;
   // This is for allowing the user to pre-filter out data where joint velocities
   // are above a certain "unreasonable limit", like 50 rad/s or so
   std::vector<s_t> mJointsMaxVelocity;
@@ -210,9 +297,11 @@ public:
   SubjectOnDiskTrial();
   void setName(const std::string& name);
   void setTimestep(s_t timestep);
+  s_t getTimestep();
   void setTrialTags(std::vector<std::string> trialTags);
   void setOriginalTrialName(const std::string& name);
   void setSplitIndex(int split);
+  std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
   void setMarkerNamesGuessed(bool markersGuessed);
@@ -226,7 +315,9 @@ public:
       std::vector<std::map<std::string, Eigen::VectorXs>> emgObservations);
   void setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
   void setForcePlates(std::vector<ForcePlate> forcePlates);
+  std::vector<ForcePlate> getForcePlates();
   std::shared_ptr<SubjectOnDiskTrialPass> addPass();
+  std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> getPasses();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
   void write(proto::SubjectOnDiskTrialHeader* proto);
 
@@ -279,7 +370,9 @@ class SubjectOnDiskPassHeader
 public:
   SubjectOnDiskPassHeader();
   void setProcessingPassType(ProcessingPassType type);
+  ProcessingPassType getProcessingPassType();
   void setOpenSimFileText(const std::string& openSimFileText);
+  std::string getOpenSimFileText();
   void write(dart::proto::SubjectOnDiskPass* proto);
   void read(const dart::proto::SubjectOnDiskPass& proto);
 
@@ -298,6 +391,7 @@ class SubjectOnDiskHeader
 public:
   SubjectOnDiskHeader();
   SubjectOnDiskHeader& setNumDofs(int dofs);
+  SubjectOnDiskHeader& setNumJoints(int joints);
   SubjectOnDiskHeader& setGroundForceBodies(
       std::vector<std::string> groundForceBodies);
   SubjectOnDiskHeader& setCustomValueNames(
@@ -310,7 +404,10 @@ public:
   SubjectOnDiskHeader& setHref(const std::string& sourceHref);
   SubjectOnDiskHeader& setNotes(const std::string& notes);
   std::shared_ptr<SubjectOnDiskPassHeader> addProcessingPass();
+  std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
+  std::vector<std::shared_ptr<SubjectOnDiskTrial>> getTrials();
+  void setTrials(std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials);
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
   void read(const dart::proto::SubjectOnDiskHeader& proto);
@@ -328,6 +425,8 @@ public:
 protected:
   // How many DOFs are in the skeleton
   int mNumDofs;
+  // How many joints are in the skeleton
+  int mNumJoints;
   // The passes we applied to this data, along with the result skeletons that
   // were generated by each pass.
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> mPasses;
@@ -382,7 +481,20 @@ public:
   SubjectOnDisk(const std::string& path);
 
   /// This will write a B3D file to disk
-  static void writeB3D(const std::string& path, SubjectOnDiskHeader& header);
+  static void writeB3D(
+      const std::string& path, std::shared_ptr<SubjectOnDiskHeader> header);
+
+  /// This loads all the frames of data, and fills in the processing pass data
+  /// matrices in the proto header classes.
+  void loadAllFrames(bool doNotStandardizeForcePlateData = false);
+
+  /// This returns the raw proto header for this subject, which can be used to
+  /// write out a new B3D file
+  std::shared_ptr<SubjectOnDiskHeader> getHeaderProto();
+
+  /// This reads all the raw sensor data for this trial, and constructs
+  /// force plates.
+  std::vector<ForcePlate> readForcePlates(int trial);
 
   /// This will read the skeleton from the binary, and optionally use the passed
   /// in Geometry folder.
@@ -441,6 +553,9 @@ public:
 
   /// This returns the number of DOFs for the model on this Subject
   int getNumDofs();
+
+  /// This returns the number of joints for the model on this Subject
+  int getNumJoints();
 
   /// This returns the vector of enums of type 'MissingGRFReason', which can
   /// include `notMissingGRF`.
@@ -511,11 +626,12 @@ protected:
   std::string mPath;
   // We cache some very basic data about the accessible bounds of on-disk data,
   // so we don't have to look that up every time.
-  int mDataSectionStart;
-  int mSensorFrameSize;
-  int mProcessingPassFrameSize;
+  long mDataSectionStart;
+  long mSensorFrameSize;
+  long mProcessingPassFrameSize;
+  bool mLoadedAllFrames;
 
-  SubjectOnDiskHeader mHeader;
+  std::shared_ptr<SubjectOnDiskHeader> mHeader;
 };
 
 } // namespace biomechanics
