@@ -89,7 +89,7 @@ struct Frame
   MissingGRFReason missingGRFReason;
   // Each processing pass has its own set of kinematics and dynamics, as the
   // model and trajectories are adjusted
-  std::vector<FramePass> processingPasses;
+  std::vector<std::shared_ptr<FramePass>> processingPasses;
 
   ///////////////////////////////////////////////////////////////////////////
   // Raw sensor data

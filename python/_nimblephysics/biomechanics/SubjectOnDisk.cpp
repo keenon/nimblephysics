@@ -1,5 +1,6 @@
 #include "dart/biomechanics/SubjectOnDisk.hpp"
 
+#include <future>
 #include <memory>
 
 #include <dart/biomechanics/OpenSimParser.hpp>
@@ -11,10 +12,16 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
+#include "dart/biomechanics/MarkerFitter.hpp"
 #include "dart/math/MathTypes.hpp"
 
 namespace py = pybind11;
+
+PYBIND11_MAKE_OPAQUE(std::vector<std::shared_ptr<dart::biomechanics::Frame>>);
+PYBIND11_MAKE_OPAQUE(
+    std::vector<std::shared_ptr<dart::biomechanics::FramePass>>);
 
 namespace dart {
 namespace python {
@@ -39,9 +46,11 @@ void SubjectOnDisk(py::module& m)
                 "kinematics and dynamics.");
 
   auto framePass
-      = ::py::class_<dart::biomechanics::FramePass>(m, "FramePass")
+      = ::py::class_<
+            dart::biomechanics::FramePass,
+            std::shared_ptr<dart::biomechanics::FramePass>>(m, "FramePass")
             //   ProcessingPassType type;
-            .def_readwrite(
+            .def_readonly(
                 "type",
                 &dart::biomechanics::FramePass::type,
                 "The type of processing pass that this data came from. Options "
@@ -49,14 +58,14 @@ void SubjectOnDisk(py::module& m)
                 "movement and physics), and LOW_PASS_FILTER (to apply a simple "
                 "Butterworth to the observed data from the previous pass).")
             //   s_t markerRMS;
-            .def_readwrite(
+            .def_readonly(
                 "markerRMS",
                 &dart::biomechanics::FramePass::markerRMS,
                 "A scalar indicating the RMS marker error (discrepancy between "
                 "the model and the experimentally observed marker locations) "
                 "on this frame, in meters, with these joint positions.")
             //   s_t markerMax;
-            .def_readwrite(
+            .def_readonly(
                 "markerMax",
                 &dart::biomechanics::FramePass::markerMax,
                 "A scalar indicating the maximum marker error (discrepancy "
@@ -64,7 +73,7 @@ void SubjectOnDisk(py::module& m)
                 "locations) on this frame, in meters, with these joint "
                 "positions.")
             //   s_t linearResidual;
-            .def_readwrite(
+            .def_readonly(
                 "linearResidual",
                 &dart::biomechanics::FramePass::linearResidual,
                 "A scalar giving how much linear force, in Newtons, would need "
@@ -72,7 +81,7 @@ void SubjectOnDisk(py::module& m)
                 "the skeleton's observed accelerations (given positions and "
                 "velocities) on this frame.")
             //   s_t angularResidual;
-            .def_readwrite(
+            .def_readonly(
                 "angularResidual",
                 &dart::biomechanics::FramePass::angularResidual,
                 "A scalar giving how much angular torque, in Newton-meters, "
@@ -81,25 +90,25 @@ void SubjectOnDisk(py::module& m)
                 "the skeleton's observed accelerations (given positions and "
                 "velocities) on this frame.")
             //   Eigen::VectorXd pos;
-            .def_readwrite(
+            .def_readonly(
                 "pos",
                 &dart::biomechanics::FramePass::pos,
                 py::return_value_policy::reference_internal,
                 "The joint positions on this frame.")
             //   Eigen::VectorXd vel;
-            .def_readwrite(
+            .def_readonly(
                 "vel",
                 &dart::biomechanics::FramePass::vel,
                 py::return_value_policy::reference_internal,
                 "The joint velocities on this frame.")
             //   Eigen::VectorXd acc;
-            .def_readwrite(
+            .def_readonly(
                 "acc",
                 &dart::biomechanics::FramePass::acc,
                 py::return_value_policy::reference_internal,
                 "The joint accelerations on this frame.")
             //   Eigen::VectorXd tau;
-            .def_readwrite(
+            .def_readonly(
                 "tau",
                 &dart::biomechanics::FramePass::tau,
                 py::return_value_policy::reference_internal,
@@ -108,7 +117,7 @@ void SubjectOnDisk(py::module& m)
             //   indicating whether
             //   // or not it's in contact
             //   Eigen::VectorXi contact;
-            .def_readwrite(
+            .def_readonly(
                 "contact",
                 &dart::biomechanics::FramePass::contact,
                 py::return_value_policy::reference_internal,
@@ -116,7 +125,7 @@ void SubjectOnDisk(py::module& m)
                 "the ground.")
             //   // These are each 6-vector of contact body wrenches, all
             //   concatenated together Eigen::VectorXd groundContactWrenches;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactWrenches",
                 &dart::biomechanics::FramePass::groundContactWrenches,
                 py::return_value_policy::reference_internal,
@@ -138,7 +147,7 @@ Note that these are specified in the local body frame, acting on the body at its
 )doc")
             //   // These are each 3-vector for each contact body, concatenated
             //   together Eigen::VectorXd groundContactCenterOfPressure;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactCenterOfPressure",
                 &dart::biomechanics::FramePass::groundContactCenterOfPressure,
                 py::return_value_policy::reference_internal,
@@ -147,7 +156,7 @@ Note that these are specified in the local body frame, acting on the body at its
             expressed in the world frame.
         )doc")
             //   Eigen::VectorXd groundContactTorque;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactTorque",
                 &dart::biomechanics::FramePass::groundContactTorque,
                 py::return_value_policy::reference_internal,
@@ -156,7 +165,7 @@ Note that these are specified in the local body frame, acting on the body at its
             expressed in the world frame, and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
             //   Eigen::VectorXd groundContactForce;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactForce",
                 &dart::biomechanics::FramePass::groundContactForce,
                 py::return_value_policy::reference_internal,
@@ -166,7 +175,7 @@ Note that these are specified in the local body frame, acting on the body at its
           )doc")
             //   // These are each 3-vector for each contact body, concatenated
             //   together Eigen::VectorXd groundContactCenterOfPressure;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactCenterOfPressureInRootFrame",
                 &dart::biomechanics::FramePass::
                     groundContactCenterOfPressureInRootFrame,
@@ -176,7 +185,7 @@ Note that these are specified in the local body frame, acting on the body at its
             expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis).
         )doc")
             //   Eigen::VectorXd groundContactTorque;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactTorqueInRootFrame",
                 &dart::biomechanics::FramePass::groundContactTorqueInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -185,7 +194,7 @@ Note that these are specified in the local body frame, acting on the body at its
             expressed in the root frame, which is a frame that is rigidly attached to the root body of the skeleton (probably the pelvis), and is assumed to be acting at the corresponding :code:`CoP` from the same index in :code:`groundContactCenterOfPressure`.
           )doc")
             //   Eigen::VectorXd groundContactForce;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactForceInRootFrame",
                 &dart::biomechanics::FramePass::groundContactForceInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -195,26 +204,26 @@ Note that these are specified in the local body frame, acting on the body at its
           )doc")
             //   // These are the center of mass kinematics
             //   Eigen::Vector3s comPos;
-            .def_readwrite(
+            .def_readonly(
                 "comPos",
                 &dart::biomechanics::FramePass::comPos,
                 py::return_value_policy::reference_internal,
                 "The position of the COM, in world space")
             //   Eigen::Vector3s comVel;
-            .def_readwrite(
+            .def_readonly(
                 "comVel",
                 &dart::biomechanics::FramePass::comVel,
                 py::return_value_policy::reference_internal,
                 "The velocity of the COM, in world space")
             //   Eigen::Vector3s comAcc;
-            .def_readwrite(
+            .def_readonly(
                 "comAcc",
                 &dart::biomechanics::FramePass::comAcc,
                 py::return_value_policy::reference_internal,
                 "The acceleration of the COM, in world space")
             //   // These are masks for which DOFs are observed
             //   Eigen::VectorXi posObserved;
-            .def_readwrite(
+            .def_readonly(
                 "posObserved",
                 &dart::biomechanics::FramePass::posObserved,
                 py::return_value_policy::reference_internal,
@@ -226,7 +235,7 @@ Note that these are specified in the local body frame, acting on the body at its
             //   and therefore
             //   // more trustworthy)
             //   Eigen::VectorXi velFiniteDifferenced;
-            .def_readwrite(
+            .def_readonly(
                 "velFiniteDifferenced",
                 &dart::biomechanics::FramePass::velFiniteDifferenced,
                 py::return_value_policy::reference_internal,
@@ -234,7 +243,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "that this DOF got its velocity through finite differencing, "
                 "and therefore may be somewhat unreliable")
             //   Eigen::VectorXi accFiniteDifferenced;
-            .def_readwrite(
+            .def_readonly(
                 "accFiniteDifferenced",
                 &dart::biomechanics::FramePass::accFiniteDifferenced,
                 py::return_value_policy::reference_internal,
@@ -242,7 +251,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "that this DOF got its acceleration through finite "
                 "differencing, and therefore may be somewhat unreliable")
             //   Eigen::Vector3s rootLinearVelInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootLinearVelInRootFrame",
                 &dart::biomechanics::FramePass::rootLinearVelInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -250,7 +259,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "root body of the skeleton (probably the pelvis) expressed in "
                 "its own coordinate frame.")
             //   Eigen::Vector3s rootAngularVelInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootAngularVelInRootFrame",
                 &dart::biomechanics::FramePass::rootAngularVelInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -259,7 +268,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "second, of the root body of the skeleton (probably the "
                 "pelvis) expressed in its own coordinate frame.")
             //   Eigen::Vector3s rootLinearAccInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootLinearAccInRootFrame",
                 &dart::biomechanics::FramePass::rootLinearAccInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -268,7 +277,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "root body of the skeleton (probably the pelvis) expressed in "
                 "its own coordinate frame.")
             //   Eigen::Vector3s rootAngularAccInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootAngularAccInRootFrame",
                 &dart::biomechanics::FramePass::rootAngularAccInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -277,7 +286,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "second squared, of the root body of the skeleton (probably "
                 "the pelvis) expressed in its own coordinate frame.")
             //   Eigen::VectorXs rootPosHistoryInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootPosHistoryInRootFrame",
                 &dart::biomechanics::FramePass::rootPosHistoryInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -287,7 +296,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "The [0:3] of the vector is the most recent, and they get "
                 "older from there. Vectors  ")
             //   Eigen::VectorXs rootEulerHistoryInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "rootEulerHistoryInRootFrame",
                 &dart::biomechanics::FramePass::rootEulerHistoryInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -296,7 +305,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 " of the skeleton (probably the pelvis) expressed in "
                 "its own coordinate frame.")
             // Eigen::Vector3s comAccInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "comAccInRootFrame",
                 &dart::biomechanics::FramePass::comAccInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -306,7 +315,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "may use a different body as the root, for instance the "
                 "torso).")
             // Eigen::VectorXd groundContactWrenchesInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "groundContactWrenchesInRootFrame",
                 &dart::biomechanics::FramePass::
                     groundContactWrenchesInRootFrame,
@@ -318,7 +327,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 "root body is probably the pelvis, but for some skeletons they "
                 "may use another body as the root, like the torso.")
             // Eigen::VectorXd groundContactWrenchesInRootFrame;
-            .def_readwrite(
+            .def_readonly(
                 "residualWrenchInRootFrame",
                 &dart::biomechanics::FramePass::residualWrenchInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -331,13 +340,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "torque, last 3 = force). The "
                 "root body is probably the pelvis, but for some skeletons they "
                 "may use another body as the root, like the torso.")
-            .def_readwrite(
+            .def_readonly(
                 "jointCenters",
                 &dart::biomechanics::FramePass::jointCenters,
                 py::return_value_policy::reference_internal,
                 "These are the joint center locations, concatenated together, "
                 "given in the world frame.")
-            .def_readwrite(
+            .def_readonly(
                 "jointCentersInRootFrame",
                 &dart::biomechanics::FramePass::jointCentersInRootFrame,
                 py::return_value_policy::reference_internal,
@@ -1332,6 +1341,12 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::getNotes,
                 "The notes (if any) added by the person who uploaded this data "
                 "to AddBiomechanics.");
+
+  // later in binding code:
+  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::Frame>>>(
+      m, "FrameList");
+  py::bind_vector<std::vector<std::shared_ptr<dart::biomechanics::FramePass>>>(
+      m, "FramePassList");
 
   subjectOnDisk.doc() = R"doc(
         This is for doing ML and large-scale data analysis. The idea here is to

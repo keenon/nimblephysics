@@ -457,7 +457,7 @@ void SubjectOnDisk::loadAllFrames(bool doNotStandardizeForcePlateData)
       const int jointCenterDim
           = frames.size() > 0
                 ? frames[0]->processingPasses.size() > 0
-                      ? frames[0]->processingPasses[0].jointCenters.size()
+                      ? frames[0]->processingPasses[0]->jointCenters.size()
                       : 0
                 : 0;
       passProto->mJointCenters = Eigen::MatrixXs::Zero(jointCenterDim, len);
@@ -469,7 +469,7 @@ void SubjectOnDisk::loadAllFrames(bool doNotStandardizeForcePlateData)
                            ? frames[0]->processingPasses.size() > 0
                                  ? frames[0]
                                        ->processingPasses[0]
-                                       .rootEulerHistoryInRootFrame.size()
+                                       ->rootEulerHistoryInRootFrame.size()
                                  : 0
                            : 0;
       passProto->mRootPosHistoryInRootFrame
@@ -479,72 +479,73 @@ void SubjectOnDisk::loadAllFrames(bool doNotStandardizeForcePlateData)
 
       for (int t = 0; t < frames.size(); t++)
       {
-        passProto->mPos.col(t) = frames[t]->processingPasses[pass].pos;
-        passProto->mVel.col(t) = frames[t]->processingPasses[pass].vel;
-        passProto->mAcc.col(t) = frames[t]->processingPasses[pass].acc;
-        passProto->mTaus.col(t) = frames[t]->processingPasses[pass].tau;
+        passProto->mPos.col(t) = frames[t]->processingPasses[pass]->pos;
+        passProto->mVel.col(t) = frames[t]->processingPasses[pass]->vel;
+        passProto->mAcc.col(t) = frames[t]->processingPasses[pass]->acc;
+        passProto->mTaus.col(t) = frames[t]->processingPasses[pass]->tau;
         passProto->mGroundBodyWrenches.col(t)
-            = frames[t]->processingPasses[pass].groundContactWrenches;
-        passProto->mComPoses.col(t) = frames[t]->processingPasses[pass].comPos;
-        passProto->mComVels.col(t) = frames[t]->processingPasses[pass].comVel;
-        passProto->mComAccs.col(t) = frames[t]->processingPasses[pass].comAcc;
+            = frames[t]->processingPasses[pass]->groundContactWrenches;
+        passProto->mComPoses.col(t) = frames[t]->processingPasses[pass]->comPos;
+        passProto->mComVels.col(t) = frames[t]->processingPasses[pass]->comVel;
+        passProto->mComAccs.col(t) = frames[t]->processingPasses[pass]->comAcc;
         passProto->mComAccsInRootFrame.col(t)
-            = frames[t]->processingPasses[pass].comAccInRootFrame;
+            = frames[t]->processingPasses[pass]->comAccInRootFrame;
         passProto->mResidualWrenchInRootFrame.col(t)
-            = frames[t]->processingPasses[pass].residualWrenchInRootFrame;
+            = frames[t]->processingPasses[pass]->residualWrenchInRootFrame;
         passProto->mGroundBodyWrenchesInRootFrame.col(t)
             = frames[t]
                   ->processingPasses[pass]
-                  .groundContactWrenchesInRootFrame;
+                  ->groundContactWrenchesInRootFrame;
 
         for (int body = 0; body < numContactBodies; body++)
         {
           passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9, t)
               = frames[t]
                     ->processingPasses[pass]
-                    .groundContactCenterOfPressure.segment<3>(body * 3);
+                    ->groundContactCenterOfPressure.segment<3>(body * 3);
           passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9 + 3, t)
               = frames[t]
                     ->processingPasses[pass]
-                    .groundContactTorque.segment<3>(body * 3);
+                    ->groundContactTorque.segment<3>(body * 3);
           passProto->mGroundBodyCopTorqueForce.block<3, 1>(body * 9 + 6, t)
-              = frames[t]->processingPasses[pass].groundContactForce.segment<3>(
-                  body * 3);
+              = frames[t]
+                    ->processingPasses[pass]
+                    ->groundContactForce.segment<3>(body * 3);
 
           passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
               body * 9, t)
               = frames[t]
                     ->processingPasses[pass]
-                    .groundContactCenterOfPressureInRootFrame.segment<3>(
+                    ->groundContactCenterOfPressureInRootFrame.segment<3>(
                         body * 3);
           passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
               body * 9 + 3, t)
               = frames[t]
                     ->processingPasses[pass]
-                    .groundContactTorqueInRootFrame.segment<3>(body * 3);
+                    ->groundContactTorqueInRootFrame.segment<3>(body * 3);
           passProto->mGroundBodyCopTorqueForceInRootFrame.block<3, 1>(
               body * 9 + 6, t)
               = frames[t]
                     ->processingPasses[pass]
-                    .groundContactForceInRootFrame.segment<3>(body * 3);
+                    ->groundContactForceInRootFrame.segment<3>(body * 3);
         }
 
         passProto->mJointCenters.col(t)
-            = frames[t]->processingPasses[pass].jointCenters;
+            = frames[t]->processingPasses[pass]->jointCenters;
         passProto->mJointCentersInRootFrame.col(t)
-            = frames[t]->processingPasses[pass].jointCentersInRootFrame;
+            = frames[t]->processingPasses[pass]->jointCentersInRootFrame;
         passProto->mRootSpatialVelInRootFrame.col(t).head<3>()
-            = frames[t]->processingPasses[pass].rootAngularVelInRootFrame;
+            = frames[t]->processingPasses[pass]->rootAngularVelInRootFrame;
         passProto->mRootSpatialVelInRootFrame.col(t).tail<3>()
-            = frames[t]->processingPasses[pass].rootLinearVelInRootFrame;
+            = frames[t]->processingPasses[pass]->rootLinearVelInRootFrame;
         passProto->mRootSpatialAccInRootFrame.col(t).head<3>()
-            = frames[t]->processingPasses[pass].rootAngularAccInRootFrame;
+            = frames[t]->processingPasses[pass]->rootAngularAccInRootFrame;
         passProto->mRootSpatialAccInRootFrame.col(t).tail<3>()
-            = frames[t]->processingPasses[pass].rootLinearAccInRootFrame;
+            = frames[t]->processingPasses[pass]->rootLinearAccInRootFrame;
         passProto->mRootPosHistoryInRootFrame.col(t)
-            = frames[t]->processingPasses[pass].rootPosHistoryInRootFrame;
+            = frames[t]->processingPasses[pass]->rootPosHistoryInRootFrame;
         passProto->mRootEulerHistoryInRootFrame.col(t)
-            = frames[t]->processingPasses[pass].rootEulerHistoryInRootFrame;
+            = frames[t]->processingPasses[pass]->rootEulerHistoryInRootFrame;
       }
     }
   }
@@ -809,8 +810,8 @@ std::vector<std::shared_ptr<Frame>> SubjectOnDisk::readFrames(
         }
 
         // 6. Copy the results out into a frame
-        frame->processingPasses.emplace_back();
-        frame->processingPasses[pass].readFromProto(
+        frame->processingPasses.push_back(std::make_shared<FramePass>());
+        frame->processingPasses[pass]->readFromProto(
             &proto,
             *mHeader.get(),
             trial,
