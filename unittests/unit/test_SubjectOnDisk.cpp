@@ -974,28 +974,28 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
       {
         Eigen::VectorXs originalPos
             = poseTrialPasses[frame->trial][pass].col(frame->t);
-        if (!equals(originalPos, frame->processingPasses[pass].pos, 1e-8))
+        if (!equals(originalPos, frame->processingPasses[pass]->pos, 1e-8))
         {
           std::cout << "Pos not recovered" << std::endl;
           return false;
         }
         Eigen::VectorXs originalVel
             = velTrialPasses[frame->trial][pass].col(frame->t);
-        if (!equals(originalVel, frame->processingPasses[pass].vel, 1e-8))
+        if (!equals(originalVel, frame->processingPasses[pass]->vel, 1e-8))
         {
           std::cout << "Vel not recovered" << std::endl;
           return false;
         }
         Eigen::VectorXs originalAcc
             = accTrialPasses[frame->trial][pass].col(frame->t);
-        if (!equals(originalAcc, frame->processingPasses[pass].acc, 1e-8))
+        if (!equals(originalAcc, frame->processingPasses[pass]->acc, 1e-8))
         {
           std::cout << "Acc not recovered" << std::endl;
           return false;
         }
         Eigen::VectorXs originalTau
             = tauTrialPasses[frame->trial][pass].col(frame->t);
-        if (!equals(originalTau, frame->processingPasses[pass].tau, 1e-8))
+        if (!equals(originalTau, frame->processingPasses[pass]->tau, 1e-8))
         {
           std::cout << "Tau not recovered" << std::endl;
           return false;
@@ -1007,7 +1007,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
                     .col(frame->t)
                     .segment<6>(b * 6);
           Eigen::Vector6s recoveredWrench
-              = frame->processingPasses[pass].groundContactWrenches.segment<6>(
+              = frame->processingPasses[pass]->groundContactWrenches.segment<6>(
                   b * 6);
           if (!equals(originalWrench, recoveredWrench, 1e-8))
           {
@@ -1020,7 +1020,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
                     .segment<3>(b * 9);
           Eigen::Vector3s recoveredCoP
               = frame->processingPasses[pass]
-                    .groundContactCenterOfPressure.segment<3>(b * 3);
+                    ->groundContactCenterOfPressure.segment<3>(b * 3);
           if (!equals(originalCoP, recoveredCoP, 1e-8))
           {
             std::cout << "GRF CoP not recovered" << std::endl;
@@ -1031,7 +1031,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
                     .col(frame->t)
                     .segment<3>((b * 9) + 3);
           Eigen::Vector3s recoveredTau
-              = frame->processingPasses[pass].groundContactTorque.segment<3>(
+              = frame->processingPasses[pass]->groundContactTorque.segment<3>(
                   b * 3);
           if (!equals(originalTau, recoveredTau, 1e-8))
           {
@@ -1043,7 +1043,7 @@ bool testWriteSubjectToDisk(std::string outputFilePath)
                     .col(frame->t)
                     .segment<3>((b * 9) + 6);
           Eigen::Vector3s recoveredF
-              = frame->processingPasses[pass].groundContactForce.segment<3>(
+              = frame->processingPasses[pass]->groundContactForce.segment<3>(
                   b * 3);
           if (!equals(originalF, recoveredF, 1e-8))
           {
