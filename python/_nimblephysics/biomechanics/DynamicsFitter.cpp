@@ -17,6 +17,7 @@ namespace python {
 
 void DynamicsFitter(py::module& m)
 {
+
   py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
       .value(
           "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
@@ -40,6 +41,10 @@ void DynamicsFitter(py::module& m)
           "missingImpact", dart::biomechanics::MissingGRFReason::missingImpact)
       .value("missingBlip", dart::biomechanics::MissingGRFReason::missingBlip)
       .value("shiftGRF", dart::biomechanics::MissingGRFReason::shiftGRF)
+      .value(
+          "interpolatedClippedGRF",
+          dart::biomechanics::MissingGRFReason::interpolatedClippedGRF)
+      .value("manualReview", dart::biomechanics::MissingGRFReason::manualReview)
       .export_values();
 
   ::py::class_<dart::biomechanics::ResidualForceHelper>(

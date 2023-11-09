@@ -81,6 +81,14 @@ void ForcePlate(py::module& m)
           &dart::biomechanics::ForcePlate::trimToIndexes,
           ::py::arg("start"),
           ::py::arg("end"))
+      .def(
+          "getResamplingMatrixAndGroundHeights",
+          &dart::biomechanics::ForcePlate::getResamplingMatrixAndGroundHeights)
+      .def(
+          "setResamplingMatrixAndGroundHeights",
+          &dart::biomechanics::ForcePlate::setResamplingMatrixAndGroundHeights,
+          ::py::arg("matrix"),
+          ::py::arg("groundHeights"))
       .def_static(
           "copyForcePlate",
           &dart::biomechanics::ForcePlate::copyForcePlate,

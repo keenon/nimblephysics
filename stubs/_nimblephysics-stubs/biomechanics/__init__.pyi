@@ -54,6 +54,8 @@ __all__ = [
     "SubjectOnDiskTrial",
     "SubjectOnDiskTrialPass",
     "forceDiscrepancy",
+    "interpolatedClippedGRF",
+    "manualReview",
     "measuredGrfZeroWhenAccelerationNonZero",
     "missingBlip",
     "missingImpact",
@@ -703,6 +705,8 @@ class ForcePlate():
     @staticmethod
     def copyForcePlate(plate: ForcePlate) -> ForcePlate: ...
     def detectAndFixCopMomentConvention(self, trial: int = -1, i: int = -1) -> None: ...
+    def getResamplingMatrixAndGroundHeights(self) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.float64, _Shape[m, 1]]]: ...
+    def setResamplingMatrixAndGroundHeights(self, matrix: numpy.ndarray[numpy.float64, _Shape[m, n]], groundHeights: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> None: ...
     def trim(self, newStartTime: float, newEndTime: float) -> None: ...
     def trimToIndexes(self, start: int, end: int) -> None: ...
     @property
@@ -2020,6 +2024,10 @@ class MissingGRFReason():
       missingBlip
 
       shiftGRF
+
+      interpolatedClippedGRF
+
+      manualReview
     """
     def __eq__(self, other: object) -> bool: ...
     def __getstate__(self) -> int: ...
@@ -2040,8 +2048,10 @@ class MissingGRFReason():
         """
         :type: int
         """
-    __members__: dict # value = {'notMissingGRF': <MissingGRFReason.notMissingGRF: 0>, 'measuredGrfZeroWhenAccelerationNonZero': <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>, 'unmeasuredExternalForceDetected': <MissingGRFReason.unmeasuredExternalForceDetected: 2>, 'torqueDiscrepancy': <MissingGRFReason.torqueDiscrepancy: 3>, 'forceDiscrepancy': <MissingGRFReason.forceDiscrepancy: 4>, 'notOverForcePlate': <MissingGRFReason.notOverForcePlate: 5>, 'missingImpact': <MissingGRFReason.missingImpact: 6>, 'missingBlip': <MissingGRFReason.missingBlip: 7>, 'shiftGRF': <MissingGRFReason.shiftGRF: 8>}
+    __members__: dict # value = {'notMissingGRF': <MissingGRFReason.notMissingGRF: 0>, 'measuredGrfZeroWhenAccelerationNonZero': <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>, 'unmeasuredExternalForceDetected': <MissingGRFReason.unmeasuredExternalForceDetected: 2>, 'torqueDiscrepancy': <MissingGRFReason.torqueDiscrepancy: 3>, 'forceDiscrepancy': <MissingGRFReason.forceDiscrepancy: 4>, 'notOverForcePlate': <MissingGRFReason.notOverForcePlate: 5>, 'missingImpact': <MissingGRFReason.missingImpact: 6>, 'missingBlip': <MissingGRFReason.missingBlip: 7>, 'shiftGRF': <MissingGRFReason.shiftGRF: 8>, 'interpolatedClippedGRF': <MissingGRFReason.interpolatedClippedGRF: 10>, 'manualReview': <MissingGRFReason.manualReview: 9>}
     forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 4>
+    interpolatedClippedGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.interpolatedClippedGRF: 10>
+    manualReview: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.manualReview: 9>
     measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
     missingBlip: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingBlip: 7>
     missingImpact: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingImpact: 6>
@@ -2601,6 +2611,8 @@ class SubjectOnDiskTrialPass():
     def setVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     pass
 forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 4>
+interpolatedClippedGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.interpolatedClippedGRF: 10>
+manualReview: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.manualReview: 9>
 measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
 missingBlip: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingBlip: 7>
 missingImpact: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingImpact: 6>

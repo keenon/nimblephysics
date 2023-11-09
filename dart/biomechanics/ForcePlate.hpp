@@ -31,6 +31,12 @@ struct ForcePlate
 
   void trimToIndexes(int start, int end);
 
+  std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+  getResamplingMatrixAndGroundHeights();
+
+  void setResamplingMatrixAndGroundHeights(
+      Eigen::MatrixXs matrix, Eigen::VectorXs groundHeights);
+
   static ForcePlate copyForcePlate(const ForcePlate& plate);
 };
 

@@ -101,6 +101,8 @@ proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
       return proto::MissingGRFReason::shiftGRF;
     case interpolatedClippedGRF:
       return proto::MissingGRFReason::interpolatedClippedGRF;
+    case manualReview:
+      return proto::MissingGRFReason::manualReview;
   }
   return proto::MissingGRFReason::notMissingGRF;
 }
@@ -129,6 +131,8 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
       return shiftGRF;
     case proto::MissingGRFReason::interpolatedClippedGRF:
       return interpolatedClippedGRF;
+    case proto::MissingGRFReason::manualReview:
+      return manualReview;
       // These are just here to keep Clang from complaining
     case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
       return notMissingGRF;
