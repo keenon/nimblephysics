@@ -799,9 +799,15 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setOriginalTrialName,
                 ::py::arg("name"))
             .def(
+                "getOriginalTrialName",
+                &dart::biomechanics::SubjectOnDiskTrial::getOriginalTrialName)
+            .def(
                 "setSplitIndex",
                 &dart::biomechanics::SubjectOnDiskTrial::setSplitIndex,
                 ::py::arg("split"))
+            .def(
+                "getSplitIndex",
+                &dart::biomechanics::SubjectOnDiskTrial::getSplitIndex)
             .def(
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,

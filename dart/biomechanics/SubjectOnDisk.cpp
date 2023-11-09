@@ -2617,9 +2617,19 @@ void SubjectOnDiskTrial::setTrialTags(std::vector<std::string> trialTags)
   mTrialTags = trialTags;
 }
 
+std::string SubjectOnDiskTrial::getOriginalTrialName()
+{
+  return mOriginalTrialName;
+}
+
 void SubjectOnDiskTrial::setOriginalTrialName(const std::string& name)
 {
   mOriginalTrialName = name;
+}
+
+int SubjectOnDiskTrial::getSplitIndex()
+{
+  return mSplitIndex;
 }
 
 void SubjectOnDiskTrial::setSplitIndex(int split)

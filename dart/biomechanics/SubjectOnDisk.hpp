@@ -299,7 +299,9 @@ public:
   void setTimestep(s_t timestep);
   s_t getTimestep();
   void setTrialTags(std::vector<std::string> trialTags);
+  std::string getOriginalTrialName();
   void setOriginalTrialName(const std::string& name);
+  int getSplitIndex();
   void setSplitIndex(int split);
   std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
