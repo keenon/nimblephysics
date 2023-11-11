@@ -58,6 +58,7 @@
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
+#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
@@ -9411,9 +9412,13 @@ Eigen::VectorXs Skeleton::unwrapPositionToNearest(
     auto* joint = getJoint(j);
     if (joint->getType() == dynamics::EulerJoint::getStaticType())
     {
+      const dynamics::EulerJoint* eulerJoint
+          = static_cast<const dynamics::EulerJoint*>(joint);
       int start = joint->getDof(0)->getIndexInSkeleton();
       unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
-          thisPos.segment<3>(start), lastPos.segment<3>(start));
+          thisPos.segment<3>(start),
+          lastPos.segment<3>(start),
+          eulerJoint->getAxisOrder());
     }
   }
   return unwrapped;

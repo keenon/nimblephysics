@@ -596,7 +596,8 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("rootHistoryLen") = 5,
                 ::py::arg("rootHistoryStride") = 1,
                 ::py::arg("explicitVels") = Eigen::MatrixXs::Zero(0, 0),
-                ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0))
+                ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0),
+                ::py::arg("forcePlateZeroThresholdNewtons") = 3.0)
             .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
@@ -823,6 +824,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 "setMarkerNamesGuessed",
                 &dart::biomechanics::SubjectOnDiskTrial::setMarkerNamesGuessed,
                 ::py::arg("markersGuessed"))
+            .def(
+                "getMarkerObservations",
+                &dart::biomechanics::SubjectOnDiskTrial::getMarkerObservations)
             .def(
                 "setMarkerObservations",
                 &dart::biomechanics::SubjectOnDiskTrial::setMarkerObservations,
