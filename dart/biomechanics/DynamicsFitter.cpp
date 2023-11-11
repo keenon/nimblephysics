@@ -9943,15 +9943,16 @@ void DynamicsFitter::estimateFootGroundContacts(
     init->contactBodies.push_back(extendedContactBodies);
   }
 
-  bool computeMissingGRF = true;
-  if (init->probablyMissingGRF.size() > 0)
-  {
-    computeMissingGRF = false;
-  }
-
   for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
   {
     bool noGroundCorners = true;
+
+    bool computeMissingGRF = true;
+    if (init->probablyMissingGRF.size() > trial
+        && init->probablyMissingGRF[trial].size() > 0)
+    {
+      computeMissingGRF = false;
+    }
 
     // 1.1. First check for the ground level from the force plates
 
@@ -10283,8 +10284,48 @@ void DynamicsFitter::estimateFootGroundContacts(
     // which case we don't want to set those values here
     if (computeMissingGRF)
     {
-      init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
-      init->missingGRFReason.push_back(trialMissingGRFReason);
+      if (init->probablyMissingGRF.size() <= trial)
+      {
+        init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
+        init->missingGRFReason.push_back(trialMissingGRFReason);
+      }
+      else
+      {
+        init->probablyMissingGRF[trial] = trialAnyOffForcePlate;
+        init->missingGRFReason[trial] = trialMissingGRFReason;
+      }
+    }
+    else
+    {
+      if (init->probablyMissingGRF.at(trial).size()
+          != trialAnyOffForcePlate.size())
+      {
+        std::cout << "Error: probablyMissingGRF manual initialization is "
+                     "missing frames for trial "
+                  << trial << "! Got frames "
+                  << init->probablyMissingGRF.at(trial).size()
+                  << ", expected frames " << trialAnyOffForcePlate.size()
+                  << std::endl;
+        throw std::runtime_error("probablyMissingGRF is missing frames");
+      }
+    }
+
+    if (init->probablyMissingGRF.size() < trial)
+    {
+      std::cout << "Error: probablyMissingGRF is missing trial " << trial
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
+    if (init->probablyMissingGRF.at(trial).size()
+        < init->poseTrials[trial].cols())
+    {
+      std::cout << "Error: probablyMissingGRF manual initialization is missing "
+                   "frames for trial "
+                << trial << "! Got frames "
+                << init->probablyMissingGRF.at(trial).size()
+                << ", expected frames " << init->poseTrials[trial].cols()
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
     }
   }
 
@@ -11683,6 +11724,18 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               std::cout << "Marking " << i
                         << " as missing GRF because it is a neighbor of a peak"
                         << std::endl;
+              if (init->probablyMissingGRF.size() <= trial)
+              {
+                std::cout << "Trial " << trial << " is out of bounds!"
+                          << std::endl;
+              }
+              if (init->probablyMissingGRF.at(trial).size() <= i)
+              {
+                std::cout << "Timestep " << i << " is out of bounds for trial "
+                          << trial << " with probablyMissingGRF array length "
+                          << init->probablyMissingGRF.at(trial).size() << "!"
+                          << std::endl;
+              }
               init->probablyMissingGRF.at(trial).at(i) = true;
               init->missingGRFReason.at(trial).at(i)
                   = MissingGRFReason::unmeasuredExternalForceDetected;
