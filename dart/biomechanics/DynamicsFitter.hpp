@@ -1278,7 +1278,15 @@ public:
       /// For two trials, where the second trial we wish to use automatic
       /// assignment, we could pass [[1,0], [-1,-1]].
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
-      = std::vector<std::vector<int>>());
+      = std::vector<std::vector<int>>(),
+      /// This argument takes a list over trials, where each trial is a list of
+      /// booleans, one per timestep, where a true values indicates that we know
+      /// (probably due to a manual human review) that there is no GRF data for
+      /// this timestep. This is useful if we have a dataset where we know that
+      /// GRF data is missing, but we don't want to just rely on the automated
+      /// detection algorithm.
+      std::vector<std::vector<bool>> initializedProbablyMissingGRF
+      = std::vector<std::vector<bool>>());
 
   // This creates an optimization problem from a kinematics initialization
   static std::shared_ptr<DynamicsInitialization> createInitialization(
@@ -1300,7 +1308,15 @@ public:
       /// For two trials, where the second trial we wish to use automatic
       /// assignment, we could pass [[1,0], [-1,-1]].
       std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment
-      = std::vector<std::vector<int>>());
+      = std::vector<std::vector<int>>(),
+      /// This argument takes a list over trials, where each trial is a list of
+      /// booleans, one per timestep, where a true values indicates that we know
+      /// (probably due to a manual human review) that there is no GRF data for
+      /// this timestep. This is useful if we have a dataset where we know that
+      /// GRF data is missing, but we don't want to just rely on the automated
+      /// detection algorithm.
+      std::vector<std::vector<bool>> initializedProbablyMissingGRF
+      = std::vector<std::vector<bool>>());
 
   // This retargets a dynamics initialization to another skeleton
   static std::shared_ptr<DynamicsInitialization> retargetInitialization(
@@ -1529,7 +1545,8 @@ public:
       const std::vector<int>& overrideForcePlateToGRFNodeAssignment,
       std::vector<std::vector<int>>& forcePlatesAssignedToContactBody,
       Eigen::MatrixXs& grfTrials,
-      std::shared_ptr<dynamics::Skeleton> skel);
+      std::shared_ptr<dynamics::Skeleton> skel,
+      s_t forcePlateZeroThresholdNewtons = 3.0);
 
   // 1. Shift the COM trajectory by a 3vec offset to minimize the amount of
   // remaining residual

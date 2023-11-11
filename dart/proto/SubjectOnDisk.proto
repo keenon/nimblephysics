@@ -12,6 +12,7 @@ enum MissingGRFReason { notMissingGRF = 0;
                         missingBlip = 7;
                         shiftGRF = 8;
                         interpolatedClippedGRF = 9;
+                        manualReview = 10;
                       };
 
 enum ProcessingPassType {

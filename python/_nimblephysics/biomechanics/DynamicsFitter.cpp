@@ -17,6 +17,7 @@ namespace python {
 
 void DynamicsFitter(py::module& m)
 {
+
   py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
       .value(
           "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
@@ -40,6 +41,10 @@ void DynamicsFitter(py::module& m)
           "missingImpact", dart::biomechanics::MissingGRFReason::missingImpact)
       .value("missingBlip", dart::biomechanics::MissingGRFReason::missingBlip)
       .value("shiftGRF", dart::biomechanics::MissingGRFReason::shiftGRF)
+      .value(
+          "interpolatedClippedGRF",
+          dart::biomechanics::MissingGRFReason::interpolatedClippedGRF)
+      .value("manualReview", dart::biomechanics::MissingGRFReason::manualReview)
       .export_values();
 
   ::py::class_<dart::biomechanics::ResidualForceHelper>(
@@ -491,7 +496,8 @@ protected:
               std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
                   markerObservationTrials,
               std::vector<std::vector<int>>
-                  overrideForcePlateToGRFNodeAssignment)
+                  overrideForcePlateToGRFNodeAssignment,
+              std::vector<std::vector<bool>> initializedProbablyMissingGRF)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
@@ -502,7 +508,8 @@ protected:
                 poseTrials,
                 framesPerSecond,
                 markerObservationTrials,
-                overrideForcePlateToGRFNodeAssignment);
+                overrideForcePlateToGRFNodeAssignment,
+                initializedProbablyMissingGRF);
           },
           ::py::arg("skel"),
           ::py::arg("markerMap"),
@@ -513,7 +520,9 @@ protected:
           ::py::arg("framesPerSecond"),
           ::py::arg("markerObservationTrials"),
           ::py::arg("overrideForcePlateToGRFNodeAssignment")
-          = std::vector<std::vector<int>>())
+          = std::vector<std::vector<int>>(),
+          ::py::arg("initializedProbablyMissingGRF")
+          = std::vector<std::vector<bool>>())
       .def_static(
           "createInitialization",
           +[](std::shared_ptr<dynamics::Skeleton> skel,
@@ -527,7 +536,8 @@ protected:
               std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
                   markerObservationTrials,
               std::vector<std::vector<int>>
-                  overrideForcePlateToGRFNodeAssignment)
+                  overrideForcePlateToGRFNodeAssignment,
+              std::vector<std::vector<bool>> initializedProbablyMissingGRF)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
@@ -537,7 +547,8 @@ protected:
                 forcePlateTrials,
                 framesPerSecond,
                 markerObservationTrials,
-                overrideForcePlateToGRFNodeAssignment);
+                overrideForcePlateToGRFNodeAssignment,
+                initializedProbablyMissingGRF);
           },
           ::py::arg("skel"),
           ::py::arg("kinematicInits"),
@@ -547,7 +558,9 @@ protected:
           ::py::arg("framesPerSecond"),
           ::py::arg("markerObservationTrials"),
           ::py::arg("overrideForcePlateToGRFNodeAssignment")
-          = std::vector<std::vector<int>>())
+          = std::vector<std::vector<int>>(),
+          ::py::arg("initializedProbablyMissingGRF")
+          = std::vector<std::vector<bool>>())
       .def(
           "comPositions",
           &dart::biomechanics::DynamicsFitter::comPositions,

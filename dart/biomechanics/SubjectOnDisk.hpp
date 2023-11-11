@@ -181,7 +181,8 @@ public:
       int rootHistoryLen = 5,
       int rootHistoryStride = 1,
       Eigen::MatrixXs explicitVels = Eigen::MatrixXs::Zero(0, 0),
-      Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0));
+      Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0),
+      s_t forcePlateZeroThresholdNewtons = 3.0);
 
   // Manual setters (and getters) that compete with computeValues()
   void setLinearResidual(std::vector<s_t> linearResidual);
@@ -299,12 +300,15 @@ public:
   void setTimestep(s_t timestep);
   s_t getTimestep();
   void setTrialTags(std::vector<std::string> trialTags);
+  std::string getOriginalTrialName();
   void setOriginalTrialName(const std::string& name);
+  int getSplitIndex();
   void setSplitIndex(int split);
   std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
   void setMarkerNamesGuessed(bool markersGuessed);
+  std::vector<std::map<std::string, Eigen::Vector3s>> getMarkerObservations();
   void setMarkerObservations(
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations);
   void setAccObservations(

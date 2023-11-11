@@ -15,6 +15,7 @@ enum MissingGRFReason
   missingImpact,
   missingBlip,
   shiftGRF,
+  manualReview,
   interpolatedClippedGRF
 };
 

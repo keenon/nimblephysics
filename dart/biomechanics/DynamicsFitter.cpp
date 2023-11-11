@@ -28,6 +28,7 @@
 #include "dart/biomechanics/MarkerLabeller.hpp"
 #include "dart/biomechanics/SkeletonConverter.hpp"
 #include "dart/biomechanics/SubjectOnDisk.hpp"
+#include "dart/biomechanics/enums.hpp"
 #include "dart/biomechanics/macros.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
@@ -9327,7 +9328,14 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::vector<int> framesPerSecond,
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
         markerObservationTrials,
-    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment)
+    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment,
+    /// This argument takes a list over trials, where each trial is a list of
+    /// booleans, one per timestep, where a true values indicates that we know
+    /// (probably due to a manual human review) that there is no GRF data for
+    /// this timestep. This is useful if we have a dataset where we know that
+    /// GRF data is missing, but we don't want to just rely on the automated
+    /// detection algorithm.
+    std::vector<std::vector<bool>> initializedProbablyMissingGRF)
 {
   std::shared_ptr<DynamicsInitialization> init
       = std::make_shared<DynamicsInitialization>();
@@ -9404,8 +9412,44 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     init->grfBodyIndices.push_back(grfNodes[i]->getIndexInSkeleton());
   }
 
+  if (initializedProbablyMissingGRF.size() > 0
+      && initializedProbablyMissingGRF.size() != init->poseTrials.size())
+  {
+    std::cout << "Got " << initializedProbablyMissingGRF.size()
+              << " probablyMissingGRF trials, but expected "
+              << init->poseTrials.size()
+              << " trials. Ignoring probablyMissingGRF." << std::endl;
+  }
+
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    if (initializedProbablyMissingGRF.size() == init->poseTrials.size())
+    {
+      if (initializedProbablyMissingGRF[trial].size()
+          == init->poseTrials[trial].cols())
+      {
+        init->probablyMissingGRF.push_back(
+            initializedProbablyMissingGRF[trial]);
+        init->missingGRFReason.emplace_back();
+        for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+        {
+          if (init->probablyMissingGRF[trial][t])
+          {
+            init->missingGRFReason[trial].push_back(
+                MissingGRFReason::manualReview);
+          }
+        }
+      }
+      else
+      {
+        std::cout << "Got " << initializedProbablyMissingGRF[trial].size()
+                  << " probablyMissingGRF timesteps, but expected "
+                  << init->poseTrials[trial].cols()
+                  << " timesteps. FATAL ERROR! Exiting." << std::endl;
+        throw std::runtime_error("Bad initializedProbablyMissingGRF size");
+      }
+    }
+
     // std::vector<ForcePlate> forcePlates = init->forcePlateTrials[trial];
 
     Eigen::MatrixXs& poses = init->poseTrials[trial];
@@ -9465,7 +9509,14 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     std::vector<int> framesPerSecond,
     std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
         markerObservationTrials,
-    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment)
+    std::vector<std::vector<int>> overrideForcePlateToGRFNodeAssignment,
+    /// This argument takes a list over trials, where each trial is a list of
+    /// booleans, one per timestep, where a true values indicates that we know
+    /// (probably due to a manual human review) that there is no GRF data for
+    /// this timestep. This is useful if we have a dataset where we know that
+    /// GRF data is missing, but we don't want to just rely on the automated
+    /// detection algorithm.
+    std::vector<std::vector<bool>> initializedProbablyMissingGRF)
 {
   NIMBLE_THROW_IF(
       markerObservationTrials.size() != kinematicInit.size(),
@@ -9499,7 +9550,8 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
       poseTrials,
       framesPerSecond,
       markerObservationTrials,
-      overrideForcePlateToGRFNodeAssignment);
+      overrideForcePlateToGRFNodeAssignment,
+      initializedProbablyMissingGRF);
 
   // Copy over the initial body scaling
   init->groupScales = kinematicInit[0].groupScales;
@@ -9895,6 +9947,13 @@ void DynamicsFitter::estimateFootGroundContacts(
   {
     bool noGroundCorners = true;
 
+    bool computeMissingGRF = true;
+    if (init->probablyMissingGRF.size() > trial
+        && init->probablyMissingGRF[trial].size() > 0)
+    {
+      computeMissingGRF = false;
+    }
+
     // 1.1. First check for the ground level from the force plates
 
     s_t groundHeight = std::numeric_limits<s_t>::infinity();
@@ -10221,8 +10280,53 @@ void DynamicsFitter::estimateFootGroundContacts(
     init->grfBodyForceActive.push_back(trialForceActive);
     init->grfBodySphereInContact.push_back(trialSphereInContact);
     init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
-    init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
-    init->missingGRFReason.push_back(trialMissingGRFReason);
+    // It's possible to initialize with a manual override for missing GRF, in
+    // which case we don't want to set those values here
+    if (computeMissingGRF)
+    {
+      if (init->probablyMissingGRF.size() <= trial)
+      {
+        init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
+        init->missingGRFReason.push_back(trialMissingGRFReason);
+      }
+      else
+      {
+        init->probablyMissingGRF[trial] = trialAnyOffForcePlate;
+        init->missingGRFReason[trial] = trialMissingGRFReason;
+      }
+    }
+    else
+    {
+      if (init->probablyMissingGRF.at(trial).size()
+          != trialAnyOffForcePlate.size())
+      {
+        std::cout << "Error: probablyMissingGRF manual initialization is "
+                     "missing frames for trial "
+                  << trial << "! Got frames "
+                  << init->probablyMissingGRF.at(trial).size()
+                  << ", expected frames " << trialAnyOffForcePlate.size()
+                  << std::endl;
+        throw std::runtime_error("probablyMissingGRF is missing frames");
+      }
+    }
+
+    if (init->probablyMissingGRF.size() < trial)
+    {
+      std::cout << "Error: probablyMissingGRF is missing trial " << trial
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
+    if (init->probablyMissingGRF.at(trial).size()
+        < init->poseTrials[trial].cols())
+    {
+      std::cout << "Error: probablyMissingGRF manual initialization is missing "
+                   "frames for trial "
+                << trial << "! Got frames "
+                << init->probablyMissingGRF.at(trial).size()
+                << ", expected frames " << init->poseTrials[trial].cols()
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
   }
 
   fillInMissingGRFBlips(init);
@@ -11620,6 +11724,18 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               std::cout << "Marking " << i
                         << " as missing GRF because it is a neighbor of a peak"
                         << std::endl;
+              if (init->probablyMissingGRF.size() <= trial)
+              {
+                std::cout << "Trial " << trial << " is out of bounds!"
+                          << std::endl;
+              }
+              if (init->probablyMissingGRF.at(trial).size() <= i)
+              {
+                std::cout << "Timestep " << i << " is out of bounds for trial "
+                          << trial << " with probablyMissingGRF array length "
+                          << init->probablyMissingGRF.at(trial).size() << "!"
+                          << std::endl;
+              }
               init->probablyMissingGRF.at(trial).at(i) = true;
               init->missingGRFReason.at(trial).at(i)
                   = MissingGRFReason::unmeasuredExternalForceDetected;
@@ -13801,7 +13917,8 @@ void DynamicsFitter::recomputeGRFs(
     const std::vector<int>& overrideForcePlateToGRFNodeAssignment,
     std::vector<std::vector<int>>& forcePlatesAssignedToContactBody,
     Eigen::MatrixXs& grfTrial,
-    std::shared_ptr<dynamics::Skeleton> skel)
+    std::shared_ptr<dynamics::Skeleton> skel,
+    s_t forcePlateZeroThresholdNewtons)
 {
   grfTrial.setZero();
 
@@ -13856,8 +13973,8 @@ void DynamicsFitter::recomputeGRFs(
         // Timesteps where the force plate has a 0 force (we use 3 newtons
         // as our threshold), don't need to be assigned to anything at this
         // stage
-        if (force.norm() < 3.0 || force.hasNaN() || cop.hasNaN()
-            || moments.hasNaN())
+        if (force.norm() < forcePlateZeroThresholdNewtons || force.hasNaN()
+            || cop.hasNaN() || moments.hasNaN())
         {
           if (lastStartedTrack > -1)
           {

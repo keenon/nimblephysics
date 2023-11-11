@@ -101,6 +101,8 @@ proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
       return proto::MissingGRFReason::shiftGRF;
     case interpolatedClippedGRF:
       return proto::MissingGRFReason::interpolatedClippedGRF;
+    case manualReview:
+      return proto::MissingGRFReason::manualReview;
   }
   return proto::MissingGRFReason::notMissingGRF;
 }
@@ -129,6 +131,8 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
       return shiftGRF;
     case proto::MissingGRFReason::interpolatedClippedGRF:
       return interpolatedClippedGRF;
+    case proto::MissingGRFReason::manualReview:
+      return manualReview;
       // These are just here to keep Clang from complaining
     case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
       return notMissingGRF;
@@ -2050,7 +2054,8 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     int rootHistoryLen,
     int rootHistoryStride,
     Eigen::MatrixXs explicitVels,
-    Eigen::MatrixXs explicitAccs)
+    Eigen::MatrixXs explicitAccs,
+    s_t forcePlateZeroThresholdNewtons)
 {
   Eigen::MatrixXs grfTrial
       = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
@@ -2251,22 +2256,32 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           }
 
           Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
-          Eigen::Vector9s copWrench
-              = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
-          copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
-          Eigen::Vector6s rootWrench
-              = math::dAdInvT(T_wr.inverse(), worldWrench);
-          groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
+          if (worldWrench.tail<3>().norm() > forcePlateZeroThresholdNewtons)
+          {
+            Eigen::Vector9s copWrench
+                = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+            copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
+            Eigen::Vector6s rootWrench
+                = math::dAdInvT(T_wr.inverse(), worldWrench);
+            groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
 
-          Eigen::Vector3s copWorld = copWrench.head<3>();
-          Eigen::Vector3s torqueWorld = copWrench.segment<3>(3);
-          Eigen::Vector3s forceWorld = copWrench.tail<3>();
-          Eigen::Vector3s copRoot = T_wr.inverse() * copWorld;
-          Eigen::Vector3s torqueRoot = T_wr.linear().transpose() * torqueWorld;
-          Eigen::Vector3s forceRoot = T_wr.linear().transpose() * forceWorld;
-          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9, t) = copRoot;
-          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 3, t) = torqueRoot;
-          copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 6, t) = forceRoot;
+            Eigen::Vector3s copWorld = copWrench.head<3>();
+            Eigen::Vector3s torqueWorld = copWrench.segment<3>(3);
+            Eigen::Vector3s forceWorld = copWrench.tail<3>();
+            Eigen::Vector3s copRoot = T_wr.inverse() * copWorld;
+            Eigen::Vector3s torqueRoot
+                = T_wr.linear().transpose() * torqueWorld;
+            Eigen::Vector3s forceRoot = T_wr.linear().transpose() * forceWorld;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9, t) = copRoot;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 3, t)
+                = torqueRoot;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 6, t)
+                = forceRoot;
+          }
+          else
+          {
+            copTorqueForceTrialInRootFrame.block<9, 1>(i * 9, t).setZero();
+          }
         }
 
 #ifndef NDEBUG
@@ -2617,9 +2632,19 @@ void SubjectOnDiskTrial::setTrialTags(std::vector<std::string> trialTags)
   mTrialTags = trialTags;
 }
 
+std::string SubjectOnDiskTrial::getOriginalTrialName()
+{
+  return mOriginalTrialName;
+}
+
 void SubjectOnDiskTrial::setOriginalTrialName(const std::string& name)
 {
   mOriginalTrialName = name;
+}
+
+int SubjectOnDiskTrial::getSplitIndex()
+{
+  return mSplitIndex;
 }
 
 void SubjectOnDiskTrial::setSplitIndex(int split)
@@ -2647,6 +2672,12 @@ void SubjectOnDiskTrial::setCustomValues(
 void SubjectOnDiskTrial::setMarkerNamesGuessed(bool markersGuessed)
 {
   mMarkerNamesGuessed = markersGuessed;
+}
+
+std::vector<std::map<std::string, Eigen::Vector3s>>
+SubjectOnDiskTrial::getMarkerObservations()
+{
+  return mMarkerObservations;
 }
 
 void SubjectOnDiskTrial::setMarkerObservations(

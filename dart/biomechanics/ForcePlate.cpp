@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 
+#include "dart/math/Geometry.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/utils/StringUtils.hpp"
 
@@ -98,14 +99,23 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
     {
       double zeroThreshold
           = (static_cast<double>(rightBound) / numBins) * maxForce;
-      std::cout << "clip force plate at " << zeroThreshold << " N" << std::endl;
-      for (int i = 0; i < trialLen; i++)
+      if (zeroThreshold < 1e-4)
       {
-        if (forceNorms(i) < zeroThreshold)
+        std::cout << "Not clipping, because zero threshold is " << zeroThreshold
+                  << " N, which is too low to matter." << std::endl;
+      }
+      else
+      {
+        std::cout << "clip force plate at " << zeroThreshold << " N"
+                  << std::endl;
+        for (int i = 0; i < trialLen; i++)
         {
-          forces[i] = Eigen::Vector3s::Zero();
-          moments[i] = Eigen::Vector3s::Zero();
-          centersOfPressure[i] = Eigen::Vector3s::Zero();
+          if (forceNorms(i) < zeroThreshold)
+          {
+            forces[i] = Eigen::Vector3s::Zero();
+            moments[i] = Eigen::Vector3s::Zero();
+            centersOfPressure[i] = Eigen::Vector3s::Zero();
+          }
         }
       }
     }
@@ -325,6 +335,42 @@ void ForcePlate::trimToIndexes(int start, int end)
     std::cout << "Warning: trimToIndexes() called with start index " << end
               << " larger than the size of the data (" << timestamps.size()
               << ")." << std::endl;
+  }
+}
+
+std::pair<Eigen::MatrixXs, Eigen::VectorXs>
+ForcePlate::getResamplingMatrixAndGroundHeights()
+{
+  // This will contain the ground heights over time
+  Eigen::VectorXs groundHeights = Eigen::VectorXs::Zero(forces.size());
+  // This will contain the wrenches at the origin over time
+  Eigen::MatrixXs resamplingMatrix = Eigen::MatrixXs::Zero(6, forces.size());
+
+  for (int i = 0; i < forces.size(); i++)
+  {
+    groundHeights(i) = centersOfPressure[i](1);
+    resamplingMatrix.col(i).head<3>()
+        = centersOfPressure[i].cross(forces[i]) + moments[i];
+    resamplingMatrix.col(i).tail<3>() = forces[i];
+  }
+
+  return std::make_pair(resamplingMatrix, groundHeights);
+}
+
+void ForcePlate::setResamplingMatrixAndGroundHeights(
+    Eigen::MatrixXs matrix, Eigen::VectorXs groundHeights)
+{
+  forces.clear();
+  moments.clear();
+  centersOfPressure.clear();
+
+  for (int i = 0; i < matrix.cols(); i++)
+  {
+    Eigen::Vector9s copTorqueForce
+        = math::projectWrenchToCoP(matrix.col(i), groundHeights(i), 1);
+    centersOfPressure.push_back(copTorqueForce.head<3>());
+    moments.push_back(copTorqueForce.segment<3>(3));
+    forces.push_back(copTorqueForce.tail<3>());
   }
 }
 
