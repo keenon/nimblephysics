@@ -9445,6 +9445,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
           }
         }
       }
+      else if (initializedProbablyMissingGRF[trial].size() == 0)
+      {
+        // This is fine
+      }
       else
       {
         std::cout << "Got " << initializedProbablyMissingGRF[trial].size()
