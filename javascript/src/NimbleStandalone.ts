@@ -343,6 +343,13 @@ class NimbleStandalone {
    * This is our keyboard listener, which we keep around until we clean up the player.
    */
   keyboardListener = (e: KeyboardEvent) => {
+    if (e.key.toString() == "c") {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Centering!");
+      this.view.view.centerView();
+      this.view.render();
+    }
     if (e.key.toString() == " ") {
       e.preventDefault();
       e.stopPropagation();
@@ -705,8 +712,14 @@ class NimbleStandalone {
         }
         */
         this.view.render();
-        if (frameNumber == 0) {
-          this.renderedFirstFrame = true;
+        if (frameNumber == 0 && !this.renderedFirstFrame) {
+          let meshCount = this.view.view.countVisibleMeshes();
+          if (meshCount > 0) {
+            console.log("Centering on first frame");
+            this.view.view.centerView();
+            this.view.render();
+            this.renderedFirstFrame = true;
+          }
         }
       }
       this.lastFrame = frameNumber;
