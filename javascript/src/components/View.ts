@@ -160,6 +160,11 @@ class View {
     let center = new THREE.Vector3();
     boundingBox.getCenter(center);
 
+    const cameraOffset = this.camera.position.clone().sub(center);
+    cameraOffset.normalize();
+    const newCameraCenter = center.clone().add(cameraOffset.multiplyScalar(300));
+    this.camera.position.copy(newCameraCenter);
+
     // Position the camera
     // Assuming this.view.camera is your camera object
     this.orbitControls.target = average;

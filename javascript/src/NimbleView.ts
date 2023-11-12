@@ -2183,10 +2183,6 @@ class DARTView {
   };
 
   render() {
-    if (this.firstRender) {
-      this.centerView();
-      this.firstRender = false;
-    }
     this.view.render();
   }
 
