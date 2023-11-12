@@ -9438,6 +9438,11 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
             init->missingGRFReason[trial].push_back(
                 MissingGRFReason::manualReview);
           }
+          else
+          {
+            init->missingGRFReason[trial].push_back(
+                MissingGRFReason::notMissingGRF);
+          }
         }
       }
       else
@@ -10308,6 +10313,17 @@ void DynamicsFitter::estimateFootGroundContacts(
                   << std::endl;
         throw std::runtime_error("probablyMissingGRF is missing frames");
       }
+      if (init->missingGRFReason.at(trial).size()
+          != trialAnyOffForcePlate.size())
+      {
+        std::cout << "Error: missingGRFReason manual initialization is "
+                     "missing frames for trial "
+                  << trial << "! Got frames "
+                  << init->missingGRFReason.at(trial).size()
+                  << ", expected frames " << trialAnyOffForcePlate.size()
+                  << std::endl;
+        throw std::runtime_error("missingGRFReason is missing frames");
+      }
     }
 
     if (init->probablyMissingGRF.size() < trial)
@@ -10326,6 +10342,23 @@ void DynamicsFitter::estimateFootGroundContacts(
                 << ", expected frames " << init->poseTrials[trial].cols()
                 << std::endl;
       throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
+    if (init->missingGRFReason.size() < trial)
+    {
+      std::cout << "Error: missingGRFReason is missing trial " << trial
+                << std::endl;
+      throw std::runtime_error("missingGRFReason is missing frames");
+    }
+    if (init->missingGRFReason.at(trial).size()
+        < init->poseTrials[trial].cols())
+    {
+      std::cout << "Error: missingGRFReason manual initialization is missing "
+                   "frames for trial "
+                << trial << "! Got frames "
+                << init->missingGRFReason.at(trial).size()
+                << ", expected frames " << init->poseTrials[trial].cols()
+                << std::endl;
+      throw std::runtime_error("missingGRFReason is missing frames");
     }
   }
 
@@ -11711,6 +11744,32 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               std::cout << "Marking " << i
                         << " as missing GRF because it is a neighbor of a peak"
                         << std::endl;
+              if (init->probablyMissingGRF.size() <= trial)
+              {
+                std::cout << "Trial " << trial
+                          << " is out of bounds for probablyMissingGRF!"
+                          << std::endl;
+              }
+              if (init->probablyMissingGRF.at(trial).size() <= i)
+              {
+                std::cout << "Timestep " << i << " is out of bounds for trial "
+                          << trial << " with probablyMissingGRF array length "
+                          << init->probablyMissingGRF.at(trial).size() << "!"
+                          << std::endl;
+              }
+              if (init->missingGRFReason.size() <= trial)
+              {
+                std::cout << "Trial " << trial
+                          << " is out of bounds for missingGRFReason!"
+                          << std::endl;
+              }
+              if (init->missingGRFReason.at(trial).size() <= i)
+              {
+                std::cout << "Timestep " << i << " is out of bounds for trial "
+                          << trial << " with missingGRFReason array length "
+                          << init->missingGRFReason.at(trial).size() << "!"
+                          << std::endl;
+              }
               init->probablyMissingGRF.at(trial).at(i) = true;
               init->missingGRFReason.at(trial).at(i)
                   = MissingGRFReason::unmeasuredExternalForceDetected;
@@ -11726,7 +11785,8 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                         << std::endl;
               if (init->probablyMissingGRF.size() <= trial)
               {
-                std::cout << "Trial " << trial << " is out of bounds!"
+                std::cout << "Trial " << trial
+                          << " is out of bounds for probablyMissingGRF!"
                           << std::endl;
               }
               if (init->probablyMissingGRF.at(trial).size() <= i)
@@ -11734,6 +11794,19 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                 std::cout << "Timestep " << i << " is out of bounds for trial "
                           << trial << " with probablyMissingGRF array length "
                           << init->probablyMissingGRF.at(trial).size() << "!"
+                          << std::endl;
+              }
+              if (init->missingGRFReason.size() <= trial)
+              {
+                std::cout << "Trial " << trial
+                          << " is out of bounds for missingGRFReason!"
+                          << std::endl;
+              }
+              if (init->missingGRFReason.at(trial).size() <= i)
+              {
+                std::cout << "Timestep " << i << " is out of bounds for trial "
+                          << trial << " with missingGRFReason array length "
+                          << init->missingGRFReason.at(trial).size() << "!"
                           << std::endl;
               }
               init->probablyMissingGRF.at(trial).at(i) = true;
