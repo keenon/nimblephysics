@@ -272,13 +272,20 @@ void ForcePlate::detectAndFixCopMomentConvention(int trial, int i)
     }
     else
     {
-      std::cout << "BAD INPUT DATA DETECTED!! Could not find an interpretation "
-                   "for "
-                   "force plate "
-                << i << " in trial " << trial
-                << " where the moments, forces, and centers of pressure are "
-                   "consistent. Continuing anyways, but EXPECT BAD RESULTS!"
-                << std::endl;
+      std::cout
+          << "BAD INPUT DATA DETECTED!! Could not find an interpretation "
+             "for "
+             "force plate "
+          << i << " in trial " << trial
+          << " where the moments, forces, and centers of pressure are "
+             "consistent. We will zero the X and Z moments, to be on the safe "
+             "side. Continuing anyways, but EXPECT BAD RESULTS!"
+          << std::endl;
+      for (int t = 0; t < moments.size(); t++)
+      {
+        moments.at(t)(0) = 0.0;
+        moments.at(t)(2) = 0.0;
+      }
     }
   }
   else
