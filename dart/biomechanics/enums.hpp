@@ -19,6 +19,13 @@ enum MissingGRFReason
   interpolatedClippedGRF
 };
 
+enum MissingGRFStatus
+{
+  no = 0,      // no will cast to `false`
+  unknown = 1, // unknown will cast to `true`
+  yes = 2,     // yes will cast to `true`
+};
+
 enum ProcessingPassType
 {
   kinematics,

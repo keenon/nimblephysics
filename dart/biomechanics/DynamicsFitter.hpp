@@ -825,7 +825,7 @@ struct DynamicsInitialization
   std::vector<std::vector<std::vector<bool>>> grfBodyOffForcePlate;
   // This is the critical value, telling us if we think we're receiving support
   // from off a force plate on this frame
-  std::vector<std::vector<bool>> probablyMissingGRF;
+  std::vector<std::vector<MissingGRFStatus>> probablyMissingGRF;
   std::vector<std::vector<MissingGRFReason>> missingGRFReason;
   // This is a map of [trial][forcePlate][timestep], where each force plate is
   // assigned to one of the contact bodies.
@@ -1285,8 +1285,8 @@ public:
       /// this timestep. This is useful if we have a dataset where we know that
       /// GRF data is missing, but we don't want to just rely on the automated
       /// detection algorithm.
-      std::vector<std::vector<bool>> initializedProbablyMissingGRF
-      = std::vector<std::vector<bool>>());
+      std::vector<std::vector<MissingGRFStatus>> initializedProbablyMissingGRF
+      = std::vector<std::vector<MissingGRFStatus>>());
 
   // This creates an optimization problem from a kinematics initialization
   static std::shared_ptr<DynamicsInitialization> createInitialization(
@@ -1315,8 +1315,8 @@ public:
       /// this timestep. This is useful if we have a dataset where we know that
       /// GRF data is missing, but we don't want to just rely on the automated
       /// detection algorithm.
-      std::vector<std::vector<bool>> initializedProbablyMissingGRF
-      = std::vector<std::vector<bool>>());
+      std::vector<std::vector<MissingGRFStatus>> initializedProbablyMissingGRF
+      = std::vector<std::vector<MissingGRFStatus>>());
 
   // This retargets a dynamics initialization to another skeleton
   static std::shared_ptr<DynamicsInitialization> retargetInitialization(

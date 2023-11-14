@@ -9335,7 +9335,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     /// this timestep. This is useful if we have a dataset where we know that
     /// GRF data is missing, but we don't want to just rely on the automated
     /// detection algorithm.
-    std::vector<std::vector<bool>> initializedProbablyMissingGRF)
+    std::vector<std::vector<MissingGRFStatus>> initializedProbablyMissingGRF)
 {
   std::shared_ptr<DynamicsInitialization> init
       = std::make_shared<DynamicsInitialization>();
@@ -9415,14 +9415,18 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
   if (initializedProbablyMissingGRF.size() > 0
       && initializedProbablyMissingGRF.size() != init->poseTrials.size())
   {
-    std::cout << "Got " << initializedProbablyMissingGRF.size()
-              << " probablyMissingGRF trials, but expected "
+    std::cout << "Error: Got non-empty " << initializedProbablyMissingGRF.size()
+              << " initializedProbablyMissingGRF trials, but expected "
               << init->poseTrials.size()
-              << " trials. Ignoring probablyMissingGRF." << std::endl;
+              << " trials. This will lead to bad results. FATAL ERROR! Exiting."
+              << std::endl;
+    throw std::runtime_error("Bad initializedProbablyMissingGRF size");
   }
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    // If the initializedProbablyMissingGRF is not empty, we'll use it to
+    // initialize the probablyMissingGRF array.
     if (initializedProbablyMissingGRF.size() == init->poseTrials.size())
     {
       if (initializedProbablyMissingGRF[trial].size()
@@ -9433,21 +9437,18 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
         init->missingGRFReason.emplace_back();
         for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
         {
-          if (init->probablyMissingGRF[trial][t])
+          if (init->probablyMissingGRF[trial][t] == MissingGRFStatus::yes)
           {
             init->missingGRFReason[trial].push_back(
                 MissingGRFReason::manualReview);
           }
           else
           {
+            // we also default to `notMissingGRF` when the status is unknown
             init->missingGRFReason[trial].push_back(
                 MissingGRFReason::notMissingGRF);
           }
         }
-      }
-      else if (initializedProbablyMissingGRF[trial].size() == 0)
-      {
-        // This is fine
       }
       else
       {
@@ -9456,6 +9457,19 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
                   << init->poseTrials[trial].cols()
                   << " timesteps. FATAL ERROR! Exiting." << std::endl;
         throw std::runtime_error("Bad initializedProbablyMissingGRF size");
+      }
+    }
+    else
+    {
+      // Otherwise, we'll initialize the probablyMissingGRF array with unknowns
+      init->probablyMissingGRF.emplace_back();
+      init->missingGRFReason.emplace_back();
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        init->probablyMissingGRF[trial].push_back(MissingGRFStatus::unknown);
+        // we default to `notMissingGRF` when the status is unknown
+        init->missingGRFReason[trial].push_back(
+            MissingGRFReason::notMissingGRF);
       }
     }
 
@@ -9525,7 +9539,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     /// this timestep. This is useful if we have a dataset where we know that
     /// GRF data is missing, but we don't want to just rely on the automated
     /// detection algorithm.
-    std::vector<std::vector<bool>> initializedProbablyMissingGRF)
+    std::vector<std::vector<MissingGRFStatus>> initializedProbablyMissingGRF)
 {
   NIMBLE_THROW_IF(
       markerObservationTrials.size() != kinematicInit.size(),
@@ -9956,13 +9970,6 @@ void DynamicsFitter::estimateFootGroundContacts(
   {
     bool noGroundCorners = true;
 
-    bool computeMissingGRF = true;
-    if (init->probablyMissingGRF.size() > trial
-        && init->probablyMissingGRF[trial].size() > 0)
-    {
-      computeMissingGRF = false;
-    }
-
     // 1.1. First check for the ground level from the force plates
 
     s_t groundHeight = std::numeric_limits<s_t>::infinity();
@@ -10289,46 +10296,6 @@ void DynamicsFitter::estimateFootGroundContacts(
     init->grfBodyForceActive.push_back(trialForceActive);
     init->grfBodySphereInContact.push_back(trialSphereInContact);
     init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
-    // It's possible to initialize with a manual override for missing GRF, in
-    // which case we don't want to set those values here
-    if (computeMissingGRF)
-    {
-      if (init->probablyMissingGRF.size() <= trial)
-      {
-        init->probablyMissingGRF.push_back(trialAnyOffForcePlate);
-        init->missingGRFReason.push_back(trialMissingGRFReason);
-      }
-      else
-      {
-        init->probablyMissingGRF[trial] = trialAnyOffForcePlate;
-        init->missingGRFReason[trial] = trialMissingGRFReason;
-      }
-    }
-    else
-    {
-      if (init->probablyMissingGRF.at(trial).size()
-          != trialAnyOffForcePlate.size())
-      {
-        std::cout << "Error: probablyMissingGRF manual initialization is "
-                     "missing frames for trial "
-                  << trial << "! Got frames "
-                  << init->probablyMissingGRF.at(trial).size()
-                  << ", expected frames " << trialAnyOffForcePlate.size()
-                  << std::endl;
-        throw std::runtime_error("probablyMissingGRF is missing frames");
-      }
-      if (init->missingGRFReason.at(trial).size()
-          != trialAnyOffForcePlate.size())
-      {
-        std::cout << "Error: missingGRFReason manual initialization is "
-                     "missing frames for trial "
-                  << trial << "! Got frames "
-                  << init->missingGRFReason.at(trial).size()
-                  << ", expected frames " << trialAnyOffForcePlate.size()
-                  << std::endl;
-        throw std::runtime_error("missingGRFReason is missing frames");
-      }
-    }
 
     if (init->probablyMissingGRF.size() < trial)
     {
@@ -10363,6 +10330,16 @@ void DynamicsFitter::estimateFootGroundContacts(
                 << ", expected frames " << init->poseTrials[trial].cols()
                 << std::endl;
       throw std::runtime_error("missingGRFReason is missing frames");
+    }
+    for (int t = 0; t < init->probablyMissingGRF.at(trial).size(); t++)
+    {
+      if (init->probablyMissingGRF.at(trial).at(t) == MissingGRFStatus::unknown)
+      {
+        init->probablyMissingGRF.at(trial).at(t) = trialAnyOffForcePlate.at(t)
+                                                       ? MissingGRFStatus::yes
+                                                       : MissingGRFStatus::no;
+        init->missingGRFReason.at(trial).at(t) = trialMissingGRFReason.at(t);
+      }
     }
   }
 
@@ -10407,8 +10384,9 @@ void DynamicsFitter::markMissingImpacts(
           int offsetT = t + i;
           if (offsetT < init->probablyMissingGRF[trial].size())
           {
-            init->probablyMissingGRF[trial][offsetT] = true;
-            init->missingGRFReason[trial][offsetT]
+            init->probablyMissingGRF.at(trial).at(offsetT)
+                = MissingGRFStatus::yes;
+            init->missingGRFReason.at(trial).at(offsetT)
                 = MissingGRFReason::missingImpact;
           }
         }
@@ -10451,7 +10429,7 @@ void DynamicsFitter::fillInMissingGRFBlips(
       {
         if (!init->probablyMissingGRF.at(trial).at(t))
         {
-          init->probablyMissingGRF.at(trial).at(t) = true;
+          init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
           init->missingGRFReason.at(trial).at(t)
               = MissingGRFReason::missingBlip;
         }
@@ -10468,7 +10446,7 @@ void DynamicsFitter::fillInMissingGRFBlips(
       {
         if (!init->probablyMissingGRF.at(trial).at(t))
         {
-          init->probablyMissingGRF.at(trial).at(t) = true;
+          init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
           init->missingGRFReason.at(trial).at(t)
               = MissingGRFReason::missingBlip;
         }
@@ -10476,21 +10454,21 @@ void DynamicsFitter::fillInMissingGRFBlips(
     }
 
     // Smooth out any GRF contact blips that are shorter than `blipFilterLen`
-    for (int t = 1; t < init->probablyMissingGRF[trial].size(); t++)
+    for (int t = 1; t < init->probablyMissingGRF.at(trial).size(); t++)
     {
       // If we're missing data on last frame, but not on this frame, we should
       // check if this is a brief "blip" of contact followed by more missing
       // data.
-      if (init->probablyMissingGRF[trial][t - 1]
-          && !init->probablyMissingGRF[trial][t])
+      if (init->probablyMissingGRF.at(trial).at(t - 1)
+          && !init->probablyMissingGRF.at(trial).at(t))
       {
         bool isBlip = false;
         for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
         {
           int scanT = t + scanForward;
-          if (scanT < init->probablyMissingGRF[trial].size())
+          if (scanT < init->probablyMissingGRF.at(trial).size())
           {
-            if (init->probablyMissingGRF[trial][scanT])
+            if (init->probablyMissingGRF.at(trial).at(scanT))
             {
               isBlip = true;
               break;
@@ -10504,10 +10482,11 @@ void DynamicsFitter::fillInMissingGRFBlips(
           for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
           {
             int scanT = t + scanForward;
-            if (scanT < init->probablyMissingGRF[trial].size())
+            if (scanT < init->probablyMissingGRF.at(trial).size())
             {
-              init->probablyMissingGRF[trial][scanT] = true;
-              init->missingGRFReason[trial][scanT]
+              init->probablyMissingGRF.at(trial).at(scanT)
+                  = MissingGRFStatus::yes;
+              init->missingGRFReason.at(trial).at(scanT)
                   = MissingGRFReason::missingBlip;
             }
           }
@@ -10757,8 +10736,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
         std::cout << "Detected unmeasured force acting on the subject in trial "
                   << trial << " at time " << t << std::endl;
         filteredTimesteps.push_back(t + 1);
-        init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1]
+        init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
+        init->missingGRFReason.at(trial).at(t + 1)
             = MissingGRFReason::unmeasuredExternalForceDetected;
         continue;
       }
@@ -10769,8 +10748,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
           std::cout << "No measured GRF on trial " << trial << " at time " << t
                     << ", yet unexplained COM acceleration" << std::endl;
           filteredTimesteps.push_back(t + 1);
-          init->probablyMissingGRF[trial][t + 1] = true;
-          init->missingGRFReason[trial][t + 1]
+          init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
+          init->missingGRFReason.at(trial).at(t + 1)
               = MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
         }
         continue;
@@ -10809,8 +10788,8 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
             << trial << " at time " << t << " (" << diff * diff << " > "
             << threshold << ")" << std::endl;
         filteredTimesteps.push_back(t + 1);
-        init->probablyMissingGRF[trial][t + 1] = true;
-        init->missingGRFReason[trial][t + 1]
+        init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
+        init->missingGRFReason.at(trial).at(t + 1)
             = MissingGRFReason::forceDiscrepancy;
       }
     }
@@ -10873,8 +10852,8 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
         filteredTimesteps.push_back(t);
         if (init->probablyMissingGRF.size() > trial)
         {
-          init->probablyMissingGRF[trial][t] = true;
-          init->missingGRFReason[trial][t]
+          init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
+          init->missingGRFReason.at(trial).at(t)
               = MissingGRFReason::torqueDiscrepancy;
         }
       }
@@ -11026,11 +11005,11 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
           << i << "/" << init->poseTrials.size() << std::endl;
       int numForcePlates = init->forcePlateTrials[i].size();
       int numMissingSteps = 0;
-      std::vector<bool> trialProbablyMissing;
+      std::vector<MissingGRFStatus> trialProbablyMissing;
       std::vector<int> missingStepIndices;
       if (init->probablyMissingGRF.size() > i)
       {
-        trialProbablyMissing = init->probablyMissingGRF[i];
+        trialProbablyMissing = init->probablyMissingGRF.at(i);
         for (int t = 0; t < trialProbablyMissing.size(); t++)
         {
           if (trialProbablyMissing[t])
@@ -11733,7 +11712,7 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
             clippedPeaks = true;
             std::cout << "Detected peak at " << t << " with change "
                       << comChanges.at(t) << "m" << std::endl;
-            init->probablyMissingGRF.at(trial).at(t) = true;
+            init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
             init->missingGRFReason.at(trial).at(t)
                 = MissingGRFReason::unmeasuredExternalForceDetected;
 
@@ -11774,7 +11753,7 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                           << init->missingGRFReason.at(trial).size() << "!"
                           << std::endl;
               }
-              init->probablyMissingGRF.at(trial).at(i) = true;
+              init->probablyMissingGRF.at(trial).at(i) = MissingGRFStatus::yes;
               init->missingGRFReason.at(trial).at(i)
                   = MissingGRFReason::unmeasuredExternalForceDetected;
             }
@@ -11813,7 +11792,7 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                           << init->missingGRFReason.at(trial).size() << "!"
                           << std::endl;
               }
-              init->probablyMissingGRF.at(trial).at(i) = true;
+              init->probablyMissingGRF.at(trial).at(i) = MissingGRFStatus::yes;
               init->missingGRFReason.at(trial).at(i)
                   = MissingGRFReason::unmeasuredExternalForceDetected;
             }
@@ -11987,6 +11966,12 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
     dq.col(0) = dq.col(1);
     ddq.col(0).setZero();
 
+    std::vector<bool> probablyMissingGRF;
+    for (int i = 0; i < init->probablyMissingGRF.at(trial).size(); i++)
+    {
+      probablyMissingGRF.push_back(init->probablyMissingGRF.at(trial).at(i));
+    }
+
     std::pair<Eigen::MatrixXs, Eigen::VectorXs> linearSystem
         = helper.getMultiMassLinearSystem(
             dt,
@@ -11994,7 +11979,7 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
             dq,
             ddq,
             init->grfTrials.at(trial),
-            init->probablyMissingGRF.at(trial),
+            probablyMissingGRF,
             maxBucketSize);
 
     int trialOutputDims = linearSystem.first.rows();
@@ -12445,6 +12430,12 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
 
     int numTimesteps = q.cols();
 
+    std::vector<bool> probablyMissingGRF;
+    for (int i = 0; i < init->probablyMissingGRF.at(trial).size(); i++)
+    {
+      probablyMissingGRF.push_back(init->probablyMissingGRF.at(trial).at(i));
+    }
+
     // std::cout << "Building linear system for optimizing linear + angular "
     //              "motion for "
     //           << numTimesteps << " timesteps with " << numMissing
@@ -12456,7 +12447,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
             dq,
             ddq,
             init->grfTrials[trial],
-            init->probablyMissingGRF[trial],
+            probablyMissingGRF,
             useReactionWheels,
             init->forcePlateTrials[trial],
             init->forcePlatesAssignedToContactBody[trial],
@@ -12650,7 +12641,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                 if (init->missingGRFReason[trial][t]
                     == MissingGRFReason::torqueDiscrepancy)
                 {
-                  init->probablyMissingGRF[trial][t] = false;
+                  init->probablyMissingGRF[trial][t] = MissingGRFStatus::no;
                 }
               }
             }
@@ -12780,7 +12771,7 @@ bool DynamicsFitter::timeSyncTrialGRF(
     originalForces.push_back(forces);
     originalMoments.push_back(moments);
   }
-  std::vector<bool> originalProbablyMissingGRF;
+  std::vector<MissingGRFStatus> originalProbablyMissingGRF;
   std::vector<MissingGRFReason> originalMissingGRFReason;
   for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
   {
@@ -12816,7 +12807,7 @@ bool DynamicsFitter::timeSyncTrialGRF(
       if (originalT < 0 || originalT >= originalGRFTrial.cols())
       {
         shiftedGRFTrial.col(t).setZero();
-        init->probablyMissingGRF[trial][t] = true;
+        init->probablyMissingGRF[trial][t] = MissingGRFStatus::yes;
         init->missingGRFReason[trial][t] = MissingGRFReason::shiftGRF;
       }
       else
@@ -12975,7 +12966,7 @@ bool DynamicsFitter::timeSyncTrialGRF(
     int originalT = t - bestShiftGRF;
     if (originalT < 0 || originalT >= originalGRFTrial.cols())
     {
-      init->probablyMissingGRF[trial][t] = true;
+      init->probablyMissingGRF[trial][t] = MissingGRFStatus::yes;
       init->missingGRFReason[trial][t] = MissingGRFReason::shiftGRF;
     }
     else
@@ -13227,7 +13218,10 @@ bool DynamicsFitter::optimizeSpatialResidualsOnCOMTrajectory(
   std::vector<bool> probablyMissingGRF;
   if (init->probablyMissingGRF.size() > trial)
   {
-    probablyMissingGRF = init->probablyMissingGRF[trial];
+    for (int t = 0; t < init->probablyMissingGRF[trial].size(); t++)
+    {
+      probablyMissingGRF.push_back(init->probablyMissingGRF[trial][t]);
+    }
   }
 
   // Save our original trajectory of poses, so we can reset if necessary

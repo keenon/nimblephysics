@@ -10,6 +10,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "dart/biomechanics/enums.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -45,6 +47,12 @@ void DynamicsFitter(py::module& m)
           "interpolatedClippedGRF",
           dart::biomechanics::MissingGRFReason::interpolatedClippedGRF)
       .value("manualReview", dart::biomechanics::MissingGRFReason::manualReview)
+      .export_values();
+
+  py::enum_<dart::biomechanics::MissingGRFStatus>(m, "MissingGRFStatus")
+      .value("no", dart::biomechanics::MissingGRFStatus::no)
+      .value("unknown", dart::biomechanics::MissingGRFStatus::unknown)
+      .value("yes", dart::biomechanics::MissingGRFStatus::yes)
       .export_values();
 
   ::py::class_<dart::biomechanics::ResidualForceHelper>(
@@ -497,7 +505,8 @@ protected:
                   markerObservationTrials,
               std::vector<std::vector<int>>
                   overrideForcePlateToGRFNodeAssignment,
-              std::vector<std::vector<bool>> initializedProbablyMissingGRF)
+              std::vector<std::vector<biomechanics::MissingGRFStatus>>
+                  initializedProbablyMissingGRF)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
@@ -537,7 +546,8 @@ protected:
                   markerObservationTrials,
               std::vector<std::vector<int>>
                   overrideForcePlateToGRFNodeAssignment,
-              std::vector<std::vector<bool>> initializedProbablyMissingGRF)
+              std::vector<std::vector<biomechanics::MissingGRFStatus>>
+                  initializedProbablyMissingGRF)
               -> std::shared_ptr<dart::biomechanics::DynamicsInitialization> {
             return dart::biomechanics::DynamicsFitter::createInitialization(
                 skel,
