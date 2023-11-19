@@ -17040,8 +17040,12 @@ std::pair<s_t, s_t> DynamicsFitter::computeAverageTrialResidualForce(
     //           << std::endl;
     count++;
   }
-  force /= count;
-  torque /= count;
+
+  if (count > 0)
+  {
+    force /= count;
+    torque /= count;
+  }
 
   mSkeleton->setPositions(originalPoses);
   mSkeleton->setGroupScales(originalScales);
