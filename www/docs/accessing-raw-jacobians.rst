@@ -1,5 +1,7 @@
-Accessing Jacobians of Dynamics
+Accessing Derivatives and Jacobians
 ==========================================
+
+In order to do gradient-based optimization, you need access to derivatives of the quantities you are optimizing.
 
 For some "old school" control algorithms like `Differential Dynamic Programming (DDP) <https://inst.eecs.berkeley.edu/~cs294-40/fa08/scribes/lecture7.pdf>`_, you need access to the Jacobians of dynamics.
 
