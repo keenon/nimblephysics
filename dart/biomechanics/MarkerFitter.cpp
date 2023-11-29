@@ -1493,38 +1493,40 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     }
 
     // 3.2. Sort the trials by the amount of joint variability in each one
-    std::vector<int> orderedByJointVariability;
+    std::vector<int> orderedByMarkerVariability;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      orderedByJointVariability.push_back(i);
+      orderedByMarkerVariability.push_back(i);
     }
     std::sort(
-        orderedByJointVariability.begin(),
-        orderedByJointVariability.end(),
+        orderedByMarkerVariability.begin(),
+        orderedByMarkerVariability.end(),
         [&](int a, int b) {
           // Sort by joint marker variability
           return markerVariabilities.at(a) > markerVariabilities.at(b);
         });
     std::vector<int> inverseOrderedByJointVariability;
-    inverseOrderedByJointVariability.resize(orderedByJointVariability.size());
-    for (int i = 0; i < orderedByJointVariability.size(); i++)
+    inverseOrderedByJointVariability.resize(orderedByMarkerVariability.size());
+    for (int i = 0; i < orderedByMarkerVariability.size(); i++)
     {
-      inverseOrderedByJointVariability[orderedByJointVariability.at(i)] = i;
+      inverseOrderedByJointVariability[orderedByMarkerVariability.at(i)] = i;
     }
 
     // 3.3. Debug the sorted trials variability
-    std::cout << "Sorted trials by the variation of markers around the joints:"
+    std::cout << "Sorted trials by the variation of inter-marker distances:"
               << std::endl;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      std::cout << std::to_string(i) << ": " << orderedByJointVariability.at(i)
+      std::cout << std::to_string(i) << ": " << orderedByMarkerVariability.at(i)
                 << " marker variability norm = "
-                << markerVariabilities.at(orderedByJointVariability.at(i))
+                << markerVariabilities.at(orderedByMarkerVariability.at(i))
                 << std::endl;
     }
 
     // 4. We'll subsample the data down here, to avoid having any accidental
-    // performance tanking if people upload 100 trials for one subject
+    // performance tanking if people upload 100 trials for one subject, which
+    // happens quite often now that we have the trial splitter limiting trials
+    // to 2000 frames each.
 
     // Sample at most N trials
     int numTrialsToSample = markerObservationTrials.size();
@@ -1546,12 +1548,12 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     for (int i = 0; i < numTrialsToSample; i++)
     {
       std::cout
-          << "Trial " << orderedByJointVariability.at(i) << " length "
-          << markerObservationTrials.at(orderedByJointVariability.at(i)).size()
+          << "Trial " << orderedByMarkerVariability.at(i) << " length "
+          << markerObservationTrials.at(orderedByMarkerVariability.at(i)).size()
           << std::endl;
-      trialSampledAtIndex.at(orderedByJointVariability.at(i)) = cursor;
-      cursor
-          += markerObservationTrials.at(orderedByJointVariability.at(i)).size();
+      trialSampledAtIndex.at(orderedByMarkerVariability.at(i)) = cursor;
+      cursor += markerObservationTrials.at(orderedByMarkerVariability.at(i))
+                    .size();
     }
     std::cout << "Total timesteps to use for scaling: " << cursor << std::endl;
 
@@ -1561,12 +1563,12 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     for (int i = 0; i < numTrialsToSample; i++)
     {
       for (int j = 0;
-           j
-           < markerObservationTrials.at(orderedByJointVariability.at(i)).size();
+           j < markerObservationTrials.at(orderedByMarkerVariability.at(i))
+                   .size();
            j++)
       {
         markerObservations.emplace_back(
-            markerObservationTrials.at(orderedByJointVariability.at(i)).at(j));
+            markerObservationTrials.at(orderedByMarkerVariability.at(i)).at(j));
         newClip.push_back(j == 0);
       }
     }
@@ -1615,6 +1617,9 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
       {
         try
         {
+          std::cout << "Running pre-scaled IK on trial " << i << "/"
+                    << markerObservationTrials.size()
+                    << ", which was not included in main solve" << std::endl;
           separateInits.push_back(runPrescaledPipeline(
               markerObservationTrials.at(i),
               InitialMarkerFitParams(params)

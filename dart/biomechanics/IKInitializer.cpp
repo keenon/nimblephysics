@@ -2312,6 +2312,15 @@ void IKInitializer::estimateGroupScalesClosedForm(bool log)
     Eigen::Vector3s scale = getLocalScale(
         localPoints, pairDistancesWithWeights, defaultScale, log);
 
+    if (scale.hasNaN())
+    {
+      std::cout << "Scale has NaN inside "
+                   "IKInitializer::estimateGroupScalesClosedForm!"
+                << std::endl;
+      throw std::runtime_error(
+          "Scale has NaN inside IKInitializer::estimateGroupScalesClosedForm!");
+    }
+
     // 1.5. Apply that scale to all the bodies in this stacked body
     for (dynamics::BodyNode* body : bodyNode->bodies)
     {
@@ -3450,7 +3459,8 @@ Eigen::Vector3s IKInitializer::getLocalScale(
     s_t w = std::get<3>(pairDistancesWithWeights[0]);
     (void)w;
     s_t ratio = d / (a - b).norm();
-    if (ratio < 0.75 * defaultAxisScale || ratio > 1.25 * defaultAxisScale)
+    if (std::isnan(ratio) || ratio < 0.75 * defaultAxisScale
+        || ratio > 1.25 * defaultAxisScale)
     {
       ratio = defaultAxisScale;
     }
@@ -3507,7 +3517,7 @@ Eigen::Vector3s IKInitializer::getLocalScale(
       // Also, if we're outside of reasonable scale bounds, just default that
       // axis, because it indicates that something went wrong in estimating.
       else if (
-          scale(i) < 0.75 * defaultAxisScale
+          std::isnan(scale(i)) || scale(i) < 0.75 * defaultAxisScale
           || scale(i) > 1.25 * defaultAxisScale)
       {
         scale(i) = defaultAxisScale;
@@ -3824,8 +3834,10 @@ Eigen::Vector3s IKInitializer::leastSquaresConcentricSphereFit(
   if (traces.size() > 0)
   {
     int minTraceSize = traces[0].size();
-    for (auto& trace : traces) {
-      if (trace.size() < minTraceSize) {
+    for (auto& trace : traces)
+    {
+      if (trace.size() < minTraceSize)
+      {
         minTraceSize = trace.size();
       }
     }
