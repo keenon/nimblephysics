@@ -843,7 +843,14 @@ void Frame::readSensorsFromProto(
   this->trial = trial;
   this->t = t;
 
-  this->missingGRFReason = header.mTrials[trial]->mMissingGRFReason[t];
+  if (header.mTrials[trial]->mMissingGRFReason.size() > t)
+  {
+    this->missingGRFReason = header.mTrials[trial]->mMissingGRFReason[t];
+  }
+  else
+  {
+    this->missingGRFReason = MissingGRFReason::unmeasuredExternalForceDetected;
+  }
 
   // 7. Read out the marker, accelerometer, and gyro info as pairs
   for (int i = 0; i < header.mMarkerNames.size(); i++)
@@ -948,15 +955,31 @@ void FramePass::readFromProto(
   // ProcessingPassType type;
   type = header.mPasses[pass]->mType;
   // s_t markerRMS;
-  markerRMS = header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS[t];
+  markerRMS = 0.0;
+  if (header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS.size() > t)
+  {
+    header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS[t];
+  }
   // s_t markerMax;
-  markerMax = header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax[t];
+  markerMax = 0.0;
+  if (header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax.size() > t)
+  {
+    header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax[t];
+  }
   // s_t linearResidual;
-  linearResidual
-      = header.mTrials[trial]->mTrialPasses[pass]->mLinearResidual[t];
+  linearResidual = 0.0;
+  if (header.mTrials[trial]->mTrialPasses[pass]->mLinearResidual.size() > t)
+  {
+    linearResidual
+        = header.mTrials[trial]->mTrialPasses[pass]->mLinearResidual[t];
+  }
   // s_t angularResidual;
-  angularResidual
-      = header.mTrials[trial]->mTrialPasses[pass]->mAngularResidual[t];
+  angularResidual = 0.0;
+  if (header.mTrials[trial]->mTrialPasses[pass]->mAngularResidual.size() > t)
+  {
+    angularResidual
+        = header.mTrials[trial]->mTrialPasses[pass]->mAngularResidual[t];
+  }
   // Eigen::VectorXd pos;
   pos = Eigen::VectorXs::Zero(header.mNumDofs);
   for (int i = 0; i < header.mNumDofs; i++)
@@ -1176,8 +1199,13 @@ void FramePass::readFromProto(
   posObserved = Eigen::VectorXi::Zero(header.mNumDofs);
   for (int i = 0; i < header.mNumDofs; i++)
   {
-    posObserved(i)
-        = header.mTrials[trial]->mTrialPasses[pass]->mDofPositionsObserved[i];
+    posObserved(i) = true;
+    if (header.mTrials[trial]->mTrialPasses[pass]->mDofPositionsObserved.size()
+        > i)
+    {
+      posObserved(i)
+          = header.mTrials[trial]->mTrialPasses[pass]->mDofPositionsObserved[i];
+    }
   }
 
   // // These are masks for which DOFs have been finite differenced (if they
@@ -1187,18 +1215,32 @@ void FramePass::readFromProto(
   velFiniteDifferenced = Eigen::VectorXi::Zero(header.mNumDofs);
   for (int i = 0; i < header.mNumDofs; i++)
   {
-    velFiniteDifferenced(i) = header.mTrials[trial]
-                                  ->mTrialPasses[pass]
-                                  ->mDofVelocitiesFiniteDifferenced[i];
+    velFiniteDifferenced(i) = true;
+    if (header.mTrials[trial]
+            ->mTrialPasses[pass]
+            ->mDofVelocitiesFiniteDifferenced.size()
+        > i)
+    {
+      velFiniteDifferenced(i) = header.mTrials[trial]
+                                    ->mTrialPasses[pass]
+                                    ->mDofVelocitiesFiniteDifferenced[i];
+    }
   }
 
   // Eigen::VectorXi accFiniteDifferenced;
   accFiniteDifferenced = Eigen::VectorXi::Zero(header.mNumDofs);
   for (int i = 0; i < header.mNumDofs; i++)
   {
-    accFiniteDifferenced(i) = header.mTrials[trial]
-                                  ->mTrialPasses[pass]
-                                  ->mDofAccelerationFiniteDifferenced[i];
+    accFiniteDifferenced(i) = true;
+    if (header.mTrials[trial]
+            ->mTrialPasses[pass]
+            ->mDofAccelerationFiniteDifferenced.size()
+        > i)
+    {
+      accFiniteDifferenced(i) = header.mTrials[trial]
+                                    ->mTrialPasses[pass]
+                                    ->mDofAccelerationFiniteDifferenced[i];
+    }
   }
 }
 

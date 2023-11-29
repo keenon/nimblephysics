@@ -59,6 +59,15 @@ namespace python {
 
 void Shape(py::module& m)
 {
+  auto shape = ::py::
+      class_<dart::dynamics::Shape, std::shared_ptr<dart::dynamics::Shape>>(
+          m, "Shape");
+
+  auto meshShape = ::py::class_<
+      dart::dynamics::MeshShape,
+      dart::dynamics::Shape,
+      std::shared_ptr<dart::dynamics::MeshShape>>(m, "MeshShape");
+
   ::py::enum_<dart::dynamics::Shape::DataVariance>(m, "DataVariance")
       .value("STATIC", dart::dynamics::Shape::DataVariance::STATIC)
       .value(
@@ -77,8 +86,7 @@ void Shape(py::module& m)
           "DYNAMIC_TRANSFORM",
           dart::dynamics::Shape::DataVariance::DYNAMIC_TRANSFORM);
 
-  ::py::class_<dart::dynamics::Shape, std::shared_ptr<dart::dynamics::Shape>>(
-      m, "Shape")
+  shape
       .def(
           "getType",
           +[](const dart::dynamics::Shape* self) -> const std::string& {
@@ -154,6 +162,11 @@ void Shape(py::module& m)
       .def(
           "refreshData",
           +[](dart::dynamics::Shape* self) { self->refreshData(); })
+      .def(
+          "asMeshShape",
+          +[](dart::dynamics::Shape* self) {
+            return dynamic_cast<dart::dynamics::MeshShape*>(self);
+          })
       .def(
           "notifyAlphaUpdated",
           +[](dart::dynamics::Shape* self, s_t alpha) {
@@ -286,10 +299,7 @@ void Shape(py::module& m)
       m, "SharedMeshWrapper");
   // TODO: Add Python bindings for raw ASSIMP meshes
 
-  ::py::class_<
-      dart::dynamics::MeshShape,
-      dart::dynamics::Shape,
-      std::shared_ptr<dart::dynamics::MeshShape>>(m, "MeshShape")
+  meshShape
       .def(
           ::py::init<
               const Eigen::Vector3s&,
