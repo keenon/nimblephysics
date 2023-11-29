@@ -9420,6 +9420,16 @@ Eigen::VectorXs Skeleton::unwrapPositionToNearest(
           lastPos.segment<3>(start),
           eulerJoint->getAxisOrder());
     }
+    else if (joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+    {
+      const dynamics::EulerFreeJoint* eulerJoint
+          = static_cast<const dynamics::EulerFreeJoint*>(joint);
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start),
+          lastPos.segment<3>(start),
+          eulerJoint->getAxisOrder());
+    }
   }
   return unwrapped;
 }

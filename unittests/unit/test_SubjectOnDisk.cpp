@@ -1255,13 +1255,10 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
 }
 #endif
 
-/*
-// #ifdef ALL_TESTS
+#ifdef ALL_TESTS
 TEST(SubjectOnDisk, READ_LOCAL_TRIAL)
 {
-  SubjectOnDisk read_back(
-      "/Users/keenonwerling/Desktop/dev/InferBiomechanics/data/train/"
-      "Moore2015_Formatted_No_Arm_subject8.b3d");
+  SubjectOnDisk read_back("/Users/keenonwerling/Desktop/grf/output.b3d");
   std::cout << "  Num Trials: " << read_back.getNumTrials() << std::endl;
   std::cout << "  Num Processing Passes: " << read_back.getNumProcessingPasses()
             << std::endl;
@@ -1331,5 +1328,4 @@ TEST(SubjectOnDisk, READ_LOCAL_TRIAL)
     }
   }
 }
-// #endif
-*/
+#endif

@@ -133,6 +133,7 @@ std::string GUIStateMachine::flushJson()
 {
   const std::lock_guard<std::recursive_mutex> lock(mProtoMutex);
 
+  mCommandListOutputBuffer.clear();
   mCommandList.SerializeToString(&mCommandListOutputBuffer);
 
   // Reset
@@ -839,7 +840,7 @@ void GUIStateMachine::createSphere(
   sphere.receiveShadows = receiveShadows;
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateSphere(list, mSpheres[key]);
+    encodeCreateSphere(list, mSpheres.at(key));
   });
 }
 
@@ -869,7 +870,7 @@ void GUIStateMachine::createCone(
   cone.receiveShadows = receiveShadows;
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateCone(list, mCones[key]);
+    encodeCreateCone(list, mCones.at(key));
   });
 }
 
@@ -897,7 +898,7 @@ void GUIStateMachine::createCylinder(
   cylinder.receiveShadows = receiveShadows;
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateCylinder(list, mCylinders[key]);
+    encodeCreateCylinder(list, mCylinders.at(key));
   });
 }
 
@@ -927,7 +928,7 @@ void GUIStateMachine::createCapsule(
   capsule.receiveShadows = receiveShadows;
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateCapsule(list, mCapsules[key]);
+    encodeCreateCapsule(list, mCapsules.at(key));
   });
 }
 
@@ -946,7 +947,8 @@ void GUIStateMachine::createLine(
   line.points = points;
   line.color = color;
   line.layer = layer;
-  for (int i = 0; i < points.size(); i++)
+  line.width.clear();
+  for (int i = 0; i < line.points.size(); i++)
   {
     if (i < width.size())
     {
@@ -959,7 +961,7 @@ void GUIStateMachine::createLine(
   }
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateLine(list, mLines[key]);
+    encodeCreateLine(list, mLines.at(key));
   });
 }
 
@@ -1000,7 +1002,7 @@ void GUIStateMachine::createMesh(
   mesh.receiveShadows = receiveShadows;
 
   queueCommand([this, key](proto::CommandList& list) {
-    encodeCreateMesh(list, mMeshes[key]);
+    encodeCreateMesh(list, mMeshes.at(key));
   });
 }
 
@@ -1192,17 +1194,17 @@ Eigen::Vector3s GUIStateMachine::getObjectPosition(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].pos;
+    return mBoxes.at(key).pos;
   if (mSpheres.find(key) != mSpheres.end())
-    return mSpheres[key].pos;
+    return mSpheres.at(key).pos;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].pos;
+    return mCapsules.at(key).pos;
   if (mCones.find(key) != mCones.end())
-    return mCones[key].pos;
+    return mCones.at(key).pos;
   if (mCylinders.find(key) != mCylinders.end())
-    return mCylinders[key].pos;
+    return mCylinders.at(key).pos;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].pos;
+    return mMeshes.at(key).pos;
   return Eigen::Vector3s::Zero();
 }
 
@@ -1213,15 +1215,15 @@ Eigen::Vector3s GUIStateMachine::getObjectRotation(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].euler;
+    return mBoxes.at(key).euler;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].euler;
+    return mCapsules.at(key).euler;
   if (mCones.find(key) != mCones.end())
-    return mCones[key].euler;
+    return mCones.at(key).euler;
   if (mCylinders.find(key) != mCylinders.end())
-    return mCylinders[key].euler;
+    return mCylinders.at(key).euler;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].euler;
+    return mMeshes.at(key).euler;
   return Eigen::Vector3s::Zero();
 }
 
@@ -1232,19 +1234,19 @@ Eigen::Vector4s GUIStateMachine::getObjectColor(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].color;
+    return mBoxes.at(key).color;
   if (mSpheres.find(key) != mSpheres.end())
-    return mSpheres[key].color;
+    return mSpheres.at(key).color;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].color;
+    return mCapsules.at(key).color;
   if (mCones.find(key) != mCones.end())
-    return mCones[key].color;
+    return mCones.at(key).color;
   if (mCylinders.find(key) != mCylinders.end())
-    return mCylinders[key].color;
+    return mCylinders.at(key).color;
   if (mLines.find(key) != mLines.end())
-    return mLines[key].color;
+    return mLines.at(key).color;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].color;
+    return mMeshes.at(key).color;
   return Eigen::Vector4s::Zero();
 }
 
@@ -1255,11 +1257,11 @@ Eigen::Vector3s GUIStateMachine::getObjectScale(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].size;
+    return mBoxes.at(key).size;
   if (mSpheres.find(key) != mSpheres.end())
-    return mSpheres[key].radii;
+    return mSpheres.at(key).radii;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].scale;
+    return mMeshes.at(key).scale;
   return Eigen::Vector3s::Zero();
 }
 
@@ -1271,27 +1273,27 @@ void GUIStateMachine::setObjectPosition(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].pos = pos;
+    mBoxes.at(key).pos = pos;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].pos = pos;
+    mSpheres.at(key).pos = pos;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].pos = pos;
+    mCapsules.at(key).pos = pos;
   }
   if (mCones.find(key) != mCones.end())
   {
-    mCones[key].pos = pos;
+    mCones.at(key).pos = pos;
   }
   if (mCylinders.find(key) != mCylinders.end())
   {
-    mCylinders[key].pos = pos;
+    mCylinders.at(key).pos = pos;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].pos = pos;
+    mMeshes.at(key).pos = pos;
   }
 
   queueCommand([&](proto::CommandList& list) {
@@ -1311,23 +1313,23 @@ void GUIStateMachine::setObjectRotation(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].euler = euler;
+    mBoxes.at(key).euler = euler;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].euler = euler;
+    mCapsules.at(key).euler = euler;
   }
   if (mCylinders.find(key) != mCylinders.end())
   {
-    mCylinders[key].euler = euler;
+    mCylinders.at(key).euler = euler;
   }
   if (mCones.find(key) != mCones.end())
   {
-    mCones[key].euler = euler;
+    mCones.at(key).euler = euler;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].euler = euler;
+    mMeshes.at(key).euler = euler;
   }
 
   queueCommand([&](proto::CommandList& list) {
@@ -1347,31 +1349,31 @@ void GUIStateMachine::setObjectColor(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].color = color;
+    mBoxes.at(key).color = color;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].color = color;
+    mSpheres.at(key).color = color;
   }
   if (mLines.find(key) != mLines.end())
   {
-    mLines[key].color = color;
+    mLines.at(key).color = color;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].color = color;
+    mMeshes.at(key).color = color;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].color = color;
+    mCapsules.at(key).color = color;
   }
   if (mCylinders.find(key) != mCylinders.end())
   {
-    mCylinders[key].color = color;
+    mCylinders.at(key).color = color;
   }
   if (mCones.find(key) != mCones.end())
   {
-    mCones[key].color = color;
+    mCones.at(key).color = color;
   }
 
   queueCommand([&](proto::CommandList& list) {
@@ -1393,30 +1395,30 @@ void GUIStateMachine::setObjectScale(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].size = scale;
+    mBoxes.at(key).size = scale;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].radii = scale;
+    mSpheres.at(key).radii = scale;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].scale = scale;
+    mMeshes.at(key).scale = scale;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].height = scale(1);
-    mCapsules[key].radius = scale(0);
+    mCapsules.at(key).height = scale(1);
+    mCapsules.at(key).radius = scale(0);
   }
   if (mCylinders.find(key) != mCylinders.end())
   {
-    mCylinders[key].height = scale(1);
-    mCylinders[key].radius = scale(0);
+    mCylinders.at(key).height = scale(1);
+    mCylinders.at(key).radius = scale(0);
   }
   if (mCones.find(key) != mCones.end())
   {
-    mCones[key].height = scale(1);
-    mCones[key].radius = scale(0);
+    mCones.at(key).height = scale(1);
+    mCones.at(key).radius = scale(0);
   }
 
   queueCommand([&](proto::CommandList& list) {
