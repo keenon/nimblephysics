@@ -1,5 +1,5 @@
-Posing Skeletons to Match Data
-====================================
+Data: Markers and Joint Centers
+========================================
 
 Quite often, you will have various forms of data about a skeleton (for example, the world coordinates of its joint centers) and you will need to
 find a configuration for your :code:`nimble.dynamics.Skeleton` object that matches your target data as closely as possible.

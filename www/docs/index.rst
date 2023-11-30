@@ -17,7 +17,8 @@ This documentation was written for Nimble :code:`v0.10.30`, and may or may not w
   install
   understanding-skeletons
   optimization
-  posing-skeletons
+  markers-and-joint-centers
+  accs-and-gyros
   inverse-dynamics
   working-with-addbiomechanics-data
   process-mocap-data
