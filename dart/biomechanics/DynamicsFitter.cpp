@@ -9736,7 +9736,7 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::retargetInitialization(
 
   DynamicsFitter fitter(
       simplifiedSkel, retargeted->grfBodyNodes, retargeted->trackingMarkers);
-  fitter.estimateFootGroundContacts(retargeted);
+  fitter.estimateFootGroundContactsWithStillness(retargeted);
 
   return retargeted;
 }
@@ -9922,10 +9922,124 @@ std::vector<Eigen::Vector3s> DynamicsFitter::measuredGRFForces(
 }
 
 //==============================================================================
+// Guess if each trial is on a treadmill or not.
+void DynamicsFitter::guessTrialsOnTreadmill(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  if (init->trialsOnTreadmill.size() > 0)
+  {
+    std::cout << "Warning: guessTrialsOnTreadmill() called, but "
+                 "init->trialOnTreadmill already has "
+              << init->trialsOnTreadmill.size() << " entries. Skipping."
+              << std::endl;
+    return;
+  }
+
+  for (int trial = 0; trial < init->forcePlateTrials.size(); trial++)
+  {
+    // Loop through each force plate, and look to see how fast the CoP tends to
+    // move, weighted by force magnitude
+    bool trialOnTreadmill = false;
+    for (int i = 0; i < init->forcePlateTrials.at(trial).size(); i++)
+    {
+      auto& plate = init->forcePlateTrials.at(trial).at(i);
+
+      s_t totalMagnitude = 0.0;
+      Eigen::Vector3s weightedVectorSum = Eigen::Vector3s::Zero();
+      for (int t = 1; t < plate.forces.size(); t++)
+      {
+        Eigen::Vector3s diff
+            = plate.centersOfPressure[t] - plate.centersOfPressure[t - 1];
+        s_t magnitude = plate.forces[t].norm();
+        weightedVectorSum += diff * magnitude;
+        totalMagnitude += magnitude;
+      }
+
+      if (totalMagnitude > 0 && plate.forces.size() > 10)
+      {
+        s_t averageSpeed = weightedVectorSum.norm()
+                           / (totalMagnitude * init->trialTimesteps[trial]);
+        if (averageSpeed > 0.1)
+        {
+          trialOnTreadmill = true;
+          // If any force plate is a treadmill force plate, then this is a
+          // treadmill trial
+          break;
+        }
+      }
+    }
+    init->trialsOnTreadmill.push_back(trialOnTreadmill);
+  }
+}
+
+//==============================================================================
 // 0. Estimate when each foot is in contact with the ground, which we can use
 // to infer when we're missing GRF data on certain timesteps, so we don't let
 // it mess with our optimization.
-void DynamicsFitter::estimateFootGroundContacts(
+void DynamicsFitter::estimateFootGroundContactsWithStillness(
+    std::shared_ptr<DynamicsInitialization> init)
+{
+  guessTrialsOnTreadmill(init);
+
+  for (int trial = 0; trial < init->poseTrials.size(); trial++)
+  {
+    // We automatically assume that all feet are in contact with the ground if
+    // we're on a treadmill
+    if (init->trialsOnTreadmill[trial])
+    {
+      continue;
+    }
+
+    if (init->missingGRFReason.size() > trial
+        && init->missingGRFReason.at(trial).size()
+               == init->poseTrials[trial].cols())
+    {
+      // If we already have a missing GRF reason array (probably from a manual
+      // review), then we don't need to estimate it
+      continue;
+    }
+
+    // Otherwise, we can estimate ground contact by looking at the velocity of
+    // the feet
+    Eigen::VectorXs originalPose = mSkeleton->getPositions();
+
+    // Collect the positions of the feet over time
+    std::vector<std::vector<Eigen::Vector3s>> footPositions;
+    for (int i = 0; i < init->grfBodyNodes.size(); i++)
+    {
+      footPositions.emplace_back();
+    }
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      for (int i = 0; i < init->grfBodyNodes.size(); i++)
+      {
+        mSkeleton->setPositions(init->poseTrials[trial].col(t));
+        Eigen::Vector3s worldPos
+            = init->grfBodyNodes[i]->getWorldTransform().translation();
+        footPositions[i].push_back(worldPos);
+      }
+    }
+
+    // Do a manual clustering for "at rest detection"
+    // If the feet are within `radius` of each other for more than `minTime`
+    // seconds, we call that at rest.
+    s_t radius = 0.05;
+    s_t minTime = 0.5;
+
+    (void)radius;
+    (void)minTime;
+
+    // TODO: finish implementing me
+
+    mSkeleton->setPositions(originalPose);
+  }
+}
+
+//==============================================================================
+// 0. Estimate when each foot is in contact with the ground, which we can use
+// to infer when we're missing GRF data on certain timesteps, so we don't let
+// it mess with our optimization.
+void DynamicsFitter::estimateFootGroundContactsWithHeightHeuristic(
     std::shared_ptr<DynamicsInitialization> init,
     bool ignoreFootNotOverForcePlate)
 {

@@ -112,6 +112,9 @@ void DynamicsFitter(py::module& m)
           "trialTimesteps",
           &dart::biomechanics::DynamicsInitialization::trialTimesteps)
       .def_readwrite(
+          "trialsOnTreadmill",
+          &dart::biomechanics::DynamicsInitialization::trialsOnTreadmill)
+      .def_readwrite(
           "includeTrialsInDynamicsFit",
           &dart::biomechanics::DynamicsInitialization::
               includeTrialsInDynamicsFit)
@@ -593,10 +596,16 @@ protected:
           ::py::arg("init"),
           ::py::arg("trial"))
       .def(
-          "estimateFootGroundContacts",
-          &dart::biomechanics::DynamicsFitter::estimateFootGroundContacts,
+          "estimateFootGroundContactsWithHeightHeuristic",
+          &dart::biomechanics::DynamicsFitter::
+              estimateFootGroundContactsWithHeightHeuristic,
           ::py::arg("init"),
           ::py::arg("ignoreFootNotOverForcePlate") = false)
+      .def(
+          "estimateFootGroundContactsWithStillness",
+          &dart::biomechanics::DynamicsFitter::
+              estimateFootGroundContactsWithStillness,
+          ::py::arg("init"))
       .def(
           "smoothAccelerations",
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,

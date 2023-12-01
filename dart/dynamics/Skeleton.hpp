@@ -1728,6 +1728,43 @@ public:
           accs,
       neural::WithRespectTo* wrt);
 
+  /// These are a set of bodies, and offsets in local body space where
+  /// magnetometers are mounted on the body
+  Eigen::VectorXs getMagnetometerReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs getMagnetometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs finiteDifferenceMagnetometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in magnetic field to
+  /// changes in magnetometer readings
+  Eigen::MatrixXs getMagnetometerReadingsJacobianWrtMagneticField(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
+  /// This returns the Jacobian relating changes in magnetic field to
+  /// changes in magnetometer readings
+  Eigen::MatrixXs finiteDifferenceMagnetometerReadingsJacobianWrtMagneticField(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
   //----------------------------------------------------------------------------
   // Handling anthropometric measurements
   //----------------------------------------------------------------------------

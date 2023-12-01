@@ -793,6 +793,7 @@ struct DynamicsInitialization
   std::vector<std::vector<std::map<std::string, Eigen::Vector3s>>>
       gyroObservationTrials;
   std::vector<s_t> trialTimesteps;
+  std::vector<bool> trialsOnTreadmill;
 
   // This vector has a single boolean per trial, and allows the pipeline to mark
   // whole trials as "excluded" during processing.
@@ -1350,10 +1351,19 @@ public:
   std::vector<Eigen::Vector3s> measuredGRFForces(
       std::shared_ptr<DynamicsInitialization> init, int trial);
 
+  // Guess if each trial is on a treadmill or not.
+  void guessTrialsOnTreadmill(std::shared_ptr<DynamicsInitialization> init);
+
   // 0. Estimate when each foot is in contact with the ground, which we can use
   // to infer when we're missing GRF data on certain timesteps, so we don't let
   // it mess with our optimization.
-  void estimateFootGroundContacts(
+  void estimateFootGroundContactsWithStillness(
+      std::shared_ptr<DynamicsInitialization> init);
+
+  // 0. Estimate when each foot is in contact with the ground, which we can use
+  // to infer when we're missing GRF data on certain timesteps, so we don't let
+  // it mess with our optimization.
+  void estimateFootGroundContactsWithHeightHeuristic(
       std::shared_ptr<DynamicsInitialization> init,
       bool ignoreFootNotOverForcePlate = false);
 

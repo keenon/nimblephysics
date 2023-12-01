@@ -3370,7 +3370,7 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
 
   DynamicsFitter dynamicsFitter(
       skel, init->grfBodyNodes, init->trackingMarkers);
-  dynamicsFitter.estimateFootGroundContacts(init);
+  dynamicsFitter.estimateFootGroundContactsWithHeightHeuristic(init);
 
   return init;
 }
@@ -3899,7 +3899,7 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
 
   DynamicsFitter dynamicsFitter(
       standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
-  dynamicsFitter.estimateFootGroundContacts(init);
+  dynamicsFitter.estimateFootGroundContactsWithHeightHeuristic(init);
 
   std::vector<std::string> trialNames;
   for (std::string& trc : trcFiles)

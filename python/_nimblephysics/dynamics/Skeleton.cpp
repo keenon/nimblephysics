@@ -1160,6 +1160,32 @@ These are a set of bodies, and offsets in local body space where accs are mounte
 This returns the Jacobian relating changes in the `wrt` quantity to changes in acc readings.
     )docs")
       .def(
+          "getMagnetometerReadings",
+          &dart::dynamics::Skeleton::getMagnetometerReadings,
+          ::py::arg("mags"),
+          ::py::arg("magneticField"),
+          R"docs(
+These are a set of bodies, and offsets in local body space where magnetometers are mounted on the body.
+    )docs")
+      .def(
+          "getMagnetometerReadingsJacobianWrt",
+          &dart::dynamics::Skeleton::getMagnetometerReadingsJacobianWrt,
+          ::py::arg("mags"),
+          ::py::arg("magneticField"),
+          ::py::arg("wrt"),
+          R"docs(
+This returns the Jacobian relating changes in the `wrt` quantity to changes in mag readings.
+    )docs")
+      .def(
+          "getMagnetometerReadingsJacobianWrtMagneticField",
+          &dart::dynamics::Skeleton::
+              getMagnetometerReadingsJacobianWrtMagneticField,
+          ::py::arg("mags"),
+          ::py::arg("magneticField"),
+          R"docs(
+This returns the Jacobian relating changes in the magnetic field to changes in mag readings.
+    )docs")
+      .def(
           "getBodyLocalVelocities",
           &dart::dynamics::Skeleton::getBodyLocalVelocities)
       .def(
