@@ -38,6 +38,7 @@ With a known state for your skeleton (position, velocity, acceleration), you can
   # Compute some noiseless sensor readings
   watch_acc = skeleton.getAccelerometerReadings(sensors)
   watch_rot_vel = skeleton.getGyroReadings(sensors)
+  watch_mag = skeleton.getMagnetometerReadings(sensors)
 
 Estimating Joint Velocity and Acceleration given IMU Readings
 #############################################################
@@ -140,22 +141,75 @@ Here is a list of the relevant Jacobians:
 - :math:`\frac{\partial a}{\partial q}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)`
 - :math:`\frac{\partial a}{\partial \dot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)`
 - :math:`\frac{\partial a}{\partial \ddot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)`
+- :math:`\frac{\partial m}{\partial q}` is :code:`skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)`
+- :math:`\frac{\partial m}{\partial w}` is :code:`skeleton.getMagnetometerReadingsJacobianWrtMagneticField(sensors)`
 
-One could imagine a Kalman filter with a state vector of :math:`[q, \dot{q}, \ddot{q}]` and a measurement vector of :math:`[g, a]`
+One could imagine a Kalman filter with a state vector of :math:`[q, \dot{q}, \ddot{q}, w]`, where :math:`q` is the estimated pose vector, and :math:`w` is the estimated world magnetic field. The measurement vector of :math:`[g, a, m]`
 
 Then, the state transition Jacobian would be:
 
 .. math::
   \begin{bmatrix}
-    I & \Delta t I & \frac{1}{2} \Delta t^2 I \\
-    0 & I & \Delta t I \\
-    0 & 0 & I
+    I & \Delta t I & \Delta t^2 I & 0 \\
+    0 & I & \Delta t I & 0 \\
+    0 & 0 & I & 0 \\
+    0 & 0 & 0 & I
   \end{bmatrix}
+
+Constructing this in copy-pastable code, assuming that :code:`skeleton` already exists in memory ::
+
+  dt: float = 0.01
+  num_dofs: int = skeleton.getNumDofs()
+  state_dim: int = num_dofs * 3 + 3
+
+  state_transition_matrix: np.ndarray = np.zeros((state_dim, state_dim))
+  # Set up next pose as a function of current pose
+  state_transition_matrix[:num_dofs, :num_dofs] = np.eye(num_dofs)
+  # Set up next pose as a function of current velocities
+  state_transition_matrix[:num_dofs, num_dofs:2*num_dofs] = dt * np.eye(num_dofs)
+  # Set up next pose as a function of current accelerations
+  state_transition_matrix[:num_dofs, 2*num_dofs:3*num_dofs] = dt * dt * np.eye(num_dofs)
+  # Set up next velocities as a function of current velocities
+  state_transition_matrix[num_dofs:2*num_dofs, num_dofs:2*num_dofs] = np.eye(num_dofs)
+  # Set up next velocities as a function of current accelerations
+  state_transition_matrix[num_dofs:2*num_dofs, 2*num_dofs:3*num_dofs] = dt * np.eye(num_dofs)
+  # Set up next accelerations as a function of current accelerations
+  state_transition_matrix[2*num_dofs:3*num_dofs, 2*num_dofs:3*num_dofs] = np.eye(num_dofs)
+  # Set up next world magnetic field as a function of current world magnetic field
+  state_transition_matrix[3*num_dofs:, 3*num_dofs:] = np.eye(3)
+
+  # Now you can use this state transition matrix in a Kalman filter...
 
 And the measurement Jacobian would be:
 
 .. math::
   \begin{bmatrix}
-    \frac{\partial g}{\partial q} & \frac{\partial g}{\partial \dot{q}} & 0 \\
-    \frac{\partial a}{\partial q} & \frac{\partial a}{\partial \dot{q}} & \frac{\partial a}{\partial \ddot{q}}
+    \frac{\partial g}{\partial q} & \frac{\partial g}{\partial \dot{q}} & 0 & 0 \\
+    \frac{\partial a}{\partial q} & \frac{\partial a}{\partial \dot{q}} & \frac{\partial a}{\partial \ddot{q}} & 0 \\
+    \frac{\partial m}{\partial q} & 0 & 0 & \frac{\partial m}{\partial w}
   \end{bmatrix}
+
+Constructing this in copy-pastable code, assuming that :code:`skeleton` and :code:`sensors: List[Pair[nimble.dynamics.BodyNode, nimble.math.Isometry3]]` already exist in memory ::
+
+  # Each type of sensor has a 3-dimensional vector measurement per sensor
+  one_sensor_type_dim: int = len(sensors) * 3
+  # Each sensor has 3 gyro readings, 3 accelerometer readings, and 3 magnetometer readings
+  measurement_dim: int = one_sensor_type_dim * 3
+
+  measurement_matrix: np.ndarray = np.zeros((measurement_dim, state_dim))
+  # Set up gyro readings as a function of pose
+  measurement_matrix[:one_sensor_type_dim, :num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  # Set up gyro readings as a function of velocities
+  measurement_matrix[:one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)
+  # Set up accelerometer readings as a function of pose
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, :num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  # Set up accelerometer readings as a function of velocities
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)
+  # Set up accelerometer readings as a function of accelerations
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, 2*num_dofs:3*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)
+  # Set up magnetometer readings as a function of pose
+  measurement_matrix[2*one_sensor_type_dim:, :num_dofs] = skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  # Set up magnetometer readings as a function of world magnetic field
+  measurement_matrix[2*one_sensor_type_dim:, 3*num_dofs:] = skeleton.getMagnetometerReadingsJacobianWrtMagneticField(sensors)
+
+  # Now you can use this measurement matrix in a Kalman filter...
