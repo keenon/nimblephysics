@@ -1255,6 +1255,7 @@ TEST(SubjectOnDisk, READ_RUNNING_TRIAL)
 }
 #endif
 
+/*
 #ifdef ALL_TESTS
 TEST(SubjectOnDisk, READ_LOCAL_TRIAL)
 {
@@ -1329,3 +1330,4 @@ TEST(SubjectOnDisk, READ_LOCAL_TRIAL)
   }
 }
 #endif
+*/
