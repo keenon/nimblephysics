@@ -9977,26 +9977,46 @@ void DynamicsFitter::guessTrialsOnTreadmill(
 // to infer when we're missing GRF data on certain timesteps, so we don't let
 // it mess with our optimization.
 void DynamicsFitter::estimateFootGroundContactsWithStillness(
-    std::shared_ptr<DynamicsInitialization> init)
+    std::shared_ptr<DynamicsInitialization> init, s_t radius, s_t minTime)
 {
   guessTrialsOnTreadmill(init);
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
-    // We automatically assume that all feet are in contact with the ground if
-    // we're on a treadmill
-    if (init->trialsOnTreadmill[trial])
-    {
-      continue;
-    }
 
-    if (init->missingGRFReason.size() > trial
-        && init->missingGRFReason.at(trial).size()
-               == init->poseTrials[trial].cols())
+    if (init->probablyMissingGRF.size() < trial)
     {
-      // If we already have a missing GRF reason array (probably from a manual
-      // review), then we don't need to estimate it
-      continue;
+      std::cout << "Error: probablyMissingGRF is missing trial " << trial
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
+    if (init->probablyMissingGRF.at(trial).size()
+        < init->poseTrials[trial].cols())
+    {
+      std::cout << "Error: probablyMissingGRF manual initialization is missing "
+                   "frames for trial "
+                << trial << "! Got frames "
+                << init->probablyMissingGRF.at(trial).size()
+                << ", expected frames " << init->poseTrials[trial].cols()
+                << std::endl;
+      throw std::runtime_error("probablyMissingGRF is missing frames");
+    }
+    if (init->missingGRFReason.size() < trial)
+    {
+      std::cout << "Error: missingGRFReason is missing trial " << trial
+                << std::endl;
+      throw std::runtime_error("missingGRFReason is missing frames");
+    }
+    if (init->missingGRFReason.at(trial).size()
+        < init->poseTrials[trial].cols())
+    {
+      std::cout << "Error: missingGRFReason manual initialization is missing "
+                   "frames for trial "
+                << trial << "! Got frames "
+                << init->missingGRFReason.at(trial).size()
+                << ", expected frames " << init->poseTrials[trial].cols()
+                << std::endl;
+      throw std::runtime_error("missingGRFReason is missing frames");
     }
 
     // Otherwise, we can estimate ground contact by looking at the velocity of
@@ -10023,16 +10043,112 @@ void DynamicsFitter::estimateFootGroundContactsWithStillness(
     // Do a manual clustering for "at rest detection"
     // If the feet are within `radius` of each other for more than `minTime`
     // seconds, we call that at rest.
-    s_t radius = 0.05;
-    s_t minTime = 0.5;
 
-    (void)radius;
-    (void)minTime;
+    // We need to extend in this window in both directions, so we need to divide
+    // the window frames we would naively get by an additional factor of 2
+    int minTimestepsWindow = (int)(minTime / (2 * init->trialTimesteps[trial]));
 
-    // TODO: finish implementing me
+    std::vector<std::vector<bool>> footAtRests;
+    for (int i = 0; i < footPositions.size(); i++)
+    {
+      std::vector<bool> footAtRest;
+      for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+      {
+        bool foundOutOfBounds = false;
+
+        // Scan backwards looking for out of bounds - start furthest away, cause
+        // that's most likely to early terminate.
+        for (int scanT = std::max(0, t - minTimestepsWindow); scanT < t;
+             scanT++)
+        {
+          if ((footPositions[i][scanT] - footPositions[i][t]).squaredNorm()
+              > radius)
+          {
+            foundOutOfBounds = true;
+            break;
+          }
+        }
+
+        if (!foundOutOfBounds)
+        {
+          // Scan forwards looking for out of bounds - start furthest away,
+          // cause that's most likely to early terminate.
+          for (int scanT = std::max(
+                   (int)footPositions[i].size() - 1, t + minTimestepsWindow);
+               scanT > t;
+               scanT--)
+          {
+            if ((footPositions[i][scanT] - footPositions[i][t]).squaredNorm()
+                > radius)
+            {
+              foundOutOfBounds = true;
+              break;
+            }
+          }
+        }
+        footAtRest.push_back(!foundOutOfBounds);
+      }
+      footAtRests.push_back(footAtRest);
+    }
+
+    std::vector<std::vector<bool>> trialForceActive;
+    std::vector<std::vector<bool>> trialSphereInContact;
+    std::vector<std::vector<bool>> trialOffForcePlate;
+    std::vector<bool> trialAnyOffForcePlate;
+    std::vector<MissingGRFReason> trialMissingGRFReason;
+
+    // Now we know when the feet were judged to be at rest, we can check if
+    // there was force coming through the feet at those times. If not, we can
+    // mark them.
+    for (int t = 0; t < init->poseTrials[trial].cols(); t++)
+    {
+      trialForceActive.emplace_back();
+      trialSphereInContact.emplace_back();
+      trialOffForcePlate.emplace_back();
+
+      bool anyOffForcePlate = false;
+      for (int i = 0; i < footAtRests.size(); i++)
+      {
+        // Check the GRF to see if we are measured as being in contact
+        bool footActive
+            = (init->grfTrials[trial].col(t).segment<6>(i * 6).squaredNorm()
+               > 1e-3);
+        trialForceActive[t].push_back(footActive);
+        trialSphereInContact[t].push_back(footAtRests[i][t]);
+        trialOffForcePlate[t].push_back(false);
+
+        if (footAtRests[i][t])
+        {
+          if (!footActive)
+          {
+            anyOffForcePlate = true;
+          }
+        }
+      }
+      trialAnyOffForcePlate.push_back(anyOffForcePlate);
+      trialMissingGRFReason.push_back(
+          anyOffForcePlate ? MissingGRFReason::unmeasuredExternalForceDetected
+                           : MissingGRFReason::notMissingGRF);
+    }
+    init->grfBodyForceActive.push_back(trialForceActive);
+    init->grfBodySphereInContact.push_back(trialSphereInContact);
+    init->grfBodyOffForcePlate.push_back(trialOffForcePlate);
+
+    for (int t = 0; t < init->probablyMissingGRF.at(trial).size(); t++)
+    {
+      if (init->probablyMissingGRF.at(trial).at(t) == MissingGRFStatus::unknown)
+      {
+        init->probablyMissingGRF.at(trial).at(t) = trialAnyOffForcePlate.at(t)
+                                                       ? MissingGRFStatus::yes
+                                                       : MissingGRFStatus::no;
+        init->missingGRFReason.at(trial).at(t) = trialMissingGRFReason.at(t);
+      }
+    }
 
     mSkeleton->setPositions(originalPose);
   }
+
+  fillInMissingGRFBlips(init);
 }
 
 //==============================================================================
@@ -10087,7 +10203,6 @@ void DynamicsFitter::estimateFootGroundContactsWithHeightHeuristic(
     // 1.1. First check for the ground level from the force plates
 
     s_t groundHeight = std::numeric_limits<s_t>::infinity();
-    bool flatGround = true;
     for (ForcePlate& forcePlate : init->forcePlateTrials[trial])
     {
       for (Eigen::Vector3s corner : forcePlate.corners)
@@ -10096,13 +10211,6 @@ void DynamicsFitter::estimateFootGroundContactsWithHeightHeuristic(
         {
           groundHeight = corner(1);
           noGroundCorners = false;
-        }
-        else
-        {
-          if (abs(groundHeight - corner(1)) < 1e-8)
-          {
-            flatGround = false;
-          }
         }
       }
     }
@@ -10201,8 +10309,6 @@ void DynamicsFitter::estimateFootGroundContactsWithHeightHeuristic(
     }
 
     init->grfBodyContactSphereRadius.push_back(grfContactSphereSizes);
-    init->groundHeight.push_back(groundHeight);
-    init->flatGround.push_back(flatGround);
 
     // 3. Create the default force plate size, if needed.
 
@@ -16027,7 +16133,6 @@ void DynamicsFitter::computePerfectGRFs(
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
     mSkeleton->setTimeStep(init->trialTimesteps[trial]);
-    s_t groundHeight = init->groundHeight[trial];
 
     Eigen::MatrixXs perfectGrfTrial = Eigen::MatrixXs::Zero(
         init->grfTrials[trial].rows(), init->grfTrials[trial].cols());
@@ -16091,10 +16196,13 @@ void DynamicsFitter::computePerfectGRFs(
 
       int activeForcePlateIndex = -1;
       bool onlyOneForcePlateActive = false;
+      s_t groundHeight = 0.0;
       for (int i = 0; i < init->forcePlateTrials[trial].size(); i++)
       {
         if (init->forcePlateTrials[trial][i].forces[t].norm() > 1e-3)
         {
+          groundHeight
+              = init->forcePlateTrials[trial][i].centersOfPressure[t](1);
           if (activeForcePlateIndex == -1)
           {
             activeForcePlateIndex = i;
@@ -16161,13 +16269,7 @@ void DynamicsFitter::computePerfectGRFs(
               sensorWorldGRF.segment<6>(i * 6)));
         }
         auto resultCops = mSkeleton->getMultipleContactInverseDynamicsNearCoP(
-            ddq,
-            constFootNodes,
-            localWrenches,
-            init->groundHeight[trial],
-            1,
-            0.1,
-            false);
+            ddq, constFootNodes, localWrenches, groundHeight, 1, 0.1, false);
 
         perfectTorques.col(t) = resultCops.jointTorques;
 
@@ -16552,12 +16654,20 @@ void DynamicsFitter::writeCSVData(
     }
     else
     {
+      s_t groundHeight = 0.0;
+      for (auto& forcePlate : init->forcePlateTrials[trial])
+      {
+        if (forcePlate.forces[t].norm() > 1e-3)
+        {
+          groundHeight = forcePlate.centersOfPressure[t](1);
+          break;
+        }
+      }
+
       for (int i = 0; i < init->grfBodyIndices.size(); i++)
       {
         footContactData.segment<9>(i * 9) = math::projectWrenchToCoP(
-            init->grfTrials[trial].col(t).segment<6>(i * 6),
-            init->groundHeight[trial],
-            1);
+            init->grfTrials[trial].col(t).segment<6>(i * 6), groundHeight, 1);
       }
     }
 
@@ -17605,19 +17715,6 @@ void DynamicsFitter::saveDynamicsToGUI(
   }
   Eigen::MatrixXs poses = init->poseTrials[trialIndex];
 
-  if (init->flatGround[trialIndex])
-  {
-    server.createBox(
-        "ground",
-        Eigen::Vector3s(10, 0.2, 10),
-        Eigen::Vector3s(0, init->groundHeight[trialIndex] - 0.1, 0),
-        Eigen::Vector3s::Zero(),
-        groundLayerColor,
-        groundLayerName,
-        false,
-        true);
-  }
-
   for (int i = 0; i < init->contactBodies.size(); i++)
   {
     for (int j = 0; j < init->contactBodies[i].size(); j++)
@@ -17653,7 +17750,8 @@ void DynamicsFitter::saveDynamicsToGUI(
     }
   }
 
-  if (init->defaultForcePlateCorners[trialIndex].size() > 0)
+  if (init->defaultForcePlateCorners.size() > trialIndex
+      && init->defaultForcePlateCorners[trialIndex].size() > 0)
   {
     std::vector<Eigen::Vector3s> points;
     for (int j = 0; j < init->defaultForcePlateCorners[trialIndex].size(); j++)
@@ -18125,10 +18223,20 @@ void DynamicsFitter::saveDynamicsToGUI(
           }
         }
 
+        float groundHeight = 0;
+        for (auto& plate : forcePlates)
+        {
+          if (plate.forces[timestep].norm() > 1e-8)
+          {
+            groundHeight = plate.centersOfPressure[timestep](1);
+            break;
+          }
+        }
+
         Eigen::Vector6s worldWrench
             = init->grfTrials[trialIndex].col(timestep).segment<6>(i * 6);
-        Eigen::Vector9s copWrench = math::projectWrenchToCoP(
-            worldWrench, init->groundHeight[trialIndex], 1);
+        Eigen::Vector9s copWrench
+            = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
         Eigen::Vector3s f = copWrench.tail<3>();
         if (f.norm() > 1e-9)
         {

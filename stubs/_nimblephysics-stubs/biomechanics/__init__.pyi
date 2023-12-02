@@ -327,7 +327,7 @@ class DynamicsFitter():
     @typing.overload
     def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, kinematicInits: typing.List[MarkerInitialization], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = [], initializedProbablyMissingGRF: typing.List[typing.List[MissingGRFStatus]] = []) -> DynamicsInitialization: ...
     def estimateFootGroundContactsWithHeightHeuristic(self, init: DynamicsInitialization, ignoreFootNotOverForcePlate: bool = False) -> None: ...
-    def estimateFootGroundContactsWithStillness(self, init: DynamicsInitialization) -> None: ...
+    def estimateFootGroundContactsWithStillness(self, init: DynamicsInitialization, radius: float = 0.05, minTime: float = 0.5) -> None: ...
     def estimateLinkMassesFromAcceleration(self, init: DynamicsInitialization, regularizationWeight: float = 50.0) -> None: ...
     def impliedCOMForces(self, init: DynamicsInitialization, trial: int, includeGravity: numpy.ndarray[numpy.float64, _Shape[3, 1]] = True) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
     def measuredGRFForces(self, init: DynamicsInitialization, trial: int) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
@@ -408,14 +408,6 @@ class DynamicsInitialization():
     def defaultForcePlateCorners(self, arg0: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
         pass
     @property
-    def flatGround(self) -> typing.List[bool]:
-        """
-        :type: typing.List[bool]
-        """
-    @flatGround.setter
-    def flatGround(self, arg0: typing.List[bool]) -> None:
-        pass
-    @property
     def forcePlateTrials(self) -> typing.List[typing.List[ForcePlate]]:
         """
         :type: typing.List[typing.List[ForcePlate]]
@@ -478,14 +470,6 @@ class DynamicsInitialization():
         """
     @grfTrials.setter
     def grfTrials(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None:
-        pass
-    @property
-    def groundHeight(self) -> typing.List[float]:
-        """
-        :type: typing.List[float]
-        """
-    @groundHeight.setter
-    def groundHeight(self, arg0: typing.List[float]) -> None:
         pass
     @property
     def groupMasses(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:

@@ -294,7 +294,9 @@ Eigen::Vector3s getAxisFlips(std::vector<Eigen::Vector3s> axisList)
 
 //==============================================================================
 OpenSimFile OpenSimParser::parseOsim(
-    const common::Uri& uri, std::string geometryFolder, const common::ResourceRetrieverPtr& nullOrRetriever)
+    const common::Uri& uri,
+    std::string geometryFolder,
+    const common::ResourceRetrieverPtr& nullOrRetriever)
 {
   const common::ResourceRetrieverPtr retriever
       = ensureRetriever(nullOrRetriever);
@@ -318,7 +320,11 @@ OpenSimFile OpenSimParser::parseOsim(
 
   common::Uri geometryURI
       = common::Uri::createFromRelativeUri(uri.toString(), "./Geometry/");
-  return parseOsim(osimFile, uri.toString(), geometryFolder == "" ? geometryURI.toString() : geometryFolder, retriever);
+  return parseOsim(
+      osimFile,
+      uri.toString(),
+      geometryFolder == "" ? geometryURI.toString() : geometryFolder,
+      retriever);
 }
 
 //==============================================================================
@@ -3592,7 +3598,9 @@ void OpenSimParser::saveProcessedGRFMot(
     const std::string& outputPath,
     const std::vector<double>& timestamps,
     const std::vector<dynamics::BodyNode*> contactBodies,
-    s_t groundHeight,
+    std::shared_ptr<dynamics::Skeleton> skel,
+    const Eigen::MatrixXs& poses,
+    const std::vector<biomechanics::ForcePlate>& forcePlates,
     const Eigen::MatrixXs wrenches)
 {
   std::ofstream motFile;
@@ -3629,11 +3637,34 @@ void OpenSimParser::saveProcessedGRFMot(
   }
   motFile << "\n";
 
+  Eigen::VectorXs originalPose = skel->getPositions();
+
   for (int t = 0; t < timestamps.size(); t++)
   {
+    skel->setPositions(poses.col(t));
+
     motFile << timestamps[t];
     for (int i = 0; i < contactBodies.size(); i++)
     {
+      Eigen::Vector3s bodyPosition
+          = contactBodies[i]->getWorldTransform().translation();
+      s_t groundHeight = bodyPosition(1);
+
+      s_t closestForcePlateDistance = std::numeric_limits<double>::infinity();
+      for (auto& forcePlate : forcePlates)
+      {
+        if (forcePlate.forces[t].norm() > 0)
+        {
+          s_t distance
+              = (forcePlate.centersOfPressure[t] - bodyPosition).norm();
+          if (distance < closestForcePlateDistance)
+          {
+            closestForcePlateDistance = distance;
+            groundHeight = forcePlate.centersOfPressure[t](1);
+          }
+        }
+      }
+
       Eigen::Vector6s worldWrench = wrenches.block<6, 1>(i * 6, t);
       Eigen::Vector3s worldTau = worldWrench.head<3>();
       Eigen::Vector3s worldF = worldWrench.tail<3>();
@@ -3661,6 +3692,8 @@ void OpenSimParser::saveProcessedGRFMot(
     }
     motFile << "\n";
   }
+
+  skel->setPositions(originalPose);
 
   motFile.close();
 }

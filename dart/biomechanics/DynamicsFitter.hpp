@@ -816,8 +816,6 @@ struct DynamicsInitialization
 
   ///////////////////////////////////////////
   // Foot ground contact, and rendering
-  std::vector<s_t> groundHeight;
-  std::vector<bool> flatGround;
   std::vector<std::vector<dynamics::BodyNode*>> contactBodies;
   std::vector<std::vector<std::vector<s_t>>> grfBodyContactSphereRadius;
   std::vector<std::vector<std::vector<bool>>> grfBodyForceActive;
@@ -1358,7 +1356,9 @@ public:
   // to infer when we're missing GRF data on certain timesteps, so we don't let
   // it mess with our optimization.
   void estimateFootGroundContactsWithStillness(
-      std::shared_ptr<DynamicsInitialization> init);
+      std::shared_ptr<DynamicsInitialization> init,
+      s_t radius = 0.05,
+      s_t minTime = 0.5);
 
   // 0. Estimate when each foot is in contact with the ground, which we can use
   // to infer when we're missing GRF data on certain timesteps, so we don't let

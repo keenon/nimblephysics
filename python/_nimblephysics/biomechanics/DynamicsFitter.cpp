@@ -127,11 +127,6 @@ void DynamicsFitter(py::module& m)
           "grfBodyNodes",
           &dart::biomechanics::DynamicsInitialization::grfBodyNodes)
       .def_readwrite(
-          "groundHeight",
-          &dart::biomechanics::DynamicsInitialization::groundHeight)
-      .def_readwrite(
-          "flatGround", &dart::biomechanics::DynamicsInitialization::flatGround)
-      .def_readwrite(
           "contactBodies",
           &dart::biomechanics::DynamicsInitialization::contactBodies)
       .def_readwrite(
@@ -605,7 +600,9 @@ protected:
           "estimateFootGroundContactsWithStillness",
           &dart::biomechanics::DynamicsFitter::
               estimateFootGroundContactsWithStillness,
-          ::py::arg("init"))
+          ::py::arg("init"),
+          ::py::arg("radius") = 0.05,
+          ::py::arg("minTime") = 0.5)
       .def(
           "smoothAccelerations",
           &dart::biomechanics::DynamicsFitter::smoothAccelerations,
