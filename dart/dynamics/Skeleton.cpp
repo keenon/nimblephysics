@@ -8307,6 +8307,153 @@ Eigen::MatrixXs Skeleton::finiteDifferenceAccelerometerReadingsJacobianWrt(
 }
 
 //==============================================================================
+/// These are a set of bodies, and offsets in local body space where
+/// magnetometers are mounted on the body
+Eigen::VectorXs Skeleton::getMagnetometerReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  Eigen::VectorXs output = Eigen::VectorXs::Zero(mags.size() * 3);
+  for (int i = 0; i < mags.size(); i++)
+  {
+    Eigen::Isometry3s T_wb = mags[i].first->getWorldTransform();
+    Eigen::Isometry3s T_bm = mags[i].second;
+    Eigen::Isometry3s T_wm = T_wb * T_bm;
+    output.segment<3>(i * 3) = T_wm.linear().transpose() * magneticField;
+  }
+  return output;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::getMagnetometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(mags.size() * 3, wrt->dim(this));
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    const Eigen::MatrixXi& parents = getJointParentMap();
+    for (int m = 0; m < mags.size(); m++)
+    {
+      auto* bodyNode = mags[m].first;
+      int parentJointIndex
+          = bodyNode->getParentJoint()->getJointIndexInSkeleton();
+
+      // const math::Jacobian& H = getJacobianInPositionSpace(bodyNodes[b]);
+      Eigen::Isometry3s Tworld = bodyNode->getWorldTransform() * mags[m].second;
+      for (auto i = 0u; i < getNumDofs(); ++i)
+      {
+        const dynamics::DegreeOfFreedom* dof = getDof(i);
+        const dynamics::Joint* joint = dof->getJoint();
+        if (joint->getJointIndexInSkeleton() == parentJointIndex
+            || parents(joint->getJointIndexInSkeleton(), parentJointIndex) == 1)
+        {
+          Eigen::Vector3s worldRotationScrew
+              = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint())
+                    .head<3>();
+          Eigen::Vector3s localRotationScrew
+              = Tworld.linear().transpose() * worldRotationScrew;
+          // Derivative of magnetic field
+          Eigen::Vector3s localMagneticField
+              = Tworld.linear().transpose() * magneticField;
+          J.block<3, 1>(m * 3, i)
+              = -1 * localRotationScrew.cross(localMagneticField);
+        }
+      }
+    }
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::finiteDifferenceMagnetometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(mags.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getMagnetometerReadings(mags, magneticField);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in magnetic field to
+/// changes in magnetometer readings
+Eigen::MatrixXs Skeleton::getMagnetometerReadingsJacobianWrtMagneticField(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  (void)magneticField;
+
+  Eigen::MatrixXs output = Eigen::MatrixXs::Zero(mags.size() * 3, 3);
+  for (int i = 0; i < mags.size(); i++)
+  {
+    Eigen::Isometry3s T_wb = mags[i].first->getWorldTransform();
+    Eigen::Isometry3s T_bm = mags[i].second;
+    Eigen::Isometry3s T_wm = T_wb * T_bm;
+    output.block<3, 3>(i * 3, 0) = T_wm.linear().transpose();
+  }
+  return output;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in magnetic field to
+/// changes in magnetometer readings
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMagnetometerReadingsJacobianWrtMagneticField(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  Eigen::MatrixXs result(mags.size() * 3, 3);
+  Eigen::VectorXs original = magneticField;
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        perturbed = getMagnetometerReadings(mags, tweaked);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
 /// This measures the distance between two markers in world space, at the
 /// current configuration and scales.
 s_t Skeleton::getDistanceInWorldSpace(
@@ -9414,6 +9561,16 @@ Eigen::VectorXs Skeleton::unwrapPositionToNearest(
     {
       const dynamics::EulerJoint* eulerJoint
           = static_cast<const dynamics::EulerJoint*>(joint);
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start),
+          lastPos.segment<3>(start),
+          eulerJoint->getAxisOrder());
+    }
+    else if (joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+    {
+      const dynamics::EulerFreeJoint* eulerJoint
+          = static_cast<const dynamics::EulerFreeJoint*>(joint);
       int start = joint->getDof(0)->getIndexInSkeleton();
       unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
           thisPos.segment<3>(start),

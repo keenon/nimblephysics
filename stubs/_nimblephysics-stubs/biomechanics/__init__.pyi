@@ -38,6 +38,7 @@ __all__ = [
     "MarkerTrace",
     "MarkersErrorReport",
     "MissingGRFReason",
+    "MissingGRFStatus",
     "NeuralMarkerLabeller",
     "OpenSimFile",
     "OpenSimMocoTrajectory",
@@ -59,11 +60,14 @@ __all__ = [
     "measuredGrfZeroWhenAccelerationNonZero",
     "missingBlip",
     "missingImpact",
+    "no",
     "notMissingGRF",
     "notOverForcePlate",
     "shiftGRF",
     "torqueDiscrepancy",
-    "unmeasuredExternalForceDetected"
+    "unknown",
+    "unmeasuredExternalForceDetected",
+    "yes"
 ]
 
 
@@ -318,11 +322,12 @@ class DynamicsFitter():
     def computePerfectGRFs(self, init: DynamicsInitialization) -> None: ...
     @staticmethod
     @typing.overload
-    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markerMap: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], poseTrials: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = [], initializedProbablyMissingGRF: typing.List[typing.List[bool]] = []) -> DynamicsInitialization: ...
+    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markerMap: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], poseTrials: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = [], initializedProbablyMissingGRF: typing.List[typing.List[MissingGRFStatus]] = []) -> DynamicsInitialization: ...
     @staticmethod
     @typing.overload
-    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, kinematicInits: typing.List[MarkerInitialization], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = [], initializedProbablyMissingGRF: typing.List[typing.List[bool]] = []) -> DynamicsInitialization: ...
-    def estimateFootGroundContacts(self, init: DynamicsInitialization, ignoreFootNotOverForcePlate: bool = False) -> None: ...
+    def createInitialization(skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, kinematicInits: typing.List[MarkerInitialization], trackingMarkers: typing.List[str], grfNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], forcePlateTrials: typing.List[typing.List[ForcePlate]], framesPerSecond: typing.List[int], markerObservationTrials: typing.List[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], overrideForcePlateToGRFNodeAssignment: typing.List[typing.List[int]] = [], initializedProbablyMissingGRF: typing.List[typing.List[MissingGRFStatus]] = []) -> DynamicsInitialization: ...
+    def estimateFootGroundContactsWithHeightHeuristic(self, init: DynamicsInitialization, ignoreFootNotOverForcePlate: bool = False) -> None: ...
+    def estimateFootGroundContactsWithStillness(self, init: DynamicsInitialization, radius: float = 0.05, minTime: float = 0.5) -> None: ...
     def estimateLinkMassesFromAcceleration(self, init: DynamicsInitialization, regularizationWeight: float = 50.0) -> None: ...
     def impliedCOMForces(self, init: DynamicsInitialization, trial: int, includeGravity: numpy.ndarray[numpy.float64, _Shape[3, 1]] = True) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
     def measuredGRFForces(self, init: DynamicsInitialization, trial: int) -> typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]: ...
@@ -403,14 +408,6 @@ class DynamicsInitialization():
     def defaultForcePlateCorners(self, arg0: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
         pass
     @property
-    def flatGround(self) -> typing.List[bool]:
-        """
-        :type: typing.List[bool]
-        """
-    @flatGround.setter
-    def flatGround(self, arg0: typing.List[bool]) -> None:
-        pass
-    @property
     def forcePlateTrials(self) -> typing.List[typing.List[ForcePlate]]:
         """
         :type: typing.List[typing.List[ForcePlate]]
@@ -473,14 +470,6 @@ class DynamicsInitialization():
         """
     @grfTrials.setter
     def grfTrials(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None:
-        pass
-    @property
-    def groundHeight(self) -> typing.List[float]:
-        """
-        :type: typing.List[float]
-        """
-    @groundHeight.setter
-    def groundHeight(self, arg0: typing.List[float]) -> None:
         pass
     @property
     def groupMasses(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -627,12 +616,12 @@ class DynamicsInitialization():
     def poseTrials(self, arg0: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None:
         pass
     @property
-    def probablyMissingGRF(self) -> typing.List[typing.List[bool]]:
+    def probablyMissingGRF(self) -> typing.List[typing.List[MissingGRFStatus]]:
         """
-        :type: typing.List[typing.List[bool]]
+        :type: typing.List[typing.List[MissingGRFStatus]]
         """
     @probablyMissingGRF.setter
-    def probablyMissingGRF(self, arg0: typing.List[typing.List[bool]]) -> None:
+    def probablyMissingGRF(self, arg0: typing.List[typing.List[MissingGRFStatus]]) -> None:
         pass
     @property
     def regularizeGroupCOMsTo(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
@@ -689,6 +678,14 @@ class DynamicsInitialization():
         """
     @trialTimesteps.setter
     def trialTimesteps(self, arg0: typing.List[float]) -> None:
+        pass
+    @property
+    def trialsOnTreadmill(self) -> typing.List[bool]:
+        """
+        :type: typing.List[bool]
+        """
+    @trialsOnTreadmill.setter
+    def trialsOnTreadmill(self, arg0: typing.List[bool]) -> None:
         pass
     @property
     def updatedMarkerMap(self) -> typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]:
@@ -2061,6 +2058,40 @@ class MissingGRFReason():
     torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 3>
     unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
     pass
+class MissingGRFStatus():
+    """
+    Members:
+
+      no
+
+      unknown
+
+      yes
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    __members__: dict # value = {'no': <MissingGRFStatus.no: 0>, 'unknown': <MissingGRFStatus.unknown: 1>, 'yes': <MissingGRFStatus.yes: 2>}
+    no: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.no: 0>
+    unknown: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.unknown: 1>
+    yes: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.yes: 2>
+    pass
 class NeuralMarkerLabeller(MarkerLabeller):
     def __init__(self, jointCenterPredictor: typing.Callable[[typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]]) -> None: ...
     pass
@@ -2617,8 +2648,11 @@ manualReview: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # 
 measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
 missingBlip: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingBlip: 7>
 missingImpact: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.missingImpact: 6>
+no: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.no: 0>
 notMissingGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notMissingGRF: 0>
 notOverForcePlate: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notOverForcePlate: 5>
 shiftGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.shiftGRF: 8>
 torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 3>
+unknown: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.unknown: 1>
 unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
+yes: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.yes: 2>

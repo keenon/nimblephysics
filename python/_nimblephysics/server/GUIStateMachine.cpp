@@ -272,6 +272,10 @@ void GUIStateMachine(py::module& m)
           &dart::server::GUIStateMachine::deleteObject,
           ::py::arg("key"))
       .def(
+          "deleteObjectsByPrefix",
+          &dart::server::GUIStateMachine::deleteObjectsByPrefix,
+          ::py::arg("prefix"))
+      .def(
           "createText",
           &dart::server::GUIStateMachine::createText,
           ::py::arg("key"),

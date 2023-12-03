@@ -379,7 +379,7 @@ $triangle-size: 5px;
     position: absolute;
     right: 10px;
     top: 10px;
-    user-select: none;
+    // user-select: none;
     font-family: "Advent Pro", sans-serif;
     color: #848484;
     font-weight: bold;
@@ -436,5 +436,18 @@ $triangle-size: 5px;
     vertical-align: middle;
     /* border: 1px solid black; */
     padding: 10px;
+  }
+
+  .GUI_instruction_center {
+    text-align: center;
+  }
+
+  .GUI_instruction_key {
+    display: inline-block;
+    padding: 5px;
+    padding-top: 2px;
+    border-radius: 3px;
+    border: 1px solid #cfcfcf;
+    margin: 9px;
   }
 }

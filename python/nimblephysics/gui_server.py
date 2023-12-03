@@ -6,7 +6,7 @@ import nimblephysics as nimble
 import random
 import typing
 import threading
-from typing import List
+from typing import List, Optional
 import torch
 import numpy as np
 
@@ -40,18 +40,20 @@ def createRequestHandler():
 
 
 class NimbleGUI:
-  def __init__(self, worldToCopy: nimble.simulation.World):
-    self.world = worldToCopy.clone()
-    self.guiServer = nimble.server.GUIWebsocketServer()
-    self.guiServer.renderWorld(self.world)
-    # Set up the realtime animation
-    self.ticker = nimble.realtime.Ticker(self.world.getTimeStep() * 10)
-    self.ticker.registerTickListener(self._onTick)
-    self.guiServer.registerConnectionListener(self._onConnect)
+  world: Optional[nimble.simulation.World]
 
-    self.looping = False
-    self.posMatrixToLoop = np.zeros((self.world.getNumDofs(), 0))
-    self.i = 0
+  def __init__(self, worldToCopy: Optional[nimble.simulation.World] = None):
+    self.guiServer = nimble.server.GUIWebsocketServer()
+    if worldToCopy is not None:
+      self.world = worldToCopy.clone()
+      self.guiServer.renderWorld(self.world)
+      # Set up the realtime animation
+      self.ticker = nimble.realtime.Ticker(self.world.getTimeStep() * 10)
+      self.ticker.registerTickListener(self._onTick)
+      self.looping = False
+      self.posMatrixToLoop = np.zeros((self.world.getNumDofs(), 0))
+      self.i = 0
+      self.guiServer.registerConnectionListener(self._onConnect)
 
   def serve(self, port):
     self.guiServer.serve(8070)

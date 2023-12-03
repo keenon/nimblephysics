@@ -310,7 +310,9 @@ public:
       const std::string& outputPath,
       const std::vector<double>& timestamps,
       const std::vector<dynamics::BodyNode*> contactBodies,
-      s_t groundLevel,
+      std::shared_ptr<dynamics::Skeleton> skel,
+      const Eigen::MatrixXs& poses,
+      const std::vector<biomechanics::ForcePlate>& forcePlates,
       const Eigen::MatrixXs wrenches);
 
   /// This saves the *.mot file with 3 columns for each body. This is
@@ -352,10 +354,10 @@ public:
   /// Append excitations and activations from a MocoTrajectory to a CSV file and
   /// save it.
   static void appendMocoTrajectoryAndSaveCSV(
-          const common::Uri& uri,
-          const OpenSimMocoTrajectory& mocoTraj,
-          std::string path,
-          const common::ResourceRetrieverPtr& retriever = nullptr);
+      const common::Uri& uri,
+      const OpenSimMocoTrajectory& mocoTraj,
+      std::string path,
+      const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// When people finish preparing their model in OpenSim, they save a *.osim
   /// file with all the scales and offsets baked in. This is a utility to go

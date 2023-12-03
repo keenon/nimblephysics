@@ -116,6 +116,60 @@ class View {
     this.onRerender();
   }
 
+  countVisibleMeshes = () => {
+    let count = 0;
+    for (let obj of this.scene.children) {
+      if (obj instanceof THREE.Mesh && obj.visible) {
+        // Check of the property "isMeshLine" exists on the obj
+        if ("isMeshLine" in obj) {
+          continue;
+        }
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  centerView = () => {
+    // After all objects have been added to the scene
+
+    // Calculate the bounding box that encompasses all objects
+    let boundingBox = new THREE.Box3();
+    console.log("Computing view center based on " + this.scene.children.length + " objects");
+    let average = new THREE.Vector3();
+    let count = 0;
+    for (let obj of this.scene.children) {
+      if (obj instanceof THREE.Mesh && obj.visible) {
+        // Check of the property "isMeshLine" exists on the obj
+        if ("isMeshLine" in obj) {
+          continue;
+        }
+
+        average.add(obj.position);
+        count += 1;
+        boundingBox.expandByObject(obj);
+      }
+    }
+    average.divideScalar(count);
+
+    if (count === 0) {
+      return;
+    }
+
+    // Compute the center of the bounding box
+    let center = new THREE.Vector3();
+    boundingBox.getCenter(center);
+
+    const cameraOffset = this.camera.position.clone().sub(center);
+    cameraOffset.normalize();
+    const newCameraCenter = center.clone().add(cameraOffset.multiplyScalar(300));
+    this.camera.position.copy(newCameraCenter);
+
+    // Position the camera
+    // Assuming this.view.camera is your camera object
+    this.orbitControls.target = average;
+  }
+
   /**
    * This cleans up any resources that the view is using
    */

@@ -3180,7 +3180,9 @@ std::shared_ptr<DynamicsInitialization> runEngine(
           "./_grf" + std::to_string(i) + ".mot",
           timestamps[i],
           init->grfBodyNodes,
-          init->groundHeight[i],
+          skel,
+          init->poseTrials[i],
+          init->forcePlateTrials[i],
           init->grfTrials[i]);
     }
     for (int i = 0; i < init->poseTrials.size(); i++)
@@ -3349,6 +3351,8 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
     // 2. Find the joint centers
     // fitter.setJointSphereFitSGDIterations(50); // TODO comment out in Release
     // build
+    fitter.setJointSphereFitSGDIterations(50);
+    fitter.setJointAxisFitSGDIterations(50);
     fitter.findJointCenters(
         fitterInit, newClip, markerObservationTrials[trial]);
     fitter.findAllJointAxis(
@@ -3370,7 +3374,8 @@ std::shared_ptr<DynamicsInitialization> createInitialization(
 
   DynamicsFitter dynamicsFitter(
       skel, init->grfBodyNodes, init->trackingMarkers);
-  dynamicsFitter.estimateFootGroundContacts(init);
+  // dynamicsFitter.estimateFootGroundContactsWithHeightHeuristic(init);
+  dynamicsFitter.estimateFootGroundContactsWithStillness(init);
 
   return init;
 }
@@ -3899,7 +3904,8 @@ std::shared_ptr<DynamicsInitialization> runEndToEnd(
 
   DynamicsFitter dynamicsFitter(
       standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
-  dynamicsFitter.estimateFootGroundContacts(init);
+  // dynamicsFitter.estimateFootGroundContactsWithHeightHeuristic(init);
+  dynamicsFitter.estimateFootGroundContactsWithStillness(init);
 
   std::vector<std::string> trialNames;
   for (std::string& trc : trcFiles)
@@ -7004,7 +7010,7 @@ TEST(DynamicsFitter, STAIRS_TEST)
       grfFiles,
       -1,
       0,
-      false,
+      true,
       true);
 }
 #endif

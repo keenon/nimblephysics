@@ -1,9 +1,10 @@
 .. _ID:
 
-Inverse Dynamics (with Contact)
-================================
+Computing Skeleton Joint Torques and Forces
+===============================================
 
-It's often useful to be able to reconstruct the forces/torques necessary to create an observed motion.
+It can be useful in sports, medicine, exoskeleton control, human-robotic interaction, and other applications 
+to know the _forces_ and _torques_ that led to an observed motion. Nimble has many utilities to help with this, though it's a non-trivial problem.
 
 To learn about how to do this, let's recall the definition of a timestep (in matrix notation):
 

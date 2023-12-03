@@ -107,6 +107,17 @@ void ShapeNode(py::module& m)
           +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3s {
             return self->getOffset();
           })
+      .def(
+          "getShape",
+          +[](const dart::dynamics::ShapeNode* self)
+              -> std::shared_ptr<const dart::dynamics::Shape> {
+            return self->getShape();
+          })
+      .def(
+          "getWorldTransform",
+          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Isometry3s {
+            return self->getWorldTransform();
+          })
       .def("getName", &dart::dynamics::ShapeNode::getName)
       .def(
           "createVisualAspect",

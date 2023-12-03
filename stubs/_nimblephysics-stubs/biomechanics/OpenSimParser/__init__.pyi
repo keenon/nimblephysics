@@ -93,7 +93,7 @@ def saveOsimInverseKinematicsXMLFile(subjectName: str, markerNames: typing.List[
     pass
 def saveOsimScalingXMLFile(subjectName: str, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, massKg: float, heightM: float, osimInputPath: str, osimInputMarkersPath: str, osimOutputPath: str, scalingInstructionsOutputPath: str) -> None:
     pass
-def saveProcessedGRFMot(outputPath: str, timestamps: typing.List[float], bodyNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], groundLevel: float, wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
+def saveProcessedGRFMot(outputPath: str, timestamps: typing.List[float], bodyNodes: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], forcePlates: typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate], wrenches: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None:
     pass
 def saveRawGRFMot(outputPath: str, timestamps: typing.List[float], forcePlates: typing.List[nimblephysics_libs._nimblephysics.biomechanics.ForcePlate]) -> None:
     pass

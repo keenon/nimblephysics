@@ -216,6 +216,70 @@ bool verifyIMUJacobians(
       }
       return false;
     }
+
+    Eigen::Vector3s magField = Eigen::Vector3s::Random();
+
+    Eigen::MatrixXs magJ
+        = skel->getMagnetometerReadingsJacobianWrt(sensors, magField, wrt);
+    Eigen::MatrixXs magJ_fd
+        = skel->finiteDifferenceMagnetometerReadingsJacobianWrt(
+            sensors, magField, wrt);
+    if (!equals(magJ, magJ_fd, 1e-8))
+    {
+      std::cout << "Magnetometer wrt " << wrt->name() << " error!" << std::endl;
+      for (int i = 0; i < sensors.size(); i++)
+      {
+        for (int dof = 0; dof < magJ.cols(); dof++)
+        {
+          Eigen::Vector3s analytical = magJ.block<3, 1>(i * 3, dof);
+          Eigen::Vector3s fd = magJ_fd.block<3, 1>(i * 3, dof);
+          if (!equals(analytical, fd, 1e-8))
+          {
+            std::cout << "Sensor on body \"" << sensors[i].first->getName()
+                      << "\" @ [" << sensors[i].second.translation()(0) << ", "
+                      << sensors[i].second.translation()(1) << ", "
+                      << sensors[i].second.translation()(2)
+                      << "] disagrees WRT " << wrt->name() << "[" << i << "]"
+                      << std::endl;
+            Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(3, 3);
+            compare.col(0) = fd;
+            compare.col(1) = analytical;
+            compare.col(2) = analytical - fd;
+            std::cout << "FD - Analytical - Diff:" << std::endl
+                      << compare << std::endl;
+          }
+        }
+      }
+      return false;
+    }
+
+    Eigen::MatrixXs magJWrtField
+        = skel->getMagnetometerReadingsJacobianWrtMagneticField(
+            sensors, magField);
+    Eigen::MatrixXs magJWrtField_fd
+        = skel->finiteDifferenceMagnetometerReadingsJacobianWrtMagneticField(
+            sensors, magField);
+    if (!equals(magJWrtField, magJWrtField_fd, 1e-8))
+    {
+      std::cout << "Magnetometer wrt field error!" << std::endl;
+      for (int i = 0; i < sensors.size(); i++)
+      {
+        Eigen::Matrix3s analytical = magJ.block<3, 3>(i * 3, 0);
+        Eigen::Matrix3s fd = magJ_fd.block<3, 3>(i * 3, 0);
+        if (!equals(analytical, fd, 1e-8))
+        {
+          std::cout << "Sensor on body \"" << sensors[i].first->getName()
+                    << "\" @ [" << sensors[i].second.translation()(0) << ", "
+                    << sensors[i].second.translation()(1) << ", "
+                    << sensors[i].second.translation()(2) << "] disagrees WRT "
+                    << wrt->name() << "[" << i << "]" << std::endl;
+          std::cout << "FD: " << std::endl << fd << std::endl;
+          std::cout << "Analytical: " << std::endl << analytical << std::endl;
+          std::cout << "Diff: " << std::endl << analytical - fd << std::endl;
+        }
+      }
+      return false;
+    }
   }
   return true;
 }

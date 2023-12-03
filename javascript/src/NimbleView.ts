@@ -369,6 +369,19 @@ class DARTView {
     instructionsRow3.appendChild(scrollMouseInstructionsCell);
     scrollMouseInstructionsCell.innerHTML = "Zoom view";
 
+    const instructionsRow4 = document.createElement("tr");
+    instructions.appendChild(instructionsRow4);
+    const cKeyCell = document.createElement("td");
+    instructionsRow4.appendChild(cKeyCell);
+    cKeyCell.className = 'GUI_instruction_center';
+    const cKey = document.createElement("td");
+    cKeyCell.appendChild(cKey);
+    cKey.className = 'GUI_instruction_key';
+    cKey.innerHTML = "c";
+    const centerInstructionsCell = document.createElement("td");
+    instructionsRow4.appendChild(centerInstructionsCell);
+    centerInstructionsCell.innerHTML = "Center view";
+
     this.uiContainer.appendChild(instructions);
 
     const layersTableOuter = document.createElement("table");
@@ -1539,6 +1552,8 @@ class DARTView {
 
       const mesh = new THREE.Mesh(line, pathMaterial);
       mesh.frustumCulled = false;
+      // This is not in the API, it's just a hack to make it easier not center around mesh lines that are crazy outliers.
+      (mesh as any).isMeshLine = true;
 
       this.meshLines.set(key, line);
       this.objects.set(key, mesh);
