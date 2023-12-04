@@ -6719,6 +6719,11 @@ OpenSimFile OpenSimParser::readOsim40(
         std::string name(markerCursor->Attribute("name"));
         Eigen::Vector3s offset
             = readVec3(markerCursor->FirstChildElement("location"));
+        if (offset.hasNaN())
+        {
+          throw std::runtime_error("Marker " + name + " has a NaN offset in the OpenSim file we are attempting to load!");
+        }
+        assert(!offset.hasNaN());
         std::string socketName;
 
         if (markerCursor->FirstChildElement("socket_parent_frame"))

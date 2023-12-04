@@ -342,6 +342,7 @@ IKInitializer::IKInitializer(
   {
     mMarkerNameToIndex[pair.first] = mMarkers.size();
     mMarkerNames.push_back(pair.first);
+    assert(!pair.second.second.hasNaN());
     mMarkers.push_back(pair.second);
     if (markerIsAnatomical.count(pair.first))
     {
@@ -853,7 +854,7 @@ s_t IKInitializer::prescaleBasedOnAnatomicalMarkers(bool logOutput)
   {
     if (mJointToMarkerSquaredDistances.count(joint->name))
     {
-      auto& map = mJointToMarkerSquaredDistances[joint->name];
+      auto& map = mJointToMarkerSquaredDistances.at(joint->name);
       for (auto& pair2 : map)
       {
         pair2.second = (getStackedJointCenterFromJointCentersVector(
@@ -902,8 +903,13 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   mSkel->setBodyScales(Eigen::VectorXs::Ones(mSkel->getNumBodyNodes() * 3));
   Eigen::VectorXs neutralSkelJointWorldPositions
       = mSkel->getJointWorldPositions(mSkel->getJoints());
+  assert(!neutralSkelJointWorldPositions.hasNaN());
+  for (auto pair : mMarkers) {
+    assert(!pair.second.hasNaN());
+  }
   Eigen::VectorXs neutralSkelMarkerWorldPositions
       = mSkel->getMarkerWorldPositions(mMarkers);
+  assert(!neutralSkelMarkerWorldPositions.hasNaN());
   mSkel->setPositions(oldPositions);
   mSkel->setBodyScales(oldScales);
   std::map<std::string, Eigen::Vector3s>
@@ -917,7 +923,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   std::map<std::string, Eigen::Vector3s> neutralSkelMarkerWorldPositionsMap;
   for (int i = 0; i < mMarkerNames.size(); i++)
   {
-    neutralSkelMarkerWorldPositionsMap[mMarkerNames[i]]
+    neutralSkelMarkerWorldPositionsMap[mMarkerNames.at(i)]
         = neutralSkelMarkerWorldPositions.segment<3>(i * 3);
   }
 
@@ -948,27 +954,31 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
 
         // 1. Find the markers that are adjacent to this joint and visible on
         // this frame
-        for (auto& pair : mJointToMarkerSquaredDistances[joint->name])
+        for (auto& pair : mJointToMarkerSquaredDistances.at(joint->name))
         {
-          if (mMarkerObservations[t].count(pair.first))
+          if (mMarkerObservations.at(t).count(pair.first))
           {
+            assert(!mMarkerObservations.at(t).at(pair.first).hasNaN());
             adjacentPointLocations.push_back(
-                mMarkerObservations[t][pair.first]);
+                mMarkerObservations.at(t).at(pair.first));
             adjacentPointSquaredDistances.push_back(pair.second);
+            assert(!neutralSkelMarkerWorldPositionsMap.at(pair.first).hasNaN());
             adjacentPointLocationsInNeutralSkel.push_back(
-                neutralSkelMarkerWorldPositionsMap[pair.first]);
+                neutralSkelMarkerWorldPositionsMap.at(pair.first));
           }
         }
 
-        for (auto& pair : mJointToJointSquaredDistances[joint->name])
+        for (auto& pair : mJointToJointSquaredDistances.at(joint->name))
         {
           if (lastSolvedJointCenters.count(pair.first))
           {
+            assert(!lastSolvedJointCenters.at(pair.first).hasNaN());
             adjacentPointLocations.push_back(
-                lastSolvedJointCenters[pair.first]);
+                lastSolvedJointCenters.at(pair.first));
             adjacentPointSquaredDistances.push_back(pair.second);
+            assert(!neutralSkelJointCenterWorldPositionsMap.at(pair.first).hasNaN());
             adjacentPointLocationsInNeutralSkel.push_back(
-                neutralSkelJointCenterWorldPositionsMap[pair.first]);
+                neutralSkelJointCenterWorldPositionsMap.at(pair.first));
           }
         }
 
@@ -990,7 +1000,7 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
         }
         for (int i = 0; i < adjacentPointLocations.size(); i++)
         {
-          D(i, dim - 1) = adjacentPointSquaredDistances[i];
+          D(i, dim - 1) = adjacentPointSquaredDistances.at(i);
           D(dim - 1, i) = D(i, dim - 1);
         }
 
@@ -1149,7 +1159,7 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
   std::map<std::string, int> bodyMarkerCounts;
   for (int i = 0; i < mMarkers.size(); i++)
   {
-    auto& marker = mMarkers[i];
+    auto& marker = mMarkers.at(i);
     // Only accept markers whose variance is above a certain threshold
     if (markerVariances[mMarkerNames[i]] > 0.01)
     {
@@ -1634,9 +1644,9 @@ s_t IKInitializer::closedFormPivotFindingJointCenterSolver(bool logOutput)
     bool anyMarkersTooCloseToJoint = false;
     for (std::string marker : movingMarkers)
     {
-      if (mJointToMarkerSquaredDistances[joint->name].count(marker) > 0)
+      if (mJointToMarkerSquaredDistances.at(joint->name).count(marker) > 0)
       {
-        if (mJointToMarkerSquaredDistances[joint->name][marker] < 0.01)
+        if (mJointToMarkerSquaredDistances.at(joint->name).at(marker) < 0.01)
         {
           if (logOutput)
           {
@@ -3401,7 +3411,7 @@ IKInitializer::getJointsAttachedToObservedMarkersCenters(int t)
 std::map<std::string, s_t> IKInitializer::getJointToMarkerSquaredDistances(
     std::string jointName)
 {
-  return mJointToMarkerSquaredDistances[jointName];
+  return mJointToMarkerSquaredDistances.at(jointName);
 }
 
 //==============================================================================
