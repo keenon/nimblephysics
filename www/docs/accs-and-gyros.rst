@@ -71,7 +71,7 @@ add that to the velocity of the sensor. Also a linear operation!
    :width: 413
 
 You can scale up this intuition to a whole skeleton, with every joint's velocity linearly changing the (linear and rotational) velocities of any sensors below it on the tree.
-The code to compute the Jacobian for gyroscopes is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)`.
+The code to compute the Jacobian for gyroscopes is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)`.
 
 Acceleration has no effect on the velocity of the sensor (at least, not immediately). So the velocity of the
 sensor is linearly related to the velocity of the joint, regardless of the acceleration of the joint.
@@ -84,13 +84,13 @@ velocity and joint velocity. Just take the time derivative of both sides, and th
    :width: 276
 
 You can also scale up this intuition to a whole skeleton, with every joint's velocity linearly changing the (linear and rotational) velocities of any sensors below it on the tree.
-The code to compute the Jacobian for gyroscopes is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)`.
+The code to compute the Jacobian for gyroscopes is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_ACCELERATION)`.
 
 The last thing to note is that the relationship between sensor readings and joint velocities and accelerations.
 This, sadly, is *not* a linear relationship. Increasing the rotational velocity of a joint increases the centripetal 
 acceleration of the sensor with a squared term. You can still compute the Jacobian, but now instead of being a precise 
 function it is simply the first order Taylor approximation of the relationship. The code to compute the Jacobian for 
-acccelerometers is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)`.
+acccelerometers is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)`.
 
 If you first solve for the joint velocities using the gyroscope data (and you trust those velocities), then you can be held 
 fixed and this non-linear relationship between joint velocities and accelerations can be irrelevant.
@@ -121,12 +121,12 @@ So let's dive into some code::
   watch_rot_vel = np.random.randn(3)
 
   # Solve for the (least-squares) joint velocities
-  d_rot_vel_d_vel: np.ndarray = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)
+  d_rot_vel_d_vel: np.ndarray = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)
   vel: np.ndarray = np.linalg.lstsq(d_rot_vel_d_vel, watch_rot_vel, rcond=None)[0]
   skeleton.setVelocities(vel)
 
   # Solve for the (least-squares) joint accelerations
-  d_lin_acc_d_acc: np.ndarray = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)
+  d_lin_acc_d_acc: np.ndarray = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_ACCELERATION)
   acc: np.ndarray = np.linalg.lstsq(d_lin_acc_d_acc, watch_acc, rcond=None)[0]
   skeleton.setAccelerations(acc)
 
@@ -137,13 +137,13 @@ This is a non-linear problem, with lots of existing research, and lots more work
 
 Here is a list of the relevant Jacobians:
 
-- :math:`\frac{\partial g}{\partial q}` is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)`
-- :math:`\frac{\partial g}{\partial \dot{q}}` is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)`
+- :math:`\frac{\partial g}{\partial q}` is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)`
+- :math:`\frac{\partial g}{\partial \dot{q}}` is :code:`skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)`
 - :math:`\frac{\partial g}{\partial \ddot{q}}` is 0
-- :math:`\frac{\partial a}{\partial q}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)`
-- :math:`\frac{\partial a}{\partial \dot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)`
-- :math:`\frac{\partial a}{\partial \ddot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)`
-- :math:`\frac{\partial m}{\partial q}` is :code:`skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)`
+- :math:`\frac{\partial a}{\partial q}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)`
+- :math:`\frac{\partial a}{\partial \dot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)`
+- :math:`\frac{\partial a}{\partial \ddot{q}}` is :code:`skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_ACCELERATION)`
+- :math:`\frac{\partial m}{\partial q}` is :code:`skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)`
 - :math:`\frac{\partial m}{\partial w}` is :code:`skeleton.getMagnetometerReadingsJacobianWrtMagneticField(sensors)`
 
 One could imagine a Kalman filter with a state vector of :math:`[q, \dot{q}, \ddot{q}, w]`, where :math:`q` is the estimated pose vector, and :math:`w` is the estimated world magnetic field. The measurement vector of :math:`[g, a, m]`
@@ -200,17 +200,17 @@ Constructing this in copy-pastable code, assuming that :code:`skeleton` and :cod
 
   measurement_matrix: np.ndarray = np.zeros((measurement_dim, state_dim))
   # Set up gyro readings as a function of pose
-  measurement_matrix[:one_sensor_type_dim, :num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  measurement_matrix[:one_sensor_type_dim, :num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)
   # Set up gyro readings as a function of velocities
-  measurement_matrix[:one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)
+  measurement_matrix[:one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getGyroReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)
   # Set up accelerometer readings as a function of pose
-  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, :num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, :num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)
   # Set up accelerometer readings as a function of velocities
-  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_VELOCITY)
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, num_dofs:2*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_VELOCITY)
   # Set up accelerometer readings as a function of accelerations
-  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, 2*num_dofs:3*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_ACCELERATION)
+  measurement_matrix[one_sensor_type_dim:2*one_sensor_type_dim, 2*num_dofs:3*num_dofs] = skeleton.getAccelerometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_ACCELERATION)
   # Set up magnetometer readings as a function of pose
-  measurement_matrix[2*one_sensor_type_dim:, :num_dofs] = skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WithRespectTo.WRT_POSITION)
+  measurement_matrix[2*one_sensor_type_dim:, :num_dofs] = skeleton.getMagnetometerReadingsJacobianWrt(sensors, wrt=nimble.neural.WRT_POSITION)
   # Set up magnetometer readings as a function of world magnetic field
   measurement_matrix[2*one_sensor_type_dim:, 3*num_dofs:] = skeleton.getMagnetometerReadingsJacobianWrtMagneticField(sensors)
 

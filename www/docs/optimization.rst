@@ -207,13 +207,13 @@ These functions all return rectangular Numpy matrices.
 There is a larger set of Jacobians which take their "with respect to" portion as the argument `wrt`.
 For these, the `wrt` argument is on the `nimble.neural.WithRespectTo` object. Options are as follows:
 
-- :code:`nimble.neural.WithRespectTo.WRT_POSITION`
-- :code:`nimble.neural.WithRespectTo.WRT_VELOCITY`
-- :code:`nimble.neural.WithRespectTo.WRT_FORCE`
-- :code:`nimble.neural.WithRespectTo.WRT_ACCELERATION`
-- :code:`nimble.neural.WithRespectTo.WRT_GROUP_SCALES`
-- :code:`nimble.neural.WithRespectTo.WRT_GROUP_MASSES`
-- :code:`nimble.neural.WithRespectTo.WRT_GROUP_INERTIAS`
+- :code:`nimble.neural.WRT_POSITION`
+- :code:`nimble.neural.WRT_VELOCITY`
+- :code:`nimble.neural.WRT_FORCE`
+- :code:`nimble.neural.WRT_ACCELERATION`
+- :code:`nimble.neural.WRT_GROUP_SCALES`
+- :code:`nimble.neural.WRT_GROUP_MASSES`
+- :code:`nimble.neural.WRT_GROUP_INERTIAS`
 
 The Jacobians that take these arguments are given below:
 
