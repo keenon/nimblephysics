@@ -18,6 +18,7 @@ With a known state for your skeleton (position, velocity, acceleration), you can
   import nimblephysics as nimble
   import numpy as np
   import time
+  from typing import List, Tuple
 
   rajagopal_opensim: nimble.biomechanics.OpenSimFile = nimble.RajagopalHumanBodyModel()
   skeleton: nimble.dynamics.Skeleton = rajagopal_opensim.skeleton
@@ -99,6 +100,7 @@ So let's dive into some code::
   import nimblephysics as nimble
   import numpy as np
   import time
+  from typing import List, Tuple
 
   rajagopal_opensim: nimble.biomechanics.OpenSimFile = nimble.RajagopalHumanBodyModel()
   skeleton: nimble.dynamics.Skeleton = rajagopal_opensim.skeleton
