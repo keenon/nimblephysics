@@ -1010,6 +1010,17 @@ Note that these are specified in the local body frame, acting on the body at its
                 "expect to get warnings about being unable to load meshes, and "
                 "expect that your skeleton will not display if you attempt to "
                 "visualize it.")
+            .def(
+                "readOpenSimFile",
+                &dart::biomechanics::SubjectOnDisk::readOpenSimFile,
+                ::py::arg("processingPass"),
+                ::py::arg("geometryFolder") = "",
+                "This is functionally the same as readSkel(), except that it "
+                "returns the entire OpenSim file object, which in addition to "
+                "the Skeleton also contains the markerset."
+                "This will read the entire OpenSim file from the binary, and "
+                "optionally "
+                "use the passed in :code:`geometryFolder` to load meshes. ")
             //   /// This will read the raw OpenSim XML file text out of the
             //   binary, and return
             //   /// it as a string

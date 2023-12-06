@@ -2523,6 +2523,10 @@ class SubjectOnDisk():
         """
         This will read from disk and allocate a number of :code:`Frame` objects. These Frame objects are assumed to be short-lived, to save working memory. For example, you might :code:`readFrames()` to construct a training batch, then immediately allow the frames to go out of scope and be released after the batch backpropagates gradient and loss. On OOB access, prints an error and returns an empty vector.
         """
+    def readOpenSimFile(self, processingPass: int, geometryFolder: str = '') -> OpenSimFile: 
+        """
+        This is functionally the same as readSkel(), except that it returns the entire OpenSim file object, which in addition to the Skeleton also contains the markerset.This will read the entire OpenSim file from the binary, and optionally use the passed in :code:`geometryFolder` to load meshes. 
+        """
     def readSkel(self, processingPass: int, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.dynamics.Skeleton: 
         """
         This will read the skeleton from the binary, and optionally use the passed in :code:`geometryFolder` to load meshes. We do not bundle meshes with :code:`SubjectOnDisk` files, to save space. If you do not pass in :code:`geometryFolder`, expect to get warnings about being unable to load meshes, and expect that your skeleton will not display if you attempt to visualize it.

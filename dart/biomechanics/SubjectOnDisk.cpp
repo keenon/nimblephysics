@@ -632,6 +632,36 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
   return osimParsed.skeleton;
 }
 
+/// If you want the skeleton _and the markerset_ from the binary, use this
+/// instead of readSkel() to get full parsed OpenSimFile object, which includes
+/// the markerset.
+OpenSimFile SubjectOnDisk::readOpenSimFile(
+    int passNumberToLoad, std::string geometryFolder)
+{
+  if (geometryFolder == "")
+  {
+    // Guess that the Geometry folder is relative to the binary, if none is
+    // provided
+    geometryFolder = common::Uri::createFromRelativeUri(mPath, "./Geometry/")
+                         .getFilesystemPath();
+  }
+
+  tinyxml2::XMLDocument osimFile;
+  osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
+  OpenSimFile osimParsed
+      = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
+  if (!(osimParsed.skeleton))
+  {
+    std::cout << "Failed to parse Osim XML: \""
+              << mHeader->mPasses[passNumberToLoad]->mOpenSimFileText << "\""
+              << std::endl;
+    return osimParsed;
+  }
+  osimParsed.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  return osimParsed;
+}
+
 /// This will read the raw OpenSim XML file text out of the binary, and return
 /// it as a string
 std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)

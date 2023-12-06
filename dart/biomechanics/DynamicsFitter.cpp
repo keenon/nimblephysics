@@ -10723,9 +10723,11 @@ void DynamicsFitter::excludeTrialsWithTooManyMissingGRFs(
     }
     if (count >= threshold && init->includeTrialsInDynamicsFit[trial])
     {
-      std::cout << "DROPPING TRIAL " << trial << " FROM DYNAMICS FIT!"
-                << std::endl;
-      init->includeTrialsInDynamicsFit[trial] = false;
+      // std::cout << "DROPPING TRIAL " << trial << " FROM DYNAMICS FIT!"
+      //           << std::endl;
+      // init->includeTrialsInDynamicsFit[trial] = false;
+
+      // Do nothing
     }
   }
 }
@@ -11526,7 +11528,7 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(200 * sampledTrials.size());
+    solver.setMaxIterations(unifiedLinearMap.rows() * 10);
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -11534,6 +11536,16 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
         = (unifiedLinearMap * tentativeResult) + unifiedGravityOffset;
 
     std::cout << "Solved!" << std::endl;
+
+    // Calculate the error
+    double error
+        = (unifiedPositions - unifiedGravityOffset - tentativeCOMTrajectory)
+              .cwiseAbs()
+              .mean();
+
+    // Print the error
+    std::cout << "COM trajectory solution average per-timestep error: " << error
+              << "m" << std::endl;
 
     // The linear map is in terms of "inverse mass", so we need to invert to
     // recover original mass.
