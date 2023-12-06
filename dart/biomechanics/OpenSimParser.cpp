@@ -6723,6 +6723,7 @@ OpenSimFile OpenSimParser::readOsim40(
         {
           throw std::runtime_error("Marker " + name + " has a NaN offset in the OpenSim file we are attempting to load!");
         }
+        assert(!offset.hasNaN());
         std::string socketName;
 
         if (markerCursor->FirstChildElement("socket_parent_frame"))

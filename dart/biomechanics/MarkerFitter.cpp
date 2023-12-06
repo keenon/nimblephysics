@@ -647,6 +647,7 @@ MarkerFitter::MarkerFitter(
         }
       }
     }
+    assert(!pair.second.second.hasNaN());
 
     if (!isOnJoint)
     {
@@ -4422,6 +4423,9 @@ MarkerInitialization MarkerFitter::getInitialization(
       markerIsAnatomical[mMarkerNames[i]] = !mMarkerIsTracking[i];
     }
 
+    for (auto& pair : mMarkerMap) {
+      assert(!pair.second.second.hasNaN());
+    }
     IKInitializer initializer(
         mSkeleton,
         mMarkerMap,
@@ -4940,13 +4944,14 @@ MarkerInitialization MarkerFitter::getInitialization(
       if (params.markerOffsets.count(name) > 0)
       {
         assert(params.markerOffsets.count(name));
-        if (mMarkerIsTracking[i])
+        assert(!params.markerOffsets.at(name).hasNaN());
+        if (mMarkerIsTracking.at(i))
         {
           result.markerOffsets[name] = params.markerOffsets.at(name);
           result.updatedMarkerMap[name]
               = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-                  mMarkerMap[name].first,
-                  mMarkerMap[name].second + params.markerOffsets.at(name));
+                  mMarkerMap.at(name).first,
+                  mMarkerMap.at(name).second + params.markerOffsets.at(name));
         }
       }
       else
@@ -4954,24 +4959,25 @@ MarkerInitialization MarkerFitter::getInitialization(
         if (mMarkerIsTracking[i] || offsetAnatomicalMarkersToo)
         {
           // Avoid divide-by-zero edge case
-          if (trackingMarkerNumObservations[name] == 0)
+          if (trackingMarkerNumObservations.at(name) == 0)
           {
             result.markerOffsets[name] = Eigen::Vector3s::Zero();
           }
           else
           {
-            result.markerOffsets[name] = trackingMarkerObservationsSum[name]
-                                         / trackingMarkerNumObservations[name];
+            result.markerOffsets[name] = trackingMarkerObservationsSum.at(name)
+                                         / trackingMarkerNumObservations.at(name);
           }
           result.updatedMarkerMap[name]
               = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-                  mMarkerMap[name].first,
-                  mMarkerMap[name].second + result.markerOffsets[name]);
+                  mMarkerMap.at(name).first,
+                  mMarkerMap.at(name).second + result.markerOffsets.at(name));
         }
         else
         {
           result.markerOffsets[name] = Eigen::Vector3s::Zero();
-          result.updatedMarkerMap[name] = mMarkerMap[name];
+          assert(!mMarkerMap.at(name).second.hasNaN());
+          result.updatedMarkerMap[name] = mMarkerMap.at(name);
         }
       }
     }
@@ -4980,19 +4986,20 @@ MarkerInitialization MarkerFitter::getInitialization(
   {
     for (int i = 0; i < mMarkerNames.size(); i++)
     {
-      std::string name = mMarkerNames[i];
+      std::string name = mMarkerNames.at(i);
       if (params.markerOffsets.count(name) > 0)
       {
         result.markerOffsets[name] = params.markerOffsets.at(name);
         result.updatedMarkerMap[name]
             = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
-                mMarkerMap[name].first,
-                mMarkerMap[name].second + params.markerOffsets.at(name));
+                mMarkerMap.at(name).first,
+                mMarkerMap.at(name).second + params.markerOffsets.at(name));
       }
       else
       {
         result.markerOffsets[name] = Eigen::Vector3s::Zero();
-        result.updatedMarkerMap[name] = mMarkerMap[name];
+        assert(!mMarkerMap.at(name).second.hasNaN());
+        result.updatedMarkerMap[name] = mMarkerMap.at(name);
       }
     }
   }
