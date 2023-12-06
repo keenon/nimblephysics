@@ -11,7 +11,7 @@ IMUs are common, in both motion capture and in wearable devices like smart watch
 Representing IMUs in Nimble
 ################################
 
-To represent accelerometers and gyroscopes, you'll use a pair of a :code:`nimble.dynamics.BodyNode` (the bone that the sensor is rigidly attached to) and a :code:`nimble.math.Isometry3` (the translation and rotation of the sensor in that bone's frame). So that means you'll have a :code:`List[Pair[BodyNode, Isometry3]]` for the accelerometers, and another list for the gyroscopes (probably identical, if you're using IMUs which bundle both sensors together).
+To represent accelerometers and gyroscopes, you'll use a pair of a :code:`nimble.dynamics.BodyNode` (the bone that the sensor is rigidly attached to) and a :code:`nimble.math.Isometry3` (the translation and rotation of the sensor in that bone's frame). So that means you'll have a :code:`List[Tuple[BodyNode, Isometry3]]` for the accelerometers, and another list for the gyroscopes (probably identical, if you're using IMUs which bundle both sensors together).
 
 With a known state for your skeleton (position, velocity, acceleration), you can generate virtual gyroscope and accelerometer readings. For simplicity, let's imagine we are working with a single IMU inside of a smart watch on the left wrist::
 
@@ -27,7 +27,7 @@ With a known state for your skeleton (position, velocity, acceleration), you can
   rotation: np.ndarray = np.eye(3)
   watch_offset: nimble.math.Isometry3 = nimble.math.Isometry3(rotation, translation)
 
-  sensors: List[Pair[nimble.dynamics.BodyNode, nimble.math.Isometry3]] = [(right_wrist, watch_offset)]
+  sensors: List[Tuple[nimble.dynamics.BodyNode, nimble.math.Isometry3]] = [(right_wrist, watch_offset)]
 
   # Set the initial state of the skeleton to whatever you want
   skeleton.setGravity(np.array([0.0, -9.81, 0.0]))
@@ -108,7 +108,7 @@ So let's dive into some code::
   rotation: np.ndarray = np.eye(3)
   watch_offset: nimble.math.Isometry3 = nimble.math.Isometry3(rotation, translation)
 
-  sensors: List[Pair[nimble.dynamics.BodyNode, nimble.math.Isometry3]] = [(right_wrist, watch_offset)]
+  sensors: List[Tuple[nimble.dynamics.BodyNode, nimble.math.Isometry3]] = [(right_wrist, watch_offset)]
 
   # Set the initial state of the skeleton
   skeleton.setGravity(np.array([0.0, -9.81, 0.0]))
@@ -189,7 +189,7 @@ And the measurement Jacobian would be:
     \frac{\partial m}{\partial q} & 0 & 0 & \frac{\partial m}{\partial w}
   \end{bmatrix}
 
-Constructing this in copy-pastable code, assuming that :code:`skeleton` and :code:`sensors: List[Pair[nimble.dynamics.BodyNode, nimble.math.Isometry3]]` already exist in memory ::
+Constructing this in copy-pastable code, assuming that :code:`skeleton` and :code:`sensors: List[Tuple[nimble.dynamics.BodyNode, nimble.math.Isometry3]]` already exist in memory ::
 
   # Each type of sensor has a 3-dimensional vector measurement per sensor
   one_sensor_type_dim: int = len(sensors) * 3
