@@ -904,9 +904,12 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
   Eigen::VectorXs neutralSkelJointWorldPositions
       = mSkel->getJointWorldPositions(mSkel->getJoints());
   assert(!neutralSkelJointWorldPositions.hasNaN());
-  for (auto pair : mMarkers) {
+#ifndef NDEBUG
+  for (auto pair : mMarkers)
+  {
     assert(!pair.second.hasNaN());
   }
+#endif
   Eigen::VectorXs neutralSkelMarkerWorldPositions
       = mSkel->getMarkerWorldPositions(mMarkers);
   assert(!neutralSkelMarkerWorldPositions.hasNaN());
@@ -976,7 +979,8 @@ s_t IKInitializer::closedFormMDSJointCenterSolver(bool logOutput)
             adjacentPointLocations.push_back(
                 lastSolvedJointCenters.at(pair.first));
             adjacentPointSquaredDistances.push_back(pair.second);
-            assert(!neutralSkelJointCenterWorldPositionsMap.at(pair.first).hasNaN());
+            assert(!neutralSkelJointCenterWorldPositionsMap.at(pair.first)
+                        .hasNaN());
             adjacentPointLocationsInNeutralSkel.push_back(
                 neutralSkelJointCenterWorldPositionsMap.at(pair.first));
           }

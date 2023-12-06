@@ -4423,9 +4423,12 @@ MarkerInitialization MarkerFitter::getInitialization(
       markerIsAnatomical[mMarkerNames[i]] = !mMarkerIsTracking[i];
     }
 
-    for (auto& pair : mMarkerMap) {
+#ifndef NDEBUG
+    for (auto& pair : mMarkerMap)
+    {
       assert(!pair.second.second.hasNaN());
     }
+#endif
     IKInitializer initializer(
         mSkeleton,
         mMarkerMap,
@@ -4965,8 +4968,9 @@ MarkerInitialization MarkerFitter::getInitialization(
           }
           else
           {
-            result.markerOffsets[name] = trackingMarkerObservationsSum.at(name)
-                                         / trackingMarkerNumObservations.at(name);
+            result.markerOffsets[name]
+                = trackingMarkerObservationsSum.at(name)
+                  / trackingMarkerNumObservations.at(name);
           }
           result.updatedMarkerMap[name]
               = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
