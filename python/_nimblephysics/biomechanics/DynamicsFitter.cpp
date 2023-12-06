@@ -47,6 +47,9 @@ void DynamicsFitter(py::module& m)
           "interpolatedClippedGRF",
           dart::biomechanics::MissingGRFReason::interpolatedClippedGRF)
       .value("manualReview", dart::biomechanics::MissingGRFReason::manualReview)
+      .value(
+          "footContactDetectedButNoForce",
+          dart::biomechanics::MissingGRFReason::footContactDetectedButNoForce)
       .export_values();
 
   py::enum_<dart::biomechanics::MissingGRFStatus>(m, "MissingGRFStatus")

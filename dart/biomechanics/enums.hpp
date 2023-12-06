@@ -9,6 +9,7 @@ enum MissingGRFReason
   notMissingGRF,
   measuredGrfZeroWhenAccelerationNonZero,
   unmeasuredExternalForceDetected,
+  footContactDetectedButNoForce,
   torqueDiscrepancy,
   forceDiscrepancy,
   notOverForcePlate,

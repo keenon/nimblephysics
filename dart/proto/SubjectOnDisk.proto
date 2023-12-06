@@ -13,6 +13,7 @@ enum MissingGRFReason { notMissingGRF = 0;
                         shiftGRF = 8;
                         interpolatedClippedGRF = 9;
                         manualReview = 10;
+                        footContactDetectedButNoForce = 11;
                       };
 
 enum ProcessingPassType {
