@@ -103,20 +103,21 @@ void MetaSkeleton(
               -> dart::dynamics::BodyNode* { return self->getBodyNode(name); },
           ::py::arg("treeIndex"),
           py::return_value_policy::reference_internal)
-      .def(
-          "getBodyNodes",
-          +[](dart::dynamics::MetaSkeleton* self, const std::string& name)
-              -> std::vector<dart::dynamics::BodyNode*> {
-            return self->getBodyNodes(name);
-          },
-          ::py::arg("name"))
-      .def(
-          "getBodyNodes",
-          +[](const dart::dynamics::MetaSkeleton* self, const std::string& name)
-              -> std::vector<const dart::dynamics::BodyNode*> {
-            return self->getBodyNodes(name);
-          },
-          ::py::arg("name"))
+      // .def(
+      //     "getBodyNodes",
+      //     +[](dart::dynamics::MetaSkeleton* self, const std::string& name)
+      //         -> std::vector<dart::dynamics::BodyNode*> {
+      //       return self->getBodyNodes(name);
+      //     },
+      //     ::py::arg("name"))
+      // .def(
+      //     "getBodyNodes",
+      //     +[](const dart::dynamics::MetaSkeleton* self, const std::string&
+      //     name)
+      //         -> std::vector<const dart::dynamics::BodyNode*> {
+      //       return self->getBodyNodes(name);
+      //     },
+      //     ::py::arg("name"))
       .def(
           "hasBodyNode",
           +[](const dart::dynamics::MetaSkeleton* self,
@@ -157,32 +158,43 @@ void MetaSkeleton(
               -> dart::dynamics::Joint* { return self->getJoint(name); },
           ::py::return_value_policy::reference_internal,
           ::py::arg("name"))
-      .def(
-          "getJoints",
-          +[](dart::dynamics::MetaSkeleton* self)
-              -> std::vector<dart::dynamics::Joint*> {
-            return self->getJoints();
-          })
-      .def(
-          "getJoints",
-          +[](const dart::dynamics::MetaSkeleton* self)
-              -> std::vector<const dart::dynamics::Joint*> {
-            return self->getJoints();
-          })
-      .def(
-          "getJoints",
-          +[](dart::dynamics::MetaSkeleton* self,
-              const std::string& name) -> std::vector<dart::dynamics::Joint*> {
-            return self->getJoints(name);
-          },
-          ::py::arg("name"))
-      .def(
-          "getJoints",
-          +[](const dart::dynamics::MetaSkeleton* self, const std::string& name)
-              -> std::vector<const dart::dynamics::Joint*> {
-            return self->getJoints(name);
-          },
-          ::py::arg("name"))
+      // These methods all crash because pybind11 tries to take ownership of
+      // the joints within the list
+      // When the list of joints is freed on the Python side, it attempts to
+      // free the joint pointers too.
+      // This seems to be a limitation of pybind11, it's challenging to assign
+      // different return policies
+      // to a vector, and the contents of that vector:
+      // https://github.com/pybind/pybind11/issues/637
+
+      // .def(
+      //     "getJoints",
+      //     +[](dart::dynamics::MetaSkeleton* self)
+      //         -> std::vector<dart::dynamics::Joint*> {
+      //       return self->getJoints();
+      //     })
+      // .def(
+      //     "getJoints",
+      //     +[](const dart::dynamics::MetaSkeleton* self)
+      //         -> std::vector<const dart::dynamics::Joint*> {
+      //       return self->getJoints();
+      //     })
+      // .def(
+      //     "getJoints",
+      //     +[](dart::dynamics::MetaSkeleton* self,
+      //         const std::string& name) -> std::vector<dart::dynamics::Joint*>
+      //         {
+      //       return self->getJoints(name);
+      //     },
+      //     ::py::arg("name"))
+      // .def(
+      //     "getJoints",
+      //     +[](const dart::dynamics::MetaSkeleton* self, const std::string&
+      //     name)
+      //         -> std::vector<const dart::dynamics::Joint*> {
+      //       return self->getJoints(name);
+      //     },
+      //     ::py::arg("name"))
       .def(
           "hasJoint",
           +[](const dart::dynamics::MetaSkeleton* self,

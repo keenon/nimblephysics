@@ -625,12 +625,17 @@ void Skeleton(
           ::py::arg("treeIndex"),
           py::return_value_policy::reference_internal)
       .def(
-          "getBodyNodes",
-          +[](dart::dynamics::Skeleton* self)
-              -> const std::vector<dart::dynamics::BodyNode*>& {
-            return self->getBodyNodes();
-          },
+          "getBodyNode",
+          +[](dart::dynamics::Skeleton* self, int index)
+              -> dart::dynamics::BodyNode* { return self->getBodyNode(index); },
           py::return_value_policy::reference_internal)
+      //   .def(
+      //       "getBodyNodes",
+      //       +[](dart::dynamics::Skeleton* self)
+      //           -> const std::vector<dart::dynamics::BodyNode*>& {
+      //         return self->getBodyNodes();
+      //       },
+      //       py::return_value_policy::reference_internal)
       .def(
           "hasBodyNode",
           +[](const dart::dynamics::Skeleton* self,
@@ -677,6 +682,18 @@ void Skeleton(
           +[](dart::dynamics::Skeleton* self, const std::string& name)
               -> dart::dynamics::Joint* { return self->getJoint(name); },
           ::py::arg("name"),
+          py::return_value_policy::reference_internal)
+      .def(
+          "getBodyNode",
+          +[](dart::dynamics::MetaSkeleton* self, std::size_t index)
+              -> dart::dynamics::BodyNode* { return self->getBodyNode(index); },
+          ::py::arg("index"),
+          py::return_value_policy::reference_internal)
+      .def(
+          "getBodyNode",
+          +[](dart::dynamics::MetaSkeleton* self, const std::string& name)
+              -> dart::dynamics::BodyNode* { return self->getBodyNode(name); },
+          ::py::arg("treeIndex"),
           py::return_value_policy::reference_internal)
       /*
       // These methods all crash because pybind11 tries to take ownership of
