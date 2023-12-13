@@ -57,6 +57,51 @@ bool verifyIMUJacobians(
     sensors.emplace_back(skel->getBodyNode(i), T3);
   }
 
+  Eigen::Vector3s oldGravity = skel->getGravity();
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::Vector3s gravity = Eigen::Vector3s::Random();
+    skel->setGravity(gravity);
+    skel->setPositions(Eigen::VectorXs::Zero(skel->getNumDofs()));
+    skel->setVelocities(Eigen::VectorXs::Zero(skel->getNumDofs()));
+    skel->setAccelerations(Eigen::VectorXs::Zero(skel->getNumDofs()));
+
+    Eigen::VectorXs gyroReadings = skel->getGyroReadings(sensors);
+    Eigen::VectorXs expectedGyroReadings
+        = Eigen::VectorXs::Zero(sensors.size() * 3);
+    if (!equals(gyroReadings, expectedGyroReadings, 1e-8))
+    {
+      std::cout << "Gyro reading error!" << std::endl;
+      std::cout << "Expected: " << std::endl
+                << Eigen::VectorXs::Zero(sensors.size() * 3) << std::endl;
+      std::cout << "Actual: " << std::endl << gyroReadings << std::endl;
+      std::cout << "Diff: " << std::endl
+                << Eigen::VectorXs::Zero(sensors.size() * 3) - gyroReadings
+                << std::endl;
+      return false;
+    }
+
+    Eigen::VectorXs accReadings = skel->getAccelerometerReadings(sensors);
+    for (int b = 0; b < sensors.size(); b++)
+    {
+      Eigen::Isometry3s T_wb = sensors[b].first->getWorldTransform();
+      Eigen::Isometry3s T_ba = sensors[b].second;
+      Eigen::Isometry3s T_wa = T_wb * T_ba;
+      Eigen::Vector3s expected = T_wa.linear().transpose() * -gravity;
+      Eigen::Vector3s actual = accReadings.segment<3>(b * 3);
+
+      if (!equals(expected, actual, 1e-8))
+      {
+        std::cout << "Acc reading error!" << std::endl;
+        std::cout << "Expected: " << std::endl << expected << std::endl;
+        std::cout << "Actual: " << std::endl << actual << std::endl;
+        std::cout << "Diff: " << std::endl << expected - actual << std::endl;
+        return false;
+      }
+    }
+  }
+  skel->setGravity(oldGravity);
+
   for (int i = 0; i < 10; i++)
   {
     skel->setPositions(Eigen::VectorXs::Random(skel->getNumDofs()));

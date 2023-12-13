@@ -10680,8 +10680,6 @@ void DynamicsFitter::fillInMissingGRFBlips(
         }
         if (isBlip)
         {
-          std::cout << "Filling in GRF blip on trial " << trial << ", timestep "
-                    << t << std::endl;
           for (int scanForward = 0; scanForward < blipFilterLen; scanForward++)
           {
             int scanT = t + scanForward;
@@ -10690,6 +10688,8 @@ void DynamicsFitter::fillInMissingGRFBlips(
               if (init->probablyMissingGRF.at(trial).at(scanT)
                   == MissingGRFStatus::unknown)
               {
+                std::cout << "Filling in GRF blip on trial " << trial
+                          << ", timestep " << scanT << std::endl;
                 init->probablyMissingGRF.at(trial).at(scanT)
                     = MissingGRFStatus::yes;
                 init->missingGRFReason.at(trial).at(scanT)
@@ -10947,24 +10947,34 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
 
       if (isEstimatedZero && !isMeasuredZero)
       {
-        std::cout << "Detected unmeasured force acting on the subject in trial "
-                  << trial << " at time " << t << std::endl;
-        filteredTimesteps.push_back(t + 1);
-        init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
-        init->missingGRFReason.at(trial).at(t + 1)
-            = MissingGRFReason::unmeasuredExternalForceDetected;
-        continue;
+        if (init->probablyMissingGRF.at(trial).at(t + 1)
+            == MissingGRFStatus::unknown)
+        {
+          std::cout
+              << "Detected unmeasured force acting on the subject in trial "
+              << trial << " at time " << t << std::endl;
+          filteredTimesteps.push_back(t + 1);
+          init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
+          init->missingGRFReason.at(trial).at(t + 1)
+              = MissingGRFReason::unmeasuredExternalForceDetected;
+          continue;
+        }
       }
       else if (!isEstimatedZero && isMeasuredZero)
       {
         if (estimatedForce.norm() > maxGRF * 0.2)
         {
-          std::cout << "No measured GRF on trial " << trial << " at time " << t
-                    << ", yet unexplained COM acceleration" << std::endl;
-          filteredTimesteps.push_back(t + 1);
-          init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
-          init->missingGRFReason.at(trial).at(t + 1)
-              = MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
+          if (init->probablyMissingGRF.at(trial).at(t + 1)
+              == MissingGRFStatus::unknown)
+          {
+            std::cout << "No measured GRF on trial " << trial << " at time "
+                      << t << ", yet unexplained COM acceleration" << std::endl;
+            filteredTimesteps.push_back(t + 1);
+            init->probablyMissingGRF.at(trial).at(t + 1)
+                = MissingGRFStatus::yes;
+            init->missingGRFReason.at(trial).at(t + 1)
+                = MissingGRFReason::measuredGrfZeroWhenAccelerationNonZero;
+          }
         }
         continue;
       }
@@ -10997,14 +11007,18 @@ void DynamicsFitter::estimateUnmeasuredExternalForces(
                    / (optimisticForce.norm() * smoothedGrf.norm()));
       if (diff * diff > threshold)
       {
-        std::cout
-            << "Detected a large force discrepancy on the subject in trial "
-            << trial << " at time " << t << " (" << diff * diff << " > "
-            << threshold << ")" << std::endl;
-        filteredTimesteps.push_back(t + 1);
-        init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
-        init->missingGRFReason.at(trial).at(t + 1)
-            = MissingGRFReason::forceDiscrepancy;
+        if (init->probablyMissingGRF.at(trial).at(t + 1)
+            == MissingGRFStatus::unknown)
+        {
+          std::cout
+              << "Detected a large force discrepancy on the subject in trial "
+              << trial << " at time " << t << " (" << diff * diff << " > "
+              << threshold << ")" << std::endl;
+          filteredTimesteps.push_back(t + 1);
+          init->probablyMissingGRF.at(trial).at(t + 1) = MissingGRFStatus::yes;
+          init->missingGRFReason.at(trial).at(t + 1)
+              = MissingGRFReason::forceDiscrepancy;
+        }
       }
     }
     if (filteredTimesteps.size() > 0)
@@ -11951,38 +11965,41 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               {
                 break;
               }
-              std::cout << "Marking " << i
-                        << " as missing GRF because it is a neighbor of a peak"
-                        << std::endl;
-              if (init->probablyMissingGRF.size() <= trial)
-              {
-                std::cout << "Trial " << trial
-                          << " is out of bounds for probablyMissingGRF!"
-                          << std::endl;
-              }
-              if (init->probablyMissingGRF.at(trial).size() <= i)
-              {
-                std::cout << "Timestep " << i << " is out of bounds for trial "
-                          << trial << " with probablyMissingGRF array length "
-                          << init->probablyMissingGRF.at(trial).size() << "!"
-                          << std::endl;
-              }
-              if (init->missingGRFReason.size() <= trial)
-              {
-                std::cout << "Trial " << trial
-                          << " is out of bounds for missingGRFReason!"
-                          << std::endl;
-              }
-              if (init->missingGRFReason.at(trial).size() <= i)
-              {
-                std::cout << "Timestep " << i << " is out of bounds for trial "
-                          << trial << " with missingGRFReason array length "
-                          << init->missingGRFReason.at(trial).size() << "!"
-                          << std::endl;
-              }
               if (init->probablyMissingGRF.at(trial).at(i)
                   == MissingGRFStatus::unknown)
               {
+                std::cout
+                    << "Marking " << i
+                    << " as missing GRF because it is a neighbor of a peak"
+                    << std::endl;
+                if (init->probablyMissingGRF.size() <= trial)
+                {
+                  std::cout << "Trial " << trial
+                            << " is out of bounds for probablyMissingGRF!"
+                            << std::endl;
+                }
+                if (init->probablyMissingGRF.at(trial).size() <= i)
+                {
+                  std::cout << "Timestep " << i
+                            << " is out of bounds for trial " << trial
+                            << " with probablyMissingGRF array length "
+                            << init->probablyMissingGRF.at(trial).size() << "!"
+                            << std::endl;
+                }
+                if (init->missingGRFReason.size() <= trial)
+                {
+                  std::cout << "Trial " << trial
+                            << " is out of bounds for missingGRFReason!"
+                            << std::endl;
+                }
+                if (init->missingGRFReason.at(trial).size() <= i)
+                {
+                  std::cout << "Timestep " << i
+                            << " is out of bounds for trial " << trial
+                            << " with missingGRFReason array length "
+                            << init->missingGRFReason.at(trial).size() << "!"
+                            << std::endl;
+                }
                 init->probablyMissingGRF.at(trial).at(i)
                     = MissingGRFStatus::yes;
                 init->missingGRFReason.at(trial).at(i)
@@ -11995,38 +12012,41 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               {
                 break;
               }
-              std::cout << "Marking " << i
-                        << " as missing GRF because it is a neighbor of a peak"
-                        << std::endl;
-              if (init->probablyMissingGRF.size() <= trial)
-              {
-                std::cout << "Trial " << trial
-                          << " is out of bounds for probablyMissingGRF!"
-                          << std::endl;
-              }
-              if (init->probablyMissingGRF.at(trial).size() <= i)
-              {
-                std::cout << "Timestep " << i << " is out of bounds for trial "
-                          << trial << " with probablyMissingGRF array length "
-                          << init->probablyMissingGRF.at(trial).size() << "!"
-                          << std::endl;
-              }
-              if (init->missingGRFReason.size() <= trial)
-              {
-                std::cout << "Trial " << trial
-                          << " is out of bounds for missingGRFReason!"
-                          << std::endl;
-              }
-              if (init->missingGRFReason.at(trial).size() <= i)
-              {
-                std::cout << "Timestep " << i << " is out of bounds for trial "
-                          << trial << " with missingGRFReason array length "
-                          << init->missingGRFReason.at(trial).size() << "!"
-                          << std::endl;
-              }
               if (init->probablyMissingGRF.at(trial).at(i)
                   == MissingGRFStatus::unknown)
               {
+                std::cout
+                    << "Marking " << i
+                    << " as missing GRF because it is a neighbor of a peak"
+                    << std::endl;
+                if (init->probablyMissingGRF.size() <= trial)
+                {
+                  std::cout << "Trial " << trial
+                            << " is out of bounds for probablyMissingGRF!"
+                            << std::endl;
+                }
+                if (init->probablyMissingGRF.at(trial).size() <= i)
+                {
+                  std::cout << "Timestep " << i
+                            << " is out of bounds for trial " << trial
+                            << " with probablyMissingGRF array length "
+                            << init->probablyMissingGRF.at(trial).size() << "!"
+                            << std::endl;
+                }
+                if (init->missingGRFReason.size() <= trial)
+                {
+                  std::cout << "Trial " << trial
+                            << " is out of bounds for missingGRFReason!"
+                            << std::endl;
+                }
+                if (init->missingGRFReason.at(trial).size() <= i)
+                {
+                  std::cout << "Timestep " << i
+                            << " is out of bounds for trial " << trial
+                            << " with missingGRFReason array length "
+                            << init->missingGRFReason.at(trial).size() << "!"
+                            << std::endl;
+                }
                 init->probablyMissingGRF.at(trial).at(i)
                     = MissingGRFStatus::yes;
                 init->missingGRFReason.at(trial).at(i)
@@ -12512,8 +12532,10 @@ void DynamicsFitter::multimassZeroLinearResidualsOnCOMTrajectory(
 //==============================================================================
 // 1. Change the initial positions and velocities of the body to achieve a
 // least-squares closest COM trajectory to the current kinematic fit, taking
-// into account approximate angular positions.
-std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
+// into account approximate angular positions. This returns [pos_success,
+// ang_success, total_residual]
+std::tuple<bool, bool, double>
+DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     std::shared_ptr<DynamicsInitialization> init,
     int trial,
     Eigen::MatrixXs targetPoses,
@@ -12598,7 +12620,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         << ", but we don't have any timesteps remaining with GRF data (that "
            "haven't been filtered out by previous heuristics). Returning."
         << std::endl;
-    return {false, totalResidual};
+    return {false, false, totalResidual};
   }
   totalResidual /= countedSteps;
 
@@ -12609,7 +12631,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     std::cout << "Total residual is NaN or Inf, unable to proceed with "
                  "residual minimization. Returning. "
               << std::endl;
-    return {false, totalResidual};
+    return {false, false, totalResidual};
   }
 
   // If the residuals are large and seem to be increasing rapidly, abort.
@@ -12627,7 +12649,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       std::cout << "Residuals still increasing after "
                 << (iterationThreshold + 1) << " iterations. Aborting..."
                 << std::endl;
-      return {false, totalResidual};
+      return {false, false, totalResidual};
     }
 
     double percentThreshold = 10.0;
@@ -12637,7 +12659,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       std::cout << "Residuals increased greater than "
                 << (percentThreshold * 100) << "% "
                 << "from previous iteration. Aborting..." << std::endl;
-      return {false, totalResidual};
+      return {false, false, totalResidual};
     }
   }
 
@@ -12826,8 +12848,9 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     totalPosOffset /= init->poseTrials[trial].cols();
     totalAngOffset /= init->poseTrials[trial].cols();
 
-    if ((totalPosOffset > avgPositionChangeThreshold
-         || totalAngOffset > avgAngularChangeThreshold))
+    bool posSuccess = totalPosOffset < avgPositionChangeThreshold;
+    bool angSuccess = totalAngOffset < avgAngularChangeThreshold;
+    if (!posSuccess || !angSuccess)
     {
       std::cout << "Trial pos/angle changed too much! (pos change="
                 << totalPosOffset
@@ -12885,7 +12908,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                 }
               }
             }
-            return {false, totalResidual};
+            return {posSuccess, angSuccess, totalResidual};
           }
           else
           {
@@ -12904,7 +12927,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                     << (threshold * 100)
                     << " percent of nominal, exiting the optimization early "
                     << std::endl;
-          return {false, totalResidual};
+          return {posSuccess, angSuccess, totalResidual};
         }
       }
       else
@@ -12915,7 +12938,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
                "(mass, scale, etc) for the rest of the pipeline."
             << std::endl;
         init->includeTrialsInDynamicsFit[trial] = false;
-        return {false, totalResidual};
+        return {posSuccess, angSuccess, totalResidual};
       }
     }
     else
@@ -12969,7 +12992,7 @@ std::pair<bool, double> DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     break;
   }
-  return {true, totalResidual};
+  return {true, true, totalResidual};
 }
 
 //==============================================================================
@@ -13116,9 +13139,11 @@ bool DynamicsFitter::timeSyncTrialGRF(
           500,
           false,
           false);
-      previousTotalResidual = output.second;
+      previousTotalResidual = std::get<2>(output);
+      bool posSuccess = std::get<0>(output);
+      bool angSuccess = std::get<1>(output);
 
-      if (!output.first)
+      if (!posSuccess || !angSuccess)
       {
         std::cout << "Minimizing residuals for shift " << shiftGRF << " failed."
                   << "Aborting..." << std::endl;
@@ -13342,6 +13367,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
     int iterations = useReactionWheelsThisTrial ? 1 : 50;
     s_t previousTotalResidual = std::numeric_limits<s_t>::infinity();
     bool residualMinimizationSuccess = true;
+    s_t angularWeightIncrease = 1.0;
     for (int i = 0; i < iterations; i++)
     {
       std::cout << "Running zeroLinearResidualsAndOptimizeAngular() iteration "
@@ -13361,7 +13387,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
           i,
           useReactionWheelsThisTrial,
           weightLinear,
-          weightAngular,
+          weightAngular * angularWeightIncrease,
           regularizeLinearResiduals,
           regularizeAngularResiduals,
           regularizeCopDriftCompensation,
@@ -13371,8 +13397,11 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
           detectUnmeasuredTorque,
           avgPositionChangeThreshold,
           avgAngularChangeThreshold);
-      previousTotalResidual = output.second;
-      if (!output.first)
+      previousTotalResidual = std::get<2>(output);
+      bool posSuccess = std::get<0>(output);
+      bool angSuccess = std::get<1>(output);
+
+      if (!posSuccess || !angSuccess)
       {
         std::cout << "zeroLinearResidualsAndOptimizeAngular() failed. "
                      "useReactionWheels="
@@ -13384,17 +13413,37 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
                     << std::endl;
           useReactionWheelsThisTrial = true;
           detectUnmeasuredTorque = false;
+          // i gets incremented at the end of the loop, so to reset to 0 we need
+          // to reset to -1 here
           i = -1;
           iterations = 1;
           continue;
         }
         else
         {
-          std::cout << "Quitting zeroLinearResidualsAndOptimizeAngular() with "
-                       "failure to optimize."
-                    << std::endl;
-          residualMinimizationSuccess = false;
-          break;
+          if (posSuccess && !angSuccess && angularWeightIncrease < 1e8)
+          {
+            std::cout << "zeroLinearResidualsAndOptimizeAngular() failed to "
+                         "minimize angular residuals, but succeeded in "
+                         "minimizing linear residuals. We will try again with "
+                         "a heavier weight on angular residuals, to see if we "
+                         "can get a better tradeoff."
+                      << std::endl;
+            angularWeightIncrease *= 2.0;
+            // i gets incremented at the end of the loop, so to reset to 0 we
+            // need to reset to -1 here
+            i = -1;
+            iterations = 1;
+          }
+          else
+          {
+            std::cout
+                << "Quitting zeroLinearResidualsAndOptimizeAngular() with "
+                   "failure to optimize."
+                << std::endl;
+            residualMinimizationSuccess = false;
+            break;
+          }
         }
       }
     }

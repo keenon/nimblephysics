@@ -1451,7 +1451,7 @@ public:
   // 1. Change the initial positions and velocities of the body to achieve a
   // least-squares closest COM trajectory to the current kinematic fit, taking
   // into account approximate angular positions.
-  std::pair<bool, double> zeroLinearResidualsAndOptimizeAngular(
+  std::tuple<bool, bool, double> zeroLinearResidualsAndOptimizeAngular(
       std::shared_ptr<DynamicsInitialization> init,
       int trial,
       Eigen::MatrixXs targetPoses,
