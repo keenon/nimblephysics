@@ -125,7 +125,7 @@ bool verifyIMUJacobians(
           {
             std::cout << "Body \"" << skel->getBodyNode(body)->getName()
                       << "\" disagrees on DOF \""
-                      << skel->getDof(dof)->getName() << "\"" << std::endl;
+                      << skel->getDof(dof)->getName() << "\" for local velocity" << std::endl;
             Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(6, 3);
             compare.col(0) = fd;
             compare.col(1) = analytical;
