@@ -8108,7 +8108,7 @@ Eigen::MatrixXs Skeleton::finiteDifferenceGyroReadingsJacobianWrt(
   Eigen::MatrixXs result(gyros.size() * 3, dim);
   Eigen::VectorXs original = wrt->get(this);
 
-  s_t eps = 1e-3;
+  s_t eps = 1e-4;
   bool useRidders = true;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
@@ -8691,7 +8691,7 @@ Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalVelocitiesJacobian(
   Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
   Eigen::VectorXs original = wrt->get(this);
 
-  s_t eps = 1e-3;
+  s_t eps = 1e-4;
   bool useRidders = true;
   math::finiteDifference(
       [&](/* in*/ s_t eps,
