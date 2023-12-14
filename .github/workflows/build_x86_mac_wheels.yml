@@ -10,11 +10,8 @@ jobs:
     runs-on: macos-11
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
         include:
-          - python-version: "3.7"
-            PYTHON_VERSION_CODE: cp37-cp37m
-            PYTHON_VERSION_NUMBER: "3.6"
           - python-version: "3.8"
             PYTHON_VERSION_CODE: cp38-cp38
             PYTHON_VERSION_NUMBER: "3.8"
