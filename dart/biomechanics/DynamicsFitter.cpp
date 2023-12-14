@@ -9429,6 +9429,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     // initialize the probablyMissingGRF array.
     if (initializedProbablyMissingGRF.size() == init->poseTrials.size())
     {
+      std::cout
+          << "Using provided manual GRF-missing review data to initialize "
+             "probablyMissingGRF for trial "
+          << trial << std::endl;
       if (initializedProbablyMissingGRF[trial].size()
           == init->poseTrials[trial].cols())
       {
@@ -9461,6 +9465,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     }
     else
     {
+      std::cout
+          << "No manual missing GRF review data provided for trial " << trial
+          << ", so we'll initialize all frames to MissingGRFStatus::unknown."
+          << std::endl;
       // Otherwise, we'll initialize the probablyMissingGRF array with unknowns
       init->probablyMissingGRF.emplace_back();
       init->missingGRFReason.emplace_back();
@@ -10534,7 +10542,18 @@ void DynamicsFitter::estimateFootGroundContactsWithHeightHeuristic(
         if (trialAnyOffForcePlate.at(t))
         {
           init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
-          init->missingGRFReason.at(trial).at(t) = trialMissingGRFReason.at(t);
+          if (trialMissingGRFReason.at(t) != MissingGRFReason::notMissingGRF)
+          {
+            init->missingGRFReason.at(trial).at(t)
+                = trialMissingGRFReason.at(t);
+          }
+          else
+          {
+            // Ensure we do not mark a frame's reason for missing GRF as
+            // notMissingGRF if we are setting the missing status to yes
+            init->missingGRFReason.at(trial).at(t)
+                = MissingGRFReason::footContactDetectedButNoForce;
+          }
         }
       }
     }
