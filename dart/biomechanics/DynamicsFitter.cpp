@@ -11096,11 +11096,11 @@ int DynamicsFitter::estimateUnmeasuredExternalTorques(
       s_t badness = (comsCorrected[t] - coms[t]).norm() * grfPercentage;
       if (badness > threshold)
       {
-        filteredTimesteps.push_back(t);
         if (init->probablyMissingGRF.size() > trial
             && init->probablyMissingGRF.at(trial).at(t)
                    == MissingGRFStatus::unknown)
         {
+          filteredTimesteps.push_back(t);
           init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
           init->missingGRFReason.at(trial).at(t)
               = MissingGRFReason::torqueDiscrepancy;
@@ -12792,8 +12792,15 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
             * A.block((numTimesteps + indices[i]) * 3, 0, 3, A.cols());
       sampledB.segment<3>((indices.size() + i) * 3)
           = weightAngular * b.segment<3>((numTimesteps + indices[i]) * 3);
-      sampledTarget.segment<3>((indices.size() + i) * 3)
-          = weightAngular * targetPoses.col(indices[i]).head<3>();
+      if (useReactionWheels)
+      {
+        sampledTarget.segment<3>((indices.size() + i) * 3).setZero();
+      }
+      else
+      {
+        sampledTarget.segment<3>((indices.size() + i) * 3)
+            = weightAngular * targetPoses.col(indices[i]).head<3>();
+      }
     }
     // Grab the linear residuals
     int linearResidualsStartCol = 6;
@@ -12837,6 +12844,43 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     // Get the new (original size, not sampled down) trajectory
     Eigen::VectorXs recovered = (A * solution) + b;
 
+    if (solution.size() > 0)
+    {
+      Eigen::Vector3s initialLinPos = solution.segment<3>(0);
+      Eigen::Vector3s initialAngPos = recovered.segment<3>(numTimesteps * 3);
+      if (init->poseTrials[trial].cols() > 0)
+      {
+        Eigen::Vector3s originalInitialLinPos
+            = init->poseTrials[trial].col(0).segment<3>(3);
+
+        Eigen::Matrix3s comparePos = Eigen::Matrix3s::Zero();
+        comparePos.col(0) = originalInitialLinPos;
+        comparePos.col(1) = initialLinPos;
+        comparePos.col(2) = initialLinPos - originalInitialLinPos;
+        std::cout << "Trial " << trial << ":" << std::endl;
+        std::cout << "Original pos - new pos - diff" << std::endl
+                  << comparePos << std::endl;
+
+        if (useReactionWheels)
+        {
+          std::cout << "Initial reaction wheel offset" << std::endl
+                    << initialAngPos << std::endl;
+        }
+        else
+        {
+          Eigen::Vector3s originalInitialAngPos
+              = init->poseTrials[trial].col(0).head<3>();
+          Eigen::Matrix3s compareAng = Eigen::Matrix3s::Zero();
+          compareAng.col(0) = originalInitialAngPos;
+          compareAng.col(1) = initialAngPos;
+          compareAng.col(3) = originalInitialAngPos - initialAngPos;
+
+          std::cout << "Original ang - new ang - diff" << std::endl
+                    << compareAng << std::endl;
+        }
+      }
+    }
+
     // std::cout << "Decoding optimized linear + angular motion" << std::endl;
 
     // Measure the total change
@@ -12849,6 +12893,7 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
 
     // Write the trajectory out to the positions
+    Eigen::VectorXs angularError = Eigen::VectorXs::Zero(numTimesteps);
     for (int t = 0; t < init->poseTrials[trial].cols(); t++)
     {
       if (weightAngular > 0)
@@ -12858,12 +12903,14 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
         if (useReactionWheels)
         {
           init->reactionWheels[trial].col(t) = angularPos;
+          angularError(t) = angularPos.norm();
           totalAngOffset += angularPos.norm();
         }
         else
         {
           Eigen::Vector3s angularChange
               = init->poseTrials[trial].col(t).head<3>() - angularPos;
+          angularError(t) = angularChange.norm();
           totalAngOffset += angularChange.norm();
         }
       }
@@ -12876,6 +12923,9 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
     }
     totalPosOffset /= init->poseTrials[trial].cols();
     totalAngOffset /= init->poseTrials[trial].cols();
+
+    (void)angularError;
+    // std::cout << "Angular error: " << angularError.transpose() << std::endl;
 
     bool posSuccess = totalPosOffset < avgPositionChangeThreshold;
     bool angSuccess = totalAngOffset < avgAngularChangeThreshold;
@@ -13462,7 +13512,8 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
         {
           if (posSuccess && !angSuccess && angularWeightIncrease < 1e8)
           {
-            std::cout << "zeroLinearResidualsAndOptimizeAngular() failed to "
+            std::cout << "zeroLinearResidualsAndOptimizeAngular() with "
+                         "reaction wheels failed to "
                          "minimize angular residuals, but succeeded in "
                          "minimizing linear residuals. We will try again with "
                          "a heavier weight on angular residuals, to see if we "
@@ -13478,7 +13529,7 @@ bool DynamicsFitter::timeSyncAndInitializePipeline(
           {
             std::cout
                 << "Quitting zeroLinearResidualsAndOptimizeAngular() with "
-                   "failure to optimize."
+                   "failure to optimize, even after turning reaction wheels on."
                 << std::endl;
             residualMinimizationSuccess = false;
             break;
@@ -14461,16 +14512,17 @@ void DynamicsFitter::recomputeGRFs(
       {
         // This force plate is never assigned to a foot, so we can't do
         // anything
-        std::cout << "NOTE: Assigning force plate " << i << " to no feet "
-                  << ", because there was never sufficient measured force on "
-                     "the plate"
-                  << std::endl;
+        // std::cout << "NOTE: Assigning force plate " << i << " to no feet "
+        //           << ", because there was never sufficient measured force on
+        //           "
+        //              "the plate"
+        //           << std::endl;
       }
       else if (assignedToFeet.size() == 1)
       {
         // #ifndef NDEBUG
-        std::cout << "Assigning force plate " << i << " to foot "
-                  << assignedToFeet[0] << std::endl;
+        // std::cout << "Assigning force plate " << i << " to foot "
+        //           << assignedToFeet[0] << std::endl;
         // #endif
         // This force plate is only ever assigned to a single foot, so we can
         // assign all timesteps to that foot
@@ -14482,8 +14534,9 @@ void DynamicsFitter::recomputeGRFs(
       }
       else
       {
-        std::cout << "NOTE: Assigning force plate " << i << " to multiple feet"
-                  << std::endl;
+        // std::cout << "NOTE: Assigning force plate " << i << " to multiple
+        // feet"
+        //           << std::endl;
         // This force plate is assigned to multiple feet over time. This can
         // often happen with foot-crossing. We won't issue a warning, but we
         // can go through and try to fill in the gaps between feet assignments
