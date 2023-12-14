@@ -12118,6 +12118,16 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
               = trialAdjustedForcePlateForces[trial][f].segment<3>(t * 3);
         }
       }
+      for (int t = originalCOMs.size() - 1; t >= 1; t--)
+      {
+        if (init->probablyMissingGRF.at(trial).at(t) != yes
+            && init->probablyMissingGRF.at(trial).at(t - 1) == yes)
+        {
+          init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
+          init->missingGRFReason.at(trial).at(t)
+              = MissingGRFReason::missingBlip;
+        }
+      }
       // This will have changed the GRF data (by rotating the force plates,
       // and doing drift correction on longer trials), so it's important to
       // recompute world wrenches here
@@ -13008,6 +13018,16 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
       Eigen::Vector3s comPos = recovered.segment<3>(t * 3);
       Eigen::Vector3s change = comPos - originalCOMs[t];
       init->poseTrials[trial].col(t).segment<3>(3) += change;
+    }
+
+    for (int t = init->poseTrials[trial].cols() - 1; t >= 1; t--)
+    {
+      if (init->probablyMissingGRF.at(trial).at(t) != yes
+          && init->probablyMissingGRF.at(trial).at(t - 1) == yes)
+      {
+        init->probablyMissingGRF.at(trial).at(t) = MissingGRFStatus::yes;
+        init->missingGRFReason.at(trial).at(t) = MissingGRFReason::missingBlip;
+      }
     }
     break;
   }
