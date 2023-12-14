@@ -60,6 +60,7 @@ jobs:
         run: |
           git clone https://github.com/pybind/pybind11.git
           pushd pybind11
+          git checkout v2.11.1
           mkdir build
           pushd build
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
