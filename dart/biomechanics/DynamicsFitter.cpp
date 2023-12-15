@@ -9948,33 +9948,90 @@ void DynamicsFitter::guessTrialsOnTreadmill(
     // Loop through each force plate, and look to see how fast the CoP tends to
     // move, weighted by force magnitude
     bool trialOnTreadmill = false;
+
+    int numPlatesNonZero = 0;
+    s_t totalMagnitude = 0.0;
+    Eigen::Vector3s weightedVectorSum = Eigen::Vector3s::Zero();
+    Eigen::Vector3s totalForceSum = Eigen::Vector3s::Zero();
+    s_t totalDistancePerStride = 0.0;
+    int numStrides = 0;
+    Eigen::Vector3s maxCoP = Eigen::Vector3s::Zero();
+    Eigen::Vector3s minCoP = Eigen::Vector3s::Zero();
     for (int i = 0; i < init->forcePlateTrials.at(trial).size(); i++)
     {
       auto& plate = init->forcePlateTrials.at(trial).at(i);
 
-      s_t totalMagnitude = 0.0;
-      Eigen::Vector3s weightedVectorSum = Eigen::Vector3s::Zero();
+      bool plateNonZero = false;
+      int startNonZeroTime = -1;
+      Eigen::Vector3s startNonZeroCoP = Eigen::Vector3s::Zero();
       for (int t = 1; t < plate.forces.size(); t++)
       {
         Eigen::Vector3s diff
             = plate.centersOfPressure[t] - plate.centersOfPressure[t - 1];
-        s_t magnitude = plate.forces[t].norm();
+        s_t magnitude
+            = sqrt(plate.forces[t].norm() * plate.forces[t - 1].norm());
         weightedVectorSum += diff * magnitude;
         totalMagnitude += magnitude;
-      }
-
-      if (totalMagnitude > 0 && plate.forces.size() > 10)
-      {
-        s_t averageSpeed = weightedVectorSum.norm()
-                           / (totalMagnitude * init->trialTimesteps[trial]);
-        if (averageSpeed > 0.1)
+        totalForceSum += plate.forces[t];
+        if (magnitude > 3.0)
         {
-          trialOnTreadmill = true;
-          // If any force plate is a treadmill force plate, then this is a
-          // treadmill trial
-          break;
+          maxCoP = maxCoP.cwiseMax(plate.centersOfPressure[t]);
+          minCoP = minCoP.cwiseMin(plate.centersOfPressure[t]);
+          plateNonZero = true;
+          if (startNonZeroTime == -1)
+          {
+            startNonZeroTime = t;
+            startNonZeroCoP = plate.centersOfPressure[t];
+          }
+        }
+        else if (startNonZeroTime != -1)
+        {
+          Eigen::Vector3s distance
+              = plate.centersOfPressure[t] - startNonZeroCoP;
+          totalDistancePerStride += distance.norm();
+          numStrides++;
         }
       }
+      if (plateNonZero)
+      {
+        numPlatesNonZero++;
+      }
+    }
+    if (totalMagnitude > 0 && numPlatesNonZero == 2)
+    {
+      s_t averageSpeed = weightedVectorSum.norm()
+                         / (totalMagnitude * init->trialTimesteps[trial]);
+      std::cout << "Trial " << trial
+                << " detected a force magnitude weighted average CoP speed of "
+                << averageSpeed << " m/s" << std::endl;
+      s_t averageVerticalGRF
+          = totalForceSum(1) / init->poseTrials[trial].cols();
+      std::cout << "Trial " << trial << " detected an average vertical GRF of "
+                << averageVerticalGRF << " N" << std::endl;
+      s_t averageDistancePerStride = totalDistancePerStride / numStrides;
+      std::cout << "Trial " << trial
+                << " detected an average distance per stride of "
+                << averageDistancePerStride << " m" << std::endl;
+      Eigen::Vector3s boundingBox = maxCoP - minCoP;
+      std::cout << "Bounding box for CoPs was " << boundingBox.transpose()
+                << std::endl;
+      if (averageSpeed > 0.1 && averageVerticalGRF > 300.0
+          && averageDistancePerStride > 0.2 && std::abs(boundingBox(0)) < 3.0
+          && std::abs(boundingBox(2)) < 3.0)
+      {
+        trialOnTreadmill = true;
+      }
+    }
+
+    if (trialOnTreadmill)
+    {
+      std::cout << "Trial " << trial << " detected as a treadmill trial."
+                << std::endl;
+    }
+    else
+    {
+      std::cout << "Trial " << trial << " detected as an overground trial."
+                << std::endl;
     }
     init->trialsOnTreadmill.push_back(trialOnTreadmill);
   }
@@ -9987,7 +10044,7 @@ void DynamicsFitter::guessTrialsOnTreadmill(
 void DynamicsFitter::estimateFootGroundContactsWithStillness(
     std::shared_ptr<DynamicsInitialization> init, s_t radius, s_t minTime)
 {
-  // guessTrialsOnTreadmill(init);
+  guessTrialsOnTreadmill(init);
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
@@ -10106,7 +10163,7 @@ void DynamicsFitter::estimateFootGroundContactsWithStillness(
         trialSphereInContact[t].push_back(footAtRests[i][t]);
         trialOffForcePlate[t].push_back(false);
 
-        if (footAtRests[i][t] && !footActive)
+        if (footAtRests[i][t] && !footActive && !init->trialsOnTreadmill[trial])
         {
           anyOffForcePlate = true;
         }
