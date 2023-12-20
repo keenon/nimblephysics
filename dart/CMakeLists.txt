@@ -1,4 +1,5 @@
 add_subdirectory(external)
+
 # Enable multi-threaded compilation.
 # We do this here and not in the root folder since the examples and the
 # tutorials do not have enough source files to benefit from this.
@@ -9,9 +10,9 @@ endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-#===============================================================================
+# ===============================================================================
 # Source directories
-#===============================================================================
+# ===============================================================================
 # common
 # math
 # lcpsolver
@@ -19,29 +20,29 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # trajectory
 # dynamics
 # collision
-#   dart
-#   fcl
-#   bullet
+# dart
+# fcl
+# bullet
 # constraint
 # simulation
 # utils
-#   sdf
-#   urdf
+# sdf
+# urdf
 
-#===============================================================================
+# ===============================================================================
 # Targets - {dependency targets}, source directories, [external dependency libs]
-#===============================================================================
+# ===============================================================================
 # dart - common, math, integration, lcpsolver, dynamics, collision,
-#        collision/dart, collision/fcl, constraint, simulation, [eigen3, libccd,
-#        fcl, assimp, boost]
+# collision/dart, collision/fcl, constraint, simulation, [eigen3, libccd,
+# fcl, assimp, boost]
 # dart-collision-bullet - {dart}, collision/bullet, [bullet]
 # dart-utils - {dart}, utils, utils/sdf, [tinyxml2]
 # dart-utils-urdf - {dart-utils}, utils/urdf, [urdfdom]
 # dart-planning - {dart}, planning, [flann]
 
-#===============================================================================
+# ===============================================================================
 # Components - (dependency component), {dependency targets}
-#===============================================================================
+# ===============================================================================
 # dart - {dart}
 # collision-bullet - (dart), {dart-collision-bullet}
 # utils - (collision-bullet), {dart-utils}
@@ -76,20 +77,25 @@ add_subdirectory(simulation)
 add_subdirectory(utils) # tinyxml2, bullet
 add_subdirectory(proto)
 add_subdirectory(biomechanics)
+add_subdirectory(exo)
 
 set(DART_CONFIG_HPP_IN ${CMAKE_SOURCE_DIR}/dart/config.hpp.in)
 set(DART_CONFIG_HPP_OUT ${CMAKE_BINARY_DIR}/dart/config.hpp)
+
 if(DART_VERBOSE)
   message(STATUS ${DART_CONFIG_HPP_OUT})
 endif()
+
 configure_file(${DART_CONFIG_HPP_IN} ${DART_CONFIG_HPP_OUT} @ONLY)
 install(FILES ${DART_CONFIG_HPP_OUT} DESTINATION include/dart)
 
 # Print building component
 get_property(components GLOBAL PROPERTY ${PROJECT_NAME}_COMPONENTS)
+
 if(DART_VERBOSE)
   message(STATUS "")
   message(STATUS "[ Components ]")
+
   foreach(component ${components})
     message(STATUS "Adding component: ${component}")
   endforeach()
@@ -109,47 +115,53 @@ get_property(dart_core_sources GLOBAL PROPERTY DART_CORE_SOURCES)
 dart_add_library(dart ${dart_core_headers} ${dart_core_sources})
 target_include_directories(dart BEFORE
   PUBLIC
-    ${Protobuf_INCLUDE_DIRS}
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<INSTALL_INTERFACE:include>
+  ${Protobuf_INCLUDE_DIRS}
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(dart
   PUBLIC
-    ${CMAKE_DL_LIBS}
-    ${PROJECT_NAME}-external-odelcpsolver
-    Eigen3::Eigen
-    ccd
-    assimp
-    ezc3d
-    Boost::boost
-    Boost::system
-    Boost::filesystem
-    IPOPT::ipopt
-    # protobuf::libprotobuf
-    # protobuf::libprotobuf-lite
-    # protobuf::libprotoc
-    gRPC::grpc++
+  ${CMAKE_DL_LIBS}
+  ${PROJECT_NAME}-external-odelcpsolver
+  Eigen3::Eigen
+  ccd
+  assimp
+  ezc3d
+  Boost::boost
+  Boost::system
+  Boost::filesystem
+  IPOPT::ipopt
+
+  # protobuf::libprotobuf
+  # protobuf::libprotobuf-lite
+  # protobuf::libprotoc
+  gRPC::grpc++
 )
-if (PerfUtils_FOUND)
-target_link_libraries(dart
-  PUBLIC
+
+if(PerfUtils_FOUND)
+  target_link_libraries(dart
+    PUBLIC
     PerfUtils
-)
+  )
 endif()
-if (DART_USE_ARBITRARY_PRECISION)
-target_link_libraries(dart
-  PUBLIC
+
+if(DART_USE_ARBITRARY_PRECISION)
+  target_link_libraries(dart
+    PUBLIC
     gmp
     mpfr
-)
+  )
 endif()
-if (TARGET octomap)
+
+if(TARGET octomap)
   target_link_libraries(dart PUBLIC octomap)
 endif()
+
 if(NOT MSVC)
   target_link_libraries(dart PUBLIC Boost::regex)
 endif()
+
 if(CMAKE_VERSION VERSION_LESS 3.8.2)
   target_compile_options(dart PUBLIC -std=c++14)
 else()
@@ -165,13 +177,15 @@ target_link_libraries(dart PRIVATE Threads::Threads)
 if(DART_ENABLE_SIMD)
   if(MSVC)
     target_compile_options(dart PUBLIC /arch:SSE2 /arch:AVX /arch:AVX2)
-    # /arch:SSE2 option is effective only for x86 but not for x64 since it's
-    # enabled for x64 by default. The option will be ignored on x64 with a
-    # warning message. If anyone knows how to detect the system's architecture
-    # in CMake time, then I would gratefully apply these options differently
-    # depending on the architectures.
+
+  # /arch:SSE2 option is effective only for x86 but not for x64 since it's
+  # enabled for x64 by default. The option will be ignored on x64 with a
+  # warning message. If anyone knows how to detect the system's architecture
+  # in CMake time, then I would gratefully apply these options differently
+  # depending on the architectures.
   elseif(CMAKE_COMPILER_IS_GNUCXX)
     target_compile_options(dart PUBLIC -march=native)
+
     if(GCC_VERSION VERSION_GREATER 7.0)
       target_compile_options(dart PUBLIC -faligned-new)
     endif()
@@ -179,8 +193,9 @@ if(DART_ENABLE_SIMD)
     target_compile_options(dart PUBLIC -march=native -faligned-new)
   endif()
 endif()
-#TODO(JS): just for debugging
-#target_compile_definitions(dart PUBLIC -DDART_DEBUG_ANALYTICAL_DERIV)
+
+# TODO(JS): just for debugging
+# target_compile_definitions(dart PUBLIC -DDART_DEBUG_ANALYTICAL_DERIV)
 target_compile_definitions(dart PUBLIC -DDART_USE_IDENTITY_JACOBIAN)
 
 # Default component

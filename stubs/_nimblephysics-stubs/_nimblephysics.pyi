@@ -9,6 +9,7 @@ __all__ = [
     "common",
     "constraint",
     "dynamics",
+    "exo",
     "math",
     "neural",
     "performance",

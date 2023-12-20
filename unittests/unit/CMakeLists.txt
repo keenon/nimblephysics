@@ -216,6 +216,10 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_JointForceField)
   target_link_libraries(test_JointForceField dart-utils)
   target_link_libraries(test_JointForceField dart-utils-urdf)
+
+  dart_add_test("unit" test_ExoSolverPinnedContact)
+  target_link_libraries(test_ExoSolverPinnedContact dart-utils)
+  target_link_libraries(test_ExoSolverPinnedContact dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)
