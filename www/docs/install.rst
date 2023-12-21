@@ -5,6 +5,10 @@ On Linux or Mac OS X, running Python 3.7, 3.8, 3.9, 3.10, 3.11 and with :code:`p
 
   pip install nimblephysics
 
+For new ARM Macs ("M1", "M2", etc chips), we make builds available for Python 3.9. If you are using Python 3.9 on an ARM Mac, you can also run::
+
+  pip install nimblephysics
+
 We do not currently support Windows. Windows users are recommended to use the `Windows Subsystem for Linux <https://docs.microsoft.com/en-us/windows/wsl/install-win10>`_.
 
 Common Errors (and how to fix them)
