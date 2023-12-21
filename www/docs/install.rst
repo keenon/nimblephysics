@@ -1,7 +1,7 @@
 Installation
 ==========================================
 
-On Linux or Mac OS X, running Python 3.5, 3.6, 3.7, or 3.8 and with :code:`pip` installed, you can run::
+On Linux or Mac OS X, running Python 3.7, 3.8, 3.9, 3.10, 3.11 and with :code:`pip` installed, you can run::
 
   pip install nimblephysics
 
