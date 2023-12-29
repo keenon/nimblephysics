@@ -891,8 +891,8 @@ TEST(CORTEX_STREAMING, TEST_GENERATE_AND_RECOVER_PACKETS)
   for (int i = 0; i < 2; i++)
   {
     forcePlateCopTorqueForce.push_back(Eigen::MatrixXs::Random(4, 9));
-    forcePlateCopTorqueForce[i].col(6).setZero();
-    forcePlateCopTorqueForce[i].col(7).setZero();
+    forcePlateCopTorqueForce[i].col(3).setZero();
+    forcePlateCopTorqueForce[i].col(4).setZero();
   }
   cortexServer.mockServerSetData(
       markerNames, markerPoses, forcePlateCopTorqueForce);

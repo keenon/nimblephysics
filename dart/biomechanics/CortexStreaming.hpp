@@ -71,7 +71,7 @@ typedef struct CortexAnalogData
   int numForcePlateSamplesPerFrame;
   // Processed force plate data. Each force plate gets a Nx9 matrix of samples,
   // where each row is a sample.
-  std::vector<Eigen::MatrixXs> plateCopForceMoment;
+  std::vector<Eigen::MatrixXs> plateCopTorqueForce;
 
   // Angle encoder values
   std::vector<Eigen::VectorXs> angleEncoderSamples;

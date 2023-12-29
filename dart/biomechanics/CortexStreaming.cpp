@@ -90,7 +90,7 @@ void CortexStreaming::mockServerSetData(
   mFrameOfData.analogData.numAnalogSamplesPerFrame = 0;
   mFrameOfData.analogData.numForcePlateSamplesPerFrame
       = copTorqueForces.size() > 0 ? copTorqueForces[0].rows() : 0;
-  mFrameOfData.analogData.plateCopForceMoment = copTorqueForces;
+  mFrameOfData.analogData.plateCopTorqueForce = copTorqueForces;
   mFrameOfData.analogData.analogSamples = std::vector<Eigen::VectorXi>();
   mFrameOfData.analogData.angleEncoderSamples = std::vector<Eigen::VectorXs>();
   mFrameOfData.bodyData.resize(1);
@@ -218,8 +218,9 @@ void CortexStreaming::connect()
         break;
       }
 
-      std::cout << "Client received " << nBytes << " bytes from UDP multicast"
-                << std::endl;
+      // std::cout << "Client received " << nBytes << " bytes from UDP
+      // multicast"
+      //           << std::endl;
 
       parseCortexPacket(&buffer, cli_addr, true);
     }
@@ -296,8 +297,8 @@ void CortexStreaming::connect()
         break;
       }
 
-      std::cout << "Client received " << nBytes << " bytes from SDK server"
-                << std::endl;
+      // std::cout << "Client received " << nBytes << " bytes from SDK server"
+      //           << std::endl;
 
       parseCortexPacket(&buffer, cli_addr, false);
     }
@@ -392,8 +393,9 @@ void CortexStreaming::startMockServer()
         break;
       }
 
-      std::cout << "Mock server received " << nBytes << " bytes from SDK client"
-                << std::endl;
+      // std::cout << "Mock server received " << nBytes << " bytes from SDK
+      // client"
+      //           << std::endl;
 
       mockServerParseCortexPacket(&buffer, cli_addr);
     }
@@ -724,7 +726,7 @@ std::vector<unsigned char> CortexStreaming::createFrameOfDataPacket(
     }
   }
 
-  int nForcePlates = frameOfData.analogData.plateCopForceMoment.size();
+  int nForcePlates = frameOfData.analogData.plateCopTorqueForce.size();
   memcpy(ptr, &nForcePlates, 4);
   ptr += 4;
 
@@ -737,35 +739,35 @@ std::vector<unsigned char> CortexStreaming::createFrameOfDataPacket(
   {
     for (int iForcePlate = 0; iForcePlate < nForcePlates; iForcePlate++)
     {
-      if (frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+      if (frameOfData.analogData.plateCopTorqueForce[iForcePlate].rows()
           < iForceSample)
       {
         std::cout
             << "Warning: force plate " << iForcePlate << " only has dimension "
-            << frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+            << frameOfData.analogData.plateCopTorqueForce[iForcePlate].rows()
             << "x"
-            << frameOfData.analogData.plateCopForceMoment[iForcePlate].cols()
+            << frameOfData.analogData.plateCopTorqueForce[iForcePlate].cols()
             << ", but we're trying to read sample (= row) " << iForceSample
             << std::endl;
         throw std::runtime_error("Invalid force plate data");
       }
-      if (frameOfData.analogData.plateCopForceMoment[iForcePlate].cols() != 9)
+      if (frameOfData.analogData.plateCopTorqueForce[iForcePlate].cols() != 9)
       {
         std::cout
             << "Warning: force plate " << iForcePlate << " only has dimension "
-            << frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+            << frameOfData.analogData.plateCopTorqueForce[iForcePlate].rows()
             << "x"
-            << frameOfData.analogData.plateCopForceMoment[iForcePlate].cols()
+            << frameOfData.analogData.plateCopTorqueForce[iForcePlate].cols()
             << ", but we're expecting 9 columns" << std::endl;
         throw std::runtime_error("Invalid force plate data");
       }
       // //!<  X,Y,Z, fX,fY,fZ, mZ
       Eigen::Vector9s rawPlateData
-          = frameOfData.analogData.plateCopForceMoment[iForcePlate].row(
+          = frameOfData.analogData.plateCopTorqueForce[iForcePlate].row(
               iForceSample);
       Eigen::Vector3s cop = rawPlateData.head<3>();
-      Eigen::Vector3s force = rawPlateData.segment<3>(3);
-      Eigen::Vector3s moment = rawPlateData.tail<3>();
+      Eigen::Vector3s moment = rawPlateData.segment<3>(3);
+      Eigen::Vector3s force = rawPlateData.tail<3>();
       for (int i = 0; i < 3; i++)
       {
         float value = cop(i);
@@ -1275,7 +1277,7 @@ void CortexStreaming::parseAndHandleFrameOfData(char* data, int nBytes)
 
   if (mFrameHandler != nullptr)
   {
-    mFrameHandler(markerNames, markers, result.analogData.plateCopForceMoment);
+    mFrameHandler(markerNames, markers, result.analogData.plateCopTorqueForce);
   }
 }
 
@@ -1618,7 +1620,7 @@ std::pair<CortexAnalogData, int> CortexStreaming::parseAnalogData(
 
   for (int iForcePlate = 0; iForcePlate < nForcePlates; iForcePlate++)
   {
-    result.plateCopForceMoment.push_back(
+    result.plateCopTorqueForce.push_back(
         Eigen::MatrixXs::Zero(nForceSamples, 9));
   }
   // TODO: uncertain if data is packed in sample-major or plate-major order
@@ -1643,12 +1645,12 @@ std::pair<CortexAnalogData, int> CortexStreaming::parseAnalogData(
       Eigen::Vector3s cop = rawPlateData.head<3>();
       Eigen::Vector3s force = rawPlateData.segment<3>(3);
       Eigen::Vector3s moment = Eigen::Vector3s::UnitZ() * rawPlateData(6);
-      result.plateCopForceMoment[iForcePlate].block<1, 3>(iForceSample, 0)
+      result.plateCopTorqueForce[iForcePlate].block<1, 3>(iForceSample, 0)
           = cop;
-      result.plateCopForceMoment[iForcePlate].block<1, 3>(iForceSample, 3)
-          = force;
-      result.plateCopForceMoment[iForcePlate].block<1, 3>(iForceSample, 6)
+      result.plateCopTorqueForce[iForcePlate].block<1, 3>(iForceSample, 3)
           = moment;
+      result.plateCopTorqueForce[iForcePlate].block<1, 3>(iForceSample, 6)
+          = force;
     }
   }
 
