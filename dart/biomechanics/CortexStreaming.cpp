@@ -144,9 +144,10 @@ void CortexStreaming::connect()
   }
   struct sockaddr_in serv_addr;
   memset(&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;                   // IPv4
-  serv_addr.sin_port = htons(mCortexMulticastPort); // Port number
-  serv_addr.sin_addr.s_addr = INADDR_ANY;           // All interfaces
+  serv_addr.sin_family = AF_INET; // IPv4
+  serv_addr.sin_port
+      = htons(mCortexMulticastPort);      // Listen to the cortex multicast port
+  serv_addr.sin_addr.s_addr = INADDR_ANY; // All interfaces
   if (bind(
           mMulticastListenerSocketFd,
           (struct sockaddr*)&serv_addr,
@@ -156,6 +157,19 @@ void CortexStreaming::connect()
     close(mMulticastListenerSocketFd);
     throw std::runtime_error("ERROR on binding");
   }
+
+  // Find the port that was assigned to us
+  socklen_t len = sizeof(serv_addr);
+  if (getsockname(
+          mMulticastListenerSocketFd, (struct sockaddr*)&serv_addr, &len)
+      == -1)
+  {
+    close(mMulticastListenerSocketFd);
+    throw std::runtime_error("ERROR on getsockname");
+  }
+  int assignedPort = ntohs(serv_addr.sin_port);
+  std::cout << "Cortex UDP Multicast listener socket was assigned port: "
+            << assignedPort << std::endl;
 
   struct ip_mreqn stMreq;
 
@@ -204,6 +218,9 @@ void CortexStreaming::connect()
         break;
       }
 
+      std::cout << "Client received " << nBytes << " bytes from UDP multicast"
+                << std::endl;
+
       parseCortexPacket(&buffer, cli_addr, true);
     }
   };
@@ -219,9 +236,41 @@ void CortexStreaming::connect()
   mCortexListenerSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
   if (mCortexListenerSocketFd < 0)
   {
-    perror("socket creation failed");
-    exit(EXIT_FAILURE);
+    throw std::runtime_error("Listener socket creation failed");
   }
+
+  // Define the server address structure
+  struct sockaddr_in listener_serv_addr;
+  memset(&serv_addr, 0, sizeof(listener_serv_addr));
+  listener_serv_addr.sin_family = AF_INET; // IPv4
+  listener_serv_addr.sin_port = 0;         // Automatically assign a port
+  listener_serv_addr.sin_addr.s_addr = INADDR_ANY; // Bind to all interfaces
+
+  // Bind the socket
+  if (bind(
+          mCortexListenerSocketFd,
+          (struct sockaddr*)&listener_serv_addr,
+          sizeof(listener_serv_addr))
+      < 0)
+  {
+    close(mCortexListenerSocketFd);
+    throw std::runtime_error("ERROR on binding");
+  }
+
+  // Retrieve the assigned port number
+  socklen_t listener_len = sizeof(serv_addr);
+  if (getsockname(
+          mCortexListenerSocketFd, (struct sockaddr*)&serv_addr, &listener_len)
+      == -1)
+  {
+    close(mCortexListenerSocketFd);
+    throw std::runtime_error("ERROR on getsockname");
+  }
+  int listenerAssignedPort = ntohs(serv_addr.sin_port);
+
+  // Output the assigned port number
+  std::cout << "Cortex SDK socket bound to port: " << listenerAssignedPort
+            << std::endl;
 
   auto cortexReceiveFunc = [this]() -> void {
     sPacket buffer;
@@ -246,6 +295,9 @@ void CortexStreaming::connect()
         }
         break;
       }
+
+      std::cout << "Client received " << nBytes << " bytes from SDK server"
+                << std::endl;
 
       parseCortexPacket(&buffer, cli_addr, false);
     }
@@ -272,9 +324,9 @@ void CortexStreaming::startMockServer()
   }
   struct sockaddr_in serv_addr;
   memset(&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;                   // IPv4
-  serv_addr.sin_port = htons(mCortexMulticastPort); // Port number
-  serv_addr.sin_addr.s_addr = INADDR_ANY;           // All interfaces
+  serv_addr.sin_family = AF_INET;         // IPv4
+  serv_addr.sin_port = 0;                 // Auto assign
+  serv_addr.sin_addr.s_addr = INADDR_ANY; // All interfaces
   if (bind(
           mMulticastListenerSocketFd,
           (struct sockaddr*)&serv_addr,
@@ -282,7 +334,7 @@ void CortexStreaming::startMockServer()
       < 0)
   {
     close(mMulticastListenerSocketFd);
-    throw std::runtime_error("ERROR on binding");
+    throw std::runtime_error("ERROR on binding multicast socket");
   }
 
   mRunningThreads = true;
@@ -299,8 +351,21 @@ void CortexStreaming::startMockServer()
   mCortexListenerSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
   if (mCortexListenerSocketFd < 0)
   {
-    perror("socket creation failed");
-    exit(EXIT_FAILURE);
+    throw std::runtime_error("Listener socket creation failed");
+  }
+
+  memset(&serv_addr, 0, sizeof(serv_addr));
+  serv_addr.sin_family = AF_INET;                  // IPv4
+  serv_addr.sin_port = htons(mCortexRequestsPort); // Port number
+  serv_addr.sin_addr.s_addr = INADDR_ANY;          // All interfaces
+  if (bind(
+          mCortexListenerSocketFd,
+          (struct sockaddr*)&serv_addr,
+          sizeof(serv_addr))
+      < 0)
+  {
+    close(mCortexListenerSocketFd);
+    throw std::runtime_error("ERROR on binding SDK listener socket");
   }
 
   auto cortexReceiveFunc = [this]() -> void {
@@ -327,7 +392,10 @@ void CortexStreaming::startMockServer()
         break;
       }
 
-      parseCortexPacket(&buffer, cli_addr, false);
+      std::cout << "Mock server received " << nBytes << " bytes from SDK client"
+                << std::endl;
+
+      mockServerParseCortexPacket(&buffer, cli_addr);
     }
   };
 
@@ -669,6 +737,28 @@ std::vector<unsigned char> CortexStreaming::createFrameOfDataPacket(
   {
     for (int iForcePlate = 0; iForcePlate < nForcePlates; iForcePlate++)
     {
+      if (frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+          < iForceSample)
+      {
+        std::cout
+            << "Warning: force plate " << iForcePlate << " only has dimension "
+            << frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+            << "x"
+            << frameOfData.analogData.plateCopForceMoment[iForcePlate].cols()
+            << ", but we're trying to read sample (= row) " << iForceSample
+            << std::endl;
+        throw std::runtime_error("Invalid force plate data");
+      }
+      if (frameOfData.analogData.plateCopForceMoment[iForcePlate].cols() != 9)
+      {
+        std::cout
+            << "Warning: force plate " << iForcePlate << " only has dimension "
+            << frameOfData.analogData.plateCopForceMoment[iForcePlate].rows()
+            << "x"
+            << frameOfData.analogData.plateCopForceMoment[iForcePlate].cols()
+            << ", but we're expecting 9 columns" << std::endl;
+        throw std::runtime_error("Invalid force plate data");
+      }
       // //!<  X,Y,Z, fX,fY,fZ, mZ
       Eigen::Vector9s rawPlateData
           = frameOfData.analogData.plateCopForceMoment[iForcePlate].row(
@@ -830,7 +920,7 @@ void CortexStreaming::parseCortexPacket(
 
       default:
         std::cout
-            << "CommandReplyReader, unexpected value, PacketIn.iCommand== "
+            << "parseCortexPacket(), unexpected value, PacketIn.iCommand== "
             << packet->iCommand << std::endl;
         break;
     }
@@ -868,8 +958,7 @@ void CortexStreaming::mockServerSendFrameMulticast()
   // Filling server information
   servaddr.sin_family = AF_INET;
   servaddr.sin_port = htons(mCortexMulticastPort);
-  servaddr.sin_addr.s_addr
-      = inet_addr("225.1.1.1"); // Example multicast address
+  servaddr.sin_addr.s_addr = inet_addr("225.1.1.1");
 
   auto frameOfData = createFrameOfDataPacket(mFrameOfData);
 
@@ -951,7 +1040,8 @@ void CortexStreaming::mockServerParseCortexPacket(
       break;
 
     default:
-      std::cout << "CommandReplyReader, unexpected value, PacketIn.iCommand== "
+      std::cout << "mockServerParseCortexPacket(), unexpected value, "
+                   "PacketIn.iCommand== "
                 << packet->iCommand << std::endl;
       break;
   }
