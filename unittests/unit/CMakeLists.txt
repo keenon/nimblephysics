@@ -33,6 +33,7 @@ dart_add_test("unit" test_MarkerTrace)
 dart_add_test("unit" test_NearestPositionToDesiredRotation)
 dart_add_test("unit" test_EnergyAccounting)
 dart_add_test("unit" test_GraphFlowDiscretizer)
+dart_add_test("unit" test_CortexStreaming)
 
 if(DART_USE_ARBITRARY_PRECISION)
   dart_add_test("unit" test_MPFR)

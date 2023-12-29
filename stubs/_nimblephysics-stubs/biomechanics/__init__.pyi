@@ -16,6 +16,7 @@ __all__ = [
     "C3D",
     "C3DLoader",
     "ContactRegimeSection",
+    "CortexStreaming",
     "DynamicsFitProblemConfig",
     "DynamicsFitter",
     "DynamicsInitialization",
@@ -253,6 +254,37 @@ class ContactRegimeSection():
     @wrenches.setter
     def wrenches(self, arg0: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[6, 1]]]]) -> None:
         pass
+    pass
+class CortexStreaming():
+    def __init__(self, cortexNicAddress: str, cortexMulticastPort: int = 1001, cortexRequestsPort: int = 1510) -> None: ...
+    def connect(self) -> None: 
+        """
+        This creates a UDP socket and starts listening for packets from Cortex
+        """
+    def disconnect(self) -> None: 
+        """
+        This closes the UDP socket and stops listening for packets from Cortex
+        """
+    def initialize(self) -> None: 
+        """
+        This connects to Cortex, and requests the body defs and a frame of data
+        """
+    def mockServerSendFrameMulticast(self) -> None: 
+        """
+        This sends a UDP packet out on the multicast address, to tell everyone about the current frame
+        """
+    def mockServerSetData(self, markerNames: typing.List[str], markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], copTorqueForces: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None: 
+        """
+        This is used for mocking the Cortex API server for local testing. This sets the current body defs and frame of data to send back to the client.
+        """
+    def setFrameHandler(self, handler: typing.Callable[[typing.List[str], typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]], None]) -> None: 
+        """
+        This is the callback that gets called when a frame of data is received
+        """
+    def startMockServer(self) -> None: 
+        """
+        This starts a UDP server that mimicks the Cortex API, so we can test locally without having to run Cortex. This is an alternative to connect(), and cannot run in the same process as connect().
+        """
     pass
 class DynamicsFitProblemConfig():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> None: ...

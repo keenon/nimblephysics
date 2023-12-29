@@ -84,6 +84,7 @@ typedef Matrix<s_t, 3, 1> Vector3s;
 typedef Matrix<s_t, 4, 1> Vector4s;
 typedef Matrix<s_t, 5, 1> Vector5s;
 typedef Matrix<s_t, 6, 1> Vector6s;
+typedef Matrix<s_t, 7, 1> Vector7s;
 typedef Matrix<s_t, 2, 2> Matrix2s;
 typedef Matrix<s_t, 3, 3> Matrix3s;
 typedef Matrix<s_t, 4, 4> Matrix4s;
