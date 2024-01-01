@@ -66,6 +66,12 @@ public:
       Eigen::VectorXs lastExoTorques);
 
   /// This is part of the main exoskeleton solver. It takes in the current
+  /// joint velocities and accelerations, and returns the estimated total
+  /// joint torques for the human + exoskeleton system.
+  Eigen::VectorXs estimateTotalTorques(
+      Eigen::VectorXs dq, Eigen::VectorXs ddq, Eigen::VectorXs contactForces);
+
+  /// This is part of the main exoskeleton solver. It takes in the current
   /// estimated human pilot joint torques, and computes the accelerations we
   /// would see on the virtual skeleton if we applied those same torques, with
   /// the contacts pinned at the CoPs.
@@ -93,8 +99,12 @@ public:
   /// This is part of the main exoskeleton solver. It takes in how the digital
   /// twin of the exo pilot is accelerating, and attempts to solve for the
   /// torques that the exo needs to apply to get as close to that as possible.
+  /// It resolves ambiguities by minimizing the change in total system torques.
   std::pair<Eigen::VectorXs, Eigen::VectorXs> getPinnedTotalTorques(
-      Eigen::VectorXs dq, Eigen::VectorXs ddqDesired);
+      Eigen::VectorXs dq,
+      Eigen::VectorXs ddqDesired,
+      Eigen::VectorXs centeringTau,
+      Eigen::VectorXs centeringForces);
 
   /// This does the same thing as getPinnedTotalTorques, but returns the Ax +
   /// b values A and b such that Ax + b = tau, accounting for the pin
@@ -111,6 +121,14 @@ public:
   /// the matrix to multiply by the torques to get the exo torques.
   Eigen::MatrixXs projectTorquesToExoControlSpaceLinearMap();
 
+  /// Often our estimates for `dq` and `ddq` violate the pin constraints. That
+  /// leads to exo torques that do not tend to zero as the virtual human exactly
+  /// matches the real human+exo system. To solve this problem, we can solve a
+  /// set of least-squares equations to find the best set of ddq values to
+  /// satisfy the constraint.
+  Eigen::VectorXs getClosestRealAccelerationConsistentWithPinsAndContactForces(
+      Eigen::VectorXs dq, Eigen::VectorXs ddq, Eigen::VectorXs contactForces);
+
   /// This runs the entire exoskeleton solver pipeline, spitting out the
   /// torques to apply to the exoskeleton actuators.
   Eigen::VectorXs solveFromAccelerations(
@@ -122,7 +140,10 @@ public:
   /// This is a subset of the steps in solveFromAccelerations, which can take
   /// the biological joint torques directly, and solve for the exo torques.
   Eigen::VectorXs solveFromBiologicalTorques(
-      Eigen::VectorXs dq, Eigen::VectorXs tau);
+      Eigen::VectorXs dq,
+      Eigen::VectorXs humanTau,
+      Eigen::VectorXs centeringTau,
+      Eigen::VectorXs centeringForces);
 
   /// This is the same as solveFromBiologicalTorques, but returns the Ax + b
   /// values A and b such that Ax + b = exo_tau, accounting for the pin

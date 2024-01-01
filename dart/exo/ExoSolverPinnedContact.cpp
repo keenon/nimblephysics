@@ -186,6 +186,25 @@ Eigen::VectorXs ExoSolverPinnedContact::estimateHumanTorques(
 
 //==============================================================================
 /// This is part of the main exoskeleton solver. It takes in the current
+/// joint velocities and accelerations, and returns the estimated total
+/// joint torques for the human + exoskeleton system.
+Eigen::VectorXs ExoSolverPinnedContact::estimateTotalTorques(
+    Eigen::VectorXs dq, Eigen::VectorXs ddq, Eigen::VectorXs contactForces)
+{
+  mRealSkel->setVelocities(dq);
+
+  Eigen::MatrixXs M = mRealSkel->getMassMatrix();
+  Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
+                      - mRealSkel->getExternalForces();
+  Eigen::VectorXs contactJointTorques
+      = getContactJacobian().transpose() * contactForces;
+  Eigen::VectorXs tau = M * ddq + C - contactJointTorques;
+
+  return tau;
+}
+
+//==============================================================================
+/// This is part of the main exoskeleton solver. It takes in the current
 /// estimated human pilot joint torques, and computes the accelerations we
 /// would see on the virtual skeleton if we applied those same torques, with
 /// the contacts pinned at the CoPs.
@@ -311,9 +330,13 @@ ExoSolverPinnedContact::getPinnedRealDynamicsLinearMap(Eigen::VectorXs dq)
 /// This is part of the main exoskeleton solver. It takes in how the digital
 /// twin of the exo pilot is accelerating, and attempts to solve for the
 /// torques that the exo needs to apply to get as close to that as possible.
+/// It resolves ambiguities by minimizing the exo torques.
 std::pair<Eigen::VectorXs, Eigen::VectorXs>
 ExoSolverPinnedContact::getPinnedTotalTorques(
-    Eigen::VectorXs dq, Eigen::VectorXs ddqDesired)
+    Eigen::VectorXs dq,
+    Eigen::VectorXs ddqDesired,
+    Eigen::VectorXs centeringTau,
+    Eigen::VectorXs centeringForces)
 {
   mRealSkel->setVelocities(dq);
 
@@ -334,7 +357,14 @@ ExoSolverPinnedContact::getPinnedTotalTorques(
   A.block(0, numDofs, contactJointTorques.cols(), contactJointTorques.rows())
       = contactJointTorques.transpose();
 
-  Eigen::VectorXs solution = A.completeOrthogonalDecomposition().solve(b);
+  Eigen::VectorXs centering
+      = Eigen::VectorXs::Zero(numDofs + contactJointTorques.rows());
+  centering.segment(0, numDofs) = centeringTau;
+  centering.segment(numDofs, contactJointTorques.rows()) = centeringForces;
+
+  Eigen::VectorXs solution
+      = A.completeOrthogonalDecomposition().solve(b - A * centering)
+        + centering;
 
   Eigen::VectorXs tauTotal = solution.segment(0, numDofs);
   Eigen::VectorXs f = solution.segment(numDofs, contactJointTorques.rows());
@@ -397,6 +427,40 @@ ExoSolverPinnedContact::projectTorquesToExoControlSpaceLinearMap()
 }
 
 //==============================================================================
+/// Often our estimates for `dq` and `ddq` violate the pin constraints. That
+/// leads to exo torques that do not tend to zero as the virtual human exactly
+/// matches the real human+exo system. To solve this problem, we can solve a
+/// set of least-squares equations to find the best set of ddq values to
+/// satisfy the constraint.
+Eigen::VectorXs ExoSolverPinnedContact::
+    getClosestRealAccelerationConsistentWithPinsAndContactForces(
+        Eigen::VectorXs dq, Eigen::VectorXs ddq, Eigen::VectorXs contactForces)
+{
+  mRealSkel->setVelocities(dq);
+
+  Eigen::MatrixXs J = getContactJacobian();
+  Eigen::MatrixXs M = mRealSkel->getMassMatrix();
+  Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
+                      - mRealSkel->getExternalForces();
+  Eigen::VectorXs contactTau = J.transpose() * contactForces;
+
+  const int numDofs = dq.size();
+
+  Eigen::MatrixXs A = Eigen::MatrixXs::Zero(6 + J.rows(), numDofs);
+  A.block(0, 0, 6, numDofs) = M.block(0, 0, 6, numDofs);
+  A.block(6, 0, J.rows(), numDofs) = J;
+
+  Eigen::VectorXs b = Eigen::VectorXs::Zero(6 + J.rows());
+  b.segment<6>(0) = contactTau.segment<6>(0) - C.segment<6>(0);
+
+  // Solve, centered on ddq
+  Eigen::VectorXs solution
+      = A.completeOrthogonalDecomposition().solve(b - A * ddq) + ddq;
+
+  return solution;
+}
+
+//==============================================================================
 /// This runs the entire exoskeleton solver pipeline, spitting out the
 /// torques to apply to the exoskeleton actuators.
 Eigen::VectorXs ExoSolverPinnedContact::solveFromAccelerations(
@@ -405,20 +469,25 @@ Eigen::VectorXs ExoSolverPinnedContact::solveFromAccelerations(
     Eigen::VectorXs lastExoTorques,
     Eigen::VectorXs contactForces)
 {
+  Eigen::VectorXs systemTau = estimateTotalTorques(dq, ddq, contactForces);
   Eigen::VectorXs humanTau
       = estimateHumanTorques(dq, ddq, contactForces, lastExoTorques);
-  return solveFromBiologicalTorques(dq, humanTau);
+  return solveFromBiologicalTorques(dq, humanTau, systemTau, contactForces);
 }
 
 //==============================================================================
 /// This is a subset of the steps in solveFromAccelerations, which can take
 /// the biological joint torques directly, and solve for the exo torques.
 Eigen::VectorXs ExoSolverPinnedContact::solveFromBiologicalTorques(
-    Eigen::VectorXs dq, Eigen::VectorXs humanTau)
+    Eigen::VectorXs dq,
+    Eigen::VectorXs humanTau,
+    Eigen::VectorXs centeringTau,
+    Eigen::VectorXs centeringForces)
 {
   Eigen::VectorXs virtualDdq = getPinnedVirtualDynamics(dq, humanTau).first;
   Eigen::VectorXs totalRealTorques
-      = getPinnedTotalTorques(dq, virtualDdq).first;
+      = getPinnedTotalTorques(dq, virtualDdq, centeringTau, centeringForces)
+            .first;
   Eigen::VectorXs netTorques = totalRealTorques - humanTau;
   Eigen::VectorXs exoTorques = projectTorquesToExoControlSpace(netTorques);
   return exoTorques;
@@ -459,7 +528,8 @@ std::tuple<Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs>
 ExoSolverPinnedContact::getPinnedForwardDynamicsForExoAndHuman(
     Eigen::VectorXs dq, Eigen::VectorXs humanTau)
 {
-  Eigen::VectorXs exoTau = solveFromBiologicalTorques(dq, humanTau);
+  Eigen::VectorXs exoTau = solveFromBiologicalTorques(
+      dq, humanTau, humanTau, Eigen::VectorXs::Zero(3 * mPins.size()));
   Eigen::VectorXs exoTauOnJoints = getExoToJointTorquesJacobian() * exoTau;
   Eigen::VectorXs totalTau = humanTau + exoTauOnJoints;
   std::pair<Eigen::VectorXs, Eigen::VectorXs> ddqAndForces
@@ -520,7 +590,8 @@ ExoSolverPinnedContact::getHumanAndExoTorques(
             .solve(ddq - humanTorquesLinearForwardDynamics.second);
 
   // Reconstruct the exo torque from the human torque
-  Eigen::VectorXs exoTau = solveFromBiologicalTorques(dq, humanTau);
+  Eigen::VectorXs exoTau = solveFromBiologicalTorques(
+      dq, humanTau, humanTau, Eigen::VectorXs::Zero(3 * mPins.size()));
 
   return std::make_pair(humanTau, exoTau);
 }

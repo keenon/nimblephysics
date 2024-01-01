@@ -25,9 +25,17 @@ class ExoSolverPinnedContact():
         """
         This is part of the main exoskeleton solver. It takes in the current joint velocities and accelerations, and the last exoskeleton torques, and returns the estimated human pilot joint torques.
         """
+    def estimateTotalTorques(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactForces: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
+        """
+        This is part of the main exoskeleton solver. It takes in the current joint velocities and accelerations, and returns the estimated human + exo system joint torques.
+        """
     def finiteDifferenceContactJacobian(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
         """
         This is only used for testing: Get the Jacobian relating world space velocity of the contact points to joint velocities, by finite differencing.
+        """
+    def getClosestRealAccelerationConsistentWithPinsAndContactForces(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], contactForces: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
+        """
+        Often our estimates for `dq` and `ddq` violate the pin constraints. That leads to exo torques that do not tend to zero as the virtual human exactly matches the real human+exo system. To solve this problem, we can solve a set of least-squares equations to find the best set of ddq values to satisfy the constraint.
         """
     def getContactJacobian(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
         """
@@ -58,7 +66,7 @@ class ExoSolverPinnedContact():
         """
         This does the same thing as getPinndRealDynamics, but returns the Ax + b values A and b such that Ax + b = ddq, accounting for the pin constraints.
         """
-    def getPinnedTotalTorques(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddqDesired: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, 1]], numpy.ndarray[numpy.float64, _Shape[m, 1]]]: 
+    def getPinnedTotalTorques(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddqDesired: numpy.ndarray[numpy.float64, _Shape[m, 1]], centeringTau: numpy.ndarray[numpy.float64, _Shape[m, 1]], centeringForces: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, 1]], numpy.ndarray[numpy.float64, _Shape[m, 1]]]: 
         """
         This is part of the main exoskeleton solver. It takes in how the digital twin of the exo pilot is accelerating, and attempts to solve for the torques that the exo needs to apply to get as close to that as possible.
         """
@@ -95,7 +103,7 @@ class ExoSolverPinnedContact():
         """
         This runs the entire exoskeleton solver pipeline, spitting out the torques to apply to the exoskeleton actuators.
         """
-    def solveFromBiologicalTorques(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], tau: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
+    def solveFromBiologicalTorques(self, dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], tau: numpy.ndarray[numpy.float64, _Shape[m, 1]], centeringTau: numpy.ndarray[numpy.float64, _Shape[m, 1]], centeringForce: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
         """
         This is a subset of the steps in solveFromAccelerations, which can take the biological joint torques directly, and solve for the exo torques.
         """

@@ -1096,6 +1096,7 @@ void Skeleton(
               bool scaleBodies,
               double convergenceThreshold,
               int maxStepCount,
+              int numIndependentStarts,
               double leastSquaresDamping,
               bool lineSearch,
               bool logOutput) -> double {
@@ -1108,6 +1109,7 @@ void Skeleton(
                     .setConvergenceThreshold(convergenceThreshold)
                     .setMaxStepCount(maxStepCount)
                     .setLeastSquaresDamping(leastSquaresDamping)
+                    .setMaxRestarts(numIndependentStarts)
                     .setLineSearch(lineSearch)
                     .setLogOutput(logOutput));
           },
@@ -1117,6 +1119,7 @@ void Skeleton(
           ::py::arg("scaleBodies") = false,
           ::py::arg("convergenceThreshold") = 1e-7,
           ::py::arg("maxStepCount") = 100,
+          ::py::arg("numIndependentStarts") = 1,
           ::py::arg("leastSquaresDamping") = 0.01,
           ::py::arg("lineSearch") = true,
           ::py::arg("logOutput") = false)

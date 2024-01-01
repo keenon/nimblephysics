@@ -292,7 +292,11 @@ TEST(EXO_SOLVER_PINNED_CONTACT, TEST_PINNED_INVERSE_DYNAMICS)
     Eigen::VectorXs contactForces = jointAccelerationsAndContactForces.second;
 
     std::pair<Eigen::VectorXs, Eigen::VectorXs> jointTorquesAndContactForces
-        = solver.getPinnedTotalTorques(dq, ddq);
+        = solver.getPinnedTotalTorques(
+            dq,
+            ddq,
+            Eigen::VectorXs::Zero(dq.size()),
+            Eigen::VectorXs::Zero(pins.size() * 3));
     std::pair<Eigen::MatrixXs, Eigen::VectorXs> jointTorquesLinearMap
         = solver.getPinnedTotalTorquesLinearMap(dq);
     Eigen::VectorXs recoveredTau = jointTorquesAndContactForces.first;
@@ -364,7 +368,11 @@ TEST(EXO_SOLVER_PINNED_CONTACT, TEST_EXO_TORQUES_LINEAR_MAP)
     Eigen::VectorXs tau = Eigen::VectorXs::Random(realSkel->getNumDofs());
     tau.head<6>().setZero();
 
-    Eigen::VectorXs exoTorques = solver.solveFromBiologicalTorques(dq, tau);
+    Eigen::VectorXs exoTorques = solver.solveFromBiologicalTorques(
+        dq,
+        tau,
+        Eigen::VectorXs::Zero(dq.size()),
+        Eigen::VectorXs::Zero(pins.size() * 3));
 
     std::pair<Eigen::MatrixXs, Eigen::VectorXs> exoTorquesLinearMap
         = solver.getExoTorquesLinearMap(dq);
@@ -524,6 +532,91 @@ TEST(EXO_SOLVER_PINNED_CONTACT, TEST_RECONSTRUCT_EXO_DYNAMICS)
       std::cout << "Diff: " << (compliantDdq - recoveredDdq).transpose()
                 << std::endl;
       EXPECT_TRUE(equals(compliantDdq, recoveredDdq, 1e-6));
+      return;
+    }
+  }
+}
+#endif
+
+#ifdef ALL_TESTS
+TEST(EXO_SOLVER_PINNED_CONTACT, ADJUST_TO_RESIDUALS_AND_CLAMPS)
+{
+  OpenSimFile file = OpenSimParser::parseOsim(
+      "dart://sample/osim/Rajagopal2015/Rajagopal2015.osim");
+  std::shared_ptr<dynamics::Skeleton> realSkel = file.skeleton;
+  std::shared_ptr<dynamics::Skeleton> virtualSkel = realSkel->cloneSkeleton();
+
+  ExoSolverPinnedContact solver = ExoSolverPinnedContact(realSkel, virtualSkel);
+
+  // Add contact points
+  std::vector<std::pair<int, Eigen::Vector3s>> pins;
+  pins.emplace_back(
+      realSkel->getBodyNode("calcn_r")->getIndexInSkeleton(),
+      Eigen::Vector3s(0.0, 0, 0.0));
+  pins.emplace_back(
+      realSkel->getBodyNode("calcn_l")->getIndexInSkeleton(),
+      Eigen::Vector3s(0.0, 0, 0.0));
+  solver.setContactPins(pins);
+
+  // Add a knee exo
+  solver.addMotorDof(realSkel->getDof("knee_angle_r")->getIndexInSkeleton());
+  solver.addMotorDof(realSkel->getDof("knee_angle_l")->getIndexInSkeleton());
+
+  for (int i = 0; i < 10; i++)
+  {
+    Eigen::VectorXs q = realSkel->getRandomPose();
+    solver.setPositions(q);
+
+    Eigen::VectorXs dq = realSkel->getRandomVelocity();
+    Eigen::VectorXs ddq = realSkel->getRandomVelocity();
+    Eigen::MatrixXs J = solver.getContactJacobian();
+    Eigen::VectorXs contactForces = Eigen::VectorXs::Random(J.rows());
+    Eigen::VectorXs compliantDdq
+        = solver.getClosestRealAccelerationConsistentWithPinsAndContactForces(
+            dq, ddq, contactForces);
+
+    Eigen::VectorXs recoveredConstraints = J * compliantDdq;
+    if (recoveredConstraints.norm() > 1e-6)
+    {
+      std::cout << "recoveredConstraints: " << recoveredConstraints.transpose()
+                << std::endl;
+      EXPECT_TRUE(recoveredConstraints.norm() < 1e-6);
+      return;
+    }
+
+    Eigen::VectorXs tau = solver.estimateHumanTorques(
+        dq, compliantDdq, contactForces, Eigen::VectorXs::Zero(2));
+    Eigen::Vector6s residual = tau.head<6>();
+
+    if (residual.norm() > 1e-6)
+    {
+      std::cout << "residual: " << residual.transpose() << std::endl;
+      EXPECT_TRUE(residual.norm() < 1e-6);
+      return;
+    }
+
+    Eigen::VectorXs recoveredDdq
+        = solver.getPinnedVirtualDynamics(dq, tau).first;
+    if (!equals(compliantDdq, recoveredDdq, 1e-6))
+    {
+      Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(compliantDdq.size(), 3);
+      compare.col(0) = compliantDdq;
+      compare.col(1) = recoveredDdq;
+      compare.col(2) = compliantDdq - recoveredDdq;
+      std::cout << "ddq - recoveredDdq - diff: " << std::endl
+                << compare << std::endl;
+      EXPECT_TRUE(equals(compliantDdq, recoveredDdq, 1e-6));
+      return;
+    }
+
+    Eigen::VectorXs totalRealTorques
+        = solver.getPinnedTotalTorques(dq, recoveredDdq, tau, contactForces)
+              .first;
+    Eigen::VectorXs netTorques = totalRealTorques - tau;
+    if (netTorques.norm() > 1e-6)
+    {
+      std::cout << "netTorques: " << netTorques.transpose() << std::endl;
+      EXPECT_TRUE(netTorques.norm() < 1e-6);
       return;
     }
   }

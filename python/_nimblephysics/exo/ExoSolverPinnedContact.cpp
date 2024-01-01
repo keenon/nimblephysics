@@ -113,6 +113,15 @@ void ExoSolverPinnedContact(py::module& m)
           "exoskeleton torques, and returns the estimated human pilot joint "
           "torques.")
       .def(
+          "estimateTotalTorques",
+          &dart::exo::ExoSolverPinnedContact::estimateTotalTorques,
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("contactForces"),
+          "This is part of the main exoskeleton solver. It takes in the "
+          "current joint velocities and accelerations, and returns the "
+          "estimated human + exo system joint torques.")
+      .def(
           "getPinnedVirtualDynamics",
           &dart::exo::ExoSolverPinnedContact::getPinnedVirtualDynamics,
           ::py::arg("dq"),
@@ -148,6 +157,8 @@ void ExoSolverPinnedContact(py::module& m)
           &dart::exo::ExoSolverPinnedContact::getPinnedTotalTorques,
           ::py::arg("dq"),
           ::py::arg("ddqDesired"),
+          ::py::arg("centeringTau"),
+          ::py::arg("centeringForces"),
           "This is part of the main exoskeleton solver. It takes in how the "
           "digital twin of the exo pilot is accelerating, and attempts to "
           "solve for the torques that the exo needs to apply to get as close "
@@ -166,6 +177,19 @@ void ExoSolverPinnedContact(py::module& m)
           "This is part of the main exoskeleton solver. It takes in the "
           "desired torques for the exoskeleton, and returns the torques on the "
           "actuated DOFs that can be used to drive the exoskeleton.")
+      .def(
+          "getClosestRealAccelerationConsistentWithPinsAndContactForces",
+          &dart::exo::ExoSolverPinnedContact::
+              getClosestRealAccelerationConsistentWithPinsAndContactForces,
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("contactForces"),
+          "Often our estimates for `dq` and `ddq` violate the pin "
+          "constraints. That leads to exo torques that do not tend to zero "
+          "as the virtual human exactly matches the real human+exo system. "
+          "To solve this problem, we can solve a set of least-squares "
+          "equations to find the best set of ddq values to satisfy the "
+          "constraint.")
       .def(
           "projectTorquesToExoControlSpaceLinearMap",
           &dart::exo::ExoSolverPinnedContact::
@@ -187,6 +211,8 @@ void ExoSolverPinnedContact(py::module& m)
           &dart::exo::ExoSolverPinnedContact::solveFromBiologicalTorques,
           ::py::arg("dq"),
           ::py::arg("tau"),
+          ::py::arg("centeringTau"),
+          ::py::arg("centeringForce"),
           "This is a subset of the steps in solveFromAccelerations, which can "
           "take the biological joint torques directly, and solve for the exo "
           "torques.")
