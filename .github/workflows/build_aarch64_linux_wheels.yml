@@ -80,7 +80,7 @@ jobs:
           echo "PYTHON_PATH=$PYTHON_PATH";\
           echo "PATH=$PATH";\
           echo "CPATH=$CPATH";\
-          ${PYTHON} -m pip install pytest wheel auditwheel;\
+          ${PYTHON} -m pip install pytest wheel auditwheel==5.1.2 pybind11-stubgen==0.16.2 numpy torch;\
           cd /;\
           git clone https://github.com/pybind/pybind11.git;\
           pushd pybind11;\
