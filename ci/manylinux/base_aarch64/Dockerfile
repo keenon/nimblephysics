@@ -190,6 +190,7 @@ RUN git clone https://github.com/ros/console_bridge.git && \
 # Install urdfdom
 RUN git clone https://github.com/ros/urdfdom.git && \
     pushd urdfdom && \
+    git checkout 3.0.0 && \
     mkdir build && \
     pushd build && \
     cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
@@ -221,9 +222,9 @@ RUN pushd grpc && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON \
-          -DgRPC_BUILD_TESTS=OFF \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          ../.. && \
+    -DgRPC_BUILD_TESTS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    ../.. && \
     make -j3 && \
     make install && \
     popd && \

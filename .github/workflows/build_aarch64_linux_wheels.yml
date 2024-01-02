@@ -84,6 +84,7 @@ jobs:
           cd /;\
           git clone https://github.com/pybind/pybind11.git;\
           pushd pybind11;\
+          git checkout v2.11.1;\
           mkdir build;\
           pushd build;\
           cmake -DPYTHON_LIBRARY=$PYTHON_LIB -DPYTHON_INCLUDE_DIR=$PYTHON_INCLUDE -DPYTHON_EXECUTABLE=$PYTHON ..;\
