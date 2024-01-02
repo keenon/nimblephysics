@@ -194,6 +194,7 @@ sudo rm -rf console_bridge
 # Install urdfdom
 git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
+git checkout 3.0.0
 mkdir build
 pushd build
 cmake .. $CMAKE_FLAGS

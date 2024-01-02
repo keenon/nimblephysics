@@ -2,7 +2,7 @@
 set -e
 
 export VERSION=$(cat ../../VERSION.txt)
-PYTHON=$(which python3)
+PYTHON=/Applications/Blender.app/Contents/Resources/3.3/python/bin/python3.10
 
 # Find our python paths
 export PYTHON_INCLUDE=$(python3-config --includes)
@@ -17,15 +17,8 @@ rm -rf build/*
 # rm -rf wheelhouse/*
 
 # Actually build the code
-$PYTHON setup.py sdist bdist_wheel
-
-# Install delocate, to bundle dependencies into the wheel
-pushd dist
-WHEEL_NAME=$(ls *.whl)
-echo "WHEEL_NAME=${WHEEL_NAME}"
-DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:/usr/local/lib" delocate-wheel -w ../wheelhouse -v --dylibs-only ${WHEEL_NAME}
-popd
+$PYTHON setup.py install
 
 # Actually push the wheel to PyPI
 # python3 -m pip install --user --upgrade twine
-python3 -m twine upload --repository pypi wheelhouse/*
+# python3 -m twine upload --repository pypi wheelhouse/*
