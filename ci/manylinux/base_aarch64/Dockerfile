@@ -6,6 +6,8 @@ ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig/"
 
 # Upgrade to the latest CMake version
 
+RUN yum update
+
 RUN yum install -y wget
 
 RUN yum install -y openssl-devel
