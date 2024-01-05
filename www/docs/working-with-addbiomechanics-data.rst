@@ -109,7 +109,7 @@ Further, let us assume that you have downloaded the generic bone geometry librar
 You can then open a browser to `http://localhost:8080 <http://localhost:8080>`_ to see the skeleton in the GUI.
 
 But that's not very interesting, because it's just a skeleton in a neutral pose. Let's also load and render some motion data!
-To do that, we will use the :code:`loadFrames` method on :code:`SubjectOnDisk`, which will load (as many as we request) 
+To do that, we will use the :code:`readFrames` method on :code:`SubjectOnDisk`, which will load (as many as we request) 
 :code:`Frame` objects from the B3D file. The :code:`Frame` objects contain all the information about the skeleton's state at that frame,
 and contain information for each processing pass separately. If we do this in a loop, we can animate the skeleton in the GUI!
 
@@ -137,11 +137,11 @@ and contain information for each processing pass separately. If we do this in a 
   trial = 0
 
   # Load all the frames from the selected trial
-  trial_frames: List[nimble.biomechanics.Frame] = your_subject.loadFrames(
+  trial_frames: List[nimble.biomechanics.Frame] = your_subject.readFrames(
       trial=trial,
       processingPass=0,
       startFrame=0,
-      endFrame=your_subject.getTrialLength(trial))
+      numFramesToRead=your_subject.getTrialLength(trial))
 
   # Figure out how many (fractional) seconds each frame represents
   seconds_per_frame = your_subject.getTrialTimestep(trial)
@@ -182,7 +182,7 @@ To load a file at :code:`your/path/your_subject_name.b3d`, simply instantiate a 
 Note that instantiating :code:`SubjectOnDisk` *does not* load all the trials into memory, it merely keeps a lightweight index of the file in memory, which can then load 
 arbitrary frames of trials quickly and efficiently. It's safe to load an enormous number of :code:`SubjectOnDisk` files simultaneously, even with very limited RAM.
 
-Once you have a :code:`SubjectOnDisk`, the main point of a :code:`SubjectOnDisk` is to load arrays of :code:`Frame` objects by calling :code:`frames = your_subject.loadFrames(...)`.
+Once you have a :code:`SubjectOnDisk`, the main point of a :code:`SubjectOnDisk` is to load arrays of :code:`Frame` objects by calling :code:`frames = your_subject.readFrames(...)`.
 Each :code:`Frame` contains all the information to set the state of the skeleton corresponding to this subject, which you can get copies of by calling :code:`skel = your_subject.readSkel(...)`.
 With a skeleton set in the correct state, with contact and dynamics information known, you're ready to derive any additional information you need to train your ML system!
 
