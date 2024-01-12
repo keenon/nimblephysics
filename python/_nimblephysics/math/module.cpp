@@ -41,6 +41,7 @@ void Random(py::module& sm);
 void Geometry(py::module& sm);
 void MultivariateGaussian(py::module& sm);
 void GraphFlowDiscretizer(py::module& sm);
+void PolynomialFitter(py::module& sm);
 
 void dart_math(py::module& m)
 {
@@ -50,6 +51,7 @@ void dart_math(py::module& m)
   Geometry(sm);
   MultivariateGaussian(sm);
   GraphFlowDiscretizer(sm);
+  PolynomialFitter(sm);
 }
 
 } // namespace python

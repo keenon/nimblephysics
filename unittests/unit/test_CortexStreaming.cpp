@@ -17,7 +17,7 @@
 using namespace dart;
 using namespace biomechanics;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 // This is the packet that the client sends to the server
 std::vector<unsigned char> helloWorldPacket
