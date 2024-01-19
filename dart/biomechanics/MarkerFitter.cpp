@@ -46,6 +46,7 @@ using namespace Ipopt;
 MarkerFitterState::MarkerFitterState(
     const Eigen::VectorXs& flat,
     std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+    std::vector<bool> newClip,
     std::vector<dynamics::Joint*> joints,
     Eigen::MatrixXs jointCenters,
     Eigen::VectorXs jointWeights,
@@ -55,6 +56,7 @@ MarkerFitterState::MarkerFitterState(
   : markerOrder(fitter->mMarkerNames),
     skeleton(fitter->mSkeleton),
     markerObservations(markerObservations),
+    newClip(newClip),
     joints(joints),
     jointCenters(jointCenters),
     jointWeights(jointWeights),
@@ -413,6 +415,9 @@ InitialMarkerFitParams::InitialMarkerFitParams()
     numIKTries(12),
     dontRescaleBodies(false),
     dontMoveMarkers(false),
+    useAnalyticalIKToInitialize(true),
+    skipBilevelProblem(false),
+    applyInnerProblemGradientConstraints(true),
     maxTrialsToUseForMultiTrialScaling(5),
     maxTimestepsToUseForMultiTrialScaling(800),
     initPoses(Eigen::MatrixXs::Zero(0, 0)),
@@ -441,6 +446,10 @@ InitialMarkerFitParams::InitialMarkerFitParams(
     groupScales(other.groupScales),
     dontRescaleBodies(other.dontRescaleBodies),
     dontMoveMarkers(other.dontMoveMarkers),
+    useAnalyticalIKToInitialize(other.useAnalyticalIKToInitialize),
+    skipBilevelProblem(other.skipBilevelProblem),
+    applyInnerProblemGradientConstraints(
+        other.applyInnerProblemGradientConstraints),
     maxTrialsToUseForMultiTrialScaling(
         other.maxTrialsToUseForMultiTrialScaling),
     maxTimestepsToUseForMultiTrialScaling(
@@ -530,6 +539,30 @@ InitialMarkerFitParams& InitialMarkerFitParams::setDontMoveMarkers(
 }
 
 //==============================================================================
+InitialMarkerFitParams& InitialMarkerFitParams::setUseAnalyticalIKToInitialize(
+    bool useAnalytical)
+{
+  this->useAnalyticalIKToInitialize = useAnalytical;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams& InitialMarkerFitParams::setSkipBilevel(bool skipBilevel)
+{
+  this->skipBilevelProblem = skipBilevel;
+  return *this;
+}
+
+//==============================================================================
+InitialMarkerFitParams&
+InitialMarkerFitParams::setApplyInnerProblemGradientConstraints(
+    bool applyConstraints)
+{
+  this->applyInnerProblemGradientConstraints = applyConstraints;
+  return *this;
+}
+
+//==============================================================================
 InitialMarkerFitParams& InitialMarkerFitParams::setMarkerOffsets(
     std::map<std::string, Eigen::Vector3s> markerOffsets)
 {
@@ -590,6 +623,7 @@ MarkerFitter::MarkerFitter(
     mRegularizeIndividualBodyScales(10.0),
     mRegularizeAllBodyScales(0.2),
     mRegularizeJointBounds(0),
+    mRegularizeMovementSmoothness(0.1),
     mTolerance(1e-8),
     mIterationLimit(500),
     mLBFGSHistoryLength(8),
@@ -1022,6 +1056,24 @@ MarkerFitter::MarkerFitter(
     }
     loss += jointForceFieldLoss;
 
+    s_t smoothMovementRegularizationLoss = 0.0;
+    for (int i = 1; i < state->posesAtTimesteps.cols(); i++)
+    {
+      if (!state->newClip[i])
+      {
+        Eigen::VectorXs error
+            = (state->posesAtTimesteps.col(i)
+               - state->posesAtTimesteps.col(i - 1));
+        smoothMovementRegularizationLoss
+            += mRegularizeMovementSmoothness * error.squaredNorm();
+        state->posesAtTimestepsGrad.col(i)
+            += 2 * mRegularizeMovementSmoothness * error;
+        state->posesAtTimestepsGrad.col(i - 1)
+            -= 2 * mRegularizeMovementSmoothness * error;
+      }
+    }
+    loss += smoothMovementRegularizationLoss;
+
     if (mDebugLoss)
     {
       std::cout << "[mkr=" << markerErrors << ",jnt=" << jointErrors
@@ -1033,6 +1085,7 @@ MarkerFitter::MarkerFitter(
                 << ",boundsR=" << jointBoundsRegularization
                 << ",jointSpringR=" << virtualJointSpringRegularization
                 << ",staticR=" << staticPoseRegularization
+                << ",smoothR=" << smoothMovementRegularizationLoss
                 << ",jointForceField=" << jointForceFieldLoss << "]"
                 << std::endl;
     }
@@ -1487,7 +1540,7 @@ std::vector<MarkerInitialization> MarkerFitter::runMultiTrialKinematicsPipeline(
     std::vector<s_t> markerVariabilities;
     for (int i = 0; i < markerObservationTrials.size(); i++)
     {
-      std::cout << "Running joint init pipeline for trial " << i << "/"
+      std::cout << "Computing marker variability for trial " << i << "/"
                 << markerObservationTrials.size() << std::endl;
       markerVariabilities.push_back(computeMarkerDistanceMatrixVariability(
           markerObservationTrials.at(i)));
@@ -1750,9 +1803,18 @@ MarkerInitialization MarkerFitter::runKinematicsPipeline(
           .setJointAxisAndWeights(init.jointAxis, init.axisWeights)
           .setInitPoses(init.poses));
 
+  if (params.skipBilevelProblem)
+  {
+    return reinit;
+  }
+
   // 4. Run bilevel optimization
-  std::shared_ptr<BilevelFitResult> bilevelFit
-      = optimizeBilevel(markerObservations, reinit, numSamples);
+  std::shared_ptr<BilevelFitResult> bilevelFit = optimizeBilevel(
+      markerObservations,
+      newClip,
+      reinit,
+      numSamples,
+      params.applyInnerProblemGradientConstraints);
 
   // 5. Fine-tune IK and re-fit all the points
   mSkeleton->setGroupScales(bilevelFit->groupScales);
@@ -2956,10 +3018,23 @@ void MarkerFitter::autorotateC3D(C3D* c3d)
 std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
+    std::vector<bool> newClip,
     MarkerInitialization& initialization,
     int numSamples,
     bool applyInnerProblemGradientConstraints)
 {
+  if (mRegularizeMovementSmoothness > 0)
+  {
+    for (int t = 1; t < initialization.poses.cols(); t++)
+    {
+      if (!newClip[t])
+      {
+        initialization.poses.col(t) = mSkeleton->unwrapPositionToNearest(
+            initialization.poses.col(t - 1), initialization.poses.col(t));
+      }
+    }
+  }
+
   // Before using Eigen in a multi-threaded environment, we need to explicitly
   // call this (at least prior to Eigen 3.3)
   Eigen::initParallel();
@@ -3041,6 +3116,7 @@ std::shared_ptr<BilevelFitResult> MarkerFitter::optimizeBilevel(
   BilevelFitProblem* problem = new BilevelFitProblem(
       this,
       markerObservations,
+      newClip,
       initialization,
       numSamples,
       applyInnerProblemGradientConstraints,
@@ -4411,7 +4487,7 @@ MarkerInitialization MarkerFitter::getInitialization(
       == mSkeleton->getNumJoints());
 
   std::cout << " joints: " << params.joints.size() << std::endl;
-  if (params.joints.size() == 0)
+  if (params.joints.size() == 0 && params.useAnalyticalIKToInitialize)
   {
     // 1. If we don't have any joint center information yet, don't just run
     // non-convex IK and hope for the best. Instead, run the least-squares IK
@@ -6124,7 +6200,7 @@ ScaleAndFitResult MarkerFitter::scaleAndFit(
 
   if (saveToGUI)
   {
-    server.writeFramesJson("../../../javascript/src/data/movement2.bin");
+    server.writeFramesJson("./movement2.bin");
   }
 
   /*
@@ -7312,6 +7388,14 @@ void MarkerFitter::setRegularizeAllBodyScales(s_t weight)
 void MarkerFitter::setRegularizeJointBounds(s_t weight)
 {
   mRegularizeJointBounds = weight;
+}
+
+//==============================================================================
+/// This sets the value weight used to regularize poses at adjacent timesteps
+/// being the same, to prevent big jumps if we suddenly drop a marker.
+void MarkerFitter::setRegularizeMovementSmoothness(s_t weight)
+{
+  mRegularizeMovementSmoothness = weight;
 }
 
 //==============================================================================
@@ -9364,6 +9448,7 @@ BilevelFitProblem::BilevelFitProblem(
     MarkerFitter* fitter,
     const std::vector<std::map<std::string, Eigen::Vector3s>>&
         markerObservations,
+    std::vector<bool> newClip,
     MarkerInitialization& initialization,
     int numSamples,
     bool applyInnerProblemGradientConstraints,
@@ -9377,6 +9462,22 @@ BilevelFitProblem::BilevelFitProblem(
   // 1. Select the random indices we'll be using for this problem
   mSampleIndices
       = math::evenlySpacedTimesteps(markerObservations.size(), numSamples);
+
+  // TODO: this needs to thread through from outside, picking it here is
+  // actually not completely accurate
+  mNewClip.clear();
+  mNewClip.push_back(true);
+  for (int i = 1; i < mSampleIndices.size(); i++)
+  {
+    if (mSampleIndices[i] != mSampleIndices[i - 1] + 1)
+    {
+      mNewClip.push_back(true);
+    }
+    else
+    {
+      mNewClip.push_back(newClip[mSampleIndices[i]]);
+    }
+  }
 
   // if (numSamples >= markerObservations.size())
   // {
@@ -9571,6 +9672,7 @@ s_t BilevelFitProblem::getLoss(Eigen::VectorXs x)
   MarkerFitterState state(
       x,
       mMarkerMapObservations,
+      mNewClip,
       mInitialization.joints,
       mJointCenters,
       mJointWeights,
@@ -9589,6 +9691,7 @@ Eigen::VectorXs BilevelFitProblem::getGradient(Eigen::VectorXs x)
   MarkerFitterState state(
       x,
       mMarkerMapObservations,
+      mNewClip,
       mInitialization.joints,
       mJointCenters,
       mJointWeights,
@@ -9714,12 +9817,17 @@ Eigen::VectorXs BilevelFitProblem::getConstraints(Eigen::VectorXs x)
       }
     }
   }
+  else
+  {
+    ikGrad = Eigen::VectorXs::Zero(0);
+  }
 
   if (mFitter->mZeroConstraints.size() > 0)
   {
     MarkerFitterState state(
         x,
         mMarkerMapObservations,
+        mNewClip,
         mInitialization.joints,
         mJointCenters,
         mJointWeights,
@@ -9887,12 +9995,17 @@ Eigen::MatrixXs BilevelFitProblem::getConstraintsJacobian(Eigen::VectorXs x)
       }
     }
   }
+  else
+  {
+    jac = Eigen::MatrixXs::Zero(0, x.size());
+  }
 
   if (mFitter->mZeroConstraints.size() > 0)
   {
     MarkerFitterState state(
         x,
         mMarkerMapObservations,
+        mNewClip,
         mInitialization.joints,
         mJointCenters,
         mJointWeights,
@@ -9993,7 +10106,9 @@ bool BilevelFitProblem::get_nlp_info(
       + (mFitter->mSkeleton->getNumDofs() * mMarkerObservations.size()) + 6;
 
   // Set the total number of constraints
-  m = mFitter->mSkeleton->getNumDofs() + mFitter->mZeroConstraints.size();
+  m = (mApplyInnerProblemGradientConstraints ? mFitter->mSkeleton->getNumDofs()
+                                             : 0)
+      + mFitter->mZeroConstraints.size();
 
   // Set the number of entries in the constraint Jacobian
   nnz_jac_g = m * n;

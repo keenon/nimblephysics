@@ -67,6 +67,7 @@ struct MarkerFitterState
   Eigen::Matrix<s_t, 3, Eigen::Dynamic> markerOffsets;
   Eigen::MatrixXs markerErrorsAtTimesteps;
   Eigen::MatrixXs posesAtTimesteps;
+  std::vector<bool> newClip;
   std::vector<std::string> jointOrder;
   Eigen::MatrixXs jointErrorsAtTimesteps;
   Eigen::MatrixXs axisErrorsAtTimesteps;
@@ -86,6 +87,7 @@ struct MarkerFitterState
   MarkerFitterState(
       const Eigen::VectorXs& flat,
       std::vector<std::map<std::string, Eigen::Vector3s>> markerObservations,
+      std::vector<bool> newClip,
       std::vector<dynamics::Joint*> joints,
       Eigen::MatrixXs jointCenters,
       Eigen::VectorXs jointWeights,
@@ -540,6 +542,10 @@ struct InitialMarkerFitParams
   bool dontRescaleBodies;
   bool dontMoveMarkers;
 
+  bool useAnalyticalIKToInitialize;
+  bool skipBilevelProblem;
+  bool applyInnerProblemGradientConstraints;
+
   int maxTrialsToUseForMultiTrialScaling;
   int maxTimestepsToUseForMultiTrialScaling;
 
@@ -563,6 +569,10 @@ struct InitialMarkerFitParams
   InitialMarkerFitParams& setInitPoses(Eigen::MatrixXs initPoses);
   InitialMarkerFitParams& setDontRescaleBodies(bool dontRescaleBodies);
   InitialMarkerFitParams& setDontMoveMarkers(bool dontMoveMarkers);
+  InitialMarkerFitParams& setUseAnalyticalIKToInitialize(bool useAnalytical);
+  InitialMarkerFitParams& setSkipBilevel(bool skipBilevel);
+  InitialMarkerFitParams& setApplyInnerProblemGradientConstraints(
+      bool applyConstraints);
   InitialMarkerFitParams& setMarkerOffsets(
       std::map<std::string, Eigen::Vector3s> markerOffsets);
   InitialMarkerFitParams& setGroupScales(Eigen::VectorXs groupScales);
@@ -867,6 +877,10 @@ public:
   /// penalty instead
   void setRegularizeJointBounds(s_t weight);
 
+  /// This sets the value weight used to regularize poses at adjacent timesteps
+  /// being the same, to prevent big jumps if we suddenly drop a marker.
+  void setRegularizeMovementSmoothness(s_t weight);
+
   /// If set to true, we print the pair observation counts and data for
   /// computing joint variability.
   void setDebugJointVariability(bool debug);
@@ -906,6 +920,7 @@ public:
   std::shared_ptr<BilevelFitResult> optimizeBilevel(
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      std::vector<bool> newClip,
       MarkerInitialization& initialization,
       int numSamples,
       bool applyInnerProblemGradientConstraints = true);
@@ -1432,6 +1447,7 @@ protected:
   s_t mRegularizeIndividualBodyScales;
   s_t mRegularizeAllBodyScales;
   s_t mRegularizeJointBounds;
+  s_t mRegularizeMovementSmoothness;
   s_t mAnatomicalMarkerDefaultWeight;
   s_t mTrackingMarkerDefaultWeight;
   s_t mStaticTrialWeight;
@@ -1474,6 +1490,7 @@ public:
       MarkerFitter* fitter,
       const std::vector<std::map<std::string, Eigen::Vector3s>>&
           markerObservations,
+      std::vector<bool> newClip,
       MarkerInitialization& initialization,
       int numSamples,
       bool applyInnerProblemGradientConstraints,
@@ -1650,6 +1667,7 @@ protected:
   MarkerFitter* mFitter;
   std::vector<std::map<std::string, Eigen::Vector3s>> mMarkerMapObservations;
   std::vector<std::vector<std::pair<int, Eigen::Vector3s>>> mMarkerObservations;
+  std::vector<bool> mNewClip;
   Eigen::MatrixXs mJointCenters;
   Eigen::VectorXs mJointWeights;
   Eigen::MatrixXs mJointAxis;

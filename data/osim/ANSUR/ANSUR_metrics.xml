@@ -181,4 +181,46 @@
     <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
     <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
   </Metric>
+  <!-- (2) ACROMION-RADIALE LENGTH -->
+  <Metric>
+    <Name>acromionradialelength</Name>
+    <MarkerA>
+      <MeshNode>humerus_lv</MeshNode>
+      <Offset>0 0.04 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>humerus_lv</MeshNode>
+      <Offset>0 -0.28 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (37) FOREARM-CENTER OF GRIP LENGTH -->
+  <Metric>
+    <Name>forearmcenterofgriplength</Name>
+    <MarkerA>
+      <MeshNode>radius_lv</MeshNode>
+      <Offset>0 0.04 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>radius_lv</MeshNode>
+      <Offset>0 -0.28 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (56) KNEE HEIGHT, MIDPATELLA  -->
+  <Metric>
+    <Name>kneeheightmidpatella</Name>
+    <MarkerA>
+      <MeshNode>r_tibia</MeshNode>
+      <Offset>0 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
 </Metrics>

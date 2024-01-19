@@ -606,7 +606,7 @@ std::vector<ForcePlate> SubjectOnDisk::readForcePlates(int trial)
 /// This will read the skeleton from the binary, and optionally use the passed
 /// in Geometry folder.
 std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
-    int passNumberToLoad, std::string geometryFolder)
+    int passNumberToLoad, std::string geometryFolder, bool ignoreGeometry)
 {
   if (geometryFolder == "")
   {
@@ -618,8 +618,8 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 
   tinyxml2::XMLDocument osimFile;
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
-  OpenSimFile osimParsed
-      = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
+  OpenSimFile osimParsed = OpenSimParser::parseOsim(
+      osimFile, mPath, geometryFolder, ignoreGeometry);
   if (!(osimParsed.skeleton))
   {
     std::cout << "Failed to parse Osim XML: \""
@@ -636,7 +636,7 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
 /// instead of readSkel() to get full parsed OpenSimFile object, which includes
 /// the markerset.
 OpenSimFile SubjectOnDisk::readOpenSimFile(
-    int passNumberToLoad, std::string geometryFolder)
+    int passNumberToLoad, std::string geometryFolder, bool ignoreGeometry)
 {
   if (geometryFolder == "")
   {
@@ -648,8 +648,8 @@ OpenSimFile SubjectOnDisk::readOpenSimFile(
 
   tinyxml2::XMLDocument osimFile;
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
-  OpenSimFile osimParsed
-      = OpenSimParser::parseOsim(osimFile, mPath, geometryFolder);
+  OpenSimFile osimParsed = OpenSimParser::parseOsim(
+      osimFile, mPath, geometryFolder, ignoreGeometry);
   if (!(osimParsed.skeleton))
   {
     std::cout << "Failed to parse Osim XML: \""
@@ -887,6 +887,8 @@ void Frame::readSensorsFromProto(
   }
 
   // 7. Read out the marker, accelerometer, and gyro info as pairs
+  assert(proto->marker_obs_size() % 3 == 0);
+  assert(proto->marker_obs_size() / 3 == header.mMarkerNames.size());
   for (int i = 0; i < header.mMarkerNames.size(); i++)
   {
     Eigen::Vector3s marker(
@@ -895,7 +897,7 @@ void Frame::readSensorsFromProto(
         proto->marker_obs(i * 3 + 2));
     if (!marker.hasNaN())
     {
-      markerObservations.emplace_back(header.mMarkerNames[i], marker);
+      this->markerObservations.emplace_back(header.mMarkerNames[i], marker);
     }
   }
   for (int i = 0; i < header.mAccNames.size(); i++)
@@ -906,7 +908,7 @@ void Frame::readSensorsFromProto(
         proto->acc_obs(i * 3 + 2));
     if (!acc.hasNaN())
     {
-      accObservations.emplace_back(header.mAccNames[i], acc);
+      this->accObservations.emplace_back(header.mAccNames[i], acc);
     }
   }
   for (int i = 0; i < header.mGyroNames.size(); i++)
@@ -917,7 +919,7 @@ void Frame::readSensorsFromProto(
         proto->gyro_obs(i * 3 + 2));
     if (!gyro.hasNaN())
     {
-      gyroObservations.emplace_back(header.mGyroNames[i], gyro);
+      this->gyroObservations.emplace_back(header.mGyroNames[i], gyro);
     }
   }
   for (int i = 0; i < header.mEmgNames.size(); i++)
@@ -929,12 +931,12 @@ void Frame::readSensorsFromProto(
     }
     if (!emgSequence.hasNaN())
     {
-      emgSignals.emplace_back(header.mEmgNames[i], emgSequence);
+      this->emgSignals.emplace_back(header.mEmgNames[i], emgSequence);
     }
   }
   for (int i = 0; i < header.mExoDofIndices.size(); i++)
   {
-    exoTorques.emplace_back(header.mExoDofIndices[i], proto->exo_obs(i));
+    this->exoTorques.emplace_back(header.mExoDofIndices[i], proto->exo_obs(i));
   }
   int customValueCursor = 0;
   for (int i = 0; i < header.mCustomValueNames.size(); i++)

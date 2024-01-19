@@ -97,6 +97,7 @@ public:
   static OpenSimFile parseOsim(
       const common::Uri& uri,
       const std::string geometryFolder = "",
+      bool ignoreGeometry = false,
       const common::ResourceRetrieverPtr& retriever = nullptr);
 
   /// Read Skeleton from *.osim file
@@ -104,6 +105,7 @@ public:
       tinyxml2::XMLDocument& osimFile,
       const std::string fileNameForErrorDisplay = "",
       const std::string geometryFolder = "",
+      bool ignoreGeometry = false,
       const common::ResourceRetrieverPtr& geometryRetriever = nullptr);
 
   /// This creates an XML configuration file, which you can pass to the OpenSim
@@ -388,12 +390,14 @@ protected:
       tinyxml2::XMLElement* docElement,
       const std::string fileNameForErrorDisplay,
       const std::string geometryFolder,
-      const common::ResourceRetrieverPtr& geometryRetriever);
+      const common::ResourceRetrieverPtr& geometryRetriever,
+      bool ignoreGeometry);
   static OpenSimFile readOsim40(
       tinyxml2::XMLElement* docElement,
       const std::string fileNameForErrorDisplay,
       const std::string geometryFolder,
-      const common::ResourceRetrieverPtr& geometryRetriever);
+      const common::ResourceRetrieverPtr& geometryRetriever,
+      bool ignoreGeometry);
 }; // namespace OpenSimParser
 
 } // namespace biomechanics

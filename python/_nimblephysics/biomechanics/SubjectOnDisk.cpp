@@ -1003,6 +1003,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::readSkel,
                 ::py::arg("processingPass"),
                 ::py::arg("geometryFolder") = "",
+                ::py::arg("ignoreGeometry") = false,
                 "This will read the skeleton from the binary, and optionally "
                 "use the passed in :code:`geometryFolder` to load meshes. We "
                 "do not bundle meshes with :code:`SubjectOnDisk` files, to "
@@ -1015,6 +1016,7 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDisk::readOpenSimFile,
                 ::py::arg("processingPass"),
                 ::py::arg("geometryFolder") = "",
+                ::py::arg("ignoreGeometry") = false,
                 "This is functionally the same as readSkel(), except that it "
                 "returns the entire OpenSim file object, which in addition to "
                 "the Skeleton also contains the markerset."

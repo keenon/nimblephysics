@@ -504,12 +504,17 @@ public:
   /// This will read the skeleton from the binary, and optionally use the passed
   /// in Geometry folder.
   std::shared_ptr<dynamics::Skeleton> readSkel(
-      int processingPass, std::string geometryFolder = "");
-  
-  /// If you want the skeleton _and the markerset_ from the binary, use this 
-  /// instead of readSkel() to get full parsed OpenSimFile object, which includes 
-  /// the markerset.
-  OpenSimFile readOpenSimFile(int processingPass, std::string geometryFolder = "");
+      int processingPass,
+      std::string geometryFolder = "",
+      bool ignoreGeometry = false);
+
+  /// If you want the skeleton _and the markerset_ from the binary, use this
+  /// instead of readSkel() to get full parsed OpenSimFile object, which
+  /// includes the markerset.
+  OpenSimFile readOpenSimFile(
+      int processingPass,
+      std::string geometryFolder = "",
+      bool ignoreGeometry = false);
 
   /// This will read the raw OpenSim XML file text out of the binary, and return
   /// it as a string

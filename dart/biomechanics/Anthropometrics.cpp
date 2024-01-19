@@ -214,9 +214,13 @@ void Anthropometrics::debugToGUI(
 
     // Create spheres at the endpoints
     server->createSphere(
-        "anthro_metric_a_" + metric.name, 0.01, markerA, colorTransparent);
+        "anthro_metric_a_" + metric.name, 0.03, markerA, colorTransparent);
+    server->setObjectTooltip(
+        "anthro_metric_a_" + metric.name, metric.name + " A");
     server->createSphere(
-        "anthro_metric_b_" + metric.name, 0.01, markerB, colorTransparent);
+        "anthro_metric_b_" + metric.name, 0.03, markerB, colorTransparent);
+    server->setObjectTooltip(
+        "anthro_metric_b_" + metric.name, metric.name + " B");
 
     // Draw lines for each metric
 

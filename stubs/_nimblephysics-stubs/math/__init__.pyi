@@ -14,6 +14,7 @@ __all__ = [
     "Isometry3",
     "MultivariateGaussian",
     "ParticlePath",
+    "PolynomialFitter",
     "Quaternion",
     "Random",
     "dAdInvT",
@@ -180,6 +181,11 @@ class ParticlePath():
     @startTime.setter
     def startTime(self, arg0: int) -> None:
         pass
+    pass
+class PolynomialFitter():
+    def __init__(self, timesteps: numpy.ndarray[numpy.float64, _Shape[m, 1]], order: int) -> None: ...
+    def calcCoeffs(self, values: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
+    def projectPosVelAccAtTime(self, timestep: float, pastValues: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: ...
     pass
 class Quaternion():
     """

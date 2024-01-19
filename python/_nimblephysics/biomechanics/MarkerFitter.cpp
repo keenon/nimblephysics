@@ -242,6 +242,20 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::InitialMarkerFitParams::setDontRescaleBodies,
           ::py::arg("dontRescaleBodies"))
       .def(
+          "setUseAnalyticalIKToInitialize",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setUseAnalyticalIKToInitialize,
+          ::py::arg("useAnalyticalIK"))
+      .def(
+          "setSkipBilevel",
+          &dart::biomechanics::InitialMarkerFitParams::setSkipBilevel,
+          ::py::arg("skipBilevel"))
+      .def(
+          "setApplyInnerProblemGradientConstraints",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setApplyInnerProblemGradientConstraints,
+          ::py::arg("applyConstraints"))
+      .def(
           "setMaxTrialsToUseForMultiTrialScaling",
           &dart::biomechanics::InitialMarkerFitParams::
               setMaxTrialsToUseForMultiTrialScaling,
@@ -295,6 +309,10 @@ void MarkerFitter(py::module& m)
           "setIgnoreJointLimits",
           &dart::biomechanics::MarkerFitter::setIgnoreJointLimits,
           ::py::arg("ignore"))
+      .def(
+          "setLBFGSHistory",
+          &dart::biomechanics::MarkerFitter::setLBFGSHistory,
+          ::py::arg("historyLen"))
       .def(
           "setDebugLoss",
           &dart::biomechanics::MarkerFitter::setDebugLoss,
@@ -401,6 +419,7 @@ void MarkerFitter(py::module& m)
           "optimizeBilevel",
           &dart::biomechanics::MarkerFitter::optimizeBilevel,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("initialization"),
           ::py::arg("numSamples"),
           ::py::arg("applyInnerProblemGradientConstraints") = true)
@@ -488,6 +507,10 @@ void MarkerFitter(py::module& m)
       .def(
           "setRegularizeJointBounds",
           &dart::biomechanics::MarkerFitter::setRegularizeJointBounds,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeMovementSmoothness",
+          &dart::biomechanics::MarkerFitter::setRegularizeMovementSmoothness,
           ::py::arg("weight"))
       .def(
           "setDebugJointVariability",

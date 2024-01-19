@@ -71,7 +71,7 @@ def loadTRC(path: str) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSim
     pass
 def moveOsimMarkers(inputPath: nimblephysics_libs._nimblephysics.common.Uri, bodyScales: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]], markerOffsets: typing.Dict[str, typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], outputPath: str) -> None:
     pass
-def parseOsim(path: str, geometryFolder: str = '') -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile:
+def parseOsim(path: str, geometryFolder: str = '', ignoreGeometry: bool = False) -> nimblephysics_libs._nimblephysics.biomechanics.OpenSimFile:
     pass
 def rationalizeJoints(inputPath: nimblephysics_libs._nimblephysics.common.Uri, outputPath: str) -> None:
     pass
