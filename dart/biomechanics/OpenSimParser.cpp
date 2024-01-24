@@ -3077,6 +3077,15 @@ OpenSimTRC OpenSimParser::loadTRC(
             if (!markerSwapSpace.hasNaN()
                 && (markerSwapSpace != Eigen::Vector3s::Zero()))
             {
+              if (markerNames.empty()) {
+                NIMBLE_THROW("No marker names found in TRC file. Please check "
+                             "that the file is formatted correctly.");
+              }
+              if (markerNumber >= (int)markerNames.size()) {
+                NIMBLE_THROW("Marker number exceeds number of marker names in "
+                             "TRC file. Please check that the file is formatted "
+                             "correctly.");
+              }
               markerPositions[markerNames[markerNumber]]
                   = Eigen::Vector3s(markerSwapSpace);
             }
