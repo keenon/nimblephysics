@@ -54,6 +54,9 @@ void Anthropometrics(py::module& sm);
 void C3DLoader(py::module& sm);
 void SubjectOnDisk(py::module& sm);
 void CortexStreaming(py::module& sm);
+void StreamingMarkerTraces(py::module& sm);
+void StreamingIK(py::module& sm);
+void StreamingMocapLab(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -77,6 +80,9 @@ void dart_biomechanics(py::module& m)
   IKErrorReport(sm);
   SubjectOnDisk(sm);
   CortexStreaming(sm);
+  StreamingMarkerTraces(sm);
+  StreamingIK(sm);
+  StreamingMocapLab(sm);
 }
 
 } // namespace python

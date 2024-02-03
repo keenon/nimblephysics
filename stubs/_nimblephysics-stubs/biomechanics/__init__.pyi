@@ -50,6 +50,9 @@ __all__ = [
     "ProcessingPassType",
     "ResidualForceHelper",
     "SkeletonConverter",
+    "StreamingIK",
+    "StreamingMarkerTraces",
+    "StreamingMocapLab",
     "SubjectOnDisk",
     "SubjectOnDiskHeader",
     "SubjectOnDiskPassHeader",
@@ -2147,6 +2150,14 @@ class OpenSimFile():
     def anatomicalMarkers(self, arg0: typing.List[str]) -> None:
         pass
     @property
+    def bodyScales(self) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        :type: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @bodyScales.setter
+    def bodyScales(self, arg0: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        pass
+    @property
     def ignoredBodies(self) -> typing.List[str]:
         """
         :type: typing.List[str]
@@ -2377,6 +2388,83 @@ class SkeletonConverter():
     def getTargetJoints(self) -> typing.List[nimblephysics_libs._nimblephysics.dynamics.Joint]: ...
     def linkJoints(self, sourceJoint: nimblephysics_libs._nimblephysics.dynamics.Joint, targetJoint: nimblephysics_libs._nimblephysics.dynamics.Joint) -> None: ...
     def rescaleAndPrepTarget(self, addFakeMarkers: int = 3, weightFakeMarkers: float = 0.1, convergenceThreshold: float = 1e-15, maxStepCount: int = 1000, leastSquaresDamping: float = 0.01, lineSearch: bool = True, logOutput: bool = False) -> None: ...
+    pass
+class StreamingIK():
+    def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def observeMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], classes: typing.List[int]) -> None: 
+        """
+        This method takes in a set of markers, along with their assigned classes, and updates the targets for the IK to match the observed markers.
+        """
+    def reset(self) -> None: 
+        """
+        This method allows tests to manually input a set of markers, rather than waiting for Cortex to send them.
+        """
+    def setAnthropometricPrior(self, prior: Anthropometrics, priorWeight: float = 1.0) -> None: 
+        """
+        This sets an anthropometric prior used to help condition the body to keep reasonable scalings.
+        """
+    def startGUIThread(self, gui: nimblephysics_libs._nimblephysics.server.GUIStateMachine) -> None: 
+        """
+        This method starts a thread that periodically updates a GUI server state, though at a much lower framerate than the IK solver.
+        """
+    def startSolverThread(self) -> None: 
+        """
+        This method starts the thread that runs the IK continuously.
+        """
+    pass
+class StreamingMarkerTraces():
+    def __init__(self, totalClasses: int, bufferSize: int = 10000) -> None: ...
+    def getTraceFeatures(self, numWindows: int, windowDuration: int, now: int, center: bool = True) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
+        """
+        This method returns the features that we used to predict the classes of the markers. The first element of the pair is the features (which are trace points concatenated with the time, as measured in integer units of 'windowDuration', backwards from now), and the second is the trace ID for each point, so that we can correctly assign logit outputs back to the traces.
+        """
+    def observeMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: int) -> typing.Tuple[typing.List[int], typing.List[int]]: 
+        """
+        This method takes in a set of markers, and returns a vector of the predicted classes for each marker, based on classes we have predicted for previous markers, and continuity assumptions. It also returns a 'trace tag' for each marker, that can be used to associate it with previous continuous observations of the same marker. The returned vector will be the same length and order as the input `markers` vector.
+        """
+    def observeTraceLogits(self, logits: numpy.ndarray[numpy.float64, _Shape[m, n]], traceIDs: numpy.ndarray[numpy.int32, _Shape[m, 1]]) -> None: 
+        """
+        This method takes in the logits for each point, and the trace IDs for each point, and updates the internal state of the trace classifier to reflect the new information.
+        """
+    def reset(self) -> None: 
+        """
+        This resets all traces to empty
+        """
+    pass
+class StreamingMocapLab():
+    def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], bufferSize: int = 10000) -> None: ...
+    def getTraceFeatures(self, numWindows: int, windowDuration: int, now: int) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
+        """
+        This method returns the features that we used to predict the classes of the markers. The first element of the pair is the features (which are trace points concatenated with the time, as measured in integer units of 'windowDuration', backwards from now), and the second is the trace ID for each point, so that we can correctly assign logit outputs back to the traces.
+        """
+    def listenToCortex(self, host: str, port: int) -> None: 
+        """
+        This method establishes a link to Cortex, and listens for real-time observations of markers and force plate data.
+        """
+    def manuallyObserveMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: int) -> None: 
+        """
+        This method allows tests to manually input a set of markers, rather than waiting for Cortex to send them.
+        """
+    def observeTraceLogits(self, logits: numpy.ndarray[numpy.float64, _Shape[m, n]], traceIDs: numpy.ndarray[numpy.int32, _Shape[m, 1]]) -> None: 
+        """
+        This method takes in the logits for each point, and the trace IDs for each point, and updates the internal state of the trace classifier to reflect the new information.
+        """
+    def reset(self) -> None: 
+        """
+        This method resets the state of the mocap lab, including the IK and the marker traces.
+        """
+    def setAnthropometricPrior(self, prior: Anthropometrics, priorWeight: float = 1.0) -> None: 
+        """
+        This sets an anthropometric prior used to help condition the body to keep reasonable scalings.
+        """
+    def startGUIThread(self, gui: nimblephysics_libs._nimblephysics.server.GUIStateMachine) -> None: 
+        """
+        This method starts a thread that periodically updates a GUI server state, though at a much lower framerate than the IK solver.
+        """
+    def startSolverThread(self) -> None: 
+        """
+        This method starts the thread that runs the IK continuously.
+        """
     pass
 class SubjectOnDisk():
     """

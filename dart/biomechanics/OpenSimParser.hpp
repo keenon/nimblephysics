@@ -33,6 +33,9 @@ struct OpenSimFile
   std::vector<std::string> anatomicalMarkers;
   std::vector<std::string> trackingMarkers;
 
+  // Body scale map
+  std::map<std::string, Eigen::Vector3s> bodyScales;
+
   // IMU map
   std::map<std::string, std::pair<std::string, Eigen::Isometry3s>> imuMap;
 

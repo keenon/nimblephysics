@@ -66,6 +66,7 @@ void OpenSimParser(py::module& m)
       .def_readwrite(
           "anatomicalMarkers",
           &dart::biomechanics::OpenSimFile::anatomicalMarkers)
+      .def_readwrite("bodyScales", &dart::biomechanics::OpenSimFile::bodyScales)
       .def_readwrite("warnings", &dart::biomechanics::OpenSimFile::warnings)
       .def_readwrite(
           "ignoredBodies", &dart::biomechanics::OpenSimFile::ignoredBodies)

@@ -35,6 +35,7 @@ dart_add_test("unit" test_NearestPositionToDesiredRotation)
 dart_add_test("unit" test_EnergyAccounting)
 dart_add_test("unit" test_GraphFlowDiscretizer)
 dart_add_test("unit" test_CortexStreaming)
+dart_add_test("unit" test_StreamingMarkerTraces)
 
 if(DART_USE_ARBITRARY_PRECISION)
   dart_add_test("unit" test_MPFR)
@@ -119,6 +120,14 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_IKLimits)
   target_link_libraries(test_IKLimits dart-utils)
   target_link_libraries(test_IKLimits dart-utils-urdf)
+
+  dart_add_test("unit" test_StreamingIK)
+  target_link_libraries(test_StreamingIK dart-utils)
+  target_link_libraries(test_StreamingIK dart-utils-urdf)
+
+  dart_add_test("unit" test_StreamingMocapLab)
+  target_link_libraries(test_StreamingMocapLab dart-utils)
+  target_link_libraries(test_StreamingMocapLab dart-utils-urdf)
 
   dart_add_test("unit" test_ConstraintSolver)
   target_link_libraries(test_ConstraintSolver dart-utils)

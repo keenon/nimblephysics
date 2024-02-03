@@ -31,6 +31,7 @@
  */
 
 #include <dart/dynamics/ShapeNode.hpp>
+#include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 
 #include "eigen_geometry_pybind.h"
@@ -112,7 +113,8 @@ void ShapeNode(py::module& m)
           +[](const dart::dynamics::ShapeNode* self)
               -> std::shared_ptr<const dart::dynamics::Shape> {
             return self->getShape();
-          })
+          },
+          py::return_value_policy::reference_internal)
       .def(
           "getWorldTransform",
           +[](const dart::dynamics::ShapeNode* self) -> Eigen::Isometry3s {

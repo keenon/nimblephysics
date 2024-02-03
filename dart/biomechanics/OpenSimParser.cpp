@@ -3077,14 +3077,18 @@ OpenSimTRC OpenSimParser::loadTRC(
             if (!markerSwapSpace.hasNaN()
                 && (markerSwapSpace != Eigen::Vector3s::Zero()))
             {
-              if (markerNames.empty()) {
-                NIMBLE_THROW("No marker names found in TRC file. Please check "
-                             "that the file is formatted correctly.");
+              if (markerNames.empty())
+              {
+                NIMBLE_THROW(
+                    "No marker names found in TRC file. Please check "
+                    "that the file is formatted correctly.");
               }
-              if (markerNumber >= (int)markerNames.size()) {
-                NIMBLE_THROW("Marker number exceeds number of marker names in "
-                             "TRC file. Please check that the file is formatted "
-                             "correctly.");
+              if (markerNumber >= (int)markerNames.size())
+              {
+                NIMBLE_THROW(
+                    "Marker number exceeds number of marker names in "
+                    "TRC file. Please check that the file is formatted "
+                    "correctly.");
               }
               markerPositions[markerNames[markerNumber]]
                   = Eigen::Vector3s(markerSwapSpace);
@@ -4837,15 +4841,19 @@ bool OpenSimParser::convertOsimToMJCF(
   }
 }
 
-void readAttachedGeometry(
+Eigen::Vector3s readAttachedGeometry(
     tinyxml2::XMLElement* attachedGeometry,
     dynamics::BodyNode* childBody,
     Eigen::Isometry3s relativeT,
     const std::string fileNameForErrorDisplay,
     const std::string geometryFolder,
-    const common::ResourceRetrieverPtr& geometryRetriever)
+    const common::ResourceRetrieverPtr& geometryRetriever,
+    bool ignoreGeometry)
 {
   (void)fileNameForErrorDisplay;
+
+  Eigen::Vector3s avgScale = Eigen::Vector3s::Zero();
+  int numScales = 0;
 
   tinyxml2::XMLElement* meshCursor
       = attachedGeometry->FirstChildElement("Mesh");
@@ -4866,54 +4874,74 @@ void readAttachedGeometry(
     Eigen::Vector3s scale
         = readVec3(meshCursor->FirstChildElement("scale_factors"));
 
-    common::Uri meshUri = common::Uri::createFromRelativeUri(
-        geometryFolder, "./" + mesh_file + ".ply");
-    std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
-        = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
-
-    if (meshPtr)
+    if (!scale.hasNaN())
     {
-      std::shared_ptr<dynamics::MeshShape> meshShape
-          = std::make_shared<dynamics::MeshShape>(
-              scale, meshPtr, meshUri, geometryRetriever);
+      avgScale += scale;
+      numScales++;
+    }
 
-      dynamics::ShapeNode* meshShapeNode
-          = childBody->createShapeNodeWith<dynamics::VisualAspect>(meshShape);
-
-      Eigen::Isometry3s localT = Eigen::Isometry3s::Identity();
-      tinyxml2::XMLElement* transformElem
-          = meshCursor->FirstChildElement("transform");
-      if (transformElem != nullptr)
+    if (!ignoreGeometry)
+    {
+      common::Uri meshUri = common::Uri::createFromRelativeUri(
+          geometryFolder, "./" + mesh_file + ".ply");
+      std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr = nullptr;
+      try
       {
-        Eigen::Vector6s transformVec = readVec6(transformElem);
-        localT.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-        localT.translation() = transformVec.tail<3>();
+        meshPtr = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
+        if (meshPtr)
+        {
+          std::shared_ptr<dynamics::MeshShape> meshShape
+              = std::make_shared<dynamics::MeshShape>(
+                  scale, meshPtr, meshUri, geometryRetriever);
+
+          dynamics::ShapeNode* meshShapeNode
+              = childBody->createShapeNodeWith<dynamics::VisualAspect>(
+                  meshShape);
+
+          Eigen::Isometry3s localT = Eigen::Isometry3s::Identity();
+          tinyxml2::XMLElement* transformElem
+              = meshCursor->FirstChildElement("transform");
+          if (transformElem != nullptr)
+          {
+            Eigen::Vector6s transformVec = readVec6(transformElem);
+            localT.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+            localT.translation() = transformVec.tail<3>();
+          }
+
+          meshShapeNode->setRelativeTransform(relativeT * localT);
+
+          dynamics::VisualAspect* meshVisualAspect
+              = meshShapeNode->getVisualAspect();
+
+          tinyxml2::XMLElement* appearance
+              = meshCursor->FirstChildElement("Appearance");
+          if (appearance != nullptr)
+          {
+            Eigen::Vector3s colors
+                = readVec3(appearance->FirstChildElement("color")) * 0.7;
+            double opacity
+                = atof(appearance->FirstChildElement("opacity")->GetText());
+            meshVisualAspect->setColor(colors);
+            meshVisualAspect->setAlpha(opacity);
+          }
+        }
       }
-
-      meshShapeNode->setRelativeTransform(relativeT * localT);
-
-      dynamics::VisualAspect* meshVisualAspect
-          = meshShapeNode->getVisualAspect();
-
-      tinyxml2::XMLElement* appearance
-          = meshCursor->FirstChildElement("Appearance");
-      if (appearance != nullptr)
+      catch (std::exception& e)
       {
-        Eigen::Vector3s colors
-            = readVec3(appearance->FirstChildElement("color")) * 0.7;
-        double opacity
-            = atof(appearance->FirstChildElement("opacity")->GetText());
-        meshVisualAspect->setColor(colors);
-        meshVisualAspect->setAlpha(opacity);
+        std::cout << "Error loading mesh " << meshUri.toString() << ": "
+                  << e.what() << std::endl;
       }
     }
 
     meshCursor = meshCursor->NextSiblingElement("Mesh");
   }
+
+  avgScale /= numScales;
+  return avgScale;
 }
 
 //==============================================================================
-std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
+std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s> createJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,
     tinyxml2::XMLElement* bodyCursor,
@@ -5848,6 +5876,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     coordinateCursor = coordinateCursor->NextSiblingElement("Coordinate");
   }
 
+  Eigen::Vector3s avgScale = Eigen::Vector3s::Zero();
+
   // OpenSim v4 files specify visible geometry this way
   tinyxml2::XMLElement* visibleObject
       = bodyCursor->FirstChildElement("VisibleObject");
@@ -5860,6 +5890,7 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       tinyxml2::XMLElement* objects = geometrySet->FirstChildElement("objects");
       if (objects)
       {
+        int numScalesCounted = 0;
         tinyxml2::XMLElement* displayGeometryCursor
             = objects->FirstChildElement("DisplayGeometry");
         while (displayGeometryCursor)
@@ -5880,31 +5911,42 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
           double opacity = atof(
               displayGeometryCursor->FirstChildElement("opacity")->GetText());
 
-          common::Uri meshUri = common::Uri::createFromRelativeUri(
-              geometryFolder, "./" + mesh_file + ".ply");
-          std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
-              = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
-
-          if (meshPtr)
+          if (!scale.hasNaN())
           {
-            std::shared_ptr<dynamics::MeshShape> meshShape
-                = std::make_shared<dynamics::MeshShape>(
-                    scale, meshPtr, meshUri, geometryRetriever);
+            avgScale += scale;
+            numScalesCounted++;
+          }
 
-            dynamics::ShapeNode* meshShapeNode
-                = childBody->createShapeNodeWith<dynamics::VisualAspect>(
-                    meshShape);
-            meshShapeNode->setRelativeTransform(transform);
+          if (!ignoreGeometry)
+          {
+            common::Uri meshUri = common::Uri::createFromRelativeUri(
+                geometryFolder, "./" + mesh_file + ".ply");
+            std::shared_ptr<dynamics::SharedMeshWrapper> meshPtr
+                = dynamics::MeshShape::loadMesh(meshUri, geometryRetriever);
 
-            dynamics::VisualAspect* meshVisualAspect
-                = meshShapeNode->getVisualAspect();
-            meshVisualAspect->setColor(colors);
-            meshVisualAspect->setAlpha(opacity);
+            if (meshPtr)
+            {
+              std::shared_ptr<dynamics::MeshShape> meshShape
+                  = std::make_shared<dynamics::MeshShape>(
+                      scale, meshPtr, meshUri, geometryRetriever);
+
+              dynamics::ShapeNode* meshShapeNode
+                  = childBody->createShapeNodeWith<dynamics::VisualAspect>(
+                      meshShape);
+              meshShapeNode->setRelativeTransform(transform);
+
+              dynamics::VisualAspect* meshVisualAspect
+                  = meshShapeNode->getVisualAspect();
+              meshVisualAspect->setColor(colors);
+              meshVisualAspect->setAlpha(opacity);
+            }
           }
 
           displayGeometryCursor
               = displayGeometryCursor->NextSiblingElement("DisplayGeometry");
         }
+
+        avgScale /= numScalesCounted;
       }
     }
   }
@@ -5935,15 +5977,16 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
       // OpenSim v3 files specify visible geometry this way
       tinyxml2::XMLElement* frameAttachedGeometry
           = frameCursor->FirstChildElement("attached_geometry");
-      if (frameAttachedGeometry && childBody != nullptr && !ignoreGeometry)
+      if (frameAttachedGeometry && childBody != nullptr)
       {
-        readAttachedGeometry(
+        avgScale = readAttachedGeometry(
             frameAttachedGeometry,
             childBody,
             relativeT,
             fileNameForErrorDisplay,
             geometryFolder,
-            geometryRetriever);
+            geometryRetriever,
+            ignoreGeometry);
       }
 
       frameCursor = frameCursor->NextSiblingElement("PhysicalOffsetFrame");
@@ -5952,15 +5995,16 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
   // OpenSim v3 files specify visible geometry this way
   tinyxml2::XMLElement* attachedGeometry
       = bodyCursor->FirstChildElement("attached_geometry");
-  if (attachedGeometry && childBody != nullptr && !ignoreGeometry)
+  if (attachedGeometry && childBody != nullptr)
   {
-    readAttachedGeometry(
+    avgScale = readAttachedGeometry(
         attachedGeometry,
         childBody,
         Eigen::Isometry3s::Identity(),
         fileNameForErrorDisplay,
         geometryFolder,
-        geometryRetriever);
+        geometryRetriever,
+        ignoreGeometry);
   }
 
   if (childBody == nullptr)
@@ -5968,7 +6012,8 @@ std::pair<dynamics::Joint*, dynamics::BodyNode*> createJoint(
     NIMBLE_THROW("Nimble OpenSimParser caught an error reading Joint \"" + jointName + "\". It has no child body. Please check that your OpenSim file is valid.");
   }
 
-  return std::pair<dynamics::Joint*, dynamics::BodyNode*>(joint, childBody);
+  return std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s>(
+      joint, childBody, avgScale);
 }
 
 //==============================================================================
@@ -6137,7 +6182,7 @@ OpenSimFile OpenSimParser::readOsim30(
             = math::eulerXYZToMatrix(orientationInChild);
         transformFromChild.translation() = locationInChild;
 
-        auto pair = createJoint(
+        auto tuple = createJoint(
             skel,
             parentBody,
             bodyCursor,
@@ -6148,7 +6193,9 @@ OpenSimFile OpenSimParser::readOsim30(
             geometryFolder,
             geometryRetriever,
             ignoreGeometry);
-        childBody = pair.second;
+        childBody = std::get<1>(tuple);
+        Eigen::Vector3s avgScale = std::get<2>(tuple);
+        file.bodyScales[name] = avgScale;
       }
     }
     assert(childBody != nullptr);
@@ -6315,6 +6362,7 @@ void recursiveCreateJoint(
     dynamics::SkeletonPtr skel,
     dynamics::BodyNode* parentBody,
     OpenSimJointXML* joint,
+    OpenSimFile& file,
     const std::string fileNameForErrorDisplay,
     const std::string geometryFolder,
     const common::ResourceRetrieverPtr& geometryRetriever,
@@ -6329,7 +6377,7 @@ void recursiveCreateJoint(
   tinyxml2::XMLElement* jointNode = joint->xml;
   tinyxml2::XMLElement* bodyNode = joint->child->xml;
 
-  auto pair = createJoint(
+  auto tuple = createJoint(
       skel,
       parentBody,
       bodyNode,
@@ -6341,7 +6389,8 @@ void recursiveCreateJoint(
       geometryRetriever,
       ignoreGeometry);
 
-  dynamics::BodyNode* childBody = pair.second;
+  dynamics::BodyNode* childBody = std::get<1>(tuple);
+  file.bodyScales[childBody->getName()] = std::get<2>(tuple);
 
   double mass = atof(bodyNode->FirstChildElement("mass")->GetText());
   Eigen::Vector3s massCenter
@@ -6381,6 +6430,7 @@ void recursiveCreateJoint(
         skel,
         childBody,
         grandChildJoint,
+        file,
         fileNameForErrorDisplay,
         geometryFolder,
         geometryRetriever,
@@ -6711,12 +6761,15 @@ OpenSimFile OpenSimParser::readOsim40(
   //--------------------------------------------------------------------------
   // Build out the physical structure
 
+  OpenSimFile file;
+
   dynamics::SkeletonPtr skel = dynamics::Skeleton::create();
   root->parentBody = nullptr;
   recursiveCreateJoint(
       skel,
       nullptr,
       root,
+      file,
       fileNameForErrorDisplay,
       geometryFolder,
       geometryRetriever,
@@ -6727,7 +6780,6 @@ OpenSimFile OpenSimParser::readOsim40(
   std::cout << "Num bodies: " << skel->getNumBodyNodes() << std::endl;
   */
 
-  OpenSimFile file;
   file.skeleton = skel;
 
   //--------------------------------------------------------------------------
