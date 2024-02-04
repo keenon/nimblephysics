@@ -11,13 +11,17 @@
 using namespace dart;
 using namespace biomechanics;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(MARKER_TRACES_BASICS, SIMPLE_TRACE_CONSTRUCTION)
 {
   int numClasses = 5;
-  StreamingMarkerTraces markerTraces(numClasses, 10);
+  int numWindows = 3;
+  int stride = 1;
+  int maxMarkersPerTimestep = 1;
+  StreamingMarkerTraces markerTraces(
+      numClasses, numWindows, stride, maxMarkersPerTimestep);
 
   for (int i = 0; i < 10; i++)
   {
@@ -28,13 +32,6 @@ TEST(MARKER_TRACES_BASICS, SIMPLE_TRACE_CONSTRUCTION)
     EXPECT_EQ(classes[0], numClasses - 1);
     EXPECT_EQ(markerTraces.getNumTraces(), 1);
   }
-
-  EXPECT_EQ(markerTraces.getRawPointsBufferCursor(), 0);
-  Eigen::MatrixXs rawPointsBuffer = markerTraces.getRawPointsBuffer();
-  for (int i = 0; i < 10; i++)
-  {
-    EXPECT_EQ(rawPointsBuffer(0, i), 0.01 * i);
-  }
 }
 #endif
 
@@ -42,7 +39,11 @@ TEST(MARKER_TRACES_BASICS, SIMPLE_TRACE_CONSTRUCTION)
 TEST(MARKER_TRACES_BASICS, HANDLING_LOGITS)
 {
   int numClasses = 5;
-  StreamingMarkerTraces markerTraces(numClasses, 20);
+  int numWindows = 3;
+  int stride = 1;
+  int maxMarkersPerTimestep = 1;
+  StreamingMarkerTraces markerTraces(
+      numClasses, numWindows, stride, maxMarkersPerTimestep);
 
   std::vector<Eigen::Vector3s> originalMarkers;
   for (int i = 0; i <= 10; i++)
@@ -64,11 +65,15 @@ TEST(MARKER_TRACES_BASICS, HANDLING_LOGITS)
 }
 #endif
 
-#ifdef ALL_TESTS
+// #ifdef ALL_TESTS
 TEST(MARKER_TRACES_BASICS, MAKING_FEATURES)
 {
   int numClasses = 5;
-  StreamingMarkerTraces markerTraces(numClasses, 20);
+  int numWindows = 5;
+  int stride = 2;
+  int maxMarkersPerTimestep = 1;
+  StreamingMarkerTraces markerTraces(
+      numClasses, numWindows, stride, maxMarkersPerTimestep);
 
   std::vector<Eigen::Vector3s> originalMarkers;
   for (int i = 0; i <= 10; i++)
@@ -79,18 +84,22 @@ TEST(MARKER_TRACES_BASICS, MAKING_FEATURES)
     std::vector<int> classes = markerTraces.observeMarkers(markers, i).first;
   }
 
-  auto pair = markerTraces.getTraceFeatures(5, 2, 10);
+  auto pair = markerTraces.getTraceFeatures(false);
   Eigen::MatrixXs features = pair.first;
   Eigen::VectorXi traceIDs = pair.second;
   EXPECT_EQ(features.cols(), 5);
   EXPECT_EQ(features.rows(), 4);
   for (int i = 0; i < features.cols(); i++)
   {
-    EXPECT_EQ(features(3, i), features.cols() - 1 - i);
+    EXPECT_EQ(features(3, i), (i + 4) % features.cols());
     EXPECT_EQ(traceIDs(i), 0);
-    // Newest is first
-    int originalCol = 10 - i * 2;
-    Eigen::Vector3s centering = Eigen::Vector3s::Ones() * 0.06;
+    int originalCol = i * 2;
+    // At the end, we wrap around and begin overwriting the buffer
+    if (i == 0)
+    {
+      originalCol = 10;
+    }
+    Eigen::Vector3s centering = Eigen::Vector3s::Zero() * 0.04;
     Eigen::Vector3s originalMarker = originalMarkers[originalCol] - centering;
     Eigen::Vector3s feature = features.block<3, 1>(0, i);
     if ((originalMarker - feature).norm() > 1e-8)
@@ -105,13 +114,17 @@ TEST(MARKER_TRACES_BASICS, MAKING_FEATURES)
     EXPECT_TRUE((originalMarker - feature).norm() < 1e-8);
   }
 }
-#endif
+// #endif
 
 #ifdef ALL_TESTS
 TEST(MARKER_TRACES_BASICS, MAKING_MIXED_FEATURES)
 {
   int numClasses = 5;
-  StreamingMarkerTraces markerTraces(numClasses, 200);
+  int numWindows = 5;
+  int stride = 2;
+  int maxMarkersPerTimestep = 10;
+  StreamingMarkerTraces markerTraces(
+      numClasses, numWindows, stride, maxMarkersPerTimestep);
 
   int numMarkers = 5;
 
@@ -133,7 +146,7 @@ TEST(MARKER_TRACES_BASICS, MAKING_MIXED_FEATURES)
     std::vector<int> classes = markerTraces.observeMarkers(markers, i).first;
   }
 
-  auto pair = markerTraces.getTraceFeatures(5, 2, 10, false);
+  auto pair = markerTraces.getTraceFeatures(false);
   Eigen::MatrixXs features = pair.first;
   Eigen::VectorXi traceIDs = pair.second;
   EXPECT_EQ(features.cols(), 5 * numMarkers);

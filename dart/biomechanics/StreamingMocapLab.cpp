@@ -16,11 +16,13 @@ namespace biomechanics {
 StreamingMocapLab::StreamingMocapLab(
     std::shared_ptr<dynamics::Skeleton> skeleton,
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers,
-    int bufferSize)
+    int numWindows,
+    int stride,
+    int maxMarkersPerTimestep)
 {
   int totalClasses = skeleton->getNumBodyNodes() + markers.size() + 1;
-  mMarkerTraces
-      = std::make_shared<StreamingMarkerTraces>(totalClasses, bufferSize);
+  mMarkerTraces = std::make_shared<StreamingMarkerTraces>(
+      totalClasses, numWindows, stride, maxMarkersPerTimestep);
   mIK = std::make_shared<StreamingIK>(skeleton, markers);
 }
 
@@ -83,10 +85,10 @@ void StreamingMocapLab::manuallyObserveMarkers(
 /// "windowDuration", backwards from now), and the second is the trace ID for
 /// each point, so that we can correctly assign logit outputs back to the
 /// traces.
-std::pair<Eigen::MatrixXs, Eigen::VectorXi> StreamingMocapLab::getTraceFeatures(
-    int numWindows, long windowDuration, long now)
+std::pair<Eigen::MatrixXs, Eigen::VectorXi>
+StreamingMocapLab::getTraceFeatures()
 {
-  return mMarkerTraces->getTraceFeatures(numWindows, windowDuration, now);
+  return mMarkerTraces->getTraceFeatures();
 }
 
 /// This method takes in the logits for each point, and the trace IDs for each
@@ -104,6 +106,16 @@ void StreamingMocapLab::reset()
 {
   mIK->reset();
   mMarkerTraces->reset();
+}
+
+std::shared_ptr<StreamingMarkerTraces> StreamingMocapLab::getMarkerTraces()
+{
+  return mMarkerTraces;
+}
+
+std::shared_ptr<StreamingIK> StreamingMocapLab::getIK()
+{
+  return mIK;
 }
 
 } // namespace biomechanics

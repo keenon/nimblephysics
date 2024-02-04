@@ -16,7 +16,8 @@ namespace biomechanics {
 class StreamingMarkerTraces
 {
 public:
-  StreamingMarkerTraces(int totalClasses, int bufferSize);
+  StreamingMarkerTraces(
+      int totalClasses, int numWindows, int stride, int maxMarkersPerTimestep);
 
   /// This method takes in a set of markers, and returns a vector of the
   /// predicted classes for each marker, based on classes we have predicted for
@@ -34,7 +35,7 @@ public:
   /// each point, so that we can correctly assign logit outputs back to the
   /// traces.
   std::pair<Eigen::MatrixXs, Eigen::VectorXi> getTraceFeatures(
-      int numWindows, long windowDuration, long now, bool center = true);
+      bool center = true);
 
   /// This method takes in the logits for each point, and the trace IDs for each
   /// point, and updates the internal state of the trace classifier to reflect
@@ -66,21 +67,17 @@ public:
   /// labeled marker clouds.
   int getNumTraces();
 
-  /// This is just for testing, and returns our internal points buffer cursor
-  int getRawPointsBufferCursor();
-
-  /// This is just for testing, and returns our internal points buffer
-  Eigen::MatrixXs getRawPointsBuffer();
-
 protected:
   int mTotalClasses;
-  int mBufferSize;
+  int mNumWindows;
+  int mStride;
+  int mMaxMarkersPerTimestep;
 
   // Collect points into a buffer, grouping by similar trace tags
-  int mBufferCursor;
-  Eigen::Matrix<s_t, 3, Eigen::Dynamic> mPointBuffer;
-  Eigen::VectorXi mPointBufferTrace;
-  std::vector<long> mPointBufferTime;
+  int mStrideCursor;
+  int mWindowCursor;
+  Eigen::Matrix<s_t, 4, Eigen::Dynamic> mWindowFeatures;
+  Eigen::VectorXi mWindowFeaturesTrace;
 
   // Each active trace needs to track its latest point, latest velocity, and
   // logits

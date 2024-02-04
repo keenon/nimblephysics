@@ -31,7 +31,9 @@ public:
   StreamingMocapLab(
       std::shared_ptr<dynamics::Skeleton> skeleton,
       std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers,
-      int bufferSize = 10000);
+      int numWindows,
+      int stride,
+      int maxMarkersPerTimestep);
 
   /// This cleans up the thread and any other resources used by the StreamingIK
   ~StreamingMocapLab();
@@ -59,13 +61,10 @@ public:
       std::vector<Eigen::Vector3s>& markers, long timestamp);
 
   /// This method returns the features that we used to predict the classes of
-  /// the markers. The first element of the pair is the features (which are
-  /// trace points concatenated with the time, as measured in integer units of
-  /// "windowDuration", backwards from now), and the second is the trace ID for
-  /// each point, so that we can correctly assign logit outputs back to the
-  /// traces.
-  std::pair<Eigen::MatrixXs, Eigen::VectorXi> getTraceFeatures(
-      int numWindows, long windowDuration, long now);
+  /// the markers. The first element of the pair is the features, and the second
+  /// is the trace ID for each point, so that we can correctly assign logit
+  /// outputs back to the traces.
+  std::pair<Eigen::MatrixXs, Eigen::VectorXi> getTraceFeatures();
 
   /// This method takes in the logits for each point, and the trace IDs for each
   /// point, and updates the internal state of the trace classifier to reflect
@@ -76,6 +75,9 @@ public:
   /// This method resets the state of the mocap lab, including the IK and the
   /// marker traces
   void reset();
+
+  std::shared_ptr<StreamingMarkerTraces> getMarkerTraces();
+  std::shared_ptr<StreamingIK> getIK();
 
 protected:
   std::shared_ptr<StreamingMarkerTraces> mMarkerTraces;

@@ -214,15 +214,31 @@ void StreamingIK::startGUIThread(std::shared_ptr<server::GUIStateMachine> gui)
     while (mGUIThreadRunning)
     {
       gui->renderSkeleton(mSkeleton);
+      Eigen::VectorXs virtualMarkers
+          = mSkeleton->getMarkerWorldPositions(mMarkers);
       for (int i = 0; i < mMarkers.size(); i++)
       {
         if (mLastMarkerObservationWeights(i * 3) == 0)
         {
           gui->setObjectPosition(std::to_string(i), Eigen::Vector3s::Zero());
+          std::vector<Eigen::Vector3s> points;
+          points.push_back(Eigen::Vector3s::Zero());
+          points.push_back(Eigen::Vector3s::Zero());
+          gui->createLine(
+              "error_" + std::to_string(i),
+              points,
+              Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
           continue;
         }
         gui->setObjectPosition(
             std::to_string(i), mLastMarkerObservations.segment<3>(i * 3));
+        std::vector<Eigen::Vector3s> points;
+        points.push_back(mLastMarkerObservations.segment<3>(i * 3));
+        points.push_back(virtualMarkers.segment<3>(i * 3));
+        gui->createLine(
+            "error_" + std::to_string(i),
+            points,
+            Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
       }
       // Don't go faster than 20fps
       std::this_thread::sleep_for(std::chrono::milliseconds(50));

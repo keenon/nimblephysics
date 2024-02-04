@@ -50,9 +50,11 @@ void StreamingMarkerTraces(py::module& m)
       std::shared_ptr<dart::biomechanics::StreamingMarkerTraces>>(
       m, "StreamingMarkerTraces")
       .def(
-          ::py::init<int, int>(),
+          ::py::init<int, int, int, int>(),
           ::py::arg("totalClasses"),
-          ::py::arg("bufferSize") = 10000)
+          ::py::arg("numWindows"),
+          ::py::arg("stride"),
+          ::py::arg("maxMarkersPerTimestep"))
       .def(
           "observeMarkers",
           &dart::biomechanics::StreamingMarkerTraces::observeMarkers,
@@ -68,9 +70,6 @@ void StreamingMarkerTraces(py::module& m)
       .def(
           "getTraceFeatures",
           &dart::biomechanics::StreamingMarkerTraces::getTraceFeatures,
-          ::py::arg("numWindows"),
-          ::py::arg("windowDuration"),
-          ::py::arg("now"),
           ::py::arg("center") = true,
           "This method returns the features that we used to predict the "
           "classes "
@@ -89,6 +88,31 @@ void StreamingMarkerTraces(py::module& m)
           "This method takes in the logits for each point, and the trace IDs "
           "for each point, and updates the internal state of the trace "
           "classifier to reflect the new information.")
+      .def(
+          "setMaxJoinDistance",
+          &dart::biomechanics::StreamingMarkerTraces::setMaxJoinDistance,
+          ::py::arg("distance"),
+          "This method sets the maximum distance that "
+          "can exist between the last head of a trace, and a new marker "
+          "position. Markers that are within this distance from a trace are "
+          "not guaranteed to be merged (they must be the closest to the "
+          "trace), but markers that are further than this distance are "
+          "guaranteed to be split into a new trace.")
+      .def(
+          "setTraceTimeoutMillis",
+          &dart::biomechanics::StreamingMarkerTraces::setTraceTimeoutMillis,
+          ::py::arg("timeout"),
+          "This method sets the timeout for traces. If a "
+          "trace has not been updated for this many milliseconds, it will be "
+          "removed from the trace list.")
+      .def(
+          "setFeatureMaxStrideTolerance",
+          &dart::biomechanics::StreamingMarkerTraces::
+              setFeatureMaxStrideTolerance,
+          ::py::arg("tolerance"),
+          "This sets the maximum number of milliseconds "
+          "that we will tolerate between a stride and a point we are going to "
+          "accept as being at that stride.")
       .def(
           "reset",
           &dart::biomechanics::StreamingMarkerTraces::reset,
