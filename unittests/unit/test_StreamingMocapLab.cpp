@@ -45,12 +45,7 @@ TEST(StreamingMocapLab, LIMIT_TEST)
   std::shared_ptr<Anthropometrics> anthro = Anthropometrics::loadFromFile(
       "dart://sample/osim/ANSUR/ANSUR_metrics.xml");
 
-  int numWindows = 5;
-  int stride = 10;
-  int maxMarkersPerTimestep = 50;
-
-  StreamingMocapLab lab(
-      standard.skeleton, markers, numWindows, stride, maxMarkersPerTimestep);
+  StreamingMocapLab lab(standard.skeleton, markers);
   lab.setAnthropometricPrior(anthro);
   lab.startSolverThread();
 
@@ -72,7 +67,7 @@ TEST(StreamingMocapLab, LIMIT_TEST)
       classes.push_back(markerNameToIndex[marker.first]);
     }
     lab.manuallyObserveMarkers(frameMarkers, time);
-    auto featurePair = lab.getTraceFeatures();
+    auto featurePair = lab.getTraceFeatures(1, 1);
     time += 10;
     Eigen::MatrixXs logits = Eigen::MatrixXs::Zero(
         standard.skeleton->getNumBodyNodes() + markers.size() + 1,

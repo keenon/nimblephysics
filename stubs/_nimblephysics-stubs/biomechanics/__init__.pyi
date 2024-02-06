@@ -2413,8 +2413,8 @@ class StreamingIK():
         """
     pass
 class StreamingMarkerTraces():
-    def __init__(self, totalClasses: int, bufferSize: int = 10000) -> None: ...
-    def getTraceFeatures(self, numWindows: int, windowDuration: int, now: int, center: bool = True) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
+    def __init__(self, totalClasses: int, bufferSize: int) -> None: ...
+    def getTraceFeatures(self, numWindows: int, windowDuration: int, center: bool = True) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
         """
         This method returns the features that we used to predict the classes of the markers. The first element of the pair is the features (which are trace points concatenated with the time, as measured in integer units of 'windowDuration', backwards from now), and the second is the trace ID for each point, so that we can correctly assign logit outputs back to the traces.
         """
@@ -2426,14 +2426,29 @@ class StreamingMarkerTraces():
         """
         This method takes in the logits for each point, and the trace IDs for each point, and updates the internal state of the trace classifier to reflect the new information.
         """
+    def renderTracesToGUI(self, gui: nimblephysics_libs._nimblephysics.server.GUIStateMachine) -> None: ...
     def reset(self) -> None: 
         """
         This resets all traces to empty
         """
+    def setFeatureMaxStrideTolerance(self, tolerance: int) -> None: 
+        """
+        This sets the maximum number of milliseconds that we will tolerate between a stride and a point we are going to accept as being at that stride.
+        """
+    def setMaxJoinDistance(self, distance: float) -> None: 
+        """
+        This method sets the maximum distance that can exist between the last head of a trace, and a new marker position. Markers that are within this distance from a trace are not guaranteed to be merged (they must be the closest to the trace), but markers that are further than this distance are guaranteed to be split into a new trace.
+        """
+    def setTraceTimeoutMillis(self, timeout: int) -> None: 
+        """
+        This method sets the timeout for traces. If a trace has not been updated for this many milliseconds, it will be removed from the trace list.
+        """
     pass
 class StreamingMocapLab():
-    def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], bufferSize: int = 10000) -> None: ...
-    def getTraceFeatures(self, numWindows: int, windowDuration: int, now: int) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
+    def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def getIK(self) -> StreamingMarkerTraces: ...
+    def getMarkerTraces(self) -> StreamingMarkerTraces: ...
+    def getTraceFeatures(self, numWindows: int, windowDuration: int) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
         """
         This method returns the features that we used to predict the classes of the markers. The first element of the pair is the features (which are trace points concatenated with the time, as measured in integer units of 'windowDuration', backwards from now), and the second is the trace ID for each point, so that we can correctly assign logit outputs back to the traces.
         """

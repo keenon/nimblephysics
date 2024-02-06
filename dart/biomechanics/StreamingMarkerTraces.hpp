@@ -1,13 +1,55 @@
 #ifndef DART_BIOMECH_STREAMING_TRACE
 #define DART_BIOMECH_STREAMING_TRACE
 
+#include <memory>
 #include <tuple>
 #include <vector>
 
 #include "dart/math/MathTypes.hpp"
+#include "dart/server/GUIStateMachine.hpp"
 
 namespace dart {
 namespace biomechanics {
+
+class Trace
+{
+public:
+  Trace(
+      const Eigen::Vector3s& first_point,
+      long trace_time,
+      int num_classes,
+      int num_bodies = 0);
+
+  void add_point(const Eigen::Vector3s& point, long time);
+
+  Eigen::Vector3s project_to(long time) const;
+
+  s_t dist_to(const Eigen::Vector3s& other) const;
+
+  long time_since_last_point(long now) const;
+
+  long last_time() const;
+
+  long start_time() const;
+
+  long get_duration() const;
+
+  int get_predicted_class() const;
+
+  std::vector<Eigen::Vector4s> get_points_at_intervals(
+      long end, long interval, int windows) const;
+
+  void render_to_gui(std::shared_ptr<server::GUIStateMachine> gui);
+
+  void drop_from_gui(std::shared_ptr<server::GUIStateMachine> gui);
+
+public:
+  int uuid;
+  std::vector<Eigen::Vector3s> points;
+  std::vector<long> times;
+  Eigen::VectorXs logits;
+  int num_bodies;
+};
 
 /**
  * This class implements the (hopefully somewhat efficient) real-time
@@ -16,8 +58,7 @@ namespace biomechanics {
 class StreamingMarkerTraces
 {
 public:
-  StreamingMarkerTraces(
-      int totalClasses, int numWindows, int stride, int maxMarkersPerTimestep);
+  StreamingMarkerTraces(int numClasses, int numBodies);
 
   /// This method takes in a set of markers, and returns a vector of the
   /// predicted classes for each marker, based on classes we have predicted for
@@ -35,7 +76,7 @@ public:
   /// each point, so that we can correctly assign logit outputs back to the
   /// traces.
   std::pair<Eigen::MatrixXs, Eigen::VectorXi> getTraceFeatures(
-      bool center = true);
+      int numWindows, long windowDuration, bool center = true);
 
   /// This method takes in the logits for each point, and the trace IDs for each
   /// point, and updates the internal state of the trace classifier to reflect
@@ -67,27 +108,13 @@ public:
   /// labeled marker clouds.
   int getNumTraces();
 
+  /// This renders the traces we have in our state to the GUI
+  void renderTracesToGUI(std::shared_ptr<server::GUIStateMachine> gui);
+
 protected:
-  int mTotalClasses;
-  int mNumWindows;
-  int mStride;
-  int mMaxMarkersPerTimestep;
-
-  // Collect points into a buffer, grouping by similar trace tags
-  int mStrideCursor;
-  int mWindowCursor;
-  Eigen::Matrix<s_t, 4, Eigen::Dynamic> mWindowFeatures;
-  Eigen::VectorXi mWindowFeaturesTrace;
-
-  // Each active trace needs to track its latest point, latest velocity, and
-  // logits
-  std::vector<Eigen::Vector3s> mTraceHeads;
-  std::vector<Eigen::Vector3s> mTraceVelocities;
-  std::vector<long> mTraceLastSeenTimestamp;
-  std::vector<int> mTraceTag;
-  int mTraceTagCursor;
-  std::vector<Eigen::VectorXs> mTraceLogits;
-  std::vector<int> mTracePredictedClass;
+  int mNumClasses;
+  int mNumBodies;
+  std::vector<Trace> mTraces;
 
   // This is configuration to handle how we group points into traces
   long mTraceTimeoutMillis;

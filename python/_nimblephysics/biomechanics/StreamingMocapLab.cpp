@@ -56,15 +56,9 @@ void StreamingMocapLab(py::module& m)
       .def(
           ::py::init<
               std::shared_ptr<dynamics::Skeleton>,
-              std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>,
-              int,
-              int,
-              int>(),
+              std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
           ::py::arg("skeleton"),
-          ::py::arg("markers"),
-          ::py::arg("numWindows"),
-          ::py::arg("stride"),
-          ::py::arg("maxMarkersPerTimestep"))
+          ::py::arg("markers"))
       .def(
           "startSolverThread",
           &dart::biomechanics::StreamingMocapLab::startSolverThread,
@@ -99,6 +93,8 @@ void StreamingMocapLab(py::module& m)
       .def(
           "getTraceFeatures",
           &dart::biomechanics::StreamingMocapLab::getTraceFeatures,
+          ::py::arg("numWindows"),
+          ::py::arg("windowDuration"),
           "This method returns the features that we used to predict the "
           "classes "
           "of the markers. The first element of the pair is the features "

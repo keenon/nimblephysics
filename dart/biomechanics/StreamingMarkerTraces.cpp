@@ -1,8 +1,11 @@
 #include "dart/biomechanics/StreamingMarkerTraces.hpp"
 
+#include <algorithm>
+#include <climits>
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -11,25 +14,170 @@
 namespace dart {
 namespace biomechanics {
 
+Trace::Trace(
+    const Eigen::Vector3s& first_point,
+    long trace_time,
+    int num_classes,
+    int num_bodies)
+  : num_bodies(num_bodies), logits(Eigen::VectorXs::Zero(num_classes))
+{
+  points.push_back(first_point);
+  times.push_back(trace_time);
+
+  uuid = rand();
+}
+
+void Trace::add_point(const Eigen::Vector3s& point, long time)
+{
+  points.push_back(point);
+  times.push_back(time);
+}
+
+Eigen::Vector3s Trace::project_to(long time) const
+{
+  if (points.size() > 1)
+  {
+    Eigen::Vector3s last_vel = (points.back() - points[points.size() - 2])
+                               / (times.back() - times[times.size() - 2]);
+    return points.back() + last_vel * (time - times.back());
+  }
+  else if (points.size() == 1)
+  {
+    return points.back();
+  }
+  else
+  {
+    return Eigen::Vector3s::Zero();
+  }
+}
+
+s_t Trace::dist_to(const Eigen::Vector3s& other) const
+{
+  return (points.back() - other).norm();
+}
+
+long Trace::time_since_last_point(long now) const
+{
+  return now - times.back();
+}
+
+long Trace::last_time() const
+{
+  return times.back();
+}
+
+long Trace::start_time() const
+{
+  return times.front();
+}
+
+long Trace::get_duration() const
+{
+  return times.back() - times.front();
+}
+
+int Trace::get_predicted_class() const
+{
+  Eigen::Index maxLogit;
+  logits.maxCoeff(&maxLogit);
+  return maxLogit;
+}
+
+std::vector<Eigen::Vector4s> Trace::get_points_at_intervals(
+    long end, long interval, int windows) const
+{
+  std::vector<Eigen::Vector4s> result_points;
+  if (times.empty())
+    return result_points;
+
+  long start = end - interval * (windows - 1);
+  Eigen::Matrix<long, Eigen::Dynamic, 1> evenly_spaced_times
+      = Eigen::Matrix<long, Eigen::Dynamic, 1>::LinSpaced(windows, start, end);
+
+  size_t points_cursor = 0;
+  long threshold = 100;
+
+  for (int i = 0; i < evenly_spaced_times.size(); ++i)
+  {
+    long target_time = evenly_spaced_times[i];
+    while (points_cursor < times.size()
+           && std::abs(times[points_cursor] - target_time) > threshold
+           && times[points_cursor] < target_time)
+    {
+      ++points_cursor;
+    }
+    if (points_cursor >= times.size())
+      break;
+
+    if (std::abs(times[points_cursor] - target_time) <= threshold)
+    {
+      Eigen::Vector4s augmented_point;
+      augmented_point.head<3>() = points[points_cursor];
+      augmented_point[3] = static_cast<s_t>(
+          i); // Assigning the interval index to the fourth dimension
+      result_points.push_back(augmented_point);
+      ++points_cursor;
+    }
+  }
+
+  return result_points;
+}
+
+void Trace::render_to_gui(std::shared_ptr<server::GUIStateMachine> gui)
+{
+  if (!gui)
+  {
+    std::cout << "NO GUI!!!" << std::endl;
+    return;
+  }
+
+  std::vector<Eigen::Vector3s> line_points;
+  const size_t num_points = 20;
+
+  // Ensure there are enough points, or repeat the first point as necessary
+  if (points.size() >= num_points)
+  {
+    line_points.insert(
+        line_points.end(), points.end() - num_points, points.end());
+  }
+  else
+  {
+    line_points.insert(line_points.end(), points.begin(), points.end());
+    while (line_points.size() < num_points)
+    {
+      line_points.push_back(points.front());
+    }
+  }
+
+  // Assuming logits is an Eigen::VectorXf
+  int max_logit_index = std::distance(
+      logits.data(),
+      std::max_element(logits.data(), logits.data() + logits.size()));
+  bool is_nothing = max_logit_index == logits.size() - 1;
+  bool is_anatomical = max_logit_index > num_bodies;
+
+  Eigen::Vector4s color
+      = is_nothing ? Eigen::Vector4s(0.5, 0.5, 0.5, 1.0)
+                   : (is_anatomical ? Eigen::Vector4s(0.0, 0.0, 1.0, 1.0)
+                                    : Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+
+  // Convert line_points to the required format if needed
+  gui->createLine(std::to_string(uuid), line_points, color);
+}
+
+void Trace::drop_from_gui(std::shared_ptr<server::GUIStateMachine> gui)
+{
+  gui->deleteObject(std::to_string(uuid));
+}
+
 //==============================================================================
-StreamingMarkerTraces::StreamingMarkerTraces(
-    int totalClasses, int numWindows, int stride, int maxMarkersPerTimestep)
-  : mTotalClasses(totalClasses),
-    mNumWindows(numWindows),
-    mStride(stride),
-    mStrideCursor(0),
-    mMaxMarkersPerTimestep(maxMarkersPerTimestep),
-    mWindowFeatures(Eigen::Matrix<s_t, 4, Eigen::Dynamic>::Random(
-        4, numWindows * maxMarkersPerTimestep)),
-    mWindowFeaturesTrace(
-        Eigen::VectorXi::Ones(numWindows * maxMarkersPerTimestep) * -1),
-    mWindowCursor(0),
-    mTraceTagCursor(0),
+StreamingMarkerTraces::StreamingMarkerTraces(int numClasses, int numBodies)
+  : mNumBodies(numBodies),
+    mNumClasses(numClasses),
     mTraceMaxJoinDistance(0.05),
     mTraceTimeoutMillis(300),
     mFeatureMaxStrideToleranceMillis(10)
 {
-  mWindowFeatures.row(3).setZero();
 }
 
 //==============================================================================
@@ -63,17 +211,7 @@ void StreamingMarkerTraces::setFeatureMaxStrideTolerance(long strideTolerance)
 /// This resets all traces to empty
 void StreamingMarkerTraces::reset()
 {
-  mWindowFeatures = Eigen::Matrix<s_t, 4, Eigen::Dynamic>::Random(
-      4, mNumWindows * mMaxMarkersPerTimestep);
-  mWindowFeatures.row(3).setZero();
-  mWindowFeaturesTrace
-      = Eigen::VectorXi::Ones(mNumWindows * mMaxMarkersPerTimestep) * -1;
-  mTraceTagCursor = 0;
-  mTraceHeads.clear();
-  mTraceVelocities.clear();
-  mTraceLastSeenTimestamp.clear();
-  mTraceTag.clear();
-  mTraceLogits.clear();
+  mTraces.clear();
 }
 
 //==============================================================================
@@ -83,143 +221,53 @@ void StreamingMarkerTraces::reset()
 /// the same length and order as the input `markers` vector.
 std::pair<std::vector<int>, std::vector<int>>
 StreamingMarkerTraces::observeMarkers(
-    const std::vector<Eigen::Vector3s>& markers, long timestamp)
+    const std::vector<Eigen::Vector3s>& markers, long now)
 {
-  std::vector<int> resultClasses(markers.size(), -1);
-  std::vector<int> resultTraceTags(markers.size(), -1);
+  std::vector<int> resultClasses = std::vector<int>(markers.size(), -1);
+  std::vector<int> resultTraceTags = std::vector<int>(markers.size(), -1);
 
-  ///////////////////////////////////////////////////////////
-  // 1. Assign all the markers to traces
-  ///////////////////////////////////////////////////////////
+  // 1. Trim the old traces
+  auto it = std::remove_if(
+      mTraces.begin(), mTraces.end(), [this, now](const Trace& trace) {
+        return trace.time_since_last_point(now) >= this->mTraceTimeoutMillis;
+      });
+  mTraces.erase(it, mTraces.end());
 
-  // First collapse the traces that have timed out, since that saves space in
-  // subsequent operations
-  for (int tr = 0; tr < mTraceHeads.size(); tr++)
+  // 2. Assign markers to traces
+  std::vector<bool> markers_assigned(markers.size(), false);
+  Eigen::MatrixXs dists = Eigen::MatrixXs::Zero(mTraces.size(), markers.size());
+  for (size_t i = 0; i < mTraces.size(); ++i)
   {
-    long elapsedMillis = timestamp - mTraceLastSeenTimestamp[tr];
-    if (elapsedMillis > mTraceTimeoutMillis)
+    auto projected_marker = mTraces[i].project_to(now);
+    for (size_t j = 0; j < markers.size(); ++j)
     {
-      // This trace has timed out, so we need to remove it
-      mTraceHeads.erase(mTraceHeads.begin() + tr);
-      mTraceVelocities.erase(mTraceVelocities.begin() + tr);
-      mTraceLastSeenTimestamp.erase(mTraceLastSeenTimestamp.begin() + tr);
-      mTraceTag.erase(mTraceTag.begin() + tr);
-      mTraceLogits.erase(mTraceLogits.begin() + tr);
-      tr--;
+      dists(i, j) = (projected_marker - markers[j]).norm();
     }
   }
-
-  int pointsAssigned = 0;
-  if (mTraceHeads.size() > 0)
+  for (size_t k = 0; k < std::min(markers.size(), mTraces.size()); ++k)
   {
-    // Now we want to fill in the distances between the points we just received
-    // and the projected trace heads
-    Eigen::MatrixXs pointsToTraces
-        = Eigen::MatrixXs::Zero(markers.size(), mTraceHeads.size());
-    for (int tr = 0; tr < mTraceHeads.size(); tr++)
+    // Find the closest pair
+    Eigen::MatrixXf::Index minRow, minCol;
+    s_t minDist = dists.minCoeff(&minRow, &minCol);
+    if (minDist > 0.1f)
     {
-      long elapsedMillis = timestamp - mTraceLastSeenTimestamp[tr];
-      // This trace is still active, so we need to project it forward by
-      // velocity
-      double elapsedSeconds = (double)elapsedMillis / 1000.0;
-      (void)elapsedSeconds;
-      const Eigen::Vector3s traceHeadProjected
-          = mTraceHeads[tr] + (mTraceVelocities[tr] * elapsedSeconds);
-
-      for (int i = 0; i < markers.size(); i++)
-      {
-        pointsToTraces(i, tr) = (traceHeadProjected - markers[i]).norm();
-      }
+      break;
     }
-
-    // Finally, we want to collapse the points into the traces
-    while (pointsAssigned < markers.size())
-    {
-      // Find the closest point to any trace
-      Eigen::MatrixXf::Index minMarker, minTrace;
-      s_t minDistance = pointsToTraces.minCoeff(&minMarker, &minTrace);
-      if (minDistance > mTraceMaxJoinDistance)
-      {
-        break;
-      }
-
-      // We can now say that this point gets the same class as the trace.
-
-      resultClasses[minMarker] = mTracePredictedClass[minTrace];
-      resultTraceTags[minMarker] = mTraceTag[minTrace];
-
-      // Now we want to update the trace head and velocity
-
-      // Before we update anything we need to figure out the time delta, and
-      // distance
-      const long elapsedMillis = timestamp - mTraceLastSeenTimestamp[minTrace];
-      const double elapsedSeconds = (double)elapsedMillis / 1000.0;
-      const Eigen::Vector3s dist = mTraceHeads[minTrace] - markers[minMarker];
-
-      // Now we can update the trace data
-      mTraceHeads[minTrace] = markers[minMarker];
-      mTraceVelocities[minTrace] = dist / elapsedSeconds;
-      mTraceLastSeenTimestamp[minTrace] = timestamp;
-
-      // Finally, we want to mark the distances as infinity, so we don't assign
-      // this point to any other trace, or this trace to any other point
-      pointsToTraces.col(minTrace).setConstant(
-          std::numeric_limits<s_t>::infinity());
-      pointsToTraces.row(minMarker).setConstant(
-          std::numeric_limits<s_t>::infinity());
-    }
+    markers_assigned[minCol] = true;
+    mTraces[minRow].add_point(markers[minCol], now);
+    resultTraceTags[minCol] = mTraces[minRow].uuid;
+    resultClasses[minCol] = mTraces[minRow].get_predicted_class();
+    dists.row(minRow).setConstant(std::numeric_limits<s_t>::infinity());
+    dists.col(minCol).setConstant(std::numeric_limits<s_t>::infinity());
   }
 
-  // Now we want to assign any unassigned points to new traces
-  for (int i = 0; i < markers.size(); i++)
+  // 3. Add any remaining markers as new traces
+  for (size_t j = 0; j < markers.size(); ++j)
   {
-    if (resultTraceTags[i] == -1)
+    if (!markers_assigned[j])
     {
-      // This point is unassigned, so we want to assign it to a new trace
-      mTraceHeads.push_back(markers[i]);
-      mTraceVelocities.push_back(Eigen::Vector3s::Zero());
-      mTraceLastSeenTimestamp.push_back(timestamp);
-      mTraceTag.push_back(mTraceTagCursor);
-      mTraceLogits.push_back(Eigen::VectorXs::Zero(mTotalClasses));
-      // The unknown class is the last class
-      mTracePredictedClass.push_back(mTotalClasses - 1);
-      resultClasses[i] = mTotalClasses - 1;
-      resultTraceTags[i] = mTraceTagCursor;
-      mTraceTagCursor++;
+      mTraces.emplace_back(markers[j], now, mNumClasses, mNumBodies);
     }
-  }
-
-  ///////////////////////////////////////////////////////////
-  // 2. On the appropriate strides
-  ///////////////////////////////////////////////////////////
-
-  mStrideCursor--;
-  if (mStrideCursor <= 0)
-  {
-    // Decrement all the timestep features on the observed data
-    mWindowFeatures.row(3) -= Eigen::VectorXs::Ones(mWindowFeatures.cols());
-
-    int observeMarkers = std::min((int)markers.size(), mMaxMarkersPerTimestep);
-
-    // Write all the marker data
-    for (int i = 0; i < observeMarkers; i++)
-    {
-      // Write the features matrix with the marker positions
-      mWindowFeatures.col((mWindowCursor + i) % mWindowFeatures.cols())
-          .head<3>()
-          = markers[i];
-      // Start the timestamps on these entries as the full window count
-      mWindowFeatures(3, (mWindowCursor + i) % mWindowFeatures.cols())
-          = mNumWindows - 1;
-      // Write the trace tags we just found
-      mWindowFeaturesTrace[(mWindowCursor + i) % mWindowFeatures.cols()]
-          = resultTraceTags[i];
-    }
-
-    // Reset the stride counter
-    mStrideCursor = mStride;
-    // Increment the window cursor by the appropriate amount
-    mWindowCursor = (mWindowCursor + observeMarkers) % mWindowFeatures.cols();
   }
 
   return std::make_pair(resultClasses, resultTraceTags);
@@ -233,31 +281,79 @@ StreamingMarkerTraces::observeMarkers(
 /// each point, so that we can correctly assign logit outputs back to the
 /// traces.
 std::pair<Eigen::MatrixXs, Eigen::VectorXi>
-StreamingMarkerTraces::getTraceFeatures(bool center)
+StreamingMarkerTraces::getTraceFeatures(
+    int numWindows, long windowDuration, bool center)
 {
-  // Sub-select just those elements that haven't timed out
-  int numFeatures = 0;
-  for (int i = 0; i < mWindowFeatures.cols(); i++)
+  //  # Get the traces that are long enough to run the model on
+  // if len(self.traces) == 0:
+  //     return
+  if (mTraces.size() == 0)
   {
-    if (mWindowFeatures(3, i) >= 0)
+    return std::make_pair(
+        Eigen::MatrixXs::Zero(4, 0), Eigen::VectorXi::Zero(0));
+  }
+  // expected_duration = self.window * self.stride
+  long expectedDuration = numWindows * windowDuration;
+  // now: float = max([trace.last_time() for trace in self.traces])
+  long now = 0;
+  for (int i = 0; i < mTraces.size(); i++)
+  {
+    const long last = mTraces[i].last_time();
+    if (last > now)
     {
-      numFeatures++;
+      now = last;
     }
   }
-  Eigen::MatrixXs features = Eigen::MatrixXs(4, numFeatures);
-  Eigen::VectorXi traces = Eigen::VectorXi(numFeatures);
-  int cursor = 0;
-  for (int i = 0; i < mWindowFeatures.cols(); i++)
+  // start: float = min([trace.start_time() for trace in self.traces])
+  long start = LONG_MAX;
+  for (int i = 0; i < mTraces.size(); i++)
   {
-    if (mWindowFeatures(3, i) >= 0)
+    const long traceStart = mTraces[i].start_time();
+    if (traceStart < start)
     {
-      features.col(cursor) = mWindowFeatures.col(i);
-      traces(cursor) = mWindowFeaturesTrace(i);
-      cursor++;
+      start = traceStart;
+    }
+  }
+  // if now - start < expected_duration:
+  //     return
+  if (now - start < expectedDuration)
+  {
+    return std::make_pair(
+        Eigen::MatrixXs::Zero(4, 0), Eigen::VectorXi::Zero(0));
+  }
+
+  // input_points_list: List[np.ndarray] = []
+  std::vector<Eigen::Vector4s> inputPointsList;
+  // points_to_trace_uuids: List[str] = []
+  std::vector<int> traceIDsList;
+
+  // for i in range(len(self.traces)):
+  //     trace = self.traces[i]
+  //     points = trace.get_points_at_intervals(now, self.stride, self.window)
+  //     input_points_list.extend(points)
+  //     points_to_trace_uuids.extend([trace.uuid for _ in range(len(points))])
+  for (int i = 0; i < mTraces.size(); i++)
+  {
+    std::vector<Eigen::Vector4s> points
+        = mTraces[i].get_points_at_intervals(now, windowDuration, numWindows);
+    for (auto& point : points)
+    {
+      inputPointsList.push_back(point);
+      traceIDsList.push_back(mTraces[i].uuid);
     }
   }
 
-  // If we're centering the point cloud, then do that
+  // x = np.stack(input_points_list)
+  // # Center the first 3 rows
+  // x[:, :3] -= x[:, :3].mean(axis=0)
+  Eigen::MatrixXs features = Eigen::MatrixXs(4, inputPointsList.size());
+  Eigen::VectorXi traceIDs = Eigen::VectorXi(inputPointsList.size());
+  for (int i = 0; i < inputPointsList.size(); i++)
+  {
+    features.col(i) = inputPointsList[i];
+    traceIDs(i) = traceIDsList[i];
+  }
+
   if (center)
   {
     features.block(0, 0, 3, features.cols())
@@ -265,7 +361,7 @@ StreamingMarkerTraces::getTraceFeatures(bool center)
           - features.block(0, 0, 3, features.cols()).rowwise().mean();
   }
 
-  return std::make_pair(features, traces);
+  return std::make_pair(features, traceIDs);
 }
 
 //==============================================================================
@@ -278,21 +374,14 @@ void StreamingMarkerTraces::observeTraceLogits(
   for (int i = 0; i < traceIDs.size(); i++)
   {
     int traceID = traceIDs(i);
-    for (int j = 0; j < mTraceTag.size(); j++)
+    for (int j = 0; j < mTraces.size(); j++)
     {
-      if (mTraceTag[j] == traceID)
+      if (mTraces[j].uuid == traceID)
       {
-        mTraceLogits[j] = logits.col(i);
+        mTraces[j].logits = logits.col(i);
         break;
       }
     }
-  }
-
-  for (int i = 0; i < mTraceLogits.size(); i++)
-  {
-    Eigen::MatrixXf::Index minIndex;
-    mTraceLogits[i].maxCoeff(&minIndex);
-    mTracePredictedClass[i] = minIndex;
   }
 }
 
@@ -303,7 +392,18 @@ void StreamingMarkerTraces::observeTraceLogits(
 /// labeled marker clouds.
 int StreamingMarkerTraces::getNumTraces()
 {
-  return mTraceHeads.size();
+  return mTraces.size();
+}
+
+//==============================================================================
+/// This renders the traces we have in our state to the GUI
+void StreamingMarkerTraces::renderTracesToGUI(
+    std::shared_ptr<server::GUIStateMachine> gui)
+{
+  for (auto& trace : mTraces)
+  {
+    trace.render_to_gui(gui);
+  }
 }
 
 } // namespace biomechanics

@@ -50,11 +50,9 @@ void StreamingMarkerTraces(py::module& m)
       std::shared_ptr<dart::biomechanics::StreamingMarkerTraces>>(
       m, "StreamingMarkerTraces")
       .def(
-          ::py::init<int, int, int, int>(),
+          ::py::init<int, int>(),
           ::py::arg("totalClasses"),
-          ::py::arg("numWindows"),
-          ::py::arg("stride"),
-          ::py::arg("maxMarkersPerTimestep"))
+          ::py::arg("bufferSize"))
       .def(
           "observeMarkers",
           &dart::biomechanics::StreamingMarkerTraces::observeMarkers,
@@ -70,6 +68,8 @@ void StreamingMarkerTraces(py::module& m)
       .def(
           "getTraceFeatures",
           &dart::biomechanics::StreamingMarkerTraces::getTraceFeatures,
+          ::py::arg("numWindows"),
+          ::py::arg("windowDuration"),
           ::py::arg("center") = true,
           "This method returns the features that we used to predict the "
           "classes "
@@ -116,7 +116,11 @@ void StreamingMarkerTraces(py::module& m)
       .def(
           "reset",
           &dart::biomechanics::StreamingMarkerTraces::reset,
-          "This resets all traces to empty");
+          "This resets all traces to empty")
+      .def(
+          "renderTracesToGUI",
+          &dart::biomechanics::StreamingMarkerTraces::renderTracesToGUI,
+          ::py::arg("gui"));
 }
 
 } // namespace python
