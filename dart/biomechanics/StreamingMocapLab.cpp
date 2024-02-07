@@ -100,9 +100,9 @@ void StreamingMocapLab::observeTraceLogits(
 
 /// This method resets the state of the mocap lab, including the IK and the
 /// marker traces
-void StreamingMocapLab::reset()
+void StreamingMocapLab::reset(std::shared_ptr<server::GUIStateMachine> gui)
 {
-  mIK->reset();
+  mIK->reset(gui);
   mMarkerTraces->reset();
 }
 

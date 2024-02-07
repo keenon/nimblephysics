@@ -51,7 +51,7 @@ public:
 
   /// This method allows tests to manually input a set of markers, rather than
   /// waiting for Cortex to send them
-  void reset();
+  void reset(std::shared_ptr<server::GUIStateMachine> gui);
 
 protected:
   std::shared_ptr<dynamics::Skeleton> mSkeleton;

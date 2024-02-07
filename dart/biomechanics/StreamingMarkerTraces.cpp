@@ -211,6 +211,10 @@ void StreamingMarkerTraces::setFeatureMaxStrideTolerance(long strideTolerance)
 /// This resets all traces to empty
 void StreamingMarkerTraces::reset()
 {
+  for (auto& trace : mTraces)
+  {
+    tracesToRemoveFromGUI.push_back(trace.uuid);
+  }
   mTraces.clear();
 }
 
@@ -225,6 +229,14 @@ StreamingMarkerTraces::observeMarkers(
 {
   std::vector<int> resultClasses = std::vector<int>(markers.size(), -1);
   std::vector<int> resultTraceTags = std::vector<int>(markers.size(), -1);
+
+  for (auto& trace : mTraces)
+  {
+    if (trace.time_since_last_point(now) >= this->mTraceTimeoutMillis)
+    {
+      tracesToRemoveFromGUI.push_back(trace.uuid);
+    }
+  }
 
   // 1. Trim the old traces
   auto it = std::remove_if(
@@ -334,6 +346,8 @@ StreamingMarkerTraces::getTraceFeatures(
   //     points_to_trace_uuids.extend([trace.uuid for _ in range(len(points))])
   for (int i = 0; i < mTraces.size(); i++)
   {
+    if (mTraces[i].get_duration() < expectedDuration)
+      continue;
     std::vector<Eigen::Vector4s> points
         = mTraces[i].get_points_at_intervals(now, windowDuration, numWindows);
     for (auto& point : points)
@@ -378,7 +392,7 @@ void StreamingMarkerTraces::observeTraceLogits(
     {
       if (mTraces[j].uuid == traceID)
       {
-        mTraces[j].logits = logits.col(i);
+        mTraces[j].logits += logits.col(i);
         break;
       }
     }
@@ -400,9 +414,17 @@ int StreamingMarkerTraces::getNumTraces()
 void StreamingMarkerTraces::renderTracesToGUI(
     std::shared_ptr<server::GUIStateMachine> gui)
 {
+  for (int toRemove : tracesToRemoveFromGUI)
+  {
+    gui->deleteObject(std::to_string(toRemove));
+  }
+  tracesToRemoveFromGUI.clear();
   for (auto& trace : mTraces)
   {
-    trace.render_to_gui(gui);
+    if (trace.get_duration() > 1500)
+    {
+      trace.render_to_gui(gui);
+    }
   }
 }
 

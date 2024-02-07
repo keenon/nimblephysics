@@ -1262,7 +1262,11 @@ void CortexStreaming::parseAndHandleFrameOfData(char* data, int nBytes)
       if (!body.markers[i].hasNaN())
       {
         markerNames.push_back(body.markerNames[i]);
-        markers.push_back(body.markers[i]);
+        Eigen::Vector3s markerTransformed = Eigen::Vector3s(
+            body.markers[i](0) * 0.001,
+            body.markers[i](2) * 0.001,
+            body.markers[i](1) * 0.001);
+        markers.push_back(markerTransformed);
       }
     }
   }
@@ -1271,7 +1275,11 @@ void CortexStreaming::parseAndHandleFrameOfData(char* data, int nBytes)
     if (!result.unidentifiedMarkers[i].hasNaN())
     {
       markerNames.push_back("UNIDENTIFIED_" + std::to_string(i));
-      markers.push_back(result.unidentifiedMarkers[i]);
+      Eigen::Vector3s markerTransformed = Eigen::Vector3s(
+          result.unidentifiedMarkers[i](0) * 0.001,
+          result.unidentifiedMarkers[i](2) * 0.001,
+          result.unidentifiedMarkers[i](1) * 0.001);
+      markers.push_back(markerTransformed);
     }
   }
 

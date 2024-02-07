@@ -74,7 +74,7 @@ public:
 
   /// This method resets the state of the mocap lab, including the IK and the
   /// marker traces
-  void reset();
+  void reset(std::shared_ptr<server::GUIStateMachine> gui);
 
   /// This method returns the IK solver that this mocap lab is using
   std::shared_ptr<StreamingIK> getIK();

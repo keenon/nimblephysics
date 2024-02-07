@@ -115,6 +115,7 @@ protected:
   int mNumClasses;
   int mNumBodies;
   std::vector<Trace> mTraces;
+  std::vector<int> tracesToRemoveFromGUI;
 
   // This is configuration to handle how we group points into traces
   long mTraceTimeoutMillis;

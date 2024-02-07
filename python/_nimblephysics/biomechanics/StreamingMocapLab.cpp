@@ -116,6 +116,7 @@ void StreamingMocapLab(py::module& m)
       .def(
           "reset",
           &dart::biomechanics::StreamingMocapLab::reset,
+          ::py::arg("gui") = nullptr,
           "This method resets the state of the mocap lab, including the IK "
           "and the marker traces.")
       .def(

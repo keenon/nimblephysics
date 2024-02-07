@@ -231,7 +231,7 @@ void StreamingIK::startGUIThread(std::shared_ptr<server::GUIStateMachine> gui)
         line.push_back(mLastMarkerObservations.segment<3>(i * 3));
         line.push_back(virtualMarkers.segment<3>(i * 3));
         gui->createLine(
-            "line_" + std::to_string(i), line, Eigen::Vector4s(1, 0, 0, 1));
+            "ik_line_" + std::to_string(i), line, Eigen::Vector4s(1, 0, 0, 1));
       }
       // Don't go faster than 20fps
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -275,7 +275,7 @@ void StreamingIK::setAnthropometricPrior(
 
 /// This method allows tests to manually input a set of markers, rather than
 /// waiting for Cortex to send them
-void StreamingIK::reset()
+void StreamingIK::reset(std::shared_ptr<server::GUIStateMachine> gui)
 {
   mSolverThreadRunning = false;
   if (mSolverThread.valid())
@@ -290,6 +290,13 @@ void StreamingIK::reset()
       Eigen::VectorXs::Zero(mSkeletonBallJoints->getNumDofs()));
   mSkeletonBallJoints->setGroupScales(
       Eigen::VectorXs::Ones(mSkeletonBallJoints->getGroupScaleDim()));
+
+  if (gui)
+  {
+    // gui->deleteObjectsByPrefix("ik_line_");
+    gui->renderSkeleton(mSkeleton);
+  }
+
   startSolverThread();
 }
 
