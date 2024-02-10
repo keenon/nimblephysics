@@ -7,8 +7,11 @@
 #include <vector>
 
 #include "dart/math/MathTypes.hpp"
+#include "dart/math/PolynomialFitter.hpp"
 
 namespace dart {
+using namespace math;
+
 namespace biomechanics {
 
 /// This class manages a thread that runs the IK continuously, and updates as
@@ -19,7 +22,8 @@ StreamingIK::StreamingIK(
   : mSkeleton(skeleton),
     mMarkers(markers),
     mSolverThreadRunning(false),
-    mNumBodyNodes(skeleton->getNumBodyNodes())
+    mNumBodyNodes(skeleton->getNumBodyNodes()),
+    mLastTimestamp(0)
 {
   mLastMarkerObservations = Eigen::VectorXs(mMarkers.size() * 3);
   mLastMarkerObservationWeights = Eigen::VectorXs(mMarkers.size() * 3);
@@ -54,6 +58,12 @@ void StreamingIK::startSolverThread()
     return;
   mSolverThreadRunning = true;
   mSolverThread = std::async(std::launch::async, [&]() {
+    Eigen::VectorXs posesUpperBound
+        = mSkeletonBallJoints->getPositionUpperLimits();
+    posesUpperBound.head<6>().setConstant(1e6);
+    Eigen::VectorXs posesLowerBound
+        = mSkeletonBallJoints->getPositionLowerLimits();
+    posesLowerBound.head<6>().setConstant(-1e6);
     Eigen::VectorXs scalesUpperBound
         = mSkeletonBallJoints->getGroupScalesUpperBound();
     Eigen::VectorXs scalesLowerBound
@@ -90,10 +100,15 @@ void StreamingIK::startSolverThread()
           mSkeletonBallJoints->getGroupScaleDim())
           = mSkeletonBallJoints->getMarkerWorldPositionsJacobianWrtGroupScales(
               mMarkersBallJoints);
-      Eigen::VectorXs diff
-          = (mSkeletonBallJoints->getMarkerWorldPositions(mMarkersBallJoints)
-             - mLastMarkerObservations)
-                .cwiseProduct(mLastMarkerObservationWeights);
+      Eigen::VectorXs diff;
+      {
+        const std::lock_guard<std::mutex> lock(
+            *(const_cast<std::mutex*>(&mGlobalLock)));
+        diff = (mSkeletonBallJoints->getMarkerWorldPositions(mMarkersBallJoints)
+                - mLastMarkerObservations)
+                   .cwiseProduct(mLastMarkerObservationWeights);
+      }
+
       if (mLastMarkerObservationWeights.isZero())
       {
         continue;
@@ -167,6 +182,11 @@ void StreamingIK::startSolverThread()
           += (expNegLogPdfGradient * expNegLogPdf);
       x -= lr * update;
 
+      // Clamp the poses
+      x.segment(0, mSkeletonBallJoints->getNumDofs())
+          = x.segment(0, mSkeletonBallJoints->getNumDofs())
+                .cwiseMax(posesLowerBound)
+                .cwiseMin(posesUpperBound);
       // Clamp the scales
       x.segment(
           mSkeletonBallJoints->getNumDofs(),
@@ -183,11 +203,24 @@ void StreamingIK::startSolverThread()
       mSkeletonBallJoints->setGroupScales(x.segment(
           mSkeletonBallJoints->getNumDofs(),
           mSkeletonBallJoints->getGroupScaleDim()));
-      mSkeleton->setPositions(mSkeleton->convertPositionsFromBallSpace(
-          x.segment(0, mSkeletonBallJoints->getNumDofs())));
-      mSkeleton->setGroupScales(x.segment(
-          mSkeletonBallJoints->getNumDofs(),
-          mSkeletonBallJoints->getGroupScaleDim()));
+      {
+        const std::lock_guard<std::mutex> lock(
+            *(const_cast<std::mutex*>(&mGlobalLock)));
+        Eigen::VectorXs newLastPose = mSkeleton->convertPositionsFromBallSpace(
+            x.segment(0, mSkeletonBallJoints->getNumDofs()));
+        if (mLastPose.size() > 0)
+        {
+          mLastPose
+              = mSkeleton->unwrapPositionToNearest(newLastPose, mLastPose);
+        }
+        else
+        {
+          mLastPose = newLastPose;
+        }
+        mSkeleton->setGroupScales(x.segment(
+            mSkeletonBallJoints->getNumDofs(),
+            mSkeletonBallJoints->getGroupScaleDim()));
+      }
     }
   });
 }
@@ -242,26 +275,57 @@ void StreamingIK::startGUIThread(std::shared_ptr<server::GUIStateMachine> gui)
 /// This method takes in a set of markers, along with their assigned classes,
 /// and updates the targets for the IK to match the observed markers.
 void StreamingIK::observeMarkers(
-    std::vector<Eigen::Vector3s>& markers, std::vector<int> classes)
+    std::vector<Eigen::Vector3s>& markers,
+    std::vector<int> classes,
+    long timestamp)
 {
-  // To go lock free, we first, before messing with any marker observations, set
-  // all their weights to 0.
-  mLastMarkerObservationWeights.setZero();
+  Eigen::VectorXs pose;
 
-  // Now we can go through and update the the markers we observed, and set their
-  // weights back to non-zero values.
-  for (int i = 0; i < markers.size(); i++)
   {
-    if (classes[i] > mNumBodyNodes
-        && classes[i] < mNumBodyNodes + mMarkers.size())
+    const std::lock_guard<std::mutex> lock(
+        *(const_cast<std::mutex*>(&mGlobalLock)));
+
+    // To go lock free, we first, before messing with any marker observations,
+    // set all their weights to 0.
+    mLastMarkerObservationWeights.setZero();
+
+    // Now we can go through and update the the markers we observed, and set
+    // their weights back to non-zero values.
+    for (int i = 0; i < markers.size(); i++)
     {
-      int markerIndex = classes[i] - mNumBodyNodes;
-      // Because we're trying to go lock free, we need to do this in a way that
-      // never leaves the matrix in an inconsistent state.
-      mLastMarkerObservations.segment<3>(markerIndex * 3) = markers[i];
-      mLastMarkerObservationWeights.segment<3>(markerIndex * 3).setOnes();
+      if (classes[i] > mNumBodyNodes
+          && classes[i] < mNumBodyNodes + mMarkers.size())
+      {
+        int markerIndex = classes[i] - mNumBodyNodes;
+        // Because we're trying to go lock free, we need to do this in a way
+        // that never leaves the matrix in an inconsistent state.
+        mLastMarkerObservations.segment<3>(markerIndex * 3) = markers[i];
+        mLastMarkerObservationWeights.segment<3>(markerIndex * 3).setOnes();
+      }
     }
+
+    pose = mLastPose;
   }
+
+  if (mLastTimestamp == 0 || pose.size() == 0)
+  {
+    mLastTimestamp = timestamp;
+    return;
+  }
+  mPoseHistory.push_back(pose);
+  mTimestampHistory.push_back(mLastTimestamp);
+
+  if (mPoseHistory.size() > 100)
+  {
+    mPoseHistory.erase(mPoseHistory.begin());
+    mTimestampHistory.erase(mTimestampHistory.begin());
+  }
+  if (mGUIThreadRunning)
+  {
+    estimateState(timestamp, 20, 3);
+  }
+
+  mLastTimestamp = timestamp;
 }
 
 /// This sets an anthropometric prior used to help condition the body to
@@ -283,6 +347,8 @@ void StreamingIK::reset(std::shared_ptr<server::GUIStateMachine> gui)
     mSolverThread.get();
   }
 
+  mPoseHistory.clear();
+  mTimestampHistory.clear();
   mSkeleton->setPositions(Eigen::VectorXs::Zero(mSkeleton->getNumDofs()));
   mSkeleton->setGroupScales(
       Eigen::VectorXs::Ones(mSkeleton->getGroupScaleDim()));
@@ -298,6 +364,98 @@ void StreamingIK::reset(std::shared_ptr<server::GUIStateMachine> gui)
   }
 
   startSolverThread();
+}
+
+/// This method uses the recent history of poses to estimate the current state
+/// of the skeleton, including velocity and acceleration.
+void StreamingIK::estimateState(long now, int numHistory, int polynomialDegree)
+{
+  if (numHistory > mPoseHistory.size())
+  {
+    numHistory = mPoseHistory.size();
+  }
+
+  // First, we attempt to do outlier rejection
+  std::vector<int> indices;
+  for (int i = 0; i < numHistory; i++)
+  {
+    indices.push_back(mPoseHistory.size() - i - 1);
+  }
+
+  while (true)
+  {
+    Eigen::VectorXs timesteps = Eigen::VectorXs::Zero(indices.size());
+    if (indices.size() == 0)
+      return;
+    for (int k = 0; k < indices.size(); k++)
+    {
+      timesteps(k) = (s_t)(now - mTimestampHistory[indices[k]]) / 1000.0;
+    }
+    PolynomialFitter fitter(timesteps, polynomialDegree);
+
+    // TODO(opt): this should probably be a bitmask
+    std::vector<int> collectedOutliers;
+    for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+    {
+      Eigen::VectorXs poses = Eigen::VectorXs::Zero(indices.size());
+      for (int k = 0; k < indices.size(); k++)
+      {
+        poses(k) = mPoseHistory[indices[k]](i);
+      }
+      std::vector<int> outlierIndices = fitter.getOutlierIndices(poses, 3);
+      for (int k = 0; k < outlierIndices.size(); k++)
+      {
+        if (std::find(
+                collectedOutliers.begin(),
+                collectedOutliers.end(),
+                outlierIndices[k])
+            == collectedOutliers.end())
+        {
+          collectedOutliers.push_back(outlierIndices[k]);
+        }
+      }
+    }
+
+    if (collectedOutliers.size() == 0)
+      break;
+
+    // Remove the collectedOutliers from the indices
+    std::sort(collectedOutliers.begin(), collectedOutliers.end());
+    for (int i = collectedOutliers.size() - 1; i >= 0; i--)
+    {
+      indices.erase(indices.begin() + collectedOutliers[i]);
+    }
+  }
+
+  Eigen::VectorXs timesteps = Eigen::VectorXs::Zero(indices.size());
+  if (indices.size() == 0)
+    return;
+  for (int k = 0; k < indices.size(); k++)
+  {
+    timesteps(k) = (s_t)(now - mTimestampHistory[indices[k]]) / 1000.0;
+  }
+  PolynomialFitter fitterNoOutliers(timesteps, polynomialDegree);
+
+  Eigen::VectorXs q = Eigen::VectorXs::Zero(mSkeleton->getNumDofs());
+  Eigen::VectorXs dq = Eigen::VectorXs::Zero(mSkeleton->getNumDofs());
+  Eigen::VectorXs ddq = Eigen::VectorXs::Zero(mSkeleton->getNumDofs());
+  for (int i = 0; i < mSkeleton->getNumDofs(); i++)
+  {
+    Eigen::VectorXs poses = Eigen::VectorXs::Zero(indices.size());
+    for (int k = 0; k < indices.size(); k++)
+    {
+      poses(k) = mPoseHistory[indices[k]](i);
+    }
+    Eigen::Vector3s result
+        = fitterNoOutliers.projectPosVelAccAtTime(timesteps(0), poses);
+    q(i) = result(0);
+    dq(i) = result(1);
+    ddq(i) = result(2);
+  }
+
+  mSkeleton->setPositions(q);
+  mSkeleton->setVelocities(dq);
+  mSkeleton->setAccelerations(ddq);
 }
 
 } // namespace biomechanics

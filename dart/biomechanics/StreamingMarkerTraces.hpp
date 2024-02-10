@@ -2,6 +2,8 @@
 #define DART_BIOMECH_STREAMING_TRACE
 
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <tuple>
 #include <vector>
 
@@ -112,6 +114,8 @@ public:
   void renderTracesToGUI(std::shared_ptr<server::GUIStateMachine> gui);
 
 protected:
+  std::mutex mGlobalLock;
+
   int mNumClasses;
   int mNumBodies;
   std::vector<Trace> mTraces;

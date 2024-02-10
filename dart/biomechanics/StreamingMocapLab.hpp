@@ -82,6 +82,11 @@ public:
   /// This method returns the marker traces that this mocap lab is using
   std::shared_ptr<StreamingMarkerTraces> getMarkerTraces();
 
+  /// This method uses the recent history of poses to estimate the current state
+  /// of the skeleton, including velocity and acceleration. The skeleton is set
+  /// to the correct position, velocity, and acceleration.
+  void estimateState(long now, int numHistory = 20, int polynomialDegree = 3);
+
 protected:
   std::shared_ptr<StreamingMarkerTraces> mMarkerTraces;
   std::shared_ptr<StreamingIK> mIK;

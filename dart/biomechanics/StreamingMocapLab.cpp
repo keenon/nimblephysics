@@ -74,7 +74,7 @@ void StreamingMocapLab::manuallyObserveMarkers(
     std::vector<Eigen::Vector3s>& markers, long timestamp)
 {
   auto pair = mMarkerTraces->observeMarkers(markers, timestamp);
-  mIK->observeMarkers(markers, pair.first);
+  mIK->observeMarkers(markers, pair.first, timestamp);
 }
 
 /// This method returns the features that we used to predict the classes of
@@ -116,6 +116,15 @@ std::shared_ptr<StreamingIK> StreamingMocapLab::getIK()
 std::shared_ptr<StreamingMarkerTraces> StreamingMocapLab::getMarkerTraces()
 {
   return mMarkerTraces;
+}
+
+/// This method uses the recent history of poses to estimate the current state
+/// of the skeleton, including velocity and acceleration. The skeleton is set
+/// to the correct position, velocity, and acceleration.
+void StreamingMocapLab::estimateState(
+    long now, int numHistory, int polynomialDegree)
+{
+  mIK->estimateState(now, numHistory, polynomialDegree);
 }
 
 } // namespace biomechanics

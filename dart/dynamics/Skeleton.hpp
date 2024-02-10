@@ -1955,7 +1955,7 @@ public:
   /// joint rotatinos that is as close as possible to our previous joint
   /// positions, without large jumps.
   Eigen::VectorXs unwrapPositionToNearest(
-      Eigen::VectorXs lastPos, Eigen::VectorXs thisPos) const;
+      Eigen::VectorXs thisPos, Eigen::VectorXs lastPos) const;
 
   //----------------------------------------------------------------------------
   // Inverse Dynamics for Contacts

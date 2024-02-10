@@ -41,7 +41,9 @@ public:
   /// This method takes in a set of markers, along with their assigned classes,
   /// and updates the targets for the IK to match the observed markers.
   void observeMarkers(
-      std::vector<Eigen::Vector3s>& markers, std::vector<int> classes);
+      std::vector<Eigen::Vector3s>& markers,
+      std::vector<int> classes,
+      long timestamp);
 
   /// This sets an anthropometric prior used to help condition the body to
   /// keep reasonable scalings.
@@ -53,7 +55,13 @@ public:
   /// waiting for Cortex to send them
   void reset(std::shared_ptr<server::GUIStateMachine> gui);
 
+  /// This method uses the recent history of poses to estimate the current state
+  /// of the skeleton, including velocity and acceleration.
+  void estimateState(long now, int numHistory = 20, int polynomialDegree = 3);
+
 protected:
+  std::mutex mGlobalLock;
+
   std::shared_ptr<dynamics::Skeleton> mSkeleton;
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> mMarkers;
   int mNumBodyNodes;
@@ -82,6 +90,11 @@ protected:
 
   s_t mAnthropometricPriorWeight;
   std::shared_ptr<biomechanics::Anthropometrics> mAnthropometrics;
+
+  Eigen::VectorXs mLastPose;
+  long mLastTimestamp;
+  std::vector<Eigen::VectorXs> mPoseHistory;
+  std::vector<long> mTimestampHistory;
 };
 
 } // namespace biomechanics

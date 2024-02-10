@@ -29,6 +29,41 @@ Eigen::VectorXs PolynomialFitter::calcCoeffs(Eigen::VectorXs values) const
 }
 
 //=============================================================================
+std::vector<int> PolynomialFitter::getOutlierIndices(
+    Eigen::VectorXs values, int maxOutlierCount) const
+{
+  Eigen::VectorXs coeffs = calcCoeffs(values);
+  Eigen::VectorXs predicted = mForwardCoeffsMatrix * coeffs;
+
+  std::vector<int> above;
+  std::vector<int> below;
+  for (int i = 0; i < values.size(); i++)
+  {
+    if (values[i] > predicted[i])
+    {
+      above.push_back(i);
+    }
+    else
+    {
+      below.push_back(i);
+    }
+  }
+
+  if (above.size() <= maxOutlierCount)
+  {
+    return above;
+  }
+  else if (below.size() <= maxOutlierCount)
+  {
+    return below;
+  }
+  else
+  {
+    return std::vector<int>();
+  }
+}
+
+//=============================================================================
 Eigen::Vector3s PolynomialFitter::projectPosVelAccAtTime(
     s_t timestep, Eigen::VectorXs pastValues) const
 {

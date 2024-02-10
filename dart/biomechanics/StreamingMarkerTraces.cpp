@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,9 +38,16 @@ Eigen::Vector3s Trace::project_to(long time) const
 {
   if (points.size() > 1)
   {
-    Eigen::Vector3s last_vel = (points.back() - points[points.size() - 2])
-                               / (times.back() - times[times.size() - 2]);
-    return points.back() + last_vel * (time - times.back());
+    int cursor = 2;
+    Eigen::Vector3s vel = (points.back() - points[points.size() - cursor])
+                          / (times.back() - times[times.size() - cursor]);
+    while (vel.norm() > 10.0 && cursor < points.size() - 1)
+    {
+      cursor++;
+      vel = (points.back() - points[points.size() - cursor])
+            / (times.back() - times[times.size() - cursor]);
+    }
+    return points.back() + vel * (time - times.back());
   }
   else if (points.size() == 1)
   {
@@ -150,9 +158,11 @@ void Trace::render_to_gui(std::shared_ptr<server::GUIStateMachine> gui)
   }
 
   // Assuming logits is an Eigen::VectorXf
-  int max_logit_index = std::distance(
-      logits.data(),
-      std::max_element(logits.data(), logits.data() + logits.size()));
+  Eigen::Index max_logit_index;
+  logits.maxCoeff(&max_logit_index);
+  // int max_logit_index = std::distance(
+  //     logits.data(),
+  //     std::max_element(logits.data(), logits.data() + logits.size()));
   bool is_nothing = max_logit_index == logits.size() - 1;
   bool is_anatomical = max_logit_index > num_bodies;
 
@@ -160,6 +170,10 @@ void Trace::render_to_gui(std::shared_ptr<server::GUIStateMachine> gui)
       = is_nothing ? Eigen::Vector4s(0.5, 0.5, 0.5, 1.0)
                    : (is_anatomical ? Eigen::Vector4s(0.0, 0.0, 1.0, 1.0)
                                     : Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+  if (get_duration() < 1500)
+  {
+    color = Eigen::Vector4s(0.7, 0.7, 0.7, 1.0);
+  }
 
   // Convert line_points to the required format if needed
   gui->createLine(std::to_string(uuid), line_points, color);
@@ -174,7 +188,7 @@ void Trace::drop_from_gui(std::shared_ptr<server::GUIStateMachine> gui)
 StreamingMarkerTraces::StreamingMarkerTraces(int numClasses, int numBodies)
   : mNumBodies(numBodies),
     mNumClasses(numClasses),
-    mTraceMaxJoinDistance(0.05),
+    mTraceMaxJoinDistance(0.15),
     mTraceTimeoutMillis(300),
     mFeatureMaxStrideToleranceMillis(10)
 {
@@ -227,6 +241,8 @@ std::pair<std::vector<int>, std::vector<int>>
 StreamingMarkerTraces::observeMarkers(
     const std::vector<Eigen::Vector3s>& markers, long now)
 {
+  const std::lock_guard<std::mutex> lock(
+      *(const_cast<std::mutex*>(&mGlobalLock)));
   std::vector<int> resultClasses = std::vector<int>(markers.size(), -1);
   std::vector<int> resultTraceTags = std::vector<int>(markers.size(), -1);
 
@@ -250,7 +266,8 @@ StreamingMarkerTraces::observeMarkers(
   Eigen::MatrixXs dists = Eigen::MatrixXs::Zero(mTraces.size(), markers.size());
   for (size_t i = 0; i < mTraces.size(); ++i)
   {
-    auto projected_marker = mTraces[i].project_to(now);
+    const Eigen::Vector3s projected_marker = mTraces[i].project_to(now);
+    // const Eigen::Vector3s projected_marker = mTraces[i].points.back();
     for (size_t j = 0; j < markers.size(); ++j)
     {
       dists(i, j) = (projected_marker - markers[j]).norm();
@@ -261,7 +278,7 @@ StreamingMarkerTraces::observeMarkers(
     // Find the closest pair
     Eigen::MatrixXf::Index minRow, minCol;
     s_t minDist = dists.minCoeff(&minRow, &minCol);
-    if (minDist > 0.1f)
+    if (minDist > mTraceMaxJoinDistance)
     {
       break;
     }
@@ -296,6 +313,9 @@ std::pair<Eigen::MatrixXs, Eigen::VectorXi>
 StreamingMarkerTraces::getTraceFeatures(
     int numWindows, long windowDuration, bool center)
 {
+  const std::lock_guard<std::mutex> lock(
+      *(const_cast<std::mutex*>(&mGlobalLock)));
+
   //  # Get the traces that are long enough to run the model on
   // if len(self.traces) == 0:
   //     return
@@ -357,9 +377,33 @@ StreamingMarkerTraces::getTraceFeatures(
     }
   }
 
-  // x = np.stack(input_points_list)
-  // # Center the first 3 rows
-  // x[:, :3] -= x[:, :3].mean(axis=0)
+  // Iteratively erase the furthest away point from the center, if it is further
+  // than 1.5m
+  while (true)
+  {
+    Eigen::Vector3s centerPoint = Eigen::Vector3s::Zero();
+    for (int i = 0; i < inputPointsList.size(); i++)
+    {
+      centerPoint += inputPointsList[i].head<3>();
+    }
+    centerPoint /= inputPointsList.size();
+    s_t furthestDist = 0.0;
+    int furthestIndex = -1;
+    for (int i = 0; i < inputPointsList.size(); i++)
+    {
+      s_t dist = (inputPointsList[i].head<3>() - centerPoint).norm();
+      if (dist > furthestDist)
+      {
+        furthestDist = dist;
+        furthestIndex = i;
+      }
+    }
+    if (furthestDist < 1.5)
+      break;
+    inputPointsList.erase(inputPointsList.begin() + furthestIndex);
+    traceIDsList.erase(traceIDsList.begin() + furthestIndex);
+  }
+
   Eigen::MatrixXs features = Eigen::MatrixXs(4, inputPointsList.size());
   Eigen::VectorXi traceIDs = Eigen::VectorXi(inputPointsList.size());
   for (int i = 0; i < inputPointsList.size(); i++)
@@ -385,6 +429,9 @@ StreamingMarkerTraces::getTraceFeatures(
 void StreamingMarkerTraces::observeTraceLogits(
     const Eigen::MatrixXs& logits, const Eigen::VectorXi& traceIDs)
 {
+  const std::lock_guard<std::mutex> lock(
+      *(const_cast<std::mutex*>(&mGlobalLock)));
+  // const s_t blendFactor = 0.9;
   for (int i = 0; i < traceIDs.size(); i++)
   {
     int traceID = traceIDs(i);
@@ -392,6 +439,8 @@ void StreamingMarkerTraces::observeTraceLogits(
     {
       if (mTraces[j].uuid == traceID)
       {
+        // mTraces[j].logits = (logits.col(i) * (1.0 - blendFactor))
+        //                     + (mTraces[j].logits * blendFactor);
         mTraces[j].logits += logits.col(i);
         break;
       }
@@ -414,6 +463,8 @@ int StreamingMarkerTraces::getNumTraces()
 void StreamingMarkerTraces::renderTracesToGUI(
     std::shared_ptr<server::GUIStateMachine> gui)
 {
+  const std::lock_guard<std::mutex> lock(
+      *(const_cast<std::mutex*>(&mGlobalLock)));
   for (int toRemove : tracesToRemoveFromGUI)
   {
     gui->deleteObject(std::to_string(toRemove));

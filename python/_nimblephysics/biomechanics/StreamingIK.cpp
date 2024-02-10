@@ -73,6 +73,7 @@ void StreamingIK(py::module& m)
           &dart::biomechanics::StreamingIK::observeMarkers,
           ::py::arg("markers"),
           ::py::arg("classes"),
+          ::py::arg("timestamp"),
           "This method takes in a set of markers, along with their assigned "
           "classes, and updates the targets for the IK to match the observed "
           "markers.")
@@ -83,6 +84,12 @@ void StreamingIK(py::module& m)
           ::py::arg("priorWeight") = 1.0,
           "This sets an anthropometric prior used to help condition the body "
           "to keep reasonable scalings.")
+      .def(
+          "estimateState",
+          &dart::biomechanics::StreamingIK::estimateState,
+          ::py::arg("now"),
+          ::py::arg("numHistory") = 20,
+          ::py::arg("polynomialDegree") = 3)
       .def(
           "reset",
           &dart::biomechanics::StreamingIK::reset,

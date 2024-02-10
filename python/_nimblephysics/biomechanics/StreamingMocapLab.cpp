@@ -36,6 +36,7 @@
 #include <dart/biomechanics/StreamingMocapLab.hpp>
 #include <dart/dynamics/BodyNode.hpp>
 #include <dart/dynamics/Skeleton.hpp>
+#include <pybind11/cast.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -122,6 +123,12 @@ void StreamingMocapLab(py::module& m)
       .def(
           "getMarkerTraces",
           &dart::biomechanics::StreamingMocapLab::getMarkerTraces)
+      .def(
+          "estimateState",
+          &dart::biomechanics::StreamingMocapLab::estimateState,
+          ::py::arg("now"),
+          ::py::arg("numHistory") = 20,
+          ::py::arg("polynomialDegree") = 3)
       .def("getIK", &dart::biomechanics::StreamingMocapLab::getMarkerTraces);
 }
 
