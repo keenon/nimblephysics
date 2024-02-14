@@ -599,6 +599,17 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0),
                 ::py::arg("forcePlateZeroThresholdNewtons") = 3.0)
             .def(
+                "computeKinematicValues",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    computeKinematicValues,
+                ::py::arg("skel"),
+                ::py::arg("timestep"),
+                ::py::arg("poses"),
+                ::py::arg("rootHistoryLen") = 5,
+                ::py::arg("rootHistoryStride") = 1,
+                ::py::arg("explicitVels") = Eigen::MatrixXs::Zero(0, 0),
+                ::py::arg("explicitAccs") = Eigen::MatrixXs::Zero(0, 0))
+            .def(
                 "setLinearResidual",
                 &dart::biomechanics::SubjectOnDiskTrialPass::setLinearResidual,
                 ::py::arg("linearResidual"))

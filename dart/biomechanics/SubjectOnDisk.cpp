@@ -15,6 +15,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/biomechanics/enums.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/Geometry.hpp"
@@ -2150,6 +2151,8 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   for (std::string footName : footBodyNames)
   {
     dynamics::BodyNode* footBody = skel->getBodyNode(footName);
+    NIMBLE_THROW_IF(!footBody,
+        "No Foot body with name " + footName + " found in the skeleton");
     footBodies.push_back(footBody);
     footIndices.push_back(footBody->getIndexInSkeleton());
   }
@@ -2389,6 +2392,212 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           assert(false);
         }
 #endif
+      }
+    }
+    linearResiduals.push_back(linearResidual);
+    angularResiduals.push_back(angularResidual);
+  }
+
+  assert(poses.cols() == rootTransforms.size());
+  for (int t = 0; t < rootTransforms.size(); t++)
+  {
+    Eigen::Isometry3s T_wr = rootTransforms[t];
+
+    for (int reachBack = 0; reachBack < rootHistoryLen; reachBack++)
+    {
+      int reachBackToT = t - rootHistoryStride * reachBack;
+      if (reachBackToT >= 0)
+      {
+        Eigen::Isometry3s T_wb = rootTransforms[reachBackToT];
+
+        Eigen::Isometry3s T_rb = T_wr.inverse() * T_wb;
+        Eigen::Vector3s rootPos = T_rb.translation();
+        Eigen::Vector3s rootEuler = math::matrixToEulerXYZ(T_rb.linear());
+        rootPosHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootPos;
+        rootEulerHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootEuler;
+      }
+    }
+  }
+
+  setLinearResidual(linearResiduals);
+  setAngularResidual(angularResiduals);
+  setPoses(poses);
+  setVels(vels);
+  setAccs(accs);
+  setTaus(taus);
+  setGroundBodyWrenches(grfTrial);
+  setComPoses(comPoses);
+  setComVels(comVels);
+  setComAccs(comAccs);
+  setComAccsInRootFrame(comAccsInRootFrame);
+  setResidualWrenchInRootFrame(residualWrenchInRootFrame);
+  setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
+  setGroundBodyCopTorqueForce(copTorqueForceTrial);
+  setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
+  setJointCenters(jointCenters);
+  setJointCentersInRootFrame(jointCentersInRootFrame);
+  setRootSpatialVelInRootFrame(rootSpatialVelInRootFrame);
+  setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
+  setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
+  setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
+}
+
+// This is for allowing the user to set all the kinematic values of a pass at
+// once. All dynamics values are set to zero.
+void SubjectOnDiskTrialPass::computeKinematicValues(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    s_t timestep,
+    Eigen::MatrixXs poses,
+    int rootHistoryLen,
+    int rootHistoryStride,
+    Eigen::MatrixXs explicitVels,
+    Eigen::MatrixXs explicitAccs)
+{
+  // 1. Assume there are two foot bodies in case that passing matrices that are
+  // empty or with mismatching dimensions causes downstream issues.
+  int numFootBodies = 2;
+  Eigen::MatrixXs grfTrial
+      = Eigen::MatrixXs::Zero(6 * numFootBodies, poses.cols());
+  Eigen::MatrixXs copTorqueForceTrial
+      = Eigen::MatrixXs::Zero(9 * numFootBodies, poses.cols());
+  Eigen::MatrixXs copTorqueForceTrialInRootFrame
+      = Eigen::MatrixXs::Zero(9 * numFootBodies, poses.cols());
+
+  // 2. We need to actually run through all the frames and compute the aggregate
+  // values
+  std::vector<s_t> linearResiduals;
+  std::vector<s_t> angularResiduals;
+  Eigen::MatrixXs vels
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  if (explicitVels.cols() == poses.cols()
+      && explicitVels.rows() == poses.rows())
+  {
+    vels = explicitVels;
+  }
+  Eigen::MatrixXs accs
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  if (explicitAccs.cols() == poses.cols()
+      && explicitAccs.rows() == poses.rows())
+  {
+    accs = explicitAccs;
+  }
+  Eigen::MatrixXs taus
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  Eigen::MatrixXs comPoses = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs comVels = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs comAccs = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs comAccsInRootFrame = Eigen::MatrixXs::Zero(3, poses.cols());
+  Eigen::MatrixXs residualWrenchInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs groundBodyWrenchesInRootFrame
+      = Eigen::MatrixXs::Zero(6 * numFootBodies, poses.cols());
+  Eigen::MatrixXs jointCenters
+      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
+  Eigen::MatrixXs jointCentersInRootFrame
+      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
+  Eigen::MatrixXs rootSpatialVelInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs rootSpatialAccInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs rootPosHistoryInRootFrame
+      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
+  Eigen::MatrixXs rootEulerHistoryInRootFrame
+      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
+
+  s_t dt = timestep;
+  std::vector<Eigen::Isometry3s> rootTransforms;
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    Eigen::VectorXs q = poses.col(t);
+    skel->setPositions(q);
+    comPoses.col(t) = skel->getCOM();
+    Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
+    rootTransforms.push_back(T_wr);
+
+    Eigen::VectorXs worldCenters
+        = skel->getJointWorldPositions(skel->getJoints());
+    jointCenters.col(t) = worldCenters;
+    for (int j = 0; j < skel->getNumJoints(); j++)
+    {
+      jointCentersInRootFrame.block<3, 1>(j * 3, t)
+          = T_wr.inverse() * worldCenters.segment<3>(j * 3);
+    }
+
+    s_t linearResidual = 0.0;
+    s_t angularResidual = 0.0;
+    if (t > 0)
+    {
+      if (explicitVels.cols() == poses.cols()
+          && explicitVels.rows() == poses.rows())
+      {
+        // Do nothing
+      }
+      else
+      {
+        vels.col(t)
+            = skel->getPositionDifferences(poses.col(t), poses.col(t - 1)) / dt;
+      }
+      Eigen::VectorXs dq = vels.col(t);
+      skel->setVelocities(dq);
+      comVels.col(t) = skel->getCOMLinearVelocity();
+      if (skel->getRootJoint() != nullptr
+          && skel->getRootJoint()->getNumDofs() == 6)
+      {
+        const Eigen::Vector6s rootSpatialVel
+            = skel->getRootJoint()->getRelativeJacobian() * dq.head<6>();
+        const Eigen::Vector3s rootAngVel = rootSpatialVel.head<3>();
+        rootSpatialVelInRootFrame.col(t).head<3>() = rootAngVel;
+        const Eigen::Vector3s rootLinVel = rootSpatialVel.tail<3>();
+        rootSpatialVelInRootFrame.col(t).tail<3>() = rootLinVel;
+      }
+
+      if (t < poses.cols() - 1)
+      {
+        Eigen::VectorXs ddq;
+        if (explicitAccs.cols() == poses.cols()
+            && explicitAccs.rows() == poses.rows())
+        {
+          ddq = explicitAccs.col(t);
+        }
+        else
+        {
+          ddq = (skel->getPositionDifferences(poses.col(t + 1), poses.col(t))
+                 - skel->getPositionDifferences(poses.col(t), poses.col(t - 1)))
+                / (dt * dt);
+        }
+
+        Eigen::Vector6s residual = Eigen::Vector6s::Zero();
+        angularResidual = residual.head<3>().norm();
+        linearResidual = residual.tail<3>().norm();
+
+        accs.col(t) = ddq;
+        taus.col(t) = Eigen::VectorXs::Zero(skel->getNumDofs());
+
+        skel->setAccelerations(ddq);
+        comAccs.col(t) = skel->getCOMLinearAcceleration() - skel->getGravity();
+        comAccsInRootFrame.col(t) = T_wr.linear().transpose() * comAccs.col(t);
+
+        if (skel->getRootJoint()->getNumDofs() == 6)
+        {
+          const Eigen::MatrixXs rootJac
+              = skel->getRootJoint()->getRelativeJacobian();
+          const Eigen::Vector6s rootSpatialAcc = rootJac * ddq.head<6>();
+          const Eigen::Vector3s rootAngAcc = rootSpatialAcc.head<3>();
+          rootSpatialAccInRootFrame.col(t).head<3>() = rootAngAcc;
+          const Eigen::Vector3s rootLinAcc
+              = rootSpatialAcc.tail<3>()
+                - (T_wr.linear().transpose() * skel->getGravity());
+          rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
+          Eigen::Matrix6s rootJacobianTransposeInverse
+              = skel->getRootJoint()
+                    ->getRelativeJacobian()
+                    .transpose()
+                    .completeOrthogonalDecomposition()
+                    .pseudoInverse();
+          residualWrenchInRootFrame.col(t)
+              = rootJacobianTransposeInverse * residual;
+        }
+
       }
     }
     linearResiduals.push_back(linearResidual);

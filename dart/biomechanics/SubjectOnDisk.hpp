@@ -185,6 +185,18 @@ public:
       Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0),
       s_t forcePlateZeroThresholdNewtons = 3.0);
 
+  // This is for allowing the user to set all the kinematic values of a pass at
+  // once. All dynamics values are set to zero.
+  void computeKinematicValues(
+      std::shared_ptr<dynamics::Skeleton> skel,
+      s_t timestep,
+      Eigen::MatrixXs poses,
+      // How much history to use for the root position and orientation
+      int rootHistoryLen = 5,
+      int rootHistoryStride = 1,
+      Eigen::MatrixXs explicitVels = Eigen::MatrixXs::Zero(0, 0),
+      Eigen::MatrixXs explicitAccs = Eigen::MatrixXs::Zero(0, 0));
+
   // Manual setters (and getters) that compete with computeValues()
   void setLinearResidual(std::vector<s_t> linearResidual);
   std::vector<s_t> getLinearResidual();
