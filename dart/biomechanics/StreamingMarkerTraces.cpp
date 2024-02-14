@@ -431,7 +431,7 @@ void StreamingMarkerTraces::observeTraceLogits(
 {
   const std::lock_guard<std::mutex> lock(
       *(const_cast<std::mutex*>(&mGlobalLock)));
-  // const s_t blendFactor = 0.9;
+  const s_t blendFactor = 0.999;
   for (int i = 0; i < traceIDs.size(); i++)
   {
     int traceID = traceIDs(i);
@@ -439,9 +439,8 @@ void StreamingMarkerTraces::observeTraceLogits(
     {
       if (mTraces[j].uuid == traceID)
       {
-        // mTraces[j].logits = (logits.col(i) * (1.0 - blendFactor))
-        //                     + (mTraces[j].logits * blendFactor);
-        mTraces[j].logits += logits.col(i);
+        mTraces[j].logits = (logits.col(i) * (1.0 - blendFactor))
+                            + (mTraces[j].logits * blendFactor);
         break;
       }
     }

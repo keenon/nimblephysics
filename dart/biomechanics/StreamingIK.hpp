@@ -38,12 +38,16 @@ public:
   /// though at a much lower framerate than the IK solver.
   void startGUIThread(std::shared_ptr<server::GUIStateMachine> gui);
 
+  /// This returns true if the GUI thread is currently running.
+  bool guiThreadRunning();
+
   /// This method takes in a set of markers, along with their assigned classes,
   /// and updates the targets for the IK to match the observed markers.
   void observeMarkers(
       std::vector<Eigen::Vector3s>& markers,
       std::vector<int> classes,
-      long timestamp);
+      long timestamp,
+      std::vector<Eigen::Vector9s>& copTorqueForces);
 
   /// This sets an anthropometric prior used to help condition the body to
   /// keep reasonable scalings.
@@ -93,6 +97,7 @@ protected:
 
   Eigen::VectorXs mLastPose;
   long mLastTimestamp;
+  std::vector<Eigen::Vector9s> mLastCopTorqueForces;
   std::vector<Eigen::VectorXs> mPoseHistory;
   std::vector<long> mTimestampHistory;
 };

@@ -50,12 +50,17 @@ public:
 
   /// This method establishes a link to Cortex, and listens for real-time
   /// observations of markers and force plate data
-  void listenToCortex(std::string host, int port);
+  void listenToCortex(
+      std::string host,
+      int cortexMulticastPort = 1001,
+      int cortexRequestsPort = 1510);
 
   /// This method allows tests to manually input a set of markers, rather than
   /// waiting for Cortex to send them
   void manuallyObserveMarkers(
-      std::vector<Eigen::Vector3s>& markers, long timestamp);
+      std::vector<Eigen::Vector3s>& markers,
+      long timestamp,
+      std::vector<Eigen::Vector9s>& copTorqueForces);
 
   /// This method returns the features that we used to predict the classes of
   /// the markers. The first element of the pair is the features (which are
@@ -91,6 +96,7 @@ protected:
   std::shared_ptr<StreamingMarkerTraces> mMarkerTraces;
   std::shared_ptr<StreamingIK> mIK;
   std::shared_ptr<CortexStreaming> mCortex;
+  std::shared_ptr<server::GUIStateMachine> mGui;
 };
 
 } // namespace biomechanics

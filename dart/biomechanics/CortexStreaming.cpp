@@ -1282,6 +1282,37 @@ void CortexStreaming::parseAndHandleFrameOfData(char* data, int nBytes)
       markers.push_back(markerTransformed);
     }
   }
+  for (int i = 0; i < result.analogData.plateCopTorqueForce.size(); i++)
+  {
+    if (result.analogData.plateCopTorqueForce[i].rows() > 0
+        && result.analogData.plateCopTorqueForce[i].cols() == 9)
+    {
+      result.analogData.plateCopTorqueForce[i].block(
+          0, 0, result.analogData.plateCopTorqueForce[i].rows(), 3)
+          *= 0.001;
+      Eigen::VectorXs tmp = result.analogData.plateCopTorqueForce[i].col(1);
+      result.analogData.plateCopTorqueForce[i].col(1)
+          = result.analogData.plateCopTorqueForce[i].col(2);
+      result.analogData.plateCopTorqueForce[i].col(2) = tmp;
+
+      tmp = result.analogData.plateCopTorqueForce[i].col(4);
+      result.analogData.plateCopTorqueForce[i].col(4)
+          = result.analogData.plateCopTorqueForce[i].col(5);
+      result.analogData.plateCopTorqueForce[i].col(5) = tmp;
+
+      tmp = result.analogData.plateCopTorqueForce[i].col(7);
+      result.analogData.plateCopTorqueForce[i].col(7)
+          = result.analogData.plateCopTorqueForce[i].col(8);
+      result.analogData.plateCopTorqueForce[i].col(8) = tmp;
+    }
+    else
+    {
+      std::cout << "Warning: force plate " << i << " only has dimension "
+                << result.analogData.plateCopTorqueForce[i].rows() << "x"
+                << result.analogData.plateCopTorqueForce[i].cols()
+                << ", but we're expecting 9 columns" << std::endl;
+    }
+  }
 
   if (mFrameHandler != nullptr)
   {

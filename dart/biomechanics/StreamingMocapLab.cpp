@@ -40,6 +40,7 @@ void StreamingMocapLab::startSolverThread()
 void StreamingMocapLab::startGUIThread(
     std::shared_ptr<server::GUIStateMachine> gui)
 {
+  mGui = gui;
   mIK->startGUIThread(gui);
 }
 
@@ -53,9 +54,11 @@ void StreamingMocapLab::setAnthropometricPrior(
 
 /// This method establishes a link to Cortex, and listens for real-time
 /// observations of markers and force plate data
-void StreamingMocapLab::listenToCortex(std::string host, int port)
+void StreamingMocapLab::listenToCortex(
+    std::string host, int cortexMulticastPort, int cortexRequestsPort)
 {
-  mCortex = std::make_shared<CortexStreaming>(host, port);
+  mCortex = std::make_shared<CortexStreaming>(
+      host, cortexMulticastPort, cortexRequestsPort);
   mCortex->setFrameHandler([&](std::vector<std::string> markerNames,
                                std::vector<Eigen::Vector3s> markers,
                                std::vector<Eigen::MatrixXs> copTorqueForces) {
@@ -64,17 +67,29 @@ void StreamingMocapLab::listenToCortex(std::string host, int port)
     long timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
-    manuallyObserveMarkers(markers, timestamp);
+    std::vector<Eigen::Vector9s> copTorqueForcesAvg;
+    for (int i = 0; i < copTorqueForces.size(); i++)
+    {
+      copTorqueForcesAvg.push_back(copTorqueForces[i].colwise().mean());
+    }
+    manuallyObserveMarkers(markers, timestamp, copTorqueForcesAvg);
   });
+  mCortex->initialize();
 }
 
 /// This method allows tests to manually input a set of markers, rather than
 /// waiting for Cortex to send them
 void StreamingMocapLab::manuallyObserveMarkers(
-    std::vector<Eigen::Vector3s>& markers, long timestamp)
+    std::vector<Eigen::Vector3s>& markers,
+    long timestamp,
+    std::vector<Eigen::Vector9s>& copTorqueForces)
 {
   auto pair = mMarkerTraces->observeMarkers(markers, timestamp);
-  mIK->observeMarkers(markers, pair.first, timestamp);
+  if (mGui)
+  {
+    mMarkerTraces->renderTracesToGUI(mGui);
+  }
+  mIK->observeMarkers(markers, pair.first, timestamp, copTorqueForces);
 }
 
 /// This method returns the features that we used to predict the classes of

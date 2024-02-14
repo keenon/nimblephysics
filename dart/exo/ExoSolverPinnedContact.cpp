@@ -216,7 +216,9 @@ ExoSolverPinnedContact::getPinnedVirtualDynamics(
 
   Eigen::MatrixXs Minv = mVirtualSkel->getInvMassMatrix();
   Eigen::VectorXs C = mVirtualSkel->getCoriolisAndGravityForces()
-                      - mVirtualSkel->getExternalForces();
+                      - mVirtualSkel->getExternalForces()
+                      + mVirtualSkel->getDampingForce()
+                      + mVirtualSkel->getSpringForce();
   Eigen::MatrixXs J = getContactJacobian();
   Eigen::VectorXs ddqOffset = Minv * (tau - C);
 
@@ -247,7 +249,9 @@ ExoSolverPinnedContact::getPinnedVirtualDynamicsLinearMap(Eigen::VectorXs dq)
 
   Eigen::MatrixXs Minv = mVirtualSkel->getInvMassMatrix();
   Eigen::VectorXs C = mVirtualSkel->getCoriolisAndGravityForces()
-                      - mVirtualSkel->getExternalForces();
+                      - mVirtualSkel->getExternalForces()
+                      + mVirtualSkel->getDampingForce()
+                      + mVirtualSkel->getSpringForce();
   Eigen::MatrixXs J = getContactJacobian();
   const int numDofs = mVirtualSkel->getNumDofs();
 
@@ -277,7 +281,9 @@ ExoSolverPinnedContact::getPinnedRealDynamics(
 
   Eigen::MatrixXs Minv = mRealSkel->getInvMassMatrix();
   Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
-                      - mRealSkel->getExternalForces();
+                      - mRealSkel->getExternalForces()
+                      + mRealSkel->getDampingForce()
+                      + mRealSkel->getSpringForce();
   Eigen::MatrixXs J = getContactJacobian();
   Eigen::VectorXs ddqOffset = Minv * (tau - C);
 
@@ -308,7 +314,9 @@ ExoSolverPinnedContact::getPinnedRealDynamicsLinearMap(Eigen::VectorXs dq)
 
   Eigen::MatrixXs Minv = mRealSkel->getInvMassMatrix();
   Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
-                      - mRealSkel->getExternalForces();
+                      - mRealSkel->getExternalForces()
+                      + mRealSkel->getDampingForce()
+                      + mRealSkel->getSpringForce();
   Eigen::MatrixXs J = getContactJacobian();
   const int numDofs = mRealSkel->getNumDofs();
 
@@ -342,7 +350,9 @@ ExoSolverPinnedContact::getPinnedTotalTorques(
 
   Eigen::MatrixXs M = mRealSkel->getMassMatrix();
   Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
-                      - mRealSkel->getExternalForces();
+                      - mRealSkel->getExternalForces()
+                      + mRealSkel->getDampingForce()
+                      + mRealSkel->getSpringForce();
   Eigen::MatrixXs contactJointTorques = getContactJacobian();
 
   const int numDofs = mRealSkel->getNumDofs();
@@ -383,7 +393,9 @@ ExoSolverPinnedContact::getPinnedTotalTorquesLinearMap(Eigen::VectorXs dq)
 
   Eigen::MatrixXs M = mRealSkel->getMassMatrix();
   Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
-                      - mRealSkel->getExternalForces();
+                      - mRealSkel->getExternalForces()
+                      + mRealSkel->getDampingForce()
+                      + mRealSkel->getSpringForce();
   Eigen::MatrixXs contactJointTorques = getContactJacobian();
 
   const int numDofs = mRealSkel->getNumDofs();
@@ -441,7 +453,9 @@ Eigen::VectorXs ExoSolverPinnedContact::
   Eigen::MatrixXs J = getContactJacobian();
   Eigen::MatrixXs M = mRealSkel->getMassMatrix();
   Eigen::VectorXs C = mRealSkel->getCoriolisAndGravityForces()
-                      - mRealSkel->getExternalForces();
+                      - mRealSkel->getExternalForces()
+                      + mRealSkel->getDampingForce()
+                      + mRealSkel->getSpringForce();
   Eigen::VectorXs contactTau = J.transpose() * contactForces;
 
   const int numDofs = dq.size();

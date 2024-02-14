@@ -266,10 +266,30 @@ void StreamingIK::startGUIThread(std::shared_ptr<server::GUIStateMachine> gui)
         gui->createLine(
             "ik_line_" + std::to_string(i), line, Eigen::Vector4s(1, 0, 0, 1));
       }
+
+      for (int i = 0; i < mLastCopTorqueForces.size(); i++)
+      {
+        Eigen::Vector3s cop = mLastCopTorqueForces[i].segment<3>(0);
+        Eigen::Vector3s torque = mLastCopTorqueForces[i].segment<3>(3);
+        (void)torque;
+        Eigen::Vector3s force = mLastCopTorqueForces[i].segment<3>(6);
+        std::vector<Eigen::Vector3s> line;
+        line.push_back(cop);
+        line.push_back(cop + force * 0.001);
+        gui->createLine(
+            "grf_" + std::to_string(i), line, Eigen::Vector4s(1, 0, 0, 1));
+      }
+
       // Don't go faster than 20fps
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
   });
+}
+
+/// This returns true if the GUI thread is currently running.
+bool StreamingIK::guiThreadRunning()
+{
+  return mGUIThreadRunning;
 }
 
 /// This method takes in a set of markers, along with their assigned classes,
@@ -277,7 +297,8 @@ void StreamingIK::startGUIThread(std::shared_ptr<server::GUIStateMachine> gui)
 void StreamingIK::observeMarkers(
     std::vector<Eigen::Vector3s>& markers,
     std::vector<int> classes,
-    long timestamp)
+    long timestamp,
+    std::vector<Eigen::Vector9s>& copTorqueForces)
 {
   Eigen::VectorXs pose;
 
@@ -306,6 +327,8 @@ void StreamingIK::observeMarkers(
 
     pose = mLastPose;
   }
+
+  mLastCopTorqueForces = copTorqueForces;
 
   if (mLastTimestamp == 0 || pose.size() == 0)
   {
@@ -402,7 +425,7 @@ void StreamingIK::estimateState(long now, int numHistory, int polynomialDegree)
       {
         poses(k) = mPoseHistory[indices[k]](i);
       }
-      std::vector<int> outlierIndices = fitter.getOutlierIndices(poses, 3);
+      std::vector<int> outlierIndices = fitter.getOutlierIndices(poses, 4);
       for (int k = 0; k < outlierIndices.size(); k++)
       {
         if (std::find(
