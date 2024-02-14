@@ -2148,14 +2148,29 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
 
   std::vector<int> footIndices;
   std::vector<dynamics::BodyNode*> footBodies;
+  bool foundNonexistentFootBody = false;
   for (std::string footName : footBodyNames)
   {
     dynamics::BodyNode* footBody = skel->getBodyNode(footName);
-    NIMBLE_THROW_IF(!footBody,
-        "No Foot body with name " + footName + " found in the skeleton");
+
+    if (!footBody) {
+      foundNonexistentFootBody = true;
+      break;
+    }
+
     footBodies.push_back(footBody);
     footIndices.push_back(footBody->getIndexInSkeleton());
   }
+
+  if (foundNonexistentFootBody) {
+    std::cout << "WARNING: One of the foot bodies specified does not exist in "
+                 "the skeleton. Skipping dynamics calculations..."
+              << std::endl;
+    computeKinematicValues(skel, timestep, poses, rootHistoryLen,
+                           rootHistoryStride, explicitVels, explicitAccs);
+    return;
+  }
+
   std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
   for (int i = 0; i < forcePlates.size(); i++)
   {
