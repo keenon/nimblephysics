@@ -2121,342 +2121,6 @@ void SubjectOnDiskTrialPass::computeValues(
       rootHistoryStride);
 }
 
-// This is for allowing the user to set all the values of a pass at once,
-// without having to manually compute them in Python, which turns out to be
-// slow and difficult to test.
-void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
-    std::shared_ptr<dynamics::Skeleton> skel,
-    s_t timestep,
-    Eigen::MatrixXs poses,
-    std::vector<std::string> footBodyNames,
-    std::vector<ForcePlate> forcePlates,
-    int rootHistoryLen,
-    int rootHistoryStride,
-    Eigen::MatrixXs explicitVels,
-    Eigen::MatrixXs explicitAccs,
-    s_t forcePlateZeroThresholdNewtons)
-{
-  Eigen::MatrixXs grfTrial
-      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
-  Eigen::MatrixXs copTorqueForceTrial
-      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
-  Eigen::MatrixXs copTorqueForceTrialInRootFrame
-      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
-
-  // 1. We need to assign the force plates to feet, and compute the total
-  // wrenches applied to each foot
-
-  std::vector<int> footIndices;
-  std::vector<dynamics::BodyNode*> footBodies;
-  bool foundNonexistentFootBody = false;
-  for (std::string footName : footBodyNames)
-  {
-    dynamics::BodyNode* footBody = skel->getBodyNode(footName);
-
-    if (!footBody) {
-      foundNonexistentFootBody = true;
-      break;
-    }
-
-    footBodies.push_back(footBody);
-    footIndices.push_back(footBody->getIndexInSkeleton());
-  }
-
-  if (foundNonexistentFootBody) {
-    std::cout << "WARNING: One of the foot bodies specified does not exist in "
-                 "the skeleton. Skipping dynamics calculations..."
-              << std::endl;
-    computeKinematicValues(skel, timestep, poses, rootHistoryLen,
-                           rootHistoryStride, explicitVels, explicitAccs);
-    return;
-  }
-
-  std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
-  for (int i = 0; i < forcePlates.size(); i++)
-  {
-    forcePlatesAssignedToContactBody.emplace_back();
-    for (int t = 0; t < poses.cols(); t++)
-    {
-      forcePlatesAssignedToContactBody
-          [forcePlatesAssignedToContactBody.size() - 1]
-              .push_back(0);
-    }
-  }
-  DynamicsFitter::recomputeGRFs(
-      forcePlates,
-      poses,
-      footBodies,
-      std::vector<int>(),
-      forcePlatesAssignedToContactBody,
-      grfTrial,
-      skel);
-
-  // 2. We need to actually run through all the frames and compute the aggregate
-  // values
-
-  std::vector<s_t> linearResiduals;
-  std::vector<s_t> angularResiduals;
-  Eigen::MatrixXs vels
-      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
-  if (explicitVels.cols() == poses.cols()
-      && explicitVels.rows() == poses.rows())
-  {
-    vels = explicitVels;
-  }
-  Eigen::MatrixXs accs
-      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
-  if (explicitAccs.cols() == poses.cols()
-      && explicitAccs.rows() == poses.rows())
-  {
-    accs = explicitAccs;
-  }
-  Eigen::MatrixXs taus
-      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
-  Eigen::MatrixXs comPoses = Eigen::MatrixXs::Zero(3, poses.cols());
-  Eigen::MatrixXs comVels = Eigen::MatrixXs::Zero(3, poses.cols());
-  Eigen::MatrixXs comAccs = Eigen::MatrixXs::Zero(3, poses.cols());
-  Eigen::MatrixXs comAccsInRootFrame = Eigen::MatrixXs::Zero(3, poses.cols());
-  Eigen::MatrixXs residualWrenchInRootFrame
-      = Eigen::MatrixXs::Zero(6, poses.cols());
-  Eigen::MatrixXs groundBodyWrenchesInRootFrame
-      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
-  Eigen::MatrixXs jointCenters
-      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
-  Eigen::MatrixXs jointCentersInRootFrame
-      = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
-  Eigen::MatrixXs rootSpatialVelInRootFrame
-      = Eigen::MatrixXs::Zero(6, poses.cols());
-  Eigen::MatrixXs rootSpatialAccInRootFrame
-      = Eigen::MatrixXs::Zero(6, poses.cols());
-  Eigen::MatrixXs rootPosHistoryInRootFrame
-      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
-  Eigen::MatrixXs rootEulerHistoryInRootFrame
-      = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
-
-  ResidualForceHelper helper(skel, footIndices);
-  s_t dt = timestep;
-  std::vector<Eigen::Isometry3s> rootTransforms;
-  for (int t = 0; t < poses.cols(); t++)
-  {
-    Eigen::VectorXs q = poses.col(t);
-    skel->setPositions(q);
-    comPoses.col(t) = skel->getCOM();
-    Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
-    rootTransforms.push_back(T_wr);
-
-    Eigen::VectorXs worldCenters
-        = skel->getJointWorldPositions(skel->getJoints());
-    jointCenters.col(t) = worldCenters;
-    for (int j = 0; j < skel->getNumJoints(); j++)
-    {
-      jointCentersInRootFrame.block<3, 1>(j * 3, t)
-          = T_wr.inverse() * worldCenters.segment<3>(j * 3);
-    }
-
-    s_t linearResidual = 0.0;
-    s_t angularResidual = 0.0;
-    if (t > 0)
-    {
-      if (explicitVels.cols() == poses.cols()
-          && explicitVels.rows() == poses.rows())
-      {
-        // Do nothing
-      }
-      else
-      {
-        vels.col(t)
-            = skel->getPositionDifferences(poses.col(t), poses.col(t - 1)) / dt;
-      }
-      Eigen::VectorXs dq = vels.col(t);
-      skel->setVelocities(dq);
-      comVels.col(t) = skel->getCOMLinearVelocity();
-      if (skel->getRootJoint() != nullptr
-          && skel->getRootJoint()->getNumDofs() == 6)
-      {
-        const Eigen::Vector6s rootSpatialVel
-            = skel->getRootJoint()->getRelativeJacobian() * dq.head<6>();
-        const Eigen::Vector3s rootAngVel = rootSpatialVel.head<3>();
-        rootSpatialVelInRootFrame.col(t).head<3>() = rootAngVel;
-        const Eigen::Vector3s rootLinVel = rootSpatialVel.tail<3>();
-        rootSpatialVelInRootFrame.col(t).tail<3>() = rootLinVel;
-      }
-
-      if (t < poses.cols() - 1)
-      {
-        Eigen::VectorXs ddq;
-        if (explicitAccs.cols() == poses.cols()
-            && explicitAccs.rows() == poses.rows())
-        {
-          ddq = explicitAccs.col(t);
-        }
-        else
-        {
-          ddq = (skel->getPositionDifferences(poses.col(t + 1), poses.col(t))
-                 - skel->getPositionDifferences(poses.col(t), poses.col(t - 1)))
-                / (dt * dt);
-        }
-        Eigen::VectorXs tau
-            = helper.calculateInverseDynamics(q, dq, ddq, grfTrial.col(t));
-        Eigen::Vector6s residual = tau.head<6>();
-        angularResidual = residual.head<3>().norm();
-        linearResidual = residual.tail<3>().norm();
-
-        accs.col(t) = ddq;
-        taus.col(t) = tau;
-
-        skel->setAccelerations(ddq);
-        comAccs.col(t) = skel->getCOMLinearAcceleration() - skel->getGravity();
-        comAccsInRootFrame.col(t) = T_wr.linear().transpose() * comAccs.col(t);
-
-        if (skel->getRootJoint()->getNumDofs() == 6)
-        {
-          const Eigen::MatrixXs rootJac
-              = skel->getRootJoint()->getRelativeJacobian();
-          const Eigen::Vector6s rootSpatialAcc = rootJac * ddq.head<6>();
-          const Eigen::Vector3s rootAngAcc = rootSpatialAcc.head<3>();
-          rootSpatialAccInRootFrame.col(t).head<3>() = rootAngAcc;
-          const Eigen::Vector3s rootLinAcc
-              = rootSpatialAcc.tail<3>()
-                - (T_wr.linear().transpose() * skel->getGravity());
-          rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
-          Eigen::Matrix6s rootJacobianTransposeInverse
-              = skel->getRootJoint()
-                    ->getRelativeJacobian()
-                    .transpose()
-                    .completeOrthogonalDecomposition()
-                    .pseudoInverse();
-          residualWrenchInRootFrame.col(t)
-              = rootJacobianTransposeInverse * residual;
-        }
-
-        for (int i = 0; i < footIndices.size(); i++)
-        {
-          // Estimate ground height from recorded CoPs, for later CoP
-          // calculations
-          s_t groundHeight = 0.0;
-          if (forcePlates.size() > 0)
-          {
-            for (int f = 0; f < forcePlates.size(); f++)
-            {
-              if (forcePlates.at(f).centersOfPressure.size() > t
-                  && !forcePlates.at(f).centersOfPressure.at(t).hasNaN()
-                  && forcePlates.at(f).forces.size() > t
-                  && forcePlates.at(f).forces.at(t).norm() > 1e-8
-                  // We want this force plate to be assigned to this body at
-                  // this frame, or else it doesn't count
-                  && forcePlatesAssignedToContactBody.at(f).at(t) == i)
-              {
-                groundHeight = forcePlates.at(f).centersOfPressure.at(t)(1);
-              }
-            }
-          }
-
-          Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
-          if (worldWrench.tail<3>().norm() > forcePlateZeroThresholdNewtons)
-          {
-            Eigen::Vector9s copWrench
-                = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
-            copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
-            Eigen::Vector6s rootWrench
-                = math::dAdInvT(T_wr.inverse(), worldWrench);
-            groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
-
-            Eigen::Vector3s copWorld = copWrench.head<3>();
-            Eigen::Vector3s torqueWorld = copWrench.segment<3>(3);
-            Eigen::Vector3s forceWorld = copWrench.tail<3>();
-            Eigen::Vector3s copRoot = T_wr.inverse() * copWorld;
-            Eigen::Vector3s torqueRoot
-                = T_wr.linear().transpose() * torqueWorld;
-            Eigen::Vector3s forceRoot = T_wr.linear().transpose() * forceWorld;
-            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9, t) = copRoot;
-            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 3, t)
-                = torqueRoot;
-            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 6, t)
-                = forceRoot;
-          }
-          else
-          {
-            copTorqueForceTrialInRootFrame.block<9, 1>(i * 9, t).setZero();
-          }
-        }
-
-#ifndef NDEBUG
-        // Check that inverse dynamics given these inputs produces the expected
-        // joint torques
-
-        std::vector<Eigen::Vector6s> rootFrameContactWrenches;
-        for (int b = 0; b < footBodies.size(); b++)
-        {
-          rootFrameContactWrenches.push_back(
-              groundBodyWrenchesInRootFrame.block<6, 1>(b * 6, t));
-        }
-        Eigen::VectorXs recoveredTau = skel->getInverseDynamicsFromPredictions(
-            ddq,
-            footBodies,
-            rootFrameContactWrenches,
-            residualWrenchInRootFrame.col(t));
-        tau.head<6>().setZero();
-        if ((recoveredTau - tau).norm() > 1e-8)
-        {
-          std::cout << "Inverse dynamics failed to recover the expected torques"
-                    << std::endl;
-          std::cout << "Expected: " << tau.transpose() << std::endl;
-          std::cout << "Recovered: " << recoveredTau.transpose() << std::endl;
-          std::cout << "Difference: " << (recoveredTau - tau).transpose()
-                    << std::endl;
-          assert(false);
-        }
-#endif
-      }
-    }
-    linearResiduals.push_back(linearResidual);
-    angularResiduals.push_back(angularResidual);
-  }
-
-  assert(poses.cols() == rootTransforms.size());
-  for (int t = 0; t < rootTransforms.size(); t++)
-  {
-    Eigen::Isometry3s T_wr = rootTransforms[t];
-
-    for (int reachBack = 0; reachBack < rootHistoryLen; reachBack++)
-    {
-      int reachBackToT = t - rootHistoryStride * reachBack;
-      if (reachBackToT >= 0)
-      {
-        Eigen::Isometry3s T_wb = rootTransforms[reachBackToT];
-
-        Eigen::Isometry3s T_rb = T_wr.inverse() * T_wb;
-        Eigen::Vector3s rootPos = T_rb.translation();
-        Eigen::Vector3s rootEuler = math::matrixToEulerXYZ(T_rb.linear());
-        rootPosHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootPos;
-        rootEulerHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootEuler;
-      }
-    }
-  }
-
-  setLinearResidual(linearResiduals);
-  setAngularResidual(angularResiduals);
-  setPoses(poses);
-  setVels(vels);
-  setAccs(accs);
-  setTaus(taus);
-  setGroundBodyWrenches(grfTrial);
-  setComPoses(comPoses);
-  setComVels(comVels);
-  setComAccs(comAccs);
-  setComAccsInRootFrame(comAccsInRootFrame);
-  setResidualWrenchInRootFrame(residualWrenchInRootFrame);
-  setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
-  setGroundBodyCopTorqueForce(copTorqueForceTrial);
-  setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
-  setJointCenters(jointCenters);
-  setJointCentersInRootFrame(jointCentersInRootFrame);
-  setRootSpatialVelInRootFrame(rootSpatialVelInRootFrame);
-  setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
-  setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
-  setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
-}
-
 // This is for allowing the user to set all the kinematic values of a pass at
 // once. All dynamics values are set to zero.
 void SubjectOnDiskTrialPass::computeKinematicValues(
@@ -2603,14 +2267,6 @@ void SubjectOnDiskTrialPass::computeKinematicValues(
               = rootSpatialAcc.tail<3>()
                 - (T_wr.linear().transpose() * skel->getGravity());
           rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
-          Eigen::Matrix6s rootJacobianTransposeInverse
-              = skel->getRootJoint()
-                    ->getRelativeJacobian()
-                    .transpose()
-                    .completeOrthogonalDecomposition()
-                    .pseudoInverse();
-          residualWrenchInRootFrame.col(t)
-              = rootJacobianTransposeInverse * residual;
         }
 
       }
@@ -2661,6 +2317,218 @@ void SubjectOnDiskTrialPass::computeKinematicValues(
   setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
   setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
   setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
+}
+
+// This is for allowing the user to set all the values of a pass at once,
+// without having to manually compute them in Python, which turns out to be
+// slow and difficult to test.
+void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    s_t timestep,
+    Eigen::MatrixXs poses,
+    std::vector<std::string> footBodyNames,
+    std::vector<ForcePlate> forcePlates,
+    int rootHistoryLen,
+    int rootHistoryStride,
+    Eigen::MatrixXs explicitVels,
+    Eigen::MatrixXs explicitAccs,
+    s_t forcePlateZeroThresholdNewtons)
+{
+  // 0. Compute kinematic values
+  computeKinematicValues(skel, timestep, poses, rootHistoryLen,
+                         rootHistoryStride, explicitVels, explicitAccs);
+  const auto& vels = getVels();
+  const auto& accs = getAccs();
+
+  // 1. We need to assign the force plates to feet, and compute the total
+  // wrenches applied to each foot
+  Eigen::MatrixXs grfTrial
+      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrial
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrialInRootFrame
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+
+  std::vector<int> footIndices;
+  std::vector<dynamics::BodyNode*> footBodies;
+  for (std::string footName : footBodyNames)
+  {
+    dynamics::BodyNode* footBody = skel->getBodyNode(footName);
+
+    if (!footBody) {
+      std::cout << "WARNING: One of the foot bodies specified does not exist in "
+                   "the skeleton. Skipping dynamics calculations..."
+                << std::endl;
+      return;
+    }
+
+    footBodies.push_back(footBody);
+    footIndices.push_back(footBody->getIndexInSkeleton());
+  }
+
+  std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    forcePlatesAssignedToContactBody.emplace_back();
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      forcePlatesAssignedToContactBody
+          [forcePlatesAssignedToContactBody.size() - 1]
+              .push_back(0);
+    }
+  }
+  DynamicsFitter::recomputeGRFs(
+      forcePlates,
+      poses,
+      footBodies,
+      std::vector<int>(),
+      forcePlatesAssignedToContactBody,
+      grfTrial,
+      skel);
+
+  // 2. We need to actually run through all the frames and compute the aggregate
+  // values
+  std::vector<s_t> linearResiduals;
+  std::vector<s_t> angularResiduals;
+  Eigen::MatrixXs taus
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  Eigen::MatrixXs residualWrenchInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs groundBodyWrenchesInRootFrame
+      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+
+  ResidualForceHelper helper(skel, footIndices);
+  std::vector<Eigen::Isometry3s> rootTransforms;
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    const Eigen::VectorXs& q = poses.col(t);
+    skel->setPositions(q);
+    Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
+    rootTransforms.push_back(T_wr);
+
+    s_t linearResidual = 0.0;
+    s_t angularResidual = 0.0;
+    if (t > 0)
+    {
+      const Eigen::VectorXs& dq = vels.col(t);
+      skel->setVelocities(dq);
+
+      if (t < poses.cols() - 1)
+      {
+        const Eigen::VectorXs& ddq = accs.col(t);
+        Eigen::VectorXs tau
+            = helper.calculateInverseDynamics(q, dq, ddq, grfTrial.col(t));
+        Eigen::Vector6s residual = tau.head<6>();
+        angularResidual = residual.head<3>().norm();
+        linearResidual = residual.tail<3>().norm();
+
+        taus.col(t) = tau;
+
+        skel->setAccelerations(ddq);
+        if (skel->getRootJoint()->getNumDofs() == 6)
+        {
+          Eigen::Matrix6s rootJacobianTransposeInverse
+              = skel->getRootJoint()
+                    ->getRelativeJacobian()
+                    .transpose()
+                    .completeOrthogonalDecomposition()
+                    .pseudoInverse();
+          residualWrenchInRootFrame.col(t)
+              = rootJacobianTransposeInverse * residual;
+        }
+
+        for (int i = 0; i < footIndices.size(); i++)
+        {
+          // Estimate ground height from recorded CoPs, for later CoP
+          // calculations
+          s_t groundHeight = 0.0;
+          if (forcePlates.size() > 0)
+          {
+            for (int f = 0; f < forcePlates.size(); f++)
+            {
+              if (forcePlates.at(f).centersOfPressure.size() > t
+                  && !forcePlates.at(f).centersOfPressure.at(t).hasNaN()
+                  && forcePlates.at(f).forces.size() > t
+                  && forcePlates.at(f).forces.at(t).norm() > 1e-8
+                  // We want this force plate to be assigned to this body at
+                  // this frame, or else it doesn't count
+                  && forcePlatesAssignedToContactBody.at(f).at(t) == i)
+              {
+                groundHeight = forcePlates.at(f).centersOfPressure.at(t)(1);
+              }
+            }
+          }
+
+          Eigen::Vector6s worldWrench = grfTrial.block<6, 1>(i * 6, t);
+          if (worldWrench.tail<3>().norm() > forcePlateZeroThresholdNewtons)
+          {
+            Eigen::Vector9s copWrench
+                = math::projectWrenchToCoP(worldWrench, groundHeight, 1);
+            copTorqueForceTrial.block<9, 1>(i * 9, t) = copWrench;
+            Eigen::Vector6s rootWrench
+                = math::dAdInvT(T_wr.inverse(), worldWrench);
+            groundBodyWrenchesInRootFrame.block<6, 1>(i * 6, t) = rootWrench;
+
+            Eigen::Vector3s copWorld = copWrench.head<3>();
+            Eigen::Vector3s torqueWorld = copWrench.segment<3>(3);
+            Eigen::Vector3s forceWorld = copWrench.tail<3>();
+            Eigen::Vector3s copRoot = T_wr.inverse() * copWorld;
+            Eigen::Vector3s torqueRoot
+                = T_wr.linear().transpose() * torqueWorld;
+            Eigen::Vector3s forceRoot = T_wr.linear().transpose() * forceWorld;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9, t) = copRoot;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 3, t)
+                = torqueRoot;
+            copTorqueForceTrialInRootFrame.block<3, 1>(i * 9 + 6, t)
+                = forceRoot;
+          }
+          else
+          {
+            copTorqueForceTrialInRootFrame.block<9, 1>(i * 9, t).setZero();
+          }
+        }
+
+#ifndef NDEBUG
+        // Check that inverse dynamics given these inputs produces the expected
+        // joint torques
+
+        std::vector<Eigen::Vector6s> rootFrameContactWrenches;
+        for (int b = 0; b < footBodies.size(); b++)
+        {
+          rootFrameContactWrenches.push_back(
+              groundBodyWrenchesInRootFrame.block<6, 1>(b * 6, t));
+        }
+        Eigen::VectorXs recoveredTau = skel->getInverseDynamicsFromPredictions(
+            ddq,
+            footBodies,
+            rootFrameContactWrenches,
+            residualWrenchInRootFrame.col(t));
+        tau.head<6>().setZero();
+        if ((recoveredTau - tau).norm() > 1e-8)
+        {
+          std::cout << "Inverse dynamics failed to recover the expected torques"
+                    << std::endl;
+          std::cout << "Expected: " << tau.transpose() << std::endl;
+          std::cout << "Recovered: " << recoveredTau.transpose() << std::endl;
+          std::cout << "Difference: " << (recoveredTau - tau).transpose()
+                    << std::endl;
+          assert(false);
+        }
+#endif
+      }
+    }
+    linearResiduals.push_back(linearResidual);
+    angularResiduals.push_back(angularResidual);
+  }
+
+  setLinearResidual(linearResiduals);
+  setAngularResidual(angularResiduals);
+  setTaus(taus);
+  setGroundBodyWrenches(grfTrial);
+  setResidualWrenchInRootFrame(residualWrenchInRootFrame);
+  setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
+  setGroundBodyCopTorqueForce(copTorqueForceTrial);
+  setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
 }
 
 // Manual setters that compete with computeValues()
