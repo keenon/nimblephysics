@@ -15,6 +15,7 @@
 #include "dart/biomechanics/ForcePlate.hpp"
 #include "dart/biomechanics/OpenSimParser.hpp"
 #include "dart/biomechanics/enums.hpp"
+#include "dart/biomechanics/macros.hpp"
 #include "dart/common/LocalResourceRetriever.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/Geometry.hpp"
@@ -2120,62 +2121,29 @@ void SubjectOnDiskTrialPass::computeValues(
       rootHistoryStride);
 }
 
-// This is for allowing the user to set all the values of a pass at once,
-// without having to manually compute them in Python, which turns out to be
-// slow and difficult to test.
-void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
+// This is for allowing the user to set all the kinematic values of a pass at
+// once. All dynamics values are set to zero.
+void SubjectOnDiskTrialPass::computeKinematicValues(
     std::shared_ptr<dynamics::Skeleton> skel,
     s_t timestep,
     Eigen::MatrixXs poses,
-    std::vector<std::string> footBodyNames,
-    std::vector<ForcePlate> forcePlates,
     int rootHistoryLen,
     int rootHistoryStride,
     Eigen::MatrixXs explicitVels,
-    Eigen::MatrixXs explicitAccs,
-    s_t forcePlateZeroThresholdNewtons)
+    Eigen::MatrixXs explicitAccs)
 {
+  // 1. Assume there are two foot bodies in case that passing matrices that are
+  // empty or with mismatching dimensions causes downstream issues.
+  int numFootBodies = 2;
   Eigen::MatrixXs grfTrial
-      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+      = Eigen::MatrixXs::Zero(6 * numFootBodies, poses.cols());
   Eigen::MatrixXs copTorqueForceTrial
-      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+      = Eigen::MatrixXs::Zero(9 * numFootBodies, poses.cols());
   Eigen::MatrixXs copTorqueForceTrialInRootFrame
-      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
-
-  // 1. We need to assign the force plates to feet, and compute the total
-  // wrenches applied to each foot
-
-  std::vector<int> footIndices;
-  std::vector<dynamics::BodyNode*> footBodies;
-  for (std::string footName : footBodyNames)
-  {
-    dynamics::BodyNode* footBody = skel->getBodyNode(footName);
-    footBodies.push_back(footBody);
-    footIndices.push_back(footBody->getIndexInSkeleton());
-  }
-  std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
-  for (int i = 0; i < forcePlates.size(); i++)
-  {
-    forcePlatesAssignedToContactBody.emplace_back();
-    for (int t = 0; t < poses.cols(); t++)
-    {
-      forcePlatesAssignedToContactBody
-          [forcePlatesAssignedToContactBody.size() - 1]
-              .push_back(0);
-    }
-  }
-  DynamicsFitter::recomputeGRFs(
-      forcePlates,
-      poses,
-      footBodies,
-      std::vector<int>(),
-      forcePlatesAssignedToContactBody,
-      grfTrial,
-      skel);
+      = Eigen::MatrixXs::Zero(9 * numFootBodies, poses.cols());
 
   // 2. We need to actually run through all the frames and compute the aggregate
   // values
-
   std::vector<s_t> linearResiduals;
   std::vector<s_t> angularResiduals;
   Eigen::MatrixXs vels
@@ -2201,7 +2169,7 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   Eigen::MatrixXs residualWrenchInRootFrame
       = Eigen::MatrixXs::Zero(6, poses.cols());
   Eigen::MatrixXs groundBodyWrenchesInRootFrame
-      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+      = Eigen::MatrixXs::Zero(6 * numFootBodies, poses.cols());
   Eigen::MatrixXs jointCenters
       = Eigen::MatrixXs::Zero(skel->getNumJoints() * 3, poses.cols());
   Eigen::MatrixXs jointCentersInRootFrame
@@ -2215,7 +2183,6 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   Eigen::MatrixXs rootEulerHistoryInRootFrame
       = Eigen::MatrixXs::Zero(3 * rootHistoryLen, poses.cols());
 
-  ResidualForceHelper helper(skel, footIndices);
   s_t dt = timestep;
   std::vector<Eigen::Isometry3s> rootTransforms;
   for (int t = 0; t < poses.cols(); t++)
@@ -2277,14 +2244,13 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
                  - skel->getPositionDifferences(poses.col(t), poses.col(t - 1)))
                 / (dt * dt);
         }
-        Eigen::VectorXs tau
-            = helper.calculateInverseDynamics(q, dq, ddq, grfTrial.col(t));
-        Eigen::Vector6s residual = tau.head<6>();
+
+        Eigen::Vector6s residual = Eigen::Vector6s::Zero();
         angularResidual = residual.head<3>().norm();
         linearResidual = residual.tail<3>().norm();
 
         accs.col(t) = ddq;
-        taus.col(t) = tau;
+        taus.col(t) = Eigen::VectorXs::Zero(skel->getNumDofs());
 
         skel->setAccelerations(ddq);
         comAccs.col(t) = skel->getCOMLinearAcceleration() - skel->getGravity();
@@ -2301,6 +2267,166 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
               = rootSpatialAcc.tail<3>()
                 - (T_wr.linear().transpose() * skel->getGravity());
           rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
+        }
+
+      }
+    }
+    linearResiduals.push_back(linearResidual);
+    angularResiduals.push_back(angularResidual);
+  }
+
+  assert(poses.cols() == rootTransforms.size());
+  for (int t = 0; t < rootTransforms.size(); t++)
+  {
+    Eigen::Isometry3s T_wr = rootTransforms[t];
+
+    for (int reachBack = 0; reachBack < rootHistoryLen; reachBack++)
+    {
+      int reachBackToT = t - rootHistoryStride * reachBack;
+      if (reachBackToT >= 0)
+      {
+        Eigen::Isometry3s T_wb = rootTransforms[reachBackToT];
+
+        Eigen::Isometry3s T_rb = T_wr.inverse() * T_wb;
+        Eigen::Vector3s rootPos = T_rb.translation();
+        Eigen::Vector3s rootEuler = math::matrixToEulerXYZ(T_rb.linear());
+        rootPosHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootPos;
+        rootEulerHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootEuler;
+      }
+    }
+  }
+
+  setLinearResidual(linearResiduals);
+  setAngularResidual(angularResiduals);
+  setPoses(poses);
+  setVels(vels);
+  setAccs(accs);
+  setTaus(taus);
+  setGroundBodyWrenches(grfTrial);
+  setComPoses(comPoses);
+  setComVels(comVels);
+  setComAccs(comAccs);
+  setComAccsInRootFrame(comAccsInRootFrame);
+  setResidualWrenchInRootFrame(residualWrenchInRootFrame);
+  setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
+  setGroundBodyCopTorqueForce(copTorqueForceTrial);
+  setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
+  setJointCenters(jointCenters);
+  setJointCentersInRootFrame(jointCentersInRootFrame);
+  setRootSpatialVelInRootFrame(rootSpatialVelInRootFrame);
+  setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
+  setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
+  setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
+}
+
+// This is for allowing the user to set all the values of a pass at once,
+// without having to manually compute them in Python, which turns out to be
+// slow and difficult to test.
+void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
+    std::shared_ptr<dynamics::Skeleton> skel,
+    s_t timestep,
+    Eigen::MatrixXs poses,
+    std::vector<std::string> footBodyNames,
+    std::vector<ForcePlate> forcePlates,
+    int rootHistoryLen,
+    int rootHistoryStride,
+    Eigen::MatrixXs explicitVels,
+    Eigen::MatrixXs explicitAccs,
+    s_t forcePlateZeroThresholdNewtons)
+{
+  // 0. Compute kinematic values
+  computeKinematicValues(skel, timestep, poses, rootHistoryLen,
+                         rootHistoryStride, explicitVels, explicitAccs);
+  const auto& vels = getVels();
+  const auto& accs = getAccs();
+
+  // 1. We need to assign the force plates to feet, and compute the total
+  // wrenches applied to each foot
+  Eigen::MatrixXs grfTrial
+      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrial
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+  Eigen::MatrixXs copTorqueForceTrialInRootFrame
+      = Eigen::MatrixXs::Zero(9 * footBodyNames.size(), poses.cols());
+
+  std::vector<int> footIndices;
+  std::vector<dynamics::BodyNode*> footBodies;
+  for (std::string footName : footBodyNames)
+  {
+    dynamics::BodyNode* footBody = skel->getBodyNode(footName);
+
+    if (!footBody) {
+      std::cout << "WARNING: One of the foot bodies specified does not exist in "
+                   "the skeleton. Skipping dynamics calculations..."
+                << std::endl;
+      return;
+    }
+
+    footBodies.push_back(footBody);
+    footIndices.push_back(footBody->getIndexInSkeleton());
+  }
+
+  std::vector<std::vector<int>> forcePlatesAssignedToContactBody;
+  for (int i = 0; i < forcePlates.size(); i++)
+  {
+    forcePlatesAssignedToContactBody.emplace_back();
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      forcePlatesAssignedToContactBody
+          [forcePlatesAssignedToContactBody.size() - 1]
+              .push_back(0);
+    }
+  }
+  DynamicsFitter::recomputeGRFs(
+      forcePlates,
+      poses,
+      footBodies,
+      std::vector<int>(),
+      forcePlatesAssignedToContactBody,
+      grfTrial,
+      skel);
+
+  // 2. We need to actually run through all the frames and compute the aggregate
+  // values
+  std::vector<s_t> linearResiduals;
+  std::vector<s_t> angularResiduals;
+  Eigen::MatrixXs taus
+      = Eigen::MatrixXs::Zero(skel->getNumDofs(), poses.cols());
+  Eigen::MatrixXs residualWrenchInRootFrame
+      = Eigen::MatrixXs::Zero(6, poses.cols());
+  Eigen::MatrixXs groundBodyWrenchesInRootFrame
+      = Eigen::MatrixXs::Zero(6 * footBodyNames.size(), poses.cols());
+
+  ResidualForceHelper helper(skel, footIndices);
+  std::vector<Eigen::Isometry3s> rootTransforms;
+  for (int t = 0; t < poses.cols(); t++)
+  {
+    const Eigen::VectorXs& q = poses.col(t);
+    skel->setPositions(q);
+    Eigen::Isometry3s T_wr = skel->getRootBodyNode()->getWorldTransform();
+    rootTransforms.push_back(T_wr);
+
+    s_t linearResidual = 0.0;
+    s_t angularResidual = 0.0;
+    if (t > 0)
+    {
+      const Eigen::VectorXs& dq = vels.col(t);
+      skel->setVelocities(dq);
+
+      if (t < poses.cols() - 1)
+      {
+        const Eigen::VectorXs& ddq = accs.col(t);
+        Eigen::VectorXs tau
+            = helper.calculateInverseDynamics(q, dq, ddq, grfTrial.col(t));
+        Eigen::Vector6s residual = tau.head<6>();
+        angularResidual = residual.head<3>().norm();
+        linearResidual = residual.tail<3>().norm();
+
+        taus.col(t) = tau;
+
+        skel->setAccelerations(ddq);
+        if (skel->getRootJoint()->getNumDofs() == 6)
+        {
           Eigen::Matrix6s rootJacobianTransposeInverse
               = skel->getRootJoint()
                     ->getRelativeJacobian()
@@ -2395,48 +2521,14 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     angularResiduals.push_back(angularResidual);
   }
 
-  assert(poses.cols() == rootTransforms.size());
-  for (int t = 0; t < rootTransforms.size(); t++)
-  {
-    Eigen::Isometry3s T_wr = rootTransforms[t];
-
-    for (int reachBack = 0; reachBack < rootHistoryLen; reachBack++)
-    {
-      int reachBackToT = t - rootHistoryStride * reachBack;
-      if (reachBackToT >= 0)
-      {
-        Eigen::Isometry3s T_wb = rootTransforms[reachBackToT];
-
-        Eigen::Isometry3s T_rb = T_wr.inverse() * T_wb;
-        Eigen::Vector3s rootPos = T_rb.translation();
-        Eigen::Vector3s rootEuler = math::matrixToEulerXYZ(T_rb.linear());
-        rootPosHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootPos;
-        rootEulerHistoryInRootFrame.block<3, 1>(reachBack * 3, t) = rootEuler;
-      }
-    }
-  }
-
   setLinearResidual(linearResiduals);
   setAngularResidual(angularResiduals);
-  setPoses(poses);
-  setVels(vels);
-  setAccs(accs);
   setTaus(taus);
   setGroundBodyWrenches(grfTrial);
-  setComPoses(comPoses);
-  setComVels(comVels);
-  setComAccs(comAccs);
-  setComAccsInRootFrame(comAccsInRootFrame);
   setResidualWrenchInRootFrame(residualWrenchInRootFrame);
   setGroundBodyWrenchesInRootFrame(groundBodyWrenchesInRootFrame);
   setGroundBodyCopTorqueForce(copTorqueForceTrial);
   setGroundBodyCopTorqueForceInRootFrame(copTorqueForceTrialInRootFrame);
-  setJointCenters(jointCenters);
-  setJointCentersInRootFrame(jointCentersInRootFrame);
-  setRootSpatialVelInRootFrame(rootSpatialVelInRootFrame);
-  setRootSpatialAccInRootFrame(rootSpatialAccInRootFrame);
-  setRootPosHistoryInRootFrame(rootPosHistoryInRootFrame);
-  setRootEulerHistoryInRootFrame(rootEulerHistoryInRootFrame);
 }
 
 // Manual setters that compete with computeValues()
