@@ -62,7 +62,8 @@ TEST(StreamingIK, LIMIT_TEST)
       frameMarkers.push_back(marker.second);
       classes.push_back(markerNameToIndex[marker.first]);
     }
-    ik.observeMarkers(frameMarkers, classes);
+    std::vector<Eigen::Vector9s> copTorqueForces;
+    ik.observeMarkers(frameMarkers, classes, i, copTorqueForces);
     // Sleep this thread for 1ms to simulate real-time
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }

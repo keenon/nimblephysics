@@ -66,7 +66,8 @@ TEST(StreamingMocapLab, LIMIT_TEST)
       frameMarkers.push_back(marker.second);
       classes.push_back(markerNameToIndex[marker.first]);
     }
-    lab.manuallyObserveMarkers(frameMarkers, time);
+    std::vector<Eigen::Vector9s> copTorqueForces;
+    lab.manuallyObserveMarkers(frameMarkers, time, copTorqueForces);
     auto featurePair = lab.getTraceFeatures(1, 1);
     time += 10;
     Eigen::MatrixXs logits = Eigen::MatrixXs::Zero(

@@ -373,9 +373,15 @@ bool testBilevelFitProblemGradients(
   init.groupScales = originalGroupScales;
   init.staticPoseRoot = Eigen::Vector6s::Zero();
 
+  std::vector<bool> newClip;
+  for (int i = 0; i < numPoses; i++)
+  {
+    newClip.push_back(i == 0);
+  }
   BilevelFitProblem problem(
       &fitter,
       observations,
+      newClip,
       init,
       numPoses,
       applyInnerProblemGradientConstraints,
@@ -623,6 +629,12 @@ bool testSolveBilevelFitProblem(
   std::shared_ptr<BilevelFitResult> tmpResult
       = std::make_shared<BilevelFitResult>();
 
+  std::vector<bool> newClip;
+  for (int i = 0; i < numPoses; i++)
+  {
+    newClip.push_back(false);
+  }
+
   MarkerInitialization init;
   init.poses = Eigen::MatrixXs::Zero(skel->getNumDofs(), numPoses);
   for (int i = 0; i < numPoses; i++)
@@ -641,7 +653,7 @@ bool testSolveBilevelFitProblem(
 
   fitter.setCheckDerivatives(true);
   BilevelFitProblem problem(
-      &fitter, observations, init, numPoses, true, tmpResult);
+      &fitter, observations, newClip, init, numPoses, true, tmpResult);
 
   s_t lossAtGold = problem.getLoss(goldX);
   if (lossAtGold != 0)
@@ -661,7 +673,7 @@ bool testSolveBilevelFitProblem(
 
   // Try running IPOPT
   std::shared_ptr<BilevelFitResult> result
-      = fitter.optimizeBilevel(observations, init, numPoses);
+      = fitter.optimizeBilevel(observations, newClip, init, numPoses);
 
   Eigen::VectorXs groupScaleError = result->groupScales - goldGroupScales;
   Eigen::MatrixXs groupScaleCols = Eigen::MatrixXs(groupScaleError.size(), 3);

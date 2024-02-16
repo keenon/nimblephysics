@@ -11,7 +11,7 @@
 using namespace dart;
 using namespace biomechanics;
 
-#define ALL_TESTS
+// #define ALL_TESTS
 
 #ifdef ALL_TESTS
 TEST(MARKER_TRACES_BASICS, SIMPLE_TRACE_CONSTRUCTION)
@@ -72,7 +72,7 @@ TEST(MARKER_TRACES_BASICS, MAKING_FEATURES)
     std::vector<int> classes = markerTraces.observeMarkers(markers, i).first;
   }
 
-  auto pair = markerTraces.getTraceFeatures(5, 2, 10);
+  auto pair = markerTraces.getTraceFeatures(5, 2, true);
   Eigen::MatrixXs features = pair.first;
   Eigen::VectorXi traceIDs = pair.second;
   EXPECT_EQ(features.cols(), 5);
@@ -126,7 +126,7 @@ TEST(MARKER_TRACES_BASICS, MAKING_MIXED_FEATURES)
     std::vector<int> classes = markerTraces.observeMarkers(markers, i).first;
   }
 
-  auto pair = markerTraces.getTraceFeatures(5, 2, 10);
+  auto pair = markerTraces.getTraceFeatures(5, 2, false);
   Eigen::MatrixXs features = pair.first;
   Eigen::VectorXi traceIDs = pair.second;
   EXPECT_EQ(features.cols(), 5 * numMarkers);

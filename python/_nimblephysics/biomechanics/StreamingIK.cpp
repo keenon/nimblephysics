@@ -74,6 +74,7 @@ void StreamingIK(py::module& m)
           ::py::arg("markers"),
           ::py::arg("classes"),
           ::py::arg("timestamp"),
+          ::py::arg("copTorqueForces") = std::vector<Eigen::Vector9s>(),
           "This method takes in a set of markers, along with their assigned "
           "classes, and updates the targets for the IK to match the observed "
           "markers.")

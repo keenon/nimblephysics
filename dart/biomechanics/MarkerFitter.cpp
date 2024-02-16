@@ -10039,7 +10039,9 @@ Eigen::MatrixXs BilevelFitProblem::finiteDifferenceConstraintsJacobian(
     Eigen::VectorXs x)
 {
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(
-      mFitter->mSkeleton->getNumDofs() + mFitter->mZeroConstraints.size(),
+      (mApplyInnerProblemGradientConstraints ? mFitter->mSkeleton->getNumDofs()
+                                             : 0)
+          + mFitter->mZeroConstraints.size(),
       x.size());
   const s_t EPS = 1e-7;
   for (int i = 0; i < x.size(); i++)

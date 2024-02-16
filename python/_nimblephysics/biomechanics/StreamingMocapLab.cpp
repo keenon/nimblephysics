@@ -81,7 +81,8 @@ void StreamingMocapLab(py::module& m)
           "listenToCortex",
           &dart::biomechanics::StreamingMocapLab::listenToCortex,
           ::py::arg("host"),
-          ::py::arg("port"),
+          ::py::arg("cortexMulticastPort") = 1001,
+          ::py::arg("cortexRequestsPort") = 1510,
           "This method establishes a link to Cortex, and listens for real-time "
           "observations of markers and force plate data.")
       .def(
@@ -89,6 +90,7 @@ void StreamingMocapLab(py::module& m)
           &dart::biomechanics::StreamingMocapLab::manuallyObserveMarkers,
           ::py::arg("markers"),
           ::py::arg("timestamp"),
+          ::py::arg("copTorqueForces") = std::vector<Eigen::Vector9s>(),
           "This method allows tests to manually input a set of markers, rather "
           "than waiting for Cortex to send them.")
       .def(

@@ -2391,11 +2391,12 @@ class SkeletonConverter():
     pass
 class StreamingIK():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
-    def observeMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], classes: typing.List[int]) -> None: 
+    def estimateState(self, now: int, numHistory: int = 20, polynomialDegree: int = 3) -> None: ...
+    def observeMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], classes: typing.List[int], timestamp: int, copTorqueForces: typing.List[numpy.ndarray[numpy.float64, _Shape[9, 1]]] = []) -> None: 
         """
         This method takes in a set of markers, along with their assigned classes, and updates the targets for the IK to match the observed markers.
         """
-    def reset(self) -> None: 
+    def reset(self, arg0: nimblephysics_libs._nimblephysics.server.GUIStateMachine) -> None: 
         """
         This method allows tests to manually input a set of markers, rather than waiting for Cortex to send them.
         """
@@ -2446,17 +2447,18 @@ class StreamingMarkerTraces():
     pass
 class StreamingMocapLab():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.List[typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def estimateState(self, now: int, numHistory: int = 20, polynomialDegree: int = 3) -> None: ...
     def getIK(self) -> StreamingMarkerTraces: ...
     def getMarkerTraces(self) -> StreamingMarkerTraces: ...
     def getTraceFeatures(self, numWindows: int, windowDuration: int) -> typing.Tuple[numpy.ndarray[numpy.float64, _Shape[m, n]], numpy.ndarray[numpy.int32, _Shape[m, 1]]]: 
         """
         This method returns the features that we used to predict the classes of the markers. The first element of the pair is the features (which are trace points concatenated with the time, as measured in integer units of 'windowDuration', backwards from now), and the second is the trace ID for each point, so that we can correctly assign logit outputs back to the traces.
         """
-    def listenToCortex(self, host: str, port: int) -> None: 
+    def listenToCortex(self, host: str, cortexMulticastPort: int = 1001, cortexRequestsPort: int = 1510) -> None: 
         """
         This method establishes a link to Cortex, and listens for real-time observations of markers and force plate data.
         """
-    def manuallyObserveMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: int) -> None: 
+    def manuallyObserveMarkers(self, markers: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: int, copTorqueForces: typing.List[numpy.ndarray[numpy.float64, _Shape[9, 1]]] = []) -> None: 
         """
         This method allows tests to manually input a set of markers, rather than waiting for Cortex to send them.
         """
@@ -2464,7 +2466,7 @@ class StreamingMocapLab():
         """
         This method takes in the logits for each point, and the trace IDs for each point, and updates the internal state of the trace classifier to reflect the new information.
         """
-    def reset(self) -> None: 
+    def reset(self, gui: nimblephysics_libs._nimblephysics.server.GUIStateMachine = None) -> None: 
         """
         This method resets the state of the mocap lab, including the IK and the marker traces.
         """
