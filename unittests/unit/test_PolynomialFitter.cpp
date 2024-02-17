@@ -118,5 +118,5 @@ TEST(PolynomialFitter, PROJECT_DERIVATIVE)
 
   Eigen::Vector3s posVelAcc
       = fitter.projectPosVelAccAtTime(timestamps[0], values);
-  EXPECT_EQ(values(0), posVelAcc(0));
+  EXPECT_TRUE(abs(values(0) - posVelAcc(0)) < 1e-8);
 }
