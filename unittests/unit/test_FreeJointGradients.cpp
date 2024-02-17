@@ -311,8 +311,8 @@ Eigen::Matrix6s FreeJoint::getRelativeJacobianInPositionSpaceStatic(
 #ifdef ALL_TESTS
 TEST(FreeJointGradients, POSITION_JACOBIAN)
 {
-  Eigen::Vector6s pos = Eigen::Vector6s(
-      0.0388429, -0.290587, -0.058277, -2.08471, 1.00021, -0.51007);
+  Eigen::Vector6s pos;
+  pos << 0.0388429, -0.290587, -0.058277, -2.08471, 1.00021, -0.51007;
 
   std::shared_ptr<dynamics::Skeleton> box = dynamics::Skeleton::create("box");
   auto pair = box->createJointAndBodyNodePair<dynamics::FreeJoint>();
