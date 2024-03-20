@@ -4123,6 +4123,11 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
     end = content.find("\n", start);
   }
 
+  NIMBLE_THROW_IF(inHeader, 
+    "Parsed the entire file '" + uri.toString() + "' and never found a line "
+    "with string 'endheader'. Please check the file to ensure it's formatted "
+    "correctly.");
+
   assert(timestamps.size() == copRows.size());
   assert(timestamps.size() == wrenchRows.size());
 
