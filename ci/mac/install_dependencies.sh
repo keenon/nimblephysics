@@ -13,8 +13,7 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-# export MACOSX_DEPLOYMENT_TARGET="11.0"
-export MACOSX_DEPLOYMENT_TARGET="10.9"
+export MACOSX_DEPLOYMENT_TARGET="12.0"
 export CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
 
 export PYTHON3=$(which python3)
