@@ -11215,7 +11215,8 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     int maxTrialsToSolveMassOver,
     bool detectExternalForce,
     int driftCorrectionBlurRadius,
-    int driftCorrectionBlurInterval)
+    int driftCorrectionBlurInterval,
+    s_t regularizeUnobservedTimesteps)
 {
   if (mSkeleton->getRootJoint()->getType()
           != dynamics::EulerFreeJoint::getStaticType()
@@ -11292,7 +11293,6 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
   {
     const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
     s_t regularizeForcePlateRotations = 10.0;
-    s_t regularizeUnobservedTimesteps = 0.1;
     s_t regularizeScaleGRF = 2.0;
 
     const s_t originalMass = mSkeleton->getMass();
@@ -11618,7 +11618,12 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(unifiedLinearMap.rows() * 10);
+    int maxIterations = unifiedLinearMap.rows() * 10;
+    if (maxIterations > 1000)
+    {
+      maxIterations = 1000;
+    }
+    solver.setMaxIterations(maxIterations);
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -12199,6 +12204,395 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
                "low without reaching a satisfactory solution."
             << std::endl;
   return false;
+}
+
+//==============================================================================
+// 1. This is an ablation study, where we just try to separately solve for
+// each section of observed GRF, and leave alone the unobserved sections.
+bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectoryAblation(
+    std::shared_ptr<DynamicsInitialization> init, int maxTrialsToSolveMassOver)
+{
+  std::cout << "WARNING: This method is NOT INTENDED FOR PRODUCTION USE! This "
+               "exists only for ablation studies."
+            << std::endl;
+
+  int numTrials = init->poseTrials.size();
+  (void)numTrials;
+  (void)maxTrialsToSolveMassOver;
+
+  std::vector<std::vector<Eigen::Vector3s>> trialGRFs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalCOMs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalCenteredCOMs;
+  std::vector<std::vector<Eigen::Vector3s>> trialOriginalAccOffsets;
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    trialGRFs.push_back(measuredGRFForces(init, i));
+    trialOriginalCOMs.push_back(comPositions(init, i));
+    trialOriginalCenteredCOMs.push_back(comPositionsToCenterResiduals(init, i));
+  }
+  (void)trialOriginalCenteredCOMs;
+
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    std::vector<Eigen::Vector3s> accOffset;
+    s_t dt = init->trialTimesteps[i];
+
+    for (int t = 0; t < init->poseTrials[i].cols(); t++)
+    {
+      if (init->probablyMissingGRF.at(i).at(t) == MissingGRFStatus::yes)
+      {
+      }
+      // Compute the offset from the difference between a finite-difference's
+      // COM acceleration and an analytical one
+      if (t > 0 && t < init->poseTrials[i].cols() - 1)
+      {
+        Eigen::VectorXs q = init->poseTrials[i].col(t);
+        Eigen::VectorXs dq
+            = mSkeleton->getPositionDifferences(
+                  init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1))
+              / dt;
+        Eigen::VectorXs ddq
+            = (mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t + 1), init->poseTrials[i].col(t))
+               - mSkeleton->getPositionDifferences(
+                   init->poseTrials[i].col(t), init->poseTrials[i].col(t - 1)))
+              / (dt * dt);
+        mSkeleton->setPositions(q);
+        mSkeleton->setVelocities(dq);
+        mSkeleton->setAccelerations(ddq);
+
+        Eigen::Vector3s analyticalAcc = mSkeleton->getCOMLinearAcceleration();
+        Eigen::Vector3s fdAcc
+            = (trialOriginalCOMs[i][t + 1] - 2 * trialOriginalCOMs[i][t]
+               + trialOriginalCOMs[i][t - 1])
+              / (dt * dt);
+        Eigen::Vector3s offset = analyticalAcc - fdAcc;
+        accOffset.push_back(offset);
+      }
+    }
+    trialOriginalAccOffsets.push_back(accOffset);
+  }
+
+  const Eigen::Vector3s gravity = Eigen::Vector3s(0, -9.81, 0);
+
+  const s_t originalMass = mSkeleton->getMass();
+
+  std::vector<Eigen::MatrixXs> trialLinearMaps;
+  std::vector<Eigen::VectorXs> trialOriginalPositions;
+  std::vector<Eigen::VectorXs> trialOriginalGravityOffsets;
+
+  std::cout << "Zeroing linear residuals in the COM trajectory" << std::endl;
+
+  const int translationDofsStart
+      = mSkeleton->getRootJoint()->getDof(3)->getIndexInSkeleton();
+
+  std::vector<s_t> masses;
+  for (int i = 0; i < init->poseTrials.size(); i++)
+  {
+    std::cout << "Constructing COM (linear) trajectory linear system for trial "
+              << i << "/" << init->poseTrials.size() << std::endl;
+
+    const s_t dt = init->trialTimesteps[i];
+
+    // Collect all the start/stop points where we see GRF data
+    std::vector<std::pair<int, int>> startStopPoints;
+    int start = -1;
+    for (int t = 0; t < init->poseTrials[i].cols(); t++)
+    {
+      if (init->probablyMissingGRF.at(i).at(t) != MissingGRFStatus::yes)
+      {
+        if (start == -1)
+        {
+          start = t;
+        }
+      }
+      else
+      {
+        if (start != -1)
+        {
+          startStopPoints.push_back(std::pair<int, int>(start, t - 1));
+          start = -1;
+        }
+      }
+    }
+    if (start != -1)
+    {
+      startStopPoints.push_back(
+          std::pair<int, int>(start, init->poseTrials[i].cols() - 1));
+    }
+
+    for (auto& pair : startStopPoints)
+    {
+      int numTimesteps = pair.second - pair.first + 1;
+
+      // This has one col each for start COM positions, start COM velocities,
+      // and total mass. It outputs the physically consistent X, Y, Z
+      // coordinates of COM over time, given those inputs. Additionally, there
+      // are columns to account for small force plate rotation errors (3 angles
+      // per force plate) and for instantaneous COM velocities at time steps
+      // with missing ground reaction force data.
+      Eigen::MatrixXs trialLinearMapToPositions
+          = Eigen::MatrixXs::Zero(numTimesteps * 3, 6 + 1);
+
+      // This is a vector with the original positions of our COM over time,
+      // which we will use to find good values for the position, velocity, and
+      // mass of our skeleton.
+      Eigen::VectorXs originalCOMPositions
+          = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+      Eigen::VectorXs comGravityOffset
+          = Eigen::VectorXs::Zero(numTimesteps * 3);
+
+      const int startPosXCol = 0;
+      const int startPosYCol = 1;
+      const int startPosZCol = 2;
+      const int startVelXCol = 3;
+      const int startVelYCol = 4;
+      const int startVelZCol = 5;
+      const int massCol = 6;
+
+      Eigen::Vector3s forceVelocity = Eigen::Vector3s::Zero();
+      Eigen::Vector3s forceOffset = Eigen::Vector3s::Zero();
+      Eigen::Vector3s gravityVelocity = Eigen::Vector3s::Zero();
+      Eigen::Vector3s gravityOffset = Eigen::Vector3s::Zero();
+
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        const int xRow = (t * 3);
+        const int yRow = (t * 3) + 1;
+        const int zRow = (t * 3) + 2;
+
+        trialLinearMapToPositions(xRow, startPosXCol) = 1;
+        trialLinearMapToPositions(yRow, startPosYCol) = 1;
+        trialLinearMapToPositions(zRow, startPosZCol) = 1;
+
+        trialLinearMapToPositions(xRow, startVelXCol) = t * dt;
+        trialLinearMapToPositions(yRow, startVelYCol) = t * dt;
+        trialLinearMapToPositions(zRow, startVelZCol) = t * dt;
+
+        trialLinearMapToPositions(xRow, massCol) = forceOffset(0);
+        trialLinearMapToPositions(yRow, massCol) = forceOffset(1);
+        trialLinearMapToPositions(zRow, massCol) = forceOffset(2);
+
+        comGravityOffset(xRow) = gravityOffset(0);
+        comGravityOffset(yRow) = gravityOffset(1);
+        comGravityOffset(zRow) = gravityOffset(2);
+
+        forceVelocity += trialGRFs[i][t] * dt;
+        forceOffset += forceVelocity * dt;
+        gravityVelocity += gravity * dt;
+
+        if (t > 0 && t < numTimesteps - 1)
+        {
+          gravityVelocity -= trialOriginalAccOffsets[i][t - 1] * dt;
+        }
+        gravityOffset += gravityVelocity * dt;
+
+        originalCOMPositions(xRow) = trialOriginalCOMs[i][pair.first + t](0);
+        originalCOMPositions(yRow) = trialOriginalCOMs[i][pair.first + t](1);
+        originalCOMPositions(zRow) = trialOriginalCOMs[i][pair.first + t](2);
+      }
+
+      trialLinearMaps.push_back(trialLinearMapToPositions);
+      trialOriginalPositions.push_back(originalCOMPositions);
+      trialOriginalGravityOffsets.push_back(comGravityOffset);
+
+      Eigen::VectorXs solution
+          = trialLinearMapToPositions.householderQr().solve(
+              originalCOMPositions - comGravityOffset);
+      Eigen::VectorXs comTrajectory
+          = (trialLinearMapToPositions * solution) + comGravityOffset;
+
+      s_t averageChange = 0.0;
+      for (int t = 0; t < numTimesteps; t++)
+      {
+        Eigen::Vector3s change = comTrajectory.segment<3>(t * 3)
+                                 - originalCOMPositions.segment<3>(t * 3);
+        init->poseTrials[i].block<3, 1>(translationDofsStart, t) += change;
+        averageChange += change.norm();
+      }
+      averageChange /= numTimesteps;
+      s_t foundMass = 1.0 / solution(massCol);
+      std::cout << "Trial " << i << " frames " << pair.first << " to "
+                << pair.second << " moved COM by an average of "
+                << averageChange
+                << "m to achieve linear physical consistency. Found mass "
+                << foundMass << "kg" << std::endl;
+      masses.push_back(foundMass);
+    }
+  }
+
+  s_t foundMass = 0.0;
+  for (int i = 0; i < masses.size(); i++)
+  {
+    foundMass += masses[i];
+  }
+  foundMass /= masses.size();
+
+  // Now we want to scale every mass in the skeleton to get to
+  // `tentativeMass` total
+  s_t scalePercentage = foundMass / originalMass;
+  // init->bodyMasses *= scalePercentage;
+  // mSkeleton->setLinkMasses(init->bodyMasses);
+  mSkeleton->setLinkMasses(mSkeleton->getLinkMasses() * scalePercentage);
+  init->bodyMasses = mSkeleton->getLinkMasses();
+  init->groupMasses = mSkeleton->getGroupMasses();
+  init->regularizeGroupMassesTo = mSkeleton->getGroupMasses();
+
+  std::cout << "Found skeleton mass: " << foundMass << "kg" << std::endl;
+
+  // Now that we've formulated our problem, we can attempt to solve:
+
+  // Eigen::VectorXs tentativeResult =
+  // unifiedLinearMap.householderQr().solve(
+  //     unifiedPositions - unifiedGravityOffset);
+  // Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+  // solver.setTolerance(1e-9);
+  // int maxIterations = unifiedLinearMap.rows() * 10;
+  // if (maxIterations > 1000)
+  // {
+  //   maxIterations = 1000;
+  // }
+  // solver.setMaxIterations(maxIterations);
+  // solver.compute(unifiedLinearMap);
+  // Eigen::VectorXs tentativeResult
+  //     = solver.solve(unifiedPositions - unifiedGravityOffset);
+  // Eigen::VectorXs tentativeCOMTrajectory
+  //     = (unifiedLinearMap * tentativeResult) + unifiedGravityOffset;
+
+  // std::cout << "Solved!" << std::endl;
+
+  // // Calculate the error
+  // double error
+  //     = (unifiedPositions - unifiedGravityOffset - tentativeCOMTrajectory)
+  //           .cwiseAbs()
+  //           .mean();
+
+  // // Print the error
+  // std::cout << "COM trajectory solution average per-timestep error: " <<
+  // error
+  //           << "m" << std::endl;
+
+  // // The linear map is in terms of "inverse mass", so we need to invert to
+  // // recover original mass.
+  // s_t foundMass = 1.0 / tentativeResult(massCol);
+
+  // Go through and read out the solution values for each trial (or solve
+  // mini problems, if these trials were trimmed out)
+  // std::vector<Eigen::VectorXs> trialSolutionInput;
+  // std::vector<Eigen::VectorXs> trialSolutionOutput;
+  // colCursor = 0;
+  // rowCursor = 0;
+  // for (int trial = 0; trial < numTrials; trial++)
+  // {
+  //   if (std::find(sampledTrials.begin(), sampledTrials.end(), trial)
+  //       != sampledTrials.end())
+  //   {
+  //     int trialCols = trialLinearMaps[trial].cols();
+  //     int trialRows = trialLinearMaps[trial].rows();
+
+  //     trialSolutionInput.push_back(
+  //         Eigen::VectorXs(tentativeResult.segment(colCursor, trialCols -
+  //         1)));
+  //     trialSolutionOutput.push_back(Eigen::VectorXs(
+  //         tentativeCOMTrajectory.segment(rowCursor, trialRows)));
+
+  //     // When written into the bulk linear map, the last column (mass) is
+  //     // combined across all the trajectories, so we ignore it
+  //     colCursor += trialCols - 1;
+  //     rowCursor += trialRows;
+  //   }
+  //   else
+  //   {
+  //     // Otherwise, we have to solve using our found mass
+  //     std::cout << "Solving trial " << trial
+  //               << " COM trajectory while holding mass fixed" << std::endl;
+  //     Eigen::MatrixXs A = trialLinearMaps[trial];
+  //     Eigen::VectorXs b = trialOriginalGravityOffsets[trial];
+
+  //     Eigen::MatrixXs AFixedMass = A.block(0, 0, A.rows(), A.cols() - 1);
+  //     Eigen::VectorXs bFixedMass = A.col(A.cols() - 1) * (1.0 / foundMass);
+  //     bFixedMass.segment(0, b.size()) += b;
+
+  //     Eigen::VectorXs desired = Eigen::VectorXs::Zero(bFixedMass.size());
+  //     desired.segment(0, trialOriginalPositions[trial].size())
+  //         += trialOriginalPositions[trial];
+  //     desired -= bFixedMass;
+
+  //     // Old version, direct solve:
+  //     // Eigen::VectorXs localResult
+  //     //     = AFixedMass.householderQr().solve(desired - bFixedMass);
+  //     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
+  //     solver.setTolerance(1e-9);
+  //     solver.setMaxIterations(200);
+  //     solver.compute(AFixedMass);
+  //     Eigen::VectorXs localResult = solver.solve(desired);
+  //     Eigen::VectorXs recoveredTrajectory
+  //         = AFixedMass * localResult + bFixedMass;
+
+  //     trialSolutionInput.push_back(localResult);
+  //     trialSolutionOutput.push_back(recoveredTrajectory);
+  //   }
+  // }
+
+  // std::vector<Eigen::VectorXs> finalCOMTrajectory;
+  // // Set up and solve "drift correction" problems, for very long trials (>
+  // // twice the blur radius timesteps) where drift can become a major issue.
+  // for (int trial = 0; trial < numTrials; trial++)
+  // {
+  //   int trialLength = init->poseTrials[trial].cols();
+  //   finalCOMTrajectory.push_back(
+  //       trialSolutionOutput[trial].segment(0, trialLength * 3));
+  // }
+
+  // // Last, we need to decode the COM trajectory, and adjust our root
+  // // translations to hit that trajectory
+  // const int translationDofsStart
+  //     = mSkeleton->getRootJoint()->getDof(3)->getIndexInSkeleton();
+  // std::vector<int> trialsChangedTooMuch;
+  // std::cout << "Checking " << numTrials << " trials for too much COM change"
+  //           << std::endl;
+  // for (int trial = 0; trial < numTrials; trial++)
+  // {
+  //   s_t totalChange = 0.0;
+  //   std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
+  //   std::vector<s_t> comChanges;
+  //   // In this case, we can just read the answer right off the unified
+  //   // matrix
+  //   for (int t = 0; t < originalCOMs.size(); t++)
+  //   {
+  //     Eigen::Vector3s change
+  //         = finalCOMTrajectory[trial].segment<3>(t * 3) - originalCOMs[t];
+  //     const s_t dist = change.norm();
+  //     comChanges.push_back(dist);
+  //     totalChange += dist;
+  //   }
+
+  //   std::cout << "Trial " << trial << " moved COM by an average of "
+  //             << (totalChange / originalCOMs.size())
+  //             << "m to achieve linear physical consistency." << std::endl;
+  //   if ((totalChange / originalCOMs.size()) > 0.045)
+  //   {
+  //     std::cout << "Trial " << trial << " changed too much!" << std::endl;
+  //     trialsChangedTooMuch.push_back(trial);
+  //   }
+  // }
+
+  // for (int trial = 0; trial < numTrials; trial++)
+  // {
+  //   std::vector<Eigen::Vector3s> originalCOMs = trialOriginalCOMs[trial];
+
+  //   for (int t = 0; t < originalCOMs.size(); t++)
+  //   {
+  //     Eigen::Vector3s change
+  //         = finalCOMTrajectory[trial].segment<3>(t * 3) - originalCOMs[t];
+  //     init->poseTrials[trial].block<3, 1>(translationDofsStart, t) += change;
+  //   }
+  // }
+
+  // std::cout << "Finished zeroing linear residuals." << std::endl;
+  // return sampledTrials.size() > 0;
+  return true;
 }
 
 //==============================================================================
