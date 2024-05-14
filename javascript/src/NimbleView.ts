@@ -1046,6 +1046,7 @@ class DARTView {
       mesh.castShadow = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(size[0], size[1], size[2]);
+      mesh.frustumCulled = false;
 
       const material = mesh.material as THREE.MeshLambertMaterial;
       material.color.r = color[0];
@@ -1081,6 +1082,7 @@ class DARTView {
       mesh.castShadow = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(size[0], size[1], size[2]);
+      mesh.frustumCulled = false;
 
       this.objects.set(key, mesh);
       this.disposeHandlers.set(key, () => {
@@ -1129,6 +1131,7 @@ class DARTView {
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
     mesh.scale.set(radii[0], radii[1], radii[2]);
+    mesh.frustumCulled = false;
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
@@ -1180,6 +1183,7 @@ class DARTView {
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
     mesh.scale.set(radius, height, radius);
+    mesh.frustumCulled = false;
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
@@ -1231,6 +1235,7 @@ class DARTView {
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
     mesh.scale.set(radius, height, radius);
+    mesh.frustumCulled = false;
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
@@ -1304,6 +1309,7 @@ class DARTView {
     mesh.rotation.z = euler[2];
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
+    mesh.frustumCulled = false;
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
