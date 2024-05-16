@@ -18,13 +18,7 @@ capture processing. This page will help you understand how to use AddBiomechanic
 Where can I download the aggregated data?
 ##########################################
 
-You can download three sample B3D files from `here <https://drive.google.com/drive/folders/1wF2LnjyCQ7A-nwJUECffQCMJIHOCt9qu?usp=drive_link>`_.
-
-Our first big public dataset release is still in peer review, and will be made publicly available when it is accepted.
-
-We plan to periodically release public snapshots of the dataset from AddBiomechanics, as we clean it and manually verify quality. The main challenge is 
-that the data is very large (100+ hours and counting), and we want to make sure that we're releasing data that is as clean as possible, so that 
-you can trust it for your research.
+You can download the big public dataset files from `the AddBiomechanics data download page <https://addbiomechanics.org/download_data.html>`_!
 
 How can I download my own lab's data?
 ##########################################
@@ -195,7 +189,7 @@ Check out the `dataset implementation <https://github.com/keenon/InferBiomechani
 
 The key is using PyTorch's :code:`DataLoader` class with :code:`num_workers` more than 1. This will allow you to load data from disk in parallel with training, which is critical for training large models on large datasets.
 The trick is that PyTorch's parallel implementation relies on being able to pickle the :code:`Dataset` you're loading from, which will contain a bunch of :code:`nimble.biomechanics.SubjectOnDisk` objects, but :code:`nimble.biomechanics.SubjectOnDisk` is not picklable.
-To get around this, you must implement :code:`__getstate__` and :code:`__setstate__` for your :code:`Dataset` class to pickle the SubjectOnDisk files as simply their path on disk (with an example `here <https://github.com/keenon/InferBiomechanics/blob/3505d4240d1e69bc579a9153eac00cec9e580df5/src/data/AddBiomechanicsDataset.py#L266>`_), and then recreate them on unpickling (`here <https://github.com/keenon/InferBiomechanics/blob/3505d4240d1e69bc579a9153eac00cec9e580df5/src/data/AddBiomechanicsDataset.py#L274>`_).
+To get around this, you must implement :code:`__getstate__` and :code:`__setstate__` for your :code:`Dataset` class to pickle the SubjectOnDisk files as simply their path on disk (with an example `on Github <https://github.com/keenon/InferBiomechanics/blob/3505d4240d1e69bc579a9153eac00cec9e580df5/src/data/AddBiomechanicsDataset.py#L266>`_), and then recreate them on unpickling (`here <https://github.com/keenon/InferBiomechanics/blob/3505d4240d1e69bc579a9153eac00cec9e580df5/src/data/AddBiomechanicsDataset.py#L274>`_).
 This is ok to do, because :code:`SubjectOnDisk` is extremely lightweight, and can be recreated very quickly. It only loads a very small header from the file into memory, so that it knows where to seek to read frames as requested.
 Having lots of copies of :code:`SubjectOnDisk` in memory in different processes is not a problem, because they are each so lightweight.
 
