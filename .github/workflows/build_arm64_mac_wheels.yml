@@ -9,7 +9,7 @@ on:
       - "**"
 jobs:
   build-mac:
-    name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
+    name: Mac OSX Arm64 Python ${{ matrix.python-version }} - Build Wheels
     runs-on: macos-14
     strategy:
       matrix:

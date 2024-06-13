@@ -6,7 +6,7 @@ on:
     types: [published]
 jobs:
   build-mac:
-    name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
+    name: Mac OSX x86_64 Python ${{ matrix.python-version }} - Build Wheels
     runs-on: macos-12
     strategy:
       matrix:
