@@ -185,8 +185,8 @@ void PGSLCPSolver::solve(ConstrainedGroup* _group)
   for (std::size_t i = 0; i < numConstraints; ++i)
   {
     const ConstraintBasePtr& constraint = _group->getConstraint(i);
-    constraint->applyImpulse(x + offset[i]);
-    constraint->excite();
+    // constraint->applyImpulse(x + offset[i]);
+    // constraint->excite();
   }
 
   delete[] offset;

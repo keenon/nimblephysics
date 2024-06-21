@@ -35,6 +35,7 @@
 #include <dart/constraint/ConstrainedGroup.hpp>
 #include <dart/constraint/ConstraintSolver.hpp>
 #include <dart/dynamics/Skeleton.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -201,7 +202,7 @@ void ConstraintSolver(py::module& m)
           "applyConstraintImpulses",
           +[](dart::constraint::ConstraintSolver* self,
               std::vector<dart::constraint::ConstraintBasePtr> constraints,
-              std::vector<s_t*> impulses) {
+              Eigen::MatrixXs impulses) {
             self->applyConstraintImpulses(constraints, impulses);
           })
       .def(
