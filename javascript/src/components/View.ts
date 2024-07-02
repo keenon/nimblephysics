@@ -52,8 +52,8 @@ class View {
     this.camera = new THREE.PerspectiveCamera(
       65,
       this.width / this.height,
-      10,
-      100000
+      0.00001,
+      10000000
     );
     this.camera.position.z = 500;
 

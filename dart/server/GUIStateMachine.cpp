@@ -213,21 +213,27 @@ void GUIStateMachine::renderBasis(
   pointsZ.push_back(T * (Eigen::Vector3s::UnitZ() * scale));
 
   deleteObjectsByPrefix(prefix + "__basis_");
+  std::vector<s_t> width;
+  width.push_back(1.0);
+  width.push_back(0.3);
   createLine(
       prefix + "__basis_unitX",
       pointsX,
       Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
-      layer);
+      layer,
+      width);
   createLine(
       prefix + "__basis_unitY",
       pointsY,
       Eigen::Vector4s(0.0, 1.0, 0.0, 1.0),
-      layer);
+      layer,
+      width);
   createLine(
       prefix + "__basis_unitZ",
       pointsZ,
       Eigen::Vector4s(0.0, 0.0, 1.0, 1.0),
-      layer);
+      layer,
+      width);
 }
 
 /// This is a high-level command that creates/updates all the shapes in a

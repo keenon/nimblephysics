@@ -5765,6 +5765,61 @@ TEST(DynamicsFitter, TEST_ZERO_RESIDUALS)
 #endif
 
 #ifdef JACOBIAN_TESTS
+TEST(DynamicsFitter, TEST_ZERO_RESIDUALS_ABLATION)
+{
+  std::vector<std::string> motFiles;
+  std::vector<std::string> c3dFiles;
+  std::vector<std::string> trcFiles;
+  std::vector<std::string> grfFiles;
+
+  motFiles.push_back("dart://sample/grf/SprinterWithSpine/IK/JA1Gait35_ik.mot");
+  trcFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/MarkerData/JA1Gait35.trc");
+  grfFiles.push_back(
+      "dart://sample/grf/SprinterWithSpine/ID/JA1Gait35_grf.mot");
+
+  std::vector<std::string> footNames;
+  footNames.push_back("calcn_r");
+  footNames.push_back("calcn_l");
+
+  OpenSimFile standard = OpenSimParser::parseOsim(
+      "dart://sample/grf/SprinterWithSpine/Models/"
+      "optimized_scale_and_markers.osim");
+  standard.skeleton->setGravity(Eigen::Vector3s(0, -9.81, 0));
+
+  std::shared_ptr<DynamicsInitialization> init = createInitialization(
+      standard.skeleton,
+      standard.markersMap,
+      standard.trackingMarkers,
+      footNames,
+      motFiles,
+      c3dFiles,
+      trcFiles,
+      grfFiles,
+      -1);
+
+  std::vector<dynamics::BodyNode*> footNodes;
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_r"));
+  footNodes.push_back(standard.skeleton->getBodyNode("calcn_l"));
+
+  DynamicsFitter fitter(
+      standard.skeleton, init->grfBodyNodes, init->trackingMarkers);
+
+  Eigen::MatrixXs originalTrajectory = init->poseTrials[0];
+  // this gets the mass of the skeleton
+  fitter.zeroLinearResidualsOnCOMTrajectoryAblation(init, 4);
+
+  // fitter.moveComsToMinimizeAngularResiduals(init);
+
+  fitter.saveDynamicsToGUI(
+      "../../../javascript/src/data/movement2.bin",
+      init,
+      0,
+      (int)round(1.0 / init->trialTimesteps[0]));
+}
+#endif
+
+#ifdef JACOBIAN_TESTS
 TEST(DynamicsFitter, TEST_MULTIMASS_ZERO_RESIDUALS)
 {
   std::vector<std::string> motFiles;

@@ -4022,6 +4022,24 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
                 token.find("torque_z"), std::string("torque_z").size(), empty);
             wrench = 2;
           }
+          if (token.find("moment_x") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("moment_x"), std::string("moment_x").size(), empty);
+            wrench = 0;
+          }
+          if (token.find("moment_y") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("moment_y"), std::string("moment_y").size(), empty);
+            wrench = 1;
+          }
+          if (token.find("moment_z") != std::string::npos)
+          {
+            prefixSuffix.replace(
+                token.find("moment_z"), std::string("moment_z").size(), empty);
+            wrench = 2;
+          }
           if (token.find("torque_r_x") != std::string::npos
               || token.find("torque_l_x") != std::string::npos)
           {
@@ -4077,7 +4095,7 @@ std::vector<ForcePlate> OpenSimParser::loadGRF(
             prefixSuffix.replace(prefixSuffix.find("__"), 2, std::string("_"));
           }
 
-          if (token == "time")
+          if (token == "time" || token == "Time")
           {
             // Default to plate 0
             plate = 0;

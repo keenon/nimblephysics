@@ -1434,7 +1434,14 @@ public:
       int maxTrialsToSolveMassOver = 4,
       bool detectExternalForce = true,
       int driftCorrectionBlurRadius = 250,
-      int driftCorrectionBlurInterval = 250);
+      int driftCorrectionBlurInterval = 250,
+      s_t regularizeUnobservedTimesteps = 0.01);
+
+  // 1. This is an ablation study, where we just try to separately solve for
+  // each section of observed GRF, and leave alone the unobserved sections.
+  bool zeroLinearResidualsOnCOMTrajectoryAblation(
+      std::shared_ptr<DynamicsInitialization> init,
+      int maxTrialsToSolveMassOver);
 
   // 1. Adjust the total mass of the body and the individual link masses for
   // each body, and change the initial positions and velocities of the body to
