@@ -262,6 +262,9 @@ git clone https://github.com/google/benchmark.git
 git clone https://github.com/google/googletest.git benchmark/googletest
 pushd benchmark
 git checkout v1.8.3
+pushd googletest
+git checkout v1.14.0 
+popd
 mkdir build
 pushd build
 cmake -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS ..
