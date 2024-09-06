@@ -81,6 +81,13 @@ void DynamicsFitter(py::module& m)
           ::py::arg("torquesMultiple"),
           ::py::arg("useL1") = false)
       .def(
+          "calculateInverseDynamics",
+          &dart::biomechanics::ResidualForceHelper::calculateInverseDynamics,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"))
+      .def(
           "calculateResidualJacobianWrt",
           &dart::biomechanics::ResidualForceHelper::
               calculateResidualJacobianWrt,
