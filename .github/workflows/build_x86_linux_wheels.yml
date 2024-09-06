@@ -1,14 +1,19 @@
 name: Build and Publish Wheels (Linux x86_64)
 
 on:
-  workflow_dispatch:
-  release:
-    types: [published]
+  pull_request:
+    branches:
+      - "**"
+#   workflow_dispatch:
+#   release:
+#     types: [published]
 jobs:
   build-linux-x86_64:
     name: Linux Python x86_64 ${{ matrix.python-version }} - Build Wheels
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
@@ -86,32 +91,32 @@ jobs:
         with:
           name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
           path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  publish:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: [build-linux-x86_64]
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: wheelhouse
-      - name: Display structure of downloaded files before flattening
-        run: ls -R
-        working-directory: wheelhouse
-      - name: Flatten files
-        run: |
-          mkdir wheelhouse2
-          find wheelhouse -type f -exec mv {} wheelhouse2 \;
-          rm -rf wheelhouse
-          mv wheelhouse2 wheelhouse
-      - name: Display structure of downloaded files after flattening
-        run: ls -R
-        working-directory: wheelhouse
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1.8
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          packages_dir: wheelhouse/
-          skip_existing: true
-          verbose: true
+#   publish:
+#     name: Publish to PyPI
+#     runs-on: ubuntu-latest
+#     needs: [build-linux-x86_64]
+#     steps:
+#       - name: Download artifacts
+#         uses: actions/download-artifact@v2
+#         with:
+#           path: wheelhouse
+#       - name: Display structure of downloaded files before flattening
+#         run: ls -R
+#         working-directory: wheelhouse
+#       - name: Flatten files
+#         run: |
+#           mkdir wheelhouse2
+#           find wheelhouse -type f -exec mv {} wheelhouse2 \;
+#           rm -rf wheelhouse
+#           mv wheelhouse2 wheelhouse
+#       - name: Display structure of downloaded files after flattening
+#         run: ls -R
+#         working-directory: wheelhouse
+#       - name: Publish package to PyPI
+#         uses: pypa/gh-action-pypi-publish@release/v1.8
+#         with:
+#           user: __token__
+#           password: ${{ secrets.PYPI_API_TOKEN }}
+#           packages_dir: wheelhouse/
+#           skip_existing: true
+#           verbose: true
