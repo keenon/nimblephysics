@@ -317,8 +317,8 @@ sudo install_name_tool -change "@rpath/libIrrXML.dylib" "/usr/local/lib/libIrrXM
 # brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="73"
-ICU4C_FULL_VERSION="73.2"
+ICU4C_MAJOR_VERSION="74"
+ICU4C_FULL_VERSION="74.2"
 if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
       pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 else
