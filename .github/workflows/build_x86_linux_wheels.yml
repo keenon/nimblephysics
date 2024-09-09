@@ -9,6 +9,8 @@ jobs:
     name: Linux Python x86_64 ${{ matrix.python-version }} - Build Wheels
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
