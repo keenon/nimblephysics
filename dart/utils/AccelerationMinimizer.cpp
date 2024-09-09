@@ -23,10 +23,14 @@ AccelerationMinimizer::AccelerationMinimizer(
     int timesteps,
     s_t smoothingWeight,
     s_t regularizationWeight,
+    s_t startVelocityZeroWeight,
+    s_t endVelocityZeroWeight,
     int numIterations)
   : mTimesteps(timesteps),
     mSmoothingWeight(smoothingWeight),
     mRegularizationWeight(regularizationWeight),
+    mStartVelocityZeroWeight(startVelocityZeroWeight * timesteps),
+    mEndVelocityZeroWeight(endVelocityZeroWeight * timesteps),
     mNumIterations(numIterations),
     mNumIterationsBackoff(6),
     mDebugIterationBackoff(false),
@@ -46,11 +50,20 @@ AccelerationMinimizer::AccelerationMinimizer(
       tripletList.push_back(T(i, i + j, stamp(j)));
     }
   }
+  // Add start velocity zero constraint
+  tripletList.push_back(T(accTimesteps, 0, mStartVelocityZeroWeight));
+  tripletList.push_back(T(accTimesteps, 1, -mStartVelocityZeroWeight));
+  // Add end velocity zero constraint
+  tripletList.push_back(
+      T(accTimesteps + 1, mTimesteps - 2, mEndVelocityZeroWeight));
+  tripletList.push_back(
+      T(accTimesteps + 1, mTimesteps - 1, -mEndVelocityZeroWeight));
   for (int i = 0; i < mTimesteps; i++)
   {
-    tripletList.push_back(T(accTimesteps + i, i, mRegularizationWeight));
+    tripletList.push_back(T(accTimesteps + 2 + i, i, mRegularizationWeight));
   }
-  mB_sparse = Eigen::SparseMatrix<s_t>(accTimesteps + mTimesteps, mTimesteps);
+  mB_sparse
+      = Eigen::SparseMatrix<s_t>(accTimesteps + 2 + mTimesteps, mTimesteps);
   mB_sparse.setFromTriplets(tripletList.begin(), tripletList.end());
   mB_sparse.makeCompressed();
   mB_sparseSolver.analyzePattern(mB_sparse);
@@ -66,9 +79,9 @@ AccelerationMinimizer::AccelerationMinimizer(
 Eigen::VectorXs AccelerationMinimizer::minimize(Eigen::VectorXs series)
 {
   const int accTimesteps = mTimesteps - 2;
-  Eigen::VectorXs b = Eigen::VectorXs(accTimesteps + mTimesteps);
-  b.segment(0, accTimesteps).setZero();
-  b.segment(accTimesteps, mTimesteps) = series * mRegularizationWeight;
+  Eigen::VectorXs b = Eigen::VectorXs(accTimesteps + 2 + mTimesteps);
+  b.segment(0, accTimesteps + 2).setZero();
+  b.segment(accTimesteps + 2, mTimesteps) = series * mRegularizationWeight;
 
   Eigen::VectorXs x = series;
 

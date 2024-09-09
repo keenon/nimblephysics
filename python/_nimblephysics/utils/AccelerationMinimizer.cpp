@@ -43,10 +43,12 @@ void AccelerationMinimizer(py::module& m)
 {
   ::py::class_<dart::utils::AccelerationMinimizer>(m, "AccelerationMinimizer")
       .def(
-          ::py::init<int, s_t, s_t, int>(),
+          ::py::init<int, s_t, s_t, s_t, s_t, int>(),
           ::py::arg("numTimesteps"),
           ::py::arg("smoothingWeight") = 1.0,
           ::py::arg("regularizationWeight") = 0.01,
+          ::py::arg("startVelocityZeroWeight") = 0.0,
+          ::py::arg("endVelocityZeroWeight") = 0.0,
           ::py::arg("numIterations") = 10000)
       .def(
           "minimize",
