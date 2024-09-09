@@ -1,12 +1,9 @@
 name: Build and Publish Wheels (Mac OSX x86_64 only)
 
 on:
-  pull_request:
-    branches:
-      - "**"
-#   workflow_dispatch:
-#   release:
-#     types: [published]
+  workflow_dispatch:
+  release:
+    types: [published]
 jobs:
   build-mac:
     name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
