@@ -16,6 +16,8 @@ public:
       int numTimesteps,
       s_t smoothingWeight = 1.0,
       s_t regularizationWeight = 0.01,
+      s_t startPositionZeroWeight = 0.0,
+      s_t endPositionZeroWeight = 0.0,
       s_t startVelocityZeroWeight = 0.0,
       s_t endVelocityZeroWeight = 0.0,
       int numIterations = 10000);
@@ -32,6 +34,8 @@ protected:
   int mTimesteps;
   s_t mSmoothingWeight;
   s_t mRegularizationWeight;
+  s_t mStartPositionZeroWeight;
+  s_t mEndPositionZeroWeight;
   s_t mStartVelocityZeroWeight;
   s_t mEndVelocityZeroWeight;
   int mNumIterations;
