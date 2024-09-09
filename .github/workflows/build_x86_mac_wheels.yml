@@ -1,9 +1,12 @@
 name: Build and Publish Wheels (Mac OSX x86_64 only)
 
 on:
-  workflow_dispatch:
-  release:
-    types: [published]
+  pull_request:
+    branches:
+      - "**"
+#   workflow_dispatch:
+#   release:
+#     types: [published]
 jobs:
   build-mac:
     name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
@@ -62,8 +65,8 @@ jobs:
       - name: Publish artifact
         uses: actions/upload-artifact@v2
         with:
-          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_9_x86_64.whl
-          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_9_x86_64.whl
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_12_0_x86_64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_12_0_x86_64.whl
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
