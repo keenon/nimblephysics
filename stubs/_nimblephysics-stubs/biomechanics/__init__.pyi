@@ -1949,6 +1949,44 @@ class MarkerLabellerMock(MarkerLabeller):
     def setMockJointLocations(self, jointsOverTime: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     pass
 class MarkerTrace():
+    def appendPoint(self, time: int, point: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None: 
+        """
+        Add a point to the end of the marker trace
+        """
+    def computeBodyMarkerLoss(self, bodyName: str) -> float: 
+        """
+        Each possible combination of (trace, body) can create a marker. This returns a score for a given body, for how "good" of a marker that body would create when combined with this trace. Lower is better.
+        """
+    def computeBodyMarkerStats(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, posesOverTime: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], scalesOverTime: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None: 
+        """
+        Each possible combination of (trace, body) can create a marker. So we can compute some summary statistics for each body we could assign this trace to.
+        """
+    def concat(self, toAppend: MarkerTrace) -> MarkerTrace: 
+        """
+        This merges two MarkerTrace's together, to create a new trace object
+        """
+    @staticmethod
+    def createRawTraces(pointClouds: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]], mergeDistance: float = 0.01, mergeFrames: int = 5) -> typing.List[MarkerTrace]: ...
+    def firstTimestep(self) -> int: 
+        """
+        This returns when this MarkerTrace begins (inclusive)
+        """
+    def getBestMarker(self) -> typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+        """
+        This finds the best body to pair this trace with (using the stats from computeBodyMarkerStats()) and returns the best marker
+        """
+    def lastTimestep(self) -> int: 
+        """
+        This returns when this MarkerTrace ends (inclusive)
+        """
+    def overlap(self, toAppend: MarkerTrace) -> bool: 
+        """
+        Returns true if these traces overlap in time
+        """
+    def pointToAppendDistance(self, time: int, point: numpy.ndarray[numpy.float64, _Shape[3, 1]], extrapolate: bool) -> float: 
+        """
+        This gives the distance from the last point (or an extrapolation at this timestep of the last point, of order up to 2)
+        """
     @property
     def bodyClosestPointDistance(self) -> typing.Dict[str, float]:
         """
@@ -2733,6 +2771,7 @@ class SubjectOnDiskTrial():
     pass
 class SubjectOnDiskTrialPass():
     def __init__(self) -> None: ...
+    def computeKinematicValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], rootHistoryLen: int = 5, rootHistoryStride: int = 1, explicitVels: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), explicitAccs: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64)) -> None: ...
     def computeValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forces: numpy.ndarray[numpy.float64, _Shape[m, n]], moments: numpy.ndarray[numpy.float64, _Shape[m, n]], cops: numpy.ndarray[numpy.float64, _Shape[m, n]], rootHistoryLen: int = 5, rootHistoryStride: int = 1) -> None: ...
     def computeValuesFromForcePlates(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forcePlates: typing.List[ForcePlate], rootHistoryLen: int = 5, rootHistoryStride: int = 1, explicitVels: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), explicitAccs: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), forcePlateZeroThresholdNewtons: float = 3.0) -> None: ...
     def copyValuesFrom(self, other: SubjectOnDiskTrialPass) -> None: ...

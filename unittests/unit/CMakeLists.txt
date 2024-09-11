@@ -45,6 +45,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
 
+  dart_add_test("unit" test_AccelerationMinimizer)
+  target_link_libraries(test_AccelerationMinimizer dart-utils)
+
   dart_add_test("unit" test_IKInitializer)
   target_link_libraries(test_IKInitializer dart-utils)
 
