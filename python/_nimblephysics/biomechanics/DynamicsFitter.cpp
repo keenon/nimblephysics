@@ -648,7 +648,14 @@ protected:
           ::py::arg("maxTrialsToSolveMassOver") = 4,
           ::py::arg("detectExternalForce") = true,
           ::py::arg("driftCorrectionBlurRadius") = 250,
-          ::py::arg("driftCorrectionBlurInterval") = 250)
+          ::py::arg("driftCorrectionBlurInterval") = 250,
+          ::py::arg("regularizeUnobservedTimesteps") = 0.1)
+      .def(
+          "zeroLinearResidualsOnCOMTrajectoryAblation",
+          &dart::biomechanics::DynamicsFitter::
+              zeroLinearResidualsOnCOMTrajectoryAblation,
+          ::py::arg("init"),
+          ::py::arg("maxTrialsToSolveMassOver") = 4)
       .def(
           "multimassZeroLinearResidualsOnCOMTrajectory",
           &dart::biomechanics::DynamicsFitter::

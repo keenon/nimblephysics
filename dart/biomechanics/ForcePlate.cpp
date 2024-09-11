@@ -26,6 +26,8 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
       numExactlyZero++;
     }
   }
+  (void)numExactlyZero;
+  /*
   if (numExactlyZero > 5)
   {
     // If there are more than a few exactly zero force readings (so more
@@ -36,6 +38,7 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
               << std::endl;
     return;
   }
+  */
 
   int numBins = 200;
   // Don't go higher than 200N as the max force, because above that we start
@@ -50,8 +53,21 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
     hist[bin]++;
   }
 
+  std::cout << numBins << " bins (from 0N to " << maxForce
+            << "N):" << std::endl;
+  for (int i = 0; i < numBins; i++)
+  {
+    std::cout << i << ": ";
+    s_t percent = (s_t)hist[i] / trialLen;
+    for (int j = 0; j < int(std::ceil(percent * 20)); j++)
+    {
+      std::cout << "*";
+    }
+    std::cout << std::endl;
+  }
+
   int avg_bin_value = trialLen / numBins;
-  auto max_it = std::max_element(hist.begin(), hist.end());
+  auto max_it = std::max_element(hist.begin(), hist.end() - 1);
   int histMaxIndex = std::distance(hist.begin(), max_it);
 
   if (histMaxIndex < (int)((s_t)numBins * percentOfMaxToCut))
@@ -65,6 +81,8 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
         break;
       }
     }
+    std::cout << "hist max index " << histMaxIndex << " < threshold "
+              << (int)((s_t)numBins * percentOfMaxToCut) << std::endl;
 
     if (rightBound > (int)((s_t)numBins * percentOfMaxToCheckThumbRightEdge))
     {
@@ -119,6 +137,13 @@ void ForcePlate::autodetectNoiseThresholdAndClip(
         }
       }
     }
+  }
+  else
+  {
+    std::cout << "Not clipping force plate because it has no obvious peak in "
+                 "the histogram. Hist max index "
+              << histMaxIndex << " < threshold "
+              << (int)((s_t)numBins * percentOfMaxToCut) << std::endl;
   }
 }
 
