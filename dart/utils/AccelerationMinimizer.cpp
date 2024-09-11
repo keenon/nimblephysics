@@ -14,7 +14,7 @@ namespace utils {
 
 /**
  * Create (and pre-factor) a smoother that can remove the "jerk" from a time
- * seriese of data.
+ * series of data.
  *
  * The alpha value will determine how much smoothing to apply. A value of 0
  * corresponds to no smoothing.
