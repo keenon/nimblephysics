@@ -1296,7 +1296,12 @@ void BodyNode(
           +[](dart::dynamics::BodyNode* self) { self->dirtyExternalForces(); })
       .def(
           "dirtyCoriolisForces",
-          +[](dart::dynamics::BodyNode* self) { self->dirtyCoriolisForces(); });
+          +[](dart::dynamics::BodyNode* self) { self->dirtyCoriolisForces(); })
+      .def(
+          "distanceFrom2DConvexHullWithChildren",
+          &dynamics::BodyNode::distanceFrom2DConvexHullWithChildren,
+          ::py::arg("point"),
+          ::py::arg("up") = Eigen::Vector3s::UnitY());
 }
 
 } // namespace python

@@ -31,7 +31,8 @@ enum ProcessingPassType
 {
   kinematics,
   dynamics,
-  lowPassFilter
+  lowPassFilter,
+  accMinimizingFilter
 };
 
 } // namespace biomechanics

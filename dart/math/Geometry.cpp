@@ -4788,6 +4788,182 @@ Eigen::Isometry3s iterativeClosestPoint(
   return T;
 }
 
+//==============================================================================
+// Comparison function for sorting points lexicographically
+bool comparePoints2D(const Eigen::Vector2s& a, const Eigen::Vector2s& b)
+{
+  if (a.x() != b.x())
+    return a.x() < b.x();
+  else
+    return a.y() < b.y();
+}
+
+//==============================================================================
+// Cross product of OA and OB vectors
+s_t cross2D(
+    const Eigen::Vector2s& O,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B)
+{
+  return (A - O).x() * (B - O).y() - (A - O).y() * (B - O).x();
+}
+
+//==============================================================================
+// Convex hull algorithm: Andrew's monotone chain algorithm
+std::vector<Eigen::Vector2s> convexHull2D(std::vector<Eigen::Vector2s>& P)
+{
+  int n = P.size(), k = 0;
+  if (n == 1)
+    return P;
+
+  std::vector<Eigen::Vector2s> H(2 * n);
+
+  // Sort points lexicographically
+  std::sort(P.begin(), P.end(), comparePoints2D);
+
+  // Build the lower hull
+  for (int i = 0; i < n; ++i)
+  {
+    while (k >= 2 && cross2D(H[k - 2], H[k - 1], P[i]) <= 0)
+      --k;
+    H[k++] = P[i];
+  }
+
+  // Build the upper hull
+  for (int i = n - 2, t = k + 1; i >= 0; --i)
+  {
+    while (k >= t && cross2D(H[k - 2], H[k - 1], P[i]) <= 0)
+      --k;
+    H[k++] = P[i];
+  }
+
+  H.resize(k - 1); // Remove the last point (same as the first)
+  return H;
+}
+
+//==============================================================================
+// Check if a point is inside a convex polygon (assumes the polygon is already
+// sorted by convex hull)
+bool isPointInsideConvexPolygon2D(
+    const Eigen::Vector2s& P, const std::vector<Eigen::Vector2s>& polygon)
+{
+  int n = polygon.size();
+  if (n == 0)
+    return false;
+
+  double sign = 0;
+
+  for (int i = 0; i < n; ++i)
+  {
+    const Eigen::Vector2s& A = polygon[i];
+    const Eigen::Vector2s& B = polygon[(i + 1) % n];
+    double cross_product = cross2D(A, B, P);
+    if (cross_product == 0)
+      continue; // Point is on the line
+
+    if (sign == 0)
+      sign = cross_product > 0 ? 1 : -1;
+    else if ((cross_product > 0 && sign < 0) || (cross_product < 0 && sign > 0))
+      return false;
+  }
+
+  return true;
+}
+
+//==============================================================================
+// Compute the distance from a point to a line segment
+s_t distancePointToSegment2D(
+    const Eigen::Vector2s& P,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B)
+{
+  Eigen::Vector2s AP = P - A;
+  Eigen::Vector2s AB = B - A;
+  double ab2 = AB.dot(AB);
+  double t = AP.dot(AB) / ab2;
+  if (t < 0.0)
+    t = 0.0;
+  else if (t > 1.0)
+    t = 1.0;
+  Eigen::Vector2s projection = A + t * AB;
+  return (P - projection).norm();
+}
+
+//==============================================================================
+// Compute the distance from a point to the convex hull
+s_t distancePointToConvexHull2D(
+    const Eigen::Vector2s& P, std::vector<Eigen::Vector2s>& points)
+{
+  if (points.size() == 1)
+  {
+    return (P - points[0]).norm();
+  }
+  else if (points.size() == 2)
+  {
+    return distancePointToSegment2D(P, points[0], points[1]);
+  }
+
+  // Compute the convex hull
+  std::vector<Eigen::Vector2s> hull = convexHull2D(points);
+
+  // Check if the point is inside the convex hull
+  if (isPointInsideConvexPolygon2D(P, hull))
+    return 0.0;
+
+  // Compute the minimal distance from P to the edges of the convex hull
+  double min_distance = std::numeric_limits<double>::max();
+  int n = hull.size();
+
+  for (int i = 0; i < n; ++i)
+  {
+    const Eigen::Vector2s& A = hull[i];
+    const Eigen::Vector2s& B = hull[(i + 1) % n];
+    double distance = distancePointToSegment2D(P, A, B);
+    if (distance < min_distance)
+      min_distance = distance;
+  }
+
+  return min_distance;
+}
+
+//==============================================================================
+/// Compute the distance from a point to the convex hull projected to a plane
+s_t distancePointToConvexHullProjectedTo2D(
+    const Eigen::Vector3s& P,
+    std::vector<Eigen::Vector3s>& points,
+    Eigen::Vector3s up)
+{
+  // Get a 2D basis that is orthogonal to the up vector
+  if (up.norm() == 0)
+  {
+    up = Eigen::Vector3s::UnitY();
+  }
+  else
+  {
+    up.normalize();
+  }
+  Eigen::Vector3s x = up.cross(Eigen::Vector3s::UnitZ());
+  if (x.norm() == 0)
+  {
+    x = up.cross(Eigen::Vector3s::UnitX());
+  }
+  Eigen::Vector3s y = up.cross(x);
+
+  // Project all the centers into 2D space
+  std::vector<Eigen::Vector2s> centers2D;
+  for (Eigen::Vector3s center : points)
+  {
+    Eigen::Vector2s center2D;
+    center2D << center.dot(x), center.dot(y);
+    centers2D.push_back(center2D);
+  }
+  Eigen::Vector2s point2D;
+  point2D << P.dot(x), P.dot(y);
+
+  // Now we can use the geometry library to compute the convex hull
+  return math::distancePointToConvexHull2D(point2D, centers2D);
+}
+
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)
 {
 }

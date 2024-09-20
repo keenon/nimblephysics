@@ -19,6 +19,8 @@ __all__ = [
     "Random",
     "dAdInvT",
     "dAdT",
+    "distancePointToConvexHull2D",
+    "distancePointToConvexHullProjectedTo2D",
     "eulerXYXToMatrix",
     "eulerXYZToMatrix",
     "eulerXZXToMatrix",
@@ -240,6 +242,10 @@ def AdT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.fl
 def dAdInvT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.float64, _Shape[3, 1]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
     pass
 def dAdT(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], p: numpy.ndarray[numpy.float64, _Shape[3, 1]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
+    pass
+def distancePointToConvexHull2D(P: numpy.ndarray[numpy.float64, _Shape[2, 1]], points: typing.List[numpy.ndarray[numpy.float64, _Shape[2, 1]]]) -> float:
+    pass
+def distancePointToConvexHullProjectedTo2D(P: numpy.ndarray[numpy.float64, _Shape[3, 1]], points: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], normal: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0., 1., 0.])) -> float:
     pass
 def eulerXYXToMatrix(angle: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 3]]:
     pass

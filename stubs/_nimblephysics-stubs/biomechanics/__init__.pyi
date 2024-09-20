@@ -2220,6 +2220,22 @@ class OpenSimFile():
     def markersMap(self, arg0: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
         pass
     @property
+    def meshMap(self) -> typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]:
+        """
+        :type: typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]
+        """
+    @meshMap.setter
+    def meshMap(self, arg0: typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> None:
+        pass
+    @property
+    def meshScaleMap(self) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        :type: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @meshScaleMap.setter
+    def meshScaleMap(self, arg0: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        pass
+    @property
     def skeleton(self) -> nimblephysics_libs._nimblephysics.dynamics.Skeleton:
         """
         :type: nimblephysics_libs._nimblephysics.dynamics.Skeleton
@@ -2381,6 +2397,8 @@ class ProcessingPassType():
       DYNAMICS : This is the pass where we solve for dynamics.
 
       LOW_PASS_FILTER : This is the pass where we apply a low-pass filter to the kinematics and dynamics.
+
+      ACC_MINIMIZING_FILTER : This is the pass where we apply an acceleration minimizing filter to the kinematics and dynamics.
     """
     def __eq__(self, other: object) -> bool: ...
     def __getstate__(self) -> int: ...
@@ -2401,13 +2419,15 @@ class ProcessingPassType():
         """
         :type: int
         """
+    ACC_MINIMIZING_FILTER: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.ACC_MINIMIZING_FILTER: 3>
     DYNAMICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.DYNAMICS: 1>
     KINEMATICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.KINEMATICS: 0>
     LOW_PASS_FILTER: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.LOW_PASS_FILTER: 2>
-    __members__: dict # value = {'KINEMATICS': <ProcessingPassType.KINEMATICS: 0>, 'DYNAMICS': <ProcessingPassType.DYNAMICS: 1>, 'LOW_PASS_FILTER': <ProcessingPassType.LOW_PASS_FILTER: 2>}
+    __members__: dict # value = {'KINEMATICS': <ProcessingPassType.KINEMATICS: 0>, 'DYNAMICS': <ProcessingPassType.DYNAMICS: 1>, 'LOW_PASS_FILTER': <ProcessingPassType.LOW_PASS_FILTER: 2>, 'ACC_MINIMIZING_FILTER': <ProcessingPassType.ACC_MINIMIZING_FILTER: 3>}
     pass
 class ResidualForceHelper():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, forceBodies: typing.List[int]) -> None: ...
+    def calculateInverseDynamics(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def calculateResidual(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]: ...
     def calculateResidualJacobianWrt(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]], wrt: nimblephysics_libs._nimblephysics.neural.WithRespectTo) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def calculateResidualNorm(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]], torquesMultiple: float, useL1: bool = False) -> float: ...
@@ -2691,6 +2711,10 @@ class SubjectOnDisk():
         """
         This returns the timestep size for the trial requested, in seconds per frame
         """
+    def hasLoadedAllFrames(self) -> bool: 
+        """
+        This returns true if all the frames have been loaded into memory.
+        """
     def loadAllFrames(self, doNotStandardizeForcePlateData: bool = False) -> None: 
         """
         This loads all the frames of data, and fills in the processing pass data matrices in the proto header classes.
@@ -2733,6 +2757,7 @@ class SubjectOnDiskHeader():
     def setNumJoints(self, joints: int) -> SubjectOnDiskHeader: ...
     def setSubjectTags(self, subjectTags: typing.List[str]) -> SubjectOnDiskHeader: ...
     def setTrials(self, trials: typing.List[SubjectOnDiskTrial]) -> None: ...
+    def trimToProcessingPasses(self, numPasses: int) -> None: ...
     pass
 class SubjectOnDiskPassHeader():
     def __init__(self) -> None: ...
@@ -2799,6 +2824,8 @@ class SubjectOnDiskTrialPass():
     def getRootSpatialVelInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getTaus(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getVels(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def setAccelerationMinimizingForceRegularization(self, reg: float) -> None: ...
+    def setAccelerationMinimizingRegularization(self, reg: float) -> None: ...
     def setAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setAngularResidual(self, angularResidual: typing.List[float]) -> None: ...
     def setComAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...

@@ -152,6 +152,13 @@ public:
   // If we filtered the force plates, then what was the cutoff frequency of that
   // filtering?
   void setForcePlateCutoffs(std::vector<s_t> cutoffs);
+  // If we filtered the position data with an acceleration minimizing filter,
+  // then what was the regularization weight that tracked the original position.
+  void setAccelerationMinimizingRegularization(s_t regularization);
+  // If we filtered the position data with an acceleration minimizing filter,
+  // then what was the regularization weight that tracked the original force
+  // data
+  void setAccelerationMinimizingForceRegularization(s_t weight);
 
   // This is for allowing the user to set all the values of a pass at once,
   // without having to manually compute them in Python, which turns out to be
@@ -270,6 +277,12 @@ protected:
   // If we're doing a lowpass filter on this pass, then what was the order of
   // that (Butterworth) filter?
   int mLowpassFilterOrder;
+  // If we filtered position with an acceleration minimizing filter, then this
+  // is the regularization weight that tracked the original position.
+  s_t mAccelerationMinimizingRegularization;
+  // If we filtered position with an acceleration minimizing filter, then this
+  // is the regularization weight that tracked the original force data
+  s_t mAccelerationMinimizingForceRegularization;
   // If we filtered the force plates, then what was the cutoff frequency of that
   // filtering?
   std::vector<s_t> mForcePlateCutoffs;
@@ -424,6 +437,7 @@ public:
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
   std::vector<std::shared_ptr<SubjectOnDiskTrial>> getTrials();
+  void trimToProcessingPasses(int numPasses);
   void setTrials(std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials);
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
@@ -504,6 +518,8 @@ public:
   /// This loads all the frames of data, and fills in the processing pass data
   /// matrices in the proto header classes.
   void loadAllFrames(bool doNotStandardizeForcePlateData = false);
+
+  bool hasLoadedAllFrames();
 
   /// This returns the raw proto header for this subject, which can be used to
   /// write out a new B3D file

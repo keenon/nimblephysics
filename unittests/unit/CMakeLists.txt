@@ -75,6 +75,9 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkeletonToBallJoints)
   target_link_libraries(test_SkeletonToBallJoints dart-utils)
 
+  dart_add_test("unit" test_Convex2DDistanceMeasurement)
+  target_link_libraries(test_Convex2DDistanceMeasurement dart-utils)
+
   dart_add_test("unit" test_SkeletonSimplification)
   target_link_libraries(test_SkeletonSimplification dart-utils)
 

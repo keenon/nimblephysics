@@ -9526,6 +9526,36 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     init->regularizeMarkerOffsetsTo[pair.first] = pair.second;
   }
 
+  // Create the joint data
+  init->joints.clear();
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    init->joints.emplace_back();
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      init->joints.back().push_back(skel->getJoint(i));
+    }
+    init->jointsAdjacentMarkers.emplace_back();
+    init->jointWeights.push_back(Eigen::VectorXs::Ones(skel->getNumJoints()));
+    init->axisWeights.push_back(Eigen::VectorXs::Zero(skel->getNumJoints()));
+  }
+
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs& poses = poseTrials[trial];
+    Eigen::MatrixXs jointCenters
+        = Eigen::MatrixXs::Zero(3 * skel->getNumJoints(), poses.cols());
+    Eigen::MatrixXs jointAxis
+        = Eigen::MatrixXs::Zero(6 * skel->getNumJoints(), poses.cols());
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      skel->setPositions(poses.col(t));
+      jointCenters.col(t) = skel->getJointWorldPositions(skel->getJoints());
+    }
+    init->jointCenters.push_back(jointCenters);
+    init->jointAxis.push_back(jointAxis);
+  }
+
   return init;
 }
 
@@ -11618,7 +11648,8 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(unifiedLinearMap.rows() * 10);
+    solver.setMaxIterations(
+        std::min<int>((int)(unifiedLinearMap.rows() * 10), 10000));
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);

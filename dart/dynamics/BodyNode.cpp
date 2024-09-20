@@ -5029,6 +5029,35 @@ void BodyNode::debugJacobianOfMinvXForward(
 }
 
 //==============================================================================
+/// Compute the distance between a point and the convex hull formed by the
+/// body node and all of its children, in world space.
+s_t BodyNode::distanceFrom2DConvexHullWithChildren(
+    Eigen::Vector3s point, Eigen::Vector3s up)
+{
+  (void)point;
+  (void)up;
+  std::vector<Eigen::Vector3s> centers;
+
+  // Fill in the list of centers
+
+  std::vector<BodyNode*> queue;
+  queue.push_back(this);
+  while (queue.size() > 0)
+  {
+    BodyNode* node = queue.back();
+    queue.pop_back();
+    Eigen::Vector3s center = node->getWorldTransform().translation();
+    centers.push_back(center);
+    for (int i = 0; i < node->getNumChildJoints(); i++)
+    {
+      queue.push_back(node->getChildJoint(i)->getChildBodyNode());
+    }
+  }
+
+  return math::distancePointToConvexHullProjectedTo2D(point, centers, up);
+}
+
+//==============================================================================
 const Eigen::Vector6s& BodyNode::getBiasForce() const
 {
   return mBiasForce;
