@@ -2554,8 +2554,6 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           }
         }
 
-        // TODO
-        /*
 #ifndef NDEBUG
         // Check that inverse dynamics given these inputs produces the expected
         // joint torques
@@ -2583,7 +2581,6 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
           assert(false);
         }
 #endif
-        */
       }
     }
     linearResiduals.push_back(linearResidual);

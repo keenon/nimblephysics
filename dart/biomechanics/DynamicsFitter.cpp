@@ -1,6 +1,7 @@
 #include "dart/biomechanics/DynamicsFitter.hpp"
 
 #include <algorithm>
+#include <climits>
 #include <future>
 #include <iostream>
 #include <limits>
@@ -8926,8 +8927,25 @@ bool DynamicsFitProblem::get_nlp_info(
   // Set the number of entries in the Hessian
   nnz_h_lag = n * n;
 
+  if ((int32_t)nnz_h_lag < 0 || nnz_h_lag >= std::numeric_limits<int32_t>::max()
+      || n > 46340)
+  {
+    // We've got so many dimensions that we can't store the size of the full
+    // hessian in 32-bits.
+    std::cout << "WARNING: nnz_h_lag is too large to store in signed 32-bits. "
+                 "Setting "
+                 "to 1."
+              << std::endl;
+    nnz_h_lag = 1;
+  }
+
   // use the C style indexing (0-based)
   index_style = Ipopt::TNLP::C_STYLE;
+
+  std::cout << "DynamicsFitProbelem: Getting NLP info" << std::endl;
+  std::cout << "   n=" << n << " m=" << m << std::endl;
+  std::cout << "   nnz_jac_g=" << nnz_jac_g << " nnz_h_lag=" << nnz_h_lag
+            << std::endl;
 
   return true;
 }

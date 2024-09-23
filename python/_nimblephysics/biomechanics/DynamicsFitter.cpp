@@ -106,7 +106,40 @@ void DynamicsFitter(py::module& m)
           ::py::arg("forcesConcat"),
           ::py::arg("wrt"),
           ::py::arg("torquesMultiple"),
-          ::py::arg("useL1") = false);
+          ::py::arg("useL1") = false)
+      .def(
+          "calculateComToCenterAngularResiduals",
+          &dart::biomechanics::ResidualForceHelper::
+              calculateComToCenterAngularResiduals,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the location that we would need to move the COM to in "
+          "order to center the angular residuals. Moving the COM to the "
+          "computed location doesn't remove angular residuals, but ensures "
+          "that any remaining residuals are parallel to the net external force "
+          "on the body.")
+      .def(
+          "calculateCOMAngularResidual",
+          &dart::biomechanics::ResidualForceHelper::calculateCOMAngularResidual,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the residual at the root, then transforms that to the "
+          "COM and expresses the torque as a spatial vector (even if the root "
+          "joint uses euler coordinates for rotation).")
+      .def(
+          "calculateResidualFreeRootAcceleration",
+          &dart::biomechanics::ResidualForceHelper::
+              calculateResidualFreeRootAcceleration,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the acceleration we would need at the root in order "
+          "to remove all residual forces.");
 
   ::py::class_<
       dart::biomechanics::DynamicsInitialization,
