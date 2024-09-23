@@ -53,6 +53,8 @@ proto::ProcessingPassType passTypeToProto(ProcessingPassType type)
       return proto::ProcessingPassType::dynamics;
     case lowPassFilter:
       return proto::ProcessingPassType::lowPassFilter;
+    case accMinimizingFilter:
+      return proto::ProcessingPassType::accMinimizingFilter;
   }
   return proto::ProcessingPassType::kinematics;
 }
@@ -67,6 +69,8 @@ ProcessingPassType passTypeFromProto(proto::ProcessingPassType type)
       return dynamics;
     case proto::ProcessingPassType::lowPassFilter:
       return lowPassFilter;
+    case proto::ProcessingPassType::accMinimizingFilter:
+      return accMinimizingFilter;
       // These are just here to keep Clang from complaining
     case proto::ProcessingPassType_INT_MIN_SENTINEL_DO_NOT_USE_:
       return kinematics;
@@ -106,6 +110,20 @@ proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
       return proto::MissingGRFReason::manualReview;
     case footContactDetectedButNoForce:
       return proto::MissingGRFReason::footContactDetectedButNoForce;
+    case tooHighMarkerRMS:
+      return proto::MissingGRFReason::tooHighMarkerRMS;
+    case hasInputOutliers:
+      return proto::MissingGRFReason::hasInputOutliers;
+    case hasNoForcePlateData:
+      return proto::MissingGRFReason::hasNoForcePlateData;
+    case velocitiesStillTooHighAfterFiltering:
+      return proto::MissingGRFReason::velocitiesStillTooHighAfterFiltering;
+    case copOutsideConvexFootError:
+      return proto::MissingGRFReason::copOutsideConvexFootError;
+    case zeroForceFrame:
+      return proto::MissingGRFReason::zeroForceFrame;
+    case extendedToNearestPeakForce:
+      return proto::MissingGRFReason::extendedToNearestPeakForce;
   }
   return proto::MissingGRFReason::notMissingGRF;
 }
@@ -138,6 +156,20 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
       return manualReview;
     case proto::MissingGRFReason::footContactDetectedButNoForce:
       return footContactDetectedButNoForce;
+    case proto::MissingGRFReason::tooHighMarkerRMS:
+      return tooHighMarkerRMS;
+    case proto::MissingGRFReason::hasInputOutliers:
+      return hasInputOutliers;
+    case proto::MissingGRFReason::hasNoForcePlateData:
+      return hasNoForcePlateData;
+    case proto::MissingGRFReason::velocitiesStillTooHighAfterFiltering:
+      return velocitiesStillTooHighAfterFiltering;
+    case proto::MissingGRFReason::copOutsideConvexFootError:
+      return copOutsideConvexFootError;
+    case proto::MissingGRFReason::zeroForceFrame:
+      return zeroForceFrame;
+    case proto::MissingGRFReason::extendedToNearestPeakForce:
+      return extendedToNearestPeakForce;
       // These are just here to keep Clang from complaining
     case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
       return notMissingGRF;
@@ -558,6 +590,11 @@ void SubjectOnDisk::loadAllFrames(bool doNotStandardizeForcePlateData)
       }
     }
   }
+}
+
+bool SubjectOnDisk::hasLoadedAllFrames()
+{
+  return mLoadedAllFrames;
 }
 
 /// This returns the raw proto header for this subject, which can be used to
@@ -1361,6 +1398,10 @@ int SubjectOnDisk::getNumProcessingPasses()
 
 ProcessingPassType SubjectOnDisk::getProcessingPassType(int processingPass)
 {
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mPasses.size() - 1;
+  }
   return mHeader->mPasses[processingPass]->mType;
 }
 
@@ -1370,6 +1411,10 @@ std::vector<bool> SubjectOnDisk::getDofPositionsObserved(
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<bool>();
+  }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
   }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
@@ -1383,6 +1428,10 @@ std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(
   {
     return std::vector<bool>();
   }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mDofVelocitiesFiniteDifferenced;
@@ -1394,6 +1443,10 @@ std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<bool>();
+  }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
   }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
@@ -1407,6 +1460,10 @@ std::vector<s_t> SubjectOnDisk::getTrialLinearResidualNorms(
   {
     return std::vector<s_t>();
   }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
   return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mLinearResidual;
 }
 
@@ -1416,6 +1473,10 @@ std::vector<s_t> SubjectOnDisk::getTrialAngularResidualNorms(
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
+  }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
   }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
@@ -1427,6 +1488,24 @@ std::vector<s_t> SubjectOnDisk::getTrialMarkerRMSs(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialMarkerRMSs() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
+    return std::vector<s_t>();
+  }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
+  if (processingPass < 0
+      || processingPass >= mHeader->mTrials[trial]->mTrialPasses.size())
+  {
+    std::cout
+        << "Requested getTrialMarkerRMSs() for trial " << trial
+        << " and processing pass " << processingPass
+        << ", which is out of bounds on the existing processing passes (len="
+        << mHeader->mTrials[trial]->mTrialPasses.size()
+        << "). Returning empty vector." << std::endl;
     return std::vector<s_t>();
   }
   return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mMarkerRMS;
@@ -1439,6 +1518,10 @@ std::vector<s_t> SubjectOnDisk::getTrialMarkerMaxs(
   {
     return std::vector<s_t>();
   }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
   return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mMarkerMax;
 }
 
@@ -1450,6 +1533,10 @@ std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
     return std::vector<s_t>();
+  }
+  if (processingPass == -1)
+  {
+    processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
   }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
@@ -2268,7 +2355,6 @@ void SubjectOnDiskTrialPass::computeKinematicValues(
                 - (T_wr.linear().transpose() * skel->getGravity());
           rootSpatialAccInRootFrame.col(t).tail<3>() = rootLinAcc;
         }
-
       }
     }
     linearResiduals.push_back(linearResidual);
@@ -2335,8 +2421,14 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
     s_t forcePlateZeroThresholdNewtons)
 {
   // 0. Compute kinematic values
-  computeKinematicValues(skel, timestep, poses, rootHistoryLen,
-                         rootHistoryStride, explicitVels, explicitAccs);
+  computeKinematicValues(
+      skel,
+      timestep,
+      poses,
+      rootHistoryLen,
+      rootHistoryStride,
+      explicitVels,
+      explicitAccs);
   const auto& vels = getVels();
   const auto& accs = getAccs();
 
@@ -2355,10 +2447,12 @@ void SubjectOnDiskTrialPass::computeValuesFromForcePlates(
   {
     dynamics::BodyNode* footBody = skel->getBodyNode(footName);
 
-    if (!footBody) {
-      std::cout << "WARNING: One of the foot bodies specified does not exist in "
-                   "the skeleton. Skipping dynamics calculations..."
-                << std::endl;
+    if (!footBody)
+    {
+      std::cout
+          << "WARNING: One of the foot bodies specified does not exist in "
+             "the skeleton. Skipping dynamics calculations..."
+          << std::endl;
       return;
     }
 
@@ -2573,6 +2667,23 @@ void SubjectOnDiskTrialPass::setForcePlateCutoffs(std::vector<s_t> cutoffs)
   mForcePlateCutoffs = cutoffs;
 }
 
+// If we filtered the position data with an acceleration minimizing filter,
+// then what was the regularization weight that tracked the original position.
+void SubjectOnDiskTrialPass::setAccelerationMinimizingRegularization(
+    s_t regularization)
+{
+  mAccelerationMinimizingRegularization = regularization;
+}
+
+// If we filtered the position data with an acceleration minimizing filter,
+// then what was the regularization weight that tracked the original force
+// data
+void SubjectOnDiskTrialPass::setAccelerationMinimizingForceRegularization(
+    s_t weight)
+{
+  mAccelerationMinimizingForceRegularization = weight;
+}
+
 void SubjectOnDiskTrialPass::setLinearResidual(std::vector<s_t> linearResidual)
 {
   mLinearResidual = linearResidual;
@@ -2664,6 +2775,10 @@ void SubjectOnDiskTrialPass::read(
 
   mLowpassCutoffFrequency = proto.lowpass_cutoff_frequency();
   mLowpassFilterOrder = proto.lowpass_filter_order();
+  mAccelerationMinimizingRegularization
+      = proto.acc_minimizing_regularization_weight();
+  mAccelerationMinimizingForceRegularization
+      = proto.acc_minimizing_force_regularization_weight();
   mForcePlateCutoffs.clear();
   for (int i = 0; i < proto.force_plate_cutoff_size(); i++)
   {
@@ -2721,6 +2836,10 @@ void SubjectOnDiskTrialPass::write(
 
   proto->set_lowpass_cutoff_frequency(mLowpassCutoffFrequency);
   proto->set_lowpass_filter_order(mLowpassFilterOrder);
+  proto->set_acc_minimizing_regularization_weight(
+      mAccelerationMinimizingRegularization);
+  proto->set_acc_minimizing_force_regularization_weight(
+      mAccelerationMinimizingForceRegularization);
   for (int i = 0; i < mForcePlateCutoffs.size(); i++)
   {
     proto->add_force_plate_cutoff(mForcePlateCutoffs[i]);
@@ -3201,6 +3320,36 @@ std::vector<std::shared_ptr<SubjectOnDiskTrial>>
 SubjectOnDiskHeader::getTrials()
 {
   return mTrials;
+}
+
+void SubjectOnDiskHeader::filterTrials(std::vector<bool> keepTrials)
+{
+  if (keepTrials.size() != mTrials.size())
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: keepTrials "
+                 "size is "
+              << keepTrials.size() << " but we have " << mTrials.size()
+              << " trials" << std::endl;
+    return;
+  }
+  std::vector<std::shared_ptr<SubjectOnDiskTrial>> newTrials;
+  for (int i = 0; i < keepTrials.size(); i++)
+  {
+    if (keepTrials[i])
+    {
+      newTrials.push_back(mTrials[i]);
+    }
+  }
+  mTrials = newTrials;
+}
+
+void SubjectOnDiskHeader::trimToProcessingPasses(int numPasses)
+{
+  mPasses.resize(numPasses);
+  for (int i = 0; i < mTrials.size(); i++)
+  {
+    mTrials[i]->mTrialPasses.resize(numPasses);
+  }
 }
 
 void SubjectOnDiskHeader::setTrials(

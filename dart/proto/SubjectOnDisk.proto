@@ -14,12 +14,20 @@ enum MissingGRFReason { notMissingGRF = 0;
                         interpolatedClippedGRF = 9;
                         manualReview = 10;
                         footContactDetectedButNoForce = 11;
+                        tooHighMarkerRMS = 12;
+                        hasInputOutliers = 13;
+                        hasNoForcePlateData = 14;
+                        velocitiesStillTooHighAfterFiltering = 15;
+                        copOutsideConvexFootError = 16;
+                        zeroForceFrame = 17;
+                        extendedToNearestPeakForce = 18;
                       };
 
 enum ProcessingPassType {
   kinematics = 0;
   dynamics = 1;
   lowPassFilter = 2;
+  accMinimizingFilter = 3;
 };
 
 // Many of the ML tasks we want to support from SubjectOnDisk data include 
@@ -59,6 +67,10 @@ message SubjectOnDiskTrialProcessingPassHeader {
   int32 lowpass_filter_order = 11;
   // If we clipped background noise on the force plates this pass, then this is the cutoff we used for each plate
   repeated float force_plate_cutoff = 12;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original positions
+  float acc_minimizing_regularization_weight = 13;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original forces
+  float acc_minimizing_force_regularization_weight = 14;
 }
 
 message SubjectOnDiskTrialHeader {

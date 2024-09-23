@@ -926,6 +926,30 @@ Eigen::Isometry3s iterativeClosestPoint(
     Eigen::Isometry3s transform = Eigen::Isometry3s::Identity(),
     bool verbose = false);
 
+// Convex hull algorithm: Andrew's monotone chain algorithm
+std::vector<Eigen::Vector2s> convexHull2D(std::vector<Eigen::Vector2s>& P);
+
+// Check if a point is inside a convex polygon (assumes the polygon is already
+// sorted by convex hull)
+bool isPointInsideConvexPolygon2D(
+    const Eigen::Vector2s& P, const std::vector<Eigen::Vector2s>& polygon);
+
+// Compute the distance from a point to a line segment
+s_t distancePointToSegment2D(
+    const Eigen::Vector2s& P,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B);
+
+// Compute the distance from a point to the convex hull
+s_t distancePointToConvexHull2D(
+    const Eigen::Vector2s& P, std::vector<Eigen::Vector2s>& points);
+
+/// Compute the distance from a point to the convex hull projected to a plane
+s_t distancePointToConvexHullProjectedTo2D(
+    const Eigen::Vector3s& P,
+    std::vector<Eigen::Vector3s>& points,
+    Eigen::Vector3s normal = Eigen::Vector3s::UnitY());
+
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox
 {

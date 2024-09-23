@@ -30,36 +30,53 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/utils/AccelerationTrackAndMinimize.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void DartLoader(py::module& sm);
-void SkelParser(py::module& sm);
-void SdfParser(py::module& sm);
-void StringUtils(py::module& sm);
-void MJCFExporter(py::module& sm);
-void UniversalLoader(py::module& sm);
-void AccelerationSmoother(py::module& sm);
-void AccelerationMinimizer(py::module& sm);
-void AccelerationTrackAndMinimize(py::module& sm);
-
-void dart_utils(py::module& m)
+void AccelerationTrackAndMinimize(py::module& m)
 {
-  auto sm = m.def_submodule("utils");
+  py::class_<dart::utils::AccelerationTrackingResult>(
+      m, "AccelerationTrackingResult")
+      .def_readwrite("series", &dart::utils::AccelerationTrackingResult::series)
+      .def_readwrite(
+          "accelerationOffset",
+          &dart::utils::AccelerationTrackingResult::accelerationOffset);
 
-  DartLoader(sm);
-  SkelParser(sm);
-  SdfParser(sm);
-  StringUtils(sm);
-  MJCFExporter(sm);
-  UniversalLoader(sm);
-  AccelerationSmoother(sm);
-  AccelerationMinimizer(sm);
-  AccelerationTrackAndMinimize(sm);
+  ::py::class_<dart::utils::AccelerationTrackAndMinimize>(
+      m, "AccelerationTrackAndMinimize")
+      .def(
+          ::py::init<int, std::vector<bool>, s_t, s_t, s_t, s_t, int>(),
+          ::py::arg("numTimesteps"),
+          ::py::arg("trackAccelerationAtTimesteps"),
+          ::py::arg("zeroUnobservedAccWeight") = 1.0,
+          ::py::arg("trackObservedAccWeight") = 1.0,
+          ::py::arg("regularizationWeight") = 0.01,
+          ::py::arg("dt") = 1.0,
+          ::py::arg("numIterations") = 10000)
+      .def(
+          "minimize",
+          &dart::utils::AccelerationTrackAndMinimize::minimize,
+          ::py::arg("series"),
+          ::py::arg("trackAcc"))
+      .def(
+          "setDebugIterationBackoff",
+          &dart::utils::AccelerationTrackAndMinimize::setDebugIterationBackoff,
+          ::py::arg("iterations"))
+      .def(
+          "setNumIterationsBackoff",
+          &dart::utils::AccelerationTrackAndMinimize::setNumIterationsBackoff,
+          ::py::arg("series"))
+      .def(
+          "setConvergenceTolerance",
+          &dart::utils::AccelerationTrackAndMinimize::setConvergenceTolerance,
+          ::py::arg("tolerance"));
 }
 
 } // namespace python

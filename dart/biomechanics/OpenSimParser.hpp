@@ -39,6 +39,11 @@ struct OpenSimFile
   // IMU map
   std::map<std::string, std::pair<std::string, Eigen::Isometry3s>> imuMap;
 
+  // Mesh map, so that we can access mesh positioning data even if we
+  // are not loading the geometry.
+  std::map<std::string, std::pair<std::string, Eigen::Isometry3s>> meshMap;
+  std::map<std::string, Eigen::Vector3s> meshScaleMap;
+
   std::vector<std::string> warnings;
   std::vector<std::string> ignoredBodies;
   std::vector<std::pair<std::string, std::string>> jointsDrivenBy;

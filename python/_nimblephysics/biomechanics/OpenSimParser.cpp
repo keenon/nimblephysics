@@ -72,8 +72,10 @@ void OpenSimParser(py::module& m)
           "ignoredBodies", &dart::biomechanics::OpenSimFile::ignoredBodies)
       .def_readwrite(
           "jointsDrivenBy", &dart::biomechanics::OpenSimFile::jointsDrivenBy)
+      .def_readwrite("markersMap", &dart::biomechanics::OpenSimFile::markersMap)
+      .def_readwrite("meshMap", &dart::biomechanics::OpenSimFile::meshMap)
       .def_readwrite(
-          "markersMap", &dart::biomechanics::OpenSimFile::markersMap);
+          "meshScaleMap", &dart::biomechanics::OpenSimFile::meshScaleMap);
 
   ::py::class_<dart::biomechanics::OpenSimMot>(m, "OpenSimMot")
       .def_readwrite("poses", &dart::biomechanics::OpenSimMot::poses)

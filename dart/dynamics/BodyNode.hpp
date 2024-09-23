@@ -1229,6 +1229,15 @@ public:
   void debugJacobianOfMinvXForward(
       neural::WithRespectTo* wrt, Eigen::VectorXs x);
 
+  //----------------------------------------------------------------------------
+  /// \{ \name Recursive algorithms geometric approximations
+  //----------------------------------------------------------------------------
+
+  /// Compute the distance between a point and the convex hull formed by the
+  /// body node and all of its children, in world space.
+  s_t distanceFrom2DConvexHullWithChildren(
+      Eigen::Vector3s point, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
   // protected:
 public:
   //--------------------------------------------------------------------------

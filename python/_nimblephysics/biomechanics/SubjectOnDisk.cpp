@@ -43,7 +43,12 @@ void SubjectOnDisk(py::module& m)
                 "LOW_PASS_FILTER",
                 dart::biomechanics::ProcessingPassType::lowPassFilter,
                 "This is the pass where we apply a low-pass filter to the "
-                "kinematics and dynamics.");
+                "kinematics and dynamics.")
+            .value(
+                "ACC_MINIMIZING_FILTER",
+                dart::biomechanics::ProcessingPassType::accMinimizingFilter,
+                "This is the pass where we apply an acceleration minimizing "
+                "filter to the kinematics and dynamics.");
 
   auto framePass
       = ::py::class_<
@@ -573,6 +578,16 @@ Note that these are specified in the local body frame, acting on the body at its
                     setForcePlateCutoffs,
                 ::py::arg("cutoffs"))
             .def(
+                "setAccelerationMinimizingRegularization",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setAccelerationMinimizingRegularization,
+                ::py::arg("reg"))
+            .def(
+                "setAccelerationMinimizingForceRegularization",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setAccelerationMinimizingForceRegularization,
+                ::py::arg("reg"))
+            .def(
                 "computeValues",
                 &dart::biomechanics::SubjectOnDiskTrialPass::computeValues,
                 ::py::arg("skel"),
@@ -966,6 +981,15 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::getTrials)
             .def(
+                "filterTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::filterTrials,
+                ::py::arg("keepTrials"))
+            .def(
+                "trimToProcessingPasses",
+                &dart::biomechanics::SubjectOnDiskHeader::
+                    trimToProcessingPasses,
+                ::py::arg("numPasses"))
+            .def(
                 "setTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::setTrials,
                 ::py::arg("trials"))
@@ -999,6 +1023,11 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("doNotStandardizeForcePlateData") = false,
                 "This loads all the frames of data, and fills in the "
                 "processing pass data matrices in the proto header classes.")
+            .def(
+                "hasLoadedAllFrames",
+                &dart::biomechanics::SubjectOnDisk::hasLoadedAllFrames,
+                "This returns true if all the frames have been loaded into "
+                "memory.")
             .def(
                 "getHeaderProto",
                 &dart::biomechanics::SubjectOnDisk::getHeaderProto,

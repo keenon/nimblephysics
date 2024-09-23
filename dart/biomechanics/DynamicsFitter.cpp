@@ -1,6 +1,7 @@
 #include "dart/biomechanics/DynamicsFitter.hpp"
 
 #include <algorithm>
+#include <climits>
 #include <future>
 #include <iostream>
 #include <limits>
@@ -8926,8 +8927,25 @@ bool DynamicsFitProblem::get_nlp_info(
   // Set the number of entries in the Hessian
   nnz_h_lag = n * n;
 
+  if ((int32_t)nnz_h_lag < 0 || nnz_h_lag >= std::numeric_limits<int32_t>::max()
+      || n > 46340)
+  {
+    // We've got so many dimensions that we can't store the size of the full
+    // hessian in 32-bits.
+    std::cout << "WARNING: nnz_h_lag is too large to store in signed 32-bits. "
+                 "Setting "
+                 "to 1."
+              << std::endl;
+    nnz_h_lag = 1;
+  }
+
   // use the C style indexing (0-based)
   index_style = Ipopt::TNLP::C_STYLE;
+
+  std::cout << "DynamicsFitProbelem: Getting NLP info" << std::endl;
+  std::cout << "   n=" << n << " m=" << m << std::endl;
+  std::cout << "   nnz_jac_g=" << nnz_jac_g << " nnz_h_lag=" << nnz_h_lag
+            << std::endl;
 
   return true;
 }
@@ -9526,6 +9544,36 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
     init->regularizeMarkerOffsetsTo[pair.first] = pair.second;
   }
 
+  // Create the joint data
+  init->joints.clear();
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    init->joints.emplace_back();
+    for (int i = 0; i < skel->getNumJoints(); i++)
+    {
+      init->joints.back().push_back(skel->getJoint(i));
+    }
+    init->jointsAdjacentMarkers.emplace_back();
+    init->jointWeights.push_back(Eigen::VectorXs::Ones(skel->getNumJoints()));
+    init->axisWeights.push_back(Eigen::VectorXs::Zero(skel->getNumJoints()));
+  }
+
+  for (int trial = 0; trial < poseTrials.size(); trial++)
+  {
+    Eigen::MatrixXs& poses = poseTrials[trial];
+    Eigen::MatrixXs jointCenters
+        = Eigen::MatrixXs::Zero(3 * skel->getNumJoints(), poses.cols());
+    Eigen::MatrixXs jointAxis
+        = Eigen::MatrixXs::Zero(6 * skel->getNumJoints(), poses.cols());
+    for (int t = 0; t < poses.cols(); t++)
+    {
+      skel->setPositions(poses.col(t));
+      jointCenters.col(t) = skel->getJointWorldPositions(skel->getJoints());
+    }
+    init->jointCenters.push_back(jointCenters);
+    init->jointAxis.push_back(jointAxis);
+  }
+
   return init;
 }
 
@@ -9589,6 +9637,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   // Copy over the joint data
   init->joints.clear();
+  init->jointWeights.clear();
+  init->axisWeights.clear();
+  init->jointCenters.clear();
+  init->jointAxis.clear();
   for (int trial = 0; trial < kinematicInit.size(); trial++)
   {
     init->joints.emplace_back();
@@ -9606,6 +9658,9 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    assert(
+        kinematicInit.at(trial).jointCenters.rows() / 3
+        == init->joints.at(trial).size());
     init->jointCenters.push_back(kinematicInit.at(trial).jointCenters);
     init->jointAxis.push_back(kinematicInit.at(trial).jointAxis);
   }
@@ -11618,7 +11673,8 @@ bool DynamicsFitter::zeroLinearResidualsOnCOMTrajectory(
     //     unifiedPositions - unifiedGravityOffset);
     Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXs> solver;
     solver.setTolerance(1e-9);
-    solver.setMaxIterations(unifiedLinearMap.rows() * 10);
+    solver.setMaxIterations(
+        std::min<int>((int)(unifiedLinearMap.rows() * 10), 10000));
     solver.compute(unifiedLinearMap);
     Eigen::VectorXs tentativeResult
         = solver.solve(unifiedPositions - unifiedGravityOffset);
@@ -18350,6 +18406,8 @@ void DynamicsFitter::saveDynamicsToGUI(
 
   // Render the joints, if we have them
   int numJoints = init->jointCenters.at(trialIndex).rows() / 3;
+  assert(numJoints == init->jointWeights.at(trialIndex).size());
+  assert(numJoints == init->joints.at(trialIndex).size());
   server.createLayer(
       functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
   for (int i = 0; i < numJoints; i++)
