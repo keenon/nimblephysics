@@ -14,6 +14,13 @@ enum MissingGRFReason { notMissingGRF = 0;
                         interpolatedClippedGRF = 9;
                         manualReview = 10;
                         footContactDetectedButNoForce = 11;
+                        tooHighMarkerRMS = 12;
+                        hasInputOutliers = 13;
+                        hasNoForcePlateData = 14;
+                        velocitiesStillTooHighAfterFiltering = 15;
+                        copOutsideConvexFootError = 16;
+                        zeroForceFrame = 17;
+                        extendedToNearestPeakForce = 18;
                       };
 
 enum ProcessingPassType {

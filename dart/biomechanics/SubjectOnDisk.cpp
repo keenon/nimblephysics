@@ -110,6 +110,20 @@ proto::MissingGRFReason missingGRFReasonToProto(MissingGRFReason reason)
       return proto::MissingGRFReason::manualReview;
     case footContactDetectedButNoForce:
       return proto::MissingGRFReason::footContactDetectedButNoForce;
+    case tooHighMarkerRMS:
+      return proto::MissingGRFReason::tooHighMarkerRMS;
+    case hasInputOutliers:
+      return proto::MissingGRFReason::hasInputOutliers;
+    case hasNoForcePlateData:
+      return proto::MissingGRFReason::hasNoForcePlateData;
+    case velocitiesStillTooHighAfterFiltering:
+      return proto::MissingGRFReason::velocitiesStillTooHighAfterFiltering;
+    case copOutsideConvexFootError:
+      return proto::MissingGRFReason::copOutsideConvexFootError;
+    case zeroForceFrame:
+      return proto::MissingGRFReason::zeroForceFrame;
+    case extendedToNearestPeakForce:
+      return proto::MissingGRFReason::extendedToNearestPeakForce;
   }
   return proto::MissingGRFReason::notMissingGRF;
 }
@@ -142,6 +156,20 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
       return manualReview;
     case proto::MissingGRFReason::footContactDetectedButNoForce:
       return footContactDetectedButNoForce;
+    case proto::MissingGRFReason::tooHighMarkerRMS:
+      return tooHighMarkerRMS;
+    case proto::MissingGRFReason::hasInputOutliers:
+      return hasInputOutliers;
+    case proto::MissingGRFReason::hasNoForcePlateData:
+      return hasNoForcePlateData;
+    case proto::MissingGRFReason::velocitiesStillTooHighAfterFiltering:
+      return velocitiesStillTooHighAfterFiltering;
+    case proto::MissingGRFReason::copOutsideConvexFootError:
+      return copOutsideConvexFootError;
+    case proto::MissingGRFReason::zeroForceFrame:
+      return zeroForceFrame;
+    case proto::MissingGRFReason::extendedToNearestPeakForce:
+      return extendedToNearestPeakForce;
       // These are just here to keep Clang from complaining
     case proto::MissingGRFReason_INT_MIN_SENTINEL_DO_NOT_USE_:
       return notMissingGRF;
@@ -3292,6 +3320,27 @@ std::vector<std::shared_ptr<SubjectOnDiskTrial>>
 SubjectOnDiskHeader::getTrials()
 {
   return mTrials;
+}
+
+void SubjectOnDiskHeader::filterTrials(std::vector<bool> keepTrials)
+{
+  if (keepTrials.size() != mTrials.size())
+  {
+    std::cout << "SubjectOnDisk::writeSubject() passed bad info: keepTrials "
+                 "size is "
+              << keepTrials.size() << " but we have " << mTrials.size()
+              << " trials" << std::endl;
+    return;
+  }
+  std::vector<std::shared_ptr<SubjectOnDiskTrial>> newTrials;
+  for (int i = 0; i < keepTrials.size(); i++)
+  {
+    if (keepTrials[i])
+    {
+      newTrials.push_back(mTrials[i]);
+    }
+  }
+  mTrials = newTrials;
 }
 
 void SubjectOnDiskHeader::trimToProcessingPasses(int numPasses)

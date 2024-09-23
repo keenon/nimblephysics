@@ -7,6 +7,7 @@ namespace biomechanics {
 enum MissingGRFReason
 {
   notMissingGRF,
+  // These are the legacy filter's reasons
   measuredGrfZeroWhenAccelerationNonZero,
   unmeasuredExternalForceDetected,
   footContactDetectedButNoForce,
@@ -17,7 +18,15 @@ enum MissingGRFReason
   missingBlip,
   shiftGRF,
   manualReview,
-  interpolatedClippedGRF
+  interpolatedClippedGRF,
+  // These are the new filter's reasons
+  tooHighMarkerRMS,
+  hasInputOutliers,
+  hasNoForcePlateData,
+  velocitiesStillTooHighAfterFiltering,
+  copOutsideConvexFootError,
+  zeroForceFrame,
+  extendedToNearestPeakForce
 };
 
 enum MissingGRFStatus

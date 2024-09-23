@@ -981,6 +981,10 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::getTrials)
             .def(
+                "filterTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::filterTrials,
+                ::py::arg("keepTrials"))
+            .def(
                 "trimToProcessingPasses",
                 &dart::biomechanics::SubjectOnDiskHeader::
                     trimToProcessingPasses,

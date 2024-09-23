@@ -21,6 +21,7 @@ void DynamicsFitter(py::module& m)
 {
 
   py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
+      // These values are used by the legacy filter
       .value(
           "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
       .value(
@@ -50,6 +51,29 @@ void DynamicsFitter(py::module& m)
       .value(
           "footContactDetectedButNoForce",
           dart::biomechanics::MissingGRFReason::footContactDetectedButNoForce)
+      // These values are used by the new filter
+      .value(
+          "tooHighMarkerRMS",
+          dart::biomechanics::MissingGRFReason::tooHighMarkerRMS)
+      .value(
+          "hasInputOutliers",
+          dart::biomechanics::MissingGRFReason::hasInputOutliers)
+      .value(
+          "hasNoForcePlateData",
+          dart::biomechanics::MissingGRFReason::hasNoForcePlateData)
+      .value(
+          "velocitiesStillTooHighAfterFiltering",
+          dart::biomechanics::MissingGRFReason::
+              velocitiesStillTooHighAfterFiltering)
+      .value(
+          "copOutsideConvexFootError",
+          dart::biomechanics::MissingGRFReason::copOutsideConvexFootError)
+      .value(
+          "zeroForceFrame",
+          dart::biomechanics::MissingGRFReason::zeroForceFrame)
+      .value(
+          "extendedToNearestPeakForce",
+          dart::biomechanics::MissingGRFReason::extendedToNearestPeakForce)
       .export_values();
 
   py::enum_<dart::biomechanics::MissingGRFStatus>(m, "MissingGRFStatus")

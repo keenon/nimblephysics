@@ -437,6 +437,7 @@ public:
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
   std::vector<std::shared_ptr<SubjectOnDiskTrial>> getTrials();
+  void filterTrials(std::vector<bool> keepTrials);
   void trimToProcessingPasses(int numPasses);
   void setTrials(std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials);
   void recomputeColumnNames();
