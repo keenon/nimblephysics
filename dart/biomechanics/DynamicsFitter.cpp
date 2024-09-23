@@ -9637,6 +9637,10 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   // Copy over the joint data
   init->joints.clear();
+  init->jointWeights.clear();
+  init->axisWeights.clear();
+  init->jointCenters.clear();
+  init->jointAxis.clear();
   for (int trial = 0; trial < kinematicInit.size(); trial++)
   {
     init->joints.emplace_back();
@@ -9654,6 +9658,9 @@ std::shared_ptr<DynamicsInitialization> DynamicsFitter::createInitialization(
 
   for (int trial = 0; trial < init->poseTrials.size(); trial++)
   {
+    assert(
+        kinematicInit.at(trial).jointCenters.rows() / 3
+        == init->joints.at(trial).size());
     init->jointCenters.push_back(kinematicInit.at(trial).jointCenters);
     init->jointAxis.push_back(kinematicInit.at(trial).jointAxis);
   }
@@ -18399,6 +18406,8 @@ void DynamicsFitter::saveDynamicsToGUI(
 
   // Render the joints, if we have them
   int numJoints = init->jointCenters.at(trialIndex).rows() / 3;
+  assert(numJoints == init->jointWeights.at(trialIndex).size());
+  assert(numJoints == init->joints.at(trialIndex).size());
   server.createLayer(
       functionalJointCenterLayerName, functionalJointCenterLayerColor, true);
   for (int i = 0; i < numJoints; i++)
