@@ -742,7 +742,7 @@ std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 // frequency of that filter?
 s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 {
-  if (trial >= getNumTrials())
+  if (trial >= getNumTrials() || trial < 0)
   {
     std::cout << "SubjectOnDisk::getLowpassCutoffFrequency() called with "
                  "invalid trial number: "
@@ -765,7 +765,7 @@ s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 // that (Butterworth) filter?
 int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 {
-  if (trial >= getNumTrials())
+  if (trial >= getNumTrials() || trial < 0)
   {
     std::cout << "SubjectOnDisk::getLowpassFilterOrder() called with invalid "
                  "trial number: "
@@ -789,7 +789,7 @@ int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 std::vector<s_t> SubjectOnDisk::getForceplateCutoffs(
     int trial, int processingPass)
 {
-  if (trial >= getNumTrials())
+  if (trial >= getNumTrials() || trial < 0)
   {
     std::cout << "SubjectOnDisk::getForceplateCutoffs() called with invalid "
                  "trial number: "
