@@ -35,6 +35,8 @@ AccelerationTrackAndMinimize::AccelerationTrackAndMinimize(
   {
     std::cout << "AccelerationTrackAndMinimize requires at least 3 timesteps"
               << std::endl;
+    throw std::runtime_error(
+        "AccelerationMinimizer requires at least 3 timesteps to work.");
     return;
   }
   if (mTrackAccelerationAtTimesteps.size() != mTimesteps)

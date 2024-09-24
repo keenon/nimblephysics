@@ -325,6 +325,8 @@ public:
   void setName(const std::string& name);
   void setTimestep(s_t timestep);
   s_t getTimestep();
+  void setTrialLength(int length);
+  int getTrialLength();
   void setTrialTags(std::vector<std::string> trialTags);
   std::string getOriginalTrialName();
   void setOriginalTrialName(const std::string& name);
@@ -511,6 +513,8 @@ class SubjectOnDisk
 {
 public:
   SubjectOnDisk(const std::string& path);
+
+  SubjectOnDisk(std::shared_ptr<SubjectOnDiskHeader> header);
 
   /// This will write a B3D file to disk
   static void writeB3D(

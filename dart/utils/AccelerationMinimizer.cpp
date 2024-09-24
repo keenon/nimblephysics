@@ -40,6 +40,13 @@ AccelerationMinimizer::AccelerationMinimizer(
     mDebugIterationBackoff(false),
     mConvergenceTolerance(1e-10)
 {
+  if (mTimesteps < 3)
+  {
+    std::cout << "AccelerationMinimizer requires at least 3 timesteps to work."
+              << std::endl;
+    throw std::runtime_error(
+        "AccelerationMinimizer requires at least 3 timesteps to work.");
+  }
   Eigen::Vector3s stamp;
   stamp << -1, 2, -1;
   stamp *= mSmoothingWeight;

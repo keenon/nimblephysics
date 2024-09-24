@@ -255,6 +255,15 @@ SubjectOnDisk::SubjectOnDisk(const std::string& path)
   fclose(file);
 }
 
+SubjectOnDisk::SubjectOnDisk(std::shared_ptr<SubjectOnDiskHeader> header)
+{
+  mHeader = header;
+  mLoadedAllFrames = true;
+  mSensorFrameSize = 0;
+  mProcessingPassFrameSize = 0;
+  mDataSectionStart = 0;
+}
+
 /// This will write a B3D file to disk
 void SubjectOnDisk::writeB3D(
     const std::string& outputPath, std::shared_ptr<SubjectOnDiskHeader> header)
@@ -610,6 +619,14 @@ std::vector<ForcePlate> SubjectOnDisk::readForcePlates(int trial)
 {
   std::vector<ForcePlate> plates;
 
+  if (trial >= getNumTrials() || trial < 0)
+  {
+    std::cout << "SubjectOnDisk::readForcePlates() called with invalid trial "
+                 "number: "
+              << trial << std::endl;
+    return plates;
+  }
+
   const int len = getTrialLength(trial);
   const int numPlates = getNumForcePlates(trial);
   for (int plate = 0; plate < numPlates; plate++)
@@ -683,6 +700,13 @@ OpenSimFile SubjectOnDisk::readOpenSimFile(
     geometryFolder = common::Uri::createFromRelativeUri(mPath, "./Geometry/")
                          .getFilesystemPath();
   }
+  if (passNumberToLoad >= mHeader->mPasses.size() || passNumberToLoad < 0)
+  {
+    std::cout << "SubjectOnDisk::readOpenSimFile() called with invalid pass "
+                 "number: "
+              << passNumberToLoad << std::endl;
+    return OpenSimFile();
+  }
 
   tinyxml2::XMLDocument osimFile;
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());
@@ -704,6 +728,13 @@ OpenSimFile SubjectOnDisk::readOpenSimFile(
 /// it as a string
 std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 {
+  if (passNumberToLoad >= mHeader->mPasses.size() || passNumberToLoad < 0)
+  {
+    std::cout << "SubjectOnDisk::getOpensimFileText() called with invalid pass "
+                 "number: "
+              << passNumberToLoad << std::endl;
+    return "";
+  }
   return mHeader->mPasses[passNumberToLoad]->mOpenSimFileText;
 }
 
@@ -711,6 +742,20 @@ std::string SubjectOnDisk::getOpensimFileText(int passNumberToLoad)
 // frequency of that filter?
 s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 {
+  if (trial >= getNumTrials())
+  {
+    std::cout << "SubjectOnDisk::getLowpassCutoffFrequency() called with "
+                 "invalid trial number: "
+              << trial << std::endl;
+    return 0.0;
+  }
+  if (processingPass >= getTrialNumProcessingPasses(trial))
+  {
+    std::cout << "SubjectOnDisk::getLowpassCutoffFrequency() called with "
+                 "invalid processing pass number: "
+              << processingPass << std::endl;
+    return 0.0;
+  }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mLowpassCutoffFrequency;
@@ -720,6 +765,20 @@ s_t SubjectOnDisk::getLowpassCutoffFrequency(int trial, int processingPass)
 // that (Butterworth) filter?
 int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 {
+  if (trial >= getNumTrials())
+  {
+    std::cout << "SubjectOnDisk::getLowpassFilterOrder() called with invalid "
+                 "trial number: "
+              << trial << std::endl;
+    return 0;
+  }
+  if (processingPass >= getTrialNumProcessingPasses(trial))
+  {
+    std::cout << "SubjectOnDisk::getLowpassFilterOrder() called with invalid "
+                 "processing pass number: "
+              << processingPass << std::endl;
+    return 0;
+  }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mLowpassFilterOrder;
@@ -730,6 +789,20 @@ int SubjectOnDisk::getLowpassFilterOrder(int trial, int processingPass)
 std::vector<s_t> SubjectOnDisk::getForceplateCutoffs(
     int trial, int processingPass)
 {
+  if (trial >= getNumTrials())
+  {
+    std::cout << "SubjectOnDisk::getForceplateCutoffs() called with invalid "
+                 "trial number: "
+              << trial << std::endl;
+    return std::vector<s_t>();
+  }
+  if (processingPass >= getTrialNumProcessingPasses(trial))
+  {
+    std::cout << "SubjectOnDisk::getForceplateCutoffs() called with invalid "
+                 "processing pass number: "
+              << processingPass << std::endl;
+    return std::vector<s_t>();
+  }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
       ->mForcePlateCutoffs;
@@ -1329,6 +1402,9 @@ int SubjectOnDisk::getTrialLength(int trial)
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "SubjectOnDisk::getTrialLength() called with invalid trial "
+                 "number: "
+              << trial << std::endl;
     return 0;
   }
   return mHeader->mTrials[trial]->mLength;
@@ -1338,6 +1414,13 @@ int SubjectOnDisk::getTrialLength(int trial)
 /// split into multiple pieces
 std::string SubjectOnDisk::getTrialOriginalName(int trial)
 {
+  if (trial < 0 || trial >= mHeader->mTrials.size())
+  {
+    std::cout << "SubjectOnDisk::getTrialOriginalName() called with invalid "
+                 "trial number: "
+              << trial << std::endl;
+    return "";
+  }
   return mHeader->mTrials[trial]->mOriginalTrialName;
 }
 
@@ -1345,6 +1428,13 @@ std::string SubjectOnDisk::getTrialOriginalName(int trial)
 /// splitting an original trial into multiple pieces
 int SubjectOnDisk::getTrialSplitIndex(int trial)
 {
+  if (trial < 0 || trial >= mHeader->mTrials.size())
+  {
+    std::cout << "SubjectOnDisk::getTrialSplitIndex() called with invalid "
+                 "trial number: "
+              << trial << std::endl;
+    return -1;
+  }
   return mHeader->mTrials[trial]->mSplitIndex;
 }
 
@@ -1353,6 +1443,9 @@ int SubjectOnDisk::getTrialNumProcessingPasses(int trial)
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "SubjectOnDisk::getTrialNumProcessingPasses() called with "
+                 "invalid trial number: "
+              << trial << std::endl;
     return 0;
   }
   return mHeader->mTrials[trial]->mTrialPasses.size();
@@ -1363,6 +1456,9 @@ s_t SubjectOnDisk::getTrialTimestep(int trial)
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "SubjectOnDisk::getTrialTimestep() called with invalid trial "
+                 "number: "
+              << trial << std::endl;
     return 0.01;
   }
   return mHeader->mTrials[trial]->mTimestep;
@@ -1386,6 +1482,9 @@ std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRF(int trial)
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getMissingGRF() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<MissingGRFReason>();
   }
   return mHeader->mTrials[trial]->mMissingGRFReason;
@@ -1402,6 +1501,15 @@ ProcessingPassType SubjectOnDisk::getProcessingPassType(int processingPass)
   {
     processingPass = mHeader->mPasses.size() - 1;
   }
+  if (processingPass < 0 || processingPass >= mHeader->mPasses.size())
+  {
+    std::cout << "Requested getProcessingPassType() for processing pass "
+              << processingPass
+              << ", which is out of bounds. Returning "
+                 "ProcessingPassType::kinematics."
+              << std::endl;
+    return ProcessingPassType::kinematics;
+  }
   return mHeader->mPasses[processingPass]->mType;
 }
 
@@ -1410,6 +1518,9 @@ std::vector<bool> SubjectOnDisk::getDofPositionsObserved(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getDofPositionsObserved() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<bool>();
   }
   if (processingPass == -1)
@@ -1426,6 +1537,9 @@ std::vector<bool> SubjectOnDisk::getDofVelocitiesFiniteDifferenced(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getDofVelocitiesFiniteDifferenced() for trial "
+              << trial << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<bool>();
   }
   if (processingPass == -1)
@@ -1442,6 +1556,9 @@ std::vector<bool> SubjectOnDisk::getDofAccelerationsFiniteDifferenced(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getDofAccelerationsFiniteDifferenced() for trial "
+              << trial << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<bool>();
   }
   if (processingPass == -1)
@@ -1458,6 +1575,9 @@ std::vector<s_t> SubjectOnDisk::getTrialLinearResidualNorms(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialLinearResidualNorms() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<s_t>();
   }
   if (processingPass == -1)
@@ -1472,6 +1592,9 @@ std::vector<s_t> SubjectOnDisk::getTrialAngularResidualNorms(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialAngularResidualNorms() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<s_t>();
   }
   if (processingPass == -1)
@@ -1516,11 +1639,25 @@ std::vector<s_t> SubjectOnDisk::getTrialMarkerMaxs(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialMarkerMaxs() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<s_t>();
   }
   if (processingPass == -1)
   {
     processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
+  if (processingPass < 0
+      || processingPass >= mHeader->mTrials[trial]->mTrialPasses.size())
+  {
+    std::cout
+        << "Requested getTrialMarkerMaxs() for trial " << trial
+        << " and processing pass " << processingPass
+        << ", which is out of bounds on the existing processing passes (len="
+        << mHeader->mTrials[trial]->mTrialPasses.size()
+        << "). Returning empty vector." << std::endl;
+    return std::vector<s_t>();
   }
   return mHeader->mTrials[trial]->mTrialPasses[processingPass]->mMarkerMax;
 }
@@ -1532,11 +1669,25 @@ std::vector<s_t> SubjectOnDisk::getTrialMaxJointVelocity(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialMaxJointVelocity() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<s_t>();
   }
   if (processingPass == -1)
   {
     processingPass = mHeader->mTrials[trial]->mTrialPasses.size() - 1;
+  }
+  if (processingPass < 0
+      || processingPass >= mHeader->mTrials[trial]->mTrialPasses.size())
+  {
+    std::cout
+        << "Requested getTrialMaxJointVelocity() for trial " << trial
+        << " and processing pass " << processingPass
+        << ", which is out of bounds on the existing processing passes (len="
+        << mHeader->mTrials[trial]->mTrialPasses.size()
+        << "). Returning empty vector." << std::endl;
+    return std::vector<s_t>();
   }
   return mHeader->mTrials[trial]
       ->mTrialPasses[processingPass]
@@ -1581,6 +1732,9 @@ std::string SubjectOnDisk::getTrialName(int trial)
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getTrialName() for trial " << trial
+              << ", which is out of bounds. Returning empty string."
+              << std::endl;
     return "";
   }
   return mHeader->mTrials[trial]->mName;
@@ -1641,10 +1795,17 @@ std::vector<Eigen::Vector3s> SubjectOnDisk::getForcePlateCorners(
 {
   if (trial < 0 || trial >= mHeader->mTrials.size())
   {
+    std::cout << "Requested getForcePlateCorners() for trial " << trial
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<Eigen::Vector3s>();
   }
   if (forcePlate < 0 || forcePlate >= mHeader->mTrials[trial]->mNumForcePlates)
   {
+    std::cout << "Requested getForcePlateCorners() for force plate "
+              << forcePlate
+              << ", which is out of bounds. Returning empty vector."
+              << std::endl;
     return std::vector<Eigen::Vector3s>();
   }
   return mHeader->mTrials[trial]->mForcePlateCorners[forcePlate];
@@ -2914,6 +3075,16 @@ void SubjectOnDiskTrial::setTimestep(s_t timestep)
 s_t SubjectOnDiskTrial::getTimestep()
 {
   return mTimestep;
+}
+
+void SubjectOnDiskTrial::setTrialLength(int length)
+{
+  mLength = length;
+}
+
+int SubjectOnDiskTrial::getTrialLength()
+{
+  return mLength;
 }
 
 void SubjectOnDiskTrial::setTrialTags(std::vector<std::string> trialTags)

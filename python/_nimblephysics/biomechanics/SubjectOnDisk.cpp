@@ -818,6 +818,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getTimestep",
                 &dart::biomechanics::SubjectOnDiskTrial::getTimestep)
             .def(
+                "setTrialLength",
+                &dart::biomechanics::SubjectOnDiskTrial::setTrialLength,
+                ::py::arg("length"))
+            .def(
+                "getTrialLength",
+                &dart::biomechanics::SubjectOnDiskTrial::getTrialLength)
+            .def(
                 "setTrialTags",
                 &dart::biomechanics::SubjectOnDiskTrial::setTrialTags,
                 ::py::arg("trialTags"))
@@ -1004,6 +1011,11 @@ Note that these are specified in the local body frame, acting on the body at its
             m, "SubjectOnDisk")
             //   SubjectOnDisk(const std::string& path);
             .def(::py::init<std::string>(), ::py::arg("path"))
+            //   SubjectOnDisk(const std::string& path);
+            .def(
+                ::py::init<
+                    std::shared_ptr<dart::biomechanics::SubjectOnDiskHeader>>(),
+                ::py::arg("header"))
             //   /// This will write a B3D file to disk
             //   static void writeB3D(const std::string& path,
             //   SubjectOnDiskHeader& header);
