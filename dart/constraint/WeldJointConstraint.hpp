@@ -35,8 +35,8 @@
 
 #include <Eigen/Dense>
 
-#include "dart/math/MathTypes.hpp"
 #include "dart/constraint/JointConstraint.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace constraint {
@@ -85,7 +85,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(s_t* _lambda) override;
+  void applyImpulse(Eigen::VectorXs _lambda) override;
 
   // Documentation inherited
   bool isActive() const override;
@@ -120,8 +120,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_WELDJOINTCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_WELDJOINTCONSTRAINT_HPP_

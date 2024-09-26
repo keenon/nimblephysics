@@ -99,7 +99,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(s_t* lambda) override;
+  void applyImpulse(Eigen::VectorXs lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;

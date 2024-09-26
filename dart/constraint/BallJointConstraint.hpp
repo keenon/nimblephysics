@@ -35,8 +35,8 @@
 
 #include <Eigen/Dense>
 
-#include "dart/math/MathTypes.hpp"
 #include "dart/constraint/JointConstraint.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace constraint {
@@ -49,17 +49,18 @@ public:
   /// Constructor that takes one body and the joint position in the world frame
   /// \param[in] _body
   /// \param[in] _jointPos Joint position expressed in world frame
-  BallJointConstraint(dynamics::BodyNode* _body,
-                      const Eigen::Vector3s& _jointPos);
-
+  BallJointConstraint(
+      dynamics::BodyNode* _body, const Eigen::Vector3s& _jointPos);
 
   /// Constructor that takes two bodies and the joint position in the frame of
   /// _body1
   /// \param[in] _body1
   /// \param[in] _body2
   /// \param[in] _jointPos Joint position expressed in world frame
-  BallJointConstraint(dynamics::BodyNode* _body1, dynamics::BodyNode* _body2,
-                      const Eigen::Vector3s& _jointPos);
+  BallJointConstraint(
+      dynamics::BodyNode* _body1,
+      dynamics::BodyNode* _body2,
+      const Eigen::Vector3s& _jointPos);
 
   /// Destructor
   virtual ~BallJointConstraint();
@@ -88,7 +89,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(s_t* _lambda) override;
+  void applyImpulse(Eigen::VectorXs _lambda) override;
 
   // Documentation inherited
   bool isActive() const override;
@@ -128,8 +129,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-}  // namespace constraint
-}  // namespace dart
+} // namespace constraint
+} // namespace dart
 
-#endif  // DART_CONSTRAINT_BALLJOINTCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_BALLJOINTCONSTRAINT_HPP_
