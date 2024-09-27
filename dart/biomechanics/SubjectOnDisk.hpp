@@ -347,6 +347,8 @@ public:
   void setOriginalTrialEndTime(s_t endTime);
   std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
+  std::vector<bool> getHasManualGRFAnnotation();
+  void setHasManualGRFAnnotation(std::vector<bool> hasManualGRFAnnotation);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
   void setMarkerNamesGuessed(bool markersGuessed);
   std::vector<std::map<std::string, Eigen::Vector3s>> getMarkerObservations();
@@ -361,6 +363,10 @@ public:
   void setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
   void setForcePlates(std::vector<ForcePlate> forcePlates);
   std::vector<ForcePlate> getForcePlates();
+  void setBasicTrialType(BasicTrialType type);
+  BasicTrialType getBasicTrialType();
+  void setDetectedTrialFeatures(std::vector<DetectedTrialFeature> features);
+  std::vector<DetectedTrialFeature> getDetectedTrialFeatures();
   std::shared_ptr<SubjectOnDiskTrialPass> addPass();
   std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> getPasses();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
@@ -373,6 +379,7 @@ protected:
   std::vector<std::string> mTrialTags;
   std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> mTrialPasses;
   std::vector<MissingGRFReason> mMissingGRFReason;
+  std::vector<bool> mHasManualGRFAnnotation;
   // This is true if we guessed the marker names, and false if we got them from
   // the uploaded user's file, which implies that they got them from human
   // observations.
@@ -384,6 +391,9 @@ protected:
   int mOriginalTrialEndFrame;
   s_t mOriginalTrialStartTime;
   s_t mOriginalTrialEndTime;
+
+  BasicTrialType mBasicTrialType;
+  std::vector<DetectedTrialFeature> mDetectedTrialFeatures;
 
   ///////////////////////////////////////////////////////////////////////////
   // Recovered proto summaries, for incremental loading of Frames
