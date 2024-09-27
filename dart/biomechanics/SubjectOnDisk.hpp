@@ -134,6 +134,7 @@ class SubjectOnDiskTrialPass
 public:
   SubjectOnDiskTrialPass();
   void setType(ProcessingPassType type);
+  ProcessingPassType getType();
   void setDofPositionsObserved(std::vector<bool> dofPositionsObserved);
   void setDofVelocitiesFiniteDifferenced(
       std::vector<bool> dofVelocitiesFiniteDifferenced);
@@ -248,6 +249,10 @@ public:
   void setRootEulerHistoryInRootFrame(Eigen::MatrixXs rootHistory);
   Eigen::MatrixXs getRootEulerHistoryInRootFrame();
 
+  // This gets the data from `getGroundBodyCopTorqueForce()` in the form of
+  // ForcePlate objects, which are easier to work with.
+  std::vector<ForcePlate> getProcessedForcePlates();
+
   // This will return a matrix where every one of our properties with setters is
   // stacked together vertically. Each column represents time, and each row is a
   // different property of interest. The point here is not to introspect into
@@ -332,6 +337,14 @@ public:
   void setOriginalTrialName(const std::string& name);
   int getSplitIndex();
   void setSplitIndex(int split);
+  int getOriginalTrialStartFrame();
+  void setOriginalTrialStartFrame(int startFrame);
+  int getOriginalTrialEndFrame();
+  void setOriginalTrialEndFrame(int endFrame);
+  s_t getOriginalTrialStartTime();
+  void setOriginalTrialStartTime(s_t startTime);
+  s_t getOriginalTrialEndTime();
+  void setOriginalTrialEndTime(s_t endTime);
   std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
@@ -366,6 +379,11 @@ protected:
   bool mMarkerNamesGuessed;
   std::string mOriginalTrialName;
   int mSplitIndex;
+
+  int mOriginalTrialStartFrame;
+  int mOriginalTrialEndFrame;
+  s_t mOriginalTrialStartTime;
+  s_t mOriginalTrialEndTime;
 
   ///////////////////////////////////////////////////////////////////////////
   // Recovered proto summaries, for incremental loading of Frames

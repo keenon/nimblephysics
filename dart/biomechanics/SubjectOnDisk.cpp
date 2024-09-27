@@ -1836,6 +1836,11 @@ void SubjectOnDiskTrialPass::setType(ProcessingPassType type)
   mType = type;
 }
 
+ProcessingPassType SubjectOnDiskTrialPass::getType()
+{
+  return mType;
+}
+
 void SubjectOnDiskTrialPass::setPoses(Eigen::MatrixXs poses)
 {
   mPos = poses;
@@ -2032,6 +2037,31 @@ void SubjectOnDiskTrialPass::setRootEulerHistoryInRootFrame(
 Eigen::MatrixXs SubjectOnDiskTrialPass::getRootEulerHistoryInRootFrame()
 {
   return mRootEulerHistoryInRootFrame;
+}
+
+// This gets the data from `getGroundBodyCopTorqueForce()` in the form of
+// ForcePlate objects, which are easier to work with.
+std::vector<ForcePlate> SubjectOnDiskTrialPass::getProcessedForcePlates()
+{
+  std::vector<ForcePlate> plates;
+  int numPlates = (int)(mGroundBodyCopTorqueForce.rows() / 9);
+  for (int i = 0; i < numPlates; i++)
+  {
+    ForcePlate plate;
+    for (int t = 0; t < mGroundBodyCopTorqueForce.cols(); t++)
+    {
+      Eigen::Vector3s cop = mGroundBodyCopTorqueForce.block(i * 9, t, 3, 1);
+      Eigen::Vector3s torque
+          = mGroundBodyCopTorqueForce.block(i * 9 + 3, t, 3, 1);
+      Eigen::Vector3s force
+          = mGroundBodyCopTorqueForce.block(i * 9 + 6, t, 3, 1);
+      plate.centersOfPressure.push_back(cop);
+      plate.moments.push_back(torque);
+      plate.forces.push_back(force);
+    }
+    plates.push_back(plate);
+  }
+  return plates;
 }
 
 // This will return a matrix where every one of our properties with setters is
@@ -3112,6 +3142,46 @@ void SubjectOnDiskTrial::setSplitIndex(int split)
   mSplitIndex = split;
 }
 
+int SubjectOnDiskTrial::getOriginalTrialStartFrame()
+{
+  return mOriginalTrialStartFrame;
+}
+
+void SubjectOnDiskTrial::setOriginalTrialStartFrame(int startFrame)
+{
+  mOriginalTrialStartFrame = startFrame;
+}
+
+int SubjectOnDiskTrial::getOriginalTrialEndFrame()
+{
+  return mOriginalTrialEndFrame;
+}
+
+void SubjectOnDiskTrial::setOriginalTrialEndFrame(int endFrame)
+{
+  mOriginalTrialEndFrame = endFrame;
+}
+
+s_t SubjectOnDiskTrial::getOriginalTrialStartTime()
+{
+  return mOriginalTrialStartTime;
+}
+
+void SubjectOnDiskTrial::setOriginalTrialStartTime(s_t startTime)
+{
+  mOriginalTrialStartTime = startTime;
+}
+
+s_t SubjectOnDiskTrial::getOriginalTrialEndTime()
+{
+  return mOriginalTrialEndTime;
+}
+
+void SubjectOnDiskTrial::setOriginalTrialEndTime(s_t endTime)
+{
+  mOriginalTrialEndTime = endTime;
+}
+
 std::vector<MissingGRFReason> SubjectOnDiskTrial::getMissingGRFReason()
 {
   return mMissingGRFReason;
@@ -3214,6 +3284,11 @@ void SubjectOnDiskTrial::read(const proto::SubjectOnDiskTrialHeader& proto)
 
   mSplitIndex = proto.split_index();
 
+  mOriginalTrialStartFrame = proto.original_trial_start_frame();
+  mOriginalTrialEndFrame = proto.original_trial_end_frame();
+  mOriginalTrialStartTime = proto.original_trial_start_time();
+  mOriginalTrialEndTime = proto.original_trial_end_time();
+
   mTrialPasses.clear();
   for (int i = 0; i < proto.processing_pass_header_size(); i++)
   {
@@ -3281,6 +3356,10 @@ void SubjectOnDiskTrial::write(proto::SubjectOnDiskTrialHeader* proto)
 
   proto->set_original_name(mOriginalTrialName);
   proto->set_split_index(mSplitIndex);
+  proto->set_original_trial_start_frame(mOriginalTrialStartFrame);
+  proto->set_original_trial_end_frame(mOriginalTrialEndFrame);
+  proto->set_original_trial_start_time(mOriginalTrialStartTime);
+  proto->set_original_trial_end_time(mOriginalTrialEndTime);
 
   // std::vector<std::string> mTrialTags;
   for (int i = 0; i < mTrialTags.size(); i++)

@@ -97,6 +97,11 @@ message SubjectOnDiskTrialHeader {
   string original_name = 10;
   // This is the split index within the original trial -- 0 if we didn't split or if we're the first split
   int32 split_index = 11;
+  // This is the shorthand for values from the original trial
+  int32 original_trial_start_frame = 12;
+  int32 original_trial_end_frame = 13;
+  float original_trial_start_time = 14;
+  float original_trial_end_time = 15;
 }
 
 message SubjectOnDiskPass {

@@ -534,6 +534,8 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setType,
                 ::py::arg("type"))
             .def(
+                "getType", &dart::biomechanics::SubjectOnDiskTrialPass::getType)
+            .def(
                 "setDofPositionsObserved",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setDofPositionsObserved,
@@ -798,7 +800,11 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getResamplingMatrix",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
-                    getResamplingMatrix);
+                    getResamplingMatrix)
+            .def(
+                "getProcessedForcePlates",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getProcessedForcePlates);
 
   auto subjectOnDiskTrial
       = ::py::class_<
@@ -842,6 +848,42 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getSplitIndex",
                 &dart::biomechanics::SubjectOnDiskTrial::getSplitIndex)
+            .def(
+                "setOriginalTrialStartFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialStartFrame,
+                ::py::arg("startFrame"))
+            .def(
+                "getOriginalTrialStartFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialStartFrame)
+            .def(
+                "setOriginalTrialEndFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialEndFrame,
+                ::py::arg("endFrame"))
+            .def(
+                "getOriginalTrialEndFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialEndFrame)
+            .def(
+                "setOriginalTrialStartTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialStartTime,
+                ::py::arg("startTime"))
+            .def(
+                "getOriginalTrialStartTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialStartTime)
+            .def(
+                "setOriginalTrialEndTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialEndTime,
+                ::py::arg("endTime"))
+            .def(
+                "getOriginalTrialEndTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialEndTime)
             .def(
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,
