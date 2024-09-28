@@ -30,6 +30,26 @@ enum ProcessingPassType {
   accMinimizingFilter = 3;
 };
 
+enum BasicTrialType {
+  treadmill = 0;
+  overground = 1;
+  staticTrial = 2;
+  other = 3;
+};
+
+enum DetectedTrialFeature {
+  walking = 0;
+  running = 1;
+  unevenTerrain = 2;
+  flatTerrain = 3;
+}
+
+enum DataQuality {
+  pilotData = 0;
+  experimentalData = 1;
+  internetData = 2;
+}
+
 // Many of the ML tasks we want to support from SubjectOnDisk data include 
 // effectively predicting the results of a downstream processing task from 
 // an upstream processing task. Trivially, that's predicting physics from
@@ -79,6 +99,7 @@ message SubjectOnDiskTrialHeader {
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.
   repeated MissingGRFReason missing_GRF_reason = 2;
+  repeated bool has_manual_GRF_annotation = 16;
   // This is how many frames are in this trial
   int32 trial_length = 3;
   // This is the timestep used in this trial (assumed constant throughout the trial)
@@ -102,6 +123,10 @@ message SubjectOnDiskTrialHeader {
   int32 original_trial_end_frame = 13;
   float original_trial_start_time = 14;
   float original_trial_end_time = 15;
+  // This is the type of trial we're dealing with
+  BasicTrialType trial_type = 17;
+  // This is the detected features of this trial
+  repeated DetectedTrialFeature detected_trial_feature = 18;
 }
 
 message SubjectOnDiskPass {
@@ -147,6 +172,8 @@ message SubjectOnDiskHeader {
   repeated int32 exo_dof_index = 22;
   // Details about the subject tags provided on the AddBiomechanics platform
   repeated string subject_tag = 23;
+  // This is what the user has tagged this subject as, in terms of data quality
+  DataQuality data_quality = 25;
 }
 
 message SubjectOnDiskProcessingPassFrame {

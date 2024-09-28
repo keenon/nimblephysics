@@ -301,5 +301,20 @@ void Geometry(py::module& m)
       .def("computeHalfExtents", &dart::math::BoundingBox::computeHalfExtents);
 }
 
+void EulerGeometry(py::module& m)
+{
+  m.def(
+      "roundEulerAnglesToNearest",
+      +[](Eigen::Vector3s angle,
+          Eigen::Vector3s previousAngle,
+          dynamics::detail::AxisOrder axisOrder) -> Eigen::Vector3s {
+        return dart::math::roundEulerAnglesToNearest(
+            angle, previousAngle, axisOrder);
+      },
+      ::py::arg("angle"),
+      ::py::arg("previousAngle"),
+      ::py::arg("axisOrder") = dart::dynamics::detail::AxisOrder::XYZ);
+}
+
 } // namespace python
 } // namespace dart

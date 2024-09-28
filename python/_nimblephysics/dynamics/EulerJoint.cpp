@@ -44,17 +44,17 @@ namespace python {
 
 void EulerJoint(py::module& m)
 {
-  ::py::enum_<dart::dynamics::EulerJoint::AxisOrder>(m, "AxisOrder")
-      .value("XYZ", dart::dynamics::EulerJoint::AxisOrder::XYZ)
-      .value("XZY", dart::dynamics::EulerJoint::AxisOrder::XZY)
-      .value("ZYX", dart::dynamics::EulerJoint::AxisOrder::ZYX)
-      .value("ZXY", dart::dynamics::EulerJoint::AxisOrder::ZXY);
+  ::py::enum_<dart::dynamics::detail::AxisOrder>(m, "AxisOrder")
+      .value("XYZ", dart::dynamics::detail::AxisOrder::XYZ)
+      .value("XZY", dart::dynamics::detail::AxisOrder::XZY)
+      .value("ZYX", dart::dynamics::detail::AxisOrder::ZYX)
+      .value("ZXY", dart::dynamics::detail::AxisOrder::ZXY);
 
   ::py::class_<dart::dynamics::EulerJoint::UniqueProperties>(
       m, "EulerJointUniqueProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<dart::dynamics::EulerJoint::AxisOrder>(),
+          ::py::init<dart::dynamics::detail::AxisOrder>(),
           ::py::arg("axisOrder"));
 
   ::py::class_<
@@ -162,21 +162,21 @@ void EulerJoint(py::module& m)
       .def(
           "setAxisOrder",
           +[](dart::dynamics::EulerJoint* self,
-              dart::dynamics::EulerJoint::AxisOrder _order) {
+              dart::dynamics::detail::AxisOrder _order) {
             self->setAxisOrder(_order);
           },
           ::py::arg("order"))
       .def(
           "setAxisOrder",
           +[](dart::dynamics::EulerJoint* self,
-              dart::dynamics::EulerJoint::AxisOrder _order,
+              dart::dynamics::detail::AxisOrder _order,
               bool _renameDofs) { self->setAxisOrder(_order, _renameDofs); },
           ::py::arg("order"),
           ::py::arg("renameDofs"))
       .def(
           "getAxisOrder",
           +[](const dart::dynamics::EulerJoint* self)
-              -> dart::dynamics::EulerJoint::AxisOrder {
+              -> dart::dynamics::detail::AxisOrder {
             return self->getAxisOrder();
           })
       .def(
@@ -209,7 +209,7 @@ void EulerJoint(py::module& m)
       .def_static(
           "convertToTransformOf",
           +[](const Eigen::Vector3s& _positions,
-              dart::dynamics::EulerJoint::AxisOrder _ordering,
+              dart::dynamics::detail::AxisOrder _ordering,
               const Eigen::Vector3s& flipAxisMap
               = Eigen::Vector3s::Ones()) -> Eigen::Isometry3s {
             return dart::dynamics::EulerJoint::convertToTransform(
@@ -221,7 +221,7 @@ void EulerJoint(py::module& m)
       .def_static(
           "convertToRotationOf",
           +[](const Eigen::Vector3s& _positions,
-              dart::dynamics::EulerJoint::AxisOrder _ordering,
+              dart::dynamics::detail::AxisOrder _ordering,
               const Eigen::Vector3s& flipAxisMap
               = Eigen::Vector3s::Ones()) -> Eigen::Matrix3s {
             return dart::dynamics::EulerJoint::convertToRotation(

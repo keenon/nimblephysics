@@ -29,6 +29,29 @@ enum MissingGRFReason
   extendedToNearestPeakForce
 };
 
+enum BasicTrialType
+{
+  treadmill,
+  overground,
+  staticTrial,
+  other
+};
+
+enum DetectedTrialFeature
+{
+  walking,
+  running,
+  unevenTerrain,
+  flatTerrain
+};
+
+enum DataQuality
+{
+  pilotData,
+  experimentalData,
+  internetData
+};
+
 enum MissingGRFStatus
 {
   no = 0,      // no will cast to `false`

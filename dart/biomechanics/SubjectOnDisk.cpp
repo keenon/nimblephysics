@@ -181,6 +181,118 @@ MissingGRFReason missingGRFReasonFromProto(proto::MissingGRFReason reason)
   return notMissingGRF;
 }
 
+BasicTrialType basicTrialTypeFromProto(proto::BasicTrialType type)
+{
+  switch (type)
+  {
+    case proto::BasicTrialType::treadmill:
+      return treadmill;
+    case proto::BasicTrialType::overground:
+      return overground;
+    case proto::BasicTrialType::staticTrial:
+      return staticTrial;
+    case proto::BasicTrialType::other:
+      return other;
+    case proto::BasicTrialType_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return other;
+      break;
+    case proto::BasicTrialType_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return other;
+      break;
+  }
+  return other;
+}
+
+proto::BasicTrialType basicTrialTypeToProto(BasicTrialType type)
+{
+  switch (type)
+  {
+    case treadmill:
+      return proto::BasicTrialType::treadmill;
+    case overground:
+      return proto::BasicTrialType::overground;
+    case staticTrial:
+      return proto::BasicTrialType::staticTrial;
+    case other:
+      return proto::BasicTrialType::other;
+  }
+  return proto::BasicTrialType::other;
+}
+
+DataQuality dataQualityFromProto(proto::DataQuality quality)
+{
+  switch (quality)
+  {
+    case proto::DataQuality::pilotData:
+      return pilotData;
+    case proto::DataQuality::experimentalData:
+      return experimentalData;
+    case proto::DataQuality::internetData:
+      return internetData;
+    case proto::DataQuality_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return internetData;
+      break;
+    case proto::DataQuality_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return internetData;
+      break;
+  }
+  return internetData;
+}
+
+proto::DataQuality dataQualityToProto(DataQuality quality)
+{
+  switch (quality)
+  {
+    case pilotData:
+      return proto::DataQuality::pilotData;
+    case experimentalData:
+      return proto::DataQuality::experimentalData;
+    case internetData:
+      return proto::DataQuality::internetData;
+  }
+  return proto::DataQuality::pilotData;
+}
+
+DetectedTrialFeature detectedTrialFeatureFromProto(
+    proto::DetectedTrialFeature feature)
+{
+  switch (feature)
+  {
+    case proto::DetectedTrialFeature::walking:
+      return walking;
+    case proto::DetectedTrialFeature::running:
+      return running;
+    case proto::DetectedTrialFeature::unevenTerrain:
+      return unevenTerrain;
+    case proto::DetectedTrialFeature::flatTerrain:
+      return flatTerrain;
+    case proto::DetectedTrialFeature_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return walking;
+      break;
+    case proto::DetectedTrialFeature_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return walking;
+      break;
+  }
+  return walking;
+}
+
+proto::DetectedTrialFeature detectedTrialFeatureToProto(
+    DetectedTrialFeature feature)
+{
+  switch (feature)
+  {
+    case walking:
+      return proto::DetectedTrialFeature::walking;
+    case running:
+      return proto::DetectedTrialFeature::running;
+    case unevenTerrain:
+      return proto::DetectedTrialFeature::unevenTerrain;
+    case flatTerrain:
+      return proto::DetectedTrialFeature::flatTerrain;
+  }
+  return proto::DetectedTrialFeature::walking;
+}
+
 SubjectOnDisk::SubjectOnDisk(const std::string& path)
   : mPath(path), mLoadedAllFrames(false)
 {
@@ -1488,6 +1600,12 @@ std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRF(int trial)
     return std::vector<MissingGRFReason>();
   }
   return mHeader->mTrials[trial]->mMissingGRFReason;
+}
+
+/// This returns the user supplied enum of type 'DataQuality'
+DataQuality SubjectOnDisk::getQuality()
+{
+  return mHeader->getQuality();
 }
 
 int SubjectOnDisk::getNumProcessingPasses()
@@ -3193,6 +3311,17 @@ void SubjectOnDiskTrial::setMissingGRFReason(
   mMissingGRFReason = missingGRFReason;
 }
 
+std::vector<bool> SubjectOnDiskTrial::getHasManualGRFAnnotation()
+{
+  return mHasManualGRFAnnotation;
+}
+
+void SubjectOnDiskTrial::setHasManualGRFAnnotation(
+    std::vector<bool> hasManualGRFAnnotation)
+{
+  mHasManualGRFAnnotation = hasManualGRFAnnotation;
+}
+
 void SubjectOnDiskTrial::setCustomValues(
     std::vector<Eigen::MatrixXs> customValues)
 {
@@ -3250,6 +3379,27 @@ std::vector<ForcePlate> SubjectOnDiskTrial::getForcePlates()
   return mForcePlates;
 }
 
+void SubjectOnDiskTrial::setBasicTrialType(BasicTrialType type)
+{
+  mBasicTrialType = type;
+}
+
+BasicTrialType SubjectOnDiskTrial::getBasicTrialType()
+{
+  return mBasicTrialType;
+}
+
+void SubjectOnDiskTrial::setDetectedTrialFeatures(
+    std::vector<DetectedTrialFeature> features)
+{
+  mDetectedTrialFeatures = features;
+}
+
+std::vector<DetectedTrialFeature> SubjectOnDiskTrial::getDetectedTrialFeatures()
+{
+  return mDetectedTrialFeatures;
+}
+
 std::shared_ptr<SubjectOnDiskTrialPass> SubjectOnDiskTrial::addPass()
 {
   mTrialPasses.push_back(std::make_shared<SubjectOnDiskTrialPass>());
@@ -3304,6 +3454,19 @@ void SubjectOnDiskTrial::read(const proto::SubjectOnDiskTrialHeader& proto)
   {
     mMissingGRFReason.push_back(
         missingGRFReasonFromProto(proto.missing_grf_reason(i)));
+  }
+  mHasManualGRFAnnotation.clear();
+  for (int i = 0; i < proto.has_manual_grf_annotation_size(); i++)
+  {
+    mHasManualGRFAnnotation.push_back(proto.has_manual_grf_annotation(i));
+  }
+
+  mBasicTrialType = basicTrialTypeFromProto(proto.trial_type());
+  mDetectedTrialFeatures.clear();
+  for (int i = 0; i < proto.detected_trial_feature_size(); i++)
+  {
+    mDetectedTrialFeatures.push_back(
+        detectedTrialFeatureFromProto(proto.detected_trial_feature(i)));
   }
 
   // ///////////////////////////////////////////////////////////////////////////
@@ -3377,6 +3540,16 @@ void SubjectOnDiskTrial::write(proto::SubjectOnDiskTrialHeader* proto)
   {
     proto->add_missing_grf_reason(
         missingGRFReasonToProto(mMissingGRFReason[i]));
+  }
+  for (int i = 0; i < mHasManualGRFAnnotation.size(); i++)
+  {
+    proto->add_has_manual_grf_annotation(mHasManualGRFAnnotation[i]);
+  }
+  proto->set_trial_type(basicTrialTypeToProto(mBasicTrialType));
+  for (int i = 0; i < mDetectedTrialFeatures.size(); i++)
+  {
+    proto->add_detected_trial_feature(
+        detectedTrialFeatureToProto(mDetectedTrialFeatures[i]));
   }
 
   // ///////////////////////////////////////////////////////////////////////////
@@ -3545,6 +3718,17 @@ SubjectOnDiskHeader& SubjectOnDiskHeader::setNotes(const std::string& notes)
 {
   mNotes = notes;
   return *this;
+}
+
+SubjectOnDiskHeader& SubjectOnDiskHeader::setQuality(DataQuality quality)
+{
+  mDataQuality = quality;
+  return *this;
+}
+
+DataQuality SubjectOnDiskHeader::getQuality()
+{
+  return mDataQuality;
 }
 
 std::shared_ptr<SubjectOnDiskPassHeader>
@@ -3782,6 +3966,7 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
   {
     header->add_exo_dof_index(index);
   }
+  header->set_data_quality(dataQualityToProto(mDataQuality));
 
   if (!header->IsInitialized())
   {
@@ -3926,6 +4111,8 @@ void SubjectOnDiskHeader::read(const dart::proto::SubjectOnDiskHeader& proto)
   {
     mExoDofIndices.push_back(proto.exo_dof_index(i));
   }
+
+  mDataQuality = dataQualityFromProto(proto.data_quality());
 }
 
 void SubjectOnDiskHeader::writeSensorsFrame(

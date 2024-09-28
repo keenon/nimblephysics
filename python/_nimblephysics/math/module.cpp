@@ -43,7 +43,7 @@ void MultivariateGaussian(py::module& sm);
 void GraphFlowDiscretizer(py::module& sm);
 void PolynomialFitter(py::module& sm);
 
-void dart_math(py::module& m)
+py::module dart_math(py::module& m)
 {
   auto sm = m.def_submodule("math");
 
@@ -52,6 +52,14 @@ void dart_math(py::module& m)
   MultivariateGaussian(sm);
   GraphFlowDiscretizer(sm);
   PolynomialFitter(sm);
+
+  return sm;
+}
+
+void EulerGeometry(py::module& sm);
+void dart_euler_math(py::module& sm)
+{
+  EulerGeometry(sm);
 }
 
 } // namespace python
