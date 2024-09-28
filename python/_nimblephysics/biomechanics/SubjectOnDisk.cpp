@@ -73,6 +73,21 @@ void SubjectOnDisk(py::module& m)
                 "This is a trial that doesn't fit into any of the "
                 "other categories.");
 
+  auto dataQuality
+      = ::py::enum_<dart::biomechanics::DataQuality>(m, "DataQuality")
+            .value(
+                "PILOT_DATA",
+                dart::biomechanics::DataQuality::pilotData,
+                "This is data that was collected as part of a pilot study.")
+            .value(
+                "EXPERIMENTAL_DATA",
+                dart::biomechanics::DataQuality::experimentalData,
+                "This is data that was collected as part of an experiment.")
+            .value(
+                "INTERNET_DATA",
+                dart::biomechanics::DataQuality::internetData,
+                "This is data that was collected from the internet.");
+
   auto detectedTrialFeature
       = ::py::enum_<dart::biomechanics::DetectedTrialFeature>(
             m, "DetectedTrialFeature")
@@ -1090,6 +1105,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskHeader::setNotes,
                 ::py::arg("notes"))
             .def(
+                "setQuality",
+                &dart::biomechanics::SubjectOnDiskHeader::setQuality,
+                ::py::arg("quality"))
+            .def(
+                "getQuality",
+                &dart::biomechanics::SubjectOnDiskHeader::getQuality)
+            .def(
                 "addProcessingPass",
                 &dart::biomechanics::SubjectOnDiskHeader::addProcessingPass)
             .def(
@@ -1323,6 +1345,11 @@ Note that these are specified in the local body frame, acting on the body at its
             This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
             the more expensive :code:`loadFrames()` and examine frames individually.
           )doc")
+            .def(
+                "getQuality",
+                &dart::biomechanics::SubjectOnDisk::getQuality,
+                "This returns the user-supplied quality of the data in this "
+                "subject")
             //   int getNumProcessingPasses();
             .def(
                 "getNumProcessingPasses",

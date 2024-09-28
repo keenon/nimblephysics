@@ -463,6 +463,8 @@ public:
   SubjectOnDiskHeader& setSubjectTags(std::vector<std::string> subjectTags);
   SubjectOnDiskHeader& setHref(const std::string& sourceHref);
   SubjectOnDiskHeader& setNotes(const std::string& notes);
+  SubjectOnDiskHeader& setQuality(DataQuality quality);
+  DataQuality getQuality();
   std::shared_ptr<SubjectOnDiskPassHeader> addProcessingPass();
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
@@ -521,6 +523,9 @@ protected:
   int mEmgDim;
   // This is exoskeleton data
   std::vector<int> mExoDofIndices;
+
+  // This is the user supplied quality of the data
+  DataQuality mDataQuality;
 
   friend class SubjectOnDisk;
   friend struct Frame;
@@ -636,6 +641,9 @@ public:
   /// This returns the vector of enums of type 'MissingGRFReason', which can
   /// include `notMissingGRF`.
   std::vector<MissingGRFReason> getMissingGRF(int trial);
+
+  /// This returns the user supplied enum of type 'DataQuality'
+  DataQuality getQuality();
 
   int getNumProcessingPasses();
 

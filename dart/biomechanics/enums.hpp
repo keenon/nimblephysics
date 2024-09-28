@@ -45,6 +45,13 @@ enum DetectedTrialFeature
   flatTerrain
 };
 
+enum DataQuality
+{
+  pilotData,
+  experimentalData,
+  internetData
+};
+
 enum MissingGRFStatus
 {
   no = 0,      // no will cast to `false`

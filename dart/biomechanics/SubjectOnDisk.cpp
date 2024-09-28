@@ -219,6 +219,40 @@ proto::BasicTrialType basicTrialTypeToProto(BasicTrialType type)
   return proto::BasicTrialType::other;
 }
 
+DataQuality dataQualityFromProto(proto::DataQuality quality)
+{
+  switch (quality)
+  {
+    case proto::DataQuality::pilotData:
+      return pilotData;
+    case proto::DataQuality::experimentalData:
+      return experimentalData;
+    case proto::DataQuality::internetData:
+      return internetData;
+    case proto::DataQuality_INT_MIN_SENTINEL_DO_NOT_USE_:
+      return internetData;
+      break;
+    case proto::DataQuality_INT_MAX_SENTINEL_DO_NOT_USE_:
+      return internetData;
+      break;
+  }
+  return internetData;
+}
+
+proto::DataQuality dataQualityToProto(DataQuality quality)
+{
+  switch (quality)
+  {
+    case pilotData:
+      return proto::DataQuality::pilotData;
+    case experimentalData:
+      return proto::DataQuality::experimentalData;
+    case internetData:
+      return proto::DataQuality::internetData;
+  }
+  return proto::DataQuality::pilotData;
+}
+
 DetectedTrialFeature detectedTrialFeatureFromProto(
     proto::DetectedTrialFeature feature)
 {
@@ -1566,6 +1600,12 @@ std::vector<MissingGRFReason> SubjectOnDisk::getMissingGRF(int trial)
     return std::vector<MissingGRFReason>();
   }
   return mHeader->mTrials[trial]->mMissingGRFReason;
+}
+
+/// This returns the user supplied enum of type 'DataQuality'
+DataQuality SubjectOnDisk::getQuality()
+{
+  return mHeader->getQuality();
 }
 
 int SubjectOnDisk::getNumProcessingPasses()
@@ -3680,6 +3720,17 @@ SubjectOnDiskHeader& SubjectOnDiskHeader::setNotes(const std::string& notes)
   return *this;
 }
 
+SubjectOnDiskHeader& SubjectOnDiskHeader::setQuality(DataQuality quality)
+{
+  mDataQuality = quality;
+  return *this;
+}
+
+DataQuality SubjectOnDiskHeader::getQuality()
+{
+  return mDataQuality;
+}
+
 std::shared_ptr<SubjectOnDiskPassHeader>
 SubjectOnDiskHeader::addProcessingPass()
 {
@@ -3915,6 +3966,7 @@ void SubjectOnDiskHeader::write(dart::proto::SubjectOnDiskHeader* header)
   {
     header->add_exo_dof_index(index);
   }
+  header->set_data_quality(dataQualityToProto(mDataQuality));
 
   if (!header->IsInitialized())
   {
@@ -4059,6 +4111,8 @@ void SubjectOnDiskHeader::read(const dart::proto::SubjectOnDiskHeader& proto)
   {
     mExoDofIndices.push_back(proto.exo_dof_index(i));
   }
+
+  mDataQuality = dataQualityFromProto(proto.data_quality());
 }
 
 void SubjectOnDiskHeader::writeSensorsFrame(
