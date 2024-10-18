@@ -1,4 +1,4 @@
-name: Build and Publish Wheels (Mac OSX x86_64 only)
+name: Build and Publish Wheels (Mac OSX x86_64)
 
 on:
   workflow_dispatch:
