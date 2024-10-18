@@ -63,7 +63,7 @@ jobs:
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
           DYLD_PRINT_LIBRARIES: 1
       - name: Publish artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_11_0_arm64.whl
           path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_11_0_arm64.whl
