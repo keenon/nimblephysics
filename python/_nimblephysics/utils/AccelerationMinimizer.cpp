@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/utils/AccelerationMinimizer.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
@@ -37,29 +39,35 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
-void Random(py::module& sm);
-void Geometry(py::module& sm);
-void MultivariateGaussian(py::module& sm);
-void GraphFlowDiscretizer(py::module& sm);
-void PolynomialFitter(py::module& sm);
-
-py::module dart_math(py::module& m)
+void AccelerationMinimizer(py::module& m)
 {
-  auto sm = m.def_submodule("math");
-
-  Random(sm);
-  Geometry(sm);
-  MultivariateGaussian(sm);
-  GraphFlowDiscretizer(sm);
-  PolynomialFitter(sm);
-
-  return sm;
-}
-
-void EulerGeometry(py::module& sm);
-void dart_euler_math(py::module& sm)
-{
-  EulerGeometry(sm);
+  ::py::class_<dart::utils::AccelerationMinimizer>(m, "AccelerationMinimizer")
+      .def(
+          ::py::init<int, s_t, s_t, s_t, s_t, s_t, s_t, int>(),
+          ::py::arg("numTimesteps"),
+          ::py::arg("smoothingWeight") = 1.0,
+          ::py::arg("regularizationWeight") = 0.01,
+          ::py::arg("startPositionZeroWeight") = 0.0,
+          ::py::arg("endPositionZeroWeight") = 0.0,
+          ::py::arg("startVelocityZeroWeight") = 0.0,
+          ::py::arg("endVelocityZeroWeight") = 0.0,
+          ::py::arg("numIterations") = 10000)
+      .def(
+          "minimize",
+          &dart::utils::AccelerationMinimizer::minimize,
+          ::py::arg("series"))
+      .def(
+          "setDebugIterationBackoff",
+          &dart::utils::AccelerationMinimizer::setDebugIterationBackoff,
+          ::py::arg("iterations"))
+      .def(
+          "setNumIterationsBackoff",
+          &dart::utils::AccelerationMinimizer::setNumIterationsBackoff,
+          ::py::arg("series"))
+      .def(
+          "setConvergenceTolerance",
+          &dart::utils::AccelerationMinimizer::setConvergenceTolerance,
+          ::py::arg("tolerance"));
 }
 
 } // namespace python

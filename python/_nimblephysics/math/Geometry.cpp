@@ -33,7 +33,9 @@
 #include <iostream>
 
 #include <dart/math/Geometry.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "dart/math/MathTypes.hpp"
 
@@ -266,6 +268,26 @@ void Geometry(py::module& m)
       ::py::arg("T"),
       ::py::arg("p"));
 
+  m.def(
+      "distancePointToConvexHull2D",
+      +[](Eigen::Vector2s P, std::vector<Eigen::Vector2s>& points) -> s_t {
+        return dart::math::distancePointToConvexHull2D(P, points);
+      },
+      ::py::arg("P"),
+      ::py::arg("points"));
+
+  m.def(
+      "distancePointToConvexHullProjectedTo2D",
+      +[](Eigen::Vector3s P,
+          std::vector<Eigen::Vector3s>& points,
+          Eigen::Vector3s normal) -> s_t {
+        return dart::math::distancePointToConvexHullProjectedTo2D(
+            P, points, normal);
+      },
+      ::py::arg("P"),
+      ::py::arg("points"),
+      ::py::arg("normal") = Eigen::Vector3s::UnitY());
+
   ::py::class_<dart::math::BoundingBox>(m, "BoundingBox")
       .def(::py::init())
       .def(
@@ -277,6 +299,21 @@ void Geometry(py::module& m)
       .def("computeCenter", &dart::math::BoundingBox::computeCenter)
       .def("computeFullExtents", &dart::math::BoundingBox::computeFullExtents)
       .def("computeHalfExtents", &dart::math::BoundingBox::computeHalfExtents);
+}
+
+void EulerGeometry(py::module& m)
+{
+  m.def(
+      "roundEulerAnglesToNearest",
+      +[](Eigen::Vector3s angle,
+          Eigen::Vector3s previousAngle,
+          dynamics::detail::AxisOrder axisOrder) -> Eigen::Vector3s {
+        return dart::math::roundEulerAnglesToNearest(
+            angle, previousAngle, axisOrder);
+      },
+      ::py::arg("angle"),
+      ::py::arg("previousAngle"),
+      ::py::arg("axisOrder") = dart::dynamics::detail::AxisOrder::XYZ);
 }
 
 } // namespace python

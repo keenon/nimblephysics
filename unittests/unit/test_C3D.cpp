@@ -72,16 +72,22 @@ TEST(C3D, JA1GAIT35_GRF_CHECK)
   {
     for (int t = 0; t < c3d.forcePlates[i].timestamps.size(); t++)
     {
-      if (c3d.forcePlates[i].forces[t].hasNaN()) {
-        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+      if (c3d.forcePlates[i].forces[t].hasNaN())
+      {
+        std::cout << "Force plate " << i << " has NaN force on time " << t
+                  << std::endl;
         return;
       }
-      if (c3d.forcePlates[i].moments[t].hasNaN()) {
-        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+      if (c3d.forcePlates[i].moments[t].hasNaN())
+      {
+        std::cout << "Force plate " << i << " has NaN force on time " << t
+                  << std::endl;
         return;
       }
-      if (c3d.forcePlates[i].centersOfPressure[t].hasNaN()) {
-        std::cout << "Force plate " << i << " has NaN force on time " << t << std::endl;
+      if (c3d.forcePlates[i].centersOfPressure[t].hasNaN())
+      {
+        std::cout << "Force plate " << i << " has NaN force on time " << t
+                  << std::endl;
         return;
       }
     }
@@ -106,3 +112,17 @@ TEST(C3D, TEST_VERTICAL_CONVENTION)
   EXPECT_GE(sum(1), 0);
 }
 #endif
+
+/*
+#ifdef ALL_TESTS
+TEST(C3D, TEST_NO_NAMED_MARKERS)
+{
+  biomechanics::C3D c3d = biomechanics::C3DLoader::loadC3D(
+      "dart://sample/c3d/CheeseburgerTrial000001.c3d");
+  for (auto& pair : c3d.markerTimesteps[0])
+  {
+    std::cout << pair.first << std::endl;
+  }
+}
+#endif
+*/

@@ -21,6 +21,7 @@ void DynamicsFitter(py::module& m)
 {
 
   py::enum_<dart::biomechanics::MissingGRFReason>(m, "MissingGRFReason")
+      // These values are used by the legacy filter
       .value(
           "notMissingGRF", dart::biomechanics::MissingGRFReason::notMissingGRF)
       .value(
@@ -50,6 +51,29 @@ void DynamicsFitter(py::module& m)
       .value(
           "footContactDetectedButNoForce",
           dart::biomechanics::MissingGRFReason::footContactDetectedButNoForce)
+      // These values are used by the new filter
+      .value(
+          "tooHighMarkerRMS",
+          dart::biomechanics::MissingGRFReason::tooHighMarkerRMS)
+      .value(
+          "hasInputOutliers",
+          dart::biomechanics::MissingGRFReason::hasInputOutliers)
+      .value(
+          "hasNoForcePlateData",
+          dart::biomechanics::MissingGRFReason::hasNoForcePlateData)
+      .value(
+          "velocitiesStillTooHighAfterFiltering",
+          dart::biomechanics::MissingGRFReason::
+              velocitiesStillTooHighAfterFiltering)
+      .value(
+          "copOutsideConvexFootError",
+          dart::biomechanics::MissingGRFReason::copOutsideConvexFootError)
+      .value(
+          "zeroForceFrame",
+          dart::biomechanics::MissingGRFReason::zeroForceFrame)
+      .value(
+          "extendedToNearestPeakForce",
+          dart::biomechanics::MissingGRFReason::extendedToNearestPeakForce)
       .export_values();
 
   py::enum_<dart::biomechanics::MissingGRFStatus>(m, "MissingGRFStatus")
@@ -81,6 +105,13 @@ void DynamicsFitter(py::module& m)
           ::py::arg("torquesMultiple"),
           ::py::arg("useL1") = false)
       .def(
+          "calculateInverseDynamics",
+          &dart::biomechanics::ResidualForceHelper::calculateInverseDynamics,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"))
+      .def(
           "calculateResidualJacobianWrt",
           &dart::biomechanics::ResidualForceHelper::
               calculateResidualJacobianWrt,
@@ -99,7 +130,40 @@ void DynamicsFitter(py::module& m)
           ::py::arg("forcesConcat"),
           ::py::arg("wrt"),
           ::py::arg("torquesMultiple"),
-          ::py::arg("useL1") = false);
+          ::py::arg("useL1") = false)
+      .def(
+          "calculateComToCenterAngularResiduals",
+          &dart::biomechanics::ResidualForceHelper::
+              calculateComToCenterAngularResiduals,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the location that we would need to move the COM to in "
+          "order to center the angular residuals. Moving the COM to the "
+          "computed location doesn't remove angular residuals, but ensures "
+          "that any remaining residuals are parallel to the net external force "
+          "on the body.")
+      .def(
+          "calculateCOMAngularResidual",
+          &dart::biomechanics::ResidualForceHelper::calculateCOMAngularResidual,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the residual at the root, then transforms that to the "
+          "COM and expresses the torque as a spatial vector (even if the root "
+          "joint uses euler coordinates for rotation).")
+      .def(
+          "calculateResidualFreeRootAcceleration",
+          &dart::biomechanics::ResidualForceHelper::
+              calculateResidualFreeRootAcceleration,
+          ::py::arg("q"),
+          ::py::arg("dq"),
+          ::py::arg("ddq"),
+          ::py::arg("forcesConcat"),
+          "This computes the acceleration we would need at the root in order "
+          "to remove all residual forces.");
 
   ::py::class_<
       dart::biomechanics::DynamicsInitialization,

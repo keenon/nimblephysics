@@ -30,36 +30,53 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <dart/utils/AccelerationTrackAndMinimize.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace dart {
 namespace python {
 
-void Random(py::module& sm);
-void Geometry(py::module& sm);
-void MultivariateGaussian(py::module& sm);
-void GraphFlowDiscretizer(py::module& sm);
-void PolynomialFitter(py::module& sm);
-
-py::module dart_math(py::module& m)
+void AccelerationTrackAndMinimize(py::module& m)
 {
-  auto sm = m.def_submodule("math");
+  py::class_<dart::utils::AccelerationTrackingResult>(
+      m, "AccelerationTrackingResult")
+      .def_readwrite("series", &dart::utils::AccelerationTrackingResult::series)
+      .def_readwrite(
+          "accelerationOffset",
+          &dart::utils::AccelerationTrackingResult::accelerationOffset);
 
-  Random(sm);
-  Geometry(sm);
-  MultivariateGaussian(sm);
-  GraphFlowDiscretizer(sm);
-  PolynomialFitter(sm);
-
-  return sm;
-}
-
-void EulerGeometry(py::module& sm);
-void dart_euler_math(py::module& sm)
-{
-  EulerGeometry(sm);
+  ::py::class_<dart::utils::AccelerationTrackAndMinimize>(
+      m, "AccelerationTrackAndMinimize")
+      .def(
+          ::py::init<int, std::vector<bool>, s_t, s_t, s_t, s_t, int>(),
+          ::py::arg("numTimesteps"),
+          ::py::arg("trackAccelerationAtTimesteps"),
+          ::py::arg("zeroUnobservedAccWeight") = 1.0,
+          ::py::arg("trackObservedAccWeight") = 1.0,
+          ::py::arg("regularizationWeight") = 0.01,
+          ::py::arg("dt") = 1.0,
+          ::py::arg("numIterations") = 10000)
+      .def(
+          "minimize",
+          &dart::utils::AccelerationTrackAndMinimize::minimize,
+          ::py::arg("series"),
+          ::py::arg("trackAcc"))
+      .def(
+          "setDebugIterationBackoff",
+          &dart::utils::AccelerationTrackAndMinimize::setDebugIterationBackoff,
+          ::py::arg("iterations"))
+      .def(
+          "setNumIterationsBackoff",
+          &dart::utils::AccelerationTrackAndMinimize::setNumIterationsBackoff,
+          ::py::arg("series"))
+      .def(
+          "setConvergenceTolerance",
+          &dart::utils::AccelerationTrackAndMinimize::setConvergenceTolerance,
+          ::py::arg("tolerance"));
 }
 
 } // namespace python

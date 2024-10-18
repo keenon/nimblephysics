@@ -45,6 +45,12 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
 
+  dart_add_test("unit" test_AccelerationMinimizer)
+  target_link_libraries(test_AccelerationMinimizer dart-utils)
+
+  dart_add_test("unit" test_AccelerationTrackAndMinimize)
+  target_link_libraries(test_AccelerationTrackAndMinimize dart-utils)
+
   dart_add_test("unit" test_IKInitializer)
   target_link_libraries(test_IKInitializer dart-utils)
 
@@ -71,6 +77,9 @@ if(TARGET dart-utils)
 
   dart_add_test("unit" test_SkeletonToBallJoints)
   target_link_libraries(test_SkeletonToBallJoints dart-utils)
+
+  dart_add_test("unit" test_Convex2DDistanceMeasurement)
+  target_link_libraries(test_Convex2DDistanceMeasurement dart-utils)
 
   dart_add_test("unit" test_SkeletonSimplification)
   target_link_libraries(test_SkeletonSimplification dart-utils)

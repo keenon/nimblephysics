@@ -347,15 +347,27 @@ C3D C3DLoader::loadC3DWithGRFConvention(const std::string& uri, int convention)
     {
       int frame = analogFramesPerFrame * (t + startFrame);
       result.forcePlates[j].timestamps.push_back(t / frameRate);
-      assert(!forcePlatforms[j].forces()[frame].hasNaN());
-      result.forcePlates[j].forces.push_back(
-          forcePlatforms[j].forces()[frame] * forcePlateForceScaleFactors[j]);
-      assert(!forcePlatforms[j].Tz()[frame].hasNaN());
-      result.forcePlates[j].moments.push_back(
-          forcePlatforms[j].Tz()[frame] * forcePlateMomentScaleFactors[j]);
-      assert(!forcePlatforms[j].CoP()[frame].hasNaN());
-      result.forcePlates[j].centersOfPressure.push_back(
-          forcePlatforms[j].CoP()[frame] * forcePlatePositionScaleFactors[j]);
+      if (forcePlatforms[j].forces().size() > frame
+          && forcePlatforms[j].Tz().size() > frame
+          && forcePlatforms[j].CoP().size() > frame)
+      {
+        assert(!forcePlatforms[j].forces()[frame].hasNaN());
+        result.forcePlates[j].forces.push_back(
+            forcePlatforms[j].forces()[frame] * forcePlateForceScaleFactors[j]);
+        assert(!forcePlatforms[j].Tz()[frame].hasNaN());
+        result.forcePlates[j].moments.push_back(
+            forcePlatforms[j].Tz()[frame] * forcePlateMomentScaleFactors[j]);
+        assert(!forcePlatforms[j].CoP()[frame].hasNaN());
+        result.forcePlates[j].centersOfPressure.push_back(
+            forcePlatforms[j].CoP()[frame] * forcePlatePositionScaleFactors[j]);
+      }
+      else
+      {
+        result.forcePlates[j].forces.push_back(Eigen::Vector3s::Zero());
+        result.forcePlates[j].moments.push_back(Eigen::Vector3s::Zero());
+        result.forcePlates[j].centersOfPressure.push_back(
+            Eigen::Vector3s::Zero());
+      }
     }
   }
 

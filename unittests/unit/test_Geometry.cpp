@@ -54,7 +54,10 @@ using namespace simulation;
 
 #define LIE_GROUP_OPT_TOL 1e-12
 
-#define ALL_TESTS
+// Tolerance for floating-point comparisons
+#define EPSILON 1e-6
+
+// #define ALL_TESTS
 
 /******************************************************************************/
 Eigen::Matrix4s toMatrixForm(const Eigen::Vector6s& v)
@@ -1248,3 +1251,233 @@ TEST(LIE_GROUP_OPERATORS, ADJOINT_MAPPINGS)
   }
 }
 #endif
+
+/******************************************************************************/
+// #ifdef ALL_TESTS
+TEST(TWO_D_CONVEX_OPS, SIMPLE_TEST)
+{
+  // Define the set of points (some of them may be internal)
+  std::vector<Eigen::Vector2s> points;
+  points.push_back(Eigen::Vector2s(0, 0));
+  points.push_back(Eigen::Vector2s(1, 0));
+  points.push_back(Eigen::Vector2s(1, 1));
+  points.push_back(Eigen::Vector2s(0, 1));
+  points.push_back(Eigen::Vector2s(0.5, 0.5)); // Internal point
+
+  // Define the point P
+  Eigen::Vector2s P(0.5, -0.5);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  std::cout << "Distance from point to convex hull: " << distance << std::endl;
+
+  EXPECT_EQ(distance, 0.5);
+}
+// #endif
+
+// Test 1: Point outside a square convex hull
+TEST(TWO_D_CONVEX_OPS, PointOutsideSquare)
+{
+  // Define the set of points (square)
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(1, 0));
+  points.push_back(Vector2s(1, 1));
+  points.push_back(Vector2s(0, 1));
+
+  // Define the point P outside the square
+  Vector2s P(0.5, -0.5);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 0.5
+  EXPECT_NEAR(distance, 0.5, EPSILON);
+}
+
+// Test 2: Point inside the convex hull
+TEST(TWO_D_CONVEX_OPS, PointInsideConvexHull)
+{
+  // Define the set of points (square)
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(2, 0));
+  points.push_back(Vector2s(2, 2));
+  points.push_back(Vector2s(0, 2));
+
+  // Define the point P inside the square
+  Vector2s P(1, 1);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 0.0 (inside the convex hull)
+  EXPECT_NEAR(distance, 0.0, EPSILON);
+}
+
+// Test 3: Point on the edge of the convex hull
+TEST(TWO_D_CONVEX_OPS, PointOnEdge)
+{
+  // Define the set of points (triangle)
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(2, 0));
+  points.push_back(Vector2s(1, std::sqrt(3)));
+
+  // Define the point P on one of the edges
+  Vector2s P(1, 0);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 0.0 (on the edge)
+  EXPECT_NEAR(distance, 0.0, EPSILON);
+}
+
+// Test 4: Point outside a convex hull with internal points
+TEST(TWO_D_CONVEX_OPS, ConvexHullWithInternalPoints)
+{
+  // Define the set of points forming a convex hull with internal points
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(-1, 0));
+  points.push_back(Vector2s(0, 1));
+  points.push_back(Vector2s(1, 0));
+  points.push_back(Vector2s(0, -1));
+  points.push_back(Vector2s(0, 0)); // Internal point
+
+  // Define the point P outside the convex hull
+  Vector2s P(2, 0);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 1.0 (distance from P(2,0) to the hull edge at (1,0))
+  EXPECT_NEAR(distance, 1.0, EPSILON);
+}
+
+// Test 5: Convex hull is a line segment
+TEST(TWO_D_CONVEX_OPS, ConvexHullLineSegment)
+{
+  // Define the set of points forming a line segment
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(2, 0));
+  points.push_back(Vector2s(1, 0)); // Colinear point
+
+  // Define the point P above the line segment
+  Vector2s P(1, 1);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 1.0 (vertical distance)
+  EXPECT_NEAR(distance, 1.0, EPSILON);
+}
+
+// Test 6: Convex hull is a single point
+TEST(TWO_D_CONVEX_OPS, ConvexHullSinglePoint)
+{
+  // Define the set of points with a single point
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+
+  // Define the point P somewhere else
+  Vector2s P(1, 1);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is sqrt(2)
+  EXPECT_NEAR(distance, std::sqrt(2), EPSILON);
+}
+
+// Test 7: Point outside an irregular convex hull
+TEST(TWO_D_CONVEX_OPS, IrregularConvexHull)
+{
+  // Define the set of points forming an irregular convex shape
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(2, 1));
+  points.push_back(Vector2s(1, 3));
+  points.push_back(Vector2s(-1, 2));
+  points.push_back(Vector2s(-2, 1));
+  points.push_back(Vector2s(0, 1)); // Internal point
+
+  // Define the point P outside the convex hull
+  Vector2s P(3, 2);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is approximately distance from P(3,2) to edge between
+  // (2,1) and (1,3)
+  s_t expected_distance = std::hypot(1.2, 0.6);
+
+  EXPECT_NEAR(distance, expected_distance, EPSILON);
+}
+
+// Test 8: Point at a vertex of the convex hull
+TEST(TWO_D_CONVEX_OPS, PointAtVertex)
+{
+  // Define the set of points forming a convex quadrilateral
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(2, 0));
+  points.push_back(Vector2s(2, 2));
+  points.push_back(Vector2s(0, 2));
+
+  // Define the point P at one of the vertices
+  Vector2s P(2, 2);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is 0.0 (point is on the convex hull)
+  EXPECT_NEAR(distance, 0.0, EPSILON);
+}
+
+// Test 9: Point very close to the convex hull edge
+TEST(TWO_D_CONVEX_OPS, PointNearEdge)
+{
+  // Define the set of points forming a square
+  std::vector<Vector2s> points;
+  points.push_back(Vector2s(0, 0));
+  points.push_back(Vector2s(1, 0));
+  points.push_back(Vector2s(1, 1));
+  points.push_back(Vector2s(0, 1));
+
+  // Define the point P very close to the right edge
+  Vector2s P(1 + 1e-7, 0.5);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is approximately 1e-7
+  EXPECT_NEAR(distance, 1e-7, EPSILON);
+}
+
+// Test 10: Large set of random points forming a circle
+TEST(TWO_D_CONVEX_OPS, LargeRandomPoints)
+{
+  // Generate points around a circle
+  std::vector<Vector2s> points;
+  int num_points = 100;
+  s_t radius = 10.0;
+
+  for (int i = 0; i < num_points; ++i)
+  {
+    s_t angle = (2 * M_PI * i) / num_points;
+    points.push_back(
+        Vector2s(radius * std::cos(angle), radius * std::sin(angle)));
+  }
+
+  // Define the point P outside the circle
+  Vector2s P(0, 15);
+
+  // Compute the distance
+  s_t distance = distancePointToConvexHull2D(P, points);
+
+  // Expected distance is approximately 5.0
+  EXPECT_NEAR(distance, 5.0, EPSILON);
+}

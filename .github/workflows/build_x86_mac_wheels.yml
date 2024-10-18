@@ -60,17 +60,17 @@ jobs:
           PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
           DYLD_PRINT_LIBRARIES: 1
       - name: Publish artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
-          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_9_x86_64.whl
-          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_10_9_x86_64.whl
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_12_0_x86_64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-macosx_12_0_x86_64.whl
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: [build-mac]
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: wheelhouse
       - name: Display structure of downloaded files before flattening

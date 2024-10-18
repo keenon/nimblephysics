@@ -14,13 +14,41 @@ enum MissingGRFReason { notMissingGRF = 0;
                         interpolatedClippedGRF = 9;
                         manualReview = 10;
                         footContactDetectedButNoForce = 11;
+                        tooHighMarkerRMS = 12;
+                        hasInputOutliers = 13;
+                        hasNoForcePlateData = 14;
+                        velocitiesStillTooHighAfterFiltering = 15;
+                        copOutsideConvexFootError = 16;
+                        zeroForceFrame = 17;
+                        extendedToNearestPeakForce = 18;
                       };
 
 enum ProcessingPassType {
   kinematics = 0;
   dynamics = 1;
   lowPassFilter = 2;
+  accMinimizingFilter = 3;
 };
+
+enum BasicTrialType {
+  treadmill = 0;
+  overground = 1;
+  staticTrial = 2;
+  other = 3;
+};
+
+enum DetectedTrialFeature {
+  walking = 0;
+  running = 1;
+  unevenTerrain = 2;
+  flatTerrain = 3;
+}
+
+enum DataQuality {
+  pilotData = 0;
+  experimentalData = 1;
+  internetData = 2;
+}
 
 // Many of the ML tasks we want to support from SubjectOnDisk data include 
 // effectively predicting the results of a downstream processing task from 
@@ -59,6 +87,10 @@ message SubjectOnDiskTrialProcessingPassHeader {
   int32 lowpass_filter_order = 11;
   // If we clipped background noise on the force plates this pass, then this is the cutoff we used for each plate
   repeated float force_plate_cutoff = 12;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original positions
+  float acc_minimizing_regularization_weight = 13;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original forces
+  float acc_minimizing_force_regularization_weight = 14;
 }
 
 message SubjectOnDiskTrialHeader {
@@ -67,6 +99,7 @@ message SubjectOnDiskTrialHeader {
   // memory, but we really want to know this information when randomly picking
   // frames from the subject to sample.
   repeated MissingGRFReason missing_GRF_reason = 2;
+  repeated bool has_manual_GRF_annotation = 16;
   // This is how many frames are in this trial
   int32 trial_length = 3;
   // This is the timestep used in this trial (assumed constant throughout the trial)
@@ -85,6 +118,15 @@ message SubjectOnDiskTrialHeader {
   string original_name = 10;
   // This is the split index within the original trial -- 0 if we didn't split or if we're the first split
   int32 split_index = 11;
+  // This is the shorthand for values from the original trial
+  int32 original_trial_start_frame = 12;
+  int32 original_trial_end_frame = 13;
+  float original_trial_start_time = 14;
+  float original_trial_end_time = 15;
+  // This is the type of trial we're dealing with
+  BasicTrialType trial_type = 17;
+  // This is the detected features of this trial
+  repeated DetectedTrialFeature detected_trial_feature = 18;
 }
 
 message SubjectOnDiskPass {
@@ -130,6 +172,8 @@ message SubjectOnDiskHeader {
   repeated int32 exo_dof_index = 22;
   // Details about the subject tags provided on the AddBiomechanics platform
   repeated string subject_tag = 23;
+  // This is what the user has tagged this subject as, in terms of data quality
+  DataQuality data_quality = 25;
 }
 
 message SubjectOnDiskProcessingPassFrame {

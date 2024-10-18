@@ -134,6 +134,7 @@ class SubjectOnDiskTrialPass
 public:
   SubjectOnDiskTrialPass();
   void setType(ProcessingPassType type);
+  ProcessingPassType getType();
   void setDofPositionsObserved(std::vector<bool> dofPositionsObserved);
   void setDofVelocitiesFiniteDifferenced(
       std::vector<bool> dofVelocitiesFiniteDifferenced);
@@ -152,6 +153,13 @@ public:
   // If we filtered the force plates, then what was the cutoff frequency of that
   // filtering?
   void setForcePlateCutoffs(std::vector<s_t> cutoffs);
+  // If we filtered the position data with an acceleration minimizing filter,
+  // then what was the regularization weight that tracked the original position.
+  void setAccelerationMinimizingRegularization(s_t regularization);
+  // If we filtered the position data with an acceleration minimizing filter,
+  // then what was the regularization weight that tracked the original force
+  // data
+  void setAccelerationMinimizingForceRegularization(s_t weight);
 
   // This is for allowing the user to set all the values of a pass at once,
   // without having to manually compute them in Python, which turns out to be
@@ -241,6 +249,10 @@ public:
   void setRootEulerHistoryInRootFrame(Eigen::MatrixXs rootHistory);
   Eigen::MatrixXs getRootEulerHistoryInRootFrame();
 
+  // This gets the data from `getGroundBodyCopTorqueForce()` in the form of
+  // ForcePlate objects, which are easier to work with.
+  std::vector<ForcePlate> getProcessedForcePlates();
+
   // This will return a matrix where every one of our properties with setters is
   // stacked together vertically. Each column represents time, and each row is a
   // different property of interest. The point here is not to introspect into
@@ -270,6 +282,12 @@ protected:
   // If we're doing a lowpass filter on this pass, then what was the order of
   // that (Butterworth) filter?
   int mLowpassFilterOrder;
+  // If we filtered position with an acceleration minimizing filter, then this
+  // is the regularization weight that tracked the original position.
+  s_t mAccelerationMinimizingRegularization;
+  // If we filtered position with an acceleration minimizing filter, then this
+  // is the regularization weight that tracked the original force data
+  s_t mAccelerationMinimizingForceRegularization;
   // If we filtered the force plates, then what was the cutoff frequency of that
   // filtering?
   std::vector<s_t> mForcePlateCutoffs;
@@ -312,13 +330,25 @@ public:
   void setName(const std::string& name);
   void setTimestep(s_t timestep);
   s_t getTimestep();
+  void setTrialLength(int length);
+  int getTrialLength();
   void setTrialTags(std::vector<std::string> trialTags);
   std::string getOriginalTrialName();
   void setOriginalTrialName(const std::string& name);
   int getSplitIndex();
   void setSplitIndex(int split);
+  int getOriginalTrialStartFrame();
+  void setOriginalTrialStartFrame(int startFrame);
+  int getOriginalTrialEndFrame();
+  void setOriginalTrialEndFrame(int endFrame);
+  s_t getOriginalTrialStartTime();
+  void setOriginalTrialStartTime(s_t startTime);
+  s_t getOriginalTrialEndTime();
+  void setOriginalTrialEndTime(s_t endTime);
   std::vector<MissingGRFReason> getMissingGRFReason();
   void setMissingGRFReason(std::vector<MissingGRFReason> missingGRFReason);
+  std::vector<bool> getHasManualGRFAnnotation();
+  void setHasManualGRFAnnotation(std::vector<bool> hasManualGRFAnnotation);
   void setCustomValues(std::vector<Eigen::MatrixXs> customValues);
   void setMarkerNamesGuessed(bool markersGuessed);
   std::vector<std::map<std::string, Eigen::Vector3s>> getMarkerObservations();
@@ -333,6 +363,10 @@ public:
   void setExoTorques(std::map<int, Eigen::VectorXs> exoTorques);
   void setForcePlates(std::vector<ForcePlate> forcePlates);
   std::vector<ForcePlate> getForcePlates();
+  void setBasicTrialType(BasicTrialType type);
+  BasicTrialType getBasicTrialType();
+  void setDetectedTrialFeatures(std::vector<DetectedTrialFeature> features);
+  std::vector<DetectedTrialFeature> getDetectedTrialFeatures();
   std::shared_ptr<SubjectOnDiskTrialPass> addPass();
   std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> getPasses();
   void read(const proto::SubjectOnDiskTrialHeader& proto);
@@ -345,12 +379,21 @@ protected:
   std::vector<std::string> mTrialTags;
   std::vector<std::shared_ptr<SubjectOnDiskTrialPass>> mTrialPasses;
   std::vector<MissingGRFReason> mMissingGRFReason;
+  std::vector<bool> mHasManualGRFAnnotation;
   // This is true if we guessed the marker names, and false if we got them from
   // the uploaded user's file, which implies that they got them from human
   // observations.
   bool mMarkerNamesGuessed;
   std::string mOriginalTrialName;
   int mSplitIndex;
+
+  int mOriginalTrialStartFrame;
+  int mOriginalTrialEndFrame;
+  s_t mOriginalTrialStartTime;
+  s_t mOriginalTrialEndTime;
+
+  BasicTrialType mBasicTrialType;
+  std::vector<DetectedTrialFeature> mDetectedTrialFeatures;
 
   ///////////////////////////////////////////////////////////////////////////
   // Recovered proto summaries, for incremental loading of Frames
@@ -420,10 +463,14 @@ public:
   SubjectOnDiskHeader& setSubjectTags(std::vector<std::string> subjectTags);
   SubjectOnDiskHeader& setHref(const std::string& sourceHref);
   SubjectOnDiskHeader& setNotes(const std::string& notes);
+  SubjectOnDiskHeader& setQuality(DataQuality quality);
+  DataQuality getQuality();
   std::shared_ptr<SubjectOnDiskPassHeader> addProcessingPass();
   std::vector<std::shared_ptr<SubjectOnDiskPassHeader>> getProcessingPasses();
   std::shared_ptr<SubjectOnDiskTrial> addTrial();
   std::vector<std::shared_ptr<SubjectOnDiskTrial>> getTrials();
+  void filterTrials(std::vector<bool> keepTrials);
+  void trimToProcessingPasses(int numPasses);
   void setTrials(std::vector<std::shared_ptr<SubjectOnDiskTrial>> trials);
   void recomputeColumnNames();
   void write(dart::proto::SubjectOnDiskHeader* proto);
@@ -477,6 +524,9 @@ protected:
   // This is exoskeleton data
   std::vector<int> mExoDofIndices;
 
+  // This is the user supplied quality of the data
+  DataQuality mDataQuality;
+
   friend class SubjectOnDisk;
   friend struct Frame;
   friend struct FramePass;
@@ -497,6 +547,8 @@ class SubjectOnDisk
 public:
   SubjectOnDisk(const std::string& path);
 
+  SubjectOnDisk(std::shared_ptr<SubjectOnDiskHeader> header);
+
   /// This will write a B3D file to disk
   static void writeB3D(
       const std::string& path, std::shared_ptr<SubjectOnDiskHeader> header);
@@ -504,6 +556,8 @@ public:
   /// This loads all the frames of data, and fills in the processing pass data
   /// matrices in the proto header classes.
   void loadAllFrames(bool doNotStandardizeForcePlateData = false);
+
+  bool hasLoadedAllFrames();
 
   /// This returns the raw proto header for this subject, which can be used to
   /// write out a new B3D file
@@ -587,6 +641,9 @@ public:
   /// This returns the vector of enums of type 'MissingGRFReason', which can
   /// include `notMissingGRF`.
   std::vector<MissingGRFReason> getMissingGRF(int trial);
+
+  /// This returns the user supplied enum of type 'DataQuality'
+  DataQuality getQuality();
 
   int getNumProcessingPasses();
 

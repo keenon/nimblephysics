@@ -26,24 +26,25 @@ dart_add_test("comprehensive" test_SpringGradient)
 
 # target_link_libraries(test_Gradients dart-collision-bullet)
 # target_link_libraries(test_Gradients dart-collision-ode)
-
 if(TARGET dart-optimizer-pagmo)
   dart_add_test("comprehensive" test_MultiObjectiveOptimization)
   target_link_libraries(test_MultiObjectiveOptimization dart-optimizer-pagmo)
 endif()
 
 dart_add_test("comprehensive" test_Raycast)
+
 if(TARGET dart-collision-bullet)
   target_link_libraries(test_Raycast dart-collision-bullet)
 endif()
 
 if(TARGET dart-utils)
-
   dart_add_test("comprehensive" test_Collision)
   target_link_libraries(test_Collision dart-utils)
+
   if(TARGET dart-collision-bullet)
     target_link_libraries(test_Collision dart-collision-bullet)
   endif()
+
   if(TARGET dart-collision-ode)
     target_link_libraries(test_Collision dart-collision-ode)
   endif()
@@ -70,6 +71,7 @@ if(TARGET dart-utils)
 
   dart_add_test("comprehensive" test_World)
   target_link_libraries(test_World dart-utils)
+
   if(TARGET dart-collision-bullet)
     target_link_libraries(test_World dart-collision-bullet)
   endif()
@@ -96,7 +98,6 @@ if(TARGET dart-utils)
     dart_add_test("comprehensive" test_ParallelPosAndVel)
     target_link_libraries(test_ParallelPosAndVel dart-utils-urdf)
   endif()
-
 endif()
 
 dart_format_add(

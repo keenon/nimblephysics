@@ -13,6 +13,8 @@ jobs:
     name: Ubuntu CI
     runs-on: ubuntu-latest
     container: keenon/diffdart:test_base
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2

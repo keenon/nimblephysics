@@ -1949,6 +1949,44 @@ class MarkerLabellerMock(MarkerLabeller):
     def setMockJointLocations(self, jointsOverTime: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     pass
 class MarkerTrace():
+    def appendPoint(self, time: int, point: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None: 
+        """
+        Add a point to the end of the marker trace
+        """
+    def computeBodyMarkerLoss(self, bodyName: str) -> float: 
+        """
+        Each possible combination of (trace, body) can create a marker. This returns a score for a given body, for how "good" of a marker that body would create when combined with this trace. Lower is better.
+        """
+    def computeBodyMarkerStats(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, posesOverTime: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], scalesOverTime: typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None: 
+        """
+        Each possible combination of (trace, body) can create a marker. So we can compute some summary statistics for each body we could assign this trace to.
+        """
+    def concat(self, toAppend: MarkerTrace) -> MarkerTrace: 
+        """
+        This merges two MarkerTrace's together, to create a new trace object
+        """
+    @staticmethod
+    def createRawTraces(pointClouds: typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]], mergeDistance: float = 0.01, mergeFrames: int = 5) -> typing.List[MarkerTrace]: ...
+    def firstTimestep(self) -> int: 
+        """
+        This returns when this MarkerTrace begins (inclusive)
+        """
+    def getBestMarker(self) -> typing.Tuple[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]: 
+        """
+        This finds the best body to pair this trace with (using the stats from computeBodyMarkerStats()) and returns the best marker
+        """
+    def lastTimestep(self) -> int: 
+        """
+        This returns when this MarkerTrace ends (inclusive)
+        """
+    def overlap(self, toAppend: MarkerTrace) -> bool: 
+        """
+        Returns true if these traces overlap in time
+        """
+    def pointToAppendDistance(self, time: int, point: numpy.ndarray[numpy.float64, _Shape[3, 1]], extrapolate: bool) -> float: 
+        """
+        This gives the distance from the last point (or an extrapolation at this timestep of the last point, of order up to 2)
+        """
     @property
     def bodyClosestPointDistance(self) -> typing.Dict[str, float]:
         """
@@ -2182,6 +2220,22 @@ class OpenSimFile():
     def markersMap(self, arg0: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None:
         pass
     @property
+    def meshMap(self) -> typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]:
+        """
+        :type: typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]
+        """
+    @meshMap.setter
+    def meshMap(self, arg0: typing.Dict[str, typing.Tuple[str, nimblephysics_libs._nimblephysics.math.Isometry3]]) -> None:
+        pass
+    @property
+    def meshScaleMap(self) -> typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]:
+        """
+        :type: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]
+        """
+    @meshScaleMap.setter
+    def meshScaleMap(self, arg0: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]) -> None:
+        pass
+    @property
     def skeleton(self) -> nimblephysics_libs._nimblephysics.dynamics.Skeleton:
         """
         :type: nimblephysics_libs._nimblephysics.dynamics.Skeleton
@@ -2343,6 +2397,8 @@ class ProcessingPassType():
       DYNAMICS : This is the pass where we solve for dynamics.
 
       LOW_PASS_FILTER : This is the pass where we apply a low-pass filter to the kinematics and dynamics.
+
+      ACC_MINIMIZING_FILTER : This is the pass where we apply an acceleration minimizing filter to the kinematics and dynamics.
     """
     def __eq__(self, other: object) -> bool: ...
     def __getstate__(self) -> int: ...
@@ -2363,14 +2419,28 @@ class ProcessingPassType():
         """
         :type: int
         """
+    ACC_MINIMIZING_FILTER: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.ACC_MINIMIZING_FILTER: 3>
     DYNAMICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.DYNAMICS: 1>
     KINEMATICS: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.KINEMATICS: 0>
     LOW_PASS_FILTER: nimblephysics_libs._nimblephysics.biomechanics.ProcessingPassType # value = <ProcessingPassType.LOW_PASS_FILTER: 2>
-    __members__: dict # value = {'KINEMATICS': <ProcessingPassType.KINEMATICS: 0>, 'DYNAMICS': <ProcessingPassType.DYNAMICS: 1>, 'LOW_PASS_FILTER': <ProcessingPassType.LOW_PASS_FILTER: 2>}
+    __members__: dict # value = {'KINEMATICS': <ProcessingPassType.KINEMATICS: 0>, 'DYNAMICS': <ProcessingPassType.DYNAMICS: 1>, 'LOW_PASS_FILTER': <ProcessingPassType.LOW_PASS_FILTER: 2>, 'ACC_MINIMIZING_FILTER': <ProcessingPassType.ACC_MINIMIZING_FILTER: 3>}
     pass
 class ResidualForceHelper():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, forceBodies: typing.List[int]) -> None: ...
+    def calculateCOMAngularResidual(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: 
+        """
+        This computes the residual at the root, then transforms that to the COM and expresses the torque as a spatial vector (even if the root joint uses euler coordinates for rotation).
+        """
+    def calculateComToCenterAngularResiduals(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]: 
+        """
+        This computes the location that we would need to move the COM to in order to center the angular residuals. Moving the COM to the computed location doesn't remove angular residuals, but ensures that any remaining residuals are parallel to the net external force on the body.
+        """
+    def calculateInverseDynamics(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
     def calculateResidual(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]: ...
+    def calculateResidualFreeRootAcceleration(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]: 
+        """
+        This computes the acceleration we would need at the root in order to remove all residual forces.
+        """
     def calculateResidualJacobianWrt(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]], wrt: nimblephysics_libs._nimblephysics.neural.WithRespectTo) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def calculateResidualNorm(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]], torquesMultiple: float, useL1: bool = False) -> float: ...
     def calculateResidualNormGradientWrt(self, q: numpy.ndarray[numpy.float64, _Shape[m, 1]], dq: numpy.ndarray[numpy.float64, _Shape[m, 1]], ddq: numpy.ndarray[numpy.float64, _Shape[m, 1]], forcesConcat: numpy.ndarray[numpy.float64, _Shape[m, 1]], wrt: nimblephysics_libs._nimblephysics.neural.WithRespectTo, torquesMultiple: float, useL1: bool = False) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: ...
@@ -2653,6 +2723,10 @@ class SubjectOnDisk():
         """
         This returns the timestep size for the trial requested, in seconds per frame
         """
+    def hasLoadedAllFrames(self) -> bool: 
+        """
+        This returns true if all the frames have been loaded into memory.
+        """
     def loadAllFrames(self, doNotStandardizeForcePlateData: bool = False) -> None: 
         """
         This loads all the frames of data, and fills in the processing pass data matrices in the proto header classes.
@@ -2695,6 +2769,7 @@ class SubjectOnDiskHeader():
     def setNumJoints(self, joints: int) -> SubjectOnDiskHeader: ...
     def setSubjectTags(self, subjectTags: typing.List[str]) -> SubjectOnDiskHeader: ...
     def setTrials(self, trials: typing.List[SubjectOnDiskTrial]) -> None: ...
+    def trimToProcessingPasses(self, numPasses: int) -> None: ...
     pass
 class SubjectOnDiskPassHeader():
     def __init__(self) -> None: ...
@@ -2733,6 +2808,7 @@ class SubjectOnDiskTrial():
     pass
 class SubjectOnDiskTrialPass():
     def __init__(self) -> None: ...
+    def computeKinematicValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], rootHistoryLen: int = 5, rootHistoryStride: int = 1, explicitVels: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), explicitAccs: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64)) -> None: ...
     def computeValues(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forces: numpy.ndarray[numpy.float64, _Shape[m, n]], moments: numpy.ndarray[numpy.float64, _Shape[m, n]], cops: numpy.ndarray[numpy.float64, _Shape[m, n]], rootHistoryLen: int = 5, rootHistoryStride: int = 1) -> None: ...
     def computeValuesFromForcePlates(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton, timestep: float, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], footBodyNames: typing.List[str], forcePlates: typing.List[ForcePlate], rootHistoryLen: int = 5, rootHistoryStride: int = 1, explicitVels: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), explicitAccs: numpy.ndarray[numpy.float64, _Shape[m, n]] = array([], shape=(0, 0), dtype=float64), forcePlateZeroThresholdNewtons: float = 3.0) -> None: ...
     def copyValuesFrom(self, other: SubjectOnDiskTrialPass) -> None: ...
@@ -2760,6 +2836,8 @@ class SubjectOnDiskTrialPass():
     def getRootSpatialVelInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getTaus(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getVels(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def setAccelerationMinimizingForceRegularization(self, reg: float) -> None: ...
+    def setAccelerationMinimizingRegularization(self, reg: float) -> None: ...
     def setAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     def setAngularResidual(self, angularResidual: typing.List[float]) -> None: ...
     def setComAccs(self, accs: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...

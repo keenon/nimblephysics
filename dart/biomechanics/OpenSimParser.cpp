@@ -4851,6 +4851,7 @@ Eigen::Vector3s readAttachedGeometry(
     dynamics::BodyNode* childBody,
     Eigen::Isometry3s relativeT,
     const std::string fileNameForErrorDisplay,
+    OpenSimFile& file,
     const std::string geometryFolder,
     const common::ResourceRetrieverPtr& geometryRetriever,
     bool ignoreGeometry)
@@ -4885,6 +4886,19 @@ Eigen::Vector3s readAttachedGeometry(
       numScales++;
     }
 
+    Eigen::Isometry3s localT = Eigen::Isometry3s::Identity();
+    tinyxml2::XMLElement* transformElem
+        = meshCursor->FirstChildElement("transform");
+    if (transformElem != nullptr)
+    {
+      Eigen::Vector6s transformVec = readVec6(transformElem);
+      localT.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
+      localT.translation() = transformVec.tail<3>();
+    }
+    file.meshMap[mesh_file]
+        = std::make_pair(childBody->getName(), relativeT * localT);
+    file.meshScaleMap[mesh_file] = scale;
+
     if (!ignoreGeometry)
     {
       common::Uri meshUri = common::Uri::createFromRelativeUri(
@@ -4902,16 +4916,6 @@ Eigen::Vector3s readAttachedGeometry(
           dynamics::ShapeNode* meshShapeNode
               = childBody->createShapeNodeWith<dynamics::VisualAspect>(
                   meshShape);
-
-          Eigen::Isometry3s localT = Eigen::Isometry3s::Identity();
-          tinyxml2::XMLElement* transformElem
-              = meshCursor->FirstChildElement("transform");
-          if (transformElem != nullptr)
-          {
-            Eigen::Vector6s transformVec = readVec6(transformElem);
-            localT.linear() = math::eulerXYZToMatrix(transformVec.head<3>());
-            localT.translation() = transformVec.tail<3>();
-          }
 
           meshShapeNode->setRelativeTransform(relativeT * localT);
 
@@ -4954,6 +4958,7 @@ std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s> createJoint(
     Eigen::Isometry3s transformFromParent,
     Eigen::Isometry3s transformFromChild,
     const std::string fileNameForErrorDisplay,
+    OpenSimFile& file,
     const std::string geometryFolder,
     const common::ResourceRetrieverPtr& geometryRetriever,
     bool ignoreGeometry)
@@ -5922,6 +5927,9 @@ std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s> createJoint(
             numScalesCounted++;
           }
 
+          file.meshMap[mesh_file] = std::make_pair(bodyName, transform);
+          file.meshScaleMap[mesh_file] = scale;
+
           if (!ignoreGeometry)
           {
             common::Uri meshUri = common::Uri::createFromRelativeUri(
@@ -5989,6 +5997,7 @@ std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s> createJoint(
             childBody,
             relativeT,
             fileNameForErrorDisplay,
+            file,
             geometryFolder,
             geometryRetriever,
             ignoreGeometry);
@@ -6007,6 +6016,7 @@ std::tuple<dynamics::Joint*, dynamics::BodyNode*, Eigen::Vector3s> createJoint(
         childBody,
         Eigen::Isometry3s::Identity(),
         fileNameForErrorDisplay,
+        file,
         geometryFolder,
         geometryRetriever,
         ignoreGeometry);
@@ -6195,6 +6205,7 @@ OpenSimFile OpenSimParser::readOsim30(
             transformFromParent,
             transformFromChild,
             fileNameForErrorDisplay,
+            file,
             geometryFolder,
             geometryRetriever,
             ignoreGeometry);
@@ -6390,6 +6401,7 @@ void recursiveCreateJoint(
       joint->fromParent,
       joint->fromChild,
       fileNameForErrorDisplay,
+      file,
       geometryFolder,
       geometryRetriever,
       ignoreGeometry);

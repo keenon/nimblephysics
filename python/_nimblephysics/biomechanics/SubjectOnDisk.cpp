@@ -43,7 +43,72 @@ void SubjectOnDisk(py::module& m)
                 "LOW_PASS_FILTER",
                 dart::biomechanics::ProcessingPassType::lowPassFilter,
                 "This is the pass where we apply a low-pass filter to the "
-                "kinematics and dynamics.");
+                "kinematics and dynamics.")
+            .value(
+                "ACC_MINIMIZING_FILTER",
+                dart::biomechanics::ProcessingPassType::accMinimizingFilter,
+                "This is the pass where we apply an acceleration minimizing "
+                "filter to the kinematics and dynamics.");
+
+  auto basicTrialType
+      = ::py::enum_<dart::biomechanics::BasicTrialType>(m, "BasicTrialType")
+            .value(
+                "TREADMILL",
+                dart::biomechanics::BasicTrialType::treadmill,
+                "This is a trial where the subject is walking or "
+                "running on a treadmill.")
+            .value(
+                "OVERGROUND",
+                dart::biomechanics::BasicTrialType::overground,
+                "This is a trial where the subject is walking or "
+                "running overground.")
+            .value(
+                "STATIC_TRIAL",
+                dart::biomechanics::BasicTrialType::staticTrial,
+                "This is a trial where the subject is standing "
+                "still.")
+            .value(
+                "OTHER",
+                dart::biomechanics::BasicTrialType::other,
+                "This is a trial that doesn't fit into any of the "
+                "other categories.");
+
+  auto dataQuality
+      = ::py::enum_<dart::biomechanics::DataQuality>(m, "DataQuality")
+            .value(
+                "PILOT_DATA",
+                dart::biomechanics::DataQuality::pilotData,
+                "This is data that was collected as part of a pilot study.")
+            .value(
+                "EXPERIMENTAL_DATA",
+                dart::biomechanics::DataQuality::experimentalData,
+                "This is data that was collected as part of an experiment.")
+            .value(
+                "INTERNET_DATA",
+                dart::biomechanics::DataQuality::internetData,
+                "This is data that was collected from the internet.");
+
+  auto detectedTrialFeature
+      = ::py::enum_<dart::biomechanics::DetectedTrialFeature>(
+            m, "DetectedTrialFeature")
+            .value(
+                "WALKING",
+                dart::biomechanics::DetectedTrialFeature::walking,
+                "This is a trial where the subject is walking.")
+            .value(
+                "RUNNING",
+                dart::biomechanics::DetectedTrialFeature::running,
+                "This is a trial where the subject is running.")
+            .value(
+                "UNEVEN_TERRAIN",
+                dart::biomechanics::DetectedTrialFeature::unevenTerrain,
+                "This is a trial where the subject is walking or "
+                "running on uneven terrain.")
+            .value(
+                "FLAT_TERRAIN",
+                dart::biomechanics::DetectedTrialFeature::flatTerrain,
+                "This is a trial where the subject is walking or "
+                "running on flat terrain.");
 
   auto framePass
       = ::py::class_<
@@ -529,6 +594,8 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::setType,
                 ::py::arg("type"))
             .def(
+                "getType", &dart::biomechanics::SubjectOnDiskTrialPass::getType)
+            .def(
                 "setDofPositionsObserved",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setDofPositionsObserved,
@@ -572,6 +639,16 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrialPass::
                     setForcePlateCutoffs,
                 ::py::arg("cutoffs"))
+            .def(
+                "setAccelerationMinimizingRegularization",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setAccelerationMinimizingRegularization,
+                ::py::arg("reg"))
+            .def(
+                "setAccelerationMinimizingForceRegularization",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    setAccelerationMinimizingForceRegularization,
+                ::py::arg("reg"))
             .def(
                 "computeValues",
                 &dart::biomechanics::SubjectOnDiskTrialPass::computeValues,
@@ -783,7 +860,11 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getResamplingMatrix",
                 &dart::biomechanics::SubjectOnDiskTrialPass::
-                    getResamplingMatrix);
+                    getResamplingMatrix)
+            .def(
+                "getProcessedForcePlates",
+                &dart::biomechanics::SubjectOnDiskTrialPass::
+                    getProcessedForcePlates);
 
   auto subjectOnDiskTrial
       = ::py::class_<
@@ -803,6 +884,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getTimestep",
                 &dart::biomechanics::SubjectOnDiskTrial::getTimestep)
             .def(
+                "setTrialLength",
+                &dart::biomechanics::SubjectOnDiskTrial::setTrialLength,
+                ::py::arg("length"))
+            .def(
+                "getTrialLength",
+                &dart::biomechanics::SubjectOnDiskTrial::getTrialLength)
+            .def(
                 "setTrialTags",
                 &dart::biomechanics::SubjectOnDiskTrial::setTrialTags,
                 ::py::arg("trialTags"))
@@ -821,12 +909,57 @@ Note that these are specified in the local body frame, acting on the body at its
                 "getSplitIndex",
                 &dart::biomechanics::SubjectOnDiskTrial::getSplitIndex)
             .def(
+                "setOriginalTrialStartFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialStartFrame,
+                ::py::arg("startFrame"))
+            .def(
+                "getOriginalTrialStartFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialStartFrame)
+            .def(
+                "setOriginalTrialEndFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialEndFrame,
+                ::py::arg("endFrame"))
+            .def(
+                "getOriginalTrialEndFrame",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialEndFrame)
+            .def(
+                "setOriginalTrialStartTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialStartTime,
+                ::py::arg("startTime"))
+            .def(
+                "getOriginalTrialStartTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialStartTime)
+            .def(
+                "setOriginalTrialEndTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setOriginalTrialEndTime,
+                ::py::arg("endTime"))
+            .def(
+                "getOriginalTrialEndTime",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getOriginalTrialEndTime)
+            .def(
                 "setMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::setMissingGRFReason,
                 ::py::arg("missingGRFReason"))
             .def(
                 "getMissingGRFReason",
                 &dart::biomechanics::SubjectOnDiskTrial::getMissingGRFReason)
+            .def(
+                "setHasManualGRFAnnotation",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setHasManualGRFAnnotation,
+                ::py::arg("hasManualGRFAnnotation"))
+            .def(
+                "getHasManualGRFAnnotation",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getHasManualGRFAnnotation)
             .def(
                 "setCustomValues",
                 &dart::biomechanics::SubjectOnDiskTrial::setCustomValues,
@@ -865,6 +998,22 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getForcePlates",
                 &dart::biomechanics::SubjectOnDiskTrial::getForcePlates)
+            .def(
+                "setBasicTrialType",
+                &dart::biomechanics::SubjectOnDiskTrial::setBasicTrialType,
+                ::py::arg("type"))
+            .def(
+                "getBasicTrialType",
+                &dart::biomechanics::SubjectOnDiskTrial::getBasicTrialType)
+            .def(
+                "setDetectedTrialFeatures",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    setDetectedTrialFeatures,
+                ::py::arg("features"))
+            .def(
+                "getDetectedTrialFeatures",
+                &dart::biomechanics::SubjectOnDiskTrial::
+                    getDetectedTrialFeatures)
             .def(
                 "addPass",
                 &dart::biomechanics::SubjectOnDiskTrial::addPass,
@@ -956,6 +1105,13 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskHeader::setNotes,
                 ::py::arg("notes"))
             .def(
+                "setQuality",
+                &dart::biomechanics::SubjectOnDiskHeader::setQuality,
+                ::py::arg("quality"))
+            .def(
+                "getQuality",
+                &dart::biomechanics::SubjectOnDiskHeader::getQuality)
+            .def(
                 "addProcessingPass",
                 &dart::biomechanics::SubjectOnDiskHeader::addProcessingPass)
             .def(
@@ -965,6 +1121,15 @@ Note that these are specified in the local body frame, acting on the body at its
             .def(
                 "getTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::getTrials)
+            .def(
+                "filterTrials",
+                &dart::biomechanics::SubjectOnDiskHeader::filterTrials,
+                ::py::arg("keepTrials"))
+            .def(
+                "trimToProcessingPasses",
+                &dart::biomechanics::SubjectOnDiskHeader::
+                    trimToProcessingPasses,
+                ::py::arg("numPasses"))
             .def(
                 "setTrials",
                 &dart::biomechanics::SubjectOnDiskHeader::setTrials,
@@ -980,6 +1145,11 @@ Note that these are specified in the local body frame, acting on the body at its
             m, "SubjectOnDisk")
             //   SubjectOnDisk(const std::string& path);
             .def(::py::init<std::string>(), ::py::arg("path"))
+            //   SubjectOnDisk(const std::string& path);
+            .def(
+                ::py::init<
+                    std::shared_ptr<dart::biomechanics::SubjectOnDiskHeader>>(),
+                ::py::arg("header"))
             //   /// This will write a B3D file to disk
             //   static void writeB3D(const std::string& path,
             //   SubjectOnDiskHeader& header);
@@ -999,6 +1169,11 @@ Note that these are specified in the local body frame, acting on the body at its
                 ::py::arg("doNotStandardizeForcePlateData") = false,
                 "This loads all the frames of data, and fills in the "
                 "processing pass data matrices in the proto header classes.")
+            .def(
+                "hasLoadedAllFrames",
+                &dart::biomechanics::SubjectOnDisk::hasLoadedAllFrames,
+                "This returns true if all the frames have been loaded into "
+                "memory.")
             .def(
                 "getHeaderProto",
                 &dart::biomechanics::SubjectOnDisk::getHeaderProto,
@@ -1170,6 +1345,11 @@ Note that these are specified in the local body frame, acting on the body at its
             This method is provided to give a cheaper way to filter out frames we want to ignore for training, without having to call
             the more expensive :code:`loadFrames()` and examine frames individually.
           )doc")
+            .def(
+                "getQuality",
+                &dart::biomechanics::SubjectOnDisk::getQuality,
+                "This returns the user-supplied quality of the data in this "
+                "subject")
             //   int getNumProcessingPasses();
             .def(
                 "getNumProcessingPasses",

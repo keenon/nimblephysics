@@ -43,7 +43,8 @@ namespace python {
 void eigen_geometry(py::module& m);
 
 void dart_common(py::module& m);
-void dart_math(py::module& m);
+py::module dart_math(py::module& m);
+void dart_euler_math(py::module& m);
 void dart_dynamics(py::module& m);
 void dart_collision(py::module& m);
 void dart_constraint(py::module& m);
@@ -71,9 +72,10 @@ PYBIND11_MODULE(_nimblephysics, m)
   eigen_geometry(m);
 
   dart_common(m);
-  dart_math(m);
+  py::module math_module = dart_math(m);
   dart_performance(m);
   dart_dynamics(m);
+  dart_euler_math(math_module);
   dart_collision(m);
   dart_constraint(m);
   dart_simulation_and_neural(m, neural, withRespectTo);

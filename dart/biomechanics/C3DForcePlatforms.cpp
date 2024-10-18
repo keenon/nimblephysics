@@ -58,24 +58,40 @@ void ForcePlatform::extractUnits(const ezc3d::c3d& c3d)
       c3d.parameters().group("FORCE_PLATFORM"));
 
   // Position units
-  if (groupPoint.isParameter("UNITS")
-      && groupPoint.parameter("UNITS").dimension()[0] > 0)
+  try
   {
-    _unitsPosition = groupPoint.parameter("UNITS").valuesAsString()[0];
+    if (groupPoint.isParameter("UNITS")
+        && groupPoint.parameter("UNITS").dimension()[0] > 0)
+    {
+      _unitsPosition = groupPoint.parameter("UNITS").valuesAsString()[0];
+    }
+    else
+    {
+      // Assume meter if not provided
+      _unitsPosition = "m";
+    }
   }
-  else
+  catch (const std::exception& e)
   {
     // Assume meter if not provided
     _unitsPosition = "m";
   }
 
   // Force units
-  if (groupFP.isParameter("UNITS")
-      && groupFP.parameter("UNITS").dimension()[0] > 0)
+  try
   {
-    _unitsForce = groupFP.parameter("UNITS").valuesAsString()[0];
+    if (groupFP.isParameter("UNITS")
+        && groupFP.parameter("UNITS").dimension()[0] > 0)
+    {
+      _unitsForce = groupFP.parameter("UNITS").valuesAsString()[0];
+    }
+    else
+    {
+      // Assume Newton if not provided
+      _unitsForce = "N";
+    }
   }
-  else
+  catch (const std::exception& e)
   {
     // Assume Newton if not provided
     _unitsForce = "N";
@@ -500,12 +516,16 @@ void ForcePlatform::extractDataWithConvention(
         assert(!_M[cmp].hasNaN());
 
         Eigen::Vector3s CoP_raw = Eigen::Vector3s(
-            moment_raw(1) == 0 ? 0 : -moment_raw(1) / force_raw(2), moment_raw(0) == 0 ? 0 : moment_raw(0) / force_raw(2), 0);
+            moment_raw(1) == 0 ? 0 : -moment_raw(1) / force_raw(2),
+            moment_raw(0) == 0 ? 0 : moment_raw(0) / force_raw(2),
+            0);
         // Avoid NaNs in the CoP data
-        if (moment_raw(1) != 0 && force_raw(2) == 0) {
+        if (moment_raw(1) != 0 && force_raw(2) == 0)
+        {
           CoP_raw(0) = 0;
         }
-        if (moment_raw(0) != 0 && force_raw(2) == 0) {
+        if (moment_raw(0) != 0 && force_raw(2) == 0)
+        {
           CoP_raw(1) = 0;
         }
         Eigen::Vector3s originNoVertical = _origin;
