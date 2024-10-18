@@ -61,7 +61,7 @@ rm -rf libccd
 # Install ASSIMP
 git clone https://github.com/assimp/assimp.git
 pushd assimp
-git checkout v5.0.1
+git checkout v5.4.3
 mkdir build
 pushd build
 cmake ..
