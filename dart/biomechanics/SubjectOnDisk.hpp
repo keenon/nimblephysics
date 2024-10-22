@@ -328,6 +328,7 @@ class SubjectOnDiskTrial
 public:
   SubjectOnDiskTrial();
   void setName(const std::string& name);
+  const std::string& getName() const;
   void setTimestep(s_t timestep);
   s_t getTimestep();
   void setTrialLength(int length);
