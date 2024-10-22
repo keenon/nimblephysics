@@ -877,6 +877,9 @@ Note that these are specified in the local body frame, acting on the body at its
                 &dart::biomechanics::SubjectOnDiskTrial::setName,
                 ::py::arg("name"))
             .def(
+                "getName",
+                &dart::biomechanics::SubjectOnDiskTrial::getName)
+            .def(
                 "setTimestep",
                 &dart::biomechanics::SubjectOnDiskTrial::setTimestep,
                 ::py::arg("timestep"))
