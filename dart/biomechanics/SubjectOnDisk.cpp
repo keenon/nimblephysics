@@ -3215,6 +3215,11 @@ void SubjectOnDiskTrial::setName(const std::string& name)
   mName = name;
 }
 
+const std::string& SubjectOnDiskTrial::getName() const
+{
+  return mName;
+}
+
 void SubjectOnDiskTrial::setTimestep(s_t timestep)
 {
   mTimestep = timestep;
