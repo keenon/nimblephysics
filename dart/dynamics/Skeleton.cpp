@@ -2528,6 +2528,8 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
   Eigen::Vector3s minVertex = Eigen::Vector3s::Zero();
   dynamics::BodyNode* minBodyNode = nullptr;
 
+  int numMeshes = 0;
+  int numVertices = 0;
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
     dynamics::BodyNode* node = getBodyNode(i);
@@ -2539,8 +2541,20 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
       {
         dynamics::MeshShape* mesh
             = static_cast<dynamics::MeshShape*>(shape.get());
+        Eigen::Vector3s scale = mesh->getScale();
+        if (!isfinite(scale[0]) || !isfinite(scale[1]) || !isfinite(scale[2]))
+        {
+          std::cout << "WARNING: getHeight() found a mesh with a non-finite "
+                       "scale, attached to body node "
+                    << node->getName()
+                    << ". This means that the skeleton is in an invalid state. Exiting..."
+                    << std::endl;
+      throw std::runtime_error("getHeight() computed a height of 0");
+        }
+        numMeshes++;
         for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
+          numVertices++;
           Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
@@ -2576,7 +2590,24 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
 
   setPositions(originalPose);
 
+  if (numMeshes == 0 || numVertices == 0)
+  {
+    std::cout << "WARNING: getHeight() found no mesh shapes in the Skeleton, "
+                 "or only empty mesh shapes with no vertices. numMeshes="
+              << numMeshes << ", numVertices=" << numVertices
+              << ". "
+                 "Exiting..."
+              << std::endl;
+    throw std::runtime_error("getHeight() computed a height of 0");
+  }
+
   s_t height = 0;
+  if (!isfinite(maxUp) || !isfinite(minUp))
+  {
+    std::cout << "ERROR: getHeight() computed a bad value. maxUp=" << maxUp
+              << ", minUp=" << minUp << ". Exiting..." << std::endl;
+    throw std::runtime_error("getHeight() computed a height of 0");
+  }
   if (isfinite(maxUp) && isfinite(minUp))
   {
     height = maxUp - minUp;

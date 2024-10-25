@@ -782,6 +782,16 @@ std::shared_ptr<dynamics::Skeleton> SubjectOnDisk::readSkel(
     geometryFolder = common::Uri::createFromRelativeUri(mPath, "./Geometry/")
                          .getFilesystemPath();
   }
+  if (passNumberToLoad == -1)
+  {
+    passNumberToLoad = mHeader->mPasses.size() - 1;
+  }
+  if (passNumberToLoad >= mHeader->mPasses.size() || passNumberToLoad < 0)
+  {
+    std::cout << "SubjectOnDisk::readSkel() called with invalid pass number: "
+              << passNumberToLoad << std::endl;
+    return nullptr;
+  }
 
   tinyxml2::XMLDocument osimFile;
   osimFile.Parse(mHeader->mPasses[passNumberToLoad]->mOpenSimFileText.c_str());

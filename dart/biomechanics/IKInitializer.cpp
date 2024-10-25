@@ -720,6 +720,8 @@ s_t IKInitializer::prescaleBasedOnAnatomicalMarkers(bool logOutput)
       defaultScale = mModelHeightM / defaultHeight;
     }
   }
+  std::cout << "[IKInitializer] Default body node scale is " << defaultScale
+            << std::endl;
   mSkel->setBodyScales(originalBodyScales);
 
   for (auto& stackedBody : mStackedBodies)
@@ -827,6 +829,8 @@ s_t IKInitializer::prescaleBasedOnAnatomicalMarkers(bool logOutput)
         pairDistancesWithWeights,
         defaultScale,
         logOutput);
+    std::cout << "Prescaling body \"" << stackedBody->name << "\" by "
+              << scale.transpose() << std::endl;
 
     // Now we scale the body
     for (auto& body : stackedBody->bodies)
@@ -2186,6 +2190,9 @@ void IKInitializer::estimateGroupScalesClosedForm(bool log)
       defaultScale = mModelHeightM / defaultHeight;
     }
   }
+  std::cout
+      << "[IKInitializer::estimateGroupScalesClosedForm()] Default scale: "
+      << defaultScale << std::endl;
 
   // 1. Find a scale for all the bodies that we can
   std::map<std::string, Eigen::Vector3s> bodyScales;
@@ -2334,10 +2341,35 @@ void IKInitializer::estimateGroupScalesClosedForm(bool log)
       throw std::runtime_error(
           "Scale has NaN inside IKInitializer::estimateGroupScalesClosedForm!");
     }
+    if (scale.norm() < 1e-6)
+    {
+      std::cout << "Scale is zero inside "
+                   "IKInitializer::estimateGroupScalesClosedForm!"
+                << std::endl;
+      throw std::runtime_error(
+          "Scale is zero inside IKInitializer::estimateGroupScalesClosedForm!");
+    }
+    if (scale.norm() > 10.0)
+    {
+      std::cout << "Scale is huge (" << scale.transpose()
+                << ") inside "
+                   "inside IKInitializer::estimateGroupScalesClosedForm for "
+                   "body nodes: "
+                << std::endl;
+      for (dynamics::BodyNode* body : bodyNode->bodies)
+      {
+        std::cout << "  " << body->getName() << std::endl;
+      }
+      throw std::runtime_error(
+          "Scale is huge inside IKInitializer::estimateGroupScalesClosedForm!");
+    }
 
     // 1.5. Apply that scale to all the bodies in this stacked body
     for (dynamics::BodyNode* body : bodyNode->bodies)
     {
+      std::cout
+          << "[IKInitializer::estimateGroupScalesClosedForm()] Setting scale "
+          << scale.transpose() << " for body " << body->getName() << std::endl;
       body->setScale(scale);
     }
   }

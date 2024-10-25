@@ -488,14 +488,21 @@ void BodyNode::setScale(Eigen::Vector3s newScale, bool silentlyClamp)
 {
   for (int i = 0; i < 3; i++)
   {
+    if (!isfinite(newScale(i)))
+    {
+      std::cout << "BodyNode " << getName() << " refusing to setScale("
+                << newScale(i) << ", axis=" << i << ") because " << newScale(i)
+                << " is not finite." << std::endl;
+      return;
+    }
     if (newScale(i) < mScaleLowerBound(i))
     {
       // Don't warn if it's close, or if we're explicitly silent
       if (newScale(i) < mScaleLowerBound(i) - 0.001 && !silentlyClamp)
       {
-        std::cout << "BodyNode refusing to setScale(" << newScale(i)
-                  << ", axis=" << i << ") because " << newScale(i)
-                  << " is less than the scale lower bound ("
+        std::cout << "BodyNode " << getName() << " refusing to setScale("
+                  << newScale(i) << ", axis=" << i << ") because "
+                  << newScale(i) << " is less than the scale lower bound ("
                   << mScaleLowerBound(i) << "). Clamping to lower bound."
                   << std::endl;
       }
@@ -506,8 +513,8 @@ void BodyNode::setScale(Eigen::Vector3s newScale, bool silentlyClamp)
       // Don't warn if it's close, or if we're explicitly silent
       if (newScale(i) > mScaleUpperBound(i) + 0.001 && !silentlyClamp)
       {
-        std::cout << "BodyNode refusing to setScale(" << newScale
-                  << ", axis=" << i << ") because " << newScale
+        std::cout << "BodyNode " << getName() << " refusing to setScale("
+                  << newScale << ", axis=" << i << ") because " << newScale
                   << " is greater than the scale upper bound ("
                   << mScaleUpperBound << "). Clamping to upper bound."
                   << std::endl;
@@ -557,7 +564,8 @@ void BodyNode::setScale(Eigen::Vector3s newScale, bool silentlyClamp)
     {
       if (ratio(0) != ratio(1) || ratio(1) != ratio(2))
       {
-        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+        std::cout << "WARNING: BodyNode " << getName()
+                  << " attempting to setScale(" << newScale
                   << ") but we're scaling an attached sphere shape, which "
                      "can't skew. Scaling by X-axis, arbitrarily."
                   << std::endl;
@@ -569,7 +577,8 @@ void BodyNode::setScale(Eigen::Vector3s newScale, bool silentlyClamp)
     {
       if (ratio(0) != ratio(2))
       {
-        std::cout << "WARNING: BodyNode attempting to setScale(" << newScale
+        std::cout << "WARNING: BodyNode " << getName()
+                  << " attempting to setScale(" << newScale
                   << ") but we're scaling an attached capsule shape, which "
                      "can't skew by a different X and Z. Scaling radius by "
                      "X-axis, height by Y-axis."
