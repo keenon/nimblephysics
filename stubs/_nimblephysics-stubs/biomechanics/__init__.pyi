@@ -11,12 +11,16 @@ _Shape = typing.Tuple[int, ...]
 
 __all__ = [
     "Anthropometrics",
+    "BasicTrialType",
     "BatchGaitInverseDynamics",
+    "Beam",
     "BilevelFitResult",
     "C3D",
     "C3DLoader",
     "ContactRegimeSection",
     "CortexStreaming",
+    "DataQuality",
+    "DetectedTrialFeature",
     "DynamicsFitProblemConfig",
     "DynamicsFitter",
     "DynamicsInitialization",
@@ -30,16 +34,19 @@ __all__ = [
     "InitialMarkerFitParams",
     "LabelledMarkers",
     "LilypadSolver",
+    "MarkerBeamSearch",
     "MarkerFitter",
     "MarkerFitterState",
     "MarkerFixer",
     "MarkerInitialization",
     "MarkerLabeller",
     "MarkerLabellerMock",
+    "MarkerMultiBeamSearch",
     "MarkerTrace",
     "MarkersErrorReport",
     "MissingGRFReason",
     "MissingGRFStatus",
+    "MultiBeam",
     "NeuralMarkerLabeller",
     "OpenSimFile",
     "OpenSimMocoTrajectory",
@@ -58,8 +65,13 @@ __all__ = [
     "SubjectOnDiskPassHeader",
     "SubjectOnDiskTrial",
     "SubjectOnDiskTrialPass",
+    "TraceHead",
+    "copOutsideConvexFootError",
+    "extendedToNearestPeakForce",
     "footContactDetectedButNoForce",
     "forceDiscrepancy",
+    "hasInputOutliers",
+    "hasNoForcePlateData",
     "interpolatedClippedGRF",
     "manualReview",
     "measuredGrfZeroWhenAccelerationNonZero",
@@ -69,10 +81,13 @@ __all__ = [
     "notMissingGRF",
     "notOverForcePlate",
     "shiftGRF",
+    "tooHighMarkerRMS",
     "torqueDiscrepancy",
     "unknown",
     "unmeasuredExternalForceDetected",
-    "yes"
+    "velocitiesStillTooHighAfterFiltering",
+    "yes",
+    "zeroForceFrame"
 ]
 
 
@@ -91,6 +106,43 @@ class Anthropometrics():
     def measure(self, skel: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> typing.Dict[str, float]: ...
     def setDistribution(self, dist: nimblephysics_libs._nimblephysics.math.MultivariateGaussian) -> None: ...
     pass
+class BasicTrialType():
+    """
+    Members:
+
+      TREADMILL : This is a trial where the subject is walking or running on a treadmill.
+
+      OVERGROUND : This is a trial where the subject is walking or running overground.
+
+      STATIC_TRIAL : This is a trial where the subject is standing still.
+
+      OTHER : This is a trial that doesn't fit into any of the other categories.
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    OTHER: nimblephysics_libs._nimblephysics.biomechanics.BasicTrialType # value = <BasicTrialType.OTHER: 3>
+    OVERGROUND: nimblephysics_libs._nimblephysics.biomechanics.BasicTrialType # value = <BasicTrialType.OVERGROUND: 1>
+    STATIC_TRIAL: nimblephysics_libs._nimblephysics.biomechanics.BasicTrialType # value = <BasicTrialType.STATIC_TRIAL: 2>
+    TREADMILL: nimblephysics_libs._nimblephysics.biomechanics.BasicTrialType # value = <BasicTrialType.TREADMILL: 0>
+    __members__: dict # value = {'TREADMILL': <BasicTrialType.TREADMILL: 0>, 'OVERGROUND': <BasicTrialType.OVERGROUND: 1>, 'STATIC_TRIAL': <BasicTrialType.STATIC_TRIAL: 2>, 'OTHER': <BasicTrialType.OTHER: 3>}
+    pass
 class BatchGaitInverseDynamics():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, poses: numpy.ndarray[numpy.float64, _Shape[m, n]], groundContactBodies: typing.List[nimblephysics_libs._nimblephysics.dynamics.BodyNode], groundNormal: numpy.ndarray[numpy.float64, _Shape[3, 1]], tileSize: float, maxSectionLength: int = 100, smoothingWeight: float = 1.0, minTorqueWeight: float = 1.0, prevContactWeight: float = 0.1, blendWeight: float = 1.0, blendSteepness: float = 10.0) -> None: ...
     def debugLilypadToGUI(self, gui: nimblephysics_libs._nimblephysics.server.GUIWebsocketServer) -> None: ...
@@ -99,6 +151,44 @@ class BatchGaitInverseDynamics():
     def getContactWrenchesAtTimestep(self, timestep: int) -> typing.List[numpy.ndarray[numpy.float64, _Shape[6, 1]]]: ...
     def getSectionForTimestep(self, timestep: int) -> ContactRegimeSection: ...
     def numTimesteps(self) -> int: ...
+    pass
+class Beam():
+    def __init__(self, label: str, cost: float, observed_this_timestep: bool, last_observed_point: numpy.ndarray[numpy.float64, _Shape[3, 1]], last_observed_timestamp: float, last_observed_velocity: numpy.ndarray[numpy.float64, _Shape[3, 1]], parent: Beam) -> None: ...
+    @property
+    def cost(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def label(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def last_observed_point(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @property
+    def last_observed_timestamp(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def last_observed_velocity(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @property
+    def observed_this_timestep(self) -> bool:
+        """
+        :type: bool
+        """
+    @property
+    def parent(self) -> Beam:
+        """
+        :type: Beam
+        """
     pass
 class BilevelFitResult():
     @property
@@ -288,6 +378,77 @@ class CortexStreaming():
         """
         This starts a UDP server that mimicks the Cortex API, so we can test locally without having to run Cortex. This is an alternative to connect(), and cannot run in the same process as connect().
         """
+    pass
+class DataQuality():
+    """
+    Members:
+
+      PILOT_DATA : This is data that was collected as part of a pilot study.
+
+      EXPERIMENTAL_DATA : This is data that was collected as part of an experiment.
+
+      INTERNET_DATA : This is data that was collected from the internet.
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    EXPERIMENTAL_DATA: nimblephysics_libs._nimblephysics.biomechanics.DataQuality # value = <DataQuality.EXPERIMENTAL_DATA: 1>
+    INTERNET_DATA: nimblephysics_libs._nimblephysics.biomechanics.DataQuality # value = <DataQuality.INTERNET_DATA: 2>
+    PILOT_DATA: nimblephysics_libs._nimblephysics.biomechanics.DataQuality # value = <DataQuality.PILOT_DATA: 0>
+    __members__: dict # value = {'PILOT_DATA': <DataQuality.PILOT_DATA: 0>, 'EXPERIMENTAL_DATA': <DataQuality.EXPERIMENTAL_DATA: 1>, 'INTERNET_DATA': <DataQuality.INTERNET_DATA: 2>}
+    pass
+class DetectedTrialFeature():
+    """
+    Members:
+
+      WALKING : This is a trial where the subject is walking.
+
+      RUNNING : This is a trial where the subject is running.
+
+      UNEVEN_TERRAIN : This is a trial where the subject is walking or running on uneven terrain.
+
+      FLAT_TERRAIN : This is a trial where the subject is walking or running on flat terrain.
+    """
+    def __eq__(self, other: object) -> bool: ...
+    def __getstate__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __index__(self) -> int: ...
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str: ...
+    def __setstate__(self, state: int) -> None: ...
+    @property
+    def name(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def value(self) -> int:
+        """
+        :type: int
+        """
+    FLAT_TERRAIN: nimblephysics_libs._nimblephysics.biomechanics.DetectedTrialFeature # value = <DetectedTrialFeature.FLAT_TERRAIN: 3>
+    RUNNING: nimblephysics_libs._nimblephysics.biomechanics.DetectedTrialFeature # value = <DetectedTrialFeature.RUNNING: 1>
+    UNEVEN_TERRAIN: nimblephysics_libs._nimblephysics.biomechanics.DetectedTrialFeature # value = <DetectedTrialFeature.UNEVEN_TERRAIN: 2>
+    WALKING: nimblephysics_libs._nimblephysics.biomechanics.DetectedTrialFeature # value = <DetectedTrialFeature.WALKING: 0>
+    __members__: dict # value = {'WALKING': <DetectedTrialFeature.WALKING: 0>, 'RUNNING': <DetectedTrialFeature.RUNNING: 1>, 'UNEVEN_TERRAIN': <DetectedTrialFeature.UNEVEN_TERRAIN: 2>, 'FLAT_TERRAIN': <DetectedTrialFeature.FLAT_TERRAIN: 3>}
     pass
 class DynamicsFitProblemConfig():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton) -> None: ...
@@ -1624,6 +1785,20 @@ class LilypadSolver():
     def setVerticalAccelerationThreshold(self, threshold: float) -> None: ...
     def setVerticalVelThreshold(self, threshold: float) -> None: ...
     pass
+class MarkerBeamSearch():
+    def __init__(self, seed_point: numpy.ndarray[numpy.float64, _Shape[3, 1]], seed_timestamp: float, seed_label: str, vel_threshold: float = 7.0, acc_threshold: float = 2000.0) -> None: ...
+    @staticmethod
+    def convert_to_trace(beam: Beam) -> typing.Tuple[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], typing.List[float], str]: ...
+    def make_next_generation(self, markers: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: float) -> None: ...
+    def prune_beams(self, beam_width: int) -> None: ...
+    @staticmethod
+    def search(label: str, marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], timestamps: typing.List[float], beam_width: int = 20, vel_threshold: float = 7.0, acc_threshold: float = 2000.0) -> typing.Tuple[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], typing.List[float], str]: ...
+    @property
+    def beams(self) -> typing.List[Beam]:
+        """
+        :type: typing.List[Beam]
+        """
+    pass
 class MarkerFitter():
     def __init__(self, skeleton: nimblephysics_libs._nimblephysics.dynamics.Skeleton, markers: typing.Dict[str, typing.Tuple[nimblephysics_libs._nimblephysics.dynamics.BodyNode, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], ignoreVirtualJointCenterMarkers: bool = False) -> None: ...
     def addZeroConstraint(self, name: str, loss: typing.Callable[[MarkerFitterState], float]) -> None: ...
@@ -1948,6 +2123,30 @@ class MarkerLabellerMock(MarkerLabeller):
     def __init__(self) -> None: ...
     def setMockJointLocations(self, jointsOverTime: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     pass
+class MarkerMultiBeamSearch():
+    def __init__(self, seed_points: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], seed_labels: typing.List[str], seed_timestamp: float, vel_threshold: float = 7.0, acc_threshold: float = 2000.0) -> None: ...
+    @staticmethod
+    def convert_to_traces(beam: MultiBeam) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], typing.List[float]]: ...
+    def make_next_generation(self, markers: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: float, trace_head_to_attach: int) -> None: ...
+    def prune_beams(self, beam_width: int) -> None: ...
+    @staticmethod
+    def search(labels: typing.List[str], marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], timestamps: typing.List[float], beam_width: int = 20, vel_threshold: float = 7.0, acc_threshold: float = 1000.0, print_interval: int = 1000, crystalize_interval: int = 1000) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], typing.List[float]]: ...
+    @property
+    def acc_threshold(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def beams(self) -> typing.List[MultiBeam]:
+        """
+        :type: typing.List[MultiBeam]
+        """
+    @property
+    def vel_threshold(self) -> float:
+        """
+        :type: float
+        """
+    pass
 class MarkerTrace():
     def appendPoint(self, time: int, point: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> None: 
         """
@@ -2106,6 +2305,20 @@ class MissingGRFReason():
       manualReview
 
       footContactDetectedButNoForce
+
+      tooHighMarkerRMS
+
+      hasInputOutliers
+
+      hasNoForcePlateData
+
+      velocitiesStillTooHighAfterFiltering
+
+      copOutsideConvexFootError
+
+      zeroForceFrame
+
+      extendedToNearestPeakForce
     """
     def __eq__(self, other: object) -> bool: ...
     def __getstate__(self) -> int: ...
@@ -2126,9 +2339,13 @@ class MissingGRFReason():
         """
         :type: int
         """
-    __members__: dict # value = {'notMissingGRF': <MissingGRFReason.notMissingGRF: 0>, 'measuredGrfZeroWhenAccelerationNonZero': <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>, 'unmeasuredExternalForceDetected': <MissingGRFReason.unmeasuredExternalForceDetected: 2>, 'torqueDiscrepancy': <MissingGRFReason.torqueDiscrepancy: 4>, 'forceDiscrepancy': <MissingGRFReason.forceDiscrepancy: 5>, 'notOverForcePlate': <MissingGRFReason.notOverForcePlate: 6>, 'missingImpact': <MissingGRFReason.missingImpact: 7>, 'missingBlip': <MissingGRFReason.missingBlip: 8>, 'shiftGRF': <MissingGRFReason.shiftGRF: 9>, 'interpolatedClippedGRF': <MissingGRFReason.interpolatedClippedGRF: 11>, 'manualReview': <MissingGRFReason.manualReview: 10>, 'footContactDetectedButNoForce': <MissingGRFReason.footContactDetectedButNoForce: 3>}
+    __members__: dict # value = {'notMissingGRF': <MissingGRFReason.notMissingGRF: 0>, 'measuredGrfZeroWhenAccelerationNonZero': <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>, 'unmeasuredExternalForceDetected': <MissingGRFReason.unmeasuredExternalForceDetected: 2>, 'torqueDiscrepancy': <MissingGRFReason.torqueDiscrepancy: 4>, 'forceDiscrepancy': <MissingGRFReason.forceDiscrepancy: 5>, 'notOverForcePlate': <MissingGRFReason.notOverForcePlate: 6>, 'missingImpact': <MissingGRFReason.missingImpact: 7>, 'missingBlip': <MissingGRFReason.missingBlip: 8>, 'shiftGRF': <MissingGRFReason.shiftGRF: 9>, 'interpolatedClippedGRF': <MissingGRFReason.interpolatedClippedGRF: 11>, 'manualReview': <MissingGRFReason.manualReview: 10>, 'footContactDetectedButNoForce': <MissingGRFReason.footContactDetectedButNoForce: 3>, 'tooHighMarkerRMS': <MissingGRFReason.tooHighMarkerRMS: 12>, 'hasInputOutliers': <MissingGRFReason.hasInputOutliers: 13>, 'hasNoForcePlateData': <MissingGRFReason.hasNoForcePlateData: 14>, 'velocitiesStillTooHighAfterFiltering': <MissingGRFReason.velocitiesStillTooHighAfterFiltering: 15>, 'copOutsideConvexFootError': <MissingGRFReason.copOutsideConvexFootError: 16>, 'zeroForceFrame': <MissingGRFReason.zeroForceFrame: 17>, 'extendedToNearestPeakForce': <MissingGRFReason.extendedToNearestPeakForce: 18>}
+    copOutsideConvexFootError: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.copOutsideConvexFootError: 16>
+    extendedToNearestPeakForce: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.extendedToNearestPeakForce: 18>
     footContactDetectedButNoForce: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.footContactDetectedButNoForce: 3>
     forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 5>
+    hasInputOutliers: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.hasInputOutliers: 13>
+    hasNoForcePlateData: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.hasNoForcePlateData: 14>
     interpolatedClippedGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.interpolatedClippedGRF: 11>
     manualReview: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.manualReview: 10>
     measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
@@ -2137,8 +2354,11 @@ class MissingGRFReason():
     notMissingGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notMissingGRF: 0>
     notOverForcePlate: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notOverForcePlate: 6>
     shiftGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.shiftGRF: 9>
+    tooHighMarkerRMS: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.tooHighMarkerRMS: 12>
     torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 4>
     unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
+    velocitiesStillTooHighAfterFiltering: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.velocitiesStillTooHighAfterFiltering: 15>
+    zeroForceFrame: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.zeroForceFrame: 17>
     pass
 class MissingGRFStatus():
     """
@@ -2173,6 +2393,25 @@ class MissingGRFStatus():
     no: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.no: 0>
     unknown: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.unknown: 1>
     yes: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.yes: 2>
+    pass
+class MultiBeam():
+    def __init__(self, cost: float, trace_heads: typing.List[TraceHead], timestep_used_markers: typing.Set[str]) -> None: ...
+    def get_child_trace_heads(self, trace_head: TraceHead, index: int) -> typing.List[TraceHead]: ...
+    @property
+    def cost(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def timestep_used_markers(self) -> typing.Set[str]:
+        """
+        :type: typing.Set[str]
+        """
+    @property
+    def trace_heads(self) -> typing.List[TraceHead]:
+        """
+        :type: typing.List[TraceHead]
+        """
     pass
 class NeuralMarkerLabeller(MarkerLabeller):
     def __init__(self, jointCenterPredictor: typing.Callable[[typing.List[typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]]]], typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]]) -> None: ...
@@ -2560,7 +2799,10 @@ class SubjectOnDisk():
     until asked for. That way we can instantiate thousands of these in memory,
     and not worry about OOM'ing a machine.
     """
+    @typing.overload
     def __init__(self, path: str) -> None: ...
+    @typing.overload
+    def __init__(self, header: SubjectOnDiskHeader) -> None: ...
     def getAgeYears(self) -> int: 
         """
         This returns the age of the subject, or 0 if unknown.
@@ -2671,6 +2913,10 @@ class SubjectOnDisk():
         """
         This returns the type of processing pass at a given index, up to the number of processing passes that were done
         """
+    def getQuality(self) -> DataQuality: 
+        """
+        This returns the user-supplied quality of the data in this subject
+        """
     def getSubjectTags(self) -> typing.List[str]: 
         """
         This returns the list of tags attached to this subject, which are arbitrary strings from the AddBiomechanics platform.
@@ -2754,7 +3000,9 @@ class SubjectOnDiskHeader():
     def __init__(self) -> None: ...
     def addProcessingPass(self) -> SubjectOnDiskPassHeader: ...
     def addTrial(self) -> SubjectOnDiskTrial: ...
+    def filterTrials(self, keepTrials: typing.List[bool]) -> None: ...
     def getProcessingPasses(self) -> typing.List[SubjectOnDiskPassHeader]: ...
+    def getQuality(self) -> DataQuality: ...
     def getTrials(self) -> typing.List[SubjectOnDiskTrial]: ...
     def recomputeColumnNames(self) -> None: ...
     def setAgeYears(self, ageYears: int) -> SubjectOnDiskHeader: ...
@@ -2767,6 +3015,7 @@ class SubjectOnDiskHeader():
     def setNotes(self, notes: str) -> SubjectOnDiskHeader: ...
     def setNumDofs(self, dofs: int) -> SubjectOnDiskHeader: ...
     def setNumJoints(self, joints: int) -> SubjectOnDiskHeader: ...
+    def setQuality(self, quality: DataQuality) -> SubjectOnDiskHeader: ...
     def setSubjectTags(self, subjectTags: typing.List[str]) -> SubjectOnDiskHeader: ...
     def setTrials(self, trials: typing.List[SubjectOnDiskTrial]) -> None: ...
     def trimToProcessingPasses(self, numPasses: int) -> None: ...
@@ -2784,26 +3033,43 @@ class SubjectOnDiskTrial():
         """
         This creates a new :code:`SubjectOnDiskTrialPass` for this trial, and returns it. That object can store results from IK and ID, as well as other results from the processing pipeline.
         """
+    def getBasicTrialType(self) -> BasicTrialType: ...
+    def getDetectedTrialFeatures(self) -> typing.List[DetectedTrialFeature]: ...
     def getForcePlates(self) -> typing.List[ForcePlate]: ...
+    def getHasManualGRFAnnotation(self) -> typing.List[bool]: ...
     def getMarkerObservations(self) -> typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]: ...
     def getMissingGRFReason(self) -> typing.List[MissingGRFReason]: ...
+    def getName(self) -> str: ...
+    def getOriginalTrialEndFrame(self) -> int: ...
+    def getOriginalTrialEndTime(self) -> float: ...
     def getOriginalTrialName(self) -> str: ...
+    def getOriginalTrialStartFrame(self) -> int: ...
+    def getOriginalTrialStartTime(self) -> float: ...
     def getPasses(self) -> typing.List[SubjectOnDiskTrialPass]: ...
     def getSplitIndex(self) -> int: ...
     def getTimestep(self) -> float: ...
+    def getTrialLength(self) -> int: ...
     def setAccObservations(self, accObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def setBasicTrialType(self, type: BasicTrialType) -> None: ...
     def setCustomValues(self, customValues: typing.List[numpy.ndarray[numpy.float64, _Shape[m, n]]]) -> None: ...
+    def setDetectedTrialFeatures(self, features: typing.List[DetectedTrialFeature]) -> None: ...
     def setEmgObservations(self, emgObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]]) -> None: ...
     def setExoTorques(self, exoTorques: typing.Dict[int, numpy.ndarray[numpy.float64, _Shape[m, 1]]]) -> None: ...
     def setForcePlates(self, forcePlates: typing.List[ForcePlate]) -> None: ...
     def setGyroObservations(self, gyroObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
+    def setHasManualGRFAnnotation(self, hasManualGRFAnnotation: typing.List[bool]) -> None: ...
     def setMarkerNamesGuessed(self, markersGuessed: bool) -> None: ...
     def setMarkerObservations(self, markerObservations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     def setMissingGRFReason(self, missingGRFReason: typing.List[MissingGRFReason]) -> None: ...
     def setName(self, name: str) -> None: ...
+    def setOriginalTrialEndFrame(self, endFrame: int) -> None: ...
+    def setOriginalTrialEndTime(self, endTime: float) -> None: ...
     def setOriginalTrialName(self, name: str) -> None: ...
+    def setOriginalTrialStartFrame(self, startFrame: int) -> None: ...
+    def setOriginalTrialStartTime(self, startTime: float) -> None: ...
     def setSplitIndex(self, split: int) -> None: ...
     def setTimestep(self, timestep: float) -> None: ...
+    def setTrialLength(self, length: int) -> None: ...
     def setTrialTags(self, trialTags: typing.List[str]) -> None: ...
     pass
 class SubjectOnDiskTrialPass():
@@ -2828,6 +3094,7 @@ class SubjectOnDiskTrialPass():
     def getMarkerMax(self) -> typing.List[float]: ...
     def getMarkerRMS(self) -> typing.List[float]: ...
     def getPoses(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getProcessedForcePlates(self) -> typing.List[ForcePlate]: ...
     def getResamplingMatrix(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getResidualWrenchInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getRootEulerHistoryInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
@@ -2835,6 +3102,7 @@ class SubjectOnDiskTrialPass():
     def getRootSpatialAccInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getRootSpatialVelInRootFrame(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def getTaus(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
+    def getType(self) -> ProcessingPassType: ...
     def getVels(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: ...
     def setAccelerationMinimizingForceRegularization(self, reg: float) -> None: ...
     def setAccelerationMinimizingRegularization(self, reg: float) -> None: ...
@@ -2870,8 +3138,45 @@ class SubjectOnDiskTrialPass():
     def setType(self, type: ProcessingPassType) -> None: ...
     def setVels(self, vels: numpy.ndarray[numpy.float64, _Shape[m, n]]) -> None: ...
     pass
+class TraceHead():
+    def __init__(self, label: str, observed_this_timestep: bool, last_observed_point: numpy.ndarray[numpy.float64, _Shape[3, 1]], last_observed_timestamp: float, last_observed_velocity: numpy.ndarray[numpy.float64, _Shape[3, 1]], parent: TraceHead = None) -> None: ...
+    @property
+    def label(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def last_observed_point(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @property
+    def last_observed_timestamp(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def last_observed_velocity(self) -> numpy.ndarray[numpy.float64, _Shape[3, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[3, 1]]
+        """
+    @property
+    def observed_this_timestep(self) -> bool:
+        """
+        :type: bool
+        """
+    @property
+    def parent(self) -> std::__1::weak_ptr<dart::biomechanics::TraceHead>:
+        """
+        :type: std::__1::weak_ptr<dart::biomechanics::TraceHead>
+        """
+    pass
+copOutsideConvexFootError: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.copOutsideConvexFootError: 16>
+extendedToNearestPeakForce: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.extendedToNearestPeakForce: 18>
 footContactDetectedButNoForce: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.footContactDetectedButNoForce: 3>
 forceDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.forceDiscrepancy: 5>
+hasInputOutliers: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.hasInputOutliers: 13>
+hasNoForcePlateData: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.hasNoForcePlateData: 14>
 interpolatedClippedGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.interpolatedClippedGRF: 11>
 manualReview: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.manualReview: 10>
 measuredGrfZeroWhenAccelerationNonZero: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.measuredGrfZeroWhenAccelerationNonZero: 1>
@@ -2881,7 +3186,10 @@ no: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <M
 notMissingGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notMissingGRF: 0>
 notOverForcePlate: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.notOverForcePlate: 6>
 shiftGRF: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.shiftGRF: 9>
+tooHighMarkerRMS: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.tooHighMarkerRMS: 12>
 torqueDiscrepancy: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.torqueDiscrepancy: 4>
 unknown: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.unknown: 1>
 unmeasuredExternalForceDetected: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.unmeasuredExternalForceDetected: 2>
+velocitiesStillTooHighAfterFiltering: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.velocitiesStillTooHighAfterFiltering: 15>
 yes: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFStatus # value = <MissingGRFStatus.yes: 2>
+zeroForceFrame: nimblephysics_libs._nimblephysics.biomechanics.MissingGRFReason # value = <MissingGRFReason.zeroForceFrame: 17>
