@@ -17,6 +17,7 @@ TraceHead::TraceHead(
     const Eigen::Vector3d& last_observed_point,
     double last_observed_timestamp,
     const Eigen::Vector3d& last_observed_velocity,
+    Eigen::VectorXd distances_to_other_traces,
     std::shared_ptr<TraceHead> parent)
   : label(label),
     observed_this_timestep(observed_this_timestep),
@@ -25,6 +26,65 @@ TraceHead::TraceHead(
     last_observed_velocity(last_observed_velocity),
     parent(parent)
 {
+  if (parent != nullptr)
+  {
+    if (parent->num_distance_samples > 0)
+    {
+      num_distance_samples = parent->num_distance_samples + 1;
+      Eigen::VectorXd delta
+          = distances_to_other_traces - parent->distances_to_other_traces_mean;
+      distances_to_other_traces_m2
+          = parent->distances_to_other_traces_m2
+            + delta.cwiseProduct(
+                distances_to_other_traces
+                - parent->distances_to_other_traces_mean);
+      distances_to_other_traces_mean = parent->distances_to_other_traces_mean
+                                       + delta / (double)num_distance_samples;
+    }
+    else
+    {
+      num_distance_samples = 1;
+      distances_to_other_traces_mean = distances_to_other_traces;
+      distances_to_other_traces_m2
+          = Eigen::VectorXd::Zero(distances_to_other_traces.size());
+    }
+  }
+  else
+  {
+    num_distance_samples = 1;
+    distances_to_other_traces_mean = distances_to_other_traces;
+    distances_to_other_traces_m2
+        = Eigen::VectorXd::Zero(distances_to_other_traces.size());
+  }
+}
+
+//==============================================================================
+TraceHead::TraceHead(
+    const std::string& label,
+    bool observed_this_timestep,
+    const Eigen::Vector3d& last_observed_point,
+    double last_observed_timestamp,
+    const Eigen::Vector3d& last_observed_velocity,
+    std::shared_ptr<TraceHead> parent)
+  : label(label),
+    observed_this_timestep(observed_this_timestep),
+    last_observed_point(last_observed_point),
+    last_observed_timestamp(last_observed_timestamp),
+    last_observed_velocity(last_observed_velocity),
+    parent(parent)
+{
+  if (parent != nullptr)
+  {
+    num_distance_samples = parent->num_distance_samples;
+    distances_to_other_traces_mean = parent->distances_to_other_traces_mean;
+    distances_to_other_traces_m2 = parent->distances_to_other_traces_m2;
+  }
+  else
+  {
+    num_distance_samples = 0;
+    distances_to_other_traces_mean = Eigen::VectorXd::Zero(0);
+    distances_to_other_traces_m2 = Eigen::VectorXd::Zero(0);
+  }
 }
 
 //==============================================================================
@@ -131,8 +191,54 @@ void MarkerMultiBeamSearch::make_next_generation(
       {
         double acc_mag = acc.norm();
         double cost = beam->cost + vel_mag + acc_mag;
+
+        Eigen::VectorXd distances_to_other_traces
+            = Eigen::VectorXd::Zero(beam->trace_heads.size());
+        for (size_t i = 0; i < beam->trace_heads.size(); ++i)
+        {
+          if (trace_head->num_distance_samples > 100
+              && trace_head->distances_to_other_traces_mean[i] > 0.2)
+          {
+            distances_to_other_traces[i]
+                = trace_head->distances_to_other_traces_mean[i];
+          }
+          else
+          {
+            distances_to_other_traces[i]
+                = (beam->trace_heads[i]->last_observed_point - point).norm();
+          }
+        }
+        if (trace_head->num_distance_samples > 100)
+        {
+          for (int i = 0; i < distances_to_other_traces.size(); ++i)
+          {
+            // Only penalize marker pairs that are closer than 20cm on mean
+            if (trace_head->distances_to_other_traces_mean[i] > 0.2)
+            {
+              continue;
+            }
+            double stddev = std::sqrt(
+                trace_head->distances_to_other_traces_m2[i]
+                / (trace_head->num_distance_samples - 1));
+            double error = std::abs(
+                               distances_to_other_traces[i]
+                               - trace_head->distances_to_other_traces_mean[i])
+                           / stddev;
+            if (error > 2.0)
+            {
+              cost += error * 10000.0;
+            }
+          }
+        }
+
         std::shared_ptr<TraceHead> new_trace_head = std::make_shared<TraceHead>(
-            label, true, point, timestamp, velocity, trace_head);
+            label,
+            true,
+            point,
+            timestamp,
+            velocity,
+            distances_to_other_traces,
+            trace_head);
         std::set<std::string> new_timestep_used_markers = timestep_used_markers;
         new_timestep_used_markers.insert(label);
 

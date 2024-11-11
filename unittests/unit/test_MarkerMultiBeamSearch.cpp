@@ -30,6 +30,8 @@ TEST(MULTI_BEAM_SEARCH, DOES_NOT_CRASH)
 {
   biomechanics::C3D c3d
       = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/Walking000003.c3d");
+  // biomechanics::C3D c3d
+  //     = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/dance1.c3d");
 
   std::vector<std::string> markerNames;
   for (auto& pair : c3d.markerTimesteps[0])
@@ -38,12 +40,12 @@ TEST(MULTI_BEAM_SEARCH, DOES_NOT_CRASH)
   }
 
   std::vector<std::map<std::string, Eigen::Vector3d>> markerTimesteps;
-  for (int i = 0; i < 3000; i++)
+  for (int i = 0; i < std::min<int>(c3d.markerTimesteps.size(), 3000); i++)
   {
     markerTimesteps.push_back(c3d.markerTimesteps[i]);
   }
 
   auto result = MarkerMultiBeamSearch::search(
-      markerNames, markerTimesteps, c3d.timestamps);
+      markerNames, markerTimesteps, c3d.timestamps, 20, 7.0, 1000.0, 1, 100);
 }
 #endif

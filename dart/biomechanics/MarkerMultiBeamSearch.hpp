@@ -5,6 +5,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -22,7 +23,19 @@ public:
   Eigen::Vector3d last_observed_point;
   double last_observed_timestamp;
   Eigen::Vector3d last_observed_velocity;
+  int num_distance_samples;
+  Eigen::VectorXd distances_to_other_traces_mean;
+  Eigen::VectorXd distances_to_other_traces_m2;
   std::weak_ptr<TraceHead> parent;
+
+  TraceHead(
+      const std::string& label,
+      bool observed_this_timestep,
+      const Eigen::Vector3d& last_observed_point,
+      double last_observed_timestamp,
+      const Eigen::Vector3d& last_observed_velocity,
+      Eigen::VectorXd distances_to_other_traces,
+      std::shared_ptr<TraceHead> parent = nullptr);
 
   TraceHead(
       const std::string& label,
