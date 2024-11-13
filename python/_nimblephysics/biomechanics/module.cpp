@@ -59,6 +59,7 @@ void StreamingIK(py::module& sm);
 void StreamingMocapLab(py::module& sm);
 void MarkerBeamSearch(py::module& sm);
 void MarkerMultiBeamSearch(py::module& sm);
+void LinkBeamSearch(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -87,6 +88,7 @@ void dart_biomechanics(py::module& m)
   StreamingMocapLab(sm);
   MarkerBeamSearch(sm);
   MarkerMultiBeamSearch(sm);
+  LinkBeamSearch(sm);
 }
 
 } // namespace python

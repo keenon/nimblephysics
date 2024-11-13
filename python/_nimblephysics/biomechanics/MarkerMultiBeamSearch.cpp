@@ -82,12 +82,14 @@ void MarkerMultiBeamSearch(py::module& m)
               const std::vector<std::string>&,
               double,
               double,
+              double,
               double>(),
           py::arg("seed_points"),
           py::arg("seed_labels"),
           py::arg("seed_timestamp"),
           py::arg("vel_threshold") = 7.0,
-          py::arg("acc_threshold") = 2000.0)
+          py::arg("acc_threshold") = 2000.0,
+          py::arg("acc_scaling") = 0.025)
       .def(
           "make_next_generation",
           &dart::biomechanics::MarkerMultiBeamSearch::make_next_generation,
@@ -118,6 +120,7 @@ void MarkerMultiBeamSearch(py::module& m)
           py::arg("beam_width") = 20,
           py::arg("vel_threshold") = 7.0,
           py::arg("acc_threshold") = 1000.0,
+          py::arg("acc_scaling") = 0.025,
           py::arg("print_interval") = 1000,
           py::arg("crystalize_interval") = 1000);
 }

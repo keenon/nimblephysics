@@ -68,6 +68,7 @@ public:
   std::vector<std::shared_ptr<MultiBeam>> beams;
   double vel_threshold;
   double acc_threshold;
+  double acc_scaling;
 
   // We try to prune the beams as we go, and store the finished marker
   // observations.
@@ -83,7 +84,8 @@ public:
       const std::vector<std::string>& seed_labels,
       double seed_timestamp,
       double vel_threshold = 7.0,
-      double acc_threshold = 2000.0);
+      double acc_threshold = 2000.0,
+      double acc_scaling = 0.025);
 
   void make_next_generation(
       const std::map<std::string, Eigen::Vector3d>& markers,
@@ -110,6 +112,7 @@ public:
       int beam_width = 20,
       double vel_threshold = 7.0,
       double acc_threshold = 1000.0,
+      double acc_scaling = 0.025,
       int print_interval = 1000,
       int crysatilize_interval = 1000);
 };

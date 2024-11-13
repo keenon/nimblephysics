@@ -36,6 +36,7 @@ dart_add_test("unit" test_EnergyAccounting)
 dart_add_test("unit" test_GraphFlowDiscretizer)
 dart_add_test("unit" test_CortexStreaming)
 dart_add_test("unit" test_StreamingMarkerTraces)
+dart_add_test("unit" test_LinkBeamSearch)
 
 if(DART_USE_ARBITRARY_PRECISION)
   dart_add_test("unit" test_MPFR)

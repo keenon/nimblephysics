@@ -116,8 +116,11 @@ MarkerMultiBeamSearch::MarkerMultiBeamSearch(
     const std::vector<std::string>& seed_labels,
     double seed_timestamp,
     double vel_threshold,
-    double acc_threshold)
-  : vel_threshold(vel_threshold), acc_threshold(acc_threshold)
+    double acc_threshold,
+    double acc_scaling)
+  : vel_threshold(vel_threshold),
+    acc_threshold(acc_threshold),
+    acc_scaling(acc_scaling)
 {
   std::vector<std::shared_ptr<TraceHead>> trace_heads;
   for (size_t i = 0; i < seed_points.size(); ++i)
@@ -155,7 +158,8 @@ void MarkerMultiBeamSearch::make_next_generation(
     }
 
     // Option 1: Skip adding a marker
-    double skip_cost = beam->cost + vel_threshold + acc_threshold;
+    double skip_cost
+        = beam->cost + vel_threshold + (acc_threshold * acc_scaling);
     std::shared_ptr<TraceHead> skip_trace_head = std::make_shared<TraceHead>(
         trace_head->label,
         false,
@@ -190,43 +194,53 @@ void MarkerMultiBeamSearch::make_next_generation(
       if (vel_mag < 2 * vel_threshold)
       {
         double acc_mag = acc.norm();
-        double cost = beam->cost + vel_mag + acc_mag;
+        double cost = beam->cost + vel_mag + (acc_mag * acc_scaling);
 
         Eigen::VectorXd distances_to_other_traces
             = Eigen::VectorXd::Zero(beam->trace_heads.size());
         for (size_t i = 0; i < beam->trace_heads.size(); ++i)
         {
-          if (trace_head->num_distance_samples > 100
-              && trace_head->distances_to_other_traces_mean[i] > 0.2)
-          {
-            distances_to_other_traces[i]
-                = trace_head->distances_to_other_traces_mean[i];
-          }
-          else
-          {
-            distances_to_other_traces[i]
-                = (beam->trace_heads[i]->last_observed_point - point).norm();
-          }
+          distances_to_other_traces[i]
+              = (beam->trace_heads[i]->last_observed_point - point).norm();
         }
-        if (trace_head->num_distance_samples > 100)
+        if (trace_head->num_distance_samples > 1000)
         {
           for (int i = 0; i < distances_to_other_traces.size(); ++i)
           {
-            // Only penalize marker pairs that are closer than 20cm on mean
-            if (trace_head->distances_to_other_traces_mean[i] > 0.2)
+            if (i == trace_head_to_attach)
+            {
+              continue;
+            }
+            // Only penalize marker pairs that are closer than 10cm on mean
+            if (trace_head->distances_to_other_traces_mean[i] > 0.1)
             {
               continue;
             }
             double stddev = std::sqrt(
                 trace_head->distances_to_other_traces_m2[i]
                 / (trace_head->num_distance_samples - 1));
+            if (stddev < 0.001)
+            {
+              stddev = 0.001;
+            }
             double error = std::abs(
                                distances_to_other_traces[i]
                                - trace_head->distances_to_other_traces_mean[i])
                            / stddev;
-            if (error > 2.0)
+            if (error > 5.0 && stddev < 0.007)
             {
-              cost += error * 10000.0;
+              // std::cout << "Error: " << error << ", stddev: " << stddev
+              //           << ", mean: "
+              //           << trace_head->distances_to_other_traces_mean[i]
+              //           << ", distance: " << distances_to_other_traces[i]
+              //           << " between next marker " << label << " (on trace "
+              //           << trace_head_to_attach << "=" << trace_head->label
+              //           << " with implied velocity " << vel_mag << ")"
+              //           << " and " << beam->trace_heads[i]->label << " (trace
+              //           "
+              //           << i << ")" << std::endl;
+              // skip_beam = true;
+              cost += error * 1000.0;
             }
           }
         }
@@ -370,6 +384,7 @@ MarkerMultiBeamSearch::search(
     int beam_width,
     double vel_threshold,
     double acc_threshold,
+    double acc_scaling,
     int print_interval,
     int crysatilize_interval)
 {
@@ -413,7 +428,8 @@ MarkerMultiBeamSearch::search(
       labels,
       timestamps[first_observation_index],
       vel_threshold,
-      acc_threshold);
+      acc_threshold,
+      acc_scaling);
   beam_search.past_beams.reserve(marker_observations.size() * labels.size());
 
   for (size_t i = first_observation_index + 1; i < marker_observations.size();
