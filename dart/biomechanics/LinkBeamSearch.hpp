@@ -58,6 +58,11 @@ public:
   double vel_threshold;
   double acc_weight;
   double acc_threshold;
+  // Total durations of different parts of the computation
+  std::chrono::duration<double> pair_distances_cost;
+  std::chrono::duration<double> create_options_cost;
+  std::chrono::duration<double> create_beams_cost;
+  std::chrono::duration<double> prune_beams_cost;
 
   LinkBeamSearch(
       const Eigen::VectorXd& seed_a_point,
@@ -74,7 +79,9 @@ public:
       double acc_threshold = 1000.0);
 
   void make_next_generation(
-      const std::map<std::string, Eigen::VectorXd>& markers, double timestamp);
+      const std::map<std::string, Eigen::VectorXd>& markers,
+      double timestamp,
+      size_t beam_width);
   void prune_beams(size_t beam_width);
 
   static std::tuple<
@@ -101,11 +108,30 @@ public:
       const std::vector<double>& timestamps,
       size_t beam_width = 20,
       double pair_weight = 100.0,
-      double pair_threshold = 0.01,
-      double vel_weight = 1.0,
+      double pair_threshold = 0.001,
+      double vel_weight = 0.1,
       double vel_threshold = 5.0,
-      double acc_weight = 0.01,
-      double acc_threshold = 1000.0);
+      double acc_weight = 0.001,
+      double acc_threshold = 500.0,
+      bool print_updates = true);
+
+  static std::tuple<
+      std::vector<std::map<std::string, Eigen::VectorXd>>,
+      std::vector<double>>
+  process_markers(
+      const std::vector<std::pair<std::string, std::string>>& label_pairs,
+      const std::vector<std::map<std::string, Eigen::VectorXd>>&
+          marker_observations,
+      const std::vector<double>& timestamps,
+      size_t beam_width = 20,
+      double pair_weight = 100.0,
+      double pair_threshold = 0.001,
+      double vel_weight = 0.1,
+      double vel_threshold = 5.0,
+      double acc_weight = 0.001,
+      double acc_threshold = 500.0,
+      bool print_updates = true,
+      bool multithread = true);
 };
 
 } // namespace biomechanics

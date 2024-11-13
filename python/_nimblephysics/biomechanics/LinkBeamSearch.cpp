@@ -3,6 +3,7 @@
 #include <memory>
 
 #include <Eigen/Dense>
+#include <pybind11/cast.h>
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
@@ -97,7 +98,8 @@ void LinkBeamSearch(py::module& m)
           "make_next_generation",
           &LinkBeamSearch::make_next_generation,
           py::arg("markers"),
-          py::arg("timestamp"))
+          py::arg("timestamp"),
+          py::arg("beam_width"))
       .def("prune_beams", &LinkBeamSearch::prune_beams, py::arg("beam_width"))
       .def_readonly("beams", &LinkBeamSearch::beams)
       .def_static(
@@ -118,6 +120,23 @@ void LinkBeamSearch(py::module& m)
           py::arg("vel_threshold") = 5.0,
           py::arg("acc_weight") = 0.01,
           py::arg("acc_threshold") = 1000.0,
+          py::arg("print_updates") = true,
+          py::return_value_policy::automatic)
+      .def_static(
+          "process_markers",
+          &LinkBeamSearch::process_markers,
+          py::arg("label_pairs"),
+          py::arg("marker_observations"),
+          py::arg("timestamps"),
+          py::arg("beam_width") = 20,
+          py::arg("pair_weight") = 100.0,
+          py::arg("pair_threshold") = 0.001,
+          py::arg("vel_weight") = 0.1,
+          py::arg("vel_threshold") = 5.0,
+          py::arg("acc_weight") = 0.001,
+          py::arg("acc_threshold") = 500.0,
+          py::arg("print_updates") = true,
+          py::arg("multithread") = true,
           py::return_value_policy::automatic);
 }
 

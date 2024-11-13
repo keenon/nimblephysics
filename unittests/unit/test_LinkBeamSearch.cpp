@@ -84,7 +84,7 @@ TEST(LinkBeamSearchTest, MakeNextGeneration)
   new_point << 0.5, 0.5, 0.5;
   markers["new"] = new_point;
 
-  beam_search.make_next_generation(markers, 1.0);
+  beam_search.make_next_generation(markers, 1.0, 10);
 
   ASSERT_GT(beam_search.beams.size(), 0);
   for (const auto& beam : beam_search.beams)
