@@ -82,14 +82,6 @@ AccelerationMinimizer::AccelerationMinimizer(
       = Eigen::SparseMatrix<s_t>(accTimesteps + 4 + mTimesteps, mTimesteps);
   mB_sparse.setFromTriplets(tripletList.begin(), tripletList.end());
   mB_sparse.makeCompressed();
-  mB_sparseSolver.analyzePattern(mB_sparse);
-  mB_sparseSolver.factorize(mB_sparse);
-  if (mB_sparseSolver.info() != Eigen::Success)
-  {
-    std::cout << "mB_sparseSolver.factorize(mB_sparse) error: "
-              << mB_sparseSolver.lastErrorMessage() << std::endl;
-  }
-  assert(mB_sparseSolver.info() == Eigen::Success);
 }
 
 Eigen::VectorXs AccelerationMinimizer::minimize(Eigen::VectorXs series)

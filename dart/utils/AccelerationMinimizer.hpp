@@ -43,8 +43,6 @@ protected:
   bool mDebugIterationBackoff;
   s_t mConvergenceTolerance;
   Eigen::SparseMatrix<s_t> mB_sparse;
-  Eigen::SparseQR<Eigen::SparseMatrix<s_t>, Eigen::NaturalOrdering<int>>
-      mB_sparseSolver;
 };
 
 } // namespace utils
