@@ -29,9 +29,7 @@ using namespace biomechanics;
 TEST(MULTI_BEAM_SEARCH, DOES_NOT_CRASH)
 {
   biomechanics::C3D c3d
-      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/Walking000003.c3d");
-  // biomechanics::C3D c3d
-  //     = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/dance1.c3d");
+      = biomechanics::C3DLoader::loadC3D("dart://sample/c3d/cmu_02_05.c3d");
 
   std::vector<std::string> markerNames;
   for (auto& pair : c3d.markerTimesteps[0])
