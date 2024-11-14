@@ -59,7 +59,11 @@ LinkBeamSearch::LinkBeamSearch(
     vel_weight(vel_weight),
     vel_threshold(vel_threshold),
     acc_weight(acc_weight),
-    acc_threshold(acc_threshold)
+    acc_threshold(acc_threshold),
+    pair_distances_cost(0.0),
+    create_options_cost(0.0),
+    create_beams_cost(0.0),
+    prune_beams_cost(0.0)
 {
   beams.emplace_back(std::make_shared<LinkBeam>(
       0.0,
@@ -109,6 +113,8 @@ void LinkBeamSearch::make_next_generation(
   pair_distances_cost += end_pair_distances - start_pair_distances_time;
 
   std::vector<std::shared_ptr<LinkBeam>> new_beams;
+  new_beams.reserve(beam_width + 1);
+
   for (const auto& beam : beams)
   {
     // Store the start time so that we can keep track of where the performance
@@ -124,29 +130,13 @@ void LinkBeamSearch::make_next_generation(
     b_point_options.emplace_back(
         "", vel_threshold * vel_weight + acc_threshold * acc_weight);
 
-    // 1. Consider only points with appropriate distance to other points
-    std::map<std::string, bool> points_valid;
-    for (int i = 0; i < markerLabels.size(); i++)
-    {
-      for (int j = i + 1; j < markerLabels.size(); j++)
-      {
-        double dist = markerPairDistances(i, j);
-        double dist_diff = std::abs(dist - pair_dist);
-        if (dist_diff < pair_threshold * 2)
-        {
-          points_valid[markerLabels.at(i)] = true;
-          points_valid[markerLabels.at(j)] = true;
-        }
-      }
-    }
-
-    // 2. Find the options for the next point for each marker individually
+    // 1. Find the options for the next point for each marker individually
     for (const auto& marker_key_value : markers)
     {
       const std::string& label = marker_key_value.first;
       const Eigen::VectorXd& point = marker_key_value.second;
 
-      bool point_valid = points_valid.find(label) != points_valid.end();
+      // bool point_valid = points_valid.find(label) != points_valid.end();
 
       // For 'a' marker
       Eigen::VectorXd a_velocity
@@ -154,14 +144,11 @@ void LinkBeamSearch::make_next_generation(
             / (timestamp - beam->a_last_observed_timestamp);
       double a_vel_mag = a_velocity.norm();
 
-      if (point_valid || (a_vel_mag < vel_threshold * 2))
-      {
-        Eigen::VectorXd a_acc = (a_velocity - beam->a_last_observed_velocity)
-                                / (timestamp - beam->a_last_observed_timestamp);
-        double a_acc_mag = a_acc.norm();
-        double a_cost = a_vel_mag * vel_weight + a_acc_mag * acc_weight;
-        a_point_options.emplace_back(label, a_cost);
-      }
+      Eigen::VectorXd a_acc = (a_velocity - beam->a_last_observed_velocity)
+                              / (timestamp - beam->a_last_observed_timestamp);
+      double a_acc_mag = a_acc.norm();
+      double a_cost = a_vel_mag * vel_weight + a_acc_mag * acc_weight;
+      a_point_options.emplace_back(label, a_cost);
 
       // For 'b' marker
       Eigen::VectorXd b_velocity
@@ -169,14 +156,11 @@ void LinkBeamSearch::make_next_generation(
             / (timestamp - beam->b_last_observed_timestamp);
       double b_vel_mag = b_velocity.norm();
 
-      if (point_valid || (b_vel_mag < vel_threshold * 2))
-      {
-        Eigen::VectorXd b_acc = (b_velocity - beam->b_last_observed_velocity)
-                                / (timestamp - beam->b_last_observed_timestamp);
-        double b_acc_mag = b_acc.norm();
-        double b_cost = b_vel_mag * vel_weight + b_acc_mag * acc_weight;
-        b_point_options.emplace_back(label, b_cost);
-      }
+      Eigen::VectorXd b_acc = (b_velocity - beam->b_last_observed_velocity)
+                              / (timestamp - beam->b_last_observed_timestamp);
+      double b_acc_mag = b_acc.norm();
+      double b_cost = b_vel_mag * vel_weight + b_acc_mag * acc_weight;
+      b_point_options.emplace_back(label, b_cost);
     }
 
     // Measure the duration of the options creation
@@ -187,9 +171,7 @@ void LinkBeamSearch::make_next_generation(
     // is going
     auto start_create_beams_time = std::chrono::high_resolution_clock::now();
 
-    new_beams.reserve(beam_width + 1);
-
-    // 3. Create new beams for each pair of options
+    // 2. Create new beams for each pair of options
     for (const auto& a_option : a_point_options)
     {
       const std::string& a_label = a_option.first;

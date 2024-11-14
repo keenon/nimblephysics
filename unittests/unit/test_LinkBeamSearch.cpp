@@ -9,7 +9,10 @@ using namespace std;
 using namespace dart;
 using namespace biomechanics;
 
+#define ALL_TESTS
+
 // Test case for LinkBeam
+#ifdef ALL_TESTS
 TEST(LinkBeamTest, ConstructorInitialization)
 {
   Eigen::VectorXd point = Eigen::VectorXd::Zero(3);
@@ -49,8 +52,10 @@ TEST(LinkBeamTest, ConstructorInitialization)
   EXPECT_FALSE(beam.b_observed_this_timestep);
   EXPECT_EQ(beam.parent.lock(), parent);
 }
+#endif
 
 // Test case for LinkBeamSearch constructor
+#ifdef ALL_TESTS
 TEST(LinkBeamSearchTest, ConstructorInitialization)
 {
   Eigen::VectorXd seed_a_point = Eigen::VectorXd::Zero(3);
@@ -65,8 +70,10 @@ TEST(LinkBeamSearchTest, ConstructorInitialization)
   EXPECT_EQ(beam_search.beams[0]->b_label, "B");
   EXPECT_EQ(beam_search.beams[0]->cost, 0.0);
 }
+#endif
 
 // Test case for make_next_generation
+#ifdef ALL_TESTS
 TEST(LinkBeamSearchTest, MakeNextGeneration)
 {
   Eigen::VectorXd seed_a_point(3);
@@ -95,8 +102,10 @@ TEST(LinkBeamSearchTest, MakeNextGeneration)
         || (beam->a_label == "new" && beam->b_label == "B"));
   }
 }
+#endif
 
 // Test case for prune_beams
+#ifdef ALL_TESTS
 TEST(LinkBeamSearchTest, PruneBeams)
 {
   Eigen::VectorXd seed_a_point = Eigen::VectorXd::Zero(3);
@@ -134,8 +143,10 @@ TEST(LinkBeamSearchTest, PruneBeams)
     EXPECT_LE(beam_search.beams[i]->cost, beam_search.beams[i + 1]->cost);
   }
 }
+#endif
 
 // Test case for convert_to_traces
+#ifdef ALL_TESTS
 TEST(LinkBeamSearchTest, ConvertToTraces)
 {
   Eigen::VectorXd point = Eigen::VectorXd::Zero(3);
@@ -170,8 +181,10 @@ TEST(LinkBeamSearchTest, ConvertToTraces)
   EXPECT_EQ(b_timestamps.size(), 1);
   EXPECT_EQ(b_label, "B");
 }
+#endif
 
 // Test case for the full search method
+#ifdef ALL_TESTS
 TEST(LinkBeamSearchTest, FullSearch)
 {
   std::vector<std::map<std::string, Eigen::VectorXd>> marker_observations;
@@ -213,3 +226,49 @@ TEST(LinkBeamSearchTest, FullSearch)
   EXPECT_EQ(b_timestamps.size(), 3);
   EXPECT_EQ(b_label, "B");
 }
+#endif
+
+// Test case for the full search method
+#ifdef ALL_TESTS
+TEST(LinkBeamSearchTest, SearchSkipsSteps)
+{
+  std::vector<std::map<std::string, Eigen::VectorXd>> marker_observations;
+  std::vector<double> timestamps = {0.0, 0.01, 0.02};
+
+  Eigen::VectorXd point_a(3);
+  point_a << 0.0, 0.0, 0.0;
+
+  Eigen::VectorXd point_b(3);
+  point_b << -1.0, -1.0, -1.0;
+
+  std::map<std::string, Eigen::VectorXd> obs1
+      = {{"A", point_a}, {"B", point_b}};
+  std::map<std::string, Eigen::VectorXd> obs2
+      = {{"A", point_a + Eigen::VectorXd::Ones(3)},
+         {"B", point_b - Eigen::VectorXd::Ones(3)}};
+  std::map<std::string, Eigen::VectorXd> obs3
+      = {{"A", point_a + 2 * Eigen::VectorXd::Ones(3)},
+         {"B", point_b - 2 * Eigen::VectorXd::Ones(3)}};
+
+  marker_observations.push_back(obs1);
+  marker_observations.push_back(obs2);
+  marker_observations.push_back(obs3);
+
+  auto result
+      = LinkBeamSearch::search("A", "B", marker_observations, timestamps);
+
+  const auto& a_points = std::get<0>(result);
+  const auto& a_timestamps = std::get<1>(result);
+  const std::string& a_label = std::get<2>(result);
+  const auto& b_points = std::get<3>(result);
+  const auto& b_timestamps = std::get<4>(result);
+  const std::string& b_label = std::get<5>(result);
+
+  EXPECT_EQ(a_points.size(), 1);
+  EXPECT_EQ(a_timestamps.size(), 1);
+  EXPECT_EQ(a_label, "A");
+  EXPECT_EQ(b_points.size(), 1);
+  EXPECT_EQ(b_timestamps.size(), 1);
+  EXPECT_EQ(b_label, "B");
+}
+#endif
