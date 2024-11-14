@@ -1,6 +1,7 @@
 #ifndef LINK_BEAM_H
 #define LINK_BEAM_H
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
