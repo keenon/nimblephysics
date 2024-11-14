@@ -93,6 +93,7 @@ void LinkBeamSearch::make_next_generation(
   Eigen::MatrixXd markerPairDistances
       = Eigen::MatrixXd::Zero(markers.size(), markers.size());
   std::vector<std::string> markerLabels;
+  std::map<std::string, int> markerLabelToIndex;
   for (const auto& marker_key_value : markers)
   {
     markerLabels.push_back(marker_key_value.first);
@@ -100,6 +101,7 @@ void LinkBeamSearch::make_next_generation(
   for (size_t i = 0; i < markers.size(); ++i)
   {
     const Eigen::Vector3d& marker_a = markers.at(markerLabels.at(i));
+    markerLabelToIndex[markerLabels.at(i)] = i;
     for (size_t j = i + 1; j < markers.size(); ++j)
     {
       markerPairDistances(i, j)
@@ -176,6 +178,7 @@ void LinkBeamSearch::make_next_generation(
     {
       const std::string& a_label = a_option.first;
       double a_cost = a_option.second;
+      size_t a_index = a_label.empty() ? 0 : markerLabelToIndex.at(a_label);
 
       for (const auto& b_option : b_point_options)
       {
@@ -186,6 +189,13 @@ void LinkBeamSearch::make_next_generation(
 
         double b_cost = b_option.second;
         double pair_cost = pair_threshold * pair_weight;
+        if (!a_label.empty() && !b_label.empty())
+        {
+          size_t b_index = markerLabelToIndex.at(b_label);
+          pair_cost
+              = std::abs(markerPairDistances(a_index, b_index) - pair_dist)
+                * pair_weight;
+        }
         double total_cost = beam->cost + a_cost + b_cost + pair_cost;
 
         if (new_beams.size() == 0 || total_cost < new_beams.end()[-1]->cost)
@@ -661,7 +671,7 @@ LinkBeamSearch::process_markers(
           [&trace_agreements](
               const std::pair<std::string, Eigen::VectorXd>& a,
               const std::pair<std::string, Eigen::VectorXd>& b) {
-            return trace_agreements.at(a.first) > trace_agreements.at(b.first);
+            return trace_agreements.at(a.first) < trace_agreements.at(b.first);
           });
       trace_map[label] = max_vote->second;
     }

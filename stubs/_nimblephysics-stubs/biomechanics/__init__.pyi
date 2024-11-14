@@ -34,6 +34,8 @@ __all__ = [
     "InitialMarkerFitParams",
     "LabelledMarkers",
     "LilypadSolver",
+    "LinkBeam",
+    "LinkBeamSearch",
     "MarkerBeamSearch",
     "MarkerFitter",
     "MarkerFitterState",
@@ -1785,6 +1787,85 @@ class LilypadSolver():
     def setVerticalAccelerationThreshold(self, threshold: float) -> None: ...
     def setVerticalVelThreshold(self, threshold: float) -> None: ...
     pass
+class LinkBeam():
+    def __init__(self, cost: float, a_label: str, a_observed_this_timestep: bool, a_last_observed_point: numpy.ndarray[numpy.float64, _Shape[m, 1]], a_last_observed_timestamp: float, a_last_observed_velocity: numpy.ndarray[numpy.float64, _Shape[m, 1]], b_label: str, b_observed_this_timestep: bool, b_last_observed_point: numpy.ndarray[numpy.float64, _Shape[m, 1]], b_last_observed_timestamp: float, b_last_observed_velocity: numpy.ndarray[numpy.float64, _Shape[m, 1]], parent: LinkBeam = None) -> None: ...
+    @property
+    def a_label(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def a_last_observed_point(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @property
+    def a_last_observed_timestamp(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def a_last_observed_velocity(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @property
+    def a_observed_this_timestep(self) -> bool:
+        """
+        :type: bool
+        """
+    @property
+    def b_label(self) -> str:
+        """
+        :type: str
+        """
+    @property
+    def b_last_observed_point(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @property
+    def b_last_observed_timestamp(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def b_last_observed_velocity(self) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]:
+        """
+        :type: numpy.ndarray[numpy.float64, _Shape[m, 1]]
+        """
+    @property
+    def b_observed_this_timestep(self) -> bool:
+        """
+        :type: bool
+        """
+    @property
+    def cost(self) -> float:
+        """
+        :type: float
+        """
+    @property
+    def parent(self) -> std::__1::weak_ptr<dart::biomechanics::LinkBeam>:
+        """
+        :type: std::__1::weak_ptr<dart::biomechanics::LinkBeam>
+        """
+    pass
+class LinkBeamSearch():
+    def __init__(self, seed_a_point: numpy.ndarray[numpy.float64, _Shape[m, 1]], seed_a_label: str, seed_b_point: numpy.ndarray[numpy.float64, _Shape[m, 1]], seed_b_label: str, seed_timestamp: float, pair_dist: float, pair_weight: float = 100.0, pair_threshold: float = 0.01, vel_weight: float = 1.0, vel_threshold: float = 5.0, acc_weight: float = 0.01, acc_threshold: float = 1000.0) -> None: ...
+    @staticmethod
+    def convert_to_traces(beam: LinkBeam) -> typing.Tuple[typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], typing.List[float], str, typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], typing.List[float], str]: ...
+    def make_next_generation(self, markers: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]], timestamp: float, beam_width: int) -> None: ...
+    @staticmethod
+    def process_markers(label_pairs: typing.List[typing.Tuple[str, str]], marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]], timestamps: typing.List[float], beam_width: int = 20, pair_weight: float = 100.0, pair_threshold: float = 0.001, vel_weight: float = 0.1, vel_threshold: float = 5.0, acc_weight: float = 0.001, acc_threshold: float = 500.0, print_updates: bool = True) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]], typing.List[float]]: ...
+    def prune_beams(self, beam_width: int) -> None: ...
+    @staticmethod
+    def search(a_label: str, b_label: str, marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[m, 1]]]], timestamps: typing.List[float], beam_width: int = 20, pair_weight: float = 100.0, pair_threshold: float = 0.01, vel_weight: float = 1.0, vel_threshold: float = 5.0, acc_weight: float = 0.01, acc_threshold: float = 1000.0, print_updates: bool = True) -> typing.Tuple[typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], typing.List[float], str, typing.List[numpy.ndarray[numpy.float64, _Shape[m, 1]]], typing.List[float], str]: ...
+    @property
+    def beams(self) -> typing.List[LinkBeam]:
+        """
+        :type: typing.List[LinkBeam]
+        """
+    pass
 class MarkerBeamSearch():
     def __init__(self, seed_point: numpy.ndarray[numpy.float64, _Shape[3, 1]], seed_timestamp: float, seed_label: str, vel_threshold: float = 7.0, acc_threshold: float = 2000.0) -> None: ...
     @staticmethod
@@ -2124,13 +2205,13 @@ class MarkerLabellerMock(MarkerLabeller):
     def setMockJointLocations(self, jointsOverTime: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]]) -> None: ...
     pass
 class MarkerMultiBeamSearch():
-    def __init__(self, seed_points: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], seed_labels: typing.List[str], seed_timestamp: float, vel_threshold: float = 7.0, acc_threshold: float = 2000.0) -> None: ...
+    def __init__(self, seed_points: typing.List[numpy.ndarray[numpy.float64, _Shape[3, 1]]], seed_labels: typing.List[str], seed_timestamp: float, vel_threshold: float = 7.0, acc_threshold: float = 2000.0, acc_scaling: float = 0.025) -> None: ...
     @staticmethod
     def convert_to_traces(beam: MultiBeam) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], typing.List[float]]: ...
     def make_next_generation(self, markers: typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]], timestamp: float, trace_head_to_attach: int) -> None: ...
     def prune_beams(self, beam_width: int) -> None: ...
     @staticmethod
-    def search(labels: typing.List[str], marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], timestamps: typing.List[float], beam_width: int = 20, vel_threshold: float = 7.0, acc_threshold: float = 1000.0, print_interval: int = 1000, crystalize_interval: int = 1000) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], typing.List[float]]: ...
+    def search(labels: typing.List[str], marker_observations: typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], timestamps: typing.List[float], beam_width: int = 20, vel_threshold: float = 7.0, acc_threshold: float = 1000.0, acc_scaling: float = 0.025, print_interval: int = 1000, crystalize_interval: int = 1000) -> typing.Tuple[typing.List[typing.Dict[str, numpy.ndarray[numpy.float64, _Shape[3, 1]]]], typing.List[float]]: ...
     @property
     def acc_threshold(self) -> float:
         """
