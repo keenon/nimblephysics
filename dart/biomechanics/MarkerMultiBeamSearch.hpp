@@ -22,10 +22,8 @@ public:
   bool observed_this_timestep;
   Eigen::Vector3d last_observed_point;
   double last_observed_timestamp;
+  int last_observed_index;
   Eigen::Vector3d last_observed_velocity;
-  int num_distance_samples;
-  Eigen::VectorXd distances_to_other_traces_mean;
-  Eigen::VectorXd distances_to_other_traces_m2;
   std::weak_ptr<TraceHead> parent;
 
   TraceHead(
@@ -33,15 +31,7 @@ public:
       bool observed_this_timestep,
       const Eigen::Vector3d& last_observed_point,
       double last_observed_timestamp,
-      const Eigen::Vector3d& last_observed_velocity,
-      Eigen::VectorXd distances_to_other_traces,
-      std::shared_ptr<TraceHead> parent = nullptr);
-
-  TraceHead(
-      const std::string& label,
-      bool observed_this_timestep,
-      const Eigen::Vector3d& last_observed_point,
-      double last_observed_timestamp,
+      int last_observed_index,
       const Eigen::Vector3d& last_observed_velocity,
       std::shared_ptr<TraceHead> parent = nullptr);
 };
@@ -66,9 +56,14 @@ class MarkerMultiBeamSearch
 {
 public:
   std::vector<std::shared_ptr<MultiBeam>> beams;
+  Eigen::MatrixXd pairwise_distances;
+
+  double pair_weight;
+  double pair_threshold;
+  double vel_weight;
   double vel_threshold;
+  double acc_weight;
   double acc_threshold;
-  double acc_scaling;
 
   // We try to prune the beams as we go, and store the finished marker
   // observations.
@@ -83,14 +78,21 @@ public:
       const std::vector<Eigen::Vector3d>& seed_points,
       const std::vector<std::string>& seed_labels,
       double seed_timestamp,
-      double vel_threshold = 7.0,
-      double acc_threshold = 2000.0,
-      double acc_scaling = 0.025);
+      int seed_index,
+      Eigen::MatrixXd pairwise_distances,
+      double pair_weight = 100.0,
+      double pair_threshold = 0.01,
+      double vel_weight = 1.0,
+      double vel_threshold = 5.0,
+      double acc_weight = 0.01,
+      double acc_threshold = 1000.0);
 
   void make_next_generation(
       const std::map<std::string, Eigen::Vector3d>& markers,
       double timestamp,
-      int trace_head_to_attach);
+      int index,
+      int trace_head_to_attach,
+      int beam_width);
 
   void prune_beams(int beam_width);
 
@@ -101,6 +103,12 @@ public:
 
   void crystallize_beams(bool include_last = true);
 
+  static double get_median_70_percent_mean_distance(
+      std::string label_1,
+      std::string label_2,
+      const std::vector<std::map<std::string, Eigen::Vector3d>>&
+          marker_observations);
+
   static std::pair<
       std::vector<std::map<std::string, Eigen::Vector3d>>,
       std::vector<double>>
@@ -110,11 +118,33 @@ public:
           marker_observations,
       const std::vector<double>& timestamps,
       int beam_width = 20,
-      double vel_threshold = 7.0,
+      double pair_weight = 100.0,
+      double pair_threshold = 0.01,
+      double vel_weight = 1.0,
+      double vel_threshold = 5.0,
+      double acc_weight = 0.01,
       double acc_threshold = 1000.0,
-      double acc_scaling = 0.025,
       int print_interval = 1000,
       int crysatilize_interval = 1000);
+
+  static std::tuple<
+      std::vector<std::map<std::string, Eigen::Vector3d>>,
+      std::vector<double>>
+  process_markers(
+      const std::vector<std::vector<std::string>>& label_groups,
+      const std::vector<std::map<std::string, Eigen::Vector3d>>&
+          marker_observations,
+      const std::vector<double>& timestamps,
+      size_t beam_width = 20,
+      double pair_weight = 100.0,
+      double pair_threshold = 0.001,
+      double vel_weight = 0.1,
+      double vel_threshold = 5.0,
+      double acc_weight = 0.001,
+      double acc_threshold = 500.0,
+      int print_interval = 1000,
+      int crysatilize_interval = 1000,
+      bool multithread = true);
 };
 
 } // namespace biomechanics

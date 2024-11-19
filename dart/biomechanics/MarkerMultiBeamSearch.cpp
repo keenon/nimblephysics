@@ -3,8 +3,12 @@
 #include "dart/biomechanics/MarkerMultiBeamSearch.hpp"
 
 #include <algorithm>
+#include <future>
 #include <iostream>
+#include <limits>
+#include <numeric>
 #include <queue>
+#include <string>
 #include <unordered_set>
 
 namespace dart {
@@ -16,75 +20,17 @@ TraceHead::TraceHead(
     bool observed_this_timestep,
     const Eigen::Vector3d& last_observed_point,
     double last_observed_timestamp,
-    const Eigen::Vector3d& last_observed_velocity,
-    Eigen::VectorXd distances_to_other_traces,
-    std::shared_ptr<TraceHead> parent)
-  : label(label),
-    observed_this_timestep(observed_this_timestep),
-    last_observed_point(last_observed_point),
-    last_observed_timestamp(last_observed_timestamp),
-    last_observed_velocity(last_observed_velocity),
-    parent(parent)
-{
-  if (parent != nullptr)
-  {
-    if (parent->num_distance_samples > 0)
-    {
-      num_distance_samples = parent->num_distance_samples + 1;
-      Eigen::VectorXd delta
-          = distances_to_other_traces - parent->distances_to_other_traces_mean;
-      distances_to_other_traces_m2
-          = parent->distances_to_other_traces_m2
-            + delta.cwiseProduct(
-                distances_to_other_traces
-                - parent->distances_to_other_traces_mean);
-      distances_to_other_traces_mean = parent->distances_to_other_traces_mean
-                                       + delta / (double)num_distance_samples;
-    }
-    else
-    {
-      num_distance_samples = 1;
-      distances_to_other_traces_mean = distances_to_other_traces;
-      distances_to_other_traces_m2
-          = Eigen::VectorXd::Zero(distances_to_other_traces.size());
-    }
-  }
-  else
-  {
-    num_distance_samples = 1;
-    distances_to_other_traces_mean = distances_to_other_traces;
-    distances_to_other_traces_m2
-        = Eigen::VectorXd::Zero(distances_to_other_traces.size());
-  }
-}
-
-//==============================================================================
-TraceHead::TraceHead(
-    const std::string& label,
-    bool observed_this_timestep,
-    const Eigen::Vector3d& last_observed_point,
-    double last_observed_timestamp,
+    int last_observed_index,
     const Eigen::Vector3d& last_observed_velocity,
     std::shared_ptr<TraceHead> parent)
   : label(label),
     observed_this_timestep(observed_this_timestep),
     last_observed_point(last_observed_point),
     last_observed_timestamp(last_observed_timestamp),
+    last_observed_index(last_observed_index),
     last_observed_velocity(last_observed_velocity),
     parent(parent)
 {
-  if (parent != nullptr)
-  {
-    num_distance_samples = parent->num_distance_samples;
-    distances_to_other_traces_mean = parent->distances_to_other_traces_mean;
-    distances_to_other_traces_m2 = parent->distances_to_other_traces_m2;
-  }
-  else
-  {
-    num_distance_samples = 0;
-    distances_to_other_traces_mean = Eigen::VectorXd::Zero(0);
-    distances_to_other_traces_m2 = Eigen::VectorXd::Zero(0);
-  }
 }
 
 //==============================================================================
@@ -115,12 +61,21 @@ MarkerMultiBeamSearch::MarkerMultiBeamSearch(
     const std::vector<Eigen::Vector3d>& seed_points,
     const std::vector<std::string>& seed_labels,
     double seed_timestamp,
+    int seed_index,
+    Eigen::MatrixXd pairwise_distances,
+    double pair_weight,
+    double pair_threshold,
+    double vel_weight,
     double vel_threshold,
-    double acc_threshold,
-    double acc_scaling)
-  : vel_threshold(vel_threshold),
-    acc_threshold(acc_threshold),
-    acc_scaling(acc_scaling)
+    double acc_weight,
+    double acc_threshold)
+  : pairwise_distances(pairwise_distances),
+    pair_weight(pair_weight),
+    pair_threshold(pair_threshold),
+    vel_weight(vel_weight),
+    vel_threshold(vel_threshold),
+    acc_weight(acc_weight),
+    acc_threshold(acc_threshold)
 {
   std::vector<std::shared_ptr<TraceHead>> trace_heads;
   for (size_t i = 0; i < seed_points.size(); ++i)
@@ -131,6 +86,7 @@ MarkerMultiBeamSearch::MarkerMultiBeamSearch(
         true,
         seed_points[i],
         seed_timestamp,
+        seed_index,
         zero_velocity,
         nullptr);
     trace_heads.push_back(trace_head);
@@ -143,13 +99,16 @@ MarkerMultiBeamSearch::MarkerMultiBeamSearch(
 void MarkerMultiBeamSearch::make_next_generation(
     const std::map<std::string, Eigen::Vector3d>& markers,
     double timestamp,
-    int trace_head_to_attach)
+    int index,
+    int trace_head_to_attach,
+    int beam_width)
 {
   std::vector<std::shared_ptr<MultiBeam>> new_beams;
   for (const auto& beam : beams)
   {
     const std::shared_ptr<TraceHead>& trace_head
         = beam->trace_heads[trace_head_to_attach];
+    const double delta_time = timestamp - trace_head->last_observed_timestamp;
 
     std::set<std::string> timestep_used_markers = beam->timestep_used_markers;
     if (trace_head_to_attach == 0)
@@ -159,19 +118,39 @@ void MarkerMultiBeamSearch::make_next_generation(
 
     // Option 1: Skip adding a marker
     double skip_cost
-        = beam->cost + vel_threshold + (acc_threshold * acc_scaling);
-    std::shared_ptr<TraceHead> skip_trace_head = std::make_shared<TraceHead>(
-        trace_head->label,
-        false,
-        trace_head->last_observed_point,
-        trace_head->last_observed_timestamp,
-        trace_head->last_observed_velocity,
-        trace_head);
-    std::vector<std::shared_ptr<TraceHead>> child_trace_heads
-        = beam->get_child_trace_heads(skip_trace_head, trace_head_to_attach);
-    auto new_beam_ptr = std::make_shared<MultiBeam>(
-        skip_cost, child_trace_heads, timestep_used_markers);
-    new_beams.push_back(new_beam_ptr);
+        = beam->cost + (vel_threshold * vel_weight)
+          + (acc_threshold * acc_weight)
+          // Measure your distance to all previous trace_heads, but not yourself
+          // or subsequent trace_heads that have not been chosen yet. Hence,
+          // this is `trace_head_to_attach` penalties.
+          + (pair_threshold * pair_weight * trace_head_to_attach);
+    if (new_beams.size() < beam_width || skip_cost < new_beams.end()[-1]->cost)
+    {
+      std::shared_ptr<TraceHead> skip_trace_head = std::make_shared<TraceHead>(
+          trace_head->label,
+          false,
+          trace_head->last_observed_point,
+          trace_head->last_observed_timestamp,
+          trace_head->last_observed_index,
+          trace_head->last_observed_velocity,
+          trace_head);
+      std::vector<std::shared_ptr<TraceHead>> child_trace_heads
+          = beam->get_child_trace_heads(skip_trace_head, trace_head_to_attach);
+      auto new_beam_ptr = std::make_shared<MultiBeam>(
+          skip_cost, child_trace_heads, timestep_used_markers);
+      new_beams.push_back(new_beam_ptr);
+      std::sort(
+          new_beams.begin(),
+          new_beams.end(),
+          [](const std::shared_ptr<MultiBeam>& a,
+             const std::shared_ptr<MultiBeam>& b) {
+            return a->cost < b->cost;
+          });
+      if (new_beams.size() > beam_width)
+      {
+        new_beams.resize(beam_width);
+      }
+    }
 
     // Option 2: Add each possible marker
     for (const auto& marker : markers)
@@ -184,83 +163,64 @@ void MarkerMultiBeamSearch::make_next_generation(
         continue;
       }
 
-      double delta_time = timestamp - trace_head->last_observed_timestamp;
       Eigen::Vector3d velocity
           = (point - trace_head->last_observed_point) / delta_time;
       Eigen::Vector3d acc
           = (velocity - trace_head->last_observed_velocity) / delta_time;
 
       double vel_mag = velocity.norm();
-      if (vel_mag < 2 * vel_threshold)
+      double acc_mag = acc.norm();
+      double cost
+          = beam->cost + (vel_mag * vel_weight) + (acc_mag * acc_weight);
+      if (new_beams.size() == beam_width && cost > new_beams.end()[-1]->cost)
       {
-        double acc_mag = acc.norm();
-        double cost = beam->cost + vel_mag + (acc_mag * acc_scaling);
+        continue;
+      }
 
-        Eigen::VectorXd distances_to_other_traces
-            = Eigen::VectorXd::Zero(beam->trace_heads.size());
-        for (size_t i = 0; i < beam->trace_heads.size(); ++i)
+      // Compare our distances to all previous trace_heads that have already
+      // (potentially) been attached.
+      for (size_t i = 0; i < trace_head_to_attach; ++i)
+      {
+        // If this trace head was attached this frame, take a penalty on the
+        // observed distance
+        if (beam->trace_heads[i]->last_observed_index == index)
         {
-          distances_to_other_traces[i]
+          double distance
               = (beam->trace_heads[i]->last_observed_point - point).norm();
+          cost += pair_weight
+                  * std::abs(
+                      pairwise_distances(i, trace_head_to_attach) - distance);
         }
-        if (trace_head->num_distance_samples > 1000)
+        else
         {
-          for (int i = 0; i < distances_to_other_traces.size(); ++i)
-          {
-            if (i == trace_head_to_attach)
-            {
-              continue;
-            }
-            // Only penalize marker pairs that are closer than 10cm on mean
-            if (trace_head->distances_to_other_traces_mean[i] > 0.1)
-            {
-              continue;
-            }
-            double stddev = std::sqrt(
-                trace_head->distances_to_other_traces_m2[i]
-                / (trace_head->num_distance_samples - 1));
-            if (stddev < 0.001)
-            {
-              stddev = 0.001;
-            }
-            double error = std::abs(
-                               distances_to_other_traces[i]
-                               - trace_head->distances_to_other_traces_mean[i])
-                           / stddev;
-            if (error > 5.0 && stddev < 0.007)
-            {
-              // std::cout << "Error: " << error << ", stddev: " << stddev
-              //           << ", mean: "
-              //           << trace_head->distances_to_other_traces_mean[i]
-              //           << ", distance: " << distances_to_other_traces[i]
-              //           << " between next marker " << label << " (on trace "
-              //           << trace_head_to_attach << "=" << trace_head->label
-              //           << " with implied velocity " << vel_mag << ")"
-              //           << " and " << beam->trace_heads[i]->label << " (trace
-              //           "
-              //           << i << ")" << std::endl;
-              // skip_beam = true;
-              cost += error * 1000.0;
-            }
-          }
+          // Otherwise just take a penalty on the threshold distance
+          cost += pair_threshold * pair_weight;
         }
+      }
+      if (new_beams.size() == beam_width && cost > new_beams.end()[-1]->cost)
+      {
+        continue;
+      }
 
-        std::shared_ptr<TraceHead> new_trace_head = std::make_shared<TraceHead>(
-            label,
-            true,
-            point,
-            timestamp,
-            velocity,
-            distances_to_other_traces,
-            trace_head);
-        std::set<std::string> new_timestep_used_markers = timestep_used_markers;
-        new_timestep_used_markers.insert(label);
+      std::shared_ptr<TraceHead> new_trace_head = std::make_shared<TraceHead>(
+          label, true, point, timestamp, index, velocity, trace_head);
+      std::set<std::string> new_timestep_used_markers = timestep_used_markers;
+      new_timestep_used_markers.insert(label);
 
-        std::vector<std::shared_ptr<TraceHead>> child_trace_heads
-            = beam->get_child_trace_heads(new_trace_head, trace_head_to_attach);
-        auto new_beam_ptr = std::make_shared<MultiBeam>(
-            cost, child_trace_heads, new_timestep_used_markers);
-        new_beams.push_back(new_beam_ptr);
+      std::vector<std::shared_ptr<TraceHead>> child_trace_heads
+          = beam->get_child_trace_heads(new_trace_head, trace_head_to_attach);
+      new_beams.emplace_back(std::make_shared<MultiBeam>(
+          cost, child_trace_heads, new_timestep_used_markers));
+      std::sort(
+          new_beams.begin(),
+          new_beams.end(),
+          [](const std::shared_ptr<MultiBeam>& a,
+             const std::shared_ptr<MultiBeam>& b) {
+            return a->cost < b->cost;
+          });
+      if (new_beams.size() > beam_width)
+      {
+        new_beams.resize(beam_width);
       }
     }
   }
@@ -373,6 +333,74 @@ void MarkerMultiBeamSearch::crystallize_beams(bool include_last)
 }
 
 //==============================================================================
+double MarkerMultiBeamSearch::get_median_70_percent_mean_distance(
+    std::string a_label,
+    std::string b_label,
+    const std::vector<std::map<std::string, Eigen::Vector3d>>&
+        marker_observations)
+{
+  // Figure out the distance between the markers
+  std::vector<double> observed_distances;
+  for (size_t t = 0; t < marker_observations.size(); ++t)
+  {
+    const auto& marker_timestep = marker_observations[t];
+    if (marker_timestep.find(a_label) != marker_timestep.end()
+        && marker_timestep.find(b_label) != marker_timestep.end())
+    {
+      double dist
+          = (marker_timestep.at(a_label) - marker_timestep.at(b_label)).norm();
+      observed_distances.push_back(dist);
+    }
+  }
+
+  // Calculate the median
+  std::vector<double> sorted_distances = observed_distances;
+  std::sort(sorted_distances.begin(), sorted_distances.end());
+  size_t n = sorted_distances.size();
+  double median
+      = (n % 2 == 0)
+            ? (sorted_distances[n / 2 - 1] + sorted_distances[n / 2]) / 2.0
+            : sorted_distances[n / 2];
+
+  // Calculate absolute distances from the median
+  std::vector<double> distance_to_median;
+  for (double dist : observed_distances)
+  {
+    distance_to_median.push_back(std::abs(dist - median));
+  }
+
+  // Select the 70% of data closest to the median
+  std::vector<size_t> indices(distance_to_median.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::sort(
+      indices.begin(),
+      indices.end(),
+      [&distance_to_median](size_t i1, size_t i2) {
+        return distance_to_median[i1] < distance_to_median[i2];
+      });
+
+  size_t threshold_index = static_cast<size_t>(observed_distances.size() * 0.7);
+  std::vector<double> closest_70_percent;
+  for (size_t i = 0; i < threshold_index; ++i)
+  {
+    closest_70_percent.push_back(observed_distances[indices[i]]);
+  }
+
+  if (closest_70_percent.size() == 0)
+  {
+    return 0.0;
+  }
+
+  // Calculate the mean of the 70% of data closest to the median
+  double mean_70
+      = std::accumulate(
+            closest_70_percent.begin(), closest_70_percent.end(), 0.0)
+        / closest_70_percent.size();
+
+  return mean_70;
+}
+
+//==============================================================================
 std::pair<
     std::vector<std::map<std::string, Eigen::Vector3d>>,
     std::vector<double>>
@@ -382,9 +410,12 @@ MarkerMultiBeamSearch::search(
         marker_observations,
     const std::vector<double>& timestamps,
     int beam_width,
+    double pair_weight,
+    double pair_threshold,
+    double vel_weight,
     double vel_threshold,
+    double acc_weight,
     double acc_threshold,
-    double acc_scaling,
     int print_interval,
     int crysatilize_interval)
 {
@@ -411,25 +442,67 @@ MarkerMultiBeamSearch::search(
   // 2. If not found, return empty trace
   if (first_observation_index == -1)
   {
+    std::cout
+        << "Could not find first observation of all labels on the same frame"
+        << std::endl;
+    std::map<std::string, int> label_counts;
+    for (size_t i = 0; i < marker_observations.size(); ++i)
+    {
+      for (const auto& label : labels)
+      {
+        if (marker_observations[i].find(label) != marker_observations[i].end())
+        {
+          label_counts[label]++;
+        }
+      }
+    }
+    for (const auto& lc : label_counts)
+    {
+      std::cout << "Label " << lc.first << " found " << lc.second << " times"
+                << std::endl;
+    }
     return std::make_pair(
         std::vector<std::map<std::string, Eigen::Vector3d>>(),
         std::vector<double>());
   }
 
-  // 3. Start the beam search
+  // 3. Get the starting points for the beam search
   std::vector<Eigen::Vector3d> seed_points;
   for (const auto& label : labels)
   {
     seed_points.push_back(
         marker_observations[first_observation_index].at(label));
   }
+
+  // 4. Collect all the pairwise distance statistics for the given labels
+  Eigen::MatrixXd pairwise_distances(labels.size(), labels.size());
+  for (size_t i = 0; i < labels.size(); ++i)
+  {
+    for (size_t j = i + 1; j < labels.size(); ++j)
+    {
+      double first_timestep_distance = (seed_points[i] - seed_points[j]).norm();
+      double median_distance = get_median_70_percent_mean_distance(
+          labels[i], labels[j], marker_observations);
+      std::cout << "Distance between " << labels[i] << " and " << labels[j]
+                << " is " << first_timestep_distance << ", with median "
+                << median_distance << std::endl;
+      pairwise_distances(i, j) = first_timestep_distance;
+      pairwise_distances(j, i) = first_timestep_distance;
+    }
+  }
+
   MarkerMultiBeamSearch beam_search(
       seed_points,
       labels,
       timestamps[first_observation_index],
+      first_observation_index,
+      pairwise_distances,
+      pair_weight,
+      pair_threshold,
+      vel_weight,
       vel_threshold,
-      acc_threshold,
-      acc_scaling);
+      acc_weight,
+      acc_threshold);
   beam_search.past_beams.reserve(marker_observations.size() * labels.size());
 
   for (size_t i = first_observation_index + 1; i < marker_observations.size();
@@ -445,8 +518,11 @@ MarkerMultiBeamSearch::search(
     for (size_t j = 0; j < labels.size(); ++j)
     {
       beam_search.make_next_generation(
-          marker_observations[i], timestamps[i], static_cast<int>(j));
-      beam_search.prune_beams(beam_width);
+          marker_observations[i],
+          timestamps[i],
+          i,
+          static_cast<int>(j),
+          beam_width);
     }
 
     if (i % crysatilize_interval == 0)
@@ -460,6 +536,177 @@ MarkerMultiBeamSearch::search(
   beam_search.crystallize_beams();
   return std::make_pair(
       beam_search.marker_observations, beam_search.timestamps);
+}
+
+std::tuple<
+    std::vector<std::map<std::string, Eigen::Vector3d>>,
+    std::vector<double>>
+MarkerMultiBeamSearch::process_markers(
+    const std::vector<std::vector<std::string>>& label_groups,
+    const std::vector<std::map<std::string, Eigen::Vector3d>>&
+        marker_observations,
+    const std::vector<double>& timestamps,
+    size_t beam_width,
+    double pair_weight,
+    double pair_threshold,
+    double vel_weight,
+    double vel_threshold,
+    double acc_weight,
+    double acc_threshold,
+    int print_interval,
+    int crysatilize_interval,
+    bool multithread)
+{
+  std::map<std::string, int> marker_observation_counts;
+  for (const auto& marker_observation : marker_observations)
+  {
+    for (const auto& marker : marker_observation)
+    {
+      marker_observation_counts[marker.first]++;
+    }
+  }
+
+  std::cout << "Building marker traces for " << label_groups.size() << " groups"
+            << std::endl;
+  std::vector<std::vector<std::string>> filtered_groups;
+  for (int i = 0; i < label_groups.size(); ++i)
+  {
+    std::cout << "Group " << i << ":" << std::endl;
+
+    std::vector<std::string> filtered_group;
+    std::vector<std::string> rejected_group;
+
+    for (const auto& label : label_groups[i])
+    {
+      if (marker_observation_counts[label] > 0)
+      {
+        filtered_group.push_back(label);
+      }
+      else
+      {
+        rejected_group.push_back(label);
+      }
+    }
+    if (filtered_group.size() > 0)
+    {
+      filtered_groups.push_back(filtered_group);
+      std::cout << "  Found Markers: ";
+      for (const auto& label : filtered_group)
+      {
+        std::cout << label << " ";
+      }
+      std::cout << std::endl;
+    }
+    if (rejected_group.size() > 0)
+    {
+      std::cout << "  Did Not Find Markers: ";
+      for (const auto& label : rejected_group)
+      {
+        std::cout << label << " ";
+      }
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+  }
+
+  std::map<double, std::map<std::string, Eigen::Vector3d>> trace_output_map;
+
+  if (multithread)
+  {
+    std::mutex mutex;
+    std::vector<std::future<void>> futures;
+    for (const std::vector<std::string>& label_group : filtered_groups)
+    {
+      futures.push_back(std::async([&] {
+        auto result = MarkerMultiBeamSearch::search(
+            label_group,
+            marker_observations,
+            timestamps,
+            beam_width,
+            pair_weight,
+            pair_threshold,
+            vel_weight,
+            vel_threshold,
+            acc_weight,
+            acc_threshold,
+            print_interval,
+            crysatilize_interval);
+
+        {
+          std::lock_guard<std::mutex> lock(mutex);
+          std::vector<std::map<std::string, Eigen::Vector3d>> outputTraces
+              = std::get<0>(result);
+          std::vector<double> outputTimesteps = std::get<1>(result);
+
+          for (size_t i = 0; i < outputTraces.size(); ++i)
+          {
+            for (const auto& label_point : outputTraces[i])
+            {
+              trace_output_map[outputTimesteps[i]][label_point.first]
+                  = label_point.second;
+            }
+          }
+        }
+      }));
+    }
+
+    for (auto& future : futures)
+    {
+      future.wait();
+    }
+  }
+  else
+  {
+    for (int g = 0; g < filtered_groups.size(); g++)
+    {
+      std::cout << "Processing group " << g << "/" << filtered_groups.size()
+                << ": ";
+      const std::vector<std::string>& label_group = filtered_groups.at(g);
+      for (const auto& label : label_group)
+      {
+        std::cout << label << " ";
+      }
+      std::cout << std::endl;
+
+      auto result = MarkerMultiBeamSearch::search(
+          label_group,
+          marker_observations,
+          timestamps,
+          beam_width,
+          pair_weight,
+          pair_threshold,
+          vel_weight,
+          vel_threshold,
+          acc_weight,
+          acc_threshold,
+          print_interval,
+          crysatilize_interval);
+      std::vector<std::map<std::string, Eigen::Vector3d>> outputTraces
+          = std::get<0>(result);
+      std::vector<double> outputTimesteps = std::get<1>(result);
+
+      for (size_t i = 0; i < outputTraces.size(); ++i)
+      {
+        for (const auto& label_point : outputTraces[i])
+        {
+          trace_output_map[outputTimesteps[i]][label_point.first]
+              = label_point.second;
+        }
+      }
+    }
+  }
+
+  std::cout << "Finished building marker traces" << std::endl;
+
+  std::vector<std::map<std::string, Eigen::Vector3d>> traces;
+  std::vector<double> timesteps;
+  for (const auto& trace : trace_output_map)
+  {
+    traces.push_back(trace.second);
+    timesteps.push_back(trace.first);
+  }
+
+  return std::make_tuple(traces, timesteps);
 }
 
 } // namespace biomechanics
