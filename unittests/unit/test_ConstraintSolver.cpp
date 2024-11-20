@@ -70,7 +70,7 @@ TEST(ConstraintSolver, SIMPLE)
   // Solve constraint impulses.
   for (auto constraintGroup : solver->getConstrainedGroups())
   {
-    std::vector<s_t*> impulses = solver->solveConstrainedGroup(constraintGroup);
+    Eigen::MatrixXs impulses = solver->solveConstrainedGroup(constraintGroup);
     EXPECT_TRUE(impulses.size() > 0);
     solver->applyConstraintImpulses(constraintGroup.getConstraints(), impulses);
   }

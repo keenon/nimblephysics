@@ -34,12 +34,11 @@
 
 #include <iostream>
 
-#include "dart/external/odelcpsolver/lcp.h"
-
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
+#include "dart/external/odelcpsolver/lcp.h"
 
 #define DART_CFM 1e-9
 
@@ -129,7 +128,7 @@ void MimicMotorConstraint::update()
   {
     s_t timeStep = mJoint->getSkeleton()->getTimeStep();
     s_t qError = mMimicJoint->getPosition(i) * mMultiplier + mOffset
-                    - mJoint->getPosition(i);
+                 - mJoint->getPosition(i);
     s_t desiredVelocity = math::clip(
         qError / timeStep,
         mJoint->getVelocityLowerLimit(i),
@@ -262,7 +261,7 @@ void MimicMotorConstraint::unexcite()
 }
 
 //==============================================================================
-void MimicMotorConstraint::applyImpulse(s_t* lambda)
+void MimicMotorConstraint::applyImpulse(Eigen::VectorXs lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();

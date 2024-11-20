@@ -33,23 +33,22 @@
 #ifndef DART_CONSTRAINT_SOFTCONTACTCONSTRAINT_HPP_
 #define DART_CONSTRAINT_SOFTCONTACTCONSTRAINT_HPP_
 
-#include "dart/constraint/ConstraintBase.hpp"
-
-#include "dart/math/MathTypes.hpp"
 #include "dart/collision/CollisionDetector.hpp"
+#include "dart/constraint/ConstraintBase.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 
-namespace collision{
+namespace collision {
 class SoftCollisionInfo;
-}  // namespace collision
+} // namespace collision
 
 namespace dynamics {
 class BodyNode;
 class SoftBodyNode;
 class PointMass;
 class Skeleton;
-}  // namespace dynamics
+} // namespace dynamics
 
 namespace constraint {
 
@@ -128,7 +127,7 @@ protected:
   void unexcite() override;
 
   // Documentation inherited
-  void applyImpulse(s_t* _lambda) override;
+  void applyImpulse(Eigen::VectorXs _lambda) override;
 
   // Documentation inherited
   dynamics::SkeletonPtr getRootSkeleton() const override;
@@ -247,5 +246,4 @@ private:
 } // namespace constraint
 } // namespace dart
 
-#endif  // DART_CONSTRAINT_SOFTCONTACTCONSTRAINT_HPP_
-
+#endif // DART_CONSTRAINT_SOFTCONTACTCONSTRAINT_HPP_
