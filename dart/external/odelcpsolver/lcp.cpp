@@ -375,7 +375,7 @@ struct dLCP {
   void transfer_i_to_C (int i);
   void transfer_i_to_N (int /*i*/) { m_nN++; }			// because we can assume C and N span 1:i-1
   void transfer_i_from_N_to_C (int i);
-  void transfer_i_from_C_to_N (int i, void *tmpbuf);
+  bool transfer_i_from_C_to_N (int i, void *tmpbuf);
   static size_t estimate_transfer_i_from_C_to_N_mem_req(int nC, int nskip) { return dEstimateLDLTRemoveTmpbufSize(nC, nskip); }
   int numC() const { return m_nC; }
   int numN() const { return m_nN; }
@@ -602,7 +602,7 @@ void dLCP::transfer_i_from_N_to_C (int i)
 }
 
 
-void dLCP::transfer_i_from_C_to_N (int i, void *tmpbuf)
+bool dLCP::transfer_i_from_C_to_N (int i, void *tmpbuf)
 {
   {
     int *C = m_C;
@@ -616,7 +616,7 @@ void dLCP::transfer_i_from_C_to_N (int i, void *tmpbuf)
         last_idx = j;
       }
       if (C[j]==i) {
-        dLDLTRemove (m_A,C,m_L,m_d,m_n,nC,j,m_nskip,tmpbuf);
+        if (!dLDLTRemove (m_A,C,m_L,m_d,m_n,nC,j,m_nskip,tmpbuf)) return false;
         int k;
         if (last_idx == -1) {
           for (k=j+1 ; k<nC; ++k) {
@@ -645,6 +645,7 @@ void dLCP::transfer_i_from_C_to_N (int i, void *tmpbuf)
 # ifdef DEBUG_LCP
   checkFactorization (m_A,m_L,m_d,m_nC,m_C,m_nskip);
 # endif
+  return true;
 }
 
 
@@ -1074,12 +1075,12 @@ bool dSolveLCP (int n, dReal *A, dReal *x, dReal *b,
         case 5:		// keep going
           x[si] = lo[si];
           state[si] = false;
-          lcp.transfer_i_from_C_to_N (si, nullptr);
+          if (!lcp.transfer_i_from_C_to_N (si, nullptr)) return false;
           break;
         case 6:		// keep going
           x[si] = hi[si];
           state[si] = true;
-          lcp.transfer_i_from_C_to_N (si, nullptr);
+          if (!lcp.transfer_i_from_C_to_N (si, nullptr)) return false;
           break;
         }
 
