@@ -21,5 +21,6 @@ This documentation was written for Nimble :code:`v0.10.31`, and may or may not w
   accs-and-gyros
   inverse-dynamics
   working-with-addbiomechanics-data
+  answering-questions-with-addbiomechanics-data
   process-mocap-data
   gui-tutorial
