@@ -15,7 +15,10 @@ WithRespectToSpring::WithRespectToSpring()
 
 //==============================================================================
 WrtSpringJointEntry::WrtSpringJointEntry(
-    std::string jointName, WrtSpringJointEntryType type, int dofs, Eigen::VectorXi worldDofs)
+    std::string jointName,
+    WrtSpringJointEntryType type,
+    int dofs,
+    Eigen::VectorXi worldDofs)
   : jointName(jointName), type(type), mDofs(dofs), mWorldDofs(worldDofs)
 {
 }
@@ -31,13 +34,11 @@ void WrtSpringJointEntry::set(
     dynamics::Skeleton* skel, const Eigen::Ref<Eigen::VectorXs>& value)
 {
   dynamics::Joint* joint = skel->getJoint(jointName);
-  for(int i = 0; i < joint->getNumDofs(); i++)
+  for (int i = 0; i < joint->getNumDofs(); i++)
   {
     joint->setSpringStiffness(i, value(i));
   }
   return;
-  
-
 }
 
 //==============================================================================
@@ -45,7 +46,7 @@ void WrtSpringJointEntry::get(
     dynamics::Skeleton* skel, Eigen::Ref<Eigen::VectorXs> out)
 {
   dynamics::Joint* joint = skel->getJoint(jointName);
-  for(int i = 0; i < joint->getNumDofs(); i++)
+  for (int i = 0; i < joint->getNumDofs(); i++)
   {
     out(i) = joint->getSpringStiffness(i);
   }
@@ -69,7 +70,8 @@ WrtSpringJointEntry& WithRespectToSpring::registerJoint(
 {
   std::string skelName = joint->getSkeleton()->getName();
   std::vector<WrtSpringJointEntry>& skelEntries = mEntries[skelName];
-  skelEntries.emplace_back(joint->getName(), type, joint->getNumDofs(), dofs_index);
+  skelEntries.emplace_back(
+      joint->getName(), type, joint->getNumDofs(), dofs_index);
 
   WrtSpringJointEntry& entry = skelEntries[skelEntries.size() - 1];
 
@@ -119,6 +121,12 @@ WrtSpringJointEntry& WithRespectToSpring::getJoint(dynamics::Joint* joint)
   // The code should never reach this point, but this is here to keep the
   // compiler happy
   throw std::runtime_error{"Execution should never reach this point"};
+}
+
+//==============================================================================
+std::string WithRespectToSpring::name()
+{
+  return "SPRING";
 }
 
 //==============================================================================

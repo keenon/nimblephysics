@@ -216,8 +216,6 @@ void SSID::runInference(long startTime)
   //     startTime - mPlanningHistoryMillis, steps, millisPerStep);
   Eigen::MatrixXs forceHistory
       = mControlLog.getRecentValuesBefore(startTime, steps + 1);
-  Eigen::MatrixXs forceHistory
-      = mControlLog.getRecentValuesBefore(startTime, steps + 1);
   for (int i = 0; i < steps; i++)
   {
     mProblem->pinForce(i, forceHistory.col(i));
@@ -230,10 +228,6 @@ void SSID::runInference(long startTime)
   // Eigen::MatrixXs velHistory = mSensorLogs[1].getValues(
   //   startTime - mPlanningHistoryMillis, steps, millisPerStep
   //  );
-  Eigen::MatrixXs poseHistory
-      = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
-  Eigen::MatrixXs velHistory
-      = mSensorLogs[1].getRecentValuesBefore(startTime, steps + 1);
   Eigen::MatrixXs poseHistory
       = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
   Eigen::MatrixXs velHistory
@@ -278,12 +272,10 @@ void SSID::runInference(long startTime)
   }
 }
 
-Eigen::VectorXs SSID::runPlotting(
+// Run plotting function should be idenpotent
+// Here it only support 1 body node plotting, but that make sense
+std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(
     long startTime, s_t upper, s_t lower, int samples)
-    // Run plotting function should be idenpotent
-    // Here it only support 1 body node plotting, but that make sense
-    std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(
-        long startTime, s_t upper, s_t lower, int samples)
 {
   int millisPerStep
       = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
@@ -340,8 +332,6 @@ Eigen::VectorXs SSID::runPlotting(
     s_t loss = mProblem->getLoss(mWorld);
     losses(0) = loss;
   }
-
-  return losses;
 
   std::pair<Eigen::VectorXs, Eigen::MatrixXs> result;
   result.first = losses;

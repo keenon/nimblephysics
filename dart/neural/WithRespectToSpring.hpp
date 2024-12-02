@@ -35,7 +35,11 @@ struct WrtSpringJointEntry
   int mDofs;
   Eigen::VectorXi mWorldDofs;
 
-  WrtSpringJointEntry(std::string jointName, WrtSpringJointEntryType type, int dofs, Eigen::VectorXi worldDofs);
+  WrtSpringJointEntry(
+      std::string jointName,
+      WrtSpringJointEntryType type,
+      int dofs,
+      Eigen::VectorXi worldDofs);
 
   int dim();
 
@@ -55,7 +59,7 @@ public:
   /// way in this differentiation
   /// Need to set the dofs
   WrtSpringJointEntry& registerJoint(
-      dynamics::Joint* joint, 
+      dynamics::Joint* joint,
       WrtSpringJointEntryType type,
       Eigen::VectorXi dofs_index,
       Eigen::VectorXs upperBound,
@@ -68,6 +72,8 @@ public:
   //////////////////////////////////////////////////////////////
   // Implement all the methods we need
   //////////////////////////////////////////////////////////////
+
+  std::string name() override;
 
   /// This returns this WRT from the world as a vector
   Eigen::VectorXs get(simulation::World* world) override;

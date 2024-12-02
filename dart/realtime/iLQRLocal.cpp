@@ -5,6 +5,8 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
+#include "dart/neural/BackpropSnapshot.hpp"
+#include "dart/neural/NeuralUtils.hpp"
 #include "dart/performance/PerformanceLog.hpp"
 #include "dart/proto/SerializeEigen.hpp"
 #include "dart/realtime/Millis.hpp"
@@ -14,8 +16,6 @@
 #include "dart/trajectory/LossFn.hpp"
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/Solution.hpp"
-#include "dart/neural/NeuralUtils.hpp"
-#include "dart/neural/BackpropSnapshot.hpp"
 
 #include "signal.h"
 
@@ -25,21 +25,20 @@ using namespace trajectory;
 
 namespace realtime {
 
-// For initialization the steps size need to be created to the maximum possible steps
+// For initialization the steps size need to be created to the maximum possible
+// steps
 LQRBuffer::LQRBuffer(
-  int steps, 
-  size_t nDofs, 
-  size_t nControls, 
-  Extrapolate_Method extrapolate)
+    int steps, size_t nDofs, size_t nControls, Extrapolate_Method extrapolate)
 {
-  std::cout << "LQRBuffer Initializing ..." <<steps<<" "<<nDofs<<" "<<nControls<< std::endl;
+  std::cout << "LQRBuffer Initializing ..." << steps << " " << nDofs << " "
+            << nControls << std::endl;
   nsteps = steps;
   mMaxSteps = steps;
   state_dim = nDofs * 2;
   control_dim = nControls;
   ext = extrapolate;
 
-  for(size_t i = 0; i < nsteps; i++)
+  for (size_t i = 0; i < nsteps; i++)
   {
     X.push_back(Eigen::VectorXs::Zero(state_dim));
     Xnew.push_back(Eigen::VectorXs::Zero(state_dim));
@@ -48,7 +47,7 @@ LQRBuffer::LQRBuffer(
     K.push_back(Eigen::MatrixXs::Zero(control_dim, state_dim));
     k.push_back(Eigen::VectorXs::Zero(control_dim));
     alpha.push_back(1.0);
-        
+
     // Jacobians
     Fx.push_back(Eigen::MatrixXs::Zero(state_dim, state_dim));
     Fu.push_back(Eigen::MatrixXs::Zero(state_dim, control_dim));
@@ -84,21 +83,21 @@ void LQRBuffer::updateXUOld()
 // This function is called everytime the alpha get set
 void LQRBuffer::updateAlpha(s_t a)
 {
-  for(int i = 0; i < nsteps - 1;i++)
+  for (int i = 0; i < nsteps - 1; i++)
   {
     alpha[i] = a;
   }
 }
 
-// From Buffer Read Plan for execution as well as control law starting from timestamp
-// Which should have equivalent effectiveness of advancePlan
+// From Buffer Read Plan for execution as well as control law starting from
+// timestamp Which should have equivalent effectiveness of advancePlan
 void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
 {
   Eigen::MatrixXs existForce = Eigen::MatrixXs::Zero(control_dim, mMaxSteps);
   Eigen::MatrixXs existk = Eigen::MatrixXs::Zero(control_dim, mMaxSteps);
   Eigen::MatrixXs existx = Eigen::MatrixXs::Zero(state_dim, mMaxSteps);
   std::vector<Eigen::MatrixXs> existK;
-  for(int i = 0; i < mMaxSteps; i++)
+  for (int i = 0; i < mMaxSteps; i++)
   {
     existK.push_back(Eigen::MatrixXs::Zero(control_dim, state_dim));
   }
@@ -108,7 +107,7 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
   buffer.getPlannedStateStartingAt(timestamp, existx);
   size_t existSteps = buffer.getRemainSteps(timestamp);
   size_t i = 0;
-  for(;i < existSteps; i++)
+  for (; i < existSteps; i++)
   {
     U[i] = existForce.col(i);
     k[i] = existk.col(i);
@@ -116,10 +115,10 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
     X[i] = existx.col(i);
   }
   size_t last = i;
-  switch(ext)
+  switch (ext)
   {
     case ZERO:
-      for(; i < nsteps; i++)
+      for (; i < nsteps; i++)
       {
         U[i] = Eigen::VectorXs::Zero(control_dim);
         k[i] = Eigen::VectorXs::Zero(control_dim);
@@ -129,9 +128,9 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
       X[nsteps] = Eigen::VectorXs::Zero(state_dim);
       break;
     case LAST:
-      if(last==0)
+      if (last == 0)
       {
-          for(; i < nsteps; i++)
+        for (; i < nsteps; i++)
         {
           U[i] = Eigen::VectorXs::Zero(control_dim);
           k[i] = Eigen::VectorXs::Zero(control_dim);
@@ -143,18 +142,19 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
       }
       else
       {
-        for(; i < nsteps; i++)
+        for (; i < nsteps; i++)
         {
           U[i].segment(0, control_dim) = U[last];
           k[i].segment(0, control_dim) = Eigen::VectorXs::Zero(control_dim);
-          K[i].block(0, 0, control_dim, state_dim) = Eigen::MatrixXs::Zero(control_dim, state_dim);
+          K[i].block(0, 0, control_dim, state_dim)
+              = Eigen::MatrixXs::Zero(control_dim, state_dim);
           X[i].segment(0, state_dim) = X[last];
         }
         X[nsteps].segment(0, state_dim) = X[last];
         break;
       }
     case RANDOM:
-      for(; i < nsteps; i++)
+      for (; i < nsteps; i++)
       {
         U[i] = 0.1 * Eigen::VectorXs::Random(control_dim);
         k[i] = Eigen::VectorXs::Zero(control_dim);
@@ -169,9 +169,12 @@ void LQRBuffer::readNewActionPlan(long timestamp, RealTimeControlBuffer buffer)
   }
 }
 
-void LQRBuffer::updateL(std::vector<Eigen::VectorXs> Lx_new, std::vector<Eigen::VectorXs> Lu_new,
-               std::vector<Eigen::MatrixXs> Lxx_new, std::vector<Eigen::MatrixXs> Luu_new,
-               std::vector<Eigen::MatrixXs> Lux_new)
+void LQRBuffer::updateL(
+    std::vector<Eigen::VectorXs> Lx_new,
+    std::vector<Eigen::VectorXs> Lu_new,
+    std::vector<Eigen::MatrixXs> Lxx_new,
+    std::vector<Eigen::MatrixXs> Luu_new,
+    std::vector<Eigen::MatrixXs> Lux_new)
 {
   Lx = Lx_new;
   Lu = Lu_new;
@@ -185,15 +188,12 @@ void LQRBuffer::setNewActionPlan(long timestamp, RealTimeControlBuffer* buffer)
   // Need to compute how many step in U has been invalid
   long current_time = timeSinceEpochMillis();
   Eigen::MatrixXs control_force = Eigen::MatrixXs::Zero(control_dim, nsteps);
-  for(int i = 0; i < nsteps; i++)
+  for (int i = 0; i < nsteps; i++)
   {
     control_force.col(i) = U[i];
   }
   // This assume the vector indicate plan right after timestamp
-  buffer->setControlForcePlan(
-        timestamp,
-        current_time,
-        control_force);
+  buffer->setControlForcePlan(timestamp, current_time, control_force);
 }
 
 void LQRBuffer::setNewControlLaw(long timestamp, RealTimeControlBuffer* buffer)
@@ -202,17 +202,13 @@ void LQRBuffer::setNewControlLaw(long timestamp, RealTimeControlBuffer* buffer)
   long current_time = timeSinceEpochMillis();
 
   // This assume the vector indicate plan right after timestamp
-  // Till this point, we can guarantee that X is the best trajectory rollout from forward
-  buffer->setControlLawPlan(
-        timestamp,
-        current_time,
-        k,
-        K,
-        X,
-        alpha);
+  // Till this point, we can guarantee that X is the best trajectory rollout
+  // from forward
+  buffer->setControlLawPlan(timestamp, current_time, k, K, X, alpha);
 }
 
-void LQRBuffer::updateF(std::vector<Eigen::MatrixXs> Fx_new, std::vector<Eigen::MatrixXs> Fu_new)
+void LQRBuffer::updateF(
+    std::vector<Eigen::MatrixXs> Fx_new, std::vector<Eigen::MatrixXs> Fu_new)
 {
   Fx = Fx_new;
   Fu = Fu_new;
@@ -220,9 +216,9 @@ void LQRBuffer::updateF(std::vector<Eigen::MatrixXs> Fx_new, std::vector<Eigen::
 
 bool LQRBuffer::validateXnew()
 {
-  for(size_t i=0; i < Xnew.size(); i++)
+  for (size_t i = 0; i < Xnew.size(); i++)
   {
-    if(Xnew[i].hasNaN())
+    if (Xnew[i].hasNaN())
       return false;
   }
   return true;
@@ -233,15 +229,18 @@ bool LQRBuffer::detectXContinuity()
 {
   s_t err = 0;
   bool flag = true;
-  for(size_t i = 0; i < X.size()-1; i++)
+  for (size_t i = 0; i < X.size() - 1; i++)
   {
-    err = (X[i+1] - X[i]).lpNorm<Eigen::Infinity>();
-    if(err > 1.0)
+    err = (X[i + 1] - X[i]).lpNorm<Eigen::Infinity>();
+    if (err > 1.0)
     {
-      if(mVerbose)
+      if (mVerbose)
       {
-        std::cout << "State: \n" << X[i+1] << "\n" << X[i] << "\n" << i << std::endl;
-      }  
+        std::cout << "State: \n"
+                  << X[i + 1] << "\n"
+                  << X[i] << "\n"
+                  << i << std::endl;
+      }
       flag = false;
     }
   }
@@ -280,14 +279,15 @@ iLQRLocal::iLQRLocal(
     mRecordIterations(false),
     mPlanningHorizonMillis(planningHorizonMillis),
     mPlanningCandidateHorizonMillis(planningHorizonMillis),
-    mMillisPerStep(scale*1000 * world->getTimeStep()),
+    mMillisPerStep(scale * 1000 * world->getTimeStep()),
     mSteps((int)ceil((s_t)planningHorizonMillis / mMillisPerStep)),
     mMaxSteps(mSteps),
     mShotLength(50),
     mMaxIterations(5),
     mMillisInAdvanceToPlan(0),
     mLastOptimizedTime(0L),
-    mBuffer(RealTimeControlBuffer(nControls, mSteps, mMillisPerStep, world->getNumDofs() * 2)),
+    mBuffer(RealTimeControlBuffer(
+        nControls, mSteps, mMillisPerStep, world->getNumDofs() * 2)),
     mSilent(false),
     // Below are iLQR related information
     mAlpha_reset_value(0.2),
@@ -298,14 +298,20 @@ iLQRLocal::iLQRLocal(
     mDelta0(2.0),
     mDelta(2.0),
     mMU_MIN(1e-6),
-    mMU(100.*1e-6),
-    mMU_reset_value(100.*1e-6),
+    mMU(100. * 1e-6),
+    mMU_reset_value(100. * 1e-6),
     mCost(std::numeric_limits<s_t>::max()),
-    mlqrBuffer(LQRBuffer(mSteps, world->getNumDofs(), nControls, Extrapolate_Method::ZERO)),
+    mlqrBuffer(LQRBuffer(
+        mSteps, world->getNumDofs(), nControls, Extrapolate_Method::ZERO)),
     mLast_U(Eigen::VectorXs::Zero(nControls)),
     mActionDim(nControls),
     mStateDim(world->getNumDofs() * 2),
-    mRollout(createRollout(mSteps, world->getNumDofs(), world->getMassDims(), world->getDampingDims(), world->getSpringDims()))
+    mRollout(createRollout(
+        mSteps,
+        world->getNumDofs(),
+        world->getMassDims(),
+        world->getDampingDims(),
+        world->getSpringDims()))
 {
 }
 
@@ -314,7 +320,12 @@ void iLQRLocal::setPlanningHorizon(size_t planningHorizonMillis)
 {
   mSteps = (int)ceil((s_t)planningHorizonMillis / mMillisPerStep);
   mPlanningHorizonMillis = planningHorizonMillis;
-  mRollout = createRollout(mSteps, mWorld->getNumDofs(), mWorld->getMassDims(), mWorld->getDampingDims(), mWorld->getSpringDims());
+  mRollout = createRollout(
+      mSteps,
+      mWorld->getNumDofs(),
+      mWorld->getMassDims(),
+      mWorld->getDampingDims(),
+      mWorld->getSpringDims());
   mlqrBuffer.setNumSteps(mSteps);
 }
 
@@ -330,7 +341,8 @@ void iLQRLocal::setCostFn(std::shared_ptr<TargetReachingCost> costFn)
   mLoss = mCostFn->getLossFn();
 }
 
-void iLQRLocal::setMappedCostFn(std::shared_ptr<MappedTargetReachingCost> costFn)
+void iLQRLocal::setMappedCostFn(
+    std::shared_ptr<MappedTargetReachingCost> costFn)
 {
   mMappedCostFn = costFn;
   mLoss = mMappedCostFn->getLossFn();
@@ -349,8 +361,8 @@ std::shared_ptr<trajectory::Optimizer> iLQRLocal::getOptimizer()
   return mOptimizer;
 }
 
-/// This sets the problem that iLQRLocal will use. This will override the default
-/// problem. This should be called before start().
+/// This sets the problem that iLQRLocal will use. This will override the
+/// default problem. This should be called before start().
 void iLQRLocal::setProblem(std::shared_ptr<trajectory::Problem> problem)
 {
   mProblem = problem;
@@ -389,11 +401,11 @@ Eigen::VectorXs iLQRLocal::computeForce(Eigen::VectorXs state, long now)
   s_t alpha = getControlAlpha(now);
   Eigen::VectorXs stateErr = state - x;
   Eigen::VectorXs action;
-  if(stateErr.norm() < 0.1)
+  if (stateErr.norm() < 0.1)
   {
-    action = (u + alpha*k
-              + K * (state - x)
-              ).cwiseMin(mActionBound).cwiseMax(-mActionBound);
+    action = (u + alpha * k + K * (state - x))
+                 .cwiseMin(mActionBound)
+                 .cwiseMax(-mActionBound);
   }
   else
   {
@@ -401,7 +413,8 @@ Eigen::VectorXs iLQRLocal::computeForce(Eigen::VectorXs state, long now)
   }
   // Eigen::VectorXs action = u;
   // std::cout << "Last Time Buffer: " << mBuffer.getLastWriteBufferTime()
-  //           << " Law Buffer: " << mBuffer.getLastWriteBufferLawTime() <<" Action: " << a << std::endl;
+  //           << " Law Buffer: " << mBuffer.getLastWriteBufferLawTime() <<"
+  //           Action: " << a << std::endl;
   // std::cout << "State Error: \n" << stateErr << std::endl;
   // std::cout << "State: \n" << state << std::endl;
   // std::cout << "Hypothetical State: \n" << x << std::endl;
@@ -431,7 +444,6 @@ void iLQRLocal::setEnableLineSearch(bool enabled)
 {
   mEnableLinesearch = enabled;
 }
-
 
 void iLQRLocal::disableAdaptiveTime()
 {
@@ -468,8 +480,8 @@ int iLQRLocal::getMaxIterations()
 }
 
 /// This sets the current maximum number of iterations that IPOPT will be
-/// allowed to run during an optimization. iLQRLocal reserves the right to change
-/// this value during runtime depending on timing and performance values
+/// allowed to run during an optimization. iLQRLocal reserves the right to
+/// change this value during runtime depending on timing and performance values
 /// observed during running.
 void iLQRLocal::setMaxIterations(int maxIters)
 {
@@ -519,7 +531,7 @@ void iLQRLocal::optimizePlan(long startTime)
       ipoptOptimizer->setCheckDerivatives(false);
       ipoptOptimizer->setSuppressOutput(true);
       ipoptOptimizer->setRecoverBest(mEnableOptimizationGuards);
-      ipoptOptimizer->setTolerance(1e-3); //1e-3
+      ipoptOptimizer->setTolerance(1e-3); // 1e-3
       ipoptOptimizer->setIterationLimit(mMaxIterations);
       ipoptOptimizer->setDisableLinesearch(!mEnableLinesearch);
       ipoptOptimizer->setRecordFullDebugInfo(false);
@@ -543,20 +555,18 @@ void iLQRLocal::optimizePlan(long startTime)
     }
 
     PerformanceLog* optimizeTrack = log->startRun("Optimize");
-    //std::cout<<"MPC Optimization Start"<<std::endl;
+    // std::cout<<"MPC Optimization Start"<<std::endl;
     mSolution = mOptimizer->optimize(mProblem.get());
-    //std::cout<<"MPC Optimization end"<<std::endl;
+    // std::cout<<"MPC Optimization end"<<std::endl;
     optimizeTrack->end();
 
     mLastOptimizedTime = startTime;
 
     // Here mBuffer should have access to mapping of control force
-    Eigen::MatrixXs actions = worldClone->mapToActionSpace(mProblem->getRolloutCache(worldClone)->getControlForcesConst());
+    Eigen::MatrixXs actions = worldClone->mapToActionSpace(
+        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
     // No need to pad here automatically paded inside
-    mBuffer.setControlForcePlan(
-        startTime,
-        timeSinceEpochMillis(),
-        actions);
+    mBuffer.setControlForcePlan(startTime, timeSinceEpochMillis(), actions);
 
     log->end();
 
@@ -589,7 +599,8 @@ void iLQRLocal::optimizePlan(long startTime)
     mBuffer.estimateWorldStateAt(
         worldClone, &mObservationLog, roundedStartTime);
 
-    // Make sure that in the force buffer, the pointer of starting point is pointed to current
+    // Make sure that in the force buffer, the pointer of starting point is
+    // pointed to current
     mProblem->advanceSteps(
         worldClone,
         worldClone->getPositions(),
@@ -603,13 +614,12 @@ void iLQRLocal::optimizePlan(long startTime)
     // std::endl;
 
     // Update the control force plan from current time stamp.
-    // The new optimization problem is started at start time, however since the replanning
-    // Process take an non trivial amount of time, the force to be set is from now.
-    Eigen::MatrixXs actions = worldClone->mapToActionSpace(mProblem->getRolloutCache(worldClone)->getControlForcesConst());
-    mBuffer.setControlForcePlan(
-        startTime,
-        timeSinceEpochMillis(),
-        actions);
+    // The new optimization problem is started at start time, however since the
+    // replanning Process take an non trivial amount of time, the force to be
+    // set is from now.
+    Eigen::MatrixXs actions = worldClone->mapToActionSpace(
+        mProblem->getRolloutCache(worldClone)->getControlForcesConst());
+    mBuffer.setControlForcePlan(startTime, timeSinceEpochMillis(), actions);
 
     long computeDurationWallTime
         = timeSinceEpochMillis() - startComputeWallTime;
@@ -634,8 +644,9 @@ void iLQRLocal::optimizePlan(long startTime)
                 << " factor of safety), and it took us "
                 << computeDurationWallTime << "ms" << std::endl;
     }
-    // Here is when optimization finished, supposingly this time should equals to now
-    // And the real world can immediately get forced that has been planned
+    // Here is when optimization finished, supposingly this time should equals
+    // to now And the real world can immediately get forced that has been
+    // planned
     mLastOptimizedTime = roundedStartTime;
   }
 }
@@ -650,12 +661,18 @@ void iLQRLocal::optimizePlan(long startTime)
 /// it may cause serious problems accordingly
 void iLQRLocal::adjustPerformance(long lastOptimizeTimeMillis)
 {
-  mMillisInAdvanceToPlan = 1.2 * lastOptimizeTimeMillis;
-  std::cout << "Estimated Planning time: " << mMillisInAdvanceToPlan << "From: " << lastOptimizeTimeMillis << std::endl;
-  if (mMillisInAdvanceToPlan > 200)
-    mMillisInAdvanceToPlan = 200;
-  if(!mAdaptiveTime)
-    mMillisInAdvanceToPlan = 20; // Which will be problematic when facing the change of parameters
+  (void)lastOptimizeTimeMillis;
+  // mMillisInAdvanceToPlan = 1.2 * lastOptimizeTimeMillis;
+  // std::cout << "Estimated Planning time: " << mMillisInAdvanceToPlan <<
+  // "From: " << lastOptimizeTimeMillis << std::endl; if (mMillisInAdvanceToPlan
+  // > 200)
+  //   mMillisInAdvanceToPlan = 200;
+  // if(!mAdaptiveTime)
+  //   mMillisInAdvanceToPlan = 20; // Which will be problematic when facing the
+  //   change of parameters
+
+  mMillisInAdvanceToPlan
+      = 0; // Which will be problematic when facing the change of parameters
 }
 
 /// This starts our main thread and begins running optimizations
@@ -674,7 +691,8 @@ void iLQRLocal::ilqrstart()
     return;
   mRunning = true;
   // mBuffer.setiLQRFlag(true);
-  mOptimizationThread = std::thread(&iLQRLocal::iLQRoptimizationThreadLoop, this);
+  mOptimizationThread
+      = std::thread(&iLQRLocal::iLQRoptimizationThreadLoop, this);
 }
 
 /// This stops our main thread, waits for it to finish, and then returns
@@ -689,7 +707,7 @@ void iLQRLocal::stop()
 /// This stops our main thread, waits for it to finish, and then returns
 void iLQRLocal::ilqrstop()
 {
-  if(!mRunning)
+  if (!mRunning)
     return;
   mRunning = false;
   mOptimizationThread.join();
@@ -719,14 +737,13 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
   std::vector<Eigen::MatrixXs> Luu;
   std::vector<Eigen::MatrixXs> Lux;
 
-
-  while(mPatience > 0)
+  while (mPatience > 0)
   {
     // Reset Control Force
     // Let New State and control force equals to old one.
     // Which is equivalent to deep copy.
     mlqrBuffer.resetXUNew();
-    
+
     // set control force and initial condition
     world->setPositions(pos);
     world->setVelocities(vel);
@@ -735,7 +752,12 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
     mlqrBuffer.Xnew[0].segment(world->getNumDofs(), world->getNumDofs()) = vel;
 
     // Rollout Trajectory
-    TrajectoryRolloutReal rollout = createRollout(mSteps, world->getNumDofs(), world->getMassDims(), world->getDampingDims(), world->getSpringDims());
+    TrajectoryRolloutReal rollout = createRollout(
+        mSteps,
+        world->getNumDofs(),
+        world->getMassDims(),
+        world->getDampingDims(),
+        world->getSpringDims());
     s_t loss = 0;
 
     // Executing the trajectory according to control law
@@ -743,32 +765,32 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
 
     // Require states be stored in rollout
     // Assume loss except the final loss are multiplied by dt
-    if(mCostFn!=nullptr)
+    if (mCostFn != nullptr)
     {
-      Lx       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
-      Lu       = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
-      Lxx      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
-      Luu      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
-      Lux      = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
+      Lx = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
+      Lu = mCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
+      Lxx = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
+      Luu = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
+      Lux = mCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
     }
     else
     {
-      Lx       = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
-      Lu       = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
-      Lxx      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
-      Luu      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
-      Lux      = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
+      Lx = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::X);
+      Lu = mMappedCostFn->ilqrGradientEstimator(&rollout, loss, WRTFLAG::U);
+      Lxx = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::XX);
+      Luu = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UU);
+      Lux = mMappedCostFn->ilqrHessianEstimator(&rollout, WRTFLAG::UX);
     }
 
     // Sanity Check
-    if(!mlqrBuffer.validateXnew())
+    if (!mlqrBuffer.validateXnew())
     {
       mAlpha *= 0.5;
       mPatience--;
       mNaN_Flag = true;
       continue;
     }
-    else if((mCost - loss) < 0)
+    else if ((mCost - loss) < 0)
     {
       mAlpha *= 0.5;
       mPatience--;
@@ -777,7 +799,7 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
     }
     else // Good to leave, Guarantee the loss is lower than prev_cost
     {
-      mCost = loss; //Update cost with current loss
+      mCost = loss; // Update cost with current loss
       mPatience = mPatience_reset_value;
       mAlpha_opt = mAlpha;
       mAlpha = mAlpha_reset_value;
@@ -787,11 +809,11 @@ bool iLQRLocal::ilqrForward(simulation::WorldPtr world)
       break;
     }
   }
-  if(mPatience == 0)
+  if (mPatience == 0)
   {
-    // std::cout << "Forward Pass Run Out of Patience, exiting ..." << std::endl;
-    // The out of patience is due to nan
-    if(mNaN_Flag)
+    // std::cout << "Forward Pass Run Out of Patience, exiting ..." <<
+    // std::endl; The out of patience is due to nan
+    if (mNaN_Flag)
     {
       std::cout << "nan_detected" << std::endl;
       return false;
@@ -820,42 +842,52 @@ bool iLQRLocal::ilqrBackward()
   bool done = false;
   bool early_termination = false;
   // The loop should exit either done or early terminate
-  while(!(early_termination || done))
+  while (!(early_termination || done))
   {
     Eigen::VectorXs Vx = mlqrBuffer.Lx[mSteps];
-    Eigen::MatrixXs Vxx = mlqrBuffer.Lxx[mSteps];    
-    for(int cursor = mSteps - 1; cursor >= 0; cursor--)
+    Eigen::MatrixXs Vxx = mlqrBuffer.Lxx[mSteps];
+    for (int cursor = mSteps - 1; cursor >= 0; cursor--)
     {
       // Build up Q matrices
-      Eigen::VectorXs Qx = mlqrBuffer.Lx[cursor] +  mlqrBuffer.Fx[cursor].transpose() * Vx;
-      Eigen::VectorXs Qu = mlqrBuffer.Lu[cursor] +  mlqrBuffer.Fu[cursor].transpose() * Vx;
-      Eigen::MatrixXs Qxx = mlqrBuffer.Lxx[cursor] 
-                            + mlqrBuffer.Fx[cursor].transpose() * Vxx * mlqrBuffer.Fx[cursor];
-      Eigen::MatrixXs Qux = mlqrBuffer.Lux[cursor].transpose()
-                            + mlqrBuffer.Fu[cursor].transpose() * Vxx * mlqrBuffer.Fx[cursor];
-      Eigen::MatrixXs Quu = mlqrBuffer.Luu[cursor] 
-                            + mlqrBuffer.Fu[cursor].transpose() * Vxx * mlqrBuffer.Fu[cursor];
-      Eigen::MatrixXs I = Eigen::MatrixXs::Identity(Vxx.rows(),Vxx.cols());
-      Eigen::MatrixXs Quubar = mlqrBuffer.Luu[cursor] 
-                            + mlqrBuffer.Fu[cursor].transpose() * (Vxx + mMU * I) * mlqrBuffer.Fu[cursor];
-      Eigen::MatrixXs Quxbar = mlqrBuffer.Lux[cursor] 
-                            + (mlqrBuffer.Fu[cursor].transpose() * (Vxx + mMU * I) * mlqrBuffer.Fx[cursor]).transpose();
+      Eigen::VectorXs Qx
+          = mlqrBuffer.Lx[cursor] + mlqrBuffer.Fx[cursor].transpose() * Vx;
+      Eigen::VectorXs Qu
+          = mlqrBuffer.Lu[cursor] + mlqrBuffer.Fu[cursor].transpose() * Vx;
+      Eigen::MatrixXs Qxx
+          = mlqrBuffer.Lxx[cursor]
+            + mlqrBuffer.Fx[cursor].transpose() * Vxx * mlqrBuffer.Fx[cursor];
+      Eigen::MatrixXs Qux
+          = mlqrBuffer.Lux[cursor].transpose()
+            + mlqrBuffer.Fu[cursor].transpose() * Vxx * mlqrBuffer.Fx[cursor];
+      Eigen::MatrixXs Quu
+          = mlqrBuffer.Luu[cursor]
+            + mlqrBuffer.Fu[cursor].transpose() * Vxx * mlqrBuffer.Fu[cursor];
+      Eigen::MatrixXs I = Eigen::MatrixXs::Identity(Vxx.rows(), Vxx.cols());
+      Eigen::MatrixXs Quubar = mlqrBuffer.Luu[cursor]
+                               + mlqrBuffer.Fu[cursor].transpose()
+                                     * (Vxx + mMU * I) * mlqrBuffer.Fu[cursor];
+      Eigen::MatrixXs Quxbar = mlqrBuffer.Lux[cursor]
+                               + (mlqrBuffer.Fu[cursor].transpose()
+                                  * (Vxx + mMU * I) * mlqrBuffer.Fx[cursor])
+                                     .transpose();
       if (abs((Quubar).determinant()) < 1e-20)
       {
-        if(mPatience == 0)
+        if (mPatience == 0)
         {
           early_termination = true;
-          // If the Q matrix kept non-invertible then it should be treated as NaN
-          std::cout << "Regularize Patience limit met, exiting... " << std::endl;
+          // If the Q matrix kept non-invertible then it should be treated as
+          // NaN
+          std::cout << "Regularize Patience limit met, exiting... "
+                    << std::endl;
           break;
         }
         else
         {
-          std::cout << "Warning Singular Quu, iteration: "<< cursor 
-                    <<" -repeating backward pass with increased mu. Patience: "
-                    <<mPatience << "Matrix:\n " << Quu << std::endl;
+          std::cout << "Warning Singular Quu, iteration: " << cursor
+                    << " -repeating backward pass with increased mu. Patience: "
+                    << mPatience << "Matrix:\n " << Quu << std::endl;
           // Increase mu
-          if(mDelta * mDelta0 > mDelta0)
+          if (mDelta * mDelta0 > mDelta0)
           {
             mDelta *= mDelta0;
           }
@@ -863,7 +895,7 @@ bool iLQRLocal::ilqrBackward()
           {
             mDelta = mDelta0;
           }
-          if(mMU * mDelta > mMU_MIN)
+          if (mMU * mDelta > mMU_MIN)
           {
             mMU *= mDelta;
           }
@@ -878,41 +910,43 @@ bool iLQRLocal::ilqrBackward()
       else
       {
         // Compute K matrix
-        //std::cout << "Reached Correct Backward pass"<< cursor << std::endl;
+        // std::cout << "Reached Correct Backward pass"<< cursor << std::endl;
         Eigen::MatrixXs Quubar_inv = Quubar.inverse();
         mlqrBuffer.K[cursor] = -Quubar_inv * Quxbar.transpose();
         mlqrBuffer.k[cursor] = -Quubar_inv * Qu;
         // Update Vxx and Vx
-        Vx = Qx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.k[cursor] 
-                + mlqrBuffer.K[cursor].transpose() * Qu 
-                + Qux.transpose() * mlqrBuffer.k[cursor];
-        Vxx = Qxx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.K[cursor] 
-                  + mlqrBuffer.K[cursor].transpose() * Qux 
-                  + Qux.transpose() * mlqrBuffer.K[cursor];
-        if(cursor == 0)
+        Vx = Qx + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.k[cursor]
+             + mlqrBuffer.K[cursor].transpose() * Qu
+             + Qux.transpose() * mlqrBuffer.k[cursor];
+        Vxx = Qxx
+              + mlqrBuffer.K[cursor].transpose() * Quu * mlqrBuffer.K[cursor]
+              + mlqrBuffer.K[cursor].transpose() * Qux
+              + Qux.transpose() * mlqrBuffer.K[cursor];
+        if (cursor == 0)
           done = true;
       }
     }
   }
   mPatience = mPatience_reset_value;
-  // The only reason for early termination is that the backward process is keep getting NaN
-  if(early_termination)
+  // The only reason for early termination is that the backward process is keep
+  // getting NaN
+  if (early_termination)
   {
     mNaN_Flag = true;
     return false;
   }
   // Progress Delta for next iteration
   // Decrease mu
-  if(1.0/mDelta0 > mDelta / mDelta0)
+  if (1.0 / mDelta0 > mDelta / mDelta0)
   {
     mDelta /= mDelta0;
   }
   else
   {
-    mDelta = 1.0/mDelta0;
+    mDelta = 1.0 / mDelta0;
   }
 
-  if(mMU * mDelta > mMU_MIN)
+  if (mMU * mDelta > mMU_MIN)
   {
     mMU = mMU * mDelta;
   }
@@ -927,30 +961,37 @@ bool iLQRLocal::ilqrBackward()
 /// This function rollout the trajectory and save all the Jacobians to Buffer
 /// as well as record the loss
 /// This function automatically update the trajectory
-void iLQRLocal::getTrajectory(simulation::WorldPtr world,
-                              TrajectoryRollout* rollout,
-                              LQRBuffer* lqrBuffer)
+void iLQRLocal::getTrajectory(
+    simulation::WorldPtr world,
+    TrajectoryRollout* rollout,
+    LQRBuffer* lqrBuffer)
 {
   // Need to store the state and actions in rollout
   Eigen::MatrixXs actions = Eigen::MatrixXs::Zero(mActionDim, mSteps);
-  for(int i = 0; i < mSteps; i++)
+  for (int i = 0; i < mSteps; i++)
   {
     // Compute New actions
-    lqrBuffer->Unew[i] = (lqrBuffer->Unew[i] + mAlpha * lqrBuffer->k[i]
-                         + lqrBuffer->K[i] * (lqrBuffer->Xnew[i] - lqrBuffer->X[i])).cwiseMin(mActionBound).cwiseMax(-mActionBound);
+    lqrBuffer->Unew[i]
+        = (lqrBuffer->Unew[i] + mAlpha * lqrBuffer->k[i]
+           + lqrBuffer->K[i] * (lqrBuffer->Xnew[i] - lqrBuffer->X[i]))
+              .cwiseMin(mActionBound)
+              .cwiseMax(-mActionBound);
     // Record state and action on rollout
     // TODO: Need to make this robot skeleton
     rollout->getPoses().col(i) = world->getPositions();
     rollout->getVels().col(i) = world->getVelocities();
     actions.col(i) = lqrBuffer->Unew[i];
-    
+
     // Set the control force just computed from control law
     world->setAction(actions.col(i));
     // Step the world
-    std::shared_ptr<neural::BackpropSnapshot> snapshot = neural::forwardPass(world, false);
+    std::shared_ptr<neural::BackpropSnapshot> snapshot
+        = neural::forwardPass(world, false);
     // set new state
-    lqrBuffer->Xnew[i+1].segment(0, world->getNumDofs()) = snapshot->getPostStepPosition();
-    lqrBuffer->Xnew[i+1].segment(world->getNumDofs(), world->getNumDofs()) = snapshot->getPostStepVelocity();
+    lqrBuffer->Xnew[i + 1].segment(0, world->getNumDofs())
+        = snapshot->getPostStepPosition();
+    lqrBuffer->Xnew[i + 1].segment(world->getNumDofs(), world->getNumDofs())
+        = snapshot->getPostStepVelocity();
     // set new Jacobian for linearization
     lqrBuffer->Fx[i] = world->getStateJacobian();
     // Need to reassemble the matrix by actuated dofs
@@ -970,16 +1011,17 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
     startTime = mLastOptimizedTime;
   }
   // Get action from mBuffer according to time
-  if(mPlanningCandidateHorizonMillis!=mPlanningHorizonMillis)
+  if (mPlanningCandidateHorizonMillis != mPlanningHorizonMillis)
   {
     setPlanningHorizon(mPlanningCandidateHorizonMillis);
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
-    std::cout << "Horizon Changed! " << mPlanningCandidateHorizonMillis <<std::endl;
+    std::cout << "Horizon Changed! " << mPlanningCandidateHorizonMillis
+              << std::endl;
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
   }
   mCost = std::numeric_limits<s_t>::max();
   mlqrBuffer.readNewActionPlan(startTime, mBuffer);
-  
+
   // Copy the world
   std::shared_ptr<simulation::World> worldClone = mWorld->clone();
 
@@ -989,12 +1031,12 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
   s_t last_cost = mCost;
   // This Process takes non trivial amount of time
   // By the time is finished or failed the real world has taken lots of steps
-  for(int iter = 0; iter < mMaxIterations; iter++)
+  for (int iter = 0; iter < mMaxIterations; iter++)
   {
     // This function will forward world to the current point
     mBuffer.estimateWorldStateAt(worldClone, &mObservationLog, startTime);
     forward_flag = ilqrForward(worldClone);
-    if(!forward_flag || iter == mMaxIterations - 1)
+    if (!forward_flag || iter == mMaxIterations - 1)
     {
       break;
     }
@@ -1002,32 +1044,32 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
     {
       backward_flag = ilqrBackward();
     }
-    
-    if(!backward_flag)
+
+    if (!backward_flag)
     {
       std::cout << "Backward Terminated, Exiting ..." << std::endl;
       break;
     }
-    if(abs(last_cost - mCost) <= mTolerence)
+    if (abs(last_cost - mCost) <= mTolerence)
     {
       break;
     }
   }
-  // Here inside the forward loop there actually mechanism which guarantee, the cost
-  // function should always decrease for MPC since the trajectory may be different and starting
-  // state is different, it may not be the case
-  // we need to enable mechanism that each optimization it will return the correspoding control laws
-  // that have lowest cost, and across optimization the lowest cost will be reset
-  // Hence in this case:
-  // If NaN detected in forward pass or non-invertible matrix detected in backward pass, the system
-  // need to be helted since the simulator has already crashed...
-  // If the forward pass the cost does not decay it should break the iteration whlie not executing the
+  // Here inside the forward loop there actually mechanism which guarantee, the
+  // cost function should always decrease for MPC since the trajectory may be
+  // different and starting state is different, it may not be the case we need
+  // to enable mechanism that each optimization it will return the correspoding
+  // control laws that have lowest cost, and across optimization the lowest cost
+  // will be reset Hence in this case: If NaN detected in forward pass or
+  // non-invertible matrix detected in backward pass, the system need to be
+  // helted since the simulator has already crashed... If the forward pass the
+  // cost does not decay it should break the iteration whlie not executing the
   // backward pass.
-  if(!mNaN_Flag)
+  if (!mNaN_Flag)
   {
     // Update the mBuffer according to current time
     bool flag = mlqrBuffer.detectXContinuity();
-    if(!flag && mlqrBuffer.getVerbose())
+    if (!flag && mlqrBuffer.getVerbose())
     {
       std::cout << "=====================" << std::endl;
       std::cout << "X is not Continuous!!" << std::endl;
@@ -1042,7 +1084,8 @@ bool iLQRLocal::ilqroptimizePlan(long startTime)
     mDelta = mDelta0;
     mAlpha = mAlpha_reset_value;
     // Invoke callback functions
-    long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
+    long computeDurationWallTime
+        = timeSinceEpochMillis() - startComputeWallTime;
     // Here mRollout is the last valid rollout from forward pass
     for (auto listener : mReplannedListeners)
     {
@@ -1091,12 +1134,17 @@ s_t iLQRLocal::getMU()
   return mMU;
 }
 
-TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t mass_dim, size_t damping_dim, size_t spring_dim)
+TrajectoryRolloutReal iLQRLocal::createRollout(
+    size_t steps,
+    size_t dofs,
+    size_t mass_dim,
+    size_t damping_dim,
+    size_t spring_dim)
 {
-  Eigen::MatrixXs pos = Eigen::MatrixXs::Zero(dofs, steps+1);
+  Eigen::MatrixXs pos = Eigen::MatrixXs::Zero(dofs, steps + 1);
   std::unordered_map<std::string, Eigen::MatrixXs> pos_map;
   pos_map.emplace("identity", pos);
-  Eigen::MatrixXs vel = Eigen::MatrixXs::Zero(dofs, steps+1);
+  Eigen::MatrixXs vel = Eigen::MatrixXs::Zero(dofs, steps + 1);
   std::unordered_map<std::string, Eigen::MatrixXs> vel_map;
   vel_map.emplace("identity", vel);
   Eigen::MatrixXs forces = Eigen::MatrixXs::Zero(dofs, steps);
@@ -1106,7 +1154,8 @@ TrajectoryRolloutReal iLQRLocal::createRollout(size_t steps, size_t dofs, size_t
   Eigen::VectorXs damping = Eigen::VectorXs::Zero(damping_dim);
   Eigen::VectorXs spring = Eigen::VectorXs::Zero(spring_dim);
   std::unordered_map<std::string, Eigen::MatrixXs> meta;
-  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(pos_map, vel_map, force_map, mass, damping, spring, meta);
+  TrajectoryRolloutReal rollout = TrajectoryRolloutReal(
+      pos_map, vel_map, force_map, mass, damping, spring, meta);
   return rollout;
 }
 
@@ -1125,13 +1174,15 @@ Eigen::VectorXs iLQRLocal::getControlState(long now)
   return mBuffer.getPlannedState(now);
 }
 
-void iLQRLocal::setTargetReachingCostFn(std::shared_ptr<TargetReachingCost> costFn)
+void iLQRLocal::setTargetReachingCostFn(
+    std::shared_ptr<TargetReachingCost> costFn)
 {
   mCostFn = costFn;
   mLoss = costFn->getLossFn();
 }
 
-/// Set action hard bound that any action computed by control law will be clipped to this.
+/// Set action hard bound that any action computed by control law will be
+/// clipped to this.
 void iLQRLocal::setActionBound(s_t actionBound)
 {
   assert(actionBound >= 0);
@@ -1148,11 +1199,11 @@ Eigen::MatrixXs iLQRLocal::assembleJacobianMatrix(Eigen::MatrixXs B)
 {
   size_t ndim = mActuatedJoint.size();
   Eigen::MatrixXs Bnew = Eigen::MatrixXs::Zero(ndim, ndim);
-  for(size_t i = 0; i < Bnew.cols(); i++)
+  for (size_t i = 0; i < Bnew.cols(); i++)
   {
-    for(size_t j = 0; j < Bnew.cols(); j++)
+    for (size_t j = 0; j < Bnew.cols(); j++)
     {
-      Bnew(i,j) = B((size_t)mActuatedJoint(i),(size_t)mActuatedJoint(j));
+      Bnew(i, j) = B((size_t)mActuatedJoint(i), (size_t)mActuatedJoint(j));
     }
   }
   return Bnew;
@@ -1305,7 +1356,8 @@ void iLQRLocal::optimizationThreadLoop()
     long startTime = timeSinceEpochMillis();
     optimizePlan(startTime + mMillisInAdvanceToPlan);
     long endTime = timeSinceEpochMillis();
-    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
+    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 <<
+    // std::endl;
     adjustPerformance(endTime - startTime);
   }
 }
@@ -1321,19 +1373,20 @@ void iLQRLocal::iLQRoptimizationThreadLoop()
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
 
-  while(mRunning)
+  while (mRunning)
   {
     long startTime = timeSinceEpochMillis();
     bool status = ilqroptimizePlan(startTime + mMillisInAdvanceToPlan);
-    //std::cout << "Planning Continue..." << std::endl;
-    if(!status)
+    // std::cout << "Planning Continue..." << std::endl;
+    if (!status)
     {
       std::cout << "Simulator Crashed by giving NaN..." << std::endl;
       // mRunning = false;
       // break;
     }
     long endTime = timeSinceEpochMillis();
-    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 << std::endl;
+    // std::cout <<"Time Per Run: "<< (float)(endTime - startTime)/1000 <<
+    // std::endl;
     adjustPerformance(endTime - startTime);
   }
 }
@@ -1345,7 +1398,7 @@ bool iLQRLocal::variableChange()
 
 void iLQRLocal::setParameterChange(Eigen::VectorXs params)
 {
-  if(mInitialized == false)
+  if (mInitialized == false)
   {
     mPre_parameter = params;
     mInitialized = true;
@@ -1354,7 +1407,7 @@ void iLQRLocal::setParameterChange(Eigen::VectorXs params)
   else
   {
     assert(params.size() == mPre_parameter.size());
-    if((params-mPre_parameter).norm()>0.001)
+    if ((params - mPre_parameter).norm() > 0.001)
     {
       mVarchange = true;
     }
