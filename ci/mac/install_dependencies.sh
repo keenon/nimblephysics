@@ -13,7 +13,7 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="12.0"
+export MACOSX_DEPLOYMENT_TARGET="15.0"
 export CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
 
 export PYTHON3=$(which python3)
@@ -52,7 +52,7 @@ pushd libccd
 git checkout v2.1
 mkdir build
 pushd build
-cmake .. -DENABLE_DOUBLE_PRECISION=ON
+cmake .. -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15"
 sudo make install -j
 popd
 popd
@@ -249,6 +249,7 @@ mkdir -p cmake/build
 pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15" \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
       $CMAKE_FLAGS \
       ../..
