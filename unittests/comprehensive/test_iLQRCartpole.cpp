@@ -282,18 +282,18 @@ TEST(REALTIME, CARTPOLE_MPC)
   world->setTimeStep(1.0 / 100);
 
   int millisPerTimestep = world->getTimeStep() * 1000;
-  int planningHorizonMillis = 500 * millisPerTimestep;
+  int planningHorizonMillis = 200 * millisPerTimestep;
 
   world->removeDofFromActionSpace(1);
   // Create Goal
   Eigen::VectorXs runningStateWeight = Eigen::VectorXs::Zero(2 * 2);
   Eigen::VectorXs runningActionWeight = Eigen::VectorXs::Zero(1);
   Eigen::VectorXs finalStateWeight = Eigen::VectorXs::Zero(2 * 2);
-  finalStateWeight(0) = 10.0;
+  finalStateWeight(0) = 0.0;
   finalStateWeight(1) = 50.0;
   finalStateWeight(2) = 50.0;
   finalStateWeight(3) = 50.0;
-  runningStateWeight(0) = 0.1;
+  runningStateWeight(0) = 0.0;
   runningStateWeight(1) = 0.5;
   runningStateWeight(2) = 0.01;
   runningStateWeight(3) = 0.01;
@@ -316,7 +316,7 @@ TEST(REALTIME, CARTPOLE_MPC)
   mpcLocal.setMaxIterations(20);
   mpcLocal.setEnableLineSearch(true);
   mpcLocal.setEnableOptimizationGuards(true);
-  mpcLocal.setPredictUsingFeedback(false);
+  mpcLocal.setPredictUsingFeedback(true);
   mpcLocal.setPatience(3);
   mpcLocal.setActionBound(20.0);
   mpcLocal.setAlpha(1);
@@ -342,39 +342,46 @@ TEST(REALTIME, CARTPOLE_MPC)
         // end drag
       });
   std::cout << "Reach Here Before Ticker" << std::endl;
-  Ticker ticker = Ticker(2 * realtimeUnderlyingWorld->getTimeStep());
+  Ticker ticker = Ticker(1 * realtimeUnderlyingWorld->getTimeStep());
 
   auto sledBodyVisual = realtimeUnderlyingWorld->getSkeleton("cartpole")
                             ->getBodyNodes()[0]
                             ->getShapeNodesWith<VisualAspect>()[0]
                             ->getVisualAspect();
-  Eigen::Vector3s originalColor = sledBodyVisual->getColor();
-  long total_steps = 0;
+  Eigen::Vector4s originalColor = Eigen::Vector4s::Ones();
+  originalColor.head<3>() = sledBodyVisual->getColor();
+  Eigen::Vector4s cartpoleColor = originalColor;
   ticker.registerTickListener([&](long now) {
     Eigen::VectorXs mpcforces
         = mpcLocal.computeForce(realtimeUnderlyingWorld->getState(), now);
     std::cout << "Force:\n" << mpcforces << std::endl;
     // Eigen::VectorXs mpcforces = mpcLocal.getControlForce(now);
     realtimeUnderlyingWorld->setControlForces(mpcforces);
+    std::cout << "Keys Down: ";
+    for (auto key : server.getKeysDown())
+    {
+      std::cout << key << " ";
+    }
+    std::cout << std::endl;
     if (server.getKeysDown().count("a"))
     {
       Eigen::VectorXs perturbedForces
           = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = -15.0;
+      perturbedForces(1) = -5.0;
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
-      sledBodyVisual->setColor(Eigen::Vector3s(1, 0, 0));
+      cartpoleColor = Eigen::Vector4s(1, 0, 0, 1.0);
     }
     else if (server.getKeysDown().count("e"))
     {
       Eigen::VectorXs perturbedForces
           = realtimeUnderlyingWorld->getControlForces();
-      perturbedForces(0) = 15.0;
+      perturbedForces(1) = 5.0;
       realtimeUnderlyingWorld->setControlForces(perturbedForces);
-      sledBodyVisual->setColor(Eigen::Vector3s(0, 1, 0));
+      cartpoleColor = Eigen::Vector4s(0, 1, 0, 1.0);
     }
     else
     {
-      sledBodyVisual->setColor(originalColor);
+      cartpoleColor = originalColor;
     }
     realtimeUnderlyingWorld->step();
     mpcLocal.recordGroundTruthState(
@@ -383,12 +390,16 @@ TEST(REALTIME, CARTPOLE_MPC)
         realtimeUnderlyingWorld->getVelocities(),
         realtimeUnderlyingWorld->getMasses());
 
-    if (total_steps % 5 == 0)
-    {
-      server.renderWorld(realtimeUnderlyingWorld);
-      total_steps = 0;
-    }
-    total_steps++;
+    server.renderWorld(realtimeUnderlyingWorld);
+    // This is coloring the base
+    // server.setObjectColor("world_cartpole_BodyNode_0", cartpoleColor);
+    // This is coloring the arm
+    server.setObjectColor("world_cartpole_BodyNode(1)_0", cartpoleColor);
+    // if (total_steps % 1 == 0)
+    // {
+    //   total_steps = 0;
+    // }
+    // total_steps++;
   });
 
   // Should only work when trajectory opt
