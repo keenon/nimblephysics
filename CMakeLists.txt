@@ -13,7 +13,6 @@ project(dart)
 
 # Add this to enable asserts in Release mode
 # add_definitions(-UNDEBUG)
-
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPERCASE)
 
 # Use MACOSX_RPATH by default on OS X. This was added in CMake 2.8.12 and
@@ -262,10 +261,6 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
   if(CLANG_VERSION VERSION_LESS 3.8)
     message(FATAL_ERROR "The installed Clang version is ${CLANG_VERSION}. ${PROJECT_NAME} requires clang 3.8 or greater.")
-  endif()
-
-  if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   endif()
 
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
