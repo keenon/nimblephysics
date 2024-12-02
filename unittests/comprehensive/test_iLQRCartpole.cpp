@@ -293,6 +293,10 @@ TEST(REALTIME, CARTPOLE_MPC)
   finalStateWeight(1) = 50.0;
   finalStateWeight(2) = 50.0;
   finalStateWeight(3) = 50.0;
+  runningStateWeight(0) = 0.1;
+  runningStateWeight(1) = 0.5;
+  runningStateWeight(2) = 0.01;
+  runningStateWeight(3) = 0.01;
   runningActionWeight(0) = 0.01;
 
   std::shared_ptr<TargetReachingCost> costFn
@@ -309,8 +313,8 @@ TEST(REALTIME, CARTPOLE_MPC)
 
   mpcLocal.setCostFn(costFn);
   mpcLocal.setSilent(true);
-  mpcLocal.setMaxIterations(5);
-  mpcLocal.setEnableLineSearch(false);
+  mpcLocal.setMaxIterations(20);
+  mpcLocal.setEnableLineSearch(true);
   mpcLocal.setEnableOptimizationGuards(true);
   mpcLocal.setPredictUsingFeedback(false);
   mpcLocal.setPatience(3);
