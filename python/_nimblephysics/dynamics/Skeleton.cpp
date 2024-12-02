@@ -1501,6 +1501,16 @@ This returns the Jacobian relating changes in the magnetic field to changes in m
           ::py::arg("localOffset"),
           ::py::arg("inCoordinatesOf"))
       .def(
+          "getWorldPositionJacobian",
+          +[](const dart::dynamics::Skeleton* self,
+              const dart::dynamics::JacobianNode* _node,
+              const Eigen::Vector3s& _localOffset
+              = Eigen::Vector3s::Zero()) -> dart::math::Jacobian {
+            return self->getWorldPositionJacobian(_node, _localOffset);
+          },
+          ::py::arg("node"),
+          ::py::arg("localOffset") = Eigen::Vector3s::Zero())
+      .def(
           "getWorldJacobian",
           +[](const dart::dynamics::Skeleton* self,
               const dart::dynamics::JacobianNode* _node)

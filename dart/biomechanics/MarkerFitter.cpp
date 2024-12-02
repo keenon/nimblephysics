@@ -407,7 +407,7 @@ Eigen::VectorXs MarkerFitterState::flattenGradient()
 }
 
 //==============================================================================
-BilevelFitResult::BilevelFitResult() : success(false){};
+BilevelFitResult::BilevelFitResult() : success(false) {};
 
 //==============================================================================
 InitialMarkerFitParams::InitialMarkerFitParams()
@@ -3398,6 +3398,27 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
   }
   */
 
+  if (params.groupScales.hasNaN())
+  {
+    std::cout << "ERROR: Group scales have NaNs!" << std::endl;
+  }
+  if (params.jointCenters.hasNaN())
+  {
+    std::cout << "ERROR: Joint centers have NaNs!" << std::endl;
+  }
+  if (params.jointAxis.hasNaN())
+  {
+    std::cout << "ERROR: Joint axes have NaNs!" << std::endl;
+  }
+  if (params.axisWeights.hasNaN())
+  {
+    std::cout << "ERROR: Axis weights have NaNs!" << std::endl;
+  }
+  if (params.jointWeights.hasNaN())
+  {
+    std::cout << "ERROR: Joint weights have NaNs!" << std::endl;
+  }
+
   result.groupScales = params.groupScales;
   result.joints = params.joints;
   result.jointCenters = params.jointCenters;
@@ -3413,6 +3434,11 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
     std::string name = mMarkerNames[i];
     if (solution->markerOffsets.count(name))
     {
+      if (solution->markerOffsets[name].hasNaN())
+      {
+        std::cout << "ERROR: Solution marker offset for " << name
+                  << " has NaNs!" << std::endl;
+      }
       result.updatedMarkerMap[name]
           = std::pair<dynamics::BodyNode*, Eigen::Vector3s>(
               mMarkerMap[name].first,
@@ -3448,10 +3474,22 @@ MarkerInitialization MarkerFitter::completeBilevelResult(
       Eigen::Vector3s localOffset
           = (marker.first->getWorldTransform().inverse() * worldPosition)
                 .cwiseQuotient(marker.first->getScale());
-      Eigen::Vector3s netOffset = localOffset - marker.second;
+      if (localOffset.hasNaN())
+      {
+        std::cout << "WARN: Local offset for " << name << " has NaNs on frame "
+                  << i << " with body scale "
+                  << marker.first->getScale().transpose()
+                  << ", ignoring this frame during computation of centered "
+                     "marker offsets"
+                  << std::endl;
+      }
+      if (!localOffset.hasNaN())
+      {
+        Eigen::Vector3s netOffset = localOffset - marker.second;
 
-      markerObservationsSum[name] += netOffset;
-      markerNumObservations[name]++;
+        markerObservationsSum[name] += netOffset;
+        markerNumObservations[name]++;
+      }
     }
   }
   mSkeleton->setPositions(originalPos);

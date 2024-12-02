@@ -42,6 +42,7 @@ void Geometry(py::module& sm);
 void MultivariateGaussian(py::module& sm);
 void GraphFlowDiscretizer(py::module& sm);
 void PolynomialFitter(py::module& sm);
+void RelativeFilter(py::module& sm);
 
 py::module dart_math(py::module& m)
 {
@@ -52,6 +53,7 @@ py::module dart_math(py::module& m)
   MultivariateGaussian(sm);
   GraphFlowDiscretizer(sm);
   PolynomialFitter(sm);
+  RelativeFilter(sm);
 
   return sm;
 }

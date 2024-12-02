@@ -18,6 +18,7 @@ __all__ = [
     "PolynomialFitter",
     "Quaternion",
     "Random",
+    "RelativeFilter",
     "dAdInvT",
     "dAdT",
     "distancePointToConvexHull2D",
@@ -236,6 +237,56 @@ class Random():
     def setSeed(seed: int) -> None: ...
     @staticmethod
     def uniform(min: float, max: float) -> float: ...
+    pass
+class RelativeFilter():
+    def __init__(self, acc_std: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0.05, 0.05, 0.05]), gyro_std: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0.05, 0.05, 0.05]), mag_std: numpy.ndarray[numpy.float64, _Shape[3, 1]] = array([0.05, 0.05, 0.05])) -> None: ...
+    def get_H_jacobian(self, R_wp: numpy.ndarray[numpy.float64, _Shape[3, 3]], R_wc: numpy.ndarray[numpy.float64, _Shape[3, 3]], acc_jc_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], acc_jc_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_jc_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_jc_c: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
+        """
+        Compute the Jacobian of the measurement function h.
+        """
+    def get_M_jacobian(self, R_wp: numpy.ndarray[numpy.float64, _Shape[3, 3]], R_wc: numpy.ndarray[numpy.float64, _Shape[3, 3]], update: numpy.ndarray[numpy.float64, _Shape[6, 1]] = array([0., 0., 0., 0., 0., 0.])) -> numpy.ndarray[numpy.float64, _Shape[m, n]]: 
+        """
+        Compute the Jacobian of the measurement function for sensor noise.
+        """
+    def get_R_pc(self) -> numpy.ndarray[numpy.float64, _Shape[3, 3]]: 
+        """
+        Get the rotation matrix representing the relative rotation between parent and child.
+        """
+    def get_h(self, R_wp: numpy.ndarray[numpy.float64, _Shape[3, 3]], R_wc: numpy.ndarray[numpy.float64, _Shape[3, 3]], acc_jc_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], acc_jc_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_jc_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_jc_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], perturbation: numpy.ndarray[numpy.float64, _Shape[6, 1]] = array([0., 0., 0., 0., 0., 0.])) -> numpy.ndarray[numpy.float64, _Shape[m, 1]]: 
+        """
+        Compute the measurement function h with optional perturbations.
+        """
+    def get_q_pc(self) -> Quaternion: 
+        """
+        Get the quaternion representing the relative rotation between parent and child.
+        """
+    def set_qs(self, q_wp: Quaternion, q_wc: Quaternion) -> None: 
+        """
+        Set the quaternions for parent and child.
+        """
+    @staticmethod
+    def skew_symmetric(v: numpy.ndarray[numpy.float64, _Shape[3, 1]]) -> numpy.ndarray[numpy.float64, _Shape[3, 3]]: 
+        """
+        Compute the skew-symmetric matrix for a given 3D vector.
+        """
+    def update(self, gyro_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], gyro_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], acc_jc_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], acc_jc_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_p: numpy.ndarray[numpy.float64, _Shape[3, 1]], mag_c: numpy.ndarray[numpy.float64, _Shape[3, 1]], dt: float) -> None: 
+        """
+        Update the filter with new sensor readings and timestep.
+        """
+    @property
+    def Q(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        Covariance matrix for gyro sensor noise.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
+    @property
+    def R(self) -> numpy.ndarray[numpy.float64, _Shape[m, n]]:
+        """
+        Covariance matrix for accelerometer and magnetometer sensor noise.
+
+        :type: numpy.ndarray[numpy.float64, _Shape[m, n]]
+        """
     pass
 def AdR(R: numpy.ndarray[numpy.float64, _Shape[3, 3]], S: numpy.ndarray[numpy.float64, _Shape[6, 1]]) -> numpy.ndarray[numpy.float64, _Shape[6, 1]]:
     pass
