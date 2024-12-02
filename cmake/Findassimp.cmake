@@ -27,15 +27,9 @@ find_path(ASSIMP_INCLUDE_DIRS assimp/scene.h
 # Libraries
 if(MSVC)
   set(ASSIMP_LIBRARIES "assimp$<$<CONFIG:Debug>:d>")
-
-  # Add IrrXML library for MSVC if necessary
-  set(IRRXML_LIBRARIES "IrrXML$<$<CONFIG:Debug>:d>")
 else()
   find_library(ASSIMP_LIBRARIES
     NAMES assimp
-    HINTS /usr/local/lib ${PC_ASSIMP_LIBDIR})
-  find_library(IRRXML_LIBRARIES
-    NAMES IrrXML
     HINTS /usr/local/lib ${PC_ASSIMP_LIBDIR})
 endif()
 
@@ -55,5 +49,5 @@ set(ASSIMP_VERSION ${PC_ASSIMP_VERSION})
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(assimp
   FAIL_MESSAGE DEFAULT_MSG
-  REQUIRED_VARS ASSIMP_INCLUDE_DIRS ASSIMP_LIBRARIES IRRXML_LIBRARIES
+  REQUIRED_VARS ASSIMP_INCLUDE_DIRS ASSIMP_LIBRARIES
   VERSION_VAR ASSIMP_VERSION)
